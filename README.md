@@ -24,6 +24,12 @@ This project is based upon the [Python version of the same name](https://github.
 *   **Database:** SQLite (`src/game.db`)
 *   **AI:** OpenAI API (e.g., `gpt-4o`)
 
+The following images shows the chat interface of DungeonGPT:
+
+![Character Creation](./screenshots/character_creator.png)
+![Chat Interface](./screenshots/chat_interface.png)
+
+
 ## Setup and Installation
 
 1.  **Clone the repository:**
