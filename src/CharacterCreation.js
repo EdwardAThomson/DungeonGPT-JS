@@ -8,17 +8,24 @@ import CharacterContext from "./CharacterContext";
 
 
 const profilePictures = [
-  // images are in the Public directory (not src).
-  { imageId: 1, src: "barbarian.png" },
-  { imageId: 2, src: "wizard.png" },
-  { imageId: 3, src: "ranger.png" },
-  { imageId: 4, src: "paladin.png" },
-  { imageId: 5, src: "cleric.png" },
-  { imageId: 6, src: "bard.png" },
-  { imageId: 7, src: "fighter.png" },
-  { imageId: 8, src: "druid.png" },
-
-  // ...
+  // Male portraits
+  { imageId: 1, src: "barbarian.png", gender: "Male" },
+  { imageId: 2, src: "wizard.png", gender: "Male" },
+  { imageId: 3, src: "ranger.png", gender: "Male" },
+  { imageId: 4, src: "paladin.png", gender: "Male" },
+  { imageId: 5, src: "cleric.png", gender: "Male" },
+  { imageId: 6, src: "bard.png", gender: "Male" },
+  { imageId: 7, src: "fighter.png", gender: "Male" },
+  { imageId: 8, src: "druid.png", gender: "Male" },
+  // Female portraits
+  { imageId: 9, src: "female_barbarian.png", gender: "Female" },
+  { imageId: 10, src: "female_wizard.png", gender: "Female" },
+  { imageId: 11, src: "female_ranger.png", gender: "Female" },
+  { imageId: 12, src: "female_paladin.png", gender: "Female" },
+  { imageId: 13, src: "female_cleric.png", gender: "Female" },
+  { imageId: 14, src: "female_bard.png", gender: "Female" },
+  { imageId: 15, src: "female_fighter.png", gender: "Female" },
+  { imageId: 16, src: "female_druid.png", gender: "Female" },
 ];
 
 const characterGenders = ["Male", "Female"];
@@ -167,7 +174,16 @@ const CharacterCreation = () => {
   };
 
   const handleGenderChange = (e) => {
-    setSelectedGender(e.target.value);
+    const newGender = e.target.value;
+    setSelectedGender(newGender);
+    
+    // Clear profile picture if it doesn't match the new gender
+    if (selectedProfilePicture) {
+      const currentPic = profilePictures.find(pic => pic.src === selectedProfilePicture);
+      if (currentPic && currentPic.gender !== newGender) {
+        setSelectedProfilePicture(null);
+      }
+    }
   };
 
   const handleRaceChange = (e) => {
@@ -316,19 +332,21 @@ const CharacterCreation = () => {
         <div className="form-section profile-pictures">
           <label>Profile Picture:</label>
           <div className="picture-options">
-            {profilePictures.map((pic) => (
-              <label key={pic.imageId} className={selectedProfilePicture === pic.src ? 'selected' : ''}>
-                <input
-                  type="radio"
-                  name="profilePicture"
-                  value={pic.src}
-                  checked={selectedProfilePicture === pic.src}
-                  onChange={handleProfilePictureChange}
-                  required
-                />
-                <img src={pic.src} alt={`Profile ${pic.imageId}`} />
-              </label>
-            ))}
+            {profilePictures
+              .filter(pic => !selectedGender || pic.gender === selectedGender)
+              .map((pic) => (
+                <label key={pic.imageId} className={selectedProfilePicture === pic.src ? 'selected' : ''}>
+                  <input
+                    type="radio"
+                    name="profilePicture"
+                    value={pic.src}
+                    checked={selectedProfilePicture === pic.src}
+                    onChange={handleProfilePictureChange}
+                    required
+                  />
+                  <img src={pic.src} alt={`Profile ${pic.imageId}`} />
+                </label>
+              ))}
           </div>
         </div>
       </div> {/* End Top Container */}

@@ -680,6 +680,16 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   margin-bottom: 0; /* No extra space below */
 }
 
+/* Session info styling */
+.session-info {
+  text-align: center;
+  font-size: 0.7rem; /* Slightly smaller than model info */
+  color: #aaa; /* Even lighter grey */
+  margin-top: 2px;
+  margin-bottom: 0;
+  font-family: monospace; /* Monospace for session ID */
+}
+
 /* Add these styles within Character Creation Form section */
 
 .name-section .name-input-group {
@@ -1348,19 +1358,69 @@ button {
 .map-tile {
     /* Base styles - background set inline */
     border: 1px solid rgba(0, 0, 0, 0.1); /* Subtle tile border */
-    /* Transition for potential hover effects */
-    transition: filter 0.2s ease;
+    /* Transition for smooth visual feedback */
+    transition: all 0.3s ease;
 }
 
 .map-tile:hover {
     filter: brightness(1.1); /* Slight brighten on hover */
+    transform: scale(1.05); /* Subtle zoom effect */
+}
+
+.map-tile:active {
+    transform: scale(0.95); /* Click feedback */
+    transition: transform 0.1s ease;
 }
 
 /* Style for the player's current tile */
 .player-tile {
     box-shadow: inset 0 0 0 3px #f1c40f; /* Yellow inset border */
-    /* Or use outline: 3px solid #f1c40f; */
     filter: brightness(1.2); /* Make it stand out */
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Player marker icon */
+.player-marker {
+    position: absolute;
+    font-size: 24px;
+    z-index: 10;
+    animation: bounce-in 0.5s ease-out;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* Unexplored tiles - darker/foggy */
+.map-tile.unexplored {
+    filter: brightness(0.4) saturate(0.5);
+    opacity: 0.7;
+}
+
+.map-tile.unexplored:hover {
+    filter: brightness(0.5) saturate(0.6);
+}
+
+/* Pulse animation for player tile */
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: inset 0 0 0 3px #f1c40f;
+    }
+    50% {
+        box-shadow: inset 0 0 0 3px #f1c40f, 0 0 15px rgba(241, 196, 15, 0.6);
+    }
+}
+
+/* Bounce in animation for player marker */
+@keyframes bounce-in {
+    0% {
+        transform: scale(0) translateY(-20px);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.2) translateY(0);
+    }
+    100% {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
 }
 
 /* --- End World Map Styles --- */

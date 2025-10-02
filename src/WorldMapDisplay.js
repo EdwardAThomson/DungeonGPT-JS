@@ -43,7 +43,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick }) => {
           return (
             <div
               key={`${tile.x}-${tile.y}`}
-              className={`map-tile ${isPlayerHere ? 'player-tile' : ''}`}
+              className={`map-tile ${isPlayerHere ? 'player-tile' : ''} ${!tile.isExplored ? 'unexplored' : ''}`}
               style={{
                   ...tileStyle,
                   display: 'flex',
@@ -51,14 +51,15 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick }) => {
                   justifyContent: 'center',
                   fontSize: '20px', // Emoji size
                   cursor: 'pointer', // Indicate clickable
-                  // Add border/outline for player position later via CSS class
+                  position: 'relative', // For player marker positioning
               }}
               onClick={() => onTileClick(tile.x, tile.y)}
-              title={`(${tile.x}, ${tile.y}) - ${tile.biome}${tile.poi ? ` (${tile.poi})` : ''}`} // Tooltip
+              title={`(${tile.x}, ${tile.y}) - ${tile.biome}${tile.poi ? ` (${tile.poi})` : ''}${tile.isExplored ? ' (Explored)' : ''}`} // Tooltip
             >
               {/* Display POI emoji if it exists */}
               {poiContent}
-              {/* Optionally display player icon/marker using CSS later */}
+              {/* Display player marker when on this tile */}
+              {isPlayerHere && <span className="player-marker">🧙</span>}
             </div>
           );
         })}

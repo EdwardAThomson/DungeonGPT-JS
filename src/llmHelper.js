@@ -75,8 +75,9 @@ async function generateText(provider, apiKey, model, prompt, maxTokens, temperat
       // --- Claude Implementation ---
       const anthropic = new Anthropic({
         apiKey: apiKey,
-        // Note: Anthropic SDK might discourage browser usage without a proxy.
-        // You might need a backend proxy for production.
+        dangerouslyAllowBrowser: true,
+        // Note: Anthropic SDK discourages browser usage without a proxy.
+        // You should use a backend proxy for production to keep API keys secure.
       });
 
       const response = await anthropic.messages.create({

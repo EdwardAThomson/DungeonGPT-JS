@@ -1,18 +1,40 @@
 // HeroSelection.js
 
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import CharacterContext from './CharacterContext';
 import SettingsContext from './SettingsContext';
 
 const HeroSelection = () => {
   const { state } = useLocation();
-  const { characters } = useContext(CharacterContext);
+  const { characters, setCharacters } = useContext(CharacterContext);
   const { settings } = useContext(SettingsContext);
   const navigate = useNavigate();
 
   const [selectedHeroes, setSelectedHeroes] = useState([]);
   const [selectionError, setSelectionError] = useState('');
+
+  // Fetch characters from database on component mount
+  useEffect(() => {
+    const fetchCharacters = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/characters');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch characters: ${response.statusText}`);
+        }
+        const data = await response.json();
+        setCharacters(data);
+      } catch (error) {
+        console.error('Error fetching characters:', error);
+        setSelectionError('Failed to load characters. Please ensure the server is running.');
+      }
+    };
+
+    // Only fetch if characters array is empty
+    if (characters.length === 0) {
+      fetchCharacters();
+    }
+  }, [characters.length, setCharacters]);
 
   const toggleHeroSelection = (character) => {
     setSelectionError('');

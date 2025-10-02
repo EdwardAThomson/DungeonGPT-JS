@@ -5,6 +5,17 @@ export const SettingsModalContent = ({ isOpen, onClose, settings, selectedProvid
   if (!isOpen) return null;
 
   const displaySetting = (value) => value || 'Not set';
+  
+  // Capitalize provider names for display
+  const formatProvider = (provider) => {
+    if (!provider) return 'Not set';
+    const providerMap = {
+      'openai': 'OpenAI',
+      'gemini': 'Gemini',
+      'claude': 'Claude'
+    };
+    return providerMap[provider.toLowerCase()] || provider;
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -26,7 +37,7 @@ export const SettingsModalContent = ({ isOpen, onClose, settings, selectedProvid
 
         <div className="modal-section">
           <h4>AI</h4>
-          <p><strong>Provider:</strong> {displaySetting(selectedProvider)}</p>
+          <p><strong>Provider:</strong> {formatProvider(selectedProvider)}</p>
           <p><strong>Response Verbosity:</strong> {displaySetting(settings.responseVerbosity)}</p>
         </div>
 

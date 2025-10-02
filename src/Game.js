@@ -37,7 +37,7 @@ const Game = () => {
 
   // Get API keys and the selected provider from context
   const { apiKeys } = useContext(ApiKeysContext);
-  const { settings, selectedProvider } = useContext(SettingsContext);
+  const { settings, setSettings, selectedProvider } = useContext(SettingsContext);
 
   const [userInput, setUserInput] = useState('');
   const [conversation, setConversation] = useState(loadedConversation?.conversation_data || []);
@@ -48,7 +48,15 @@ const Game = () => {
   const [isHowToPlayModalOpen, setIsHowToPlayModalOpen] = useState(false); // State for How to Play modal
   const [isMapModalOpen, setIsMapModalOpen] = useState(false); // State for Map modal
   const [sessionId, setSessionId] = useState(loadedConversation?.sessionId || null); // State for Session ID
-  const [worldMap, setWorldMap] = useState(() => loadedConversation?.world_map || generateMapData()); // Use loaded map or generate new
+  const [worldMap, setWorldMap] = useState(() => {
+    if (loadedConversation?.world_map) {
+      return loadedConversation.world_map;
+    }
+    // Generate new map with starting tile explored
+    const newMap = generateMapData();
+    newMap[1][1].isExplored = true; // Mark starting position (1,1) as explored
+    return newMap;
+  });
   const [playerPosition, setPlayerPosition] = useState(loadedConversation?.player_position || { x: 1, y: 1 }); // Use loaded position or start at (1,1)
   const [hasAdventureStarted, setHasAdventureStarted] = useState(loadedConversation ? true : false); // State for initial start
 
@@ -79,6 +87,11 @@ const Game = () => {
       console.log("Generated Session ID:", newSessionId);
     } else {
       console.log("Loaded conversation with Session ID:", loadedConversation.sessionId);
+      // Restore game settings to Context if they were saved
+      if (loadedConversation.game_settings) {
+        setSettings(loadedConversation.game_settings);
+        console.log("Restored game settings from saved conversation:", loadedConversation.game_settings);
+      }
     }
 
     // Cleanup function to save conversation on unmount
@@ -94,6 +107,20 @@ const Game = () => {
       }
     };
   }, []); // Empty dependency array ensures this runs only once on mount and cleanup on unmount
+
+  // Periodic auto-save effect - save every 30 seconds if there's conversation data
+  useEffect(() => {
+    if (!sessionId || !hasAdventureStarted) return;
+
+    const autoSaveInterval = setInterval(() => {
+      if (conversationRef.current && conversationRef.current.length > 0) {
+        console.log('Auto-saving conversation...');
+        saveConversationToBackend(sessionId, conversationRef.current);
+      }
+    }, 30000); // Save every 30 seconds
+
+    return () => clearInterval(autoSaveInterval);
+  }, [sessionId, hasAdventureStarted]); // Re-run if sessionId or adventure state changes
 
   // Function to send data to backend
   const saveConversationToBackend = async (sessionIdToSave, conversationToSave) => {
@@ -200,6 +227,16 @@ const Game = () => {
     setIsLoading(true);
     setError(null);
     const model = getCurrentModel();
+    
+    // Mark starting tile as explored
+    const updatedMap = worldMap.map(row => 
+      row.map(tile => 
+        tile.x === playerPosition.x && tile.y === playerPosition.y 
+          ? { ...tile, isExplored: true }
+          : tile
+      )
+    );
+    setWorldMap(updatedMap);
 
     // --- Construct Prompt --- //
     const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
@@ -304,15 +341,14 @@ const Game = () => {
     const currentX = playerPosition.x;
     const currentY = playerPosition.y;
 
-    // Check adjacency (simple N, S, E, W for now - optionally add diagonals)
+    // Check adjacency (including diagonals - one square in any direction)
     const dx = Math.abs(clickedX - currentX);
     const dy = Math.abs(clickedY - currentY);
-    const isAdjacent = (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+    const isAdjacent = dx <= 1 && dy <= 1 && (dx + dy) > 0;
 
     if (!isAdjacent) {
       console.log("Cannot move: Tile is not adjacent.");
-      // Optionally set an error message for the UI
-      // setError("You can only move to adjacent tiles.");
+      setError("You can only move to adjacent tiles (including diagonals).");
       return;
     }
 
@@ -324,6 +360,16 @@ const Game = () => {
     }
 
     console.log(`Moving player to: ${clickedX}, ${clickedY}`);
+    
+    // Mark the target tile as explored
+    const updatedMap = worldMap.map(row => 
+      row.map(tile => 
+        tile.x === clickedX && tile.y === clickedY 
+          ? { ...tile, isExplored: true }
+          : tile
+      )
+    );
+    setWorldMap(updatedMap);
     setPlayerPosition({ x: clickedX, y: clickedY });
 
     // --- Trigger LLM description for the new location --- //
@@ -435,8 +481,9 @@ const Game = () => {
               </button>
             </form>
             <p className="info">AI responses may not always be accurate or coherent.</p>
-            {/* Add Model info here */}
+            {/* Add Model and Session info here */}
             <p className="model-info">Model: {getCurrentModel()}</p>
+            <p className="session-info">Session ID: {sessionId || 'Generating...'}</p>
           </div>
         </div>
 

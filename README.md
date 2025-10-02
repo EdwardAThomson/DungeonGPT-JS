@@ -53,16 +53,20 @@ The following images shows the chat interface of DungeonGPT:
     *   The backend server (`src/server.js`) handles saving and loading characters to/from the SQLite database (`src/game.db`).
     *   **This server must be running** in a separate terminal for character saving/loading features to work.
     *   Open a terminal, navigate to the project root directory, and run:
+
     ```bash
     node src/server.js
     ```
+    
     *   Keep this terminal window open while using the application.
 
 5.  **Run the React development server:**
     *   In **another** terminal window (while the backend server is running), navigate to the project root directory and run:
+
     ```bash
     npm start
     ```
+
     *   This will open the application in your default browser, usually at `http://localhost:3000`.
 
 ## Usage
