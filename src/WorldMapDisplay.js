@@ -1,14 +1,17 @@
 import React from 'react';
 
-// Basic styling will be needed in App.css
-const tileStyles = {
+// Biome background colors
+const biomeColors = {
   plains: { backgroundColor: '#c3e6cb' }, // Light green
-  forest: { backgroundColor: '#28a745' }, // Darker green
   water: { backgroundColor: '#007bff' }, // Blue
-  mountains: { backgroundColor: '#6c757d' }, // Grey
-  town: '🏡',
-  cave_entrance: '🕳️',
-  // Add more as needed
+};
+
+// POI emojis - displayed on top of biome tiles
+const poiEmojis = {
+  forest: '🌲',      // Tree emoji on plains-colored tile
+  mountain: '⛰️',    // Mountain emoji on plains-colored tile
+  town: '🏡',        // Town/house emoji
+  cave_entrance: '🕳️', // Cave entrance
 };
 
 const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero }) => {
@@ -38,8 +41,19 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero }) =>
       <div style={gridStyle} className="world-map-grid">
         {mapData.flat().map((tile) => { // Flatten the 2D array for easier mapping
           const isPlayerHere = playerPosition.x === tile.x && playerPosition.y === tile.y;
-          const tileStyle = tileStyles[tile.biome] || {}; // Get biome background color
-          const poiContent = tile.poi ? tileStyles[tile.poi] || tile.poi : null; // Get POI emoji
+          
+          // Handle backward compatibility: old maps had 'forest' as biome, new maps have it as poi
+          let tileStyle = biomeColors[tile.biome] || biomeColors.plains;
+          let poiContent = tile.poi ? poiEmojis[tile.poi] || tile.poi : null;
+          
+          // If biome is 'forest' or 'mountains' (old system), convert to POI emoji
+          if (tile.biome === 'forest' && !tile.poi) {
+            tileStyle = biomeColors.plains; // Use plains color
+            poiContent = poiEmojis.forest; // Show tree emoji
+          } else if (tile.biome === 'mountains' && !tile.poi) {
+            tileStyle = biomeColors.plains; // Use plains color
+            poiContent = poiEmojis.mountain; // Show mountain emoji
+          }
 
           return (
             <div

@@ -1,6 +1,7 @@
 // src/mapGenerator.js
 
-// Simple Placeholder Map Generator
+// Deterministic Map Generator
+// Creates a varied world map with forests, mountains, and towns
 
 export const generateMapData = (width = 10, height = 10) => {
   const mapData = [];
@@ -12,26 +13,60 @@ export const generateMapData = (width = 10, height = 10) => {
       let poi = null;
       let descriptionSeed = "Open fields";
 
-      // Simple pattern: Add a patch of forest in the middle
-      if (x >= 3 && x < 7 && y >= 3 && y < 7) {
-        biome = 'forest';
+      // Scattered forest tiles (trees on plains-colored background)
+      // Top-left forest cluster
+      if ((x === 2 && y === 0) || (x === 3 && y === 1) || (x === 1 && y === 2)) {
+        poi = 'forest';
         descriptionSeed = "Dense woods";
       }
-
-      // Add a 'starting town' POI
-      if (x === 1 && y === 1) {
-        poi = 'town';
-        biome = 'plains'; // Ensure town is on plains
-        descriptionSeed = "A small village";
+      
+      // Middle forest cluster
+      if ((x === 5 && y === 4) || (x === 6 && y === 5) || (x === 4 && y === 5)) {
+        poi = 'forest';
+        descriptionSeed = "Ancient forest";
+      }
+      
+      // Bottom-right forest cluster
+      if ((x === 8 && y === 7) || (x === 7 && y === 8) || (x === 9 && y === 8)) {
+        poi = 'forest';
+        descriptionSeed = "Wild woods";
       }
 
-      // Add a 'cave' POI
-       if (x === 6 && y === 6) {
-         poi = 'cave_entrance';
-         biome = 'forest'; // Ensure cave is in forest
-         descriptionSeed = "A dark cave entrance";
-       }
+      // Mountain tiles scattered across the map
+      if ((x === 7 && y === 2) || (x === 8 && y === 3)) {
+        poi = 'mountain';
+        descriptionSeed = "Rocky peaks";
+      }
+      
+      if ((x === 2 && y === 6) || (x === 3 && y === 7)) {
+        poi = 'mountain';
+        descriptionSeed = "Mountain range";
+      }
 
+      // Towns - multiple settlements across the map
+      // Starting town
+      if (x === 1 && y === 1) {
+        poi = 'town';
+        descriptionSeed = "A small village";
+      }
+      
+      // Eastern town
+      if (x === 8 && y === 1) {
+        poi = 'town';
+        descriptionSeed = "A trading post";
+      }
+      
+      // Southern town
+      if (x === 4 && y === 8) {
+        poi = 'town';
+        descriptionSeed = "A farming hamlet";
+      }
+
+      // Cave entrance in the mountains
+      if (x === 7 && y === 3) {
+        poi = 'cave_entrance';
+        descriptionSeed = "A dark cave entrance";
+      }
 
       row.push({
         x,
