@@ -718,14 +718,66 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   cursor: not-allowed;
 }
 
+/* Status bar container */
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 10px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+  gap: 15px;
+}
+
 /* Session info styling */
 .session-info {
-  text-align: center;
-  font-size: 0.7rem; /* Slightly smaller than model info */
-  color: #aaa; /* Even lighter grey */
-  margin-top: 2px;
-  margin-bottom: 4px;
-  font-family: monospace; /* Monospace for session ID */
+  font-size: 0.7rem;
+  color: #aaa;
+  margin: 0;
+  font-family: monospace;
+  flex: 1;
+}
+
+/* API Key Status */
+.api-key-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: #666;
+}
+
+.status-light {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.3);
+}
+
+.status-active {
+  background-color: #27ae60;
+  box-shadow: 0 0 8px rgba(39, 174, 96, 0.6);
+  animation: pulse-green 2s ease-in-out infinite;
+}
+
+.status-inactive {
+  background-color: #e74c3c;
+  box-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
+}
+
+.status-text {
+  font-weight: 500;
+}
+
+/* Pulse animation for active status */
+@keyframes pulse-green {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(39, 174, 96, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(39, 174, 96, 0.9);
+  }
 }
 
 /* Debug toggle button */

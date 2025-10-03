@@ -561,7 +561,18 @@ const Game = () => {
                 ))}
               </select>
             </div>
-            <p className="session-info">Session ID: {sessionId || 'Generating...'}</p>
+            <div className="status-bar">
+              <p className="session-info">Session ID: {sessionId || 'Generating...'}</p>
+              <div className="api-key-status">
+                <span 
+                  className={`status-light ${apiKeys[selectedProvider] ? 'status-active' : 'status-inactive'}`}
+                  title={apiKeys[selectedProvider] ? `${selectedProvider} API key is set` : `${selectedProvider} API key is missing`}
+                ></span>
+                <span className="status-text">
+                  API Key: {apiKeys[selectedProvider] ? 'Set' : 'Missing'}
+                </span>
+              </div>
+            </div>
             <button 
               onClick={() => setShowDebugInfo(!showDebugInfo)} 
               className="debug-toggle-button"
