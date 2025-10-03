@@ -97,6 +97,29 @@ const SavedConversations = () => {
     return new Date(timestamp).toLocaleString();
   };
 
+  const formatProvider = (provider) => {
+    if (!provider) return 'Not set';
+    const providerMap = {
+      'openai': 'OpenAI',
+      'gemini': 'Gemini',
+      'claude': 'Claude'
+    };
+    return providerMap[provider.toLowerCase()] || provider;
+  };
+
+  const formatModel = (model) => {
+    if (!model) return 'Not set';
+    const modelMap = {
+      'gpt-5': 'GPT-5',
+      'gpt-5-mini': 'GPT-5 Mini',
+      'o4-mini': 'O4 Mini',
+      'gemini-2.5-pro': 'Gemini 2.5 Pro',
+      'gemini-2.5-flash': 'Gemini 2.5 Flash',
+      'claude-sonnet-4-5-20250929': 'Claude Sonnet 4.5'
+    };
+    return modelMap[model] || model;
+  };
+
   if (loading) {
     return <div className="page-container">Loading conversations...</div>;
   }
@@ -153,18 +176,42 @@ const SavedConversations = () => {
                 )}
               </div>
               
-              <div className="conversation-details">
-                <p><strong>Date:</strong> {formatDate(conversation.timestamp)}</p>
-                <p><strong>Provider:</strong> {conversation.provider}</p>
-                <p><strong>Session ID:</strong> {conversation.sessionId}</p>
-                {conversation.summary && (
-                  <p><strong>Summary:</strong> {conversation.summary.substring(0, 100)}...</p>
-                )}
-                {conversation.selected_heroes && (
-                  <p><strong>Heroes:</strong> {JSON.parse(conversation.selected_heroes).map(h => h.characterName).join(', ')}</p>
-                )}
-                {conversation.player_position && (
-                  <p><strong>Location:</strong> ({JSON.parse(conversation.player_position).x}, {JSON.parse(conversation.player_position).y})</p>
+              <div className="conversation-content">
+                <div className="conversation-details">
+                  <p><strong>Date:</strong> {formatDate(conversation.timestamp)}</p>
+                  <p><strong>Provider:</strong> {formatProvider(conversation.provider)}</p>
+                  <p><strong>Model:</strong> {formatModel(conversation.model)}</p>
+                  <p><strong>Session ID:</strong> {conversation.sessionId}</p>
+                  {conversation.selected_heroes && (
+                    <p><strong>Heroes:</strong> {JSON.parse(conversation.selected_heroes).map(h => h.characterName).join(', ')}</p>
+                  )}
+                  {conversation.player_position && (
+                    <p><strong>Location:</strong> ({JSON.parse(conversation.player_position).x}, {JSON.parse(conversation.player_position).y})</p>
+                  )}
+                  {conversation.summary && (
+                    <p><strong>Summary:</strong> {conversation.summary.substring(0, 100)}...</p>
+                  )}
+                </div>
+                
+                {conversation.game_settings && (
+                  <div className="conversation-settings">
+                    <h4>Game Settings</h4>
+                    {(() => {
+                      const settings = typeof conversation.game_settings === 'string' 
+                        ? JSON.parse(conversation.game_settings) 
+                        : conversation.game_settings;
+                      return (
+                        <>
+                          {settings.shortDescription && <p><strong>Story:</strong> {settings.shortDescription}</p>}
+                          {settings.grimnessLevel && <p><strong>Grimness:</strong> {settings.grimnessLevel}</p>}
+                          {settings.darknessLevel && <p><strong>Darkness:</strong> {settings.darknessLevel}</p>}
+                          {settings.magicLevel && <p><strong>Magic:</strong> {settings.magicLevel}</p>}
+                          {settings.technologyLevel && <p><strong>Tech:</strong> {settings.technologyLevel}</p>}
+                          {settings.responseVerbosity && <p><strong>Verbosity:</strong> {settings.responseVerbosity}</p>}
+                        </>
+                      );
+                    })()}
+                  </div>
                 )}
               </div>
               

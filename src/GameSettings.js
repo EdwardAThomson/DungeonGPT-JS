@@ -9,8 +9,8 @@ const GameSettings = () => {
 
   // characters should be saved in Context
   const { characters } = useContext(CharacterContext);
-  // Get settings and provider state from context
-  const { settings, setSettings, selectedProvider, setSelectedProvider } = useContext(SettingsContext);
+  // Get settings, provider, and model state from context
+  const { settings, setSettings, selectedProvider, setSelectedProvider, selectedModel, setSelectedModel } = useContext(SettingsContext);
   const navigate = useNavigate();
 
   // Existing state
@@ -33,13 +33,38 @@ const GameSettings = () => {
   const magicOptions = ['No Magic', 'Low Magic', 'High Magic', 'Arcane Tech'];
   const technologyOptions = ['Ancient', 'Medieval', 'Renaissance', 'Industrial']; // Excluded 'Futuristic'
   const verbosityOptions = ['Concise', 'Moderate', 'Descriptive'];
-  const providerOptions = ['openai', 'gemini', 'claude'];
+  
+  // Combined provider-model options (same as in Game.js)
+  const modelOptions = [
+    { provider: 'openai', model: 'gpt-5', label: 'OpenAI - GPT-5' },
+    { provider: 'openai', model: 'gpt-5-mini', label: 'OpenAI - GPT-5 Mini' },
+    { provider: 'openai', model: 'o4-mini', label: 'OpenAI - O4 Mini' },
+    { provider: 'gemini', model: 'gemini-2.5-pro', label: 'Gemini - 2.5 Pro' },
+    { provider: 'gemini', model: 'gemini-2.5-flash', label: 'Gemini - 2.5 Flash' },
+    { provider: 'claude', model: 'claude-sonnet-4-5-20250929', label: 'Claude - Sonnet 4.5' }
+  ];
 
   // Existing handlers
   const handleShortDescriptionChange = (e) => setShortDescription(e.target.value);
   const handleGrimnessChange = (e) => setGrimnessLevel(e.target.value);
   const handleDarknessChange = (e) => setDarknessLevel(e.target.value);
-  const handleProviderChange = (e) => setSelectedProvider(e.target.value);
+  
+  // Handle combined model selection
+  const handleModelSelection = (value) => {
+    const selected = modelOptions.find(opt => `${opt.provider}:${opt.model}` === value);
+    if (selected) {
+      setSelectedProvider(selected.provider);
+      setSelectedModel(selected.model);
+    }
+  };
+  
+  // Get current selection value for dropdown
+  const getCurrentSelection = () => {
+    if (selectedProvider && selectedModel) {
+      return `${selectedProvider}:${selectedModel}`;
+    }
+    return '';
+  };
 
   // New handlers
   const handleMagicLevelChange = (e) => setMagicLevel(e.target.value);
@@ -184,14 +209,21 @@ const GameSettings = () => {
       <div className="form-section ai-settings-section">
         <h2>AI Settings</h2>
         <div className="ai-settings-selectors"> {/* Wrapper */}            
-            {/* AI Provider Sub-section */}
+            {/* AI Model Selection */}
             <div className="ai-setting-item">
-                <h3>AI Provider</h3>
-                <p>Select the AI for generating responses:</p>
-                <select value={selectedProvider} onChange={handleProviderChange} className="settings-select provider-select">
-                {providerOptions.map((option) => (
-                    <option key={option} value={option}>{option.charAt(0).toUpperCase() + option.slice(1)}</option>
-                ))}
+                <h3>AI Model</h3>
+                <p>Select the AI model for generating responses:</p>
+                <select 
+                  value={getCurrentSelection()} 
+                  onChange={(e) => handleModelSelection(e.target.value)} 
+                  className="settings-select provider-select"
+                >
+                  <option value="">Select AI Model...</option>
+                  {modelOptions.map(option => (
+                    <option key={`${option.provider}:${option.model}`} value={`${option.provider}:${option.model}`}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
             </div>
 

@@ -680,14 +680,116 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   margin-bottom: 0; /* No extra space below */
 }
 
+/* Model selector container */
+.model-selector-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.model-label {
+  font-size: 0.75rem;
+  color: #999;
+  margin: 0;
+}
+
+.provider-select {
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: white;
+  color: #333;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  min-width: 180px;
+}
+
+.provider-select:hover:not(:disabled) {
+  border-color: #999;
+}
+
+.provider-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Session info styling */
 .session-info {
   text-align: center;
   font-size: 0.7rem; /* Slightly smaller than model info */
   color: #aaa; /* Even lighter grey */
   margin-top: 2px;
-  margin-bottom: 0;
+  margin-bottom: 4px;
   font-family: monospace; /* Monospace for session ID */
+}
+
+/* Debug toggle button */
+.debug-toggle-button {
+  font-size: 0.7rem;
+  padding: 4px 8px;
+  margin: 4px auto;
+  display: block;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.debug-toggle-button:hover {
+  background-color: #e0e0e0;
+}
+
+/* Debug info box */
+.debug-info-box {
+  margin: 10px auto;
+  padding: 12px;
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  max-width: 600px;
+  max-height: 400px;
+  overflow-y: auto;
+  font-size: 0.75rem;
+  text-align: left;
+}
+
+.debug-info-box h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #333;
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 4px;
+}
+
+.debug-section {
+  margin-bottom: 8px;
+  padding: 6px;
+  background-color: white;
+  border-radius: 4px;
+}
+
+.debug-section strong {
+  color: #555;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.debug-section pre {
+  margin: 0;
+  padding: 6px;
+  background-color: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 /* Add these styles within Character Creation Form section */
@@ -1379,7 +1481,7 @@ button {
     animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Player marker icon */
+/* Player marker icon (old emoji style - keeping for fallback) */
 .player-marker {
     position: absolute;
     font-size: 24px;
@@ -1388,15 +1490,55 @@ button {
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
-/* Unexplored tiles - darker/foggy */
-.map-tile.unexplored {
+/* Player marker with portrait - circular design with pointer */
+.player-marker-portrait {
+    position: absolute;
+    top: -18px; /* Position above and to the left */
+    left: -18px;
+    z-index: 15;
+    width: 32px;
+    height: 32px;
+    /* Remove animation from container, apply to children instead */
+}
+
+.player-marker-portrait img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 3px solid #f1c40f; /* Gold border */
+    background: white;
+    display: block;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    position: relative;
+    z-index: 1;
+}
+
+/* Triangular pointer - points to bottom-right toward tile center */
+.player-marker-pointer {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-top: 7px solid transparent;
+    border-right: 9px solid #f1c40f; /* Gold triangle pointing down-right */
+    border-bottom: 9px solid #f1c40f;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+    transform: rotate(45deg);
+    transform-origin: bottom right;
+    z-index: 0;
+}
+
+/* Unexplored tiles - darker/foggy (DISABLED FOR DEVELOPMENT) */
+/* .map-tile.unexplored {
     filter: brightness(0.4) saturate(0.5);
     opacity: 0.7;
 }
 
 .map-tile.unexplored:hover {
     filter: brightness(0.5) saturate(0.6);
-}
+} */
 
 /* Pulse animation for player tile */
 @keyframes pulse-glow {
@@ -1494,14 +1636,52 @@ button {
   color: white;
 }
 
-.conversation-details {
+/* Two-column layout for conversation content */
+.conversation-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
   margin-bottom: 15px;
+}
+
+.conversation-details {
+  /* Left column */
 }
 
 .conversation-details p {
   margin: 5px 0;
   font-size: 0.9rem;
   color: #555;
+}
+
+.conversation-settings {
+  /* Right column */
+  background-color: #fff;
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.conversation-settings h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #2c3e50;
+  font-size: 1rem;
+  border-bottom: 2px solid #3498db;
+  padding-bottom: 5px;
+}
+
+.conversation-settings p {
+  margin: 5px 0;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+/* Responsive: stack on smaller screens */
+@media (max-width: 768px) {
+  .conversation-content {
+    grid-template-columns: 1fr;
+  }
 }
 
 .conversation-actions {

@@ -8,7 +8,7 @@ import WorldMapDisplay from './WorldMapDisplay'; // Import the map display
 import { generateMapData, getTile } from './mapGenerator'; // Import map generator and helper
 
 // --- Map Modal --- //
-const MapModalContent = ({ isOpen, onClose, mapData, playerPosition, onTileClick }) => {
+const MapModalContent = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero }) => {
     if (!isOpen) return null;
   
     return (
@@ -19,7 +19,8 @@ const MapModalContent = ({ isOpen, onClose, mapData, playerPosition, onTileClick
           <WorldMapDisplay 
             mapData={mapData} 
             playerPosition={playerPosition} 
-            onTileClick={onTileClick} 
+            onTileClick={onTileClick}
+            firstHero={firstHero}
           />
           <button className="modal-close-button" onClick={onClose}>
             Close Map
@@ -37,7 +38,17 @@ const Game = () => {
 
   // Get API keys and the selected provider from context
   const { apiKeys } = useContext(ApiKeysContext);
-  const { settings, setSettings, selectedProvider } = useContext(SettingsContext);
+  const { settings, setSettings, selectedProvider, setSelectedProvider, selectedModel, setSelectedModel } = useContext(SettingsContext);
+
+  // Combined provider-model options
+  const modelOptions = [
+    { provider: 'openai', model: 'gpt-5', label: 'OpenAI - GPT-5' },
+    { provider: 'openai', model: 'gpt-5-mini', label: 'OpenAI - GPT-5 Mini' },
+    { provider: 'openai', model: 'o4-mini', label: 'OpenAI - O4 Mini' },
+    { provider: 'gemini', model: 'gemini-2.5-pro', label: 'Gemini - 2.5 Pro' },
+    { provider: 'gemini', model: 'gemini-2.5-flash', label: 'Gemini - 2.5 Flash' },
+    { provider: 'claude', model: 'claude-sonnet-4-5-20250929', label: 'Claude - Sonnet 4.5' }
+  ];
 
   const [userInput, setUserInput] = useState('');
   const [conversation, setConversation] = useState(loadedConversation?.conversation_data || []);
@@ -59,11 +70,15 @@ const Game = () => {
   });
   const [playerPosition, setPlayerPosition] = useState(loadedConversation?.player_position || { x: 1, y: 1 }); // Use loaded position or start at (1,1)
   const [hasAdventureStarted, setHasAdventureStarted] = useState(loadedConversation ? true : false); // State for initial start
+  const [showDebugInfo, setShowDebugInfo] = useState(false); // Debug info toggle
 
   // Refs to hold the latest state for the cleanup function
   const conversationRef = useRef(conversation);
   const sessionIdRef = useRef(sessionId);
-  const selectedProviderRef = useRef(selectedProvider); // Also track provider if needed for saving endpoint
+  const selectedProviderRef = useRef(selectedProvider);
+  const selectedModelRef = useRef(selectedModel);
+  const worldMapRef = useRef(worldMap);
+  const playerPositionRef = useRef(playerPosition);
 
   // Update refs whenever the state changes
   useEffect(() => {
@@ -78,6 +93,18 @@ const Game = () => {
     selectedProviderRef.current = selectedProvider;
   }, [selectedProvider]);
 
+  useEffect(() => {
+    selectedModelRef.current = selectedModel;
+  }, [selectedModel]);
+
+  useEffect(() => {
+    worldMapRef.current = worldMap;
+  }, [worldMap]);
+
+  useEffect(() => {
+    playerPositionRef.current = playerPosition;
+  }, [playerPosition]);
+
   // Generate session ID on component mount (only if not loading a saved conversation)
   useEffect(() => {
     if (!loadedConversation) {
@@ -87,10 +114,29 @@ const Game = () => {
       console.log("Generated Session ID:", newSessionId);
     } else {
       console.log("Loaded conversation with Session ID:", loadedConversation.sessionId);
+      console.log("Full loaded conversation object:", loadedConversation);
+      
       // Restore game settings to Context if they were saved
       if (loadedConversation.game_settings) {
-        setSettings(loadedConversation.game_settings);
-        console.log("Restored game settings from saved conversation:", loadedConversation.game_settings);
+        // Check if it's a string that needs parsing
+        const parsedSettings = typeof loadedConversation.game_settings === 'string' 
+          ? JSON.parse(loadedConversation.game_settings) 
+          : loadedConversation.game_settings;
+        setSettings(parsedSettings);
+        console.log("Restored game settings from saved conversation:", parsedSettings);
+      } else {
+        console.log("No game_settings found in loaded conversation");
+      }
+      
+      // Restore provider from saved conversation
+      if (loadedConversation.provider) {
+        setSelectedProvider(loadedConversation.provider);
+        console.log("Restored provider from saved conversation:", loadedConversation.provider);
+      }
+      // Restore selected model from saved conversation
+      if (loadedConversation.model) {
+        setSelectedModel(loadedConversation.model);
+        console.log("Restored model from saved conversation:", loadedConversation.model);
       }
     }
 
@@ -125,6 +171,7 @@ const Game = () => {
   // Function to send data to backend
   const saveConversationToBackend = async (sessionIdToSave, conversationToSave) => {
     try {
+        console.log('Saving with provider:', selectedProviderRef.current, 'model:', selectedModelRef.current);
         // Adjust URL to your backend endpoint
       const response = await fetch('http://localhost:5000/api/conversations', {
         method: 'POST',
@@ -135,13 +182,14 @@ const Game = () => {
           sessionId: sessionIdToSave,
           conversation: conversationToSave,
           provider: selectedProviderRef.current,
+          model: selectedModelRef.current, // Save the selected model
           timestamp: new Date().toISOString(),
           conversationName: `Adventure - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
           gameSettings: settings,
           selectedHeroes: selectedHeroes,
           currentSummary: currentSummary,
-          worldMap: worldMap,
-          playerPosition: playerPosition,
+          worldMap: worldMapRef.current,
+          playerPosition: playerPositionRef.current,
         }),
       });
 
@@ -167,19 +215,34 @@ const Game = () => {
     setUserInput(event.target.value);
   };
 
-  // Determine the appropriate model based on the provider
-  const getCurrentModel = () => {
-    switch (selectedProvider) {
-      case 'openai':
-        return 'gpt-4o';
-      case 'gemini':
-        return 'gemini-2.5-flash';
-      case 'claude':
-        return 'claude-3-5-sonnet-20241022';
-      default:
-        console.warn(`Unknown provider selected: ${selectedProvider}, defaulting to OpenAI model.`);
-        return 'gpt-4o';
+  // Handle combined selection change
+  const handleModelSelection = (value) => {
+    const selected = modelOptions.find(opt => `${opt.provider}:${opt.model}` === value);
+    if (selected) {
+      setSelectedProvider(selected.provider);
+      setSelectedModel(selected.model);
     }
+  };
+  
+  // Get current selection value for dropdown
+  const getCurrentSelection = () => {
+    if (selectedProvider && selectedModel) {
+      return `${selectedProvider}:${selectedModel}`;
+    }
+    return '';
+  };
+
+  // Get current model - use selected model or fallback to first available
+  const getCurrentModel = () => {
+    if (selectedModel) return selectedModel;
+    
+    // Fallback to first model of selected provider
+    if (selectedProvider) {
+      const firstModel = modelOptions.find(opt => opt.provider === selectedProvider);
+      if (firstModel) return firstModel.model;
+    }
+    
+    return 'gpt-5'; // Ultimate fallback
   };
 
   // Summarization function - updated to use selected provider and API key
@@ -481,9 +544,65 @@ const Game = () => {
               </button>
             </form>
             <p className="info">AI responses may not always be accurate or coherent.</p>
-            {/* Add Model and Session info here */}
-            <p className="model-info">Model: {getCurrentModel()}</p>
+            {/* Model selector and Session info */}
+            <div className="model-selector-container">
+              <select 
+                id="model-select"
+                value={getCurrentSelection()}
+                onChange={(e) => handleModelSelection(e.target.value)}
+                className="provider-select"
+                disabled={isLoading}
+              >
+                <option value="">Select AI Model...</option>
+                {modelOptions.map(option => (
+                  <option key={`${option.provider}:${option.model}`} value={`${option.provider}:${option.model}`}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <p className="session-info">Session ID: {sessionId || 'Generating...'}</p>
+            <button 
+              onClick={() => setShowDebugInfo(!showDebugInfo)} 
+              className="debug-toggle-button"
+              title="Toggle debug information"
+            >
+              {showDebugInfo ? '🐛 Hide Debug' : '🐛 Show Debug'}
+            </button>
+            
+            {showDebugInfo && (
+              <div className="debug-info-box">
+                <h4>Debug Information</h4>
+                <div className="debug-section">
+                  <strong>Loaded Conversation:</strong>
+                  <pre>{loadedConversation ? 'Yes' : 'No (New Game)'}</pre>
+                </div>
+                {loadedConversation && (
+                  <>
+                    <div className="debug-section">
+                      <strong>Game Settings:</strong>
+                      <pre>{JSON.stringify(loadedConversation.game_settings, null, 2)}</pre>
+                    </div>
+                    <div className="debug-section">
+                      <strong>Provider:</strong> {loadedConversation.provider || 'Not set'}
+                    </div>
+                    <div className="debug-section">
+                      <strong>Model:</strong> {loadedConversation.model || 'Not set'}
+                    </div>
+                    <div className="debug-section">
+                      <strong>Current Context Settings:</strong>
+                      <pre>{JSON.stringify(settings, null, 2)}</pre>
+                    </div>
+                    <div className="debug-section">
+                      <strong>Current Provider:</strong> {selectedProvider || 'Not set'}
+                    </div>
+                    <div className="debug-section">
+                      <strong>Current Model:</strong> {selectedModel || 'Not set'}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -527,7 +646,8 @@ const Game = () => {
         isOpen={isSettingsModalOpen} 
         onClose={() => setIsSettingsModalOpen(false)} 
         settings={settings} 
-        selectedProvider={selectedProvider} 
+        selectedProvider={selectedProvider}
+        selectedModel={selectedModel}
       />
       <HowToPlayModalContent
         isOpen={isHowToPlayModalOpen}
@@ -538,7 +658,8 @@ const Game = () => {
         onClose={() => setIsMapModalOpen(false)}
         mapData={worldMap}
         playerPosition={playerPosition}
-        onTileClick={handleMapTileClick} 
+        onTileClick={handleMapTileClick}
+        firstHero={selectedHeroes && selectedHeroes.length > 0 ? selectedHeroes[0] : null}
       />
     </div>
   );

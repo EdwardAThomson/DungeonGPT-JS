@@ -11,7 +11,7 @@ const tileStyles = {
   // Add more as needed
 };
 
-const WorldMapDisplay = ({ mapData, playerPosition, onTileClick }) => {
+const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero }) => {
   if (!mapData || mapData.length === 0) {
     return <div>Loading map...</div>;
   }
@@ -31,9 +31,10 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick }) => {
     backgroundColor: '#eee' // Background for gaps
   };
 
+  // <h4>World Map</h4> // don't need this
   return (
     <div className="world-map-container">
-       <h4>World Map</h4>
+       
       <div style={gridStyle} className="world-map-grid">
         {mapData.flat().map((tile) => { // Flatten the 2D array for easier mapping
           const isPlayerHere = playerPosition.x === tile.x && playerPosition.y === tile.y;
@@ -59,7 +60,12 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick }) => {
               {/* Display POI emoji if it exists */}
               {poiContent}
               {/* Display player marker when on this tile */}
-              {isPlayerHere && <span className="player-marker">🧙</span>}
+              {isPlayerHere && firstHero && (
+                <div className="player-marker-portrait">
+                  <img src={firstHero.profilePicture} alt={firstHero.characterName} />
+                  <div className="player-marker-pointer"></div>
+                </div>
+              )}
             </div>
           );
         })}

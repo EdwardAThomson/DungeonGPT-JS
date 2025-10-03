@@ -122,6 +122,12 @@ db.run(`CREATE TABLE IF NOT EXISTS characterstable (
             console.error('Error adding player_position column:', err);
           }
         });
+        
+        db.run(`ALTER TABLE conversations ADD COLUMN model TEXT`, (err) => {
+          if (err && !err.message.includes('duplicate column name')) {
+            console.error('Error adding model column:', err);
+          }
+        });
       }
     });
   }
@@ -242,7 +248,7 @@ app.get('/test', (req, res) => {
 // --- New Conversation Saving Endpoint (SQLite Version) ---
 app.post('/api/conversations', (req, res) => {
   try {
-    const { sessionId, conversation, provider, timestamp, conversationName, gameSettings, selectedHeroes, currentSummary, worldMap, playerPosition } = req.body;
+    const { sessionId, conversation, provider, model, timestamp, conversationName, gameSettings, selectedHeroes, currentSummary, worldMap, playerPosition } = req.body;
 
     // Basic validation
     if (!sessionId || !conversation || !Array.isArray(conversation)) {
@@ -258,12 +264,13 @@ app.post('/api/conversations', (req, res) => {
 
     // SQL Query using ON CONFLICT for Upsert behavior
     const query = `
-      INSERT INTO conversations (sessionId, conversation_data, provider, timestamp, conversation_name, game_settings, selected_heroes, summary, world_map, player_position)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO conversations (sessionId, conversation_data, provider, model, timestamp, conversation_name, game_settings, selected_heroes, summary, world_map, player_position)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (sessionId)
       DO UPDATE SET
         conversation_data = excluded.conversation_data,
         provider = excluded.provider,
+        model = excluded.model,
         timestamp = excluded.timestamp,
         conversation_name = excluded.conversation_name,
         game_settings = excluded.game_settings,
@@ -276,7 +283,8 @@ app.post('/api/conversations', (req, res) => {
     const params = [
       sessionId, 
       conversationJson, 
-      provider, 
+      provider,
+      model,
       timestamp,
       conversationName || `Game Session ${new Date(timestamp).toLocaleDateString()}`,
       settingsJson,

@@ -1,7 +1,7 @@
 import React from 'react';
 
 // --- Settings Modal --- //
-export const SettingsModalContent = ({ isOpen, onClose, settings, selectedProvider }) => {
+export const SettingsModalContent = ({ isOpen, onClose, settings, selectedProvider, selectedModel }) => {
   if (!isOpen) return null;
 
   const displaySetting = (value) => value || 'Not set';
@@ -15,6 +15,21 @@ export const SettingsModalContent = ({ isOpen, onClose, settings, selectedProvid
       'claude': 'Claude'
     };
     return providerMap[provider.toLowerCase()] || provider;
+  };
+  
+  // Format model name for display
+  const formatModel = (model) => {
+    if (!model) return 'Not set';
+    // Convert model ID to readable name
+    const modelMap = {
+      'gpt-5': 'GPT-5',
+      'gpt-5-mini': 'GPT-5 Mini',
+      'o4-mini': 'O4 Mini',
+      'gemini-2.5-pro': 'Gemini 2.5 Pro',
+      'gemini-2.5-flash': 'Gemini 2.5 Flash',
+      'claude-sonnet-4-5-20250929': 'Claude Sonnet 4.5'
+    };
+    return modelMap[model] || model;
   };
 
   return (
@@ -38,6 +53,7 @@ export const SettingsModalContent = ({ isOpen, onClose, settings, selectedProvid
         <div className="modal-section">
           <h4>AI</h4>
           <p><strong>Provider:</strong> {formatProvider(selectedProvider)}</p>
+          <p><strong>Model:</strong> {formatModel(selectedModel)}</p>
           <p><strong>Response Verbosity:</strong> {displaySetting(settings.responseVerbosity)}</p>
         </div>
 
