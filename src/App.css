@@ -537,7 +537,8 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 /* Style for header buttons */
 .view-settings-button,
 .how-to-play-button,
-.view-map-button { /* Added map button */
+.view-map-button,
+.manual-save-button { /* Added save button */
     background-color: #ecf0f1; /* Even lighter grey */
     color: #34495e; 
     border: 1px solid #bdc3c7; /* Light border */
@@ -551,7 +552,8 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 
 .view-settings-button:hover,
 .how-to-play-button:hover,
-.view-map-button:hover { /* Added map button */
+.view-map-button:hover,
+.manual-save-button:hover { /* Added save button */
     background-color: #dfe4e7;
     border-color: #aeb5ba;
 }

@@ -4,6 +4,8 @@ import React, { useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import CharacterContext from "./CharacterContext";
 import SettingsContext from "./SettingsContext";
+import { generateMapData } from "./mapGenerator";
+import WorldMapDisplay from "./WorldMapDisplay";
 
 const GameSettings = () => {
 
@@ -25,6 +27,10 @@ const GameSettings = () => {
 
   // State for validation error message
   const [formError, setFormError] = useState('');
+  
+  // State for generated map
+  const [generatedMap, setGeneratedMap] = useState(null);
+  const [showMapPreview, setShowMapPreview] = useState(false);
 
   // Possible options
   const grimnessOptions = ['Noble', 'Neutral', 'Bleak', 'Grim'];
@@ -70,6 +76,13 @@ const GameSettings = () => {
   const handleMagicLevelChange = (e) => setMagicLevel(e.target.value);
   const handleTechnologyLevelChange = (e) => setTechnologyLevel(e.target.value);
   const handleResponseVerbosityChange = (e) => setResponseVerbosity(e.target.value);
+  
+  // Map generation handler
+  const handleGenerateMap = () => {
+    const newMap = generateMapData();
+    setGeneratedMap(newMap);
+    setShowMapPreview(true);
+  };
 
   const handleSubmit = () => {
     // Validation Checks
@@ -103,11 +116,17 @@ const GameSettings = () => {
       // Note: selectedProvider is managed directly in context
     };
 
+    // Check if map has been generated
+    if (!generatedMap) {
+      setFormError('Please generate a world map before proceeding.');
+      return;
+    }
+
     // Save the descriptive settings data in context
     setSettings(settingsData);
 
-    // Navigate to hero selection
-    navigate('/hero-selection', { state: { characters } });
+    // Navigate to hero selection with generated map
+    navigate('/hero-selection', { state: { characters, generatedMap } });
   };
 
   return (
@@ -238,6 +257,41 @@ const GameSettings = () => {
                 </select>
             </div>
         </div>
+      </div>
+
+      {/* World Map Generation Section */}
+      <div className="form-section map-generation-section">
+        <h2>World Map</h2>
+        <p>Generate a random world map for your adventure. Each map is unique with forests, mountains, and towns.</p>
+        
+        <div className="map-generation-controls">
+          <button 
+            onClick={handleGenerateMap} 
+            className="generate-map-button"
+            type="button"
+          >
+            {generatedMap ? '🔄 Regenerate Map' : '🗺️ Generate World Map'}
+          </button>
+          
+          {generatedMap && (
+            <span className="map-status">✓ Map generated!</span>
+          )}
+        </div>
+
+        {showMapPreview && generatedMap && (
+          <div className="map-preview-container">
+            <h3>Map Preview</h3>
+            <p className="map-preview-hint">
+              🏡 = Town | 🌲 = Forest | ⛰️ = Mountain | 🕳️ = Cave
+            </p>
+            <WorldMapDisplay 
+              mapData={generatedMap}
+              playerPosition={{x: 1, y: 1}}
+              onTileClick={() => {}} // No interaction in preview
+              firstHero={null} // No player marker in preview
+            />
+          </div>
+        )}
       </div>
 
       {/* Action Button & Error Message */}

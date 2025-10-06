@@ -250,6 +250,12 @@ app.post('/api/conversations', (req, res) => {
   try {
     const { sessionId, conversation, provider, model, timestamp, conversationName, gameSettings, selectedHeroes, currentSummary, worldMap, playerPosition } = req.body;
 
+    console.log('[SERVER] Received save request');
+    console.log('[SERVER] Session ID:', sessionId);
+    console.log('[SERVER] Provider:', provider);
+    console.log('[SERVER] Model:', model);
+    console.log('[SERVER] Model type:', typeof model);
+
     // Basic validation
     if (!sessionId || !conversation || !Array.isArray(conversation)) {
       return res.status(400).json({ message: 'Missing required session ID or conversation data.' });

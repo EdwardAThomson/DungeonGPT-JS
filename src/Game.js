@@ -33,7 +33,7 @@ const MapModalContent = ({ isOpen, onClose, mapData, playerPosition, onTileClick
 const Game = () => {
   const { state } = useLocation();
   // Handle both new games and loaded conversations
-  const { selectedHeroes: stateHeroes, loadedConversation } = state || { selectedHeroes: [], loadedConversation: null };
+  const { selectedHeroes: stateHeroes, loadedConversation, generatedMap } = state || { selectedHeroes: [], loadedConversation: null, generatedMap: null };
   const selectedHeroes = loadedConversation?.selected_heroes || stateHeroes || [];
 
   // Get API keys and the selected provider from context
@@ -58,13 +58,17 @@ const Game = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false); // State for modal visibility
   const [isHowToPlayModalOpen, setIsHowToPlayModalOpen] = useState(false); // State for How to Play modal
   const [isMapModalOpen, setIsMapModalOpen] = useState(false); // State for Map modal
-  const [sessionId, setSessionId] = useState(loadedConversation?.sessionId || null); // State for Session ID
+  const [sessionId, setSessionId] = useState(() => {
+    const id = loadedConversation?.sessionId || null;
+    console.log("Initializing sessionId:", id, "from loadedConversation:", !!loadedConversation);
+    return id;
+  }); // State for Session ID
   const [worldMap, setWorldMap] = useState(() => {
     if (loadedConversation?.world_map) {
       return loadedConversation.world_map;
     }
-    // Generate new map with starting tile explored
-    const newMap = generateMapData();
+    // Use generated map from settings, or generate new one
+    const newMap = generatedMap || generateMapData();
     newMap[1][1].isExplored = true; // Mark starting position (1,1) as explored
     return newMap;
   });
@@ -75,10 +79,20 @@ const Game = () => {
   // Refs to hold the latest state for the cleanup function
   const conversationRef = useRef(conversation);
   const sessionIdRef = useRef(sessionId);
-  const selectedProviderRef = useRef(selectedProvider);
-  const selectedModelRef = useRef(selectedModel);
+  // Initialize provider and model refs from loadedConversation if available, otherwise from Context
+  console.log('[DEBUG] loadedConversation?.provider:', loadedConversation?.provider);
+  console.log('[DEBUG] loadedConversation?.model:', loadedConversation?.model);
+  console.log('[DEBUG] selectedProvider from Context:', selectedProvider);
+  console.log('[DEBUG] selectedModel from Context:', selectedModel);
+  
+  const selectedProviderRef = useRef(loadedConversation?.provider || selectedProvider);
+  const selectedModelRef = useRef(loadedConversation?.model || selectedModel);
   const worldMapRef = useRef(worldMap);
   const playerPositionRef = useRef(playerPosition);
+  const settingsRef = useRef(loadedConversation?.game_settings || settings);
+
+  // Log initial ref values for debugging
+  console.log('[REFS INIT] Provider ref:', selectedProviderRef.current, 'Model ref:', selectedModelRef.current);
 
   // Update refs whenever the state changes
   useEffect(() => {
@@ -94,6 +108,7 @@ const Game = () => {
   }, [selectedProvider]);
 
   useEffect(() => {
+    console.log('[REF UPDATE] Updating selectedModelRef from:', selectedModelRef.current, 'to:', selectedModel);
     selectedModelRef.current = selectedModel;
   }, [selectedModel]);
 
@@ -105,14 +120,18 @@ const Game = () => {
     playerPositionRef.current = playerPosition;
   }, [playerPosition]);
 
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
   // Generate session ID on component mount (only if not loading a saved conversation)
   useEffect(() => {
-    if (!loadedConversation) {
-      // Generate a simple unique ID (you could use a library like uuid for more robustness)
+    if (!loadedConversation && !sessionId) {
+      // Only generate new session ID if we don't have one already
       const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       setSessionId(newSessionId);
-      console.log("Generated Session ID:", newSessionId);
-    } else {
+      console.log("Generated NEW Session ID:", newSessionId);
+    } else if (loadedConversation) {
       console.log("Loaded conversation with Session ID:", loadedConversation.sessionId);
       console.log("Full loaded conversation object:", loadedConversation);
       
@@ -128,15 +147,16 @@ const Game = () => {
         console.log("No game_settings found in loaded conversation");
       }
       
-      // Restore provider from saved conversation
+      // Restore provider and model from saved conversation
       if (loadedConversation.provider) {
         setSelectedProvider(loadedConversation.provider);
         console.log("Restored provider from saved conversation:", loadedConversation.provider);
       }
-      // Restore selected model from saved conversation
       if (loadedConversation.model) {
         setSelectedModel(loadedConversation.model);
         console.log("Restored model from saved conversation:", loadedConversation.model);
+      } else {
+        console.warn("No model found in loaded conversation! Provider:", loadedConversation.provider);
       }
     }
 
@@ -145,33 +165,41 @@ const Game = () => {
       const finalConversation = conversationRef.current;
       const finalSessionId = sessionIdRef.current;
 
-      if (finalSessionId && finalConversation && finalConversation.length > 0) {
-        console.log(`Attempting to save conversation for session: ${finalSessionId}`);
-        saveConversationToBackend(finalSessionId, finalConversation);
+      if (finalSessionId) {
+        console.log(`[UNMOUNT] Attempting to save conversation for session: ${finalSessionId}`);
+        console.log(`[UNMOUNT] Conversation length: ${finalConversation?.length || 0}`);
+        console.log(`[UNMOUNT] Provider: ${selectedProviderRef.current}, Model: ${selectedModelRef.current}`);
+        // Save even if conversation is empty - we still want to save settings, map, etc.
+        saveConversationToBackend(finalSessionId, finalConversation || []);
       } else {
-        console.log("Skipping save: No session ID or conversation is empty.");
+        console.log("[UNMOUNT] Skipping save: No session ID.");
       }
     };
   }, []); // Empty dependency array ensures this runs only once on mount and cleanup on unmount
 
-  // Periodic auto-save effect - save every 30 seconds if there's conversation data
+  // Periodic auto-save effect - save every 30 seconds
   useEffect(() => {
     if (!sessionId || !hasAdventureStarted) return;
 
     const autoSaveInterval = setInterval(() => {
-      if (conversationRef.current && conversationRef.current.length > 0) {
-        console.log('Auto-saving conversation...');
-        saveConversationToBackend(sessionId, conversationRef.current);
-      }
+      console.log('[AUTO-SAVE] Triggering auto-save...');
+      console.log('[AUTO-SAVE] Provider:', selectedProviderRef.current, 'Model:', selectedModelRef.current);
+      saveConversationToBackend(sessionId, conversationRef.current || []);
     }, 30000); // Save every 30 seconds
 
-    return () => clearInterval(autoSaveInterval);
+    return () => {
+      console.log('[AUTO-SAVE] Clearing auto-save interval');
+      clearInterval(autoSaveInterval);
+    };
   }, [sessionId, hasAdventureStarted]); // Re-run if sessionId or adventure state changes
 
   // Function to send data to backend
   const saveConversationToBackend = async (sessionIdToSave, conversationToSave) => {
     try {
-        console.log('Saving with provider:', selectedProviderRef.current, 'model:', selectedModelRef.current);
+        console.log('[SAVE] Starting save operation...');
+        console.log('[SAVE] Session ID:', sessionIdToSave);
+        console.log('[SAVE] Provider:', selectedProviderRef.current, 'Model:', selectedModelRef.current);
+        console.log('[SAVE] Conversation messages:', conversationToSave?.length || 0);
         // Adjust URL to your backend endpoint
       const response = await fetch('http://localhost:5000/api/conversations', {
         method: 'POST',
@@ -185,7 +213,7 @@ const Game = () => {
           model: selectedModelRef.current, // Save the selected model
           timestamp: new Date().toISOString(),
           conversationName: `Adventure - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
-          gameSettings: settings,
+          gameSettings: settingsRef.current,
           selectedHeroes: selectedHeroes,
           currentSummary: currentSummary,
           worldMap: worldMapRef.current,
@@ -503,6 +531,17 @@ const Game = () => {
                 <button onClick={() => setIsSettingsModalOpen(true)} className="view-settings-button">
                     View Full Settings
                 </button>
+                <button 
+                  onClick={() => {
+                    console.log('[MANUAL SAVE] User clicked save button');
+                    saveConversationToBackend(sessionId, conversation);
+                  }} 
+                  className="manual-save-button"
+                  disabled={!sessionId}
+                  title="Manually save game progress"
+                >
+                    💾 Save Now
+                </button>
               </div>
             </div>
           </div>
@@ -609,6 +648,13 @@ const Game = () => {
                     </div>
                     <div className="debug-section">
                       <strong>Current Model:</strong> {selectedModel || 'Not set'}
+                    </div>
+                    <div className="debug-section">
+                      <strong>What will be saved:</strong>
+                      <pre>{JSON.stringify({
+                        provider: selectedProviderRef.current,
+                        model: selectedModelRef.current
+                      }, null, 2)}</pre>
                     </div>
                   </>
                 )}

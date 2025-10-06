@@ -10,7 +10,21 @@ const SavedConversations = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    console.log('SavedConversations: Component mounted, fetching conversations...');
     fetchConversations();
+  }, []); // Fetch on mount
+
+  // Also refetch when component becomes visible again (navigating back from game)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('SavedConversations: Page visible, refetching...');
+        fetchConversations();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   const fetchConversations = async () => {
@@ -21,7 +35,19 @@ const SavedConversations = () => {
         throw new Error('Failed to fetch conversations');
       }
       const data = await response.json();
-      setConversations(data);
+      console.log('Fetched conversations:', data);
+      if (data.length > 0) {
+        console.log('First conversation model field:', data[0]?.model);
+        console.log('First conversation full object:', data[0]);
+        console.log('All fields in first conversation:', Object.keys(data[0]));
+      }
+      
+      // Sort by timestamp descending (newest first)
+      const sortedData = data.sort((a, b) => {
+        return new Date(b.timestamp) - new Date(a.timestamp);
+      });
+      
+      setConversations(sortedData);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -180,7 +206,7 @@ const SavedConversations = () => {
                 <div className="conversation-details">
                   <p><strong>Date:</strong> {formatDate(conversation.timestamp)}</p>
                   <p><strong>Provider:</strong> {formatProvider(conversation.provider)}</p>
-                  <p><strong>Model:</strong> {formatModel(conversation.model)}</p>
+                  <p><strong>Model:</strong> {formatModel(conversation.model)} <span style={{fontSize: '0.8em', color: '#999'}}>(Raw: {conversation.model || 'undefined'})</span></p>
                   <p><strong>Session ID:</strong> {conversation.sessionId}</p>
                   {conversation.selected_heroes && (
                     <p><strong>Heroes:</strong> {JSON.parse(conversation.selected_heroes).map(h => h.characterName).join(', ')}</p>

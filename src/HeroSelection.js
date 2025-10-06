@@ -10,6 +10,9 @@ const HeroSelection = () => {
   const { characters, setCharacters } = useContext(CharacterContext);
   const { settings } = useContext(SettingsContext);
   const navigate = useNavigate();
+  
+  // Get generated map from navigation state
+  const generatedMap = state?.generatedMap;
 
   const [selectedHeroes, setSelectedHeroes] = useState([]);
   const [selectionError, setSelectionError] = useState('');
@@ -64,7 +67,7 @@ const HeroSelection = () => {
     }
     setSelectionError('');
     
-    navigate('/game', { state: { selectedHeroes } });
+    navigate('/game', { state: { selectedHeroes, generatedMap } });
 
   };
 
