@@ -4,7 +4,7 @@ import React, { useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import CharacterContext from "./CharacterContext";
 import SettingsContext from "./SettingsContext";
-import { generateMapData } from "./mapGenerator";
+import { generateMapData, findStartingTown } from "./mapGenerator";
 import WorldMapDisplay from "./WorldMapDisplay";
 
 const GameSettings = () => {
@@ -282,11 +282,26 @@ const GameSettings = () => {
           <div className="map-preview-container">
             <h3>Map Preview</h3>
             <p className="map-preview-hint">
-              🏡 = Town | 🌲 = Forest | ⛰️ = Mountain | 🕳️ = Cave
+              🏡 = Town | 🌲 = Forest | ⛰️ = Mountain
             </p>
             <WorldMapDisplay 
               mapData={generatedMap}
-              playerPosition={{x: 1, y: 1}}
+              playerPosition={(() => {
+                try {
+                  return findStartingTown(generatedMap);
+                } catch (error) {
+                  console.error('Error finding starting town in preview:', error);
+                  // Find any town as fallback for preview
+                  for (let y = 0; y < generatedMap.length; y++) {
+                    for (let x = 0; x < generatedMap[y].length; x++) {
+                      if (generatedMap[y][x].poi === 'town') {
+                        return { x, y };
+                      }
+                    }
+                  }
+                  return { x: 0, y: 0 }; // Last resort
+                }
+              })()}
               onTileClick={() => {}} // No interaction in preview
               firstHero={null} // No player marker in preview
             />

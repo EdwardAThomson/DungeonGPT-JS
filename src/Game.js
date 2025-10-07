@@ -5,7 +5,7 @@ import SettingsContext from "./SettingsContext";
 import { generateText } from "./llmHelper"; // Ensure this path is correct after rename
 import { SettingsModalContent, HowToPlayModalContent } from './Modals'; // Import modals
 import WorldMapDisplay from './WorldMapDisplay'; // Import the map display
-import { generateMapData, getTile } from './mapGenerator'; // Import map generator and helper
+import { generateMapData, getTile, findStartingTown, testMapGeneration } from './mapGenerator'; // Import map generator and helper
 
 // --- Map Modal --- //
 const MapModalContent = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero }) => {
@@ -63,16 +63,32 @@ const Game = () => {
     console.log("Initializing sessionId:", id, "from loadedConversation:", !!loadedConversation);
     return id;
   }); // State for Session ID
-  const [worldMap, setWorldMap] = useState(() => {
-    if (loadedConversation?.world_map) {
-      return loadedConversation.world_map;
+  // Generate map and starting position together to ensure consistency
+  const [mapAndPosition] = useState(() => {
+    if (loadedConversation?.world_map && loadedConversation?.player_position) {
+      return {
+        map: loadedConversation.world_map,
+        position: loadedConversation.player_position
+      };
     }
-    // Use generated map from settings, or generate new one
+    
+    // Generate new map
     const newMap = generatedMap || generateMapData();
-    newMap[1][1].isExplored = true; // Mark starting position (1,1) as explored
-    return newMap;
+    const startingPos = findStartingTown(newMap);
+    console.log('[MAP INIT] Starting town found at:', startingPos);
+    console.log('[MAP INIT] Player position will be set to:', startingPos);
+    
+    // Mark starting position as explored
+    newMap[startingPos.y][startingPos.x].isExplored = true;
+    
+    return {
+      map: newMap,
+      position: startingPos
+    };
   });
-  const [playerPosition, setPlayerPosition] = useState(loadedConversation?.player_position || { x: 1, y: 1 }); // Use loaded position or start at (1,1)
+
+  const [worldMap, setWorldMap] = useState(mapAndPosition.map);
+  const [playerPosition, setPlayerPosition] = useState(mapAndPosition.position);
   const [hasAdventureStarted, setHasAdventureStarted] = useState(loadedConversation ? true : false); // State for initial start
   const [showDebugInfo, setShowDebugInfo] = useState(false); // Debug info toggle
 
@@ -520,6 +536,38 @@ const Game = () => {
                 <p><strong>Setting:</strong> {settings.shortDescription || "Not set"}</p>
                 {/* Updated Location Display */}
                 <p><strong>Location:</strong> ({playerPosition.x}, {playerPosition.y}) - {currentBiome}</p>
+                <div style={{fontSize: '12px', color: '#666', marginTop: '5px'}}>
+                  <strong>Debug:</strong> Player at ({playerPosition.x}, {playerPosition.y}) | 
+                  Starting town at: {(() => {
+                    for (let y = 0; y < worldMap.length; y++) {
+                      for (let x = 0; x < worldMap[y].length; x++) {
+                        if (worldMap[y][x].poi === 'town' && worldMap[y][x].descriptionSeed === "A small village") {
+                          return `(${x}, ${y})`;
+                        }
+                      }
+                    }
+                    return 'Not found';
+                  })()} | 
+                  Match: {playerPosition.x === (() => {
+                    for (let y = 0; y < worldMap.length; y++) {
+                      for (let x = 0; x < worldMap[y].length; x++) {
+                        if (worldMap[y][x].poi === 'town' && worldMap[y][x].descriptionSeed === "A small village") {
+                          return x;
+                        }
+                      }
+                    }
+                    return -1;
+                  })() && playerPosition.y === (() => {
+                    for (let y = 0; y < worldMap.length; y++) {
+                      for (let x = 0; x < worldMap[y].length; x++) {
+                        if (worldMap[y][x].poi === 'town' && worldMap[y][x].descriptionSeed === "A small village") {
+                          return y;
+                        }
+                      }
+                    }
+                    return -1;
+                  })() ? 'YES' : 'NO'}
+                </div>
               </div>
               <div className="header-button-group">
                 <button onClick={() => setIsMapModalOpen(true)} className="view-map-button">
@@ -619,6 +667,16 @@ const Game = () => {
             >
               {showDebugInfo ? '🐛 Hide Debug' : '🐛 Show Debug'}
             </button>
+            <button 
+              onClick={() => {
+                console.log('=== MANUAL MAP TEST ===');
+                testMapGeneration();
+              }} 
+              className="debug-toggle-button"
+              title="Test map generation"
+            >
+              🗺️ Test Map Gen
+            </button>
             
             {showDebugInfo && (
               <div className="debug-info-box">
@@ -639,25 +697,54 @@ const Game = () => {
                     <div className="debug-section">
                       <strong>Model:</strong> {loadedConversation.model || 'Not set'}
                     </div>
-                    <div className="debug-section">
-                      <strong>Current Context Settings:</strong>
-                      <pre>{JSON.stringify(settings, null, 2)}</pre>
-                    </div>
-                    <div className="debug-section">
-                      <strong>Current Provider:</strong> {selectedProvider || 'Not set'}
-                    </div>
-                    <div className="debug-section">
-                      <strong>Current Model:</strong> {selectedModel || 'Not set'}
-                    </div>
-                    <div className="debug-section">
-                      <strong>What will be saved:</strong>
-                      <pre>{JSON.stringify({
-                        provider: selectedProviderRef.current,
-                        model: selectedModelRef.current
-                      }, null, 2)}</pre>
-                    </div>
                   </>
                 )}
+                <div className="debug-section">
+                  <strong>Current Context Settings:</strong>
+                  <pre>{JSON.stringify(settings, null, 2)}</pre>
+                </div>
+                <div className="debug-section">
+                  <strong>Current Provider:</strong> {selectedProvider || 'Not set'}
+                </div>
+                <div className="debug-section">
+                  <strong>Current Model:</strong> {selectedModel || 'Not set'}
+                </div>
+                <div className="debug-section">
+                  <strong>What will be saved:</strong>
+                  <pre>{JSON.stringify({
+                    provider: selectedProviderRef.current,
+                    model: selectedModelRef.current
+                  }, null, 2)}</pre>
+                </div>
+                
+                <div className="debug-section">
+                  <strong>Map & Position Debug:</strong>
+                  <pre>{JSON.stringify({
+                    playerPosition: playerPosition,
+                    startingTownSearch: (() => {
+                      // Search for starting town in current map
+                      for (let y = 0; y < worldMap.length; y++) {
+                        for (let x = 0; x < worldMap[y].length; x++) {
+                          if (worldMap[y][x].poi === 'town' && worldMap[y][x].descriptionSeed === "A small village") {
+                            return { x, y, found: true };
+                          }
+                        }
+                      }
+                      return { found: false };
+                    })(),
+                    allTowns: (() => {
+                      const towns = [];
+                      for (let y = 0; y < worldMap.length; y++) {
+                        for (let x = 0; x < worldMap[y].length; x++) {
+                          if (worldMap[y][x].poi === 'town') {
+                            towns.push({ x, y, desc: worldMap[y][x].descriptionSeed });
+                          }
+                        }
+                      }
+                      return towns;
+                    })()
+                  }, null, 2)}</pre>
+                </div>
               </div>
             )}
           </div>
