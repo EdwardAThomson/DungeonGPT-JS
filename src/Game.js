@@ -5,7 +5,7 @@ import SettingsContext from "./SettingsContext";
 import { generateText } from "./llmHelper"; // Ensure this path is correct after rename
 import { SettingsModalContent, HowToPlayModalContent } from './Modals'; // Import modals
 import WorldMapDisplay from './WorldMapDisplay'; // Import the map display
-import { generateMapData, getTile, findStartingTown, testMapGeneration } from './mapGenerator'; // Import map generator and helper
+import { generateMapData, getTile, findStartingTown } from './mapGenerator'; // Import map generator and helper
 
 // --- Map Modal --- //
 const MapModalContent = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero }) => {
@@ -536,38 +536,6 @@ const Game = () => {
                 <p><strong>Setting:</strong> {settings.shortDescription || "Not set"}</p>
                 {/* Updated Location Display */}
                 <p><strong>Location:</strong> ({playerPosition.x}, {playerPosition.y}) - {currentBiome}</p>
-                <div style={{fontSize: '12px', color: '#666', marginTop: '5px'}}>
-                  <strong>Debug:</strong> Player at ({playerPosition.x}, {playerPosition.y}) | 
-                  Starting town at: {(() => {
-                    for (let y = 0; y < worldMap.length; y++) {
-                      for (let x = 0; x < worldMap[y].length; x++) {
-                        if (worldMap[y][x].poi === 'town' && worldMap[y][x].descriptionSeed === "A small village") {
-                          return `(${x}, ${y})`;
-                        }
-                      }
-                    }
-                    return 'Not found';
-                  })()} | 
-                  Match: {playerPosition.x === (() => {
-                    for (let y = 0; y < worldMap.length; y++) {
-                      for (let x = 0; x < worldMap[y].length; x++) {
-                        if (worldMap[y][x].poi === 'town' && worldMap[y][x].descriptionSeed === "A small village") {
-                          return x;
-                        }
-                      }
-                    }
-                    return -1;
-                  })() && playerPosition.y === (() => {
-                    for (let y = 0; y < worldMap.length; y++) {
-                      for (let x = 0; x < worldMap[y].length; x++) {
-                        if (worldMap[y][x].poi === 'town' && worldMap[y][x].descriptionSeed === "A small village") {
-                          return y;
-                        }
-                      }
-                    }
-                    return -1;
-                  })() ? 'YES' : 'NO'}
-                </div>
               </div>
               <div className="header-button-group">
                 <button onClick={() => setIsMapModalOpen(true)} className="view-map-button">
@@ -666,16 +634,6 @@ const Game = () => {
               title="Toggle debug information"
             >
               {showDebugInfo ? '🐛 Hide Debug' : '🐛 Show Debug'}
-            </button>
-            <button 
-              onClick={() => {
-                console.log('=== MANUAL MAP TEST ===');
-                testMapGeneration();
-              }} 
-              className="debug-toggle-button"
-              title="Test map generation"
-            >
-              🗺️ Test Map Gen
             </button>
             
             {showDebugInfo && (
