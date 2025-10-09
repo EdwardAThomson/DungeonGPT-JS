@@ -6,6 +6,7 @@ import CharacterContext from "./CharacterContext";
 import SettingsContext from "./SettingsContext";
 import { generateMapData, findStartingTown } from "./mapGenerator";
 import WorldMapDisplay from "./WorldMapDisplay";
+import { generateTownMap, getTownTileEmoji } from "./townMapGenerator";
 
 const GameSettings = () => {
 
@@ -31,6 +32,11 @@ const GameSettings = () => {
   // State for generated map
   const [generatedMap, setGeneratedMap] = useState(null);
   const [showMapPreview, setShowMapPreview] = useState(false);
+  
+  // State for town map preview
+  const [generatedTownMap, setGeneratedTownMap] = useState(null);
+  const [showTownMapPreview, setShowTownMapPreview] = useState(false);
+  const [selectedTownSize, setSelectedTownSize] = useState('village');
 
   // Possible options
   const grimnessOptions = ['Noble', 'Neutral', 'Bleak', 'Grim'];
@@ -82,6 +88,13 @@ const GameSettings = () => {
     const newMap = generateMapData();
     setGeneratedMap(newMap);
     setShowMapPreview(true);
+  };
+  
+  // Town map generation handler
+  const handleGenerateTownMap = () => {
+    const townMap = generateTownMap(selectedTownSize, `Test ${selectedTownSize}`, 'south');
+    setGeneratedTownMap(townMap);
+    setShowTownMapPreview(true);
   };
 
   const handleSubmit = () => {
@@ -282,7 +295,8 @@ const GameSettings = () => {
           <div className="map-preview-container">
             <h3>Map Preview</h3>
             <p className="map-preview-hint">
-              🏡 = Town | 🌲 = Forest | ⛰️ = Mountain
+              <strong>Towns:</strong> 🛖 Hamlet | 🏡 Village | 🏘️ Town | 🏰 City<br/>
+              <strong>Features:</strong> 🌲 Forest | ⛰️ Mountain
             </p>
             <WorldMapDisplay 
               mapData={generatedMap}
@@ -305,6 +319,89 @@ const GameSettings = () => {
               onTileClick={() => {}} // No interaction in preview
               firstHero={null} // No player marker in preview
             />
+          </div>
+        )}
+      </div>
+
+      {/* Town Map Generation Section */}
+      <div className="form-section">
+        <h2>Town Map Generator (Debug/Test)</h2>
+        <p className="section-description">
+          Test the town interior map generator for different town sizes.
+        </p>
+        
+        <div className="town-map-controls">
+          <label htmlFor="town-size-select">
+            <strong>Town Size:</strong>
+          </label>
+          <select 
+            id="town-size-select"
+            value={selectedTownSize}
+            onChange={(e) => setSelectedTownSize(e.target.value)}
+            className="town-size-select"
+          >
+            <option value="hamlet">Hamlet (8x8)</option>
+            <option value="village">Village (12x12)</option>
+            <option value="town">Town (16x16)</option>
+            <option value="city">City (20x20)</option>
+          </select>
+          
+          <button 
+            onClick={handleGenerateTownMap} 
+            className="generate-map-button"
+            type="button"
+          >
+            🏘️ Generate Town Map
+          </button>
+          
+          {generatedTownMap && (
+            <span className="map-status">✓ Town map generated!</span>
+          )}
+        </div>
+
+        {showTownMapPreview && generatedTownMap && (
+          <div className="map-preview-container">
+            <h3>Town Map Preview: {generatedTownMap.townName}</h3>
+            <p className="map-preview-hint">
+              <strong>Buildings:</strong> 🏠 House | 🏨 Inn | 🏪 Shop | ⛪ Temple | 🍺 Tavern | 🏦 Bank | 🏛️ Guild<br/>
+              <strong>Features:</strong> ⛲ Fountain | 🪣 Well | 🌳 Tree
+            </p>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${generatedTownMap.width}, 30px)`,
+              gridTemplateRows: `repeat(${generatedTownMap.height}, 30px)`,
+              gap: '1px',
+              border: '1px solid #ccc',
+              width: `${generatedTownMap.width * 30 + (generatedTownMap.width - 1)}px`,
+              margin: '20px auto',
+              backgroundColor: '#eee',
+              fontSize: '16px'
+            }}>
+              {generatedTownMap.mapData.flat().map((tile, index) => (
+                <div
+                  key={index}
+                  style={{
+                    backgroundColor: tile.type === 'grass' ? '#90EE90' : 
+                                   tile.type === 'stone_path' ? '#E0E0E0' :
+                                   tile.type === 'dirt_path' ? '#CD853F' :
+                                   tile.type === 'building' ? '#D3D3D3' : '#FFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: tile.isEntry ? '2px solid yellow' : 'none',
+                    position: 'relative'
+                  }}
+                  title={`(${tile.x}, ${tile.y}) - ${tile.type}${tile.buildingType ? ` (${tile.buildingType})` : ''}${tile.buildingName ? ` - ${tile.buildingName}` : ''}`}
+                >
+                  {getTownTileEmoji(tile)}
+                </div>
+              ))}
+            </div>
+            <p style={{ textAlign: 'center', fontSize: '12px', color: '#666' }}>
+              Entry point marked with yellow border | 
+              Size: {generatedTownMap.width}x{generatedTownMap.height} | 
+              Buildings: {generatedTownMap.mapData.flat().filter(t => t.type === 'building').length} structures
+            </p>
           </div>
         )}
       </div>

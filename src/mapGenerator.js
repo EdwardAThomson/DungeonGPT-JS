@@ -3,6 +3,9 @@
 // Random but sensible map generator
 // Creates varied world maps with forests, mountains, and towns
 
+import { generateTownName } from './townNameGenerator';
+import { generateTownPaths, markPathTiles } from './pathfinding';
+
 /**
  * Generate a random world map with natural-looking feature placement
  * @param {number} width - Map width (default 10)
@@ -59,25 +62,35 @@ export const generateMapData = (width = 10, height = 10, seed = null) => {
   // Improve map distribution by adding features to sparse quadrants
   improveMapDistribution(mapData, width, height, rng);
   
-  // Select one town randomly to be the starting town
+  // Assign sizes and names to all towns
   if (townsList.length > 0) {
+    assignTownSizesAndNames(mapData, townsList, rng);
+    
+    // Select one town randomly to be the starting town
     const startingTownIndex = Math.floor(rng() * townsList.length);
     const startingTown = townsList[startingTownIndex];
     
-    // Mark it as the starting town by updating its description
-    mapData[startingTown.y][startingTown.x].descriptionSeed = "A small village";
+    // Mark it as the starting town
     mapData[startingTown.y][startingTown.x].isStartingTown = true;
     
-    console.log(`[MAP_GENERATION] Selected starting town at (${startingTown.x}, ${startingTown.y}) from ${townsList.length} towns`);
+    const startingTile = mapData[startingTown.y][startingTown.x];
+    console.log(`[MAP_GENERATION] Selected starting town: ${startingTile.townName} (${startingTile.townSize}) at (${startingTown.x}, ${startingTown.y})`);
   } else {
     console.error('[MAP_GENERATION] No towns were placed! This should not happen.');
+  }
+  
+  // Generate paths between towns
+  if (townsList.length > 1) {
+    console.log('[MAP_GENERATION] Generating paths between towns...');
+    const paths = generateTownPaths(mapData, townsList);
+    markPathTiles(mapData, paths);
   }
   
   // Debug: Log all towns on the map
   console.log('[MAP_GENERATION] Map generation complete. Towns on map:');
   townsList.forEach(town => {
     const tile = mapData[town.y][town.x];
-    console.log(`  Town at (${town.x}, ${town.y}): "${tile.descriptionSeed}"${tile.isStartingTown ? ' (STARTING TOWN)' : ''}`);
+    console.log(`  ${tile.townName} (${tile.townSize}) at (${town.x}, ${town.y})${tile.isStartingTown ? ' ⭐ STARTING TOWN' : ''}`);
   });
   
   return mapData;
@@ -239,6 +252,45 @@ function placeCave(mapData, width, height, rng) {
   }
 }
 
+// Assign sizes and names to all towns on the map
+function assignTownSizesAndNames(mapData, townsList, rng) {
+  console.log(`[ASSIGN_TOWNS] Assigning sizes and names to ${townsList.length} towns...`);
+  
+  // Define size distribution based on number of towns
+  // Ensure variety: hamlet, village, town, city
+  const sizeDistribution = ['hamlet', 'village', 'town', 'city'];
+  
+  // Shuffle to randomize which town gets which size
+  const shuffledSizes = [...sizeDistribution];
+  for (let i = shuffledSizes.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [shuffledSizes[i], shuffledSizes[j]] = [shuffledSizes[j], shuffledSizes[i]];
+  }
+  
+  // Assign sizes and generate names
+  townsList.forEach((town, index) => {
+    const tile = mapData[town.y][town.x];
+    const biome = tile.biome || 'plains';
+    
+    // Assign size (cycle through shuffled sizes if we have more towns than sizes)
+    const size = shuffledSizes[index % shuffledSizes.length];
+    tile.townSize = size;
+    
+    // Generate name based on size and biome
+    tile.townName = generateTownName(size, biome, rng);
+    
+    // Update description seed based on size
+    const sizeDescriptions = {
+      hamlet: 'A small hamlet',
+      village: 'A quiet village',
+      town: 'A bustling town',
+      city: 'A grand city'
+    };
+    tile.descriptionSeed = sizeDescriptions[size] || 'A settlement';
+    
+    console.log(`[ASSIGN_TOWNS] ${tile.townName} (${size}) at (${town.x}, ${town.y})`);
+  });
+}
 
 // Improve map distribution by adding features to sparse quadrants
 function improveMapDistribution(mapData, width, height, rng) {
@@ -326,7 +378,9 @@ export const findStartingTown = (mapData) => {
   for (let y = 0; y < mapData.length; y++) {
     for (let x = 0; x < mapData[y].length; x++) {
       if (mapData[y][x].poi === 'town' && mapData[y][x].isStartingTown) {
-        console.log('[FIND_STARTING_TOWN] Found starting town at:', { x, y });
+        const townName = mapData[y][x].townName || 'Unknown';
+        const townSize = mapData[y][x].townSize || 'unknown';
+        console.log(`[FIND_STARTING_TOWN] Found starting town: ${townName} (${townSize}) at (${x}, ${y})`);
         return { x, y };
       }
     }

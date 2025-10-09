@@ -79,7 +79,8 @@ db.run(`CREATE TABLE IF NOT EXISTS characterstable (
              selected_heroes TEXT,
              summary TEXT,
              world_map TEXT,
-             player_position TEXT
+             player_position TEXT,
+             sub_maps TEXT
            )`, (err) => {
       if (err) {
         console.error('Error creating conversations table', err);
@@ -126,6 +127,12 @@ db.run(`CREATE TABLE IF NOT EXISTS characterstable (
         db.run(`ALTER TABLE conversations ADD COLUMN model TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
             console.error('Error adding model column:', err);
+          }
+        });
+        
+        db.run(`ALTER TABLE conversations ADD COLUMN sub_maps TEXT`, (err) => {
+          if (err && !err.message.includes('duplicate column name')) {
+            console.error('Error adding sub_maps column:', err);
           }
         });
       }
@@ -248,7 +255,7 @@ app.get('/test', (req, res) => {
 // --- New Conversation Saving Endpoint (SQLite Version) ---
 app.post('/api/conversations', (req, res) => {
   try {
-    const { sessionId, conversation, provider, model, timestamp, conversationName, gameSettings, selectedHeroes, currentSummary, worldMap, playerPosition } = req.body;
+    const { sessionId, conversation, provider, model, timestamp, conversationName, gameSettings, selectedHeroes, currentSummary, worldMap, playerPosition, subMaps } = req.body;
 
     console.log('[SERVER] Received save request');
     console.log('[SERVER] Session ID:', sessionId);
@@ -267,11 +274,12 @@ app.post('/api/conversations', (req, res) => {
     const heroesJson = selectedHeroes ? JSON.stringify(selectedHeroes) : null;
     const mapJson = worldMap ? JSON.stringify(worldMap) : null;
     const positionJson = playerPosition ? JSON.stringify(playerPosition) : null;
+    const subMapsJson = subMaps ? JSON.stringify(subMaps) : null;
 
     // SQL Query using ON CONFLICT for Upsert behavior
     const query = `
-      INSERT INTO conversations (sessionId, conversation_data, provider, model, timestamp, conversation_name, game_settings, selected_heroes, summary, world_map, player_position)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO conversations (sessionId, conversation_data, provider, model, timestamp, conversation_name, game_settings, selected_heroes, summary, world_map, player_position, sub_maps)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT (sessionId)
       DO UPDATE SET
         conversation_data = excluded.conversation_data,
@@ -283,7 +291,8 @@ app.post('/api/conversations', (req, res) => {
         selected_heroes = excluded.selected_heroes,
         summary = excluded.summary,
         world_map = excluded.world_map,
-        player_position = excluded.player_position;
+        player_position = excluded.player_position,
+        sub_maps = excluded.sub_maps;
     `;
 
     const params = [
@@ -297,7 +306,8 @@ app.post('/api/conversations', (req, res) => {
       heroesJson,
       currentSummary,
       mapJson,
-      positionJson
+      positionJson,
+      subMapsJson
     ];
 
     db.run(query, params, function (err) {
@@ -336,7 +346,8 @@ app.get('/api/conversations/:sessionId', (req, res) => {
         game_settings: row.game_settings ? JSON.parse(row.game_settings) : null,
         selected_heroes: row.selected_heroes ? JSON.parse(row.selected_heroes) : null,
         world_map: row.world_map ? JSON.parse(row.world_map) : null,
-        player_position: row.player_position ? JSON.parse(row.player_position) : null
+        player_position: row.player_position ? JSON.parse(row.player_position) : null,
+        sub_maps: row.sub_maps ? JSON.parse(row.sub_maps) : null
       };
       res.json(conversation);
     }

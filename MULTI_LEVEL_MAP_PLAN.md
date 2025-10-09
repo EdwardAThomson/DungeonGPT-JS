@@ -210,6 +210,119 @@ const checkSubMapExit = (playerPos, subMapSize, currentEdge) => {
 3. **If confirmed**: Return to world map at original tile
 4. **Player position**: Back on world map tile
 
+## 🛤️ Path System Between Towns
+
+### Overview
+Create visual paths connecting towns on the world map to enhance navigation and visual appeal.
+
+### Path Generation Algorithm
+
+#### 1. Find Shortest Paths
+Use A* or Dijkstra's algorithm to find shortest paths between all towns:
+```javascript
+// Pathfinding between towns
+const generateTownPaths = (mapData, townsList) => {
+  const paths = [];
+  
+  // Connect each town to its nearest neighbors
+  townsList.forEach((town, index) => {
+    // Find 1-2 nearest towns
+    const nearestTowns = findNearestTowns(town, townsList, 2);
+    
+    nearestTowns.forEach(targetTown => {
+      // Use A* to find path
+      const path = findPath(mapData, town, targetTown);
+      if (path) {
+        paths.push(path);
+      }
+    });
+  });
+  
+  return paths;
+};
+```
+
+#### 2. Path Tile Marking
+```javascript
+// Mark tiles as part of a path
+const markPathTiles = (mapData, paths) => {
+  paths.forEach(path => {
+    path.forEach(tile => {
+      if (mapData[tile.y][tile.x].poi === null) {
+        mapData[tile.y][tile.x].hasPath = true;
+        mapData[tile.y][tile.x].pathDirection = calculateDirection(tile, path);
+      }
+    });
+  });
+};
+```
+
+#### 3. Visual Path Rendering
+Paths should curve naturally within tiles:
+```javascript
+// In WorldMapDisplay.js - render path overlay
+const renderPath = (tile) => {
+  if (!tile.hasPath) return null;
+  
+  // SVG path with curves based on entry/exit directions
+  return (
+    <svg className="path-overlay" viewBox="0 0 40 40">
+      <path
+        d={generateCurvedPath(tile.pathDirection)}
+        stroke="#8B4513"  // Brown color
+        strokeWidth="3"
+        fill="none"
+        opacity="0.7"
+      />
+    </svg>
+  );
+};
+```
+
+### Path Direction System
+```javascript
+const pathDirections = {
+  NORTH_SOUTH: 'M20,0 L20,40',           // Straight vertical
+  EAST_WEST: 'M0,20 L40,20',             // Straight horizontal
+  NORTH_EAST: 'M20,0 Q20,20 40,20',      // Curved from north to east
+  NORTH_WEST: 'M20,0 Q20,20 0,20',       // Curved from north to west
+  SOUTH_EAST: 'M20,40 Q20,20 40,20',     // Curved from south to east
+  SOUTH_WEST: 'M20,40 Q20,20 0,20',      // Curved from south to west
+  INTERSECTION: 'M20,0 L20,40 M0,20 L40,20' // Cross intersection
+};
+```
+
+### Path Tile Properties
+```javascript
+{
+  x: 5, y: 5,
+  biome: 'plains',
+  poi: null,
+  hasPath: true,              // NEW: indicates path present
+  pathDirection: 'NORTH_EAST', // NEW: path direction for rendering
+  pathConnections: ['north', 'east'] // NEW: which sides connect
+}
+```
+
+### Implementation Steps
+1. **Add pathfinding algorithm** (A* implementation)
+2. **Generate paths during map creation** (after towns are placed)
+3. **Mark path tiles** with direction information
+4. **Update WorldMapDisplay** to render path overlays
+5. **Add path styling** (brown color, curves, transparency)
+
+### Visual Design
+- **Color**: Brown (#8B4513) with 70% opacity
+- **Width**: 3-4 pixels
+- **Style**: Curved paths using SVG quadratic bezier curves
+- **Layering**: Paths render below POI emojis but above biome color
+
+### Pathfinding Considerations
+- **Avoid water tiles** (if present)
+- **Prefer plains over forests/mountains** (optional weight system)
+- **Connect to nearest 1-2 neighbors** (avoid over-connecting)
+- **Ensure all towns are reachable** (minimum spanning tree)
+
 ## 🏗️ Implementation Strategy
 
 ### Phase 1: Foundation (Immediate)
