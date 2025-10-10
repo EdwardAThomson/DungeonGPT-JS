@@ -55,8 +55,13 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   const centerPos = { x: Math.floor(width / 2), y: Math.floor(height / 2) };
   placeTownCenter(mapData, centerPos, townSize);
   
-  // Place buildings
-  placeBuildings(mapData, buildingCount, townSize, rng);
+  // Place city walls (cities only)
+  if (townSize === 'city') {
+    placeCityWalls(mapData);
+  }
+  
+  // Place buildings (including keep for cities)
+  placeBuildings(mapData, buildingCount, townSize, rng, centerPos);
   
   // Generate paths connecting all buildings to the road network
   generateBuildingPaths(mapData, centerPos, rng);
@@ -146,6 +151,37 @@ function placeMainRoad(mapData, entryPos, direction, width, height, townSize) {
   }
 }
 
+// Place city walls around perimeter (cities only)
+function placeCityWalls(mapData) {
+  const width = mapData[0].length;
+  const height = mapData.length;
+  
+  // Place walls on all perimeter tiles
+  for (let x = 0; x < width; x++) {
+    // Top wall
+    if (mapData[0][x].type === 'grass') {
+      mapData[0][x].type = 'wall';
+    }
+    // Bottom wall
+    if (mapData[height - 1][x].type === 'grass') {
+      mapData[height - 1][x].type = 'wall';
+    }
+  }
+  
+  for (let y = 0; y < height; y++) {
+    // Left wall
+    if (mapData[y][0].type === 'grass') {
+      mapData[y][0].type = 'wall';
+    }
+    // Right wall
+    if (mapData[y][width - 1].type === 'grass') {
+      mapData[y][width - 1].type = 'wall';
+    }
+  }
+  
+  console.log('[TOWN_MAP] Placed city walls around perimeter');
+}
+
 // Place town center/square
 function placeTownCenter(mapData, centerPos, townSize) {
   const sizeMap = {
@@ -164,14 +200,10 @@ function placeTownCenter(mapData, centerPos, townSize) {
       const y = centerPos.y + dy;
       
       if (x >= 0 && x < mapData[0].length && y >= 0 && y < mapData.length) {
-        // Hamlets and villages use dirt paths, towns and cities use stone
-        if (townSize === 'hamlet' || townSize === 'village') {
-          mapData[y][x].type = 'dirt_path';
-        } else {
-          mapData[y][x].type = 'stone_path';
-        }
+        // Town square is a solid tile (not thin path)
+        mapData[y][x].type = 'town_square';
         
-        // Place fountain/well in the very center
+        // Place fountain/well in the very center (on top of square)
         if (dx === 0 && dy === 0) {
           mapData[y][x].poi = townSize === 'city' ? 'fountain' : 'well';
         }
@@ -181,9 +213,9 @@ function placeTownCenter(mapData, centerPos, townSize) {
 }
 
 // Place buildings around the town - COMPLETELY REWRITTEN
-function placeBuildings(mapData, count, townSize, rng) {
-  const centerX = Math.floor(mapData[0].length / 2);
-  const centerY = Math.floor(mapData.length / 2);
+function placeBuildings(mapData, count, townSize, rng, centerPos) {
+  const centerX = centerPos.x;
+  const centerY = centerPos.y;
   
   // Define important buildings for each town size
   const buildingConfig = {
@@ -201,7 +233,8 @@ function placeBuildings(mapData, count, townSize, rng) {
     },
     city: {
       important: ['temple', 'market', 'manor', 'tavern', 'tavern', 'tavern', 'guild', 'guild', 'guild', 'bank', 'bank', 'bank'],
-      houses: 40  // Reduced from 80
+      houses: 40,  // Reduced from 80
+      hasKeep: true  // Cities have keeps
     }
   };
   
@@ -228,6 +261,56 @@ function placeBuildings(mapData, count, townSize, rng) {
   // Get square size
   const squareSize = townSize === 'hamlet' ? 1 : townSize === 'village' ? 2 : 3;
   const halfSize = Math.floor(squareSize / 2);
+  
+  // STEP 0: Place keep at top of city (cities only)
+  if (config.hasKeep) {
+    console.log('[TOWN_MAP] Placing keep at top of city...');
+    
+    // Place keep at top center, inside the walls
+    const keepX = centerX;
+    const keepY = 3; // Inside the wall (y=0 is wall, y=1 is keep wall, y=2 might be road)
+    
+    if (!isOccupied(keepX, keepY)) {
+      mapData[keepY][keepX].type = 'building';
+      mapData[keepY][keepX].buildingType = 'keep';
+      mapData[keepY][keepX].walkable = false;
+      mapData[keepY][keepX].poi = null;
+      markOccupied(keepX, keepY);
+      
+      // Place thin wall around keep (3x3 area)
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const wallX = keepX + dx;
+          const wallY = keepY + dy;
+          
+          // Only place on perimeter of 3x3 area
+          if ((Math.abs(dx) === 1 || Math.abs(dy) === 1) && 
+              wallX >= 1 && wallX < mapData[0].length - 1 &&
+              wallY >= 1 && wallY < mapData.length - 1) {
+            
+            // Don't overwrite the keep itself
+            if (!(dx === 0 && dy === 0)) {
+              if (mapData[wallY][wallX].type === 'grass') {
+                mapData[wallY][wallX].type = 'keep_wall';
+                markOccupied(wallX, wallY);
+              }
+            }
+          }
+        }
+      }
+      
+      // Create stone path from keep wall to town square
+      let pathY = keepY + 2; // Start after keep wall
+      while (pathY < centerY) {
+        if (mapData[pathY][keepX].type === 'grass') {
+          mapData[pathY][keepX].type = 'stone_path';
+        }
+        pathY++;
+      }
+      
+      console.log(`[TOWN_MAP] Placed keep at (${keepX}, ${keepY}) with keep wall and path to square`);
+    }
+  }
   
   // STEP 1: Place important buildings around town square clockwise
   console.log(`[TOWN_MAP] Placing ${important.length} important buildings around square...`);
@@ -452,8 +535,11 @@ function generateBuildingPaths(mapData, centerPos, rng) {
     }
   };
   
-  // STEP 1: Connect a few houses (20%) directly to the main road network
-  const directConnections = Math.ceil(houses.length * 0.2);
+  // Track which houses are connected to the main network
+  const connectedHouses = new Set();
+  
+  // STEP 1: Connect a few houses (30%) directly to the main road network
+  const directConnections = Math.ceil(houses.length * 0.3);
   const shuffledHouses = [...houses];
   
   // Shuffle houses
@@ -462,7 +548,7 @@ function generateBuildingPaths(mapData, centerPos, rng) {
     [shuffledHouses[i], shuffledHouses[j]] = [shuffledHouses[j], shuffledHouses[i]];
   }
   
-  // Connect first 20% directly to nearest road
+  // Connect first 30% directly to nearest road
   for (let i = 0; i < directConnections && i < shuffledHouses.length; i++) {
     const house = shuffledHouses[i];
     
@@ -480,29 +566,59 @@ function generateBuildingPaths(mapData, centerPos, rng) {
     
     if (nearestRoad && minDist > 1) {
       createPath(house, nearestRoad);
+      connectedHouses.add(`${house.x},${house.y}`);
     }
   }
   
-  // STEP 2: Connect remaining houses to nearest building (house or path)
-  for (let i = directConnections; i < shuffledHouses.length; i++) {
-    const house = shuffledHouses[i];
+  // STEP 2: Connect remaining houses to nearest CONNECTED building or path
+  // Keep trying until all houses are connected or we can't connect any more
+  let unconnectedHouses = shuffledHouses.slice(directConnections);
+  let maxIterations = 10;
+  let iteration = 0;
+  
+  while (unconnectedHouses.length > 0 && iteration < maxIterations) {
+    iteration++;
+    const stillUnconnected = [];
     
-    // Find nearest path tile OR other building
-    let nearestTarget = null;
-    let minDist = Infinity;
-    
-    // Check all path tiles and already-placed buildings
-    [...pathTiles, ...shuffledHouses.slice(0, i)].forEach(target => {
-      const dist = Math.abs(house.x - target.x) + Math.abs(house.y - target.y);
-      if (dist < minDist && dist > 0) {
-        minDist = dist;
-        nearestTarget = target;
+    for (const house of unconnectedHouses) {
+      // Find nearest path tile OR connected house
+      let nearestTarget = null;
+      let minDist = Infinity;
+      
+      // Check all path tiles
+      pathTiles.forEach(target => {
+        const dist = Math.abs(house.x - target.x) + Math.abs(house.y - target.y);
+        if (dist < minDist && dist > 0) {
+          minDist = dist;
+          nearestTarget = target;
+        }
+      });
+      
+      // Check connected houses
+      shuffledHouses.forEach(otherHouse => {
+        if (connectedHouses.has(`${otherHouse.x},${otherHouse.y}`)) {
+          const dist = Math.abs(house.x - otherHouse.x) + Math.abs(house.y - otherHouse.y);
+          if (dist < minDist && dist > 0) {
+            minDist = dist;
+            nearestTarget = otherHouse;
+          }
+        }
+      });
+      
+      if (nearestTarget && minDist > 1 && minDist < 10) {
+        createPath(house, nearestTarget);
+        connectedHouses.add(`${house.x},${house.y}`);
+      } else {
+        stillUnconnected.push(house);
       }
-    });
-    
-    if (nearestTarget && minDist > 1 && minDist < 8) {
-      createPath(house, nearestTarget);
     }
+    
+    // If we didn't connect any houses this iteration, break
+    if (stillUnconnected.length === unconnectedHouses.length) {
+      break;
+    }
+    
+    unconnectedHouses = stillUnconnected;
   }
   
   console.log(`[TOWN_MAP] Generated organic paths: ${directConnections} direct connections, ${houses.length - directConnections} house-to-house`);
@@ -521,9 +637,10 @@ export const getTownTileEmoji = (tile) => {
       well: '🪣',
       tree: '🌳',
       bush: '🌿',
-      flowers: '🌸'
+      flowers: '🌸',
+      '🔲': '🔲'  // Wall emoji passes through
     };
-    return poiEmojis[tile.poi] || '❓';
+    return poiEmojis[tile.poi] || tile.poi || '❓';  // Return the poi itself if not in map
   }
   
   // Building types
@@ -539,7 +656,8 @@ export const getTownTileEmoji = (tile) => {
       bank: '🏦',
       barracks: '🏰',
       manor: '🏰',
-      barn: '🏚️'
+      barn: '🏚️',
+      keep: '🏰'  // Castle/keep for cities
     };
     return buildingEmojis[tile.buildingType] || '🏠';
   }

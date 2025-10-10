@@ -377,25 +377,267 @@ const GameSettings = () => {
               backgroundColor: '#eee',
               fontSize: '16px'
             }}>
-              {generatedTownMap.mapData.flat().map((tile, index) => (
-                <div
-                  key={index}
-                  style={{
-                    backgroundColor: tile.type === 'grass' ? '#90EE90' : 
-                                   tile.type === 'stone_path' ? '#E0E0E0' :
-                                   tile.type === 'dirt_path' ? '#CD853F' :
-                                   tile.type === 'building' ? '#D3D3D3' : '#FFF',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    border: tile.isEntry ? '2px solid yellow' : 'none',
-                    position: 'relative'
-                  }}
-                  title={`(${tile.x}, ${tile.y}) - ${tile.type}${tile.buildingType ? ` (${tile.buildingType})` : ''}${tile.buildingName ? ` - ${tile.buildingName}` : ''}`}
-                >
-                  {getTownTileEmoji(tile)}
-                </div>
-              ))}
+              {generatedTownMap.mapData.flat().map((tile, index) => {
+                const row = Math.floor(index / generatedTownMap.width);
+                const col = index % generatedTownMap.width;
+                const isPath = tile.type === 'dirt_path' || tile.type === 'stone_path';
+                const isWall = tile.type === 'wall';
+                const isKeepWall = tile.type === 'keep_wall';
+                const pathColor = tile.type === 'dirt_path' ? '#8B4513' : '#E0E0E0';
+                const wallColor = '#A9A9A9';
+                const keepWallColor = '#E0E0E0';
+                
+                // Check adjacent tiles to determine path direction
+                let hasPathNorth = false, hasPathSouth = false, hasPathEast = false, hasPathWest = false;
+                if (isPath) {
+                  const north = row > 0 ? generatedTownMap.mapData[row - 1][col] : null;
+                  const south = row < generatedTownMap.height - 1 ? generatedTownMap.mapData[row + 1][col] : null;
+                  const east = col < generatedTownMap.width - 1 ? generatedTownMap.mapData[row][col + 1] : null;
+                  const west = col > 0 ? generatedTownMap.mapData[row][col - 1] : null;
+                  
+                  hasPathNorth = north && (north.type === 'dirt_path' || north.type === 'stone_path' || north.type === 'building' || north.type === 'town_square');
+                  hasPathSouth = south && (south.type === 'dirt_path' || south.type === 'stone_path' || south.type === 'building' || south.type === 'town_square');
+                  hasPathEast = east && (east.type === 'dirt_path' || east.type === 'stone_path' || east.type === 'building' || east.type === 'town_square');
+                  hasPathWest = west && (west.type === 'dirt_path' || west.type === 'stone_path' || west.type === 'building' || west.type === 'town_square');
+                }
+                
+                // Check adjacent tiles for wall connections
+                let hasWallNorth = false, hasWallSouth = false, hasWallEast = false, hasWallWest = false;
+                if (isWall) {
+                  const north = row > 0 ? generatedTownMap.mapData[row - 1][col] : null;
+                  const south = row < generatedTownMap.height - 1 ? generatedTownMap.mapData[row + 1][col] : null;
+                  const east = col < generatedTownMap.width - 1 ? generatedTownMap.mapData[row][col + 1] : null;
+                  const west = col > 0 ? generatedTownMap.mapData[row][col - 1] : null;
+                  
+                  hasWallNorth = north && north.type === 'wall';
+                  hasWallSouth = south && south.type === 'wall';
+                  hasWallEast = east && east.type === 'wall';
+                  hasWallWest = west && west.type === 'wall';
+                }
+                
+                // Check adjacent tiles for keep wall connections
+                let hasKeepWallNorth = false, hasKeepWallSouth = false, hasKeepWallEast = false, hasKeepWallWest = false;
+                if (isKeepWall) {
+                  const north = row > 0 ? generatedTownMap.mapData[row - 1][col] : null;
+                  const south = row < generatedTownMap.height - 1 ? generatedTownMap.mapData[row + 1][col] : null;
+                  const east = col < generatedTownMap.width - 1 ? generatedTownMap.mapData[row][col + 1] : null;
+                  const west = col > 0 ? generatedTownMap.mapData[row][col - 1] : null;
+                  
+                  hasKeepWallNorth = north && north.type === 'keep_wall';
+                  hasKeepWallSouth = south && south.type === 'keep_wall';
+                  hasKeepWallEast = east && east.type === 'keep_wall';
+                  hasKeepWallWest = west && west.type === 'keep_wall';
+                }
+                
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      backgroundColor: tile.type === 'grass' ? '#90EE90' : 
+                                     tile.type === 'stone_path' ? '#90EE90' :
+                                     tile.type === 'dirt_path' ? '#90EE90' :
+                                     tile.type === 'wall' ? '#90EE90' :  // Grass background for walls (draw lines)
+                                     tile.type === 'keep_wall' ? '#90EE90' :  // Grass background for keep walls (draw lines)
+                                     tile.type === 'town_square' ? '#E0E0E0' :  // Solid grey square
+                                     tile.type === 'building' ? '#90EE90' : '#FFF',  // Green under buildings
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: tile.isEntry ? '2px solid yellow' : 'none',
+                      position: 'relative'
+                    }}
+                    title={`(${tile.x}, ${tile.y}) - ${tile.type}${tile.buildingType ? ` (${tile.buildingType})` : ''}${tile.buildingName ? ` - ${tile.buildingName}` : ''}`}
+                  >
+                    {isPath && (
+                      <>
+                        {/* North segment - only if there's a path north */}
+                        {hasPathNorth && (
+                          <div style={{
+                            position: 'absolute',
+                            width: '4px',
+                            height: '50%',
+                            backgroundColor: pathColor,
+                            left: '50%',
+                            top: '0',
+                            transform: 'translateX(-50%)'
+                          }} />
+                        )}
+                        {/* South segment - only if there's a path south */}
+                        {hasPathSouth && (
+                          <div style={{
+                            position: 'absolute',
+                            width: '4px',
+                            height: '50%',
+                            backgroundColor: pathColor,
+                            left: '50%',
+                            bottom: '0',
+                            transform: 'translateX(-50%)'
+                          }} />
+                        )}
+                        {/* East segment - only if there's a path east */}
+                        {hasPathEast && (
+                          <div style={{
+                            position: 'absolute',
+                            height: '4px',
+                            width: '50%',
+                            backgroundColor: pathColor,
+                            top: '50%',
+                            right: '0',
+                            transform: 'translateY(-50%)'
+                          }} />
+                        )}
+                        {/* West segment - only if there's a path west */}
+                        {hasPathWest && (
+                          <div style={{
+                            position: 'absolute',
+                            height: '4px',
+                            width: '50%',
+                            backgroundColor: pathColor,
+                            top: '50%',
+                            left: '0',
+                            transform: 'translateY(-50%)'
+                          }} />
+                        )}
+                        {/* Center dot only for corners/intersections (2+ connections) */}
+                        {(hasPathNorth || hasPathSouth) && (hasPathEast || hasPathWest) && (
+                          <div style={{
+                            position: 'absolute',
+                            width: '6px',
+                            height: '6px',
+                            backgroundColor: pathColor,
+                            borderRadius: '50%'
+                          }} />
+                        )}
+                      </>
+                    )}
+                    {isWall && (
+                      <>
+                        {/* North wall segment - 12px thick (3x paths) */}
+                        {hasWallNorth && (
+                          <div style={{
+                            position: 'absolute',
+                            width: '12px',
+                            height: '50%',
+                            backgroundColor: wallColor,
+                            left: '50%',
+                            top: '0',
+                            transform: 'translateX(-50%)'
+                          }} />
+                        )}
+                        {/* South wall segment */}
+                        {hasWallSouth && (
+                          <div style={{
+                            position: 'absolute',
+                            width: '12px',
+                            height: '50%',
+                            backgroundColor: wallColor,
+                            left: '50%',
+                            bottom: '0',
+                            transform: 'translateX(-50%)'
+                          }} />
+                        )}
+                        {/* East wall segment */}
+                        {hasWallEast && (
+                          <div style={{
+                            position: 'absolute',
+                            height: '12px',
+                            width: '50%',
+                            backgroundColor: wallColor,
+                            top: '50%',
+                            right: '0',
+                            transform: 'translateY(-50%)'
+                          }} />
+                        )}
+                        {/* West wall segment */}
+                        {hasWallWest && (
+                          <div style={{
+                            position: 'absolute',
+                            height: '12px',
+                            width: '50%',
+                            backgroundColor: wallColor,
+                            top: '50%',
+                            left: '0',
+                            transform: 'translateY(-50%)'
+                          }} />
+                        )}
+                        {/* Center square only for corners/intersections (2+ connections) */}
+                        {(hasWallNorth || hasWallSouth) && (hasWallEast || hasWallWest) && (
+                          <div style={{
+                            position: 'absolute',
+                            width: '14px',
+                            height: '14px',
+                            backgroundColor: wallColor,
+                            borderRadius: '2px'
+                          }} />
+                        )}
+                      </>
+                    )}
+                    {isKeepWall && (
+                      <>
+                        {/* North keep wall segment - 4px like paths */}
+                        {hasKeepWallNorth && (
+                          <div style={{
+                            position: 'absolute',
+                            width: '4px',
+                            height: '50%',
+                            backgroundColor: keepWallColor,
+                            left: '50%',
+                            top: '0',
+                            transform: 'translateX(-50%)'
+                          }} />
+                        )}
+                        {/* South keep wall segment */}
+                        {hasKeepWallSouth && (
+                          <div style={{
+                            position: 'absolute',
+                            width: '4px',
+                            height: '50%',
+                            backgroundColor: keepWallColor,
+                            left: '50%',
+                            bottom: '0',
+                            transform: 'translateX(-50%)'
+                          }} />
+                        )}
+                        {/* East keep wall segment */}
+                        {hasKeepWallEast && (
+                          <div style={{
+                            position: 'absolute',
+                            height: '4px',
+                            width: '50%',
+                            backgroundColor: keepWallColor,
+                            top: '50%',
+                            right: '0',
+                            transform: 'translateY(-50%)'
+                          }} />
+                        )}
+                        {/* West keep wall segment */}
+                        {hasKeepWallWest && (
+                          <div style={{
+                            position: 'absolute',
+                            height: '4px',
+                            width: '50%',
+                            backgroundColor: keepWallColor,
+                            top: '50%',
+                            left: '0',
+                            transform: 'translateY(-50%)'
+                          }} />
+                        )}
+                        {/* Center dot only for corners/intersections (2+ connections) */}
+                        {(hasKeepWallNorth || hasKeepWallSouth) && (hasKeepWallEast || hasKeepWallWest) && (
+                          <div style={{
+                            position: 'absolute',
+                            width: '6px',
+                            height: '6px',
+                            backgroundColor: keepWallColor,
+                            borderRadius: '50%'
+                          }} />
+                        )}
+                      </>
+                    )}
+                    {getTownTileEmoji(tile)}
+                  </div>
+                );
+              })}
             </div>
             <p style={{ textAlign: 'center', fontSize: '12px', color: '#666' }}>
               Entry point marked with yellow border | 
