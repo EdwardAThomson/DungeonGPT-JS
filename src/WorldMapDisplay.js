@@ -20,8 +20,12 @@ const poiEmojis = {
 
 // Helper function to get the appropriate town emoji
 const getTownEmoji = (tile) => {
-  if (tile.poi === 'town' && tile.townSize) {
-    return poiEmojis[`town_${tile.townSize}`] || poiEmojis.town_village;
+  if (tile.poi === 'town') {
+    if (tile.townSize) {
+      return poiEmojis[`town_${tile.townSize}`] || poiEmojis.town_village;
+    }
+    // Backward compatibility: if no townSize, default to village emoji
+    return poiEmojis.town_village;
   }
   return null;
 };

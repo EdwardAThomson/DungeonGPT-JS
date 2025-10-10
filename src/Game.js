@@ -5,23 +5,123 @@ import SettingsContext from "./SettingsContext";
 import { generateText } from "./llmHelper"; // Ensure this path is correct after rename
 import { SettingsModalContent, HowToPlayModalContent } from './Modals'; // Import modals
 import WorldMapDisplay from './WorldMapDisplay'; // Import the map display
+import TownMapDisplay from './TownMapDisplay'; // Import town map display
 import { generateMapData, getTile, findStartingTown } from './mapGenerator'; // Import map generator and helper
+import { generateTownMap } from './townMapGenerator'; // Import town map generator
+
+// --- Encounter Modal --- //
+const EncounterModalContent = ({ isOpen, onClose, encounter, onEnterLocation }) => {
+  if (!isOpen || !encounter) return null;
+
+  const getLocationIcon = (poiType) => {
+    const icons = {
+      'town': '🏘️',
+      'city': '🏰',
+      'village': '🏡',
+      'hamlet': '🏚️',
+      'dungeon': '⚔️',
+      'ruins': '🏛️',
+      'cave': '🕳️',
+      'forest': '🌲',
+      'mountain': '⛰️'
+    };
+    return icons[poiType] || '📍';
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content encounter-modal-content" onClick={(e) => e.stopPropagation()}>
+        <div style={{ textAlign: 'center', fontSize: '64px', marginBottom: '20px' }}>
+          {getLocationIcon(encounter.poiType)}
+        </div>
+        <h2>{encounter.name}</h2>
+        <p style={{ fontSize: '16px', lineHeight: '1.6', marginBottom: '20px' }}>
+          {encounter.description}
+        </p>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          {encounter.canEnter && (
+            <button 
+              className="primary-button" 
+              onClick={() => {
+                onEnterLocation();
+                onClose();
+              }}
+            >
+              Enter {encounter.name}
+            </button>
+          )}
+          <button className="secondary-button" onClick={onClose}>
+            Continue Journey
+          </button>
+          <button 
+            className="secondary-button" 
+            onClick={() => {
+              onClose();
+              // Will open map modal - handled by parent
+            }}
+          >
+            View Map
+          </button>
+        </div>
+        <p style={{ fontSize: '12px', color: '#666', marginTop: '20px', fontStyle: 'italic' }}>
+          💡 Tip: Use the Map button in the top-right to navigate the world
+        </p>
+      </div>
+    </div>
+  );
+};
 
 // --- Map Modal --- //
-const MapModalContent = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero }) => {
+const MapModalContent = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted }) => {
     if (!isOpen) return null;
+    
+    // Check if player is on a town tile
+    const isOnTown = mapLevel === 'world' && currentTile && currentTile.poi === 'town';
   
     return (
       <div className="modal-overlay" onClick={onClose}>
         {/* Add specific class for map styling if needed */}
         <div className="modal-content map-modal-content" onClick={(e) => e.stopPropagation()}>
-          <h2>World Map</h2>
-          <WorldMapDisplay 
-            mapData={mapData} 
-            playerPosition={playerPosition} 
-            onTileClick={onTileClick}
-            firstHero={firstHero}
-          />
+          <h2>{mapLevel === 'town' ? 'Town Map' : 'World Map'}</h2>
+          {mapLevel === 'world' ? (
+            <>
+              <WorldMapDisplay 
+                mapData={mapData} 
+                playerPosition={playerPosition} 
+                onTileClick={onTileClick}
+                firstHero={firstHero}
+              />
+              {isOnTown && (
+                <div style={{ textAlign: 'center', marginTop: '10px' }}>
+                  <button 
+                    className="primary-button" 
+                    onClick={() => {
+                      onEnterCurrentTown();
+                      // Don't close modal - it will switch to town view
+                    }}
+                    style={{ marginRight: '10px' }}
+                    disabled={!hasAdventureStarted}
+                    title={!hasAdventureStarted ? 'Start the adventure first' : ''}
+                  >
+                    {isInsideTown ? `View ${currentTile.townName || currentTile.poi} Map` : `Enter ${currentTile.townName || currentTile.poi}`}
+                  </button>
+                  {!hasAdventureStarted && (
+                    <p style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+                      Start your adventure to enter towns
+                    </p>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <TownMapDisplay
+              townMapData={townMapData}
+              playerPosition={townPlayerPosition}
+              onLeaveTown={onLeaveTown}
+              onTileClick={onTownTileClick}
+              firstHero={firstHero}
+            />
+          )}
           <button className="modal-close-button" onClick={onClose}>
             Close Map
           </button>
@@ -58,6 +158,8 @@ const Game = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false); // State for modal visibility
   const [isHowToPlayModalOpen, setIsHowToPlayModalOpen] = useState(false); // State for How to Play modal
   const [isMapModalOpen, setIsMapModalOpen] = useState(false); // State for Map modal
+  const [isEncounterModalOpen, setIsEncounterModalOpen] = useState(false); // State for Encounter modal
+  const [currentEncounter, setCurrentEncounter] = useState(null); // Current encounter data
   const [sessionId, setSessionId] = useState(() => {
     const id = loadedConversation?.sessionId || null;
     console.log("Initializing sessionId:", id, "from loadedConversation:", !!loadedConversation);
@@ -89,8 +191,51 @@ const Game = () => {
 
   const [worldMap, setWorldMap] = useState(mapAndPosition.map);
   const [playerPosition, setPlayerPosition] = useState(mapAndPosition.position);
-  const [hasAdventureStarted, setHasAdventureStarted] = useState(loadedConversation ? true : false); // State for initial start
+  // Determine if adventure has started:
+  // 1. If field exists in save, use it
+  // 2. For old saves without field: check if conversation has AI messages (adventure started)
+  // 3. For new games: false (must click "Start Adventure")
+  const [hasAdventureStarted, setHasAdventureStarted] = useState(() => {
+    if (loadedConversation?.hasAdventureStarted !== undefined) {
+      return loadedConversation.hasAdventureStarted;
+    }
+    // For old saves: check if conversation has any AI messages
+    if (loadedConversation?.conversation && loadedConversation.conversation.length > 0) {
+      const hasAIMessages = loadedConversation.conversation.some(msg => msg.role === 'ai');
+      return hasAIMessages; // If AI has responded, adventure started
+    }
+    return false; // New game - must click "Start Adventure"
+  });
   const [showDebugInfo, setShowDebugInfo] = useState(false); // Debug info toggle
+  
+  // Multi-level map system
+  const [currentMapLevel, setCurrentMapLevel] = useState(loadedConversation?.sub_maps?.currentMapLevel || 'world'); // 'world' or 'town'
+  const [currentTownMap, setCurrentTownMap] = useState(loadedConversation?.sub_maps?.currentTownMap || null); // Current town map data
+  const [townPlayerPosition, setTownPlayerPosition] = useState(loadedConversation?.sub_maps?.townPlayerPosition || null); // Player position in town
+  const [currentTownTile, setCurrentTownTile] = useState(loadedConversation?.sub_maps?.currentTownTile || null); // World map tile of current town
+  const [isInsideTown, setIsInsideTown] = useState(loadedConversation?.sub_maps?.isInsideTown || false); // Whether player has entered the town (vs just standing on tile)
+  const [townMapsCache, setTownMapsCache] = useState(loadedConversation?.sub_maps?.townMapsCache || {}); // Cache of all generated town maps by town name
+
+  // Validate and regenerate town map if needed (for old saves with corrupted data)
+  useEffect(() => {
+    if (currentTownMap && currentTownTile) {
+      // Check if town map has valid structure
+      const isValid = currentTownMap.mapData && 
+                      currentTownMap.width && 
+                      currentTownMap.height &&
+                      currentTownMap.entryPoint &&
+                      typeof currentTownMap.townName === 'string';
+      
+      if (!isValid) {
+        console.log('[TOWN_MAP] Invalid town map data detected, regenerating...');
+        const townSize = currentTownTile.townSize || currentTownTile.poiType || 'village';
+        const townName = currentTownTile.townName || currentTownTile.poi || 'Town';
+        const newTownMap = generateTownMap(townSize, townName);
+        setCurrentTownMap(newTownMap);
+        setTownPlayerPosition({ x: newTownMap.entryPoint.x, y: newTownMap.entryPoint.y });
+      }
+    }
+  }, []); // Only run once on mount
 
   // Refs to hold the latest state for the cleanup function
   const conversationRef = useRef(conversation);
@@ -234,6 +379,16 @@ const Game = () => {
           currentSummary: currentSummary,
           worldMap: worldMapRef.current,
           playerPosition: playerPositionRef.current,
+          hasAdventureStarted: hasAdventureStarted,
+          // Town map state packaged as subMaps
+          subMaps: {
+            currentTownMap: currentTownMap,
+            townPlayerPosition: townPlayerPosition,
+            currentTownTile: currentTownTile,
+            isInsideTown: isInsideTown,
+            currentMapLevel: currentMapLevel,
+            townMapsCache: townMapsCache,
+          },
         }),
       });
 
@@ -440,6 +595,186 @@ const Game = () => {
     }
   };
 
+  // Handle entering a location (town, dungeon, etc.)
+  const handleEnterLocation = () => {
+    if (!currentEncounter) return;
+    
+    console.log('[ENCOUNTER] Entering location:', currentEncounter.name);
+    
+    // Generate town map based on POI type
+    if (['town', 'city', 'village', 'hamlet'].includes(currentEncounter.poiType)) {
+      const townTile = currentEncounter.tile;
+      const townSize = townTile.townSize || currentEncounter.poiType;
+      const townName = currentEncounter.name;
+      
+      console.log('[TOWN_ENTRY] Entering town from encounter:', townName, 'Size:', townSize);
+      
+      // Check if we already have this town map in cache
+      let townMapData = townMapsCache[townName];
+      
+      if (!townMapData) {
+        // Generate new town map only if not in cache
+        console.log('[TOWN_ENTRY] Generating new town map for:', townName);
+        townMapData = generateTownMap(townSize, townName);
+        
+        // Add to cache
+        setTownMapsCache({
+          ...townMapsCache,
+          [townName]: townMapData
+        });
+      } else {
+        console.log('[TOWN_ENTRY] Loading cached town map for:', townName);
+      }
+      
+      // Set town map state
+      setCurrentTownMap(townMapData);
+      setCurrentTownTile(townTile);
+      setTownPlayerPosition({ x: townMapData.entryPoint.x, y: townMapData.entryPoint.y });
+      setCurrentMapLevel('town');
+      setIsInsideTown(true); // Mark that player has entered the town
+      
+      // Add message to conversation
+      const enterMessage = { 
+        role: 'system', 
+        content: `You have entered ${townName}.` 
+      };
+      setConversation([...conversation, enterMessage]);
+      
+      // Open map modal to show town
+      setIsMapModalOpen(true);
+    }
+  };
+
+  // Handle entering the town from the current tile (when already on town tile)
+  const handleEnterCurrentTown = () => {
+    // Prevent entering towns before adventure starts
+    if (!hasAdventureStarted) {
+      console.log('[TOWN_ENTRY] Cannot enter town - adventure has not started yet');
+      return;
+    }
+    
+    const currentTile = getTile(worldMap, playerPosition.x, playerPosition.y);
+    if (!currentTile || currentTile.poi !== 'town') return;
+    
+    const poiType = currentTile.poiType || currentTile.poi;
+    const townSize = currentTile.townSize || poiType;
+    const townName = currentTile.townName || currentTile.poi;
+    
+    console.log('[TOWN_ENTRY] Entering current town:', townName, 'Size:', townSize);
+    
+    // Check if we already have this town map in cache
+    let townMapData = townMapsCache[townName];
+    
+    if (!townMapData) {
+      // Generate new town map only if not in cache
+      console.log('[TOWN_ENTRY] Generating new town map for:', townName);
+      townMapData = generateTownMap(townSize, townName);
+      
+      // Add to cache
+      setTownMapsCache({
+        ...townMapsCache,
+        [townName]: townMapData
+      });
+    } else {
+      console.log('[TOWN_ENTRY] Loading cached town map for:', townName);
+    }
+    
+    // If already inside, just switch to town view (don't add message)
+    if (isInsideTown && currentTownTile?.townName === townName) {
+      setCurrentMapLevel('town');
+      return;
+    }
+    
+    // Set town map state
+    setCurrentTownMap(townMapData);
+    setCurrentTownTile(currentTile);
+    setTownPlayerPosition({ x: townMapData.entryPoint.x, y: townMapData.entryPoint.y });
+    setCurrentMapLevel('town');
+    setIsInsideTown(true); // Mark that player has entered the town
+    
+    // Add message to conversation only when first entering
+    const enterMessage = { 
+      role: 'system', 
+      content: `You have entered ${townName}.` 
+    };
+    setConversation([...conversation, enterMessage]);
+  };
+  
+  // Handle leaving a town and returning to world map
+  const handleLeaveTown = () => {
+    if (!currentTownMap || !townPlayerPosition) return;
+    
+    // Check if player is at the entrance or adjacent to it on the right
+    const entryPoint = currentTownMap.entryPoint;
+    const playerX = townPlayerPosition.x;
+    const playerY = townPlayerPosition.y;
+    
+    const isAtEntry = playerX === entryPoint.x && playerY === entryPoint.y;
+    const isAdjacentRight = playerX === entryPoint.x + 1 && playerY === entryPoint.y;
+    
+    if (!isAtEntry && !isAdjacentRight) {
+      setError('You must be at the town entrance (marked with yellow outline) to leave.');
+      console.log('[TOWN_EXIT] Not at entrance. Player:', playerX, playerY, 'Entry:', entryPoint.x, entryPoint.y);
+      return;
+    }
+    
+    console.log('[TOWN_EXIT] Leaving town, returning to world map');
+    setCurrentMapLevel('world');
+    setCurrentTownMap(null);
+    setTownPlayerPosition(null);
+    setCurrentTownTile(null);
+    setIsInsideTown(false); // Mark that player has left the town
+    
+    // Add message to conversation
+    const exitMessage = { 
+      role: 'system', 
+      content: `You have left the town and returned to the world map.` 
+    };
+    setConversation([...conversation, exitMessage]);
+  };
+
+  // Handle clicking on a town tile for movement
+  const handleTownTileClick = (clickedX, clickedY) => {
+    if (!townPlayerPosition || !currentTownMap || isLoading) return;
+
+    const currentX = townPlayerPosition.x;
+    const currentY = townPlayerPosition.y;
+
+    // Calculate Manhattan distance (5 tile range in towns)
+    const distance = Math.abs(clickedX - currentX) + Math.abs(clickedY - currentY);
+    
+    if (distance === 0) {
+      console.log('[TOWN_MOVE] Already at this position');
+      return;
+    }
+
+    if (distance > 5) {
+      console.log('[TOWN_MOVE] Too far - max 5 tiles');
+      setError('You can move up to 5 tiles at a time in town.');
+      return;
+    }
+
+    // Get target tile
+    const targetTile = currentTownMap.mapData[clickedY][clickedX];
+    
+    if (!targetTile.walkable) {
+      console.log('[TOWN_MOVE] Tile is not walkable');
+      setError('You cannot move to that location.');
+      return;
+    }
+
+    console.log(`[TOWN_MOVE] Moving to (${clickedX}, ${clickedY}) - ${distance} tiles`);
+    
+    // Update player position in town (no chat message to avoid spam)
+    setTownPlayerPosition({ x: clickedX, y: clickedY });
+    
+    // Note: We don't add movement messages to chat to avoid spam
+    // Position is still saved and will persist across sessions
+    
+    // TODO: Check if player is at a building and trigger interaction
+    // TODO: Check if player is at town edge and offer to leave
+  };
+
   // Handle clicking on a map tile for movement
   const handleMapTileClick = async (clickedX, clickedY) => {
     // Ensure adventure has started before allowing movement
@@ -478,6 +813,21 @@ const Game = () => {
     );
     setWorldMap(updatedMap);
     setPlayerPosition({ x: clickedX, y: clickedY });
+
+    // Check if this tile has a POI and trigger encounter
+    if (targetTile.poi) {
+      // Backward compatibility: use poiType if available, otherwise use poi field
+      const poiType = targetTile.poiType || targetTile.poi;
+      const encounter = {
+        name: targetTile.townName || targetTile.poi,
+        poiType: poiType,
+        description: targetTile.description || targetTile.descriptionSeed || `You have arrived at ${targetTile.poi}.`,
+        canEnter: ['town', 'city', 'village', 'hamlet', 'dungeon'].includes(poiType),
+        tile: targetTile
+      };
+      setCurrentEncounter(encounter);
+      setIsEncounterModalOpen(true);
+    }
 
     // --- Trigger LLM description for the new location --- //
     const currentApiKey = apiKeys[selectedProvider];
@@ -762,6 +1112,21 @@ const Game = () => {
         playerPosition={playerPosition}
         onTileClick={handleMapTileClick}
         firstHero={selectedHeroes && selectedHeroes.length > 0 ? selectedHeroes[0] : null}
+        mapLevel={currentMapLevel}
+        townMapData={currentTownMap}
+        townPlayerPosition={townPlayerPosition}
+        onLeaveTown={handleLeaveTown}
+        onTownTileClick={handleTownTileClick}
+        currentTile={currentTile}
+        onEnterCurrentTown={handleEnterCurrentTown}
+        isInsideTown={isInsideTown}
+        hasAdventureStarted={hasAdventureStarted}
+      />
+      <EncounterModalContent
+        isOpen={isEncounterModalOpen}
+        onClose={() => setIsEncounterModalOpen(false)}
+        encounter={currentEncounter}
+        onEnterLocation={handleEnterLocation}
       />
     </div>
   );
