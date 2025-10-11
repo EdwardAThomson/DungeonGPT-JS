@@ -72,7 +72,7 @@ const EncounterModalContent = ({ isOpen, onClose, encounter, onEnterLocation }) 
 };
 
 // --- Map Modal --- //
-const MapModalContent = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted }) => {
+const MapModalContent = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError }) => {
     if (!isOpen) return null;
     
     // Check if player is on a town tile
@@ -120,6 +120,7 @@ const MapModalContent = ({ isOpen, onClose, mapData, playerPosition, onTileClick
               onLeaveTown={onLeaveTown}
               onTileClick={onTownTileClick}
               firstHero={firstHero}
+              townError={townError}
             />
           )}
           <button className="modal-close-button" onClick={onClose}>
@@ -155,6 +156,7 @@ const Game = () => {
   const [currentSummary, setCurrentSummary] = useState(loadedConversation?.summary || '');
   const [isLoading, setIsLoading] = useState(false); // State for loading indicator
   const [error, setError] = useState(null); // State for error messages
+  const [townError, setTownError] = useState(null); // State for town-specific error messages
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false); // State for modal visibility
   const [isHowToPlayModalOpen, setIsHowToPlayModalOpen] = useState(false); // State for How to Play modal
   const [isMapModalOpen, setIsMapModalOpen] = useState(false); // State for Map modal
@@ -200,8 +202,10 @@ const Game = () => {
       return loadedConversation.hasAdventureStarted;
     }
     // For old saves: check if conversation has any AI messages
-    if (loadedConversation?.conversation && loadedConversation.conversation.length > 0) {
-      const hasAIMessages = loadedConversation.conversation.some(msg => msg.role === 'ai');
+    // Note: conversation is stored as 'conversation_data' in the database
+    const conversationData = loadedConversation?.conversation_data || loadedConversation?.conversation || [];
+    if (conversationData.length > 0) {
+      const hasAIMessages = conversationData.some(msg => msg.role === 'ai');
       return hasAIMessages; // If AI has responded, adventure started
     }
     return false; // New game - must click "Start Adventure"
@@ -503,7 +507,15 @@ const Game = () => {
     // --- Construct Prompt --- //
     const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
     const currentTile = getTile(worldMap, playerPosition.x, playerPosition.y);
-    const locationInfo = `Player starts at coordinates (${playerPosition.x}, ${playerPosition.y}) in a ${currentTile?.biome || 'Unknown Area'} biome.${currentTile?.poi ? ` POI: ${currentTile.poi}.` : ''}`;
+    
+    // Build location info with town name if starting at a town
+    let locationInfo = `Player starts at coordinates (${playerPosition.x}, ${playerPosition.y}) in a ${currentTile?.biome || 'Unknown Area'} biome.`;
+    if (currentTile?.poi === 'town' && currentTile?.townName) {
+      locationInfo += ` The party is standing at the edge of ${currentTile.townName}, a ${currentTile.townSize || 'settlement'}.`;
+    } else if (currentTile?.poi) {
+      locationInfo += ` POI: ${currentTile.poi}.`;
+    }
+    
     const gameContext = `Setting: ${settings.shortDescription || 'A generic fantasy world'}. Mood: ${settings.grimnessLevel || 'Neutral'} Grimness, ${settings.darknessLevel || 'Neutral'} Darkness. Magic: ${settings.magicLevel || 'Low'}. Tech: ${settings.technologyLevel || 'Medieval'}. ${locationInfo}. Party: ${partyInfo}.`;
     // Specific prompt to kick off the adventure
     const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary || 'The adventure begins.'}\n\nThe player party has just arrived. Start the adventure by describing the scene and presenting the initial situation based on the game context and starting location.`;
@@ -713,11 +725,13 @@ const Game = () => {
     const isAdjacentRight = playerX === entryPoint.x + 1 && playerY === entryPoint.y;
     
     if (!isAtEntry && !isAdjacentRight) {
-      setError('You must be at the town entrance (marked with yellow outline) to leave.');
+      setTownError('You must be at the town entrance (marked with yellow outline) to leave.');
       console.log('[TOWN_EXIT] Not at entrance. Player:', playerX, playerY, 'Entry:', entryPoint.x, entryPoint.y);
       return;
     }
     
+    // Clear any town errors
+    setTownError(null);
     console.log('[TOWN_EXIT] Leaving town, returning to world map');
     setCurrentMapLevel('world');
     setCurrentTownMap(null);
@@ -764,6 +778,9 @@ const Game = () => {
     }
 
     console.log(`[TOWN_MOVE] Moving to (${clickedX}, ${clickedY}) - ${distance} tiles`);
+    
+    // Clear any town errors on successful movement
+    setTownError(null);
     
     // Update player position in town (no chat message to avoid spam)
     setTownPlayerPosition({ x: clickedX, y: clickedY });
@@ -835,14 +852,29 @@ const Game = () => {
       setError(`API Key for ${selectedProvider} is not set.`); return;
     }
     const model = getCurrentModel();
-    const systemMessage = { role: 'system', content: `You moved to coordinates (${clickedX}, ${clickedY}).` }; // Add system message
+    
+    // Build system message with town name if arriving at a town
+    let systemMessageContent = `You moved to coordinates (${clickedX}, ${clickedY}).`;
+    if (targetTile.poi === 'town' && targetTile.townName) {
+      systemMessageContent = `You arrived at ${targetTile.townName}, a ${targetTile.townSize || 'settlement'}.`;
+    }
+    const systemMessage = { role: 'system', content: systemMessageContent };
     const updatedConversation = [...conversation, systemMessage];
     setConversation(updatedConversation);
     setIsLoading(true);
     setError(null);
 
     const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
-    const locationInfo = `Player has moved to coordinates (${clickedX}, ${clickedY}) in a ${targetTile.biome} biome.${targetTile.poi ? ` POI: ${targetTile.poi}.` : ''} Description seed: ${targetTile.descriptionSeed || 'Describe the area.'}`;
+    
+    // Build location info with town name if arriving at a town
+    let locationInfo = `Player has moved to coordinates (${clickedX}, ${clickedY}) in a ${targetTile.biome} biome.`;
+    if (targetTile.poi === 'town' && targetTile.townName) {
+      locationInfo += ` The party has arrived at ${targetTile.townName}, a ${targetTile.townSize || 'settlement'}. They are standing at the edge of the town.`;
+    } else if (targetTile.poi) {
+      locationInfo += ` POI: ${targetTile.poi}.`;
+    }
+    locationInfo += ` Description seed: ${targetTile.descriptionSeed || 'Describe the area.'}`;
+    
     const gameContext = `Setting: ${settings.shortDescription || 'A generic fantasy world'}. Mood: ${settings.grimnessLevel || 'Neutral'} Grimness, ${settings.darknessLevel || 'Neutral'} Darkness. Magic: ${settings.magicLevel || 'Low'}. Tech: ${settings.technologyLevel || 'Medieval'}. Party: ${partyInfo}.`;
     // Prompt focused on describing the arrival
     const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary || 'The adventure begins.'}\n\n${locationInfo}\n\nDescribe what the player sees upon arriving at this new location.`;
@@ -1121,6 +1153,7 @@ const Game = () => {
         onEnterCurrentTown={handleEnterCurrentTown}
         isInsideTown={isInsideTown}
         hasAdventureStarted={hasAdventureStarted}
+        townError={townError}
       />
       <EncounterModalContent
         isOpen={isEncounterModalOpen}

@@ -9,8 +9,9 @@ import { getTownTileEmoji } from './townMapGenerator';
  * @param {Function} onLeaveTown - Optional callback for leave town button
  * @param {boolean} showLeaveButton - Whether to show the leave town button
  * @param {Object} firstHero - First hero for player portrait display
+ * @param {string} townError - Error message to display in town map
  */
-const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero }) => {
+const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError }) => {
   if (!townMapData) return null;
 
   return (
@@ -231,6 +232,20 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           );
         })}
       </div>
+      {townError && (
+        <div style={{ 
+          textAlign: 'center', 
+          marginTop: '10px', 
+          padding: '10px', 
+          backgroundColor: '#fee', 
+          border: '1px solid #fcc',
+          borderRadius: '4px',
+          color: '#c00',
+          fontSize: '14px'
+        }}>
+          ⚠️ {townError}
+        </div>
+      )}
       {showLeaveButton && onLeaveTown && (
         <div style={{ textAlign: 'center', marginTop: '10px' }}>
           <button onClick={onLeaveTown} className="secondary-button">
