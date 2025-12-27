@@ -5,6 +5,7 @@ import SettingsContext from "../contexts/SettingsContext";
 import { SettingsModalContent, HowToPlayModalContent } from '../components/Modals';
 import MapModal from '../components/MapModal';
 import EncounterModal from '../components/EncounterModal';
+import DiceRoller from '../components/DiceRoller';
 import useGameSession from '../hooks/useGameSession';
 import useGameMap from '../hooks/useGameMap';
 import useGameInteraction from '../hooks/useGameInteraction';
@@ -22,6 +23,7 @@ const Game = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isHowToPlayModalOpen, setIsHowToPlayModalOpen] = useState(false);
   const [isEncounterModalOpen, setIsEncounterModalOpen] = useState(false);
+  const [isDiceModalOpen, setIsDiceModalOpen] = useState(false);
   const [currentEncounter, setCurrentEncounter] = useState(null);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
 
@@ -126,6 +128,14 @@ const Game = () => {
       performSave();
     };
   }, []);
+
+  // --- Effect to monitor AI Check Requests ---
+  useEffect(() => {
+    if (interactionHook.checkRequest) {
+      console.log('Opening Dice Modal for:', interactionHook.checkRequest);
+      setIsDiceModalOpen(true);
+    }
+  }, [interactionHook.checkRequest]);
 
   // --- Map Movement Handler with AI ---
   const handleMoveOnWorldMap = async (clickedX, clickedY) => {
@@ -237,6 +247,9 @@ const Game = () => {
     }
   };
 
+  const diceSkill = interactionHook.checkRequest?.type === 'skill' ? interactionHook.checkRequest.skill : null;
+  const diceMode = interactionHook.checkRequest?.type === 'skill' ? 'skill' : 'dice';
+
   return (
     <div className="game-page-wrapper">
       <div className="game-container">
@@ -250,13 +263,13 @@ const Game = () => {
               </div>
               <div className="header-button-group">
                 <button onClick={() => mapHook.setIsMapModalOpen(true)} className="view-map-button">View Map</button>
+                <button onClick={() => setIsDiceModalOpen(true)} className="view-settings-button">🎲 Roll Dice</button>
                 <button onClick={() => setIsHowToPlayModalOpen(true)} className="how-to-play-button">How to Play</button>
                 <button onClick={() => setIsSettingsModalOpen(true)} className="view-settings-button">View Full Settings</button>
                 <button
                   onClick={() => performSave()}
                   className="manual-save-button"
                   disabled={!sessionId}
-                  title="Manually save game progress"
                 >
                   💾 Save Now
                 </button>
@@ -412,6 +425,18 @@ const Game = () => {
         onClose={() => setIsEncounterModalOpen(false)}
         encounter={currentEncounter}
         onEnterLocation={() => mapHook.handleEnterLocation(currentEncounter, interactionHook.setConversation, interactionHook.conversation)}
+      />
+      <DiceRoller
+        isOpen={isDiceModalOpen}
+        onClose={() => {
+          setIsDiceModalOpen(false);
+          if (interactionHook.checkRequest) {
+            interactionHook.setCheckRequest(null);
+          }
+        }}
+        preselectedSkill={diceSkill}
+        initialMode={diceMode}
+        character={selectedHeroes.length > 0 ? selectedHeroes[0] : null}
       />
     </div>
   );

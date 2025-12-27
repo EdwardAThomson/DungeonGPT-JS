@@ -23,6 +23,9 @@
     *   **`App.js`:** The root component. It sets up the main routing using `react-router-dom` and manages the top-level state for the list of `characters` and which character is being edited.
     *   **`openaiHelper.js`:** Contains logic to interact with the OpenAI API for generating text responses in the `Game.js` component and summarizing conversations.
     *   **`server.js`:** Acts as the backend server. Its exact functions need closer inspection, but it likely handles saving/loading character data to/from `game.db` and potentially serves the React application build.
+    *   **`DebugMenu.js`:** A floating button in the bottom-right corner that toggles a menu for accessing developer tools.
+    *   **`DiceTest.js`:** A diagnostic page for verifying the dice rolling logic and skill check math.
+    *   **`TownMapTest.js`:** A testing ground for the town map visualization.
     *   **Contexts (`ApiKeyContext.js`, `SettingsContext.js`, `CharacterContext.js`):** Used to provide global state (like the OpenAI API key, game settings, and potentially character data) to different components without prop drilling.
 
 4.  **State Management:**
@@ -43,4 +46,9 @@
     *   In `Game.js`, the user inputs text -> `handleSubmit` sends input + context (summary) to OpenAI -> AI response is displayed -> Conversation is summarized for future context.
 
 7.  **Potential Areas Noted:**
-    *   Client-side API calls in `openaiHelper.js` might expose the OpenAI API key if not handled carefully (e.g., if the key is hardcoded or easily accessible in the browser's source). Ideally, these calls would be proxied through `server.js`. 
+    *   Client-side API calls in `openaiHelper.js` might expose the OpenAI API key if not handled carefully (e.g., if the key is hardcoded or easily accessible in the browser's source). Ideally, these calls would be proxied through `server.js`.
+
+8.  **Developer Tools & Diagnostics:**
+    *   **Secret Debug Menu:** A hidden menu accessible via a floating button (🐞) in the bottom-right corner of the screen.
+    *   **Dice Diagnostics:** Accessible via the debug menu, this page runs automated tests on the dice rolling algorithms to ensure distribution fairness and mathematical correctness of skill modifiers.
+    *   **Map Testing:** Accessible via the debug menu, allowing for isolated testing of the town map features. 

@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { generateText } from '../utils/llmHelper';
 import { getTile } from '../utils/mapGenerator';
 
+const TRIGGER_REGEX = /\[(CHECK|ROLL):\s*([a-zA-Z0-9\s]+)\]/i;
+
 const useGameInteraction = (
     loadedConversation,
     apiKeys,
@@ -19,6 +21,7 @@ const useGameInteraction = (
     const [currentSummary, setCurrentSummary] = useState(loadedConversation?.summary || '');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [checkRequest, setCheckRequest] = useState(null); // { type: 'skill', skill: 'Perception' } or null
 
     // Sync conversation ref for parent use if needed, but setState is enough for React updates
 
@@ -92,7 +95,22 @@ const useGameInteraction = (
         const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary || 'The adventure begins.'}\n\nThe player party has just arrived. Start the adventure by describing the scene and presenting the initial situation based on the game context and starting location.`;
 
         try {
-            const aiResponse = await generateText(selectedProvider, currentApiKey, model, prompt, 1600, 0.7, settings.responseVerbosity);
+            let aiResponse = await generateText(selectedProvider, currentApiKey, model, prompt, 1600, 0.7, settings.responseVerbosity);
+
+            // Parse for Triggers
+            const match = aiResponse.match(TRIGGER_REGEX);
+            if (match) {
+                const type = match[1].toUpperCase();
+                const value = match[2].trim();
+                console.log(`[AI TRIGGER] ${type}: ${value}`);
+
+                if (type === 'CHECK') {
+                    setCheckRequest({ type: 'skill', skill: value });
+                }
+                // Optional: Remove tag from display? 
+                // aiResponse = aiResponse.replace(match[0], '').trim();
+            }
+
             const aiMessage = { role: 'ai', content: aiResponse };
 
             setConversation(prev => [...prev, aiMessage]);
@@ -140,7 +158,22 @@ const useGameInteraction = (
         const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary || 'The adventure begins.'}\n\nUser action: ${userMessage.content}`;
 
         try {
-            const aiResponse = await generateText(selectedProvider, currentApiKey, model, prompt, 1600, 0.7, settings.responseVerbosity);
+            let aiResponse = await generateText(selectedProvider, currentApiKey, model, prompt, 1600, 0.7, settings.responseVerbosity);
+
+            // Parse for Triggers
+            const match = aiResponse.match(TRIGGER_REGEX);
+            if (match) {
+                const type = match[1].toUpperCase();
+                const value = match[2].trim();
+                console.log(`[AI TRIGGER] ${type}: ${value}`);
+
+                if (type === 'CHECK') {
+                    setCheckRequest({ type: 'skill', skill: value });
+                }
+                // Optional: Remove tag from display? 
+                // aiResponse = aiResponse.replace(match[0], '').trim();
+            }
+
             const aiMessage = { role: 'ai', content: aiResponse };
 
             setConversation([...tempConversation, aiMessage]);
@@ -174,6 +207,8 @@ const useGameInteraction = (
         modelOptions,
         handleStartAdventure,
         handleSubmit,
+        checkRequest,
+        setCheckRequest,
         handleInputChange
     };
 };

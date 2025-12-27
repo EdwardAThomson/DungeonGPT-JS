@@ -11,8 +11,11 @@ import HeroSelection from './pages/HeroSelection';
 import Game from './pages/Game';
 import SavedConversations from './pages/SavedConversations';
 import TownMapTest from './pages/TownMapTest';
+import DiceTest from './pages/DiceTest';
 
 import "./App.css";
+
+import DebugMenu from './components/DebugMenu';
 
 const App = () => {
   const [characters, setCharacters] = useState([]);
@@ -30,7 +33,6 @@ const App = () => {
             <li><Link to="/all-characters">All Characters</Link></li>
             <li><Link to="/game-settings">New Game</Link></li>
             <li><Link to="/saved-conversations">Saved Games</Link></li>
-            <li><Link to="/town-map-test">Map Test</Link></li>
           </ul>
         </nav>
 
@@ -65,9 +67,11 @@ const App = () => {
             <Route path="/game" element={<Game />} />
             <Route path="/saved-conversations" element={<SavedConversations />} />
             <Route path="/town-map-test" element={<TownMapTest />} />
+            <Route path="/dice-test" element={<DiceTest />} />
           </Routes>
         </div>
 
+        <DebugMenu />
       </div>
     </Router>
   );
