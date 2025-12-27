@@ -1,13 +1,9 @@
-// GameSettings.js
-
 import React, { useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import CharacterContext from "./CharacterContext";
-import SettingsContext from "./SettingsContext";
-import { generateMapData, findStartingTown } from "./mapGenerator";
-import WorldMapDisplay from "./WorldMapDisplay";
-import TownMapDisplay from "./TownMapDisplay";
-import { generateTownMap } from "./townMapGenerator";
+import CharacterContext from "../contexts/CharacterContext";
+import SettingsContext from "../contexts/SettingsContext";
+import { generateMapData, findStartingTown } from "../utils/mapGenerator";
+import WorldMapDisplay from "../components/WorldMapDisplay";
 
 const GameSettings = () => {
 
@@ -29,15 +25,12 @@ const GameSettings = () => {
 
   // State for validation error message
   const [formError, setFormError] = useState('');
-  
+
   // State for generated map
   const [generatedMap, setGeneratedMap] = useState(null);
   const [showMapPreview, setShowMapPreview] = useState(false);
-  
-  // State for town map preview
-  const [generatedTownMap, setGeneratedTownMap] = useState(null);
-  const [showTownMapPreview, setShowTownMapPreview] = useState(false);
-  const [selectedTownSize, setSelectedTownSize] = useState('village');
+
+
 
   // Possible options
   const grimnessOptions = ['Noble', 'Neutral', 'Bleak', 'Grim'];
@@ -46,7 +39,7 @@ const GameSettings = () => {
   const magicOptions = ['No Magic', 'Low Magic', 'High Magic', 'Arcane Tech'];
   const technologyOptions = ['Ancient', 'Medieval', 'Renaissance', 'Industrial']; // Excluded 'Futuristic'
   const verbosityOptions = ['Concise', 'Moderate', 'Descriptive'];
-  
+
   // Combined provider-model options (same as in Game.js)
   const modelOptions = [
     { provider: 'openai', model: 'gpt-5', label: 'OpenAI - GPT-5' },
@@ -61,7 +54,7 @@ const GameSettings = () => {
   const handleShortDescriptionChange = (e) => setShortDescription(e.target.value);
   const handleGrimnessChange = (e) => setGrimnessLevel(e.target.value);
   const handleDarknessChange = (e) => setDarknessLevel(e.target.value);
-  
+
   // Handle combined model selection
   const handleModelSelection = (value) => {
     const selected = modelOptions.find(opt => `${opt.provider}:${opt.model}` === value);
@@ -70,7 +63,7 @@ const GameSettings = () => {
       setSelectedModel(selected.model);
     }
   };
-  
+
   // Get current selection value for dropdown
   const getCurrentSelection = () => {
     if (selectedProvider && selectedModel) {
@@ -83,34 +76,29 @@ const GameSettings = () => {
   const handleMagicLevelChange = (e) => setMagicLevel(e.target.value);
   const handleTechnologyLevelChange = (e) => setTechnologyLevel(e.target.value);
   const handleResponseVerbosityChange = (e) => setResponseVerbosity(e.target.value);
-  
+
   // Map generation handler
   const handleGenerateMap = () => {
     const newMap = generateMapData();
     setGeneratedMap(newMap);
     setShowMapPreview(true);
   };
-  
-  // Town map generation handler
-  const handleGenerateTownMap = () => {
-    const townMap = generateTownMap(selectedTownSize, `Test ${selectedTownSize}`, 'south');
-    setGeneratedTownMap(townMap);
-    setShowTownMapPreview(true);
-  };
+
+
 
   const handleSubmit = () => {
     // Validation Checks
     if (!shortDescription.trim()) {
-        setFormError('Please enter a story description.');
-        return;
+      setFormError('Please enter a story description.');
+      return;
     }
     if (!grimnessLevel) {
-        setFormError('Please select a Grimness level.');
-        return;
+      setFormError('Please select a Grimness level.');
+      return;
     }
     if (!darknessLevel) {
-        setFormError('Please select a Darkness level.');
-        return;
+      setFormError('Please select a Darkness level.');
+      return;
     }
     // Optional: Add checks for magicLevel, technologyLevel, responseVerbosity if defaults aren't sufficient
     // if (!magicLevel) { setFormError('Please select a Magic level.'); return; }
@@ -212,81 +200,82 @@ const GameSettings = () => {
 
       {/* World Settings Section */}
       <div className="form-section world-settings-section">
-          <h2>World Settings</h2>
-          <div className="world-settings-selectors"> {/* Wrapper for side-by-side */}            
-              {/* Magic Level Sub-section */}
-              <div className="world-setting-item">
-                <h3>Magic Level</h3>
-                <p>Prevalence of magic:</p>
-                <select value={magicLevel} onChange={handleMagicLevelChange} className="settings-select">
-                  {magicOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Technology Level Sub-section */}
-              <div className="world-setting-item">
-                <h3>Technology Level</h3>
-                <p>Dominant technology:</p>
-                <select value={technologyLevel} onChange={handleTechnologyLevelChange} className="settings-select">
-                  {technologyOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </div>
+        <h2>World Settings</h2>
+        <div className="world-settings-selectors"> {/* Wrapper for side-by-side */}
+          {/* Magic Level Sub-section */}
+          <div className="world-setting-item">
+            <h3>Magic Level</h3>
+            <p>Prevalence of magic:</p>
+            <select value={magicLevel} onChange={handleMagicLevelChange} className="settings-select">
+              {magicOptions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
           </div>
+
+          {/* Technology Level Sub-section */}
+          <div className="world-setting-item">
+            <h3>Technology Level</h3>
+            <p>Dominant technology:</p>
+            <select value={technologyLevel} onChange={handleTechnologyLevelChange} className="settings-select">
+              {technologyOptions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* AI Settings Section */}
       <div className="form-section ai-settings-section">
         <h2>AI Settings</h2>
-        <div className="ai-settings-selectors"> {/* Wrapper */}            
-            {/* AI Model Selection */}
-            <div className="ai-setting-item">
-                <h3>AI Model</h3>
-                <p>Select the AI model for generating responses:</p>
-                <select 
-                  value={getCurrentSelection()} 
-                  onChange={(e) => handleModelSelection(e.target.value)} 
-                  className="settings-select provider-select"
-                >
-                  <option value="">Select AI Model...</option>
-                  {modelOptions.map(option => (
-                    <option key={`${option.provider}:${option.model}`} value={`${option.provider}:${option.model}`}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-            </div>
+        <div className="ai-settings-selectors"> {/* Wrapper */}
+          {/* AI Model Selection */}
+          <div className="ai-setting-item">
+            <h3>AI Model</h3>
+            <p>Select the AI model for generating responses:</p>
+            <select
+              value={getCurrentSelection()}
+              onChange={(e) => handleModelSelection(e.target.value)}
+              className="settings-select provider-select"
+            >
+              <option value="">Select AI Model...</option>
+              {modelOptions.map(option => (
+                <option key={`${option.provider}:${option.model}`} value={`${option.provider}:${option.model}`}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            {/* Response Verbosity Sub-section */}
-            <div className="ai-setting-item">
-                <h3>Response Verbosity</h3>
-                <p>How detailed should AI responses be?</p>
-                <select value={responseVerbosity} onChange={handleResponseVerbosityChange} className="settings-select verbosity-select">
-                {verbosityOptions.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                ))}
-                </select>
-            </div>
+          {/* Response Verbosity Sub-section */}
+          <div className="ai-setting-item">
+            <h3>Response Verbosity</h3>
+            <p>How detailed should AI responses be?</p>
+            <select value={responseVerbosity} onChange={handleResponseVerbosityChange} className="settings-select verbosity-select">
+              {verbosityOptions.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
+
 
       {/* World Map Generation Section */}
       <div className="form-section map-generation-section">
         <h2>World Map</h2>
         <p>Generate a random world map for your adventure. Each map is unique with forests, mountains, and towns.</p>
-        
+
         <div className="map-generation-controls">
-          <button 
-            onClick={handleGenerateMap} 
+          <button
+            onClick={handleGenerateMap}
             className="generate-map-button"
             type="button"
           >
             {generatedMap ? '🔄 Regenerate Map' : '🗺️ Generate World Map'}
           </button>
-          
+
           {generatedMap && (
             <span className="map-status">✓ Map generated!</span>
           )}
@@ -296,10 +285,10 @@ const GameSettings = () => {
           <div className="map-preview-container">
             <h3>Map Preview</h3>
             <p className="map-preview-hint">
-              <strong>Towns:</strong> 🛖 Hamlet | 🏡 Village | 🏘️ Town | 🏰 City<br/>
+              <strong>Towns:</strong> 🛖 Hamlet | 🏡 Village | 🏘️ Town | 🏰 City<br />
               <strong>Features:</strong> 🌲 Forest | ⛰️ Mountain
             </p>
-            <WorldMapDisplay 
+            <WorldMapDisplay
               mapData={generatedMap}
               playerPosition={(() => {
                 try {
@@ -317,66 +306,9 @@ const GameSettings = () => {
                   return { x: 0, y: 0 }; // Last resort
                 }
               })()}
-              onTileClick={() => {}} // No interaction in preview
+              onTileClick={() => { }} // No interaction in preview
               firstHero={null} // No player marker in preview
             />
-          </div>
-        )}
-      </div>
-
-      {/* Town Map Generation Section */}
-      <div className="form-section">
-        <h2>Town Map Generator (Debug/Test)</h2>
-        <p className="section-description">
-          Test the town interior map generator for different town sizes.
-        </p>
-        
-        <div className="town-map-controls">
-          <label htmlFor="town-size-select">
-            <strong>Town Size:</strong>
-          </label>
-          <select 
-            id="town-size-select"
-            value={selectedTownSize}
-            onChange={(e) => setSelectedTownSize(e.target.value)}
-            className="town-size-select"
-          >
-            <option value="hamlet">Hamlet (8x8)</option>
-            <option value="village">Village (12x12)</option>
-            <option value="town">Town (16x16)</option>
-            <option value="city">City (20x20)</option>
-          </select>
-          
-          <button 
-            onClick={handleGenerateTownMap} 
-            className="generate-map-button"
-            type="button"
-          >
-            🏘️ Generate Town Map
-          </button>
-          
-          {generatedTownMap && (
-            <span className="map-status">✓ Town map generated!</span>
-          )}
-        </div>
-
-        {showTownMapPreview && generatedTownMap && (
-          <div className="map-preview-container">
-            <h3>Town Map Preview: {generatedTownMap.townName}</h3>
-            <p className="map-preview-hint">
-              <strong>Buildings:</strong> 🏠 House | 🏨 Inn | 🏪 Shop | ⛪ Temple | 🍺 Tavern | 🏦 Bank | 🏛️ Guild<br/>
-              <strong>Features:</strong> ⛲ Fountain | 🪣 Well | 🌳 Tree
-            </p>
-            <TownMapDisplay 
-              townMapData={generatedTownMap}
-              playerPosition={null}
-              showLeaveButton={false}
-            />
-            <p style={{ textAlign: 'center', fontSize: '12px', color: '#666' }}>
-              Entry point marked with blue border | 
-              Size: {generatedTownMap.width}x{generatedTownMap.height} | 
-              Buildings: {generatedTownMap.mapData.flat().filter(t => t.type === 'building').length} structures
-            </p>
           </div>
         )}
       </div>
@@ -395,14 +327,14 @@ const GameSettings = () => {
 export default GameSettings;
 
 
-  // const { state } = useLocation();
-  // const settingsData = state?.settingsData;
+// const { state } = useLocation();
+// const settingsData = state?.settingsData;
 
-  /*
-  const [shortDescription, setShortDescription] = useState(settingsData?.shortDescription || '');
-  const [grimnessLevel, setGrimnessLevel] = useState(settingsData?.grimnessLevel || '');
-  const [darknessLevel, setDarknessLevel] = useState(settingsData?.darknessLevel || '');
-  const [magicLevel, setMagicLevel] = useState(settingsData?.magicLevel || 'Low Magic');
-  const [technologyLevel, setTechnologyLevel] = useState(settingsData?.technologyLevel || 'Medieval');
-  const [responseVerbosity, setResponseVerbosity] = useState(settingsData?.responseVerbosity || 'Moderate');
-  */
+/*
+const [shortDescription, setShortDescription] = useState(settingsData?.shortDescription || '');
+const [grimnessLevel, setGrimnessLevel] = useState(settingsData?.grimnessLevel || '');
+const [darknessLevel, setDarknessLevel] = useState(settingsData?.darknessLevel || '');
+const [magicLevel, setMagicLevel] = useState(settingsData?.magicLevel || 'Low Magic');
+const [technologyLevel, setTechnologyLevel] = useState(settingsData?.technologyLevel || 'Medieval');
+const [responseVerbosity, setResponseVerbosity] = useState(settingsData?.responseVerbosity || 'Moderate');
+*/

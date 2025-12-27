@@ -2,8 +2,8 @@
 
 import React, { useState, useContext } from "react";
 import { Link } from "react-router-dom";
-import CharacterContext from "./CharacterContext";
-import ApiKeysContext from "./ApiKeysContext"; // New multi-key context
+import CharacterContext from "../contexts/CharacterContext";
+import ApiKeysContext from "../contexts/ApiKeysContext"; // New multi-key context
 
 const HomePage = () => {
   const { characters } = useContext(CharacterContext);

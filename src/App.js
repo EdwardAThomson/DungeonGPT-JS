@@ -2,14 +2,15 @@
 
 import React, { useState } from "react";
 import { BrowserRouter as Router, Route, Link, Routes } from "react-router-dom";
-import CharacterCreation from "./CharacterCreation";
-import CharacterSummary from "./CharacterSummary";
-import AllCharacters from "./AllCharacters";
-import HomePage from "./HomePage";
-import GameSettings from "./GameSettings";
-import HeroSelection from './HeroSelection';
-import Game from './Game';
-import SavedConversations from './SavedConversations';
+import CharacterCreation from "./pages/CharacterCreation";
+import CharacterSummary from "./components/CharacterSummary";
+import AllCharacters from "./pages/AllCharacters";
+import HomePage from "./pages/HomePage";
+import GameSettings from "./pages/GameSettings";
+import HeroSelection from './pages/HeroSelection';
+import Game from './pages/Game';
+import SavedConversations from './pages/SavedConversations';
+import TownMapTest from './pages/TownMapTest';
 
 import "./App.css";
 
@@ -29,6 +30,7 @@ const App = () => {
             <li><Link to="/all-characters">All Characters</Link></li>
             <li><Link to="/game-settings">New Game</Link></li>
             <li><Link to="/saved-conversations">Saved Games</Link></li>
+            <li><Link to="/town-map-test">Map Test</Link></li>
           </ul>
         </nav>
 
@@ -56,12 +58,13 @@ const App = () => {
             />
             <Route
               path="/all-characters"
-              element={<AllCharacters characters={characters} setEditingCharacterIndex={setEditingCharacterIndex}/>}
+              element={<AllCharacters characters={characters} setEditingCharacterIndex={setEditingCharacterIndex} />}
             />
             <Route path="/game-settings" element={<GameSettings />} />
             <Route path="/hero-selection" element={<HeroSelection />} />
             <Route path="/game" element={<Game />} />
             <Route path="/saved-conversations" element={<SavedConversations />} />
+            <Route path="/town-map-test" element={<TownMapTest />} />
           </Routes>
         </div>
 

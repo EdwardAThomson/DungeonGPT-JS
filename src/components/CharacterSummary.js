@@ -2,8 +2,8 @@
 
 import React, { useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { downloadJSONFile } from "./fileHelper";
-import CharacterContext from "./CharacterContext";
+import { downloadJSONFile } from "../utils/fileHelper";
+import CharacterContext from "../contexts/CharacterContext";
 
 const CharacterSummary = () => {
   const { characters, setCharacters } = useContext(CharacterContext);

@@ -2,9 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';  // Correct import for React 18+
 import './index.css';
 import App from './App';
-import { SettingsProvider } from "./SettingsContext";
-import { CharacterProvider } from './CharacterContext';
-import { ApiKeysProvider } from "./ApiKeysContext"; // New context
+import { SettingsProvider } from "./contexts/SettingsContext";
+import { CharacterProvider } from './contexts/CharacterContext';
+import { ApiKeysProvider } from "./contexts/ApiKeysContext"; // New context
 
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

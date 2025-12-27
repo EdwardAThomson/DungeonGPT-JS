@@ -1,5 +1,5 @@
 import React from 'react';
-import { getTownTileEmoji } from './townMapGenerator';
+import { getTownTileEmoji } from '../utils/townMapGenerator';
 
 /**
  * TownMapDisplay - Renders a town map with paths, buildings, and player position
@@ -36,47 +36,47 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           const pathColor = tile.type === 'dirt_path' ? '#8B4513' : '#808080';
           const wallColor = '#A9A9A9';
           const keepWallColor = '#696969';
-          
+
           // Calculate if tile is clickable
           const distance = playerPosition ? Math.abs(col - playerPosition.x) + Math.abs(row - playerPosition.y) : 999;
           const isInRange = distance > 0 && distance <= 5;
           const isClickable = onTileClick && isInRange && tile.walkable && !isPlayer;
-          
+
           // Check adjacent tiles for path/wall connections
           let hasPathNorth = false, hasPathSouth = false, hasPathEast = false, hasPathWest = false;
           let hasWallNorth = false, hasWallSouth = false, hasWallEast = false, hasWallWest = false;
           let hasKeepWallNorth = false, hasKeepWallSouth = false, hasKeepWallEast = false, hasKeepWallWest = false;
-          
+
           if (isPath) {
             const north = row > 0 ? townMapData.mapData[row - 1][col] : null;
             const south = row < townMapData.height - 1 ? townMapData.mapData[row + 1][col] : null;
             const east = col < townMapData.width - 1 ? townMapData.mapData[row][col + 1] : null;
             const west = col > 0 ? townMapData.mapData[row][col - 1] : null;
-            
+
             hasPathNorth = north && (north.type === 'dirt_path' || north.type === 'stone_path' || north.type === 'building' || north.type === 'town_square' || north.type === 'keep');
             hasPathSouth = south && (south.type === 'dirt_path' || south.type === 'stone_path' || south.type === 'building' || south.type === 'town_square' || south.type === 'keep');
             hasPathEast = east && (east.type === 'dirt_path' || east.type === 'stone_path' || east.type === 'building' || east.type === 'town_square' || east.type === 'keep');
             hasPathWest = west && (west.type === 'dirt_path' || west.type === 'stone_path' || west.type === 'building' || west.type === 'town_square' || west.type === 'keep');
           }
-          
+
           if (isWall) {
             const north = row > 0 ? townMapData.mapData[row - 1][col] : null;
             const south = row < townMapData.height - 1 ? townMapData.mapData[row + 1][col] : null;
             const east = col < townMapData.width - 1 ? townMapData.mapData[row][col + 1] : null;
             const west = col > 0 ? townMapData.mapData[row][col - 1] : null;
-            
+
             hasWallNorth = north && north.type === 'wall';
             hasWallSouth = south && south.type === 'wall';
             hasWallEast = east && east.type === 'wall';
             hasWallWest = west && west.type === 'wall';
           }
-          
+
           if (isKeepWall) {
             const north = row > 0 ? townMapData.mapData[row - 1][col] : null;
             const south = row < townMapData.height - 1 ? townMapData.mapData[row + 1][col] : null;
             const east = col < townMapData.width - 1 ? townMapData.mapData[row][col + 1] : null;
             const west = col > 0 ? townMapData.mapData[row][col - 1] : null;
-            
+
             hasKeepWallNorth = north && north.type === 'keep_wall';
             hasKeepWallSouth = south && south.type === 'keep_wall';
             hasKeepWallEast = east && east.type === 'keep_wall';
@@ -87,18 +87,18 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
             <div
               key={index}
               style={{
-                backgroundColor: tile.type === 'grass' ? '#90EE90' : 
-                               tile.type === 'stone_path' ? '#90EE90' :
-                               tile.type === 'dirt_path' ? '#90EE90' :
-                               tile.type === 'wall' ? '#90EE90' :
-                               tile.type === 'keep_wall' ? '#90EE90' :
-                               tile.type === 'town_square' ? '#E0E0E0' :
-                               tile.type === 'building' ? '#90EE90' : '#FFF',
+                backgroundColor: tile.type === 'grass' ? '#90EE90' :
+                  tile.type === 'stone_path' ? '#90EE90' :
+                    tile.type === 'dirt_path' ? '#90EE90' :
+                      tile.type === 'wall' ? '#90EE90' :
+                        tile.type === 'keep_wall' ? '#90EE90' :
+                          tile.type === 'town_square' ? '#E0E0E0' :
+                            tile.type === 'building' ? '#90EE90' : '#FFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                outline: isPlayer ? '2px solid yellow' : 
-                         tile.isEntry ? '2px solid yellow' : 'none',
+                outline: isPlayer ? '2px solid yellow' :
+                  tile.isEntry ? '2px solid yellow' : 'none',
                 outlineOffset: '-2px',
                 position: 'relative',
                 width: '30px',
@@ -233,11 +233,11 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
         })}
       </div>
       {townError && (
-        <div style={{ 
-          textAlign: 'center', 
-          marginTop: '10px', 
-          padding: '10px', 
-          backgroundColor: '#fee', 
+        <div style={{
+          textAlign: 'center',
+          marginTop: '10px',
+          padding: '10px',
+          backgroundColor: '#fee',
           border: '1px solid #fcc',
           borderRadius: '4px',
           color: '#c00',

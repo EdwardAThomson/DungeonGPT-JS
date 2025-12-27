@@ -2,8 +2,8 @@
 
 import React, { useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { downloadJSONFile } from "./fileHelper";
-import CharacterContext from "./CharacterContext";
+import { downloadJSONFile } from "../utils/fileHelper";
+import CharacterContext from "../contexts/CharacterContext";
 
 const AllCharacters = () => {
   const { characters, setCharacters, setEditingCharacterIndex } = useContext(CharacterContext);
@@ -34,11 +34,11 @@ const AllCharacters = () => {
   const handleEdit = (character) => { // Pass the whole character object
     const index = characters.findIndex((char) => char.characterId === character.characterId);
     if (index !== -1) {
-        setEditingCharacterIndex(index);
-        // Pass the specific character to edit as newCharacter state
-        navigate("/character-creation", { state: { newCharacter: character, editing: true } });
+      setEditingCharacterIndex(index);
+      // Pass the specific character to edit as newCharacter state
+      navigate("/character-creation", { state: { newCharacter: character, editing: true } });
     } else {
-        console.error("Character not found for editing:", character.characterId);
+      console.error("Character not found for editing:", character.characterId);
     }
   };
 

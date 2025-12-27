@@ -4,7 +4,7 @@ import React, { useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 
-import CharacterContext from "./CharacterContext";
+import CharacterContext from "../contexts/CharacterContext";
 
 
 const profilePictures = [
@@ -176,7 +176,7 @@ const CharacterCreation = () => {
   const handleGenderChange = (e) => {
     const newGender = e.target.value;
     setSelectedGender(newGender);
-    
+
     // Clear profile picture if it doesn't match the new gender
     if (selectedProfilePicture) {
       const currentPic = profilePictures.find(pic => pic.src === selectedProfilePicture);
@@ -317,15 +317,15 @@ const CharacterCreation = () => {
 
         {/* Gender Selection - Moved here */}
         <div className="form-section">
-            <label htmlFor="gender">Gender:</label>
-            <select id="gender" value={selectedGender} onChange={handleGenderChange} required>
-              <option value="">Select Gender</option>
-              {characterGenders.map((characterGender) => (
-                <option key={characterGender} value={characterGender}>
-                  {characterGender}
-                </option>
-              ))}
-            </select>
+          <label htmlFor="gender">Gender:</label>
+          <select id="gender" value={selectedGender} onChange={handleGenderChange} required>
+            <option value="">Select Gender</option>
+            {characterGenders.map((characterGender) => (
+              <option key={characterGender} value={characterGender}>
+                {characterGender}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Picture Selection */}
@@ -382,7 +382,7 @@ const CharacterCreation = () => {
 
           {/* Details Row (Race, Class, Level, Alignment ONLY) */}
           <div className="form-row">
-           {/* Race */}
+            {/* Race */}
             <div className="form-item">
               <label htmlFor="race">Race:</label>
               <select id="race" value={selectedRace} onChange={handleRaceChange} required>

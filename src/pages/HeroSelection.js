@@ -2,15 +2,15 @@
 
 import React, { useState, useContext, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import CharacterContext from './CharacterContext';
-import SettingsContext from './SettingsContext';
+import CharacterContext from '../contexts/CharacterContext';
+import SettingsContext from '../contexts/SettingsContext';
 
 const HeroSelection = () => {
   const { state } = useLocation();
   const { characters, setCharacters } = useContext(CharacterContext);
   const { settings } = useContext(SettingsContext);
   const navigate = useNavigate();
-  
+
   // Get generated map from navigation state
   const generatedMap = state?.generatedMap;
 
@@ -66,7 +66,7 @@ const HeroSelection = () => {
       return;
     }
     setSelectionError('');
-    
+
     navigate('/game', { state: { selectedHeroes, generatedMap } });
 
   };
@@ -118,7 +118,7 @@ const HeroSelection = () => {
                     <span className="detail-label">BG:</span> {char.characterBackground ? `${char.characterBackground.substring(0, 60)}...` : 'N/A'}
                   </p>
                 </div>
-                
+
                 {char.stats && (
                   <ul className="character-item-stats">
                     {Object.entries(char.stats).map(([stat, value]) => (
