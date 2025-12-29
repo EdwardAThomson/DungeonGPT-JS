@@ -6,20 +6,26 @@
  */
 const nameComponents = {
   prefixes: [
-    'Mill', 'Stone', 'River', 'Oak', 'Iron', 'Gold', 'Silver', 'Green', 
+    'Mill', 'Stone', 'River', 'Oak', 'Iron', 'Gold', 'Silver', 'Green',
     'White', 'Black', 'Red', 'Blue', 'High', 'Low', 'North', 'South',
     'East', 'West', 'Old', 'New', 'Fair', 'Bright', 'Dark', 'Swift',
-    'Deep', 'Shallow', 'Long', 'Short', 'Broad', 'Narrow', 'Wide'
+    'Deep', 'Shallow', 'Long', 'Short', 'Broad', 'Narrow', 'Wide',
+    'Winter', 'Summer', 'Spring', 'Autumn', 'Frost', 'Sun', 'Moon', 'Star',
+    'Cloud', 'Mist', 'Fog', 'Rain', 'Storm', 'Thunder', 'Wind', 'Snow',
+    'Crystal', 'Diamond', 'Ruby', 'Emerald', 'Sapphire', 'Amber', 'Jade'
   ],
   suffixes: [
     'brook', 'ford', 'bridge', 'haven', 'port', 'gate', 'hill', 'dale',
     'wood', 'field', 'moor', 'shire', 'ton', 'burg', 'keep', 'hold',
     'watch', 'guard', 'rest', 'fall', 'ridge', 'vale', 'glen', 'marsh',
-    'crest', 'point', 'bay', 'cove', 'landing', 'crossing'
+    'crest', 'point', 'bay', 'cove', 'landing', 'crossing',
+    'cliff', 'rock', 'stone', 'mount', 'peak', 'view', 'side', 'edge',
+    'wall', 'moat', 'tower', 'spire', 'helm', 'home', 'stead', 'wick'
   ],
   cityNames: [
     'Stronghold', 'Fortress', 'Citadel', 'Bastion', 'Rampart', 'Bulwark',
-    'Keep', 'Castle', 'Tower', 'Spire', 'Crown', 'Throne', 'Palace'
+    'Keep', 'Castle', 'Tower', 'Spire', 'Crown', 'Throne', 'Palace',
+    'Capital', 'Metropolis', 'Sanctuary', 'Dominion', 'Empire'
   ]
 };
 
@@ -69,10 +75,10 @@ export const generateTownName = (size = 'village', biome = 'plains', rng = Math.
     const suffix = randomElement(nameComponents.cityNames, rng);
     return `${prefix} ${suffix}`;
   }
-  
+
   // Use regional names if biome is recognized, otherwise use generic names
   let prefixList, suffixList;
-  
+
   if (regionalNames[biome]) {
     // 70% chance to use regional names, 30% chance to use generic
     if (rng() < 0.7) {
@@ -87,10 +93,10 @@ export const generateTownName = (size = 'village', biome = 'plains', rng = Math.
     prefixList = nameComponents.prefixes;
     suffixList = nameComponents.suffixes;
   }
-  
+
   const prefix = randomElement(prefixList, rng);
   const suffix = randomElement(suffixList, rng);
-  
+
   return `${prefix}${suffix}`;
 };
 
@@ -106,14 +112,14 @@ export const generateUniqueTownNames = (count, biome = 'plains', sizes = [], rng
   const names = new Set();
   const maxAttempts = count * 10; // Prevent infinite loops
   let attempts = 0;
-  
+
   while (names.size < count && attempts < maxAttempts) {
     const size = sizes[names.size] || 'village';
     const name = generateTownName(size, biome, rng);
     names.add(name);
     attempts++;
   }
-  
+
   return Array.from(names);
 };
 
@@ -122,10 +128,10 @@ export const generateUniqueTownNames = (count, biome = 'plains', sizes = [], rng
  */
 export const testNameGenerator = () => {
   console.log('=== TOWN NAME GENERATOR TEST ===');
-  
+
   const biomes = ['plains', 'forest', 'mountain', 'water'];
   const sizes = ['hamlet', 'village', 'town', 'city'];
-  
+
   biomes.forEach(biome => {
     console.log(`\n${biome.toUpperCase()} Towns:`);
     sizes.forEach(size => {
@@ -133,7 +139,7 @@ export const testNameGenerator = () => {
       console.log(`  ${size.padEnd(10)} - ${name}`);
     });
   });
-  
+
   console.log('\n=== TEST COMPLETE ===');
 };
 
@@ -146,47 +152,99 @@ export const generateTavernName = (rng = Math.random) => {
   const adjectives = [
     'Prancing', 'Golden', 'Silver', 'Drunken', 'Rusty', 'Broken', 'Dancing',
     'Sleeping', 'Laughing', 'Singing', 'Roaring', 'Jolly', 'Merry', 'Red',
-    'Green', 'Blue', 'Black', 'White', 'Iron', 'Stone', 'Wooden'
+    'Green', 'Blue', 'Black', 'White', 'Iron', 'Stone', 'Wooden',
+    'Crimson', 'Azure', 'Violet', 'Amber', 'Emerald', 'Sapphire', 'Ruby',
+    'Lost', 'Wandering', 'Hidden', 'Secret', 'Silent', 'Whispering', 'Howling',
+    'Flying', 'Running', 'Jumping', 'Fighting', 'Smiling', 'Crying', 'Blind'
   ];
-  
+
   const nouns = [
     'Pony', 'Dragon', 'Lion', 'Bear', 'Boar', 'Stag', 'Eagle', 'Crow',
     'Tankard', 'Barrel', 'Flagon', 'Mug', 'Keg', 'Bottle', 'Goblet',
-    'Sword', 'Shield', 'Hammer', 'Axe', 'Anchor', 'Wheel', 'Crown'
+    'Sword', 'Shield', 'Hammer', 'Axe', 'Anchor', 'Wheel', 'Crown',
+    'Goat', 'Sheep', 'Wolf', 'Fox', 'Cat', 'Dog', 'Horse', 'Mare',
+    'Wizard', 'Knight', 'King', 'Queen', 'Prince', 'Princess', 'Jester',
+    'Ghost', 'Spirit', 'Soul', 'Shadow', 'Flame', 'Fire', 'Ice', 'Frost'
   ];
-  
+
   const adj = adjectives[Math.floor(rng() * adjectives.length)];
   const noun = nouns[Math.floor(rng() * nouns.length)];
-  
+
   return `The ${adj} ${noun}`;
 };
 
 /**
- * Generate a guild name
+ * Generate a guild name with weighted probabilities
  * @param {Function} rng - Random number generator function (optional)
  * @returns {string} Generated guild name
  */
 export const generateGuildName = (rng = Math.random) => {
-  const types = [
-    'Merchants', 'Artisans', 'Craftsmen', 'Traders', 'Smiths', 'Masons',
-    'Weavers', 'Brewers', 'Bakers', 'Scribes', 'Scholars', 'Mages',
-    'Alchemists', 'Healers', 'Adventurers', 'Explorers'
+  // Weighted categories
+  const categories = [
+    { weight: 60, types: ['Merchants', 'Smiths', 'Masons', 'Bakers', 'Brewers', 'Weavers', 'Carpenters', 'Farmers', 'Cobblers', 'Tailors'] }, // Common
+    { weight: 25, types: ['Warriors', 'Healers', 'Alchemists', 'Scribes', 'Scholars', 'Inventors', 'Explorers', 'Rangers'] }, // Uncommon
+    { weight: 10, types: ['Thieves', 'Assassins', 'Spies', 'Smugglers', 'Bards', 'Illusionists'] }, // Rare / Illicit
+    { weight: 5, types: ['Mages', 'Wizards', 'Sorcerers', 'Necromancers', 'Druids'] } // Very Rare / Magic
   ];
-  
+
+  // Pick category based on weight
+  const totalWeight = categories.reduce((sum, cat) => sum + cat.weight, 0);
+  let randomVal = rng() * totalWeight;
+  let selectedTypes = categories[0].types;
+
+  for (const cat of categories) {
+    if (randomVal < cat.weight) {
+      selectedTypes = cat.types;
+      break;
+    }
+    randomVal -= cat.weight;
+  }
+
+  const type = selectedTypes[Math.floor(rng() * selectedTypes.length)];
+
   const descriptors = [
     'Honorable', 'Ancient', 'Noble', 'Royal', 'Imperial', 'Grand',
-    'United', 'Free', 'Independent', 'Loyal', 'True', 'Faithful'
+    'United', 'Free', 'Independent', 'Loyal', 'True', 'Faithful',
+    'Mystic', 'Secret', 'Hidden', 'Golden', 'Silver', 'Iron'
   ];
-  
-  const type = types[Math.floor(rng() * types.length)];
-  
-  // 50% chance to add descriptor
-  if (rng() < 0.5) {
+
+  // 40% chance to add descriptor
+  if (rng() < 0.4) {
     const desc = descriptors[Math.floor(rng() * descriptors.length)];
-    return `${desc} ${type} Guild`;
+    return `${desc} Order of ${type}`;
+  } else if (rng() < 0.8) {
+    return `${type} Guild`;
+  } else {
+    return `The Order of ${type}`;
   }
-  
-  return `${type} Guild`;
+};
+
+/**
+ * Generate a temple name
+ * @param {Function} rng - Random number generator function (optional)
+ * @returns {string} Generated temple name
+ */
+export const generateTempleName = (rng = Math.random) => {
+  const domains = [
+    'Light', 'Life', 'Nature', 'War', 'Peace', 'Death', 'Storms', 'Seas',
+    'Knowledge', 'Trickery', 'Love', 'Justice', 'Time', 'Fate'
+  ];
+
+  const titles = [
+    'Temple', 'Shrine', 'Sanctuary', 'Cathedral', 'Chapel', 'Altar', 'Hall'
+  ];
+
+  const domain = domains[Math.floor(rng() * domains.length)];
+  const title = titles[Math.floor(rng() * titles.length)];
+
+  // 50/50 format split
+  if (rng() < 0.5) {
+    return `${title} of ${domain}`;
+  } else {
+    const adjectives = ['Holy', 'Sacred', 'Divine', 'Eternal', 'Blessed', 'Hallowed', 'Silent', 'Golden'];
+    const adj = adjectives[Math.floor(rng() * adjectives.length)];
+    return `The ${adj} ${title}`;
+  }
 };
 
 /**
@@ -198,23 +256,88 @@ export const generateBankName = (rng = Math.random) => {
   const founders = [
     'Goldsworth', 'Silverton', 'Ironvault', 'Stonekeeper', 'Coinmaster',
     'Wealthguard', 'Treasurekeep', 'Safehaven', 'Vaultwright', 'Gemhold',
-    'Richman', 'Moneychanger', 'Goldkeeper', 'Silversmith'
+    'Richman', 'Moneychanger', 'Goldkeeper', 'Silversmith',
+    'Profitmaker', 'Loadstone', 'Bullion', 'Cache', 'Hoard', 'Stash'
   ];
-  
+
   const types = [
     'Bank', 'Trust', 'Vault', 'Treasury', 'Reserve', 'Exchange',
-    'Counting House', 'Money Lenders', 'Financial House'
+    'Counting House', 'Money Lenders', 'Financial House',
+    'Coffers', 'Depository', 'Fund', 'Investment', 'Capital'
   ];
-  
+
   const founder = founders[Math.floor(rng() * founders.length)];
   const type = types[Math.floor(rng() * types.length)];
-  
+
   // 70% chance for "Founder & Type" format, 30% for just "Founder Type"
   if (rng() < 0.7) {
     return `${founder} & Co. ${type}`;
   }
-  
+
   return `${founder} ${type}`;
 };
 
+/**
+ * Generate a shop name
+ * @param {Function} rng - Random number generator function (optional)
+ * @returns {string} Generated shop name
+ */
+export const generateShopName = (rng = Math.random) => {
+  const format = rng() < 0.6 ? 'adjective_noun' : 'person_goods';
+
+  if (format === 'adjective_noun') {
+    const adjectives = [
+      'Lucky', 'Golden', 'Silver', 'Honest', 'Fair', 'Quality', 'Best',
+      'Quick', 'Strong', 'Sturdy', 'Fine', 'Cheap', 'Useful', 'Magic',
+      'Mystic', 'Ancient', 'Old', 'New', 'Bright', 'Dark', 'Shining',
+      'Rusty', 'Dusty', 'Clean', 'Dirty', 'Broken', 'Fixed'
+    ];
+    const nouns = [
+      'Horseshoe', 'Hammer', 'Shield', 'Sword', 'Cloak', 'Potion', 'Scroll',
+      'Backpack', 'Boot', 'Glove', 'Gem', 'Anvil', 'Arrow', 'Bow',
+      'Lantern', 'Compass', 'Map', 'Book', 'Feather', 'Quill', 'Ink'
+    ];
+    const adj = adjectives[Math.floor(rng() * adjectives.length)];
+    const noun = nouns[Math.floor(rng() * nouns.length)];
+    return `The ${adj} ${noun}`;
+  } else {
+    const names = [
+      "Gareth", "Bram", "Cedric", "Doran", "Elara", "Fiona", "Helena",
+      "Marius", "Rowan", "Tavish", "Vanya",
+      "Alden", "Beatrix", "Cora", "Dahlia", "Ewan", "Joric", "Kaelen",
+      "Lyra", "Nadia", "Orion", "Peregrine", "Quilla", "Ronan", "Uriel"
+    ];
+    const goods = [
+      "Goods", "Supplies", "Wares", "Trade", "Emporium", "Exchange",
+      "General Store", "Market", "Provisions", "Equipment",
+      "Trinkets", "Treasures", "Oddities", "Curiosities", "Sundries"
+    ];
+    const name = names[Math.floor(rng() * names.length)];
+    const good = goods[Math.floor(rng() * goods.length)];
+    return `${name}'s ${good}`;
+  }
+};
+
+/**
+ * Generate a manor or estate name
+ * @param {Function} rng - Random number generator function (optional)
+ * @returns {string} Generated manor name
+ */
+export const generateManorName = (rng = Math.random) => {
+  const surnames = [
+    "Ashwood", "Blackwater", "Copperleaf", "Dawnbringer", "Evenfall", "Frostbeard",
+    "Goldfeather", "Highwind", "Ironhand", "Jadefire", "Kingsley", "Lightfoot",
+    "Moonwhisper", "Nightshade", "Oakenshield", "Pinecroft", "Quickfoot", "Redfern",
+    "Shadowclaw", "Stormblade", "Thornwood", "Underhill", "Valerius", "Wolfsbane",
+    "Stormwind", "Fireheart", "Winterbourne", "Summerfield", "Rosewood", "Hawthorne",
+    "Ravenscroft", "Dragonbane", "Lionshield", "Bearclaw", "Eagleeye", "Foxglove"
+  ];
+
+  const types = ["Manor", "Hall", "Estate", "House", "Keep", "Lodge", "Chateau", "Villa", "Palace", "Castle"];
+
+  const surname = surnames[Math.floor(rng() * surnames.length)];
+  const type = types[Math.floor(rng() * types.length)];
+
+  return `${surname} ${type}`;
+};
 export default generateTownName;

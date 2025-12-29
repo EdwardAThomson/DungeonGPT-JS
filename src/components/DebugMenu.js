@@ -65,6 +65,9 @@ const DebugMenu = () => {
                     <Link to="/town-map-test" style={linkStyle} onClick={() => setIsOpen(false)}>
                         🗺️ Map Test
                     </Link>
+                    <Link to="/npc-test" style={linkStyle} onClick={() => setIsOpen(false)}>
+                        👤 NPC Test
+                    </Link>
                 </div>
             )}
             <button style={buttonStyle} onClick={toggleMenu} title="Debug Menu">
