@@ -1,5 +1,6 @@
 // townNameGenerator.js
 // Generates contextual town names based on size and biome
+import { HUMAN_NAMES_MALE, HUMAN_NAMES_FEMALE, NOBLE_LAST_NAMES } from './nameData';
 
 /**
  * Name components for generating town names
@@ -14,6 +15,7 @@ const nameComponents = {
     'Cloud', 'Mist', 'Fog', 'Rain', 'Storm', 'Thunder', 'Wind', 'Snow',
     'Crystal', 'Diamond', 'Ruby', 'Emerald', 'Sapphire', 'Amber', 'Jade'
   ],
+  /*
   suffixes: [
     'brook', 'ford', 'bridge', 'haven', 'port', 'gate', 'hill', 'dale',
     'wood', 'field', 'moor', 'shire', 'ton', 'burg', 'keep', 'hold',
@@ -22,6 +24,13 @@ const nameComponents = {
     'cliff', 'rock', 'stone', 'mount', 'peak', 'view', 'side', 'edge',
     'wall', 'moat', 'tower', 'spire', 'helm', 'home', 'stead', 'wick'
   ],
+  */
+  historicalSuffixes: {
+    hamlet: ['stead', 'wick', 'croft', 'well', 'hill', 'side', 'edge'],
+    village: ['ton', 'ham', 'ley', 'worth', 'field', 'wood', 'burn'],
+    town: ['market', 'ford', 'bridge', 'haven', 'shire', 'mouth', 'crossing'],
+    city: ['burg', 'bury', 'caster', 'chester', 'cester', 'keep', 'hold', 'bastion']
+  },
   cityNames: [
     'Stronghold', 'Fortress', 'Citadel', 'Bastion', 'Rampart', 'Bulwark',
     'Keep', 'Castle', 'Tower', 'Spire', 'Crown', 'Throne', 'Palace',
@@ -76,26 +85,46 @@ export const generateTownName = (size = 'village', biome = 'plains', rng = Math.
     return `${prefix} ${suffix}`;
   }
 
+  // 20% chance for town/city to be named after a noble family
+  if ((size === 'town' || size === 'city') && rng() < 0.2) {
+    const noblePrefix = randomElement(NOBLE_LAST_NAMES, rng);
+    const townSuffixes = ['ton', 'burg', 'shire', 'hold', 'wick', 'stead'];
+    const suffix = randomElement(townSuffixes, rng);
+    return `${noblePrefix}${suffix}`;
+  }
+
   // Use regional names if biome is recognized, otherwise use generic names
-  let prefixList, suffixList;
+  let prefixList;
 
   if (regionalNames[biome]) {
     // 70% chance to use regional names, 30% chance to use generic
     if (rng() < 0.7) {
       prefixList = regionalNames[biome].prefixes;
-      suffixList = regionalNames[biome].suffixes;
     } else {
       prefixList = nameComponents.prefixes;
-      suffixList = nameComponents.suffixes;
     }
   } else {
     // Unknown biome, use generic names
     prefixList = nameComponents.prefixes;
-    suffixList = nameComponents.suffixes;
   }
 
   const prefix = randomElement(prefixList, rng);
+
+  // --- NEW HISTORICAL SUFFIX LOGIC ---
+  const historicalList = nameComponents.historicalSuffixes[size] || nameComponents.historicalSuffixes.village;
+
+  /* 
+  // Old generic/biome suffix logic (commented out for testing new variation)
+  let suffixList;
+  if (regionalNames[biome] && rng() < 0.7) {
+    suffixList = regionalNames[biome].suffixes;
+  } else {
+    suffixList = nameComponents.suffixes;
+  }
   const suffix = randomElement(suffixList, rng);
+  */
+
+  const suffix = randomElement(historicalList, rng);
 
   return `${prefix}${suffix}`;
 };
@@ -301,12 +330,7 @@ export const generateShopName = (rng = Math.random) => {
     const noun = nouns[Math.floor(rng() * nouns.length)];
     return `The ${adj} ${noun}`;
   } else {
-    const names = [
-      "Gareth", "Bram", "Cedric", "Doran", "Elara", "Fiona", "Helena",
-      "Marius", "Rowan", "Tavish", "Vanya",
-      "Alden", "Beatrix", "Cora", "Dahlia", "Ewan", "Joric", "Kaelen",
-      "Lyra", "Nadia", "Orion", "Peregrine", "Quilla", "Ronan", "Uriel"
-    ];
+    const names = [...HUMAN_NAMES_MALE, ...HUMAN_NAMES_FEMALE];
     const goods = [
       "Goods", "Supplies", "Wares", "Trade", "Emporium", "Exchange",
       "General Store", "Market", "Provisions", "Equipment",
@@ -324,19 +348,10 @@ export const generateShopName = (rng = Math.random) => {
  * @returns {string} Generated manor name
  */
 export const generateManorName = (rng = Math.random) => {
-  const surnames = [
-    "Ashwood", "Blackwater", "Copperleaf", "Dawnbringer", "Evenfall", "Frostbeard",
-    "Goldfeather", "Highwind", "Ironhand", "Jadefire", "Kingsley", "Lightfoot",
-    "Moonwhisper", "Nightshade", "Oakenshield", "Pinecroft", "Quickfoot", "Redfern",
-    "Shadowclaw", "Stormblade", "Thornwood", "Underhill", "Valerius", "Wolfsbane",
-    "Stormwind", "Fireheart", "Winterbourne", "Summerfield", "Rosewood", "Hawthorne",
-    "Ravenscroft", "Dragonbane", "Lionshield", "Bearclaw", "Eagleeye", "Foxglove"
-  ];
-
   const types = ["Manor", "Hall", "Estate", "House", "Keep", "Lodge", "Chateau", "Villa", "Palace", "Castle"];
 
-  const surname = surnames[Math.floor(rng() * surnames.length)];
-  const type = types[Math.floor(rng() * types.length)];
+  const surname = randomElement(NOBLE_LAST_NAMES, rng);
+  const type = randomElement(types, rng);
 
   return `${surname} ${type}`;
 };

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { generateMapData, getTile, findStartingTown } from '../utils/mapGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
+import { populateTown } from '../utils/npcGenerator';
 
-const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError) => {
+const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed) => {
     // --- State Initialization --- //
     const [generatedMap] = useState(() => loadedConversation?.generatedMap || null); // Capture generatedMap if passed via state
 
@@ -15,7 +16,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         }
 
         // Generate new map
-        const newMap = generatedMap || generateMapData();
+        const newMap = generatedMap || generateMapData(10, 10, worldSeed);
         const startingPos = findStartingTown(newMap);
         console.log('[MAP INIT] Starting town found at:', startingPos);
 
@@ -55,7 +56,13 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 console.log('[TOWN_MAP] Invalid town map data detected, regenerating...');
                 const townSize = currentTownTile.townSize || currentTownTile.poiType || 'village';
                 const townName = currentTownTile.townName || currentTownTile.poi || 'Town';
-                const newTownMap = generateTownMap(townSize, townName);
+                const seed = worldSeed ? (parseInt(worldSeed) + (currentTownTile.x * 1000) + (currentTownTile.y * 10000)) : (loadedConversation?.sessionId || Math.floor(Math.random() * 1000000));
+                const newTownMap = generateTownMap(townSize, townName, 'south', seed);
+
+                // POPULATE TOWN
+                const npcs = populateTown(newTownMap, seed);
+                newTownMap.npcs = npcs;
+
                 setCurrentTownMap(newTownMap);
                 setTownPlayerPosition({ x: newTownMap.entryPoint.x, y: newTownMap.entryPoint.y });
             }
@@ -78,7 +85,14 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
 
             if (!townMapData) {
                 console.log('[TOWN_ENTRY] Generating new town map for:', townName);
-                townMapData = generateTownMap(townSize, townName);
+                const seed = worldSeed ? (parseInt(worldSeed) + (townTile.x * 1000) + (townTile.y * 10000)) : (loadedConversation?.sessionId || Math.floor(Math.random() * 1000000));
+                townMapData = generateTownMap(townSize, townName, 'south', seed);
+
+                // POPULATE TOWN WITH NPCs
+                console.log('[TOWN_ENTRY] Populating town with NPCs...');
+                const npcs = populateTown(townMapData, seed);
+                townMapData.npcs = npcs;
+
                 setTownMapsCache(prev => ({ ...prev, [townName]: townMapData }));
             } else {
                 console.log('[TOWN_ENTRY] Loading cached town map for:', townName);
@@ -117,7 +131,14 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
 
         if (!townMapData) {
             console.log('[TOWN_ENTRY] Generating new town map for:', townName);
-            townMapData = generateTownMap(townSize, townName);
+            const seed = worldSeed ? (parseInt(worldSeed) + (currentTile.x * 1000) + (currentTile.y * 10000)) : (loadedConversation?.sessionId || Math.floor(Math.random() * 1000000));
+            townMapData = generateTownMap(townSize, townName, 'south', seed);
+
+            // POPULATE TOWN WITH NPCs
+            console.log('[TOWN_ENTRY] Populating town with NPCs...');
+            const npcs = populateTown(townMapData, seed);
+            townMapData.npcs = npcs;
+
             setTownMapsCache(prev => ({ ...prev, [townName]: townMapData }));
         }
 
@@ -169,7 +190,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         setConversation([...conversation, exitMessage]);
     };
 
-    const handleTownTileClick = (clickedX, clickedY) => {
+    const handleTownTileClick = (clickedX, clickedY, setConversation, conversation) => {
         if (!townPlayerPosition || !currentTownMap || isLoading) return;
 
         const currentX = townPlayerPosition.x;
@@ -185,6 +206,28 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         }
 
         const targetTile = currentTownMap.mapData[clickedY][clickedX];
+
+        // Interaction with buildings
+        if (targetTile.type === 'building' && setConversation && conversation) {
+            const buildingName = targetTile.buildingName || targetTile.buildingType || "Building";
+            const buildingNpcs = (currentTownMap.npcs || []).filter(npc =>
+                npc.location.x === clickedX && npc.location.y === clickedY
+            );
+
+            let npcList = "";
+            if (buildingNpcs.length > 0) {
+                npcList = " Inside, you see: " + buildingNpcs.map(n => `${n.title} ${n.name} (${n.job})`).join(", ") + ".";
+            } else {
+                npcList = " The building seems empty for now.";
+            }
+
+            const interactMessage = {
+                role: 'system',
+                content: `You approach the ${buildingName}.${npcList} You can now interact with them in the chat.`
+            };
+            setConversation([...conversation, interactMessage]);
+            return;
+        }
 
         if (!targetTile.walkable) {
             setError('You cannot move to that location.');

@@ -68,6 +68,9 @@ const DebugMenu = () => {
                     <Link to="/npc-test" style={linkStyle} onClick={() => setIsOpen(false)}>
                         👤 NPC Test
                     </Link>
+                    <Link to="/seed-debug-test" style={linkStyle} onClick={() => setIsOpen(false)}>
+                        🌱 Seed Debug
+                    </Link>
                 </div>
             )}
             <button style={buttonStyle} onClick={toggleMenu} title="Debug Menu">

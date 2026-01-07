@@ -13,6 +13,7 @@ import SavedConversations from './pages/SavedConversations';
 import TownMapTest from './pages/TownMapTest';
 import DiceTest from './pages/DiceTest';
 import NPCTest from './pages/NPCTest';
+import SeedDebugTest from './pages/SeedDebugTest';
 
 import "./App.css";
 
@@ -70,6 +71,7 @@ const App = () => {
             <Route path="/town-map-test" element={<TownMapTest />} />
             <Route path="/dice-test" element={<DiceTest />} />
             <Route path="/npc-test" element={<NPCTest />} />
+            <Route path="/seed-debug-test" element={<SeedDebugTest />} />
           </Routes>
         </div>
 

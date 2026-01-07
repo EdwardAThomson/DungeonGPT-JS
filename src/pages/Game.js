@@ -14,8 +14,14 @@ import { generateText } from '../utils/llmHelper';
 
 const Game = () => {
   const { state } = useLocation();
-  const { selectedHeroes: stateHeroes, loadedConversation } = state || { selectedHeroes: [], loadedConversation: null };
+  const { selectedHeroes: stateHeroes, loadedConversation, worldSeed: stateSeed } = state || { selectedHeroes: [], loadedConversation: null, worldSeed: null };
   const selectedHeroes = loadedConversation?.selected_heroes || stateHeroes || [];
+
+  // Robust seed extraction
+  const settingsObj = typeof loadedConversation?.game_settings === 'string'
+    ? JSON.parse(loadedConversation.game_settings)
+    : loadedConversation?.game_settings;
+  const worldSeed = settingsObj?.worldSeed || stateSeed;
 
   const { apiKeys } = useContext(ApiKeysContext);
   const { settings, setSettings, selectedProvider, setSelectedProvider, selectedModel, setSelectedModel } = useContext(SettingsContext);
@@ -36,7 +42,7 @@ const Game = () => {
   } = useGameSession(loadedConversation, setSettings, setSelectedProvider, setSelectedModel);
 
   // Pass dummy/empty functions for now where we handle logic in Game.js wrapper
-  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { });
+  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed);
 
   const interactionHook = useGameInteraction(
     loadedConversation,
@@ -413,7 +419,7 @@ const Game = () => {
         townMapData={mapHook.currentTownMap}
         townPlayerPosition={mapHook.townPlayerPosition}
         onLeaveTown={() => mapHook.handleLeaveTown(interactionHook.setConversation, interactionHook.conversation)}
-        onTownTileClick={mapHook.handleTownTileClick}
+        onTownTileClick={(x, y) => mapHook.handleTownTileClick(x, y, interactionHook.setConversation, interactionHook.conversation)}
         currentTile={currentTile}
         onEnterCurrentTown={() => mapHook.handleEnterCurrentTown(interactionHook.setConversation, interactionHook.conversation)}
         isInsideTown={mapHook.isInsideTown}

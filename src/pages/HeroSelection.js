@@ -13,6 +13,7 @@ const HeroSelection = () => {
 
   // Get generated map from navigation state
   const generatedMap = state?.generatedMap;
+  const worldSeed = state?.worldSeed;
 
   const [selectedHeroes, setSelectedHeroes] = useState([]);
   const [selectionError, setSelectionError] = useState('');
@@ -67,7 +68,7 @@ const HeroSelection = () => {
     }
     setSelectionError('');
 
-    navigate('/game', { state: { selectedHeroes, generatedMap } });
+    navigate('/game', { state: { selectedHeroes, generatedMap, worldSeed } });
 
   };
 

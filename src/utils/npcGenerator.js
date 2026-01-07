@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import { calculateModifier } from './rules';
+import { HUMAN_NAMES_MALE, HUMAN_NAMES_FEMALE, HUMAN_LAST_NAMES, NOBLE_LAST_NAMES } from './nameData';
 
 /**
  * A simple Linear Congruential Generator (LCG) for deterministic randomness.
@@ -31,22 +32,7 @@ class SeededRNG {
 }
 
 // --- Data Lists ---
-
-const HUMAN_NAMES_MALE = [
-    "Aelar", "Albert", "Alfred", "Alexander", "Cael", "Darius", "Edgar", "Edward", "Finnian", "Gareth", "Joric", "Kaelen", "Marius", "Orion", "Peregrine", "Ronan", "Tavish", "Warrick",
-    "Alden", "Bram", "Cedric", "Doran", "Ewan", "Adric", "Balin", "Corin", "Davik", "Eldrin", "Faelan", "Garrik", "Hadrian", "Ivar", "Jareth",
-    "Kegan", "Lorien", "Mylo", "Nevin", "Osric", "Phelan", "Quinn", "Roric", "Silas", "Thoren", "Ulric", "Valen", "Wyatt", "Yoric"
-];
-const HUMAN_NAMES_FEMALE = [
-    "Brynn", "Elara", "Isolde", "Lyra", "Nadia", "Quilla", "Seraphina", "Vanya", "Xylia", "Yarrow", "Anya", "Fiona", "Genevieve", "Helena", "Rowan",
-    "Adela", "Beatrix", "Cora", "Dahlia", "Elise", "Aria", "Bella", "Cassia", "Dora", "Elora", "Freya", "Gwen", "Hanna", "Iris", "Juna",
-    "Kaia", "Lana", "Mira", "Nova", "Opal", "Piper", "Ria", "Selene", "Tessa", "Una", "Vera", "Willa", "Xena", "Yara", "Zara"
-];
-const HUMAN_LAST_NAMES = [
-    "Ashwood", "Blackwater", "Copperleaf", "Dawnbringer", "Evenfall", "Frostbeard", "Highwind", "Ironhand", "Jadefire", "Kingsley", "Lightfoot", "Moonwhisper", "Nightshade", "Oakenshield", "Pinecroft", "Quickfoot", "Redfern", "Shadowclaw", "Stormblade", "Thornwood", "Underhill", "Valerius", "Wolfsbane", "Youngblood", "Zephyrson",
-    "Smith", "Miller", "Baker", "Carter", "Fisher", "Hunter", "Mason", "Potter", "Shepherd", "Tailor", "Weaver",
-    "Crowley", "Darkmoor", "Ember", "Falconer", "Grimm", "Hawk", "Ivy", "Juniper", "Knight", "Lance", "Moss", "North", "Owl", "Pike", "Quarrel", "Raven", "Steel", "Torrent", "Vance", "West", "York"
-];
+// Removed local constants (now imported from nameData.js)
 
 const ROLES = {
     "Villager": {
@@ -71,14 +57,20 @@ const ROLES = {
         hpRange: [6, 10]
     },
     "Noble": {
-        possibleTitles: ["Lord", "Lady", "Baron", "Baroness", "Duke", "Duchess", "Sir", "Dame"],
+        possibleTitles: {
+            Male: ["Lord", "Baron", "Duke", "Earl", "Count", "Viscount", "Sir"],
+            Female: ["Lady", "Baroness", "Duchess", "Countess", "Countess", "Viscountess", "Dame"]
+        },
         defaultClass: "Aristocrat",
         baseStats: { Strength: 9, Dexterity: 12, Constitution: 9, Intelligence: 12, Wisdom: 11, Charisma: 15 },
         inventory: ["Silk Clothes", "Signet Ring", "Jewelry"],
         hpRange: [6, 12]
     },
     "Noble Child": {
-        possibleTitles: ["Young Lord", "Young Lady", "Heir", "Master", "Miss"],
+        possibleTitles: {
+            Male: ["Young Lord", "Master"],
+            Female: ["Young Lady", "Miss"]
+        },
         defaultClass: "Aristocrat",
         baseStats: { Strength: 6, Dexterity: 10, Constitution: 8, Intelligence: 10, Wisdom: 8, Charisma: 12 },
         inventory: ["Fine Clothes", "Toy Sword", "Doll"],
@@ -92,14 +84,20 @@ const ROLES = {
         hpRange: [10, 16]
     },
     "Tavern Keeper": {
-        possibleTitles: ["Innkeeper", "Barkeep", "Owner", "Host"],
+        possibleTitles: {
+            Male: ["Innkeeper", "Barkeep", "Owner", "Host"],
+            Female: ["Innkeeper", "Barkeep", "Owner", "Hostess"]
+        },
         defaultClass: "Expert",
         baseStats: { Strength: 10, Dexterity: 10, Constitution: 10, Intelligence: 12, Wisdom: 13, Charisma: 14 },
         inventory: ["Apron", "Keys to the Cellar", "Tankard", "Towel"],
         hpRange: [6, 12]
     },
     "Tavern Worker": {
-        possibleTitles: ["Server", "Cook", "Stablehand", "Maid", "Potboy"],
+        possibleTitles: {
+            Male: ["Server", "Cook", "Stablehand", "Potboy"],
+            Female: ["Server", "Cook", "Maid", "Hostess"]
+        },
         defaultClass: "Commoner",
         baseStats: { Strength: 11, Dexterity: 12, Constitution: 11, Intelligence: 9, Wisdom: 10, Charisma: 10 },
         inventory: ["Simple Clothes", "Dirty Apron", ["Broom", "Tray", "Bucket"]],
@@ -122,18 +120,42 @@ const ROLES = {
     },
     // Religious Functions
     "Priest": {
-        possibleTitles: ["Father", "Mother", "High Priest", "Curate", "Bishop", "Elder"],
+        possibleTitles: {
+            Male: ["Father", "High Priest", "Curate", "Bishop", "Elder"],
+            Female: ["Mother", "High Priestess", "Bishop", "Elder"]
+        },
         defaultClass: "Cleric",
         baseStats: { Strength: 10, Dexterity: 10, Constitution: 12, Intelligence: 12, Wisdom: 16, Charisma: 14 },
         inventory: ["Holy Symbol", "Vestments", "Prayer Book", "Incense"],
         hpRange: [12, 24]
     },
     "Acolyte": {
-        possibleTitles: ["Brother", "Sister", "Novice", "Initiate", "Deacon"],
+        possibleTitles: {
+            Male: ["Brother", "Novice", "Initiate", "Deacon"],
+            Female: ["Sister", "Novice", "Initiate", "Deacon"]
+        },
         defaultClass: "Adept",
         baseStats: { Strength: 10, Dexterity: 10, Constitution: 10, Intelligence: 11, Wisdom: 13, Charisma: 12 },
         inventory: ["Holy Symbol", "Simple Robes", "Candle"],
         hpRange: [6, 12]
+    },
+    // Specialized Trades
+    "Blacksmith": {
+        possibleTitles: {
+            Male: ["Smith", "Blacksmith", "Armorer", "Ironwright", "Master Smith"],
+            Female: ["Smith", "Blacksmith", "Armorer", "Ironwright", "Master Smith"]
+        },
+        defaultClass: "Expert",
+        baseStats: { Strength: 15, Dexterity: 10, Constitution: 14, Intelligence: 10, Wisdom: 11, Charisma: 10 },
+        inventory: ["Leather Apron", "Hammer", "Tongs", "Iron Scraps"],
+        hpRange: [10, 18]
+    },
+    "Farmer": {
+        possibleTitles: ["Farmer", "Crofter", "Husbandman", "Harvester", "Plowman"],
+        defaultClass: "Commoner",
+        baseStats: { Strength: 13, Dexterity: 11, Constitution: 12, Intelligence: 10, Wisdom: 11, Charisma: 10 },
+        inventory: ["Rough Clothes", ["Pitchfork", "Scythe", "Sickle"], "Straw Hat"],
+        hpRange: [6, 10]
     }
 };
 
@@ -177,7 +199,21 @@ export const generateNPC = (options = {}) => {
     const roleData = ROLES[roleKey];
 
     // 4. Determine Title
-    const title = options.title || rng.pick(roleData.possibleTitles);
+    let title;
+    let selectedTitleIndex = -1;
+    if (options.title) {
+        title = options.title;
+    } else {
+        const titles = roleData.possibleTitles;
+        if (Array.isArray(titles)) {
+            selectedTitleIndex = options.titleIndex !== undefined ? options.titleIndex : rng.range(0, titles.length - 1);
+            title = titles[selectedTitleIndex];
+        } else if (typeof titles === 'object') {
+            const list = titles[gender] || titles.Male || [];
+            selectedTitleIndex = options.titleIndex !== undefined ? options.titleIndex : rng.range(0, list.length - 1);
+            title = list[selectedTitleIndex] || "Citizen";
+        }
+    }
 
     // 5. Determine Age
     let age;
@@ -275,6 +311,7 @@ export const generateNPC = (options = {}) => {
             max: maxHP
         },
         inventory: inventory,
+        selectedTitleIndex: selectedTitleIndex, // Return the index for spouse matching
         isNPC: true
     };
 };
@@ -288,188 +325,212 @@ export const generateNPC = (options = {}) => {
  * @returns {Array} List of generated NPCs with location data
  */
 export const populateTown = (townMapData, seed) => {
-    // 1. Initialize RNG with town seed to stay consistent
     const rng = new SeededRNG(seed);
     const npcs = [];
+    const { mapData, width, height, townSize, townName } = townMapData;
 
-    // Helper to add NPC
-    const addNPC = (role, buildingName, x, y, options = {}) => {
-        // Create unique seed for this specific NPC
-        // Combine town seed + coordinates + role + random variance
-        const npcSeed = parseInt(seed) + (x * 1000) + (y * 100) + rng.range(0, 9999);
+    // 1. ANALYZE MAP FOR BUILDINGS & SITES
+    const residentialSites = [];
+    const serviceBuildings = [];
+    const workSites = []; // Fields, Barns
+    let vocationSlots = null;
 
-        // Default to no evil alignments for town NPCs unless overridden
-        const npcOptions = {
-            seed: npcSeed,
-            role: role,
-            noEvil: true,
-            ...options
-        };
-
-        const npc = generateNPC(npcOptions);
-
-        // Add location data
-        npc.location = {
-            x,
-            y,
-            buildingName: buildingName || "Unknown Building",
-            buildingType: townMapData.mapData[y][x].buildingType
-        };
-
-        // Add job description based on role
-        if (role === "Tavern Keeper") npc.job = `Owner of ${buildingName}`;
-        else if (role === "Tavern Worker") npc.job = `Staff at ${buildingName}`;
-        else if (role === "Merchant") npc.job = `Proprietor of ${buildingName}`;
-        else if (role === "Guard") npc.job = `Guard at ${buildingName}`;
-        else if (role === "Noble") npc.job = `${npc.title} of ${buildingName}`; // Use specific title (Lord, Lady, Baroness, etc.)
-
-        npcs.push(npc);
-    };
-
-    const { mapData, width, height } = townMapData;
-
-    // Scan map for buildings
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const tile = mapData[y][x];
-
             if (tile.type === 'building') {
-                // Ensure we only process each building once (using its top-left coordinate or unique name check)
-                // Since our current generator places single tiles or marks them, we need to be careful.
-                // However, the current map info stores name/type on the specific placed tile.
-                // Assuming 1 tile = 1 building distinct entry for our logic's sake for now.
-                // (Refinement: If buildings are multi-tile, we'd need a way to dedupe. 
-                // Currently placeBuildings puts a type/name on specific tiles.)
-
-                const bType = tile.buildingType;
-                const bName = tile.buildingName || `${bType} at ${x},${y}`;
-
-                if (bType === 'tavern' || bType === 'inn') {
-                    // Tavern Couple Logic
-                    const keeperLastName = rng.pick(HUMAN_LAST_NAMES);
-                    const keeperGender = rng.random() > 0.5 ? "Male" : "Female";
-                    const spouseGender = keeperGender === "Male" ? "Female" : "Male";
-
-                    // 1 Primary Keeper
-                    addNPC("Tavern Keeper", bName, x, y, {
-                        gender: keeperGender,
-                        lastName: keeperLastName,
-                        title: "Owner"
-                    });
-
-                    // 1 Spouse (Co-Owner)
-                    addNPC("Tavern Keeper", bName, x, y, {
-                        gender: spouseGender,
-                        lastName: keeperLastName,
-                        title: "Co-Owner"
-                    });
-
-                    // 1-2 Workers
-                    const workerCount = rng.range(1, 2);
-                    for (let i = 0; i < workerCount; i++) {
-                        addNPC("Tavern Worker", bName, x, y);
-                    }
+                if (tile.buildingType === 'house' || tile.buildingType === 'manor' || tile.buildingType === 'keep') {
+                    residentialSites.push({ x, y, type: tile.buildingType, name: tile.buildingName });
+                } else {
+                    serviceBuildings.push({ x, y, type: tile.buildingType, name: tile.buildingName });
                 }
-                else if (bType === 'shop' || bType === 'market') {
-                    // 1 Merchant
-                    addNPC("Merchant", bName, x, y);
-                }
-                else if (bType === 'bank') {
-                    // 1 Merchant (Banker)
-                    addNPC("Merchant", bName, x, y, { title: "Banker" }); // Override title maybe?
-                    // 2 Guards
-                    addNPC("Guard", bName, x, y, { gender: "Male" });
-                    addNPC("Guard", bName, x, y, { gender: "Male" });
-                }
-                else if (bType === 'keep' || bType === 'manor') {
-                    // Noble Family
-                    // Attempt to parse family name from building name (e.g. "Ashwood Manor" -> "Ashwood")
-                    let familyName = null;
-                    // Check for various manor-like suffixes
-                    if (bName) {
-                        const suffixes = ['Manor', 'Hall', 'House', 'Keep', 'Estate', 'Lodge', 'Castle', 'Palace'];
-                        for (const suffix of suffixes) {
-                            if (bName.includes(suffix)) {
-                                familyName = bName.split(' ' + suffix)[0]; // robustly get everything before the suffix
-                                break;
-                            }
-                        }
-                        // Fallback: just take first word if we missed the suffix
-                        if (!familyName) familyName = bName.split(' ')[0];
-                    }
-
-                    // Noble Family Logic
-
-                    // 1. Determine Head of Household Gender & Title
-                    const headGender = rng.random() > 0.5 ? "Male" : "Female";
-                    let headTitle, spouseTitle;
-
-                    // Pick a title pair
-                    const pairs = [
-                        { m: "Lord", f: "Lady" },
-                        { m: "Baron", f: "Baroness" },
-                        { m: "Duke", f: "Duchess" },
-                        { m: "Count", f: "Countess" }
-                    ];
-                    const pair = rng.pick(pairs);
-
-                    if (headGender === "Male") {
-                        headTitle = pair.m;
-                        spouseTitle = pair.f;
-                    } else {
-                        headTitle = pair.f;
-                        spouseTitle = pair.m;
-                    }
-
-                    // 1 Head of Household
-                    addNPC("Noble", bName, x, y, {
-                        gender: headGender,
-                        title: headTitle,
-                        lastName: familyName
-                    });
-
-                    // Spouse
-                    const spouseGender = headGender === "Male" ? "Female" : "Male";
-                    addNPC("Noble", bName, x, y, {
-                        gender: spouseGender,
-                        title: spouseTitle,
-                        lastName: familyName
-                    });
-
-                    // 1-3 Children
-                    const childCount = rng.range(1, 3);
-                    for (let i = 0; i < childCount; i++) {
-                        addNPC("Noble Child", bName, x, y, { lastName: familyName });
-                    }
-
-                    const guardCount = rng.range(2, 4);
-                    for (let i = 0; i < guardCount; i++) {
-                        addNPC("Guard", bName, x, y, { gender: "Male" });
-                    }
-                }
-                else if (bType === 'guild') {
-                    // Guild Master
-                    addNPC("Guild Master", bName, x, y);
-
-                    // 2-4 Members
-                    const memberCount = rng.range(2, 4);
-                    for (let i = 0; i < memberCount; i++) {
-                        addNPC("Guild Member", bName, x, y);
-                    }
-                }
-                else if (bType === 'temple') {
-                    // Head Priest
-                    addNPC("Priest", bName, x, y);
-
-                    // 2-5 Acolytes
-                    const acolyteCount = rng.range(2, 5);
-                    for (let i = 0; i < acolyteCount; i++) {
-                        addNPC("Acolyte", bName, x, y);
-                    }
-                }
+            } else if (tile.type === 'farm_field' || (tile.type === 'building' && tile.buildingType === 'barn')) {
+                workSites.push({ x, y, type: tile.type === 'farm_field' ? 'field' : 'barn' });
             }
         }
     }
+
+    // Helper to add NPC with linkage
+    const addNPC = (role, workplace, home, options = {}) => {
+        const npcSeed = parseInt(seed) + (workplace.x * 1000) + (workplace.y * 100) + rng.range(0, 9999);
+        const npc = generateNPC({ seed: npcSeed, role, noEvil: true, ...options });
+
+        npc.location = {
+            x: workplace.x,
+            y: workplace.y,
+            buildingName: workplace.name || workplace.type || "Outdoors",
+            buildingType: workplace.type,
+            homeCoords: home ? { x: home.x, y: home.y } : null
+        };
+        npcs.push(npc);
+        return npc;
+    };
+
+    // 2. TOWN LEADER LOGIC
+    let leaderSet = false;
+    let mainResidence = residentialSites.find(r => r.type === 'keep' || r.type === 'manor');
+
+    if (mainResidence) {
+        // High Noble Leader and Family
+        let familyName;
+        if (mainResidence.name && mainResidence.name !== "Manor" && mainResidence.name !== "Keep") {
+            familyName = mainResidence.name.split(' ')[0];
+        } else if (rng.random() < 0.4) {
+            // 40% chance the noble house takes the name of the town (e.g. House Everfell)
+            // Strip common suffixes if present
+            familyName = townName.replace(/(ton|burg|shire|hold|wick|stead)$/, '');
+        } else {
+            familyName = rng.pick(NOBLE_LAST_NAMES);
+        }
+
+        // 1. Head of House
+        const head = addNPC("Noble", mainResidence, mainResidence, { lastName: familyName });
+        head.job = `${head.title} of ${townName}`;
+
+        // 2. Spouse
+        const spouseGender = head.gender === "Male" ? "Female" : "Male";
+        const spouse = addNPC("Noble", mainResidence, mainResidence, {
+            lastName: familyName,
+            gender: spouseGender,
+            titleIndex: head.selectedTitleIndex // Match title index for spouse correlation
+        });
+        spouse.job = `${spouse.title} of ${townName}`;
+
+        // 3. Children (1-3)
+        const childCount = rng.range(1, 3);
+        for (let i = 0; i < childCount; i++) {
+            const child = addNPC("Noble Child", mainResidence, mainResidence, { lastName: familyName });
+            child.job = `${child.title} of the House ${familyName}`;
+        }
+
+        leaderSet = true;
+    } else if (residentialSites.length > 0) {
+        // Village Elder / Headman
+        const elderHome = residentialSites[0]; // Take first house
+        const elder = addNPC("Villager", elderHome, elderHome, { title: townSize === 'hamlet' ? 'Headman' : 'Elder' });
+        elder.job = `Leader of ${townName}`;
+        leaderSet = true;
+    }
+
+    // 3. SERVICE BUILDINGS (Inns, Shops, Temples, Blacksmiths)
+    serviceBuildings.forEach(b => {
+        if (b.type === 'tavern' || b.type === 'inn') {
+            const keeper = addNPC("Tavern Keeper", b, b, { title: "Owner" });
+            keeper.job = `Owner of ${b.name}`;
+            const spouseGender = keeper.gender === "Male" ? "Female" : "Male";
+            const spouse = addNPC("Tavern Keeper", b, b, {
+                gender: spouseGender,
+                lastName: keeper.lastName,
+                titleIndex: keeper.selectedTitleIndex // Sync titles like 'Host' & 'Hostess'
+            });
+            spouse.job = `Co-Owner of ${b.name}`;
+        } else if (b.type === 'shop' || b.type === 'market') {
+            // Check for "Name's Goods" pattern in building name
+            let forcedOptions = {};
+            if (b.name && b.name.includes("'s ")) {
+                const possibleName = b.name.split("'s ")[0];
+                if (HUMAN_NAMES_MALE.includes(possibleName)) {
+                    forcedOptions = { firstName: possibleName, gender: "Male" };
+                } else if (HUMAN_NAMES_FEMALE.includes(possibleName)) {
+                    forcedOptions = { firstName: possibleName, gender: "Female" };
+                }
+            }
+
+            const merchant = addNPC("Merchant", b, b, forcedOptions);
+            merchant.job = `Proprietor of ${b.name}`;
+            const spouseGender = merchant.gender === "Male" ? "Female" : "Male";
+            const spouse = addNPC("Merchant", b, b, {
+                gender: spouseGender,
+                lastName: merchant.lastName,
+                titleIndex: merchant.selectedTitleIndex
+            });
+            spouse.job = `Merchant at ${b.name}`;
+        } else if (b.type === 'temple') {
+            const priest = addNPC("Priest", b, b);
+            priest.job = `${priest.title} of ${b.name}`;
+            const spouseGender = priest.gender === "Male" ? "Female" : "Male";
+            const spouse = addNPC("Acolyte", b, b, {
+                gender: spouseGender,
+                lastName: priest.lastName,
+                titleIndex: priest.selectedTitleIndex // Father & Sister (or Mother & Brother)
+            });
+            spouse.job = `${spouse.title} of ${b.name}`;
+        } else if (b.type === 'blacksmith') {
+            const smith = addNPC("Blacksmith", b, b);
+            smith.job = `Master Smith of ${b.name}`;
+            const spouseGender = smith.gender === "Male" ? "Female" : "Male";
+            const spouse = addNPC("Blacksmith", b, b, {
+                gender: spouseGender,
+                lastName: smith.lastName,
+                titleIndex: smith.selectedTitleIndex
+            });
+            spouse.job = `Assistant Smith at ${b.name}`;
+        } else if (b.type === 'guild') {
+            const master = addNPC("Guild Master", b, b);
+            master.job = `Master of ${b.name}`;
+        }
+    });
+
+    // 4. RESIDENTIAL POPULATION (Families)
+    const occupiedHomes = new Set(npcs.filter(n => n.location.homeCoords).map(n => `${n.location.homeCoords.x},${n.location.homeCoords.y}`));
+
+    residentialSites.forEach(home => {
+        if (occupiedHomes.has(`${home.x},${home.y}`)) return; // Skip if already populated (e.g. leader)
+
+        const familyName = rng.pick(HUMAN_LAST_NAMES);
+        const familySize = rng.range(3, 6); // More authentic medieval family sizes (1-4 children)
+
+        for (let i = 0; i < familySize; i++) {
+            const isChild = i >= 2;
+            const canBeFarmer = workSites.length > 0 && (townSize === 'hamlet' || townSize === 'village' || townSize === 'town');
+            const role = isChild ? "Villager" : (canBeFarmer ? "Farmer" : "Villager");
+            const npc = addNPC(role, home, home, {
+                lastName: familyName,
+                title: isChild ? "Child" : (role === "Farmer" ? "Farmer" : "Citizen")
+            });
+
+            // Assign jobs to adults
+            if (!isChild) {
+                if (role === "Farmer" && workSites.length > 0) {
+                    const site = workSites[rng.range(0, workSites.length - 1)];
+                    npc.location.x = site.x;
+                    npc.location.y = site.y;
+                    npc.location.buildingType = site.type;
+                    npc.job = site.type === 'field' ? "Tilling the fields" : "Tending to the barn";
+                } else {
+                    // Balanced Vocation System
+                    if (!vocationSlots) {
+                        const slotsBySize = {
+                            hamlet: { "Cloth Weaver": 1, "Tool Mender": 1 },
+                            village: { "Cloth Weaver": 1, "Tool Mender": 1, "Tanner": 1, "Tailor": 1, "Carpenter": 1 },
+                            town: { "Cloth Weaver": 2, "Tool Mender": 2, "Tanner": 2, "Tailor": 2, "Carpenter": 2, "Ale Brewer": 2, "Baker": 2 },
+                            city: { "Cloth Weaver": 5, "Tool Mender": 4, "Tanner": 4, "Tailor": 5, "Carpenter": 4, "Ale Brewer": 3, "Baker": 4 }
+                        };
+                        vocationSlots = { ...(slotsBySize[townSize] || slotsBySize.village) };
+                    }
+
+                    // Try to pick an available specialized vocation
+                    const availableVocations = Object.keys(vocationSlots).filter(v => vocationSlots[v] > 0);
+                    if (availableVocations.length > 0) {
+                        const vocation = rng.pick(availableVocations);
+                        npc.job = vocation;
+                        vocationSlots[vocation]--;
+                    } else {
+                        // Fallback to more common/domestic activities
+                        const domesticActivities = [
+                            "Tending the hearth", "Cleaning the house", "Resting in the square",
+                            "Trading at the market", "Mending nets", "Preparing a meal",
+                            "Helping neighbors", "Running errands", "Fetching water"
+                        ];
+                        npc.job = rng.pick(domesticActivities);
+                    }
+                }
+            } else {
+                const childActivities = ["Playing in the street", "Helping parents", "Exploring nearby", "Playing tag"];
+                npc.job = rng.pick(childActivities);
+            }
+        }
+    });
 
     return npcs;
 };

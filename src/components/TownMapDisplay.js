@@ -40,7 +40,8 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           // Calculate if tile is clickable
           const distance = playerPosition ? Math.abs(col - playerPosition.x) + Math.abs(row - playerPosition.y) : 999;
           const isInRange = distance > 0 && distance <= 5;
-          const isClickable = onTileClick && isInRange && tile.walkable && !isPlayer;
+          const isBuilding = tile.type === 'building';
+          const isClickable = onTileClick && isInRange && (tile.walkable || isBuilding) && !isPlayer;
 
           // Check adjacent tiles for path/wall connections
           let hasPathNorth = false, hasPathSouth = false, hasPathEast = false, hasPathWest = false;
@@ -93,7 +94,8 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
                       tile.type === 'wall' ? '#90EE90' :
                         tile.type === 'keep_wall' ? '#90EE90' :
                           tile.type === 'town_square' ? '#E0E0E0' :
-                            tile.type === 'building' ? '#90EE90' : '#FFF',
+                            tile.type === 'farm_field' ? '#D2B48C' :
+                              tile.type === 'building' ? '#90EE90' : '#FFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

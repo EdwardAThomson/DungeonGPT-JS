@@ -28,6 +28,7 @@ const GameSettings = () => {
 
   // State for generated map
   const [generatedMap, setGeneratedMap] = useState(null);
+  const [worldSeed, setWorldSeed] = useState(settings?.worldSeed || null);
   const [showMapPreview, setShowMapPreview] = useState(false);
 
 
@@ -77,12 +78,6 @@ const GameSettings = () => {
   const handleTechnologyLevelChange = (e) => setTechnologyLevel(e.target.value);
   const handleResponseVerbosityChange = (e) => setResponseVerbosity(e.target.value);
 
-  // Map generation handler
-  const handleGenerateMap = () => {
-    const newMap = generateMapData();
-    setGeneratedMap(newMap);
-    setShowMapPreview(true);
-  };
 
 
 
@@ -115,6 +110,7 @@ const GameSettings = () => {
       magicLevel, // Added
       technologyLevel, // Added
       responseVerbosity, // Added
+      worldSeed, // Added
       // Note: selectedProvider is managed directly in context
     };
 
@@ -128,7 +124,7 @@ const GameSettings = () => {
     setSettings(settingsData);
 
     // Navigate to hero selection with generated map
-    navigate('/hero-selection', { state: { characters, generatedMap } });
+    navigate('/hero-selection', { state: { characters, generatedMap, worldSeed } });
   };
 
   return (
@@ -268,12 +264,39 @@ const GameSettings = () => {
         <p>Generate a random world map for your adventure. Each map is unique with forests, mountains, and towns.</p>
 
         <div className="map-generation-controls">
+          <div className="seed-input-group" style={{ marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <label htmlFor="worldSeed" style={{ fontWeight: 'bold' }}>World Seed:</label>
+            <input
+              id="worldSeed"
+              type="number"
+              value={worldSeed || ''}
+              onChange={(e) => setWorldSeed(e.target.value)}
+              placeholder="Leave empty for random"
+              className="settings-input"
+              style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '150px' }}
+            />
+            <button
+              type="button"
+              onClick={() => setWorldSeed(Math.floor(Math.random() * 1000000))}
+              className="secondary-button"
+              style={{ padding: '6px 12px', fontSize: '0.9rem' }}
+            >
+              🎲 Randomize
+            </button>
+          </div>
           <button
-            onClick={handleGenerateMap}
+            onClick={() => {
+              const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
+              if (!worldSeed) setWorldSeed(seedToUse);
+              const newMap = generateMapData(10, 10, seedToUse);
+              setGeneratedMap(newMap);
+              setShowMapPreview(true);
+            }}
             className="generate-map-button"
             type="button"
+            style={{ width: '100%', maxWidth: '300px' }}
           >
-            {generatedMap ? '🔄 Regenerate Map' : '🗺️ Generate World Map'}
+            {generatedMap ? '🔄 Build Map from Seed' : '🗺️ Generate World Map'}
           </button>
 
           {generatedMap && (

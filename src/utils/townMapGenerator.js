@@ -66,6 +66,11 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   // Generate paths connecting all buildings to the road network
   generateBuildingPaths(mapData, centerPos, rng);
 
+  // Place farm fields (Hamlets, Villages, and Towns)
+  if (townSize === 'hamlet' || townSize === 'village' || townSize === 'town') {
+    placeFarmFields(mapData, townSize, rng);
+  }
+
   // Place decorations (trees, wells, etc.) LAST
   // This way they fill in empty spaces without blocking buildings or paths
   placeDecorations(mapData, townSize, rng);
@@ -224,17 +229,17 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
       houses: 5
     },
     village: {
-      important: ['inn', 'shop'],
+      important: ['inn', 'shop', 'blacksmith'],
       houses: 8
     },
     town: {
-      important: ['inn', 'shop', 'temple', 'tavern', 'tavern'],
-      houses: 20  // Reduced from 40
+      important: ['inn', 'shop', 'temple', 'blacksmith', 'tavern', 'tavern'],
+      houses: 20
     },
     city: {
-      important: ['temple', 'market', 'manor', 'tavern', 'tavern', 'tavern', 'guild', 'guild', 'guild', 'bank', 'bank', 'bank'],
-      houses: 40,  // Reduced from 80
-      hasKeep: true  // Cities have keeps
+      important: ['temple', 'market', 'manor', 'blacksmith', 'tavern', 'tavern', 'tavern', 'guild', 'guild', 'guild', 'bank', 'bank', 'bank'],
+      houses: 40,
+      hasKeep: true
     }
   };
 
@@ -367,6 +372,9 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
           mapData[pos.y][pos.x].buildingName = generateBankName(rng);
         } else if (buildingType === 'shop' || buildingType === 'market') {
           mapData[pos.y][pos.x].buildingName = generateShopName(rng);
+        } else if (buildingType === 'blacksmith') {
+          const blacksmithNames = ["Iron Anvil", "Heavy Hammer", "Strong Forge", "Dragon Sunder", "Steel Strike", "The Hearth Forge"];
+          mapData[pos.y][pos.x].buildingName = `${blacksmithNames[Math.floor(rng() * blacksmithNames.length)]}`;
         } else if (buildingType === 'manor' || buildingType === 'keep') {
           mapData[pos.y][pos.x].buildingName = generateManorName(rng);
         } else if (buildingType === 'temple') {
@@ -403,6 +411,9 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
                   mapData[y][x].buildingName = generateBankName(rng);
                 } else if (buildingType === 'shop' || buildingType === 'market') {
                   mapData[y][x].buildingName = generateShopName(rng);
+                } else if (buildingType === 'blacksmith') {
+                  const blacksmithNames = ["Iron Anvil", "Heavy Hammer", "Strong Forge", "Dragon Sunder", "Steel Strike", "The Hearth Forge"];
+                  mapData[y][x].buildingName = `${blacksmithNames[Math.floor(rng() * blacksmithNames.length)]}`;
                 } else if (buildingType === 'manor' || buildingType === 'keep') {
                   mapData[y][x].buildingName = generateManorName(rng);
                 } else if (buildingType === 'temple') {
@@ -493,6 +504,51 @@ function placeDecorations(mapData, townSize, rng) {
     // Only place on grass tiles without POIs
     if (tile.type === 'grass' && tile.poi === null) {
       tile.poi = decorations[Math.floor(rng() * decorations.length)];
+    }
+  }
+}
+
+// Place farm fields in clusters (Hamlets and Villages only)
+function placeFarmFields(mapData, townSize, rng) {
+  const width = mapData[0].length;
+  const height = mapData.length;
+
+  // Decide how many clusters to place
+  const clusterCount = townSize === 'hamlet' ? 2 : (townSize === 'village' ? 4 : 6);
+
+  for (let i = 0; i < clusterCount; i++) {
+    // Pick a starting point for the cluster, preferably away from center
+    // Try to find a grass tile
+    let startX, startY;
+    let found = false;
+    for (let attempt = 0; attempt < 10; attempt++) {
+      startX = Math.floor(rng() * width);
+      startY = Math.floor(rng() * height);
+
+      const distFromCenter = Math.sqrt(Math.pow(startX - width / 2, 2) + Math.pow(startY - height / 2, 2));
+      if (distFromCenter > width / 4 && mapData[startY][startX].type === 'grass') {
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) continue;
+
+    // Create a small cluster (2x2 or 2x3)
+    const cWidth = 2 + Math.floor(rng() * 2);
+    const cHeight = 2 + Math.floor(rng() * 2);
+
+    for (let dy = 0; dy < cHeight; dy++) {
+      for (let dx = 0; dx < cWidth; dx++) {
+        const x = startX + dx;
+        const y = startY + dy;
+
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+          if (mapData[y][x].type === 'grass' && mapData[y][x].poi === null) {
+            mapData[y][x].type = 'farm_field';
+          }
+        }
+      }
     }
   }
 }
@@ -657,6 +713,11 @@ export const getTownTileEmoji = (tile) => {
     return poiEmojis[tile.poi] || tile.poi || '❓';  // Return the poi itself if not in map
   }
 
+  // Terrain types
+  if (tile.type === 'farm_field') {
+    return '🌾';
+  }
+
   // Building types
   if (tile.type === 'building') {
     const buildingEmojis = {
@@ -671,6 +732,7 @@ export const getTownTileEmoji = (tile) => {
       barracks: '🏰',
       manor: '🏰',
       barn: '🏚️',
+      blacksmith: '⚒️',
       keep: '🏰'  // Castle/keep for cities
     };
     return buildingEmojis[tile.buildingType] || '🏠';
