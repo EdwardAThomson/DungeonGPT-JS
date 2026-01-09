@@ -2,7 +2,7 @@ import React from 'react';
 import WorldMapDisplay from './WorldMapDisplay';
 import TownMapDisplay from './TownMapDisplay';
 
-const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError }) => {
+const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered }) => {
     if (!isOpen) return null;
 
     // Check if player is on a town tile
@@ -12,7 +12,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
         <div className="modal-overlay" onClick={onClose}>
             {/* Add specific class for map styling if needed */}
             <div className="modal-content map-modal-content" onClick={(e) => e.stopPropagation()}>
-                <h2>{mapLevel === 'town' ? 'Town Map' : 'World Map'}</h2>
+                <h2>{mapLevel === 'town' ? (townMapData?.townName || 'Town Map') : 'World Map'}</h2>
                 {mapLevel === 'world' ? (
                     <>
                         <WorldMapDisplay
@@ -56,6 +56,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                         onTileClick={onTownTileClick}
                         firstHero={firstHero}
                         townError={townError}
+                        markBuildingDiscovered={markBuildingDiscovered}
                     />
                 )}
                 <button className="modal-close-button" onClick={onClose}>

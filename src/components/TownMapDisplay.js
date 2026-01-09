@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { getTownTileEmoji } from '../utils/townMapGenerator';
+import BuildingModal from './BuildingModal';
 
 /**
  * TownMapDisplay - Renders a town map with paths, buildings, and player position
@@ -10,9 +11,38 @@ import { getTownTileEmoji } from '../utils/townMapGenerator';
  * @param {boolean} showLeaveButton - Whether to show the leave town button
  * @param {Object} firstHero - First hero for player portrait display
  * @param {string} townError - Error message to display in town map
+ * @param {Function} markBuildingDiscovered - Callback to mark a building as seen
  */
-const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError }) => {
+const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError, markBuildingDiscovered }) => {
+  const [selectedBuilding, setSelectedBuilding] = useState(null);
+
   if (!townMapData) return null;
+
+  const discoveredBuildings = townMapData.discoveredBuildings || [];
+
+  const handleBuildingClick = (tile) => {
+    // 1. Calculate distance
+    const distance = Math.abs(tile.x - playerPosition.x) + Math.abs(tile.y - playerPosition.y);
+    const isDiscovered = discoveredBuildings.includes(`${tile.x},${tile.y}`);
+
+    // Allow seeing info if close enough (within 2 tiles) OR if already discovered
+    if (distance <= 2 || isDiscovered) {
+      // Find NPCs in this building
+      const buildingNpcs = (townMapData.npcs || []).filter(npc =>
+        npc.location && npc.location.x === tile.x && npc.location.y === tile.y
+      );
+
+      setSelectedBuilding({ ...tile, npcs: buildingNpcs });
+
+      // Mark as discovered if not already
+      if (!isDiscovered && markBuildingDiscovered) {
+        markBuildingDiscovered(townMapData.townName, tile.x, tile.y);
+      }
+    } else {
+      // Too far and not discovered
+      alert("You are too far away to identify this building clearly.");
+    }
+  };
 
   return (
     <div>
@@ -41,6 +71,12 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           const distance = playerPosition ? Math.abs(col - playerPosition.x) + Math.abs(row - playerPosition.y) : 999;
           const isInRange = distance > 0 && distance <= 5;
           const isBuilding = tile.type === 'building';
+
+          // Hover info discovery
+          const isDiscovered = discoveredBuildings.includes(`${tile.x},${tile.y}`);
+          const canSeeName = distance <= 2 || isDiscovered;
+          const displayName = canSeeName && tile.buildingName ? tile.buildingName : (tile.buildingType || tile.type);
+
           const isClickable = onTileClick && isInRange && (tile.walkable || isBuilding) && !isPlayer;
 
           // Check adjacent tiles for path/wall connections
@@ -107,8 +143,14 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
                 height: '30px',
                 cursor: isClickable ? 'pointer' : 'default'
               }}
-              onClick={() => isClickable && onTileClick(col, row)}
-              title={`(${tile.x}, ${tile.y}) - ${tile.type}${tile.buildingType ? ` (${tile.buildingType})` : ''}${isInRange ? ` [${distance} tiles away]` : ''}`}
+              onClick={() => {
+                if (isBuilding) {
+                  handleBuildingClick(tile);
+                } else if (isClickable) {
+                  onTileClick(col, row);
+                }
+              }}
+              title={`(${tile.x}, ${tile.y}) - ${displayName}${isInRange ? ` [${distance} tiles away]` : ''}${isDiscovered ? ' (Discovered)' : ''}`}
             >
               {/* Path rendering */}
               {isPath && (
@@ -235,16 +277,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
         })}
       </div>
       {townError && (
-        <div style={{
-          textAlign: 'center',
-          marginTop: '10px',
-          padding: '10px',
-          backgroundColor: '#fee',
-          border: '1px solid #fcc',
-          borderRadius: '4px',
-          color: '#c00',
-          fontSize: '14px'
-        }}>
+        <div className="message system error" style={{ margin: '10px auto', display: 'block', maxWidth: '400px' }}>
           ⚠️ {townError}
         </div>
       )}
@@ -254,6 +287,14 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
             Leave Town
           </button>
         </div>
+      )}
+
+      {selectedBuilding && (
+        <BuildingModal
+          building={selectedBuilding}
+          npcs={selectedBuilding.npcs}
+          onClose={() => setSelectedBuilding(null)}
+        />
       )}
     </div>
   );

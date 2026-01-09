@@ -84,6 +84,26 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         });
     };
 
+    const markBuildingDiscovered = (townName, x, y) => {
+        if (!townName) return;
+        setTownMapsCache(prev => {
+            const townData = prev[townName];
+            if (!townData) return prev;
+
+            const coord = `${x},${y}`;
+            const discovered = townData.discoveredBuildings || [];
+            if (discovered.includes(coord)) return prev;
+
+            return {
+                ...prev,
+                [townName]: {
+                    ...townData,
+                    discoveredBuildings: [...discovered, coord]
+                }
+            };
+        });
+    };
+
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
     const [townError, setTownError] = useState(null);
 
@@ -291,31 +311,10 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             return;
         }
 
-        const targetTile = currentTownMap.mapData[clickedY][clickedX];
+        const targetTile = currentTownMap.mapData[clickedY] && currentTownMap.mapData[clickedY][clickedX] ? currentTownMap.mapData[clickedY][clickedX] : null;
+        if (!targetTile) return;
 
-        // Interaction with buildings
-        if (targetTile.type === 'building' && setConversation && conversation) {
-            const buildingName = targetTile.buildingName || targetTile.buildingType || "Building";
-            const buildingNpcs = (currentTownMap.npcs || []).filter(npc =>
-                npc.location.x === clickedX && npc.location.y === clickedY
-            );
-
-            let npcList = "";
-            if (buildingNpcs.length > 0) {
-                npcList = " Inside, you see: " + buildingNpcs.map(n => `${n.title} ${n.name} (${n.job})`).join(", ") + ".";
-            } else {
-                npcList = " The building seems empty for now.";
-            }
-
-            const interactMessage = {
-                role: 'system',
-                content: `You approach the ${buildingName}.${npcList} You can now interact with them in the chat.`
-            };
-            setConversation([...conversation, interactMessage]);
-            return;
-        }
-
-        if (!targetTile.walkable) {
+        if (!targetTile.walkable && targetTile.type !== 'building') {
             setError('You cannot move to that location.');
             return;
         }
@@ -347,7 +346,8 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         visitedBiomes,
         visitedTowns,
         trackBiomeVisit,
-        trackTownVisit
+        trackTownVisit,
+        markBuildingDiscovered
     };
 };
 
