@@ -1330,10 +1330,6 @@ button {
 */
 
 /* --- Game Settings Page Styles --- */
-.game-settings-page {
-  /* Inherits .page-container styles for base padding/background */
-  /* Add specific spacing if needed */
-}
 
 /* Spacing between sections */
 .game-settings-page .form-section {
@@ -1557,9 +1553,6 @@ button {
 /* --- End Game Settings Page Styles --- */
 
 /* --- Hero Selection Page Styles --- */
-.hero-selection-page {
-  /* Inherits .page-container styles */
-}
 
 .hero-selection-page .page-header {
   /* Reuse styles from .all-characters-page .page-header if defined */
@@ -1593,10 +1586,6 @@ button {
 }
 
 
-.hero-selection-list {
-  /* Inherits .all-characters-list styles */
-  /* Add specific adjustments if needed */
-}
 
 .hero-item {
   /* Inherits .character-item styles */
