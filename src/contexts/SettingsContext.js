@@ -4,13 +4,13 @@ import { DEFAULT_MODELS } from "../llm/llm_constants";
 const SettingsContext = createContext({
   settings: {},
   setSettings: () => { },
-  selectedProvider: 'openai',
+  selectedProvider: 'gemini-cli',
   setSelectedProvider: () => { },
-  selectedModel: DEFAULT_MODELS['openai'],
+  selectedModel: DEFAULT_MODELS['gemini-cli'],
   setSelectedModel: () => { },
-  assistantProvider: 'openai',
+  assistantProvider: 'gemini-cli',
   setAssistantProvider: () => { },
-  assistantModel: DEFAULT_MODELS['openai'],
+  assistantModel: DEFAULT_MODELS['gemini-cli'],
   setAssistantModel: () => { },
   isSettingsModalOpen: false,
   setIsSettingsModalOpen: () => { },
@@ -18,10 +18,10 @@ const SettingsContext = createContext({
 
 export const SettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState({});
-  const [selectedProvider, setSelectedProvider] = useState('openai');
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODELS['openai']);
-  const [assistantProvider, setAssistantProvider] = useState('openai');
-  const [assistantModel, setAssistantModel] = useState(DEFAULT_MODELS['openai']);
+  const [selectedProvider, setSelectedProvider] = useState('gemini-cli');
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODELS['gemini-cli']);
+  const [assistantProvider, setAssistantProvider] = useState('gemini-cli');
+  const [assistantModel, setAssistantModel] = useState(DEFAULT_MODELS['gemini-cli']);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   return (

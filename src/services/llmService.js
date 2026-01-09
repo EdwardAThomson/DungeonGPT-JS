@@ -65,5 +65,41 @@ export const llmService = {
         return () => {
             eventSource.close();
         };
+    },
+
+    /**
+     * Unified generation that handles both Cloud and CLI providers
+     */
+    async generateUnified({ provider, model, prompt, maxTokens, temperature }) {
+        const isCli = ['codex', 'claude-cli', 'gemini-cli'].includes(provider);
+
+        if (isCli) {
+            let cliBackend = 'codex';
+            if (provider === 'claude-cli') cliBackend = 'claude';
+            if (provider === 'gemini-cli') cliBackend = 'gemini';
+
+            const { id } = await this.createTask(cliBackend, prompt, undefined, model);
+
+            return new Promise((resolve, reject) => {
+                let fullText = '';
+                this.streamTask(id, (update) => {
+                    if (update.type === 'log' && update.data.stream === 'stdout') {
+                        fullText += update.data.line + '\n';
+                    } else if (update.type === 'done') {
+                        resolve(fullText.trim());
+                    } else if (update.type === 'error') {
+                        reject(new Error(update.data));
+                    }
+                });
+            });
+        } else {
+            return await this.generateText({
+                provider,
+                model,
+                prompt,
+                maxTokens: maxTokens || 1000,
+                temperature: temperature || 0.7
+            });
+        }
     }
 };

@@ -44,36 +44,13 @@ const useGameInteraction = (
     };
 
     const generateResponse = async (model, prompt) => {
-        const isCli = ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider);
-
-        if (isCli) {
-            let cliBackend = 'codex';
-            if (selectedProvider === 'claude-cli') cliBackend = 'claude';
-            if (selectedProvider === 'gemini-cli') cliBackend = 'gemini';
-
-            const { id } = await llmService.createTask(cliBackend, prompt, undefined, model);
-
-            return new Promise((resolve, reject) => {
-                let fullText = '';
-                llmService.streamTask(id, (update) => {
-                    if (update.type === 'log' && update.data.stream === 'stdout') {
-                        fullText += update.data.line + '\n';
-                    } else if (update.type === 'done') {
-                        resolve(fullText.trim());
-                    } else if (update.type === 'error') {
-                        reject(new Error(update.data));
-                    }
-                });
-            });
-        } else {
-            return await llmService.generateText({
-                provider: selectedProvider,
-                model,
-                prompt,
-                maxTokens: 1600,
-                temperature: 0.7
-            });
-        }
+        return await llmService.generateUnified({
+            provider: selectedProvider,
+            model,
+            prompt,
+            maxTokens: 1600,
+            temperature: 0.7
+        });
     };
 
     const summarizeConversation = async (summary, newMessages) => {
@@ -117,7 +94,9 @@ const useGameInteraction = (
             locationInfo += ` POI: ${currentTile.poi}.`;
         }
 
-        const gameContext = `Setting: ${settings.shortDescription || 'A generic fantasy world'}. Mood: ${settings.grimnessLevel || 'Neutral'} Grimness, ${settings.darknessLevel || 'Neutral'} Darkness. Magic: ${settings.magicLevel || 'Low'}. Tech: ${settings.technologyLevel || 'Medieval'}. ${locationInfo}. Party: ${partyInfo}.`;
+        const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
+        const milestonesInfo = settings.milestones && settings.milestones.length > 0 ? `\nKey Milestones to achieve: ${settings.milestones.join(', ')}` : '';
+        const gameContext = `Setting: ${settings.shortDescription || 'A generic fantasy world'}. Mood: ${settings.grimnessLevel || 'Neutral'} Grimness, ${settings.darknessLevel || 'Neutral'} Darkness. Magic: ${settings.magicLevel || 'Low'}. Tech: ${settings.technologyLevel || 'Medieval'}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
         const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary || 'The adventure begins.'}\n\nThe player party has just arrived. Start the adventure by describing the scene and presenting the initial situation based on the game context and starting location.`;
 
         try {
@@ -174,7 +153,9 @@ const useGameInteraction = (
         const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
         const currentTile = getTile(worldMap, playerPosition.x, playerPosition.y);
         const locationInfo = `Player is at coordinates (${playerPosition.x}, ${playerPosition.y}) in a ${currentTile?.biome || 'Unknown Area'} biome.${currentTile?.poi ? ` Point Of Interest: ${currentTile.poi}.` : ''}`;
-        const gameContext = `Setting: ${settings.shortDescription || 'A generic fantasy world'}. Mood: ${settings.grimnessLevel || 'Neutral'} Grimness, ${settings.darknessLevel || 'Neutral'} Darkness. Magic: ${settings.magicLevel || 'Low'}. Tech: ${settings.technologyLevel || 'Medieval'}. ${locationInfo}. Party: ${partyInfo}.`;
+        const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
+        const milestonesInfo = settings.milestones && settings.milestones.length > 0 ? `\nKey Milestones to achieve: ${settings.milestones.join(', ')}` : '';
+        const gameContext = `Setting: ${settings.shortDescription || 'A generic fantasy world'}. Mood: ${settings.grimnessLevel || 'Neutral'} Grimness, ${settings.darknessLevel || 'Neutral'} Darkness. Magic: ${settings.magicLevel || 'Low'}. Tech: ${settings.technologyLevel || 'Medieval'}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
         const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary || 'The adventure begins.'}\n\nUser action: ${userMessage.content}`;
 
         try {

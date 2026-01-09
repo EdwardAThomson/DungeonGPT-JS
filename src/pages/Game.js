@@ -11,6 +11,7 @@ import useGameMap from '../hooks/useGameMap';
 import useGameInteraction from '../hooks/useGameInteraction';
 import { getTile } from '../utils/mapGenerator';
 import AiAssistantPanel from '../components/AiAssistantPanel';
+import CharacterModal from '../components/CharacterModal';
 import { llmService } from '../services/llmService';
 
 const Game = () => {
@@ -42,6 +43,8 @@ const Game = () => {
   const [isHowToPlayModalOpen, setIsHowToPlayModalOpen] = useState(false);
   const [isEncounterModalOpen, setIsEncounterModalOpen] = useState(false);
   const [isDiceModalOpen, setIsDiceModalOpen] = useState(false);
+  const [isCharacterModalOpen, setIsCharacterModalOpen] = useState(false);
+  const [selectedHeroForModal, setSelectedHeroForModal] = useState(null);
   const [currentEncounter, setCurrentEncounter] = useState(null);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
 
@@ -254,7 +257,9 @@ const Game = () => {
     }
     locationInfo += ` Description seed: ${targetTile.descriptionSeed || 'Describe the area.'}`;
 
-    const gameContext = `Setting: ${settings.shortDescription}. Mood: ${settings.grimnessLevel}. ${locationInfo}. Party: ${partyInfo}.`;
+    const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
+    const milestonesInfo = settings.milestones && settings.milestones.length > 0 ? `\nKey Milestones to achieve: ${settings.milestones.join(', ')}` : '';
+    const gameContext = `Setting: ${settings.shortDescription}. Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
     const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${interactionHook.currentSummary}\n\n${locationInfo}\n\nDescribe what the player sees upon arriving at this new location.`;
 
     try {
@@ -303,6 +308,10 @@ const Game = () => {
             <div className="game-info-header">
               <div>
                 <p><strong>Setting:</strong> {settings.shortDescription || "Not set"}</p>
+                {settings.campaignGoal && (
+                  <p><strong>Quest:</strong> <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>{settings.campaignGoal}</span></p>
+                )}
+                <p><strong>Mood:</strong> {settings.grimnessLevel || "Neutral"} / {settings.darknessLevel || "Neutral"} | <strong>World:</strong> {settings.magicLevel || "Low Magic"} ({settings.technologyLevel || "Medieval"})</p>
                 <p><strong>Location:</strong> ({mapHook.playerPosition.x}, {mapHook.playerPosition.y}) - {currentBiome}</p>
               </div>
               <div className="header-button-group">
@@ -408,21 +417,39 @@ const Game = () => {
           {selectedHeroes && selectedHeroes.length > 0 ? (
             selectedHeroes.map(hero => (
               <div key={hero.characterId || hero.characterName} className="party-member">
-                {hero.profilePicture && <img src={hero.profilePicture} alt={`${hero.characterName}'s profile`} width="80" />}
+                {hero.profilePicture && (
+                  <img
+                    src={hero.profilePicture}
+                    alt={`${hero.characterName}'s profile`}
+                    width="80"
+                    onClick={() => {
+                      setSelectedHeroForModal(hero);
+                      setIsCharacterModalOpen(true);
+                    }}
+                  />
+                )}
                 <h3>{hero.characterName}</h3>
                 <p>Level {hero.characterLevel} {hero.characterRace} {hero.characterClass}</p>
-                {hero.stats && (
-                  <div className="stats">
-                    <h4>Stats:</h4>
-                    <div className="stats-grid">
-                      {Object.entries(hero.stats).map(([stat, value]) => (
-                        <div key={stat} className="stat-item">
-                          {stat.substring(0, 3).toUpperCase()}: {value}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <div style={{ textAlign: 'center', marginTop: '5px' }}>
+                  <button
+                    className="view-details-btn"
+                    style={{
+                      background: 'none',
+                      border: '1px solid rgba(236, 240, 241, 0.3)',
+                      color: '#bdc3c7',
+                      fontSize: '0.7rem',
+                      borderRadius: '4px',
+                      padding: '2px 8px',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => {
+                      setSelectedHeroForModal(hero);
+                      setIsCharacterModalOpen(true);
+                    }}
+                  >
+                    View Details
+                  </button>
+                </div>
               </div>
             ))
           ) : (
@@ -436,6 +463,7 @@ const Game = () => {
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
         settings={settings}
+        setSettings={setSettings}
         selectedProvider={selectedProvider}
         setSelectedProvider={setSelectedProvider}
         selectedModel={selectedModel}
@@ -485,6 +513,11 @@ const Game = () => {
         onClose={() => setIsEncounterModalOpen(false)}
         encounter={currentEncounter}
         onEnterLocation={() => mapHook.handleEnterLocation(currentEncounter, interactionHook.setConversation, interactionHook.conversation)}
+      />
+      <CharacterModal
+        isOpen={isCharacterModalOpen}
+        onClose={() => setIsCharacterModalOpen(false)}
+        character={selectedHeroForModal}
       />
       <DiceRoller
         isOpen={isDiceModalOpen}
