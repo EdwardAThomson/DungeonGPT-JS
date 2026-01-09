@@ -174,6 +174,32 @@ const TRINKETS = [
 // --- Generator Functions ---
 
 /**
+ * Picks a random name from the dataset.
+ * @param {string} gender "Male", "Female", or null/other
+ * @param {Object} [rng] Optional SeededRNG instance
+ * @param {string} [lastName] Optional fixed last name
+ * @returns {string}
+ */
+export const generateName = (gender, rng = null, lastName = null) => {
+    const pick = (arr) => {
+        if (rng) return rng.pick(arr);
+        return arr[Math.floor(Math.random() * arr.length)];
+    };
+
+    let firstName;
+    if (gender === "Male") {
+        firstName = pick(HUMAN_NAMES_MALE);
+    } else if (gender === "Female") {
+        firstName = pick(HUMAN_NAMES_FEMALE);
+    } else {
+        firstName = pick([...HUMAN_NAMES_MALE, ...HUMAN_NAMES_FEMALE]);
+    }
+
+    const selectedLastName = lastName || pick(HUMAN_LAST_NAMES);
+    return `${firstName} ${selectedLastName}`;
+};
+
+/**
  * Generates a full NPC object deterministically based on input options and/or a seed.
  * 
  * @param {Object} options Configuration options
@@ -234,14 +260,7 @@ export const generateNPC = (options = {}) => {
     }
 
     // 6. Generate Name
-    let firstName;
-    if (gender === "Male") {
-        firstName = rng.pick(HUMAN_NAMES_MALE);
-    } else {
-        firstName = rng.pick(HUMAN_NAMES_FEMALE);
-    }
-    const lastName = options.lastName || rng.pick(HUMAN_LAST_NAMES);
-    const fullName = `${firstName} ${lastName}`;
+    const fullName = generateName(gender, rng, options.lastName);
 
     // 6. Generate Stats (Base + Variance)
     const stats = { ...roleData.baseStats };

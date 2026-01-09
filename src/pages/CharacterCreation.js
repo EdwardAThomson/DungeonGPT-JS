@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 
 import CharacterContext from "../contexts/CharacterContext";
+import { generateName } from "../utils/npcGenerator";
 
 
 const profilePictures = [
@@ -52,12 +53,6 @@ const initialStats = {
   Wisdom: 8,
   Charisma: 8,
 };
-
-// --- Sample Name Lists (Expand these!) ---
-const maleFantasyFirstNames = ["Aelar", "Cael", "Darius", "Finnian", "Gareth", "Joric", "Kaelen", "Marius", "Orion", "Peregrine", "Ronan", "Tavish", "Uriel", "Warrick", "Zephyr"];
-const femaleFantasyFirstNames = ["Brynn", "Elara", "Isolde", "Lyra", "Nadia", "Quilla", "Seraphina", "Vanya", "Xylia", "Yarrow", "Anya", "Fiona", "Genevieve", "Helena", "Rowan"];
-// Keep last names gender-neutral for simplicity
-const fantasyLastNames = ["Ashwood", "Blackwater", "Copperleaf", "Dawnbringer", "Evenfall", "Frostbeard", "Goldfeather", "Highwind", "Ironhand", "Jadefire", "Kingsley", "Lightfoot", "Moonwhisper", "Nightshade", "Oakenshield", "Pinecroft", "Quickfoot", "Redfern", "Shadowclaw", "Stormblade", "Thornwood", "Underhill", "Valerius", "Wolfsbane", "Youngblood", "Zephyrson"];
 
 // --- Character Class Templates (Level 1) ---
 const characterTemplates = {
@@ -271,22 +266,9 @@ const CharacterCreation = () => {
     }
   };
 
-  // --- Update Name Generation Function --- // (Moved definition up)
+  // --- Update Name Generation Function --- // (Now using centralized dataset)
   const generateRandomName = () => {
-    let firstName;
-    // Choose list based on selected gender
-    if (selectedGender === "Male") {
-      firstName = maleFantasyFirstNames[Math.floor(Math.random() * maleFantasyFirstNames.length)];
-    } else if (selectedGender === "Female") {
-      firstName = femaleFantasyFirstNames[Math.floor(Math.random() * femaleFantasyFirstNames.length)];
-    } else {
-      // Default: Combine lists or pick from one if gender is not set or 'Other'
-      const combinedFirstNames = [...maleFantasyFirstNames, ...femaleFantasyFirstNames];
-      firstName = combinedFirstNames[Math.floor(Math.random() * combinedFirstNames.length)];
-    }
-
-    const lastName = fantasyLastNames[Math.floor(Math.random() * fantasyLastNames.length)];
-    setCharacterName(`${firstName} ${lastName}`);
+    setCharacterName(generateName(selectedGender));
   };
 
   return (

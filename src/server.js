@@ -1,6 +1,11 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
+const dotenv = require('dotenv');
+const llmBackend = require('./llm/llmBackend');
+const runner = require('./llm/runner/runner');
+
+dotenv.config();
 
 const app = express();
 const port = 5000;
@@ -12,13 +17,13 @@ app.use(express.json());
 // create a table called:  characterstable
 // create schema for character stats
 
- /*
-   characterId
-   Name, Gender, profilePicture
-   Race, Class, Level, Background, Alignment
-   Stats [Strength, Dexterity, Constitution, Intelligence, Wisdom, Charisma]
+/*
+  characterId
+  Name, Gender, profilePicture
+  Race, Class, Level, Background, Alignment
+  Stats [Strength, Dexterity, Constitution, Intelligence, Wisdom, Charisma]
 
-   */
+  */
 
 
 /*  --- this comes from CharacterCreation.js
@@ -50,7 +55,7 @@ const db = new sqlite3.Database('./src/game.db', (err) => {
   } else {
     console.log('Connected to SQLite database');
     // language=SQL format=false
-db.run(`CREATE TABLE IF NOT EXISTS characterstable (
+    db.run(`CREATE TABLE IF NOT EXISTS characterstable (
              characterId TEXT PRIMARY KEY,
              characterName TEXT,
              characterGender TEXT,
@@ -86,50 +91,50 @@ db.run(`CREATE TABLE IF NOT EXISTS characterstable (
         console.error('Error creating conversations table', err);
       } else {
         console.log('Table created or already exists (re: Conversations Table)');
-        
+
         // Add new columns if they don't exist (for existing databases)
         db.run(`ALTER TABLE conversations ADD COLUMN conversation_name TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
             console.error('Error adding conversation_name column:', err);
           }
         });
-        
+
         db.run(`ALTER TABLE conversations ADD COLUMN game_settings TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
             console.error('Error adding game_settings column:', err);
           }
         });
-        
+
         db.run(`ALTER TABLE conversations ADD COLUMN selected_heroes TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
             console.error('Error adding selected_heroes column:', err);
           }
         });
-        
+
         db.run(`ALTER TABLE conversations ADD COLUMN summary TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
             console.error('Error adding summary column:', err);
           }
         });
-        
+
         db.run(`ALTER TABLE conversations ADD COLUMN world_map TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
             console.error('Error adding world_map column:', err);
           }
         });
-        
+
         db.run(`ALTER TABLE conversations ADD COLUMN player_position TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
             console.error('Error adding player_position column:', err);
           }
         });
-        
+
         db.run(`ALTER TABLE conversations ADD COLUMN model TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
             console.error('Error adding model column:', err);
           }
         });
-        
+
         db.run(`ALTER TABLE conversations ADD COLUMN sub_maps TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
             console.error('Error adding sub_maps column:', err);
@@ -144,40 +149,72 @@ db.run(`CREATE TABLE IF NOT EXISTS characterstable (
 // These are the API methods
 
 
- /* // First route: a route to add a new character
-   0. characterId
-   1. Name, 2. Gender, 3. profilePicture
-   4. Race, 5. Class, 6. Level, 7. Background, 8. Alignment
-   9. Strength, Dexterity, Constitution, Intelligence, Wisdom, 14. Charisma
-   */
+/* // First route: a route to add a new character
+  0. characterId
+  1. Name, 2. Gender, 3. profilePicture
+  4. Race, 5. Class, 6. Level, 7. Background, 8. Alignment
+  9. Strength, Dexterity, Constitution, Intelligence, Wisdom, 14. Charisma
+  */
 
+// Route to add a new character
 app.post('/characters', (req, res) => {
-  const { characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, stats} = req.body;
-
-       /*
-             characterName TEXT,
-             characterGender TEXT,
-             profilePicture TEXT,
-             characterRace TEXT,
-             characterClass TEXT,
-             characterLevel INTEGER,
-             characterBackground TEXT,
-             characterAlignment TEXT,
-             stats TEXT
-        */
-
-  console.log([characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, JSON.stringify(stats)]);
+  const { characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, stats } = req.body;
+  console.log('Adding character:', [characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, JSON.stringify(stats)]);
 
   const query = `INSERT INTO characterstable (characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, stats) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-  const params = [characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, JSON.stringify(stats)]
+  const params = [characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, JSON.stringify(stats)];
 
-// If no existing character, proceed to insert
   db.run(query, params, function (err) {
     if (err) {
       console.error('Error adding character', err);
       res.status(500).json({ error: 'Failed to add character' });
     } else {
       res.json({ id: this.lastID });
+    }
+  });
+});
+
+// Route to update an existing character
+app.put('/characters/:characterId', (req, res) => {
+  const { characterId } = req.params;
+  const { characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, stats } = req.body;
+
+  console.log('Updating character:', characterId, [characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, JSON.stringify(stats)]);
+
+  const query = `
+    UPDATE characterstable 
+    SET characterName = ?, 
+        characterGender = ?, 
+        profilePicture = ?, 
+        characterRace = ?, 
+        characterClass = ?, 
+        characterLevel = ?, 
+        characterBackground = ?, 
+        characterAlignment = ?, 
+        stats = ? 
+    WHERE characterId = ?`;
+
+  const params = [
+    characterName,
+    characterGender,
+    profilePicture,
+    characterRace,
+    characterClass,
+    characterLevel,
+    characterBackground,
+    characterAlignment,
+    JSON.stringify(stats),
+    characterId
+  ];
+
+  db.run(query, params, function (err) {
+    if (err) {
+      console.error('Error updating character', err);
+      res.status(500).json({ error: 'Failed to update character' });
+    } else if (this.changes === 0) {
+      res.status(404).json({ error: 'Character not found' });
+    } else {
+      res.json({ message: 'Character updated successfully' });
     }
   });
 });
@@ -232,16 +269,16 @@ app.post('/conversation', (req, res) => {
 
 // GET endpoint to fetch all conversations
 app.get('/conversations', (req, res) => {
-    const query = `SELECT * FROM conversations`;
+  const query = `SELECT * FROM conversations`;
 
-    db.all(query, [], (err, rows) => {
-        if (err) {
-            console.error('Error retrieving conversations', err);
-            res.status(500).json({ error: 'Failed to retrieve conversations' });
-        } else {
-            res.json(rows);
-        }
-    });
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error('Error retrieving conversations', err);
+      res.status(500).json({ error: 'Failed to retrieve conversations' });
+    } else {
+      res.json(rows);
+    }
+  });
 });
 
 
@@ -249,13 +286,14 @@ app.get('/conversations', (req, res) => {
 
 app.get('/test', (req, res) => {
   console.log("Received request for /test");
-  res.json([{name: "Test Character" }]);
+  res.json([{ name: "Test Character" }]);
 });
 
 // --- New Conversation Saving Endpoint (SQLite Version) ---
 app.post('/api/conversations', (req, res) => {
   try {
-    const { sessionId, conversation, provider, model, timestamp, conversationName, gameSettings, selectedHeroes, currentSummary, worldMap, playerPosition, subMaps } = req.body;
+    const { sessionId, conversation, provider, model, timestamp, conversationName, gameSettings, selectedHeroes, currentSummary, worldMap, playerPosition, sub_maps, subMaps } = req.body;
+    const effectiveSubMaps = sub_maps || subMaps;
 
     console.log('[SERVER] Received save request');
     console.log('[SERVER] Session ID:', sessionId);
@@ -274,7 +312,7 @@ app.post('/api/conversations', (req, res) => {
     const heroesJson = selectedHeroes ? JSON.stringify(selectedHeroes) : null;
     const mapJson = worldMap ? JSON.stringify(worldMap) : null;
     const positionJson = playerPosition ? JSON.stringify(playerPosition) : null;
-    const subMapsJson = subMaps ? JSON.stringify(subMaps) : null;
+    const subMapsJson = effectiveSubMaps ? JSON.stringify(effectiveSubMaps) : null;
 
     // SQL Query using ON CONFLICT for Upsert behavior
     const query = `
@@ -296,8 +334,8 @@ app.post('/api/conversations', (req, res) => {
     `;
 
     const params = [
-      sessionId, 
-      conversationJson, 
+      sessionId,
+      conversationJson,
       provider,
       model,
       timestamp,
@@ -329,9 +367,9 @@ app.post('/api/conversations', (req, res) => {
 // Get a specific conversation by sessionId
 app.get('/api/conversations/:sessionId', (req, res) => {
   const { sessionId } = req.params;
-  
+
   const query = `SELECT * FROM conversations WHERE sessionId = ?`;
-  
+
   db.get(query, [sessionId], (err, row) => {
     if (err) {
       console.error('Error retrieving conversation:', err);
@@ -358,13 +396,13 @@ app.get('/api/conversations/:sessionId', (req, res) => {
 app.put('/api/conversations/:sessionId/name', (req, res) => {
   const { sessionId } = req.params;
   const { conversationName } = req.body;
-  
+
   if (!conversationName || !conversationName.trim()) {
     return res.status(400).json({ message: 'Conversation name is required' });
   }
-  
+
   const query = `UPDATE conversations SET conversation_name = ? WHERE sessionId = ?`;
-  
+
   db.run(query, [conversationName.trim(), sessionId], function (err) {
     if (err) {
       console.error('Error updating conversation name:', err);
@@ -380,9 +418,9 @@ app.put('/api/conversations/:sessionId/name', (req, res) => {
 // Delete a conversation
 app.delete('/api/conversations/:sessionId', (req, res) => {
   const { sessionId } = req.params;
-  
+
   const query = `DELETE FROM conversations WHERE sessionId = ?`;
-  
+
   db.run(query, [sessionId], function (err) {
     if (err) {
       console.error('Error deleting conversation:', err);
@@ -393,6 +431,46 @@ app.delete('/api/conversations/:sessionId', (req, res) => {
       res.json({ message: 'Conversation deleted successfully' });
     }
   });
+});
+
+// --- Unified LLM Endpoints ---
+
+// Standard generation (SDK-based)
+app.post('/api/llm/generate', async (req, res) => {
+  try {
+    const response = await llmBackend.generateText(req.body);
+    res.json({ text: response });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// CLI Task Creation
+app.post('/api/llm/tasks', (req, res) => {
+  const { backend, prompt, cwd, model } = req.body;
+  try {
+    const taskId = runner.createTask({ backend, prompt, cwd, model });
+    res.json({ id: taskId, status: 'queued' });
+  } catch (error) {
+    console.error('Task creation failed:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// CLI Task Streaming (SSE)
+app.get('/api/llm/tasks/:id/stream', (req, res) => {
+  const { id } = req.params;
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+
+  try {
+    runner.streamTask(id, res);
+  } catch (error) {
+    console.error('Stream failed:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', data: error.message })}\n\n`);
+    res.end();
+  }
 });
 
 

@@ -1,6 +1,6 @@
 // App.js
 
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import { BrowserRouter as Router, Route, Link, Routes } from "react-router-dom";
 import CharacterCreation from "./pages/CharacterCreation";
 import CharacterSummary from "./components/CharacterSummary";
@@ -18,11 +18,26 @@ import SeedDebugTest from './pages/SeedDebugTest';
 import "./App.css";
 
 import DebugMenu from './components/DebugMenu';
+import SettingsContext from "./contexts/SettingsContext";
+import { SettingsModalContent } from "./components/Modals";
 
 const App = () => {
   const [characters, setCharacters] = useState([]);
   const [editingCharacterIndex, setEditingCharacterIndex] = useState(null);
-  // const [newCharacter, setNewCharacter] = useState(null); // This state doesn't seem to be used here
+
+  const {
+    settings,
+    selectedProvider,
+    setSelectedProvider,
+    selectedModel,
+    setSelectedModel,
+    assistantProvider,
+    setAssistantProvider,
+    assistantModel,
+    setAssistantModel,
+    isSettingsModalOpen,
+    setIsSettingsModalOpen
+  } = useContext(SettingsContext);
 
   return (
     <Router>
@@ -35,8 +50,30 @@ const App = () => {
             <li><Link to="/all-characters">All Characters</Link></li>
             <li><Link to="/game-settings">New Game</Link></li>
             <li><Link to="/saved-conversations">Saved Games</Link></li>
+            <li className="nav-settings-item">
+              <button
+                onClick={() => setIsSettingsModalOpen(true)}
+                className="nav-settings-btn"
+              >
+                ⚙️ Settings
+              </button>
+            </li>
           </ul>
         </nav>
+
+        <SettingsModalContent
+          isOpen={isSettingsModalOpen}
+          onClose={() => setIsSettingsModalOpen(false)}
+          settings={settings}
+          selectedProvider={selectedProvider}
+          setSelectedProvider={setSelectedProvider}
+          selectedModel={selectedModel}
+          setSelectedModel={setSelectedModel}
+          assistantProvider={assistantProvider}
+          setAssistantProvider={setAssistantProvider}
+          assistantModel={assistantModel}
+          setAssistantModel={setAssistantModel}
+        />
 
         {/* === Add this wrapper div === */}
         <div className="main-content">

@@ -1,12 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { generateText } from '../utils/llmHelper';
 import { getTile } from '../utils/mapGenerator';
+import { llmService } from '../services/llmService';
 
 const TRIGGER_REGEX = /\[(CHECK|ROLL):\s*([a-zA-Z0-9\s]+)\]/i;
 
 const useGameInteraction = (
     loadedConversation,
-    apiKeys,
     settings,
     selectedProvider,
     selectedModel,
@@ -44,17 +43,48 @@ const useGameInteraction = (
         return 'gpt-5';
     };
 
+    const generateResponse = async (model, prompt) => {
+        const isCli = ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider);
+
+        if (isCli) {
+            let cliBackend = 'codex';
+            if (selectedProvider === 'claude-cli') cliBackend = 'claude';
+            if (selectedProvider === 'gemini-cli') cliBackend = 'gemini';
+
+            const { id } = await llmService.createTask(cliBackend, prompt, undefined, model);
+
+            return new Promise((resolve, reject) => {
+                let fullText = '';
+                llmService.streamTask(id, (update) => {
+                    if (update.type === 'log' && update.data.stream === 'stdout') {
+                        fullText += update.data.line + '\n';
+                    } else if (update.type === 'done') {
+                        resolve(fullText.trim());
+                    } else if (update.type === 'error') {
+                        reject(new Error(update.data));
+                    }
+                });
+            });
+        } else {
+            return await llmService.generateText({
+                provider: selectedProvider,
+                model,
+                prompt,
+                maxTokens: 1600,
+                temperature: 0.7
+            });
+        }
+    };
+
     const summarizeConversation = async (summary, newMessages) => {
         const model = getCurrentModel();
-        const apiKey = apiKeys[selectedProvider];
-
-        if (!apiKey) return summary;
-
         const prompt = `Old summary: ${summary}\nRecent exchange: ${newMessages.map(msg => `${msg.role === 'ai' ? 'AI' : 'User'}: ${msg.content}`).join('\n')}\n\nCreate a concise new summary based on the old summary and recent exchange, capturing the key events and character actions.`;
 
         try {
-            const updatedSummary = await generateText(selectedProvider, apiKey, model, prompt, 1500, 0.5);
-            return updatedSummary;
+            // Summary is usually small and non-critical to stream, so we use API-style generation if possible
+            // But if ONLY CLI is selected, we should probably follow suit or just use a default safe API.
+            // For now, let's keep it simple and use generateResponse which handles both.
+            return await generateResponse(model, prompt);
         } catch (error) {
             console.error("Summarization failed:", error);
             return summary;
@@ -66,10 +96,6 @@ const useGameInteraction = (
 
         if (!selectedHeroes || selectedHeroes.length === 0) {
             setError('Cannot start game without selecting heroes.'); return;
-        }
-        const currentApiKey = apiKeys[selectedProvider];
-        if (!currentApiKey) {
-            setError(`API Key for ${selectedProvider} is not set.`); return;
         }
 
         setHasAdventureStarted(true);
@@ -95,7 +121,7 @@ const useGameInteraction = (
         const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary || 'The adventure begins.'}\n\nThe player party has just arrived. Start the adventure by describing the scene and presenting the initial situation based on the game context and starting location.`;
 
         try {
-            let aiResponse = await generateText(selectedProvider, currentApiKey, model, prompt, 1600, 0.7, settings.responseVerbosity);
+            let aiResponse = await generateResponse(model, prompt);
 
             // Parse for Triggers
             const match = aiResponse.match(TRIGGER_REGEX);
@@ -135,12 +161,6 @@ const useGameInteraction = (
             return;
         }
 
-        const currentApiKey = apiKeys[selectedProvider];
-        if (!currentApiKey) {
-            setError(`API Key for ${selectedProvider} is not set. Please configure it.`);
-            return;
-        }
-
         const model = getCurrentModel();
         const userMessage = { role: 'user', content: userInput };
 
@@ -158,7 +178,7 @@ const useGameInteraction = (
         const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary || 'The adventure begins.'}\n\nUser action: ${userMessage.content}`;
 
         try {
-            let aiResponse = await generateText(selectedProvider, currentApiKey, model, prompt, 1600, 0.7, settings.responseVerbosity);
+            let aiResponse = await generateResponse(model, prompt);
 
             // Parse for Triggers
             const match = aiResponse.match(TRIGGER_REGEX);
@@ -202,6 +222,7 @@ const useGameInteraction = (
         currentSummary,
         setCurrentSummary,
         isLoading,
+        setIsLoading,
         error,
         setError,
         modelOptions,

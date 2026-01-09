@@ -10,7 +10,8 @@ import useGameSession from '../hooks/useGameSession';
 import useGameMap from '../hooks/useGameMap';
 import useGameInteraction from '../hooks/useGameInteraction';
 import { getTile } from '../utils/mapGenerator';
-import { generateText } from '../utils/llmHelper';
+import AiAssistantPanel from '../components/AiAssistantPanel';
+import { llmService } from '../services/llmService';
 
 const Game = () => {
   const { state } = useLocation();
@@ -24,7 +25,18 @@ const Game = () => {
   const worldSeed = settingsObj?.worldSeed || stateSeed;
 
   const { apiKeys } = useContext(ApiKeysContext);
-  const { settings, setSettings, selectedProvider, setSelectedProvider, selectedModel, setSelectedModel } = useContext(SettingsContext);
+  const {
+    settings,
+    setSettings,
+    selectedProvider,
+    setSelectedProvider,
+    selectedModel,
+    setSelectedModel,
+    assistantProvider,
+    setAssistantProvider,
+    assistantModel,
+    setAssistantModel
+  } = useContext(SettingsContext);
 
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isHowToPlayModalOpen, setIsHowToPlayModalOpen] = useState(false);
@@ -96,13 +108,15 @@ const Game = () => {
   const performSave = () => {
     if (!sessionIdRef.current) return;
 
-    const subMaps = {
+    const sub_maps = {
       currentTownMap: currentTownMapRef.current,
       townPlayerPosition: townPlayerPositionRef.current,
       currentTownTile: currentTownTileRef.current,
       isInsideTown: isInsideTownRef.current,
       currentMapLevel: currentMapLevelRef.current,
       townMapsCache: townMapsCacheRef.current,
+      visitedBiomes: Array.from(mapHook.visitedBiomes),
+      visitedTowns: Array.from(mapHook.visitedTowns),
     };
 
     saveConversationToBackend(sessionIdRef.current, {
@@ -115,7 +129,7 @@ const Game = () => {
       worldMap: worldMapRef.current,
       playerPosition: playerPositionRef.current,
       hasAdventureStarted: hasAdventureStarted,
-      subMaps: subMaps
+      sub_maps: sub_maps
     });
   };
 
@@ -168,9 +182,24 @@ const Game = () => {
     mapHook.setPlayerPosition({ x: clickedX, y: clickedY });
 
     const targetTile = getTile(newMap, clickedX, clickedY);
+    if (!targetTile) return;
 
-    // POI Check
-    if (targetTile && targetTile.poi) {
+    const biomeType = targetTile.biome || 'Unknown Area';
+    const townName = targetTile.townName || (targetTile.poi === 'town' ? 'Unknown Town' : null);
+
+    const isBiomeVisited = mapHook.visitedBiomes.has(biomeType);
+    const isTownVisited = townName ? mapHook.visitedTowns.has(townName) : true;
+
+    // Track new visits
+    if (!isBiomeVisited) {
+      mapHook.trackBiomeVisit(biomeType);
+    }
+    if (townName && !isTownVisited) {
+      mapHook.trackTownVisit(townName);
+    }
+
+    // POI Check (for Modal)
+    if (targetTile.poi) {
       const poiType = targetTile.poiType || targetTile.poi;
       const encounter = {
         name: targetTile.townName || targetTile.poi,
@@ -183,9 +212,25 @@ const Game = () => {
       setIsEncounterModalOpen(true);
     }
 
-    // AI Description
+    // Determine if we need an AI description
+    const needsAiDescription = !isBiomeVisited || (townName && !isTownVisited);
+
+    if (!needsAiDescription) {
+      // Just a system message for revisited areas
+      let returnMsg = `You continue through the ${biomeType}.`;
+      if (townName) {
+        returnMsg = `You have returned to ${townName}.`;
+      }
+      interactionHook.setConversation(prev => [...prev, { role: 'system', content: returnMsg }]);
+      return;
+    }
+
+    // AI Description for new areas
     const currentApiKey = apiKeys[selectedProvider];
-    if (!currentApiKey) {
+    // Note: CLI providers don't need a key here, handled inside llmService/InteractionHook
+    // But we check interactionHook.selectedProvider logic
+    const isCli = ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider);
+    if (!currentApiKey && !isCli) {
       interactionHook.setError(`API Key for ${selectedProvider} is not set.`);
       return;
     }
@@ -197,20 +242,8 @@ const Game = () => {
       systemMessageContent = `You arrived at ${targetTile.townName}, a ${targetTile.townSize || 'settlement'}.`;
     }
     const systemMessage = { role: 'system', content: systemMessageContent };
-    const updatedConversation = [...interactionHook.conversation, systemMessage];
-
-    // Optimistic prompt update? No, just loading state.
-    interactionHook.setConversation(updatedConversation);
-    // Note: We can't access `setIsLoading` from hook directly if not exposed.
-    // I exposed `isLoading` but not `setIsLoading`.
-    // Actually I did not expose `setIsLoading` in `useGameInteraction.js`.
-    // I need to update `useGameInteraction.js` to expose `setIsLoading` or add a `setLoading(bool)` method?
-    // OR I just hack it by calling `handleStartAdventure` which sets loading? No.
-
-    // I will modify `useGameInteraction` in next step if needed, but for now I assume I can't set loading.
-    // This is a gap. I should have exposed `setIsLoading`.
-    // However, I can't leave `Game.js` broken.
-    // The user will just not see a loading spinner for movement if I don't set it. That's acceptable for now.
+    interactionHook.setConversation(prev => [...prev, systemMessage]);
+    interactionHook.setIsLoading(true);
 
     const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
     let locationInfo = `Player has moved to coordinates (${clickedX}, ${clickedY}) in a ${targetTile.biome} biome.`;
@@ -225,15 +258,20 @@ const Game = () => {
     const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${interactionHook.currentSummary}\n\n${locationInfo}\n\nDescribe what the player sees upon arriving at this new location.`;
 
     try {
-      const aiResponse = await generateText(selectedProvider, currentApiKey, model, prompt, 1600, 0.7, settings.responseVerbosity);
+      const aiResponse = await llmService.generateText({
+        provider: selectedProvider,
+        model,
+        prompt,
+        maxTokens: 1600,
+        temperature: 0.7
+      });
       const aiMessage = { role: 'ai', content: aiResponse };
-      interactionHook.setConversation([...updatedConversation, aiMessage]);
-      // Update summary if I had exposed `summarizeConversation`. Use internal one?
-      // `useGameInteraction` doesn't expose it.
-      // It's okay, maybe strictly not needed for every move.
+      interactionHook.setConversation(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('Movement AI error:', error);
       interactionHook.setError(error.message);
+    } finally {
+      interactionHook.setIsLoading(false);
     }
   };
 
@@ -320,31 +358,28 @@ const Game = () => {
               </button>
             </form>
             <p className="info">AI responses may not always be accurate or coherent.</p>
-            <div className="model-selector-container">
-              <select
-                id="model-select"
-                value={getCurrentSelection()}
-                onChange={(e) => handleModelSelection(e.target.value)}
-                className="provider-select"
-                disabled={interactionHook.isLoading}
-              >
-                <option value="">Select AI Model...</option>
-                {interactionHook.modelOptions.map(option => (
-                  <option key={`${option.provider}:${option.model}`} value={`${option.provider}:${option.model}`}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+            <div className="model-info-text">
+              <span className="model-label">Active Model:</span>
+              <span className="model-value">{selectedModel} ({selectedProvider.toUpperCase()})</span>
             </div>
             <div className="status-bar">
               <p className="session-info">Session ID: {sessionId || 'Generating...'}</p>
               <div className="api-key-status">
                 <span
-                  className={`status-light ${apiKeys[selectedProvider] ? 'status-active' : 'status-inactive'}`}
-                  title={apiKeys[selectedProvider] ? `${selectedProvider} API key is set` : `${selectedProvider} API key is missing`}
+                  className={`status-light ${['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
+                    ? 'status-cli'
+                    : (apiKeys[selectedProvider] ? 'status-active' : 'status-inactive')
+                    }`}
+                  title={
+                    ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
+                      ? `${selectedProvider} is a CLI tool (No API Key required)`
+                      : (apiKeys[selectedProvider] ? `${selectedProvider} API key is set` : `${selectedProvider} API key is missing`)
+                  }
                 ></span>
                 <span className="status-text">
-                  API Key: {apiKeys[selectedProvider] ? 'Set' : 'Missing'}
+                  {['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
+                    ? 'CLI Mode'
+                    : (apiKeys[selectedProvider] ? 'API Key: Set' : 'API Key: Missing')}
                 </span>
               </div>
             </div>
@@ -402,11 +437,30 @@ const Game = () => {
         onClose={() => setIsSettingsModalOpen(false)}
         settings={settings}
         selectedProvider={selectedProvider}
+        setSelectedProvider={setSelectedProvider}
         selectedModel={selectedModel}
+        setSelectedModel={setSelectedModel}
+        assistantProvider={assistantProvider}
+        setAssistantProvider={setAssistantProvider}
+        assistantModel={assistantModel}
+        setAssistantModel={setAssistantModel}
+        worldSeed={worldSeed}
       />
       <HowToPlayModalContent
         isOpen={isHowToPlayModalOpen}
         onClose={() => setIsHowToPlayModalOpen(false)}
+      />
+
+      {/* AI Assistant Panel */}
+      <AiAssistantPanel
+        gameState={{
+          selectedHeroes,
+          playerPosition: mapHook.playerPosition,
+          isInsideTown: mapHook.isInsideTown,
+          currentTownMap: mapHook.currentTownMap
+        }}
+        backend={assistantProvider || selectedProvider}
+        model={assistantModel || selectedModel}
       />
       <MapModal
         isOpen={mapHook.isMapModalOpen}

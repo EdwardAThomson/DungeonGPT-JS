@@ -8,12 +8,15 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: #f4f7f6; /* Match index.css */
+  background-color: #f4f7f6;
+  /* Match index.css */
 }
 
 /* Navigation Bar Styling */
-nav.main-nav { /* Add a class to the nav in App.js if needed */
-  background-color: #2c3e50; /* Dark blue-gray */
+nav.main-nav {
+  /* Add a class to the nav in App.js if needed */
+  background-color: #2c3e50;
+  /* Dark blue-gray */
   padding: 10px 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -23,8 +26,10 @@ nav.main-nav ul {
   padding: 0;
   margin: 0;
   display: flex;
-  justify-content: center; /* Center nav items */
-  gap: 30px; /* Space between nav items */
+  justify-content: center;
+  /* Center nav items */
+  gap: 30px;
+  /* Space between nav items */
 }
 
 nav.main-nav li {
@@ -32,7 +37,8 @@ nav.main-nav li {
 }
 
 nav.main-nav a {
-  color: #ecf0f1; /* Light gray text */
+  color: #ecf0f1;
+  /* Light gray text */
   text-decoration: none;
   font-weight: 500;
   padding: 8px 15px;
@@ -41,17 +47,45 @@ nav.main-nav a {
 }
 
 nav.main-nav a:hover,
-nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
-  background-color: #3498db; /* Blue background on hover/active */
+nav.main-nav a.active {
+  /* Add activeClassName="active" to NavLink if using */
+  background-color: #3498db;
+  /* Blue background on hover/active */
   color: white;
+}
+
+.nav-settings-btn {
+  background: none;
+  border: none;
+  color: #ecf0f1;
+  text-decoration: none;
+  font-weight: 500;
+  padding: 8px 15px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.nav-settings-btn:hover {
+  background-color: #3498db;
+  color: white;
+}
+
+.nav-settings-item {
+  display: flex;
+  align-items: center;
 }
 
 /* Main Content Area */
 .main-content {
   flex-grow: 1;
   padding: 20px;
-  max-width: 1200px; /* <--- This limits the width */
-  margin: 20px auto; /* <--- This centers it horizontally */
+  max-width: 1200px;
+  /* <--- This limits the width */
+  margin: 20px auto;
+  /* <--- This centers it horizontally */
   width: 100%;
   box-sizing: border-box;
 }
@@ -59,21 +93,27 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 /* --- Page Specific Styles --- */
 
 /* HomePage & Generic Page Container */
-.Home-page, /* Keep existing class name or use a new one */
+.Home-page,
+/* Keep existing class name or use a new one */
 .page-container {
-  background-color: #ffffff; /* White background for content boxes */
+  background-color: #ffffff;
+  /* White background for content boxes */
   padding: 30px;
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  text-align: left; /* Align text left for readability */
+  text-align: left;
+  /* Align text left for readability */
 }
 
-.Home-page h1, .Home-page h2 {
-  text-align: center; /* Center headings on home page */
+.Home-page h1,
+.Home-page h2 {
+  text-align: center;
+  /* Center headings on home page */
 }
 
 .Home-page nav {
-  text-align: center; /* Center internal navigation links */
+  text-align: center;
+  /* Center internal navigation links */
   margin-bottom: 20px;
 }
 
@@ -99,7 +139,8 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 }
 
 .api-key-input-group input {
-  width: calc(100% - 22px); /* Adjust width if needed */
+  width: calc(100% - 22px);
+  /* Adjust width if needed */
 }
 
 /* Character Creation Form - Container Layout */
@@ -119,36 +160,48 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 
 /* Top Container: Header + Pictures */
 .top-container {
-  margin-bottom: 30px; /* Space below pictures */
+  margin-bottom: 30px;
+  /* Space below pictures */
 }
+
 .top-container .form-section {
-    margin-bottom: 25px; /* Space between header/name and pictures */
+  margin-bottom: 25px;
+  /* Space between header/name and pictures */
 }
+
 .top-container .form-section:last-child {
-    margin-bottom: 0; /* No extra margin after pictures */
+  margin-bottom: 0;
+  /* No extra margin after pictures */
 }
 
 
 /* Middle Container: Two Columns (Details Left, Stats Right) */
 .middle-container {
-  display: flex; /* Use Flexbox for two columns */
-  gap: 40px; /* Space between columns */
-  margin-bottom: 30px; /* Space below middle section */
+  display: flex;
+  /* Use Flexbox for two columns */
+  gap: 40px;
+  /* Space between columns */
+  margin-bottom: 30px;
+  /* Space below middle section */
 }
 
 .middle-left {
-  flex: 2; /* Take up 2/3 of the space */
+  flex: 2;
+  /* Take up 2/3 of the space */
   display: flex;
   flex-direction: column;
-  gap: 25px; /* Space between details row and background */
+  gap: 25px;
+  /* Space between details row and background */
 }
 
 .middle-right {
-  flex: 1; /* Take up 1/3 of the space */
+  flex: 1;
+  /* Take up 1/3 of the space */
 }
+
 .middle-right h2 {
-    margin-top: 0;
-    margin-bottom: 8px;
+  margin-top: 0;
+  margin-bottom: 8px;
 }
 
 /* Keep styles for .form-row */
@@ -158,12 +211,23 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   gap: 15px;
   align-items: flex-end;
 }
+
 .form-row .form-item {
   flex: 1;
   min-width: 130px;
 }
-.form-row .form-item label { margin-bottom: 5px; font-size: 0.9rem; }
-.form-row .form-item input, .form-row .form-item select { width: 100%; margin-bottom: 0; padding: 8px; }
+
+.form-row .form-item label {
+  margin-bottom: 5px;
+  font-size: 0.9rem;
+}
+
+.form-row .form-item input,
+.form-row .form-item select {
+  width: 100%;
+  margin-bottom: 0;
+  padding: 8px;
+}
 
 
 /* Keep styles for .stats-section */
@@ -173,8 +237,19 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   gap: 10px;
   margin-bottom: 12px;
 }
-.stats-section .stat-input label { width: 110px; margin-bottom: 0; font-weight: normal; color: #555; }
-.stats-section .stat-input input { width: 70px; margin-bottom: 0; padding: 8px; }
+
+.stats-section .stat-input label {
+  width: 110px;
+  margin-bottom: 0;
+  font-weight: normal;
+  color: #555;
+}
+
+.stats-section .stat-input input {
+  width: 70px;
+  margin-bottom: 0;
+  padding: 8px;
+}
 
 
 /* Actions remain at the bottom */
@@ -188,10 +263,14 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 }
 
 .profile-pictures .picture-options {
-  display: grid; /* Use CSS Grid */
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); /* Create auto-fitting columns */
-  gap: 15px; /* Space between pictures */
-  justify-content: start; /* Align grid items to the start if the grid doesn't fill the container */
+  display: grid;
+  /* Use CSS Grid */
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  /* Create auto-fitting columns */
+  gap: 15px;
+  /* Space between pictures */
+  justify-content: start;
+  /* Align grid items to the start if the grid doesn't fill the container */
 }
 
 .profile-pictures label {
@@ -200,16 +279,20 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   border-radius: 5px;
   padding: 5px;
   transition: border-color 0.2s ease;
-  display: inline-block; /* Needed for grid items */
-  line-height: 0; /* Prevent extra space below image */
+  display: inline-block;
+  /* Needed for grid items */
+  line-height: 0;
+  /* Prevent extra space below image */
 }
 
 .profile-pictures input[type="radio"] {
-  display: none; /* Hide the actual radio button */
+  display: none;
+  /* Hide the actual radio button */
 }
 
 .profile-pictures img {
-  width: 100px; /* Adjust size as needed */
+  width: 100px;
+  /* Adjust size as needed */
   height: 100px;
   object-fit: cover;
   border-radius: 4px;
@@ -218,7 +301,8 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 
 .profile-pictures label.selected,
 .profile-pictures label:hover {
-  border-color: #3498db; /* Highlight selected/hovered picture */
+  border-color: #3498db;
+  /* Highlight selected/hovered picture */
 }
 
 /* All Characters List */
@@ -232,15 +316,21 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 }
 
 .character-item {
-  background-color: #ffffff; /* White background */
-  border: 1px solid #e0e0e0; /* Light grey border */
+  background-color: #ffffff;
+  /* White background */
+  border: 1px solid #e0e0e0;
+  /* Light grey border */
   border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  /* Subtle shadow */
   padding: 15px;
   display: flex;
-  flex-direction: column; /* Stack elements vertically */
-  align-items: center; /* Center align content */
-  transition: box-shadow 0.3s ease; /* Smooth shadow transition on hover */
+  flex-direction: column;
+  /* Stack elements vertically */
+  align-items: center;
+  /* Center align content */
+  transition: box-shadow 0.3s ease;
+  /* Smooth shadow transition on hover */
 }
 
 .character-item:hover {
@@ -248,24 +338,33 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 }
 
 .character-item-image {
-  width: 100px; /* Consistent image size */
+  width: 100px;
+  /* Consistent image size */
   height: 100px;
-  border-radius: 50%; /* Circular image */
-  overflow: hidden; /* Clip image to circle */
-  margin-bottom: 15px; /* Space below image */
-  border: 3px solid #f0f0f0; /* Light border around image */
+  border-radius: 50%;
+  /* Circular image */
+  overflow: hidden;
+  /* Clip image to circle */
+  margin-bottom: 15px;
+  /* Space below image */
+  border: 3px solid #f0f0f0;
+  /* Light border around image */
 }
 
 .character-item-image img {
   width: 100%;
   height: 100%;
-  object-fit: cover; /* Ensure image covers the area */
+  object-fit: cover;
+  /* Ensure image covers the area */
 }
 
 .character-item-info {
-  text-align: center; /* Center text details */
-  margin-bottom: 15px; /* Space below info */
-  width: 100%; /* Take full width */
+  text-align: center;
+  /* Center text details */
+  margin-bottom: 15px;
+  /* Space below info */
+  width: 100%;
+  /* Take full width */
 }
 
 .character-item-info h3 {
@@ -292,12 +391,15 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   margin-top: 10px;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center; /* Center stats horizontally */
-  gap: 10px; /* Space between stats */
+  justify-content: center;
+  /* Center stats horizontally */
+  gap: 10px;
+  /* Space between stats */
 }
 
 .character-item-stats li {
-  background-color: #f8f8f8; /* Light background for stats */
+  background-color: #f8f8f8;
+  /* Light background for stats */
   padding: 3px 8px;
   border-radius: 4px;
   font-size: 0.85em;
@@ -306,10 +408,14 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 
 .character-item-actions {
   display: flex;
-  justify-content: center; /* Center buttons */
-  gap: 10px; /* Space between buttons */
-  width: 100%; /* Take full width */
-  margin-top: auto; /* Push actions to the bottom */
+  justify-content: center;
+  /* Center buttons */
+  gap: 10px;
+  /* Space between buttons */
+  width: 100%;
+  /* Take full width */
+  margin-top: auto;
+  /* Push actions to the bottom */
 }
 
 /* Style buttons within character items */
@@ -319,58 +425,75 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 }
 
 .edit-button {
-  background-color: #3498db; /* Blue */
+  background-color: #3498db;
+  /* Blue */
 }
+
 .edit-button:hover {
   background-color: #2980b9;
 }
 
 .download-button {
-  background-color: #95a5a6; /* Grey */
+  background-color: #95a5a6;
+  /* Grey */
 }
+
 .download-button:hover {
   background-color: #7f8c8d;
 }
 
 /* Game Component Styling */
 .game-page-wrapper {
-    /* This outer wrapper might just need full height/width */
-    height: calc(100vh - 60px); /* Example: Full viewport height minus nav height */
-    width: 100%;
-    overflow: hidden; /* Prevent wrapper from scrolling */
+  /* This outer wrapper might just need full height/width */
+  height: calc(100vh - 60px);
+  /* Example: Full viewport height minus nav height */
+  width: 100%;
+  overflow: hidden;
+  /* Prevent wrapper from scrolling */
 }
 
-.game-container { /* This is the new flex container */
+.game-container {
+  /* This is the new flex container */
   display: flex;
-  height: 100%; /* Fill the wrapper */
+  height: 100%;
+  /* Fill the wrapper */
   width: 100%;
-  background-color: #e8edf0; 
-  overflow: hidden; /* Prevent this container from scrolling */
+  background-color: #e8edf0;
+  overflow: hidden;
+  /* Prevent this container from scrolling */
 }
 
 /* Game Sidebars (Chat History & Party) */
 .game-chat-bar,
 .party-bar {
-  background-color: #34495e; 
-  color: #ecf0f1; 
+  background-color: #34495e;
+  color: #ecf0f1;
   width: 280px;
-  flex-shrink: 0; /* Prevent sidebar from shrinking */
+  flex-shrink: 0;
+  /* Prevent sidebar from shrinking */
   padding: 15px;
   display: flex;
   flex-direction: column;
-  overflow-y: auto; /* Allow sidebar itself to scroll */
-  box-shadow: -2px 0 5px rgba(0,0,0,0.1); /* Shadow on the left */
-  height: 100%; 
+  overflow-y: auto;
+  /* Allow sidebar itself to scroll */
+  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+  /* Shadow on the left */
+  height: 100%;
   box-sizing: border-box;
-  order: 2; /* Place party bar on the right */
+  order: 2;
+  /* Place party bar on the right */
 }
 
 /* Add/Ensure this rule for the title */
 .party-bar h2 {
-    color: #ecf0f1; /* Explicitly set light color */
-    text-align: center; /* Center the title */
-    margin-bottom: 15px; /* Add space below title */
-    font-size: 1.4rem; /* Adjust size if needed */
+  color: #ecf0f1;
+  /* Explicitly set light color */
+  text-align: center;
+  /* Center the title */
+  margin-bottom: 15px;
+  /* Add space below title */
+  font-size: 1.4rem;
+  /* Adjust size if needed */
 }
 
 .game-chat-bar {
@@ -418,7 +541,8 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 .made-by {
   border-top: 1px solid #7f8c8d;
   padding-top: 10px;
-  margin-top: auto; /* Pushes to bottom */
+  margin-top: auto;
+  /* Pushes to bottom */
   text-align: center;
   font-size: 0.8rem;
   color: #bdc3c7;
@@ -442,7 +566,8 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   object-fit: cover;
   margin-bottom: 10px;
   border: 2px solid #ecf0f1;
-  display: block; /* Center image if container is wider */
+  display: block;
+  /* Center image if container is wider */
   margin-left: auto;
   margin-right: auto;
 }
@@ -457,12 +582,13 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   margin: 2px 0;
   font-size: 0.85rem;
   color: #bdc3c7;
-    text-align: center;
+  text-align: center;
 }
 
 .party-member .stats {
   margin-top: 10px;
-  text-align: center; /* Center the heading */
+  text-align: center;
+  /* Center the heading */
 }
 
 .party-member .stats h4 {
@@ -474,104 +600,125 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 /* New Stats Grid Layout */
 .party-member .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr); /* 3 columns */
-  gap: 5px 8px; /* Row gap, Column gap */
-  padding: 0; 
+  grid-template-columns: repeat(3, 1fr);
+  /* 3 columns */
+  gap: 5px 8px;
+  /* Row gap, Column gap */
+  padding: 0;
   margin: 0;
   font-size: 0.8rem;
   color: #bdc3c7;
 }
 
 .party-member .stat-item {
-  background-color: rgba(0, 0, 0, 0.2); /* Slightly darker background for items */
+  background-color: rgba(0, 0, 0, 0.2);
+  /* Slightly darker background for items */
   padding: 3px 5px;
   border-radius: 3px;
   text-align: center;
-  white-space: nowrap; /* Prevent wrapping within a stat item */
+  white-space: nowrap;
+  /* Prevent wrapping within a stat item */
 }
 
 /* Game Main Area */
 .game-main {
-  flex-grow: 1; /* Take up remaining space */
-   display: flex;
-   flex-direction: column;
+  flex-grow: 1;
+  /* Take up remaining space */
+  display: flex;
+  flex-direction: column;
   padding: 20px;
-  height: 100%; /* Fill container height */
+  height: 100%;
+  /* Fill container height */
   box-sizing: border-box;
-  overflow-y: auto; /* Allow main area content to scroll */
-  order: 1; /* Place main area on the left */
-  background-color: #ffffff; /* Give main area a distinct background? */
+  overflow-y: auto;
+  /* Allow main area content to scroll */
+  order: 1;
+  /* Place main area on the left */
+  background-color: #ffffff;
+  /* Give main area a distinct background? */
 }
 
 .game-top {
   padding-bottom: 15px;
   border-bottom: 1px solid #dce4e8;
   margin-bottom: 15px;
-   text-align: center;
+  text-align: center;
 }
 
 .game-top h2 {
   margin-top: 0;
-  margin-bottom: 10px; /* Add space below title */
+  margin-bottom: 10px;
+  /* Add space below title */
 }
 
 .game-top .game-info-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start; /* Align items to top */
-    gap: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  /* Align items to top */
+  gap: 20px;
 }
 
 .game-top .game-info-header p {
-    margin: 2px 0; /* Reduce margin for header info */
-    text-align: left; /* Align info left */
+  margin: 2px 0;
+  /* Reduce margin for header info */
+  text-align: left;
+  /* Align info left */
 }
 
 /* New style for the button group */
 .header-button-group {
-    display: flex;
-    gap: 10px; /* Space between buttons */
-    align-items: center; /* Align buttons vertically */
+  display: flex;
+  gap: 10px;
+  /* Space between buttons */
+  align-items: center;
+  /* Align buttons vertically */
 }
 
 /* Style for header buttons */
 .view-settings-button,
 .how-to-play-button,
 .view-map-button,
-.manual-save-button { /* Added save button */
-    background-color: #ecf0f1; /* Even lighter grey */
-    color: #34495e; 
-    border: 1px solid #bdc3c7; /* Light border */
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s ease, border-color 0.3s ease;
-    font-size: 0.9rem;
-    white-space: nowrap; 
+.manual-save-button {
+  /* Added save button */
+  background-color: #ecf0f1;
+  /* Even lighter grey */
+  color: #34495e;
+  border: 1px solid #bdc3c7;
+  /* Light border */
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 .view-settings-button:hover,
 .how-to-play-button:hover,
 .view-map-button:hover,
-.manual-save-button:hover { /* Added save button */
-    background-color: #dfe4e7;
-    border-color: #aeb5ba;
+.manual-save-button:hover {
+  /* Added save button */
+  background-color: #dfe4e7;
+  border-color: #aeb5ba;
 }
 
 .conversation {
   flex-grow: 1;
-  overflow-y: auto; 
+  overflow-y: auto;
   padding: 10px;
   margin-bottom: 15px;
   display: flex;
   flex-direction: column;
-  gap: 10px; 
-  position: relative; /* Needed for absolute positioning of overlay */
+  gap: 10px;
+  position: relative;
+  /* Needed for absolute positioning of overlay */
 }
 
 /* Start Adventure Overlay */
 .start-adventure-overlay {
-  position: absolute; /* Position over the conversation area */
+  position: absolute;
+  /* Position over the conversation area */
   top: 0;
   left: 0;
   right: 0;
@@ -579,8 +726,10 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.7); /* Semi-transparent white background */
-  z-index: 5; /* Ensure it's above messages but below modals */
+  background-color: rgba(255, 255, 255, 0.7);
+  /* Semi-transparent white background */
+  z-index: 5;
+  /* Ensure it's above messages but below modals */
 }
 
 .start-adventure-button {
@@ -588,7 +737,8 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   font-size: 1.2rem;
   font-weight: bold;
   color: white;
-  background-color: #2ecc71; /* Green */
+  background-color: #2ecc71;
+  /* Green */
   border: none;
   border-radius: 8px;
   cursor: pointer;
@@ -599,35 +749,40 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 .start-adventure-button:hover {
   background-color: #27ae60;
 }
+
 .start-adventure-button:active {
   transform: scale(0.98);
 }
 
 /* Message Styling */
 .message {
-    padding: 10px 15px;
+  padding: 10px 15px;
   border-radius: 15px;
   max-width: 75%;
   word-wrap: break-word;
   line-height: 1.4;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .message.user {
   background-color: #3498db;
   color: white;
-  border-bottom-right-radius: 5px; /* Slightly different shape */
+  border-bottom-right-radius: 5px;
+  /* Slightly different shape */
   align-self: flex-end;
-  margin-left: auto; /* Push to right */
+  margin-left: auto;
+  /* Push to right */
 }
 
 .message.ai {
   background-color: #ffffff;
   color: #333;
   border: 1px solid #e0e0e0;
-  border-bottom-left-radius: 5px; /* Slightly different shape */
+  border-bottom-left-radius: 5px;
+  /* Slightly different shape */
   align-self: flex-start;
-  margin-right: auto; /* Push to left */
+  margin-right: auto;
+  /* Push to left */
 }
 
 .message.system,
@@ -643,27 +798,32 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 }
 
 .game-lower-section {
-  margin-top: auto; /* Pushes to bottom */
+  margin-top: auto;
+  /* Pushes to bottom */
   width: 100%;
 }
 
 .game-lower-section form {
-    display: flex;
-    align-items: center;
+  display: flex;
+  align-items: center;
   gap: 10px;
 }
 
 .user-input {
   flex-grow: 1;
   /* Use base input styles from index.css */
-  margin-bottom: 0; /* Override margin from base */
-  height: 60px; /* Adjust height as needed */
+  margin-bottom: 0;
+  /* Override margin from base */
+  height: 60px;
+  /* Adjust height as needed */
 }
 
 .game-send-button {
   /* Use base button styles */
-  padding: 12px 20px; /* Slightly larger padding */
-  flex-shrink: 0; /* Prevent button from shrinking */
+  padding: 12px 20px;
+  /* Slightly larger padding */
+  flex-shrink: 0;
+  /* Prevent button from shrinking */
 }
 
 .info {
@@ -676,10 +836,14 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 /* New style for model info */
 .model-info {
   text-align: center;
-  font-size: 0.75rem; /* Even smaller */
-  color: #999; /* Lighter grey */
-  margin-top: 5px; /* Space above */
-  margin-bottom: 0; /* No extra space below */
+  font-size: 0.75rem;
+  /* Even smaller */
+  color: #999;
+  /* Lighter grey */
+  margin-top: 5px;
+  /* Space above */
+  margin-bottom: 0;
+  /* No extra space below */
 }
 
 /* Model selector container */
@@ -763,6 +927,12 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   animation: pulse-green 2s ease-in-out infinite;
 }
 
+.status-cli {
+  background-color: #3498db;
+  box-shadow: 0 0 8px rgba(52, 152, 219, 0.6);
+  animation: pulse-blue 2s ease-in-out infinite;
+}
+
 .status-inactive {
   background-color: #e74c3c;
   box-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
@@ -774,12 +944,51 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 
 /* Pulse animation for active status */
 @keyframes pulse-green {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 8px rgba(39, 174, 96, 0.6);
   }
+
   50% {
     box-shadow: 0 0 12px rgba(39, 174, 96, 0.9);
   }
+}
+
+@keyframes pulse-blue {
+
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(52, 152, 219, 0.6);
+  }
+
+  50% {
+    box-shadow: 0 0 12px rgba(52, 152, 219, 0.9);
+  }
+}
+
+.model-info-text {
+  text-align: center;
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  background: #f8f9fa;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #eee;
+  display: inline-block;
+  margin-left: 50%;
+  transform: translateX(-50%);
+}
+
+.model-label {
+  font-weight: bold;
+  margin-right: 5px;
+}
+
+.model-value {
+  color: #2c3e50;
+  font-family: monospace;
 }
 
 /* Debug toggle button */
@@ -850,20 +1059,28 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 
 .name-section .name-input-group {
   display: flex;
-  align-items: center; /* Align input and button vertically */
-  gap: 10px; /* Space between input and button */
+  align-items: center;
+  /* Align input and button vertically */
+  gap: 10px;
+  /* Space between input and button */
 }
 
 .name-section input {
-  flex-grow: 1; /* Allow input to take up available space */
-  margin-bottom: 0; /* Remove default bottom margin if needed */
+  flex-grow: 1;
+  /* Allow input to take up available space */
+  margin-bottom: 0;
+  /* Remove default bottom margin if needed */
 }
 
 .generate-name-btn {
-  padding: 8px 12px; /* Adjust padding */
-  font-size: 1.2rem; /* Make dice icon larger */
-  line-height: 1; /* Ensure button height matches input */
-  flex-shrink: 0; /* Prevent button from shrinking */
+  padding: 8px 12px;
+  /* Adjust padding */
+  font-size: 1.2rem;
+  /* Make dice icon larger */
+  line-height: 1;
+  /* Ensure button height matches input */
+  flex-shrink: 0;
+  /* Prevent button from shrinking */
   /* Use base button styles, or customize */
   /* Example: a more subtle look */
   background-color: #e9ecef;
@@ -883,13 +1100,15 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 }
 
 .template-controls select {
-  flex-grow: 1; /* Allow select to take space */
+  flex-grow: 1;
+  /* Allow select to take space */
   /* Inherit base select styles */
 }
 
 .apply-template-btn {
   /* Inherit base button styles or customize */
-  padding: 8px 15px; /* Match input height */
+  padding: 8px 15px;
+  /* Match input height */
   flex-shrink: 0;
 }
 
@@ -900,43 +1119,63 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   gap: 10px;
   margin-bottom: 12px;
 }
-.stats-section .stat-input label { width: 110px; margin-bottom: 0; font-weight: normal; color: #555; }
-.stats-section .stat-input input { width: 70px; margin-bottom: 0; padding: 8px; }
+
+.stats-section .stat-input label {
+  width: 110px;
+  margin-bottom: 0;
+  font-weight: normal;
+  color: #555;
+}
+
+.stats-section .stat-input input {
+  width: 70px;
+  margin-bottom: 0;
+  padding: 8px;
+}
 
 /* Character Summary Page Styles */
 .summary-container {
   /* Inherits base styles from .page-container if used, */
   /* or add similar styles here */
   background-color: #ffffff;
-  padding: 30px 40px; /* More padding */
+  padding: 30px 40px;
+  /* More padding */
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
 
 .summary-content {
   display: flex;
-  gap: 30px; /* Space between image and details */
-  align-items: flex-start; /* Align items to the top */
-  margin-bottom: 30px; /* Space before buttons */
+  gap: 30px;
+  /* Space between image and details */
+  align-items: flex-start;
+  /* Align items to the top */
+  margin-bottom: 30px;
+  /* Space before buttons */
 }
 
 .summary-image {
-  flex-shrink: 0; /* Prevent image from shrinking */
+  flex-shrink: 0;
+  /* Prevent image from shrinking */
 }
 
 .summary-image img {
-  width: 150px; /* Larger image */
+  width: 150px;
+  /* Larger image */
   height: 150px;
   object-fit: cover;
-  border-radius: 8px; /* Match container radius */
+  border-radius: 8px;
+  /* Match container radius */
   border: 1px solid #eee;
 }
 
 .summary-details {
-  flex-grow: 1; /* Allow details to take remaining space */
+  flex-grow: 1;
+  /* Allow details to take remaining space */
 }
 
-.summary-details h2 { /* Character Name */
+.summary-details h2 {
+  /* Character Name */
   margin-top: 0;
   margin-bottom: 10px;
   color: #34495e;
@@ -953,7 +1192,8 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   font-weight: 500;
   color: #333;
   display: inline-block;
-  min-width: 90px; /* Align labels */
+  min-width: 90px;
+  /* Align labels */
 }
 
 .summary-stats-list {
@@ -977,29 +1217,40 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 /* Button Styling for Summary Page */
 .summary-actions {
   display: flex;
-  justify-content: center; /* Center buttons */
-  gap: 15px; /* Space between buttons */
-  flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+  justify-content: center;
+  /* Center buttons */
+  gap: 15px;
+  /* Space between buttons */
+  flex-wrap: wrap;
+  /* Allow buttons to wrap on smaller screens */
   padding-top: 20px;
   border-top: 1px solid #eee;
 }
 
 /* Optional: Style specific buttons differently */
 .summary-actions .add-button {
-  background-color: #2ecc71; /* Green */
+  background-color: #2ecc71;
+  /* Green */
 }
+
 .summary-actions .add-button:hover {
   background-color: #27ae60;
 }
+
 .summary-actions .download-button {
-  background-color: #f39c12; /* Orange */
+  background-color: #f39c12;
+  /* Orange */
 }
+
 .summary-actions .download-button:hover {
   background-color: #e67e22;
 }
+
 .summary-actions .back-button {
-  background-color: #95a5a6; /* Gray */
+  background-color: #95a5a6;
+  /* Gray */
 }
+
 .summary-actions .back-button:hover {
   background-color: #7f8c8d;
 }
@@ -1007,7 +1258,8 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 /* Adjust styles for the AllCharacters page header */
 .all-characters-page .page-header {
   display: flex;
-  justify-content: space-between; /* Keep title left, actions right */
+  justify-content: space-between;
+  /* Keep title left, actions right */
   align-items: center;
   margin-bottom: 20px;
   padding-bottom: 15px;
@@ -1021,30 +1273,34 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
 /* Container for header buttons */
 .page-header-actions {
   display: flex;
-  gap: 15px; /* Space between buttons */
+  gap: 15px;
+  /* Space between buttons */
 }
 
 /* Style for the new Start Game button (optional, can inherit base) */
 .all-characters-page .start-game-button {
   /* Example: Different color? */
-  background-color: #e67e22; /* Orange */
+  background-color: #e67e22;
+  /* Orange */
   /* Inherit padding, border, etc. from general button styles if defined */
   /* You might need to copy common button styles here or ensure */
   /* they are applied globally */
-  padding: 8px 15px; 
+  padding: 8px 15px;
   border: none;
   border-radius: 4px;
   color: white;
   cursor: pointer;
   transition: background-color 0.3s ease;
 }
+
 .all-characters-page .start-game-button:hover {
   background-color: #d35400;
 }
 
 .all-characters-page .create-new-button {
   /* Existing styles */
-  background-color: #2ecc71; /* Green */
+  background-color: #2ecc71;
+  /* Green */
   /* ensure consistency if needed */
   padding: 8px 15px;
   border: none;
@@ -1053,6 +1309,7 @@ nav.main-nav a.active { /* Add activeClassName="active" to NavLink if using */
   cursor: pointer;
   transition: background-color 0.3s ease;
 }
+
 .all-characters-page .create-new-button:hover {
   background-color: #27ae60;
 }
@@ -1084,42 +1341,51 @@ button {
   padding-bottom: 20px;
   border-bottom: 1px solid #eee;
 }
+
 .game-settings-page .form-section:last-of-type {
-    border-bottom: none; /* No border after the last section */
-    margin-bottom: 0;
+  border-bottom: none;
+  /* No border after the last section */
+  margin-bottom: 0;
 }
 
 
 .game-settings-page h2 {
   margin-top: 0;
-  margin-bottom: 15px; /* Space below headings */
+  margin-bottom: 15px;
+  /* Space below headings */
   color: #34495e;
 }
 
 .game-settings-page h3 {
-    margin-bottom: 8px;
-    color: #555;
-    display: inline-block; /* Needed for tooltip relative positioning */
-    position: relative; /* Context for tooltip absolutely positioned */
+  margin-bottom: 8px;
+  color: #555;
+  display: inline-block;
+  /* Needed for tooltip relative positioning */
+  position: relative;
+  /* Context for tooltip absolutely positioned */
 }
 
 .game-settings-page p {
-    margin: 0 0 10px 0; /* Consistent paragraph spacing */
-    line-height: 1.5;
-    color: #555;
+  margin: 0 0 10px 0;
+  /* Consistent paragraph spacing */
+  line-height: 1.5;
+  color: #555;
 }
 
 /* Textarea Styling */
 .game-settings-page .settings-textarea {
   width: 100%;
-  max-width: 600px; /* Limit max width */
+  max-width: 600px;
+  /* Limit max width */
   padding: 10px;
   border: 1px solid #ccc;
   border-radius: 4px;
-  font-family: inherit; /* Use app's font */
+  font-family: inherit;
+  /* Use app's font */
   font-size: 1rem;
   box-sizing: border-box;
-  resize: vertical; /* Allow vertical resizing */
+  resize: vertical;
+  /* Allow vertical resizing */
 }
 
 /* Mood Selectors Layout (Existing) */
@@ -1128,15 +1394,19 @@ button {
 .game-settings-page .world-settings-selectors,
 .game-settings-page .ai-settings-selectors {
   display: flex;
-  gap: 40px; /* Space between items */
-  flex-wrap: wrap; /* Allow wrapping on smaller screens */
+  gap: 40px;
+  /* Space between items */
+  flex-wrap: wrap;
+  /* Allow wrapping on smaller screens */
 }
 
 .game-settings-page .mood-selector-item,
 .game-settings-page .world-setting-item,
 .game-settings-page .ai-setting-item {
-  flex: 1; /* Allow items to grow and shrink */
-  min-width: 200px; /* Minimum width before wrapping */
+  flex: 1;
+  /* Allow items to grow and shrink */
+  min-width: 200px;
+  /* Minimum width before wrapping */
 }
 
 /* Select Dropdown Styling (Existing + New) */
@@ -1154,7 +1424,8 @@ button {
   background-repeat: no-repeat;
   background-position: right 10px top 50%;
   background-size: .65em auto;
-  padding-right: 2.5em; /* Make space for the arrow */
+  padding-right: 2.5em;
+  /* Make space for the arrow */
 }
 
 /* Specific width adjustments if needed */
@@ -1168,15 +1439,18 @@ button {
   display: inline-block;
   margin-left: 8px;
   font-size: 0.8em;
-  color: #3498db; /* Blue */
+  color: #3498db;
+  /* Blue */
   border: 1px solid #3498db;
   border-radius: 50%;
   width: 16px;
   height: 16px;
-  line-height: 16px; /* Center text vertically */
+  line-height: 16px;
+  /* Center text vertically */
   text-align: center;
   cursor: help;
-  position: relative; /* Relative positioning for pseudo-element */
+  position: relative;
+  /* Relative positioning for pseudo-element */
 }
 
 /* Hide tooltip text by default */
@@ -1187,22 +1461,31 @@ button {
   transform: translateX(-50%);
   opacity: 0;
   transition: opacity 0.3s ease;
-  pointer-events: none; /* Prevent tooltip from interfering with hover */
-  z-index: 10; /* Ensure tooltip is above other elements */
+  pointer-events: none;
+  /* Prevent tooltip from interfering with hover */
+  z-index: 10;
+  /* Ensure tooltip is above other elements */
 }
 
 /* Tooltip content */
 .tooltip-trigger::before {
-  content: attr(data-tooltip); /* Get text from data-tooltip attribute */
-  background-color: #34495e; /* Dark background */
-  color: #fff; /* White text */
+  content: attr(data-tooltip);
+  /* Get text from data-tooltip attribute */
+  background-color: #34495e;
+  /* Dark background */
+  color: #fff;
+  /* White text */
   padding: 8px 12px;
   border-radius: 4px;
   font-size: 0.9em;
-  white-space: pre-wrap; /* Wrap text within tooltip */
-  bottom: 150%; /* Position above the trigger */
-  width: max-content; /* Adjust width to content */
-  max-width: 250px; /* Limit max width */
+  white-space: pre-wrap;
+  /* Wrap text within tooltip */
+  bottom: 150%;
+  /* Position above the trigger */
+  width: max-content;
+  /* Adjust width to content */
+  max-width: 250px;
+  /* Limit max width */
   line-height: 1.4;
 }
 
@@ -1210,9 +1493,11 @@ button {
 .tooltip-trigger::after {
   content: '';
   border: 5px solid transparent;
-  border-top-color: #34495e; /* Match tooltip background */
+  border-top-color: #34495e;
+  /* Match tooltip background */
   bottom: 150%;
-  margin-bottom: -10px; /* Position arrow correctly */
+  margin-bottom: -10px;
+  /* Position arrow correctly */
 }
 
 /* Show tooltip on hover */
@@ -1224,21 +1509,27 @@ button {
 
 /* Action Button Styling (Existing) */
 .game-settings-page .form-actions {
-    /* Uses existing .form-actions styles for centering/border */
-     margin-top: 30px; /* More space above buttons */
-     position: relative; /* Needed for absolute positioning of error message if desired */
-     text-align: center; /* Center button and error message */
+  /* Uses existing .form-actions styles for centering/border */
+  margin-top: 30px;
+  /* More space above buttons */
+  position: relative;
+  /* Needed for absolute positioning of error message if desired */
+  text-align: center;
+  /* Center button and error message */
 }
 
 /* Error Message Styling */
 .game-settings-page .error-message {
-  color: #e74c3c; /* Red */
+  color: #e74c3c;
+  /* Red */
   font-weight: bold;
-  margin-bottom: 15px; /* Space between error and button */
+  margin-bottom: 15px;
+  /* Space between error and button */
   font-size: 0.95rem;
   /* Removed absolute positioning - simpler layout */
   /* position: absolute; */
-  /* bottom: 100%; */ /* Position above the button */
+  /* bottom: 100%; */
+  /* Position above the button */
   /* left: 0; */
   /* right: 0; */
   /* text-align: center; */
@@ -1246,9 +1537,11 @@ button {
 
 .game-settings-page .settings-submit-button {
   /* Inherit base button styles or use specific ones */
-  padding: 12px 25px; /* Larger button */
+  padding: 12px 25px;
+  /* Larger button */
   font-size: 1.1rem;
-  background-color: #3498db; /* Blue */
+  background-color: #3498db;
+  /* Blue */
   color: white;
   border: none;
   border-radius: 4px;
@@ -1265,131 +1558,156 @@ button {
 
 /* --- Hero Selection Page Styles --- */
 .hero-selection-page {
-    /* Inherits .page-container styles */
+  /* Inherits .page-container styles */
 }
 
 .hero-selection-page .page-header {
-    /* Reuse styles from .all-characters-page .page-header if defined */
-    /* Or copy/define them here if specific adjustments needed */
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 15px;
-    border-bottom: 1px solid #eee;
+  /* Reuse styles from .all-characters-page .page-header if defined */
+  /* Or copy/define them here if specific adjustments needed */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
 }
+
 .hero-selection-page .page-header h2 {
-    margin: 0;
+  margin: 0;
 }
+
 /* Ensure create button uses existing styles */
 .hero-selection-page .create-new-button {
-    background-color: #2ecc71; /* Green */
-    padding: 8px 15px;
-    border: none;
-    border-radius: 4px;
-    color: white;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
+  background-color: #2ecc71;
+  /* Green */
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
+
 .hero-selection-page .create-new-button:hover {
-    background-color: #27ae60;
+  background-color: #27ae60;
 }
 
 
 .hero-selection-list {
-    /* Inherits .all-characters-list styles */
-    /* Add specific adjustments if needed */
+  /* Inherits .all-characters-list styles */
+  /* Add specific adjustments if needed */
 }
 
 .hero-item {
-    /* Inherits .character-item styles */
-    cursor: pointer;
-    position: relative; /* For positioning the selection indicator */
-    transition: border-color 0.2s ease, box-shadow 0.2s ease; /* Smooth selection transition */
-    border: 2px solid transparent; /* Base border for transition */
-    padding: 13px; /* Adjust padding slightly for the border */
+  /* Inherits .character-item styles */
+  cursor: pointer;
+  position: relative;
+  /* For positioning the selection indicator */
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  /* Smooth selection transition */
+  border: 2px solid transparent;
+  /* Base border for transition */
+  padding: 13px;
+  /* Adjust padding slightly for the border */
 }
 
 /* Style for selected hero cards */
 .hero-item.selected {
-    border-color: #3498db; /* Blue border */
-    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3); /* Blueish shadow */
+  border-color: #3498db;
+  /* Blue border */
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+  /* Blueish shadow */
 }
 
 /* Selection indicator (checkmark) */
 .selection-indicator {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    background-color: #3498db; /* Blue */
-    color: white;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    font-weight: bold;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #3498db;
+  /* Blue */
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 /* Actions container */
 .hero-selection-actions {
-    /* Inherits .form-actions styles (centered, border-top) */
-    display: flex; /* Ensure flex for alignment */
-    flex-direction: column; /* Stack error and buttons */
-    align-items: center; /* Center items horizontally */
-    gap: 15px; /* Space between error and buttons if error is shown */
+  /* Inherits .form-actions styles (centered, border-top) */
+  display: flex;
+  /* Ensure flex for alignment */
+  flex-direction: column;
+  /* Stack error and buttons */
+  align-items: center;
+  /* Center items horizontally */
+  gap: 15px;
+  /* Space between error and buttons if error is shown */
 }
 
 .hero-selection-actions .button-row {
-    display: flex;
-    gap: 15px; /* Space between Back and Next buttons */
-    justify-content: center; /* Center buttons */
-    width: 100%;
+  display: flex;
+  gap: 15px;
+  /* Space between Back and Next buttons */
+  justify-content: center;
+  /* Center buttons */
+  width: 100%;
 }
 
 /* Error message reuse */
 .hero-selection-actions .error-message {
-    color: #e74c3c;
-    font-weight: bold;
-    font-size: 0.95rem;
-    text-align: center;
-    width: 100%; /* Take full width */
-    margin-bottom: 0; /* Reset margin if needed */
+  color: #e74c3c;
+  font-weight: bold;
+  font-size: 0.95rem;
+  text-align: center;
+  width: 100%;
+  /* Take full width */
+  margin-bottom: 0;
+  /* Reset margin if needed */
 }
 
 /* Button styling reuse */
 .hero-selection-actions .back-button {
-    background-color: #95a5a6; /* Grey */
-    padding: 10px 20px;
-    border: none;
-    border-radius: 4px;
-    color: white;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
+  background-color: #95a5a6;
+  /* Grey */
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
 }
+
 .hero-selection-actions .back-button:hover {
-    background-color: #7f8c8d;
+  background-color: #7f8c8d;
 }
 
 .hero-selection-actions .next-button {
-    background-color: #2ecc71; /* Green for primary action */
-    padding: 10px 20px;
-    border: none;
-    border-radius: 4px;
-    color: white;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-    font-size: 1rem;
+  background-color: #2ecc71;
+  /* Green for primary action */
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-size: 1rem;
 }
+
 .hero-selection-actions .next-button:hover {
-    background-color: #27ae60;
+  background-color: #27ae60;
 }
+
 .hero-selection-actions .next-button:disabled {
-    background-color: #bdc3c7; /* Muted color when disabled */
-    cursor: not-allowed;
+  background-color: #bdc3c7;
+  /* Muted color when disabled */
+  cursor: not-allowed;
 }
 
 
@@ -1397,16 +1715,19 @@ button {
 
 /* --- Modal Styles (for SettingsModal) --- */
 .modal-overlay {
-  position: fixed; /* Sit on top of the page content */
+  position: fixed;
+  /* Sit on top of the page content */
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.6); /* Black background with opacity */
+  background-color: rgba(0, 0, 0, 0.6);
+  /* Black background with opacity */
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000; /* Sit on top */
+  z-index: 1000;
+  /* Sit on top */
 }
 
 .modal-content {
@@ -1415,10 +1736,14 @@ button {
   border-radius: 8px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
   width: 90%;
-  max-width: 600px; /* Limit maximum width */
-  max-height: 80vh; /* Limit maximum height */
-  overflow-y: auto; /* Enable scroll if content is too long */
-  position: relative; /* For positioning the close button */
+  max-width: 600px;
+  /* Limit maximum width */
+  max-height: 80vh;
+  /* Limit maximum height */
+  overflow-y: auto;
+  /* Enable scroll if content is too long */
+  position: relative;
+  /* For positioning the close button */
 }
 
 .modal-content h2 {
@@ -1433,10 +1758,11 @@ button {
   padding-bottom: 15px;
   border-bottom: 1px solid #eee;
 }
+
 .modal-section:last-of-type {
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
 }
 
 .modal-section h4 {
@@ -1450,17 +1776,22 @@ button {
   line-height: 1.5;
   color: #333;
 }
+
 .modal-content p strong {
   color: #34495e;
-  min-width: 100px; /* Optional: align labels */
+  min-width: 100px;
+  /* Optional: align labels */
   display: inline-block;
 }
 
 .modal-close-button {
-  display: block; /* Make it a block element */
-  margin: 25px auto 0 auto; /* Center the button horizontally with top margin */
+  display: block;
+  /* Make it a block element */
+  margin: 25px auto 0 auto;
+  /* Center the button horizontally with top margin */
   padding: 10px 20px;
-  background-color: #95a5a6; /* Grey */
+  background-color: #95a5a6;
+  /* Grey */
   color: white;
   border: none;
   border-radius: 4px;
@@ -1475,113 +1806,128 @@ button {
 
 /* Optional: Specific styles for the map modal content area */
 .map-modal-content {
-    /* Example: Make it wider? */
-    /* max-width: 800px; */
+  /* Example: Make it wider? */
+  /* max-width: 800px; */
 
-    /* Center the map grid within the modal */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+  /* Center the map grid within the modal */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 /* Ensure map grid margins are suitable inside modal */
 .map-modal-content .world-map-grid {
-    margin-top: 15px; 
-    margin-bottom: 25px; /* More space before close button */
+  margin-top: 15px;
+  margin-bottom: 25px;
+  /* More space before close button */
 }
 
 /* --- End Modal Styles --- */
 
 /* --- World Map Display Styles --- */
 .world-map-container {
-    margin-top: 20px; /* Space above the map */
-    padding-top: 15px;
-    border-top: 1px solid #7f8c8d; /* Separator line */
-    text-align: center; /* Center map title */
+  margin-top: 20px;
+  /* Space above the map */
+  padding-top: 15px;
+  border-top: 1px solid #7f8c8d;
+  /* Separator line */
+  text-align: center;
+  /* Center map title */
 }
 
 .world-map-container h4 {
-    margin-bottom: 10px;
-    color: #ecf0f1; /* Light title */
+  margin-bottom: 10px;
+  color: #ecf0f1;
+  /* Light title */
 }
 
 .world-map-grid {
-    /* Styles set inline in component for dynamic columns/rows */
-    /* Add any additional styles here if needed */
-    margin: 10px auto; /* Center grid */
+  /* Styles set inline in component for dynamic columns/rows */
+  /* Add any additional styles here if needed */
+  margin: 10px auto;
+  /* Center grid */
 }
 
 .map-tile {
-    /* Base styles - background set inline */
-    border: 1px solid rgba(0, 0, 0, 0.1); /* Subtle tile border */
-    /* Transition for smooth visual feedback */
-    transition: all 0.3s ease;
+  /* Base styles - background set inline */
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  /* Subtle tile border */
+  /* Transition for smooth visual feedback */
+  transition: all 0.3s ease;
 }
 
 .map-tile:hover {
-    filter: brightness(1.1); /* Slight brighten on hover */
-    transform: scale(1.05); /* Subtle zoom effect */
+  filter: brightness(1.1);
+  /* Slight brighten on hover */
+  transform: scale(1.05);
+  /* Subtle zoom effect */
 }
 
 .map-tile:active {
-    transform: scale(0.95); /* Click feedback */
-    transition: transform 0.1s ease;
+  transform: scale(0.95);
+  /* Click feedback */
+  transition: transform 0.1s ease;
 }
 
 /* Style for the player's current tile */
 .player-tile {
-    box-shadow: inset 0 0 0 3px #f1c40f; /* Yellow inset border */
-    filter: brightness(1.2); /* Make it stand out */
-    animation: pulse-glow 2s ease-in-out infinite;
+  box-shadow: inset 0 0 0 3px #f1c40f;
+  /* Yellow inset border */
+  filter: brightness(1.2);
+  /* Make it stand out */
+  animation: pulse-glow 2s ease-in-out infinite;
 }
 
 /* Player marker icon (old emoji style - keeping for fallback) */
 .player-marker {
-    position: absolute;
-    font-size: 24px;
-    z-index: 10;
-    animation: bounce-in 0.5s ease-out;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  position: absolute;
+  font-size: 24px;
+  z-index: 10;
+  animation: bounce-in 0.5s ease-out;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 /* Player marker with portrait - circular design with pointer */
 .player-marker-portrait {
-    position: absolute;
-    top: -18px; /* Position above and to the left */
-    left: -18px;
-    z-index: 15;
-    width: 32px;
-    height: 32px;
-    /* Remove animation from container, apply to children instead */
+  position: absolute;
+  top: -18px;
+  /* Position above and to the left */
+  left: -18px;
+  z-index: 15;
+  width: 32px;
+  height: 32px;
+  /* Remove animation from container, apply to children instead */
 }
 
 .player-marker-portrait img {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    border: 3px solid #f1c40f; /* Gold border */
-    background: white;
-    display: block;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-    position: relative;
-    z-index: 1;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid #f1c40f;
+  /* Gold border */
+  background: white;
+  display: block;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  position: relative;
+  z-index: 1;
 }
 
 /* Triangular pointer - points to bottom-right toward tile center */
 .player-marker-pointer {
-    position: absolute;
-    bottom: 0;
-    right: 0;
-    width: 0;
-    height: 0;
-    border-left: 7px solid transparent;
-    border-top: 7px solid transparent;
-    border-right: 9px solid #f1c40f; /* Gold triangle pointing down-right */
-    border-bottom: 9px solid #f1c40f;
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-    transform: rotate(45deg);
-    transform-origin: bottom right;
-    z-index: 0;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-top: 7px solid transparent;
+  border-right: 9px solid #f1c40f;
+  /* Gold triangle pointing down-right */
+  border-bottom: 9px solid #f1c40f;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  transform: rotate(45deg);
+  transform-origin: bottom right;
+  z-index: 0;
 }
 
 /* Unexplored tiles - darker/foggy (DISABLED FOR DEVELOPMENT) */
@@ -1596,27 +1942,32 @@ button {
 
 /* Pulse animation for player tile */
 @keyframes pulse-glow {
-    0%, 100% {
-        box-shadow: inset 0 0 0 3px #f1c40f;
-    }
-    50% {
-        box-shadow: inset 0 0 0 3px #f1c40f, 0 0 15px rgba(241, 196, 15, 0.6);
-    }
+
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 3px #f1c40f;
+  }
+
+  50% {
+    box-shadow: inset 0 0 0 3px #f1c40f, 0 0 15px rgba(241, 196, 15, 0.6);
+  }
 }
 
 /* Bounce in animation for player marker */
 @keyframes bounce-in {
-    0% {
-        transform: scale(0) translateY(-20px);
-        opacity: 0;
-    }
-    50% {
-        transform: scale(1.2) translateY(0);
-    }
-    100% {
-        transform: scale(1) translateY(0);
-        opacity: 1;
-    }
+  0% {
+    transform: scale(0) translateY(-20px);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1.2) translateY(0);
+  }
+
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
 }
 
 /* --- End World Map Styles --- */
@@ -1634,7 +1985,7 @@ button {
   border-radius: 8px;
   padding: 20px;
   background-color: #f9f9f9;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .conversation-header {

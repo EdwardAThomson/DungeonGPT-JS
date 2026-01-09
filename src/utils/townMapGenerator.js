@@ -53,6 +53,7 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
 
   // Place town square/center
   const centerPos = { x: Math.floor(width / 2), y: Math.floor(height / 2) };
+  console.log('[TOWN_MAP] centerPos:', centerPos);
   placeTownCenter(mapData, centerPos, townSize);
 
   // Place city walls (cities only)
@@ -61,6 +62,13 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   }
 
   // Place buildings (including keep for cities)
+  console.log('[TOWN_MAP] Calling placeBuildings with:', {
+    mapDataSnapshot: mapData ? `${mapData.length}x${mapData[0].length}` : 'undefined',
+    buildingCount,
+    townSize,
+    rngType: typeof rng,
+    centerPos
+  });
   placeBuildings(mapData, buildingCount, townSize, rng, centerPos);
 
   // Generate paths connecting all buildings to the road network
@@ -219,6 +227,11 @@ function placeTownCenter(mapData, centerPos, townSize) {
 
 // Place buildings around the town - COMPLETELY REWRITTEN
 function placeBuildings(mapData, count, townSize, rng, centerPos) {
+  if (!centerPos) {
+    console.warn('[TOWN_MAP] placeBuildings called with undefined centerPos, using map defaults');
+    centerPos = { x: Math.floor(mapData[0].length / 2), y: Math.floor(mapData.length / 2) };
+  }
+
   const centerX = centerPos.x;
   const centerY = centerPos.y;
 
@@ -256,8 +269,19 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
 
   // Helper to check if occupied
   const isOccupied = (x, y) => {
+    if (x === undefined || y === undefined) {
+      console.warn('[TOWN_MAP] isOccupied called with undefined coordinates:', { x, y });
+      return true;
+    }
     if (x < 0 || x >= mapData[0].length || y < 0 || y >= mapData.length) return true;
     if (occupied.has(`${x},${y}`)) return true;
+
+    // Safety check mapData access
+    if (!mapData[y] || !mapData[y][x]) {
+      console.warn('[TOWN_MAP] isOccupied: tile undefined at', { x, y });
+      return true;
+    }
+
     const tile = mapData[y][x];
     // Only place on empty grass (no paths, no buildings)
     return tile.type !== 'grass';
@@ -355,6 +379,8 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
     // Try positions around square
     for (let i = 0; i < squarePositions.length && !placed; i++) {
       const pos = squarePositions[(posIndex + i) % squarePositions.length];
+
+      if (!pos) continue;
 
       if (!isOccupied(pos.x, pos.y)) {
         mapData[pos.y][pos.x].type = 'building';
@@ -467,6 +493,8 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
   // Place houses
   for (const pos of housePositions) {
     if (housesPlaced >= houses) break;
+
+    if (!pos) continue;
 
     if (!isOccupied(pos.x, pos.y)) {
       mapData[pos.y][pos.x].type = 'building';

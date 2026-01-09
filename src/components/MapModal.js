@@ -21,6 +21,11 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                             onTileClick={onTileClick}
                             firstHero={firstHero}
                         />
+                        {townError && (
+                            <div className="message system error" style={{ margin: '10px auto', display: 'block' }}>
+                                {townError}
+                            </div>
+                        )}
                         {isOnTown && (
                             <div style={{ textAlign: 'center', marginTop: '10px' }}>
                                 <button

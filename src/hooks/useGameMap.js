@@ -9,8 +9,26 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
 
     const [mapAndPosition] = useState(() => {
         if (loadedConversation?.world_map && loadedConversation?.player_position) {
+            const map = loadedConversation.world_map;
+
+            // --- MIGRATION: Patch old saves missing x/y on tiles ---
+            console.log('[MIGRATION] Checking map data compatibility...');
+            let migrationCount = 0;
+            for (let y = 0; y < map.length; y++) {
+                for (let x = 0; x < map[y].length; x++) {
+                    if (map[y][x].x === undefined || map[y][x].y === undefined) {
+                        map[y][x].x = x;
+                        map[y][x].y = y;
+                        migrationCount++;
+                    }
+                }
+            }
+            if (migrationCount > 0) {
+                console.log(`[MIGRATION] Patched ${migrationCount} tiles with coordinates.`);
+            }
+
             return {
-                map: loadedConversation.world_map,
+                map: map,
                 position: loadedConversation.player_position
             };
         }
@@ -32,13 +50,39 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
     const [worldMap, setWorldMap] = useState(mapAndPosition.map);
     const [playerPosition, setPlayerPosition] = useState(mapAndPosition.position);
 
+    const subMapsData = loadedConversation?.sub_maps || loadedConversation?.subMaps;
+
     // Multi-level map system
-    const [currentMapLevel, setCurrentMapLevel] = useState(loadedConversation?.sub_maps?.currentMapLevel || 'world');
-    const [currentTownMap, setCurrentTownMap] = useState(loadedConversation?.sub_maps?.currentTownMap || null);
-    const [townPlayerPosition, setTownPlayerPosition] = useState(loadedConversation?.sub_maps?.townPlayerPosition || null);
-    const [currentTownTile, setCurrentTownTile] = useState(loadedConversation?.sub_maps?.currentTownTile || null);
-    const [isInsideTown, setIsInsideTown] = useState(loadedConversation?.sub_maps?.isInsideTown || false);
-    const [townMapsCache, setTownMapsCache] = useState(loadedConversation?.sub_maps?.townMapsCache || {});
+    const [currentMapLevel, setCurrentMapLevel] = useState(subMapsData?.currentMapLevel || 'world');
+    const [currentTownMap, setCurrentTownMap] = useState(subMapsData?.currentTownMap || null);
+    const [townPlayerPosition, setTownPlayerPosition] = useState(subMapsData?.townPlayerPosition || null);
+    const [currentTownTile, setCurrentTownTile] = useState(subMapsData?.currentTownTile || null);
+    const [isInsideTown, setIsInsideTown] = useState(subMapsData?.isInsideTown || false);
+    const [townMapsCache, setTownMapsCache] = useState(subMapsData?.townMapsCache || {});
+
+    // Visited tracking
+    const [visitedBiomes, setVisitedBiomes] = useState(() => new Set(subMapsData?.visitedBiomes || []));
+    const [visitedTowns, setVisitedTowns] = useState(() => new Set(subMapsData?.visitedTowns || []));
+
+    const trackBiomeVisit = (biome) => {
+        if (!biome) return;
+        setVisitedBiomes(prev => {
+            if (prev.has(biome)) return prev;
+            const next = new Set(prev);
+            next.add(biome);
+            return next;
+        });
+    };
+
+    const trackTownVisit = (town) => {
+        if (!town) return;
+        setVisitedTowns(prev => {
+            if (prev.has(town)) return prev;
+            const next = new Set(prev);
+            next.add(town);
+            return next;
+        });
+    };
 
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
     const [townError, setTownError] = useState(null);
@@ -56,7 +100,14 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 console.log('[TOWN_MAP] Invalid town map data detected, regenerating...');
                 const townSize = currentTownTile.townSize || currentTownTile.poiType || 'village';
                 const townName = currentTownTile.townName || currentTownTile.poi || 'Town';
-                const seed = worldSeed ? (parseInt(worldSeed) + (currentTownTile.x * 1000) + (currentTownTile.y * 10000)) : (loadedConversation?.sessionId || Math.floor(Math.random() * 1000000));
+
+                if (!worldSeed) {
+                    console.error('[TOWN_MAP] Cannot regenerate town: worldSeed missing.');
+                    setTownError('This save file is missing its World Seed and cannot be repaired.');
+                    return;
+                }
+
+                const seed = parseInt(worldSeed) + (currentTownTile.x * 1000) + (currentTownTile.y * 10000);
                 const newTownMap = generateTownMap(townSize, townName, 'south', seed);
 
                 // POPULATE TOWN
@@ -103,6 +154,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             setTownPlayerPosition({ x: townMapData.entryPoint.x, y: townMapData.entryPoint.y });
             setCurrentMapLevel('town');
             setIsInsideTown(true);
+            trackTownVisit(townName);
 
             const enterMessage = {
                 role: 'system',
@@ -131,7 +183,40 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
 
         if (!townMapData) {
             console.log('[TOWN_ENTRY] Generating new town map for:', townName);
-            const seed = worldSeed ? (parseInt(worldSeed) + (currentTile.x * 1000) + (currentTile.y * 10000)) : (loadedConversation?.sessionId || Math.floor(Math.random() * 1000000));
+            const tileX = currentTile.x !== undefined ? currentTile.x : playerPosition.x;
+            const tileY = currentTile.y !== undefined ? currentTile.y : playerPosition.y;
+
+            // Robust determinism for legacy saves: Hashing stable data points (World Signature)
+            const getLegacySeed = (conv) => {
+                const sid = conv?.sessionId || '';
+                const ts = conv?.timestamp || '';
+                const heroes = (conv?.selected_heroes || []).map(h => h.characterName).sort().join('');
+                const signature = `${sid}-${ts}-${heroes}`;
+
+                let hash = 0;
+                for (let i = 0; i < signature.length; i++) {
+                    const char = signature.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash | 0; // Convert to 32bit integer
+                }
+                return Math.abs(hash);
+            };
+
+            const effectiveSeed = worldSeed || getLegacySeed(loadedConversation);
+
+            if (!worldSeed) {
+                console.warn('[TOWN_ENTRY] worldSeed missing for legacy save, using World Signature:', effectiveSeed);
+            }
+
+            const seed = effectiveSeed + (tileX * 1000) + (tileY * 10000);
+
+            if (isNaN(seed)) {
+                console.error('[TOWN_ENTRY] Critical Failure: Generated seed is NaN.', { effectiveSeed, tileX, tileY });
+                setTownError('Could not generate a valid town seed from this save file.');
+                return;
+            }
+
+            console.log('[TOWN_ENTRY] Using seed:', seed);
             townMapData = generateTownMap(townSize, townName, 'south', seed);
 
             // POPULATE TOWN WITH NPCs
@@ -153,6 +238,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         setTownPlayerPosition({ x: townMapData.entryPoint.x, y: townMapData.entryPoint.y });
         setCurrentMapLevel('town');
         setIsInsideTown(true);
+        trackTownVisit(townName);
 
         const enterMessage = {
             role: 'system',
@@ -254,10 +340,14 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         setIsMapModalOpen,
         townError,
 
-        handleEnterLocation,
         handleEnterCurrentTown,
         handleLeaveTown,
-        handleTownTileClick
+        handleTownTileClick,
+
+        visitedBiomes,
+        visitedTowns,
+        trackBiomeVisit,
+        trackTownVisit
     };
 };
 
