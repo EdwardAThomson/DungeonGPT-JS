@@ -128,7 +128,14 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 }
 
                 const seed = parseInt(worldSeed) + (currentTownTile.x * 1000) + (currentTownTile.y * 10000);
-                const newTownMap = generateTownMap(townSize, townName, 'south', seed);
+                const newTownMap = generateTownMap(
+                    townSize,
+                    townName,
+                    'south',
+                    seed,
+                    currentTownTile.hasRiver,
+                    currentTownTile.riverDirection
+                );
 
                 // POPULATE TOWN
                 const npcs = populateTown(newTownMap, seed);
@@ -157,7 +164,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             if (!townMapData) {
                 console.log('[TOWN_ENTRY] Generating new town map for:', townName);
                 const seed = worldSeed ? (parseInt(worldSeed) + (townTile.x * 1000) + (townTile.y * 10000)) : (loadedConversation?.sessionId || Math.floor(Math.random() * 1000000));
-                townMapData = generateTownMap(townSize, townName, 'south', seed);
+                townMapData = generateTownMap(townSize, townName, 'south', seed, townTile.hasRiver, townTile.riverDirection);
 
                 // POPULATE TOWN WITH NPCs
                 console.log('[TOWN_ENTRY] Populating town with NPCs...');
@@ -237,7 +244,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             }
 
             console.log('[TOWN_ENTRY] Using seed:', seed);
-            townMapData = generateTownMap(townSize, townName, 'south', seed);
+            townMapData = generateTownMap(townSize, townName, 'south', seed, currentTile.hasRiver, currentTile.riverDirection);
 
             // POPULATE TOWN WITH NPCs
             console.log('[TOWN_ENTRY] Populating town with NPCs...');

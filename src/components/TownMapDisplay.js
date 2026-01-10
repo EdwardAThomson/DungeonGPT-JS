@@ -131,7 +131,9 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
                         tile.type === 'keep_wall' ? '#90EE90' :
                           tile.type === 'town_square' ? '#E0E0E0' :
                             tile.type === 'farm_field' ? '#D2B48C' :
-                              tile.type === 'building' ? '#90EE90' : '#FFF',
+                              tile.type === 'water' ? '#007bff' :
+                                tile.type === 'bridge' ? '#5d4037' :
+                                  tile.type === 'building' ? '#90EE90' : '#FFF',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',

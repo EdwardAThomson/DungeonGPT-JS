@@ -9,9 +9,11 @@ import { generateTavernName, generateGuildName, generateBankName, generateShopNa
  * @param {string} townName - Name of the town
  * @param {Object} entryPoint - Entry direction: 'north', 'south', 'east', 'west'
  * @param {number} seed - Optional seed for reproducible maps
+ * @param {boolean} hasRiver - Whether the town has a river passing through it
+ * @param {string} riverDirection - Direction of the river on the world map
  * @returns {Object} Town map data with tiles and metadata
  */
-export const generateTownMap = (townSize, townName, entryPoint = 'south', seed = null) => {
+export const generateTownMap = (townSize, townName, entryPoint = 'south', seed = null, hasRiver = false, riverDirection = 'NORTH_SOUTH') => {
   console.log(`[TOWN_MAP] Generating ${townSize} map for ${townName}`);
 
   // Determine map size based on town size
@@ -48,8 +50,14 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   // Calculate entry point position
   const entryPos = calculateEntryPosition(width, height, entryPoint);
 
+  // Place river if it exists
+  let riverInfo = null;
+  if (hasRiver) {
+    riverInfo = placeRiverInTown(mapData, riverDirection, width, height, rng);
+  }
+
   // Place main road from entry to center
-  placeMainRoad(mapData, entryPos, entryPoint, width, height, townSize);
+  placeMainRoad(mapData, entryPos, entryPoint, width, height, townSize, riverInfo);
 
   // Place town square/center
   const centerPos = { x: Math.floor(width / 2), y: Math.floor(height / 2) };
@@ -124,8 +132,38 @@ function calculateEntryPosition(width, height, direction) {
   }
 }
 
+// Place a river crossing the town
+function placeRiverInTown(mapData, riverDirection, width, height, rng) {
+  const isHorizontal = riverDirection === 'EAST_WEST';
+  const riverWidth = 2;
+  const offset = Math.floor(rng() * 3) - 1; // Slightly offset from perfect center
+  const center = Math.floor((isHorizontal ? height : width) / 2) + offset;
+
+  if (isHorizontal) {
+    for (let y = center; y < center + riverWidth; y++) {
+      for (let x = 0; x < width; x++) {
+        if (mapData[y] && mapData[y][x]) {
+          mapData[y][x].type = 'water';
+          mapData[y][x].walkable = false;
+        }
+      }
+    }
+  } else {
+    for (let x = center; x < center + riverWidth; x++) {
+      for (let y = 0; y < height; y++) {
+        if (mapData[y] && mapData[y][x]) {
+          mapData[y][x].type = 'water';
+          mapData[y][x].walkable = false;
+        }
+      }
+    }
+  }
+
+  return { isHorizontal, center, riverWidth };
+}
+
 // Place main road from entry to center
-function placeMainRoad(mapData, entryPos, direction, width, height, townSize) {
+function placeMainRoad(mapData, entryPos, direction, width, height, townSize, riverInfo = null) {
   const centerX = Math.floor(width / 2);
   const centerY = Math.floor(height / 2);
 
@@ -140,11 +178,29 @@ function placeMainRoad(mapData, entryPos, direction, width, height, townSize) {
     const endY = Math.max(entryPos.y, centerY);
 
     for (let y = startY; y <= endY; y++) {
-      mapData[y][centerX].type = roadType;
+      // Check for bridge
+      if (riverInfo && !riverInfo.isHorizontal && centerX >= riverInfo.center && centerX < riverInfo.center + riverInfo.riverWidth) {
+        mapData[y][centerX].type = 'bridge';
+        mapData[y][centerX].walkable = true;
+      } else if (riverInfo && riverInfo.isHorizontal && y >= riverInfo.center && y < riverInfo.center + riverInfo.riverWidth) {
+        mapData[y][centerX].type = 'bridge';
+        mapData[y][centerX].walkable = true;
+      } else {
+        mapData[y][centerX].type = roadType;
+      }
 
       // Add road width for towns and cities (2 wide total)
       if (isWideRoad && centerX < width - 1) {
-        mapData[y][centerX + 1].type = roadType;
+        const nextX = centerX + 1;
+        if (riverInfo && !riverInfo.isHorizontal && nextX >= riverInfo.center && nextX < riverInfo.center + riverInfo.riverWidth) {
+          mapData[y][nextX].type = 'bridge';
+          mapData[y][nextX].walkable = true;
+        } else if (riverInfo && riverInfo.isHorizontal && y >= riverInfo.center && y < riverInfo.center + riverInfo.riverWidth) {
+          mapData[y][nextX].type = 'bridge';
+          mapData[y][nextX].walkable = true;
+        } else {
+          mapData[y][nextX].type = roadType;
+        }
       }
     }
   } else {
@@ -154,11 +210,29 @@ function placeMainRoad(mapData, entryPos, direction, width, height, townSize) {
     const roadY = Math.floor(height / 2);
 
     for (let x = startX; x <= endX; x++) {
-      mapData[roadY][x].type = roadType;
+      // Check for bridge
+      if (riverInfo && riverInfo.isHorizontal && roadY >= riverInfo.center && roadY < riverInfo.center + riverInfo.riverWidth) {
+        mapData[roadY][x].type = 'bridge';
+        mapData[roadY][x].walkable = true;
+      } else if (riverInfo && !riverInfo.isHorizontal && x >= riverInfo.center && x < riverInfo.center + riverInfo.riverWidth) {
+        mapData[roadY][x].type = 'bridge';
+        mapData[roadY][x].walkable = true;
+      } else {
+        mapData[roadY][x].type = roadType;
+      }
 
       // Add road width for towns and cities (2 wide total)
       if (isWideRoad && roadY < height - 1) {
-        mapData[roadY + 1][x].type = roadType;
+        const nextY = roadY + 1;
+        if (riverInfo && riverInfo.isHorizontal && nextY >= riverInfo.center && nextY < riverInfo.center + riverInfo.riverWidth) {
+          mapData[nextY][x].type = 'bridge';
+          mapData[nextY][x].walkable = true;
+        } else if (riverInfo && !riverInfo.isHorizontal && x >= riverInfo.center && x < riverInfo.center + riverInfo.riverWidth) {
+          mapData[nextY][x].type = 'bridge';
+          mapData[nextY][x].walkable = true;
+        } else {
+          mapData[nextY][x].type = roadType;
+        }
       }
     }
   }

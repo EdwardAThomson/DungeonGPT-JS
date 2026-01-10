@@ -14,6 +14,7 @@ import TownMapTest from './pages/TownMapTest';
 import DiceTest from './pages/DiceTest';
 import NPCTest from './pages/NPCTest';
 import SeedDebugTest from './pages/SeedDebugTest';
+import WorldMapTest from './pages/WorldMapTest';
 
 import "./App.css";
 
@@ -110,6 +111,7 @@ const App = () => {
             <Route path="/dice-test" element={<DiceTest />} />
             <Route path="/npc-test" element={<NPCTest />} />
             <Route path="/seed-debug-test" element={<SeedDebugTest />} />
+            <Route path="/world-map-test" element={<WorldMapTest />} />
           </Routes>
         </div>
 

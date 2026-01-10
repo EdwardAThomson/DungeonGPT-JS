@@ -37,19 +37,35 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
     mapData.push(row);
   }
 
-  // Generate 3-5 forest clusters (increased from 2-4)
+  // 1. Generate Coast (one random edge)
+  placeCoast(mapData, width, height, rng);
+
+  // 2. Generate 1-2 Lake clusters
+  const numLakes = 1 + Math.floor(rng() * 2);
+  for (let i = 0; i < numLakes; i++) {
+    placeLakeCluster(mapData, width, height, rng);
+  }
+
+  // 3. Generate 3-5 forest clusters
   const numForestClusters = 3 + Math.floor(rng() * 3);
   for (let i = 0; i < numForestClusters; i++) {
     placeForestCluster(mapData, width, height, rng);
   }
 
-  // Generate 2-3 mountain ranges (increased from 1-2)
+  // 4. Generate 2-3 mountain ranges
   const numMountainRanges = 2 + Math.floor(rng() * 2);
+  const mountainTiles = []; // Track mountains for river sources
   for (let i = 0; i < numMountainRanges; i++) {
-    placeMountainRange(mapData, width, height, rng);
+    const range = placeMountainRange(mapData, width, height, rng);
+    if (range) mountainTiles.push(...range);
   }
 
-  // Place 2-4 towns (including what will become the starting town)
+  // 5. Generate Rivers (from mountains to lakes/coast)
+  if (mountainTiles.length > 0) {
+    generateRivers(mapData, mountainTiles, rng);
+  }
+
+  // 6. Place 2-4 towns
   const numTowns = 2 + Math.floor(rng() * 3);
   console.log(`[MAP_GENERATION] Placing ${numTowns} towns...`);
 
@@ -107,8 +123,12 @@ function seededRandom(seed) {
 // Place a cluster of 2-4 forest tiles
 function placeForestCluster(mapData, width, height, rng) {
   const clusterSize = 2 + Math.floor(rng() * 3);
-  const startX = 1 + Math.floor(rng() * (width - 2));
-  const startY = 1 + Math.floor(rng() * (height - 2));
+  let startX, startY;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    startX = 1 + Math.floor(rng() * (width - 2));
+    startY = 1 + Math.floor(rng() * (height - 2));
+    if (mapData[startY][startX].biome !== 'water') break;
+  }
 
   const tiles = [{ x: startX, y: startY }];
 
@@ -135,7 +155,7 @@ function placeForestCluster(mapData, width, height, rng) {
 
   // Place forest tiles
   tiles.forEach(tile => {
-    if (mapData[tile.y] && mapData[tile.y][tile.x] && !mapData[tile.y][tile.x].poi) {
+    if (mapData[tile.y] && mapData[tile.y][tile.x] && !mapData[tile.y][tile.x].poi && mapData[tile.y][tile.x].biome !== 'water') {
       mapData[tile.y][tile.x].poi = 'forest';
       mapData[tile.y][tile.x].descriptionSeed = "Dense woods";
     }
@@ -145,8 +165,12 @@ function placeForestCluster(mapData, width, height, rng) {
 // Place a mountain range of 2-3 tiles
 function placeMountainRange(mapData, width, height, rng) {
   const rangeSize = 2 + Math.floor(rng() * 2);
-  const startX = 1 + Math.floor(rng() * (width - 2));
-  const startY = 1 + Math.floor(rng() * (height - 2));
+  let startX, startY;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    startX = 1 + Math.floor(rng() * (width - 2));
+    startY = 1 + Math.floor(rng() * (height - 2));
+    if (mapData[startY][startX].biome !== 'water' && mapData[startY][startX].biome !== 'beach') break;
+  }
 
   const tiles = [{ x: startX, y: startY }];
 
@@ -163,7 +187,7 @@ function placeMountainRange(mapData, width, height, rng) {
       const newX = base.x + dir.dx;
       const newY = base.y + dir.dy;
 
-      if (isValidPlacement(mapData, newX, newY, width, height)) {
+      if (isValidPlacement(mapData, newX, newY, width, height, false)) {
         tiles.push({ x: newX, y: newY });
         break;
       }
@@ -172,11 +196,13 @@ function placeMountainRange(mapData, width, height, rng) {
 
   // Place mountain tiles
   tiles.forEach(tile => {
-    if (mapData[tile.y] && mapData[tile.y][tile.x] && !mapData[tile.y][tile.x].poi) {
+    if (mapData[tile.y] && mapData[tile.y][tile.x] && !mapData[tile.y][tile.x].poi && mapData[tile.y][tile.x].biome !== 'water') {
       mapData[tile.y][tile.x].poi = 'mountain';
       mapData[tile.y][tile.x].descriptionSeed = "Rocky peaks";
     }
   });
+
+  return tiles;
 }
 
 // Place a town at a random empty location with minimum distance from other towns
@@ -243,7 +269,7 @@ function placeCave(mapData, width, height, rng) {
     const x = mountain.x + dir.dx;
     const y = mountain.y + dir.dy;
 
-    if (isValidPlacement(mapData, x, y, width, height)) {
+    if (isValidPlacement(mapData, x, y, width, height, false)) {
       mapData[y][x].poi = 'cave_entrance';
       mapData[y][x].descriptionSeed = "A dark cave entrance";
       return;
@@ -332,7 +358,7 @@ function improveMapDistribution(mapData, width, height, rng) {
         if (mapData[y] && mapData[y][x]) {
           if (mapData[y][x].poi !== null) {
             featureCount++;
-          } else {
+          } else if (mapData[y][x].biome === 'plains') {
             plainsTiles.push({ x, y });
           }
         }
@@ -372,10 +398,12 @@ function addFeaturesToQuadrant(mapData, plainsTiles, featuresNeeded, rng) {
 }
 
 // Check if a tile is valid for placement
-function isValidPlacement(mapData, x, y, width, height) {
+function isValidPlacement(mapData, x, y, width, height, allowBeach = true) {
   if (x < 0 || x >= width || y < 0 || y >= height) return false;
   if (!mapData[y] || !mapData[y][x]) return false;
   if (mapData[y][x].poi !== null) return false; // Already has something
+  if (mapData[y][x].biome === 'water') return false; // Don't place on water
+  if (!allowBeach && mapData[y][x].biome === 'beach') return false; // Restricted from beaches
   return true;
 }
 
@@ -445,3 +473,111 @@ export const testMapGeneration = () => {
 
   return { map: testMap, startingPosition: foundTown };
 };
+
+// Place a coast on one random edge of the map
+function placeCoast(mapData, width, height, rng) {
+  const edge = Math.floor(rng() * 4); // 0: North, 1: East, 2: South, 3: West
+  const depth = 2 + Math.floor(rng() * 2); // At least 2 tiles deep
+
+  for (let i = 0; i < width; i++) {
+    for (let d = 0; d < depth; d++) {
+      let x, y;
+      if (edge === 0) { x = i; y = d; }
+      else if (edge === 1) { x = width - 1 - d; y = i; }
+      else if (edge === 2) { x = i; y = height - 1 - d; }
+      else { x = d; y = i; }
+
+      if (mapData[y] && mapData[y][x]) {
+        if (d === depth - 1) {
+          // Inner edge touching land becomes the beach
+          mapData[y][x].biome = 'beach';
+          mapData[y][x].beachDirection = edge;
+          mapData[y][x].descriptionSeed = "A sandy beach";
+        } else {
+          mapData[y][x].biome = 'water';
+          mapData[y][x].descriptionSeed = "The coastal sea";
+        }
+      }
+    }
+  }
+}
+
+// Helper to check if a tile is near water or beach (for buffering)
+function isNearCoast(mapData, x, y, width, height) {
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+        if (mapData[ny][nx].biome === 'water' || mapData[ny][nx].biome === 'beach') {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+// Place a single lake tile
+function placeLakeCluster(mapData, width, height, rng) {
+  // Find a random spot not on the extreme edge and not on water/beach
+  let startX, startY;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    startX = 2 + Math.floor(rng() * (width - 4));
+    startY = 2 + Math.floor(rng() * (height - 4));
+    if (mapData[startY][startX].biome === 'plains' && !isNearCoast(mapData, startX, startY, width, height)) {
+      mapData[startY][startX].biome = 'water';
+      mapData[startY][startX].descriptionSeed = "A clear lake";
+      mapData[startY][startX].isLake = true;
+      break;
+    }
+  }
+}
+
+// Generate rivers flowing from mountains to water
+function generateRivers(mapData, mountainTiles, rng) {
+  // Find all water tiles
+  const waterTiles = [];
+  for (let y = 0; y < mapData.length; y++) {
+    for (let x = 0; x < mapData[y].length; x++) {
+      if (mapData[y][x].biome === 'water') {
+        waterTiles.push({ x, y });
+      }
+    }
+  }
+
+  if (waterTiles.length === 0) return;
+
+  // Pick 1-2 source mountains
+  const numRivers = Math.min(mountainTiles.length, 1 + Math.floor(rng() * 2));
+  const shuffledMountains = [...mountainTiles].sort(() => 0.5 - rng());
+
+  const rivers = [];
+  for (let i = 0; i < numRivers; i++) {
+    const source = shuffledMountains[i];
+
+    // Find nearest water tile
+    let target = waterTiles[0];
+    let minDist = Infinity;
+    waterTiles.forEach(w => {
+      const dist = Math.abs(w.x - source.x) + Math.abs(w.y - source.y);
+      if (dist < minDist) {
+        minDist = dist;
+        target = w;
+      }
+    });
+
+    // Use pathfinding to create river
+    // We'll import these dynamically to avoid circular dependencies if any
+    const { findPath, markRiverTiles } = require('./pathfinding');
+    const path = findPath(mapData, source, target);
+    if (path) {
+      rivers.push(path);
+    }
+  }
+
+  if (rivers.length > 0) {
+    const { markRiverTiles } = require('./pathfinding');
+    markRiverTiles(mapData, rivers);
+  }
+}

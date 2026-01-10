@@ -71,6 +71,9 @@ const DebugMenu = () => {
                     <Link to="/seed-debug-test" style={linkStyle} onClick={() => setIsOpen(false)}>
                         🌱 Seed Debug
                     </Link>
+                    <Link to="/world-map-test" style={linkStyle} onClick={() => setIsOpen(false)}>
+                        🌍 World Map Test
+                    </Link>
                 </div>
             )}
             <button style={buttonStyle} onClick={toggleMenu} title="Debug Menu">
