@@ -14,6 +14,8 @@ const SettingsContext = createContext({
   setAssistantModel: () => { },
   isSettingsModalOpen: false,
   setIsSettingsModalOpen: () => { },
+  theme: 'dark-fantasy',
+  setTheme: () => { },
 });
 
 export const SettingsProvider = ({ children }) => {
@@ -23,6 +25,12 @@ export const SettingsProvider = ({ children }) => {
   const [assistantProvider, setAssistantProvider] = useState('gemini-cli');
   const [assistantModel, setAssistantModel] = useState(DEFAULT_MODELS['gemini-cli']);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark-fantasy');
+
+  const updateTheme = (newTheme) => {
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
 
   return (
     <SettingsContext.Provider value={{
@@ -37,7 +45,9 @@ export const SettingsProvider = ({ children }) => {
       assistantModel,
       setAssistantModel,
       isSettingsModalOpen,
-      setIsSettingsModalOpen
+      setIsSettingsModalOpen,
+      theme,
+      setTheme: updateTheme
     }}>
       {children}
     </SettingsContext.Provider>

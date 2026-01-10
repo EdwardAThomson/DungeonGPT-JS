@@ -309,7 +309,7 @@ const Game = () => {
               <div>
                 <p><strong>Setting:</strong> {settings.shortDescription || "Not set"}</p>
                 {settings.campaignGoal && (
-                  <p><strong>Quest:</strong> <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>{settings.campaignGoal}</span></p>
+                  <p><strong>Quest:</strong> <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{settings.campaignGoal}</span></p>
                 )}
                 <p><strong>Mood:</strong> {settings.grimnessLevel || "Neutral"} / {settings.darknessLevel || "Neutral"} | <strong>World:</strong> {settings.magicLevel || "Low Magic"} ({settings.technologyLevel || "Medieval"})</p>
                 <p><strong>Location:</strong> ({mapHook.playerPosition.x}, {mapHook.playerPosition.y}) - {currentBiome}</p>

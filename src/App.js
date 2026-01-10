@@ -36,12 +36,13 @@ const App = () => {
     assistantModel,
     setAssistantModel,
     isSettingsModalOpen,
-    setIsSettingsModalOpen
+    setIsSettingsModalOpen,
+    theme
   } = useContext(SettingsContext);
 
   return (
     <Router>
-      <div className="App">
+      <div className="App" data-theme={theme}>
         {/* Add className="main-nav" here for the nav styles */}
         <nav className="main-nav">
           <ul>

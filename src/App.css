@@ -5,126 +5,252 @@
 
 /* General App Layout */
 .App {
+  text-align: center;
+  min-height: 100vh;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--body-font);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  background-color: #f4f7f6;
-  /* Match index.css */
 }
 
 /* Navigation Bar Styling */
-nav.main-nav {
-  /* Add a class to the nav in App.js if needed */
-  background-color: #2c3e50;
-  /* Dark blue-gray */
-  padding: 10px 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.main-nav {
+  background-color: var(--surface);
+  border-bottom: 2px solid var(--primary);
+  padding: 0 20px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 4px 12px var(--shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-nav.main-nav ul {
+.main-nav ul {
   list-style-type: none;
   padding: 0;
   margin: 0;
   display: flex;
   justify-content: center;
-  /* Center nav items */
-  gap: 30px;
-  /* Space between nav items */
+  align-items: center;
+  height: 70px;
+  gap: 15px;
 }
 
-nav.main-nav li {
-  display: inline;
+.main-nav li {
+  display: flex;
+  align-items: center;
+  height: 100%;
 }
 
-nav.main-nav a {
-  color: #ecf0f1;
-  /* Light gray text */
+.main-nav a {
+  color: var(--text);
   text-decoration: none;
   font-weight: 500;
-  padding: 8px 15px;
+  font-family: var(--header-font);
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  padding: 10px 15px;
   border-radius: 4px;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
 }
 
-nav.main-nav a:hover,
-nav.main-nav a.active {
-  /* Add activeClassName="active" to NavLink if using */
-  background-color: #3498db;
-  /* Blue background on hover/active */
-  color: white;
+.main-nav a:hover {
+  color: var(--primary);
+  background-color: var(--shadow);
 }
 
 .nav-settings-btn {
-  background: none;
-  border: none;
-  color: #ecf0f1;
-  text-decoration: none;
-  font-weight: 500;
-  padding: 8px 15px;
+  background: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  font-family: var(--header-font);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  padding: 8px 16px;
   border-radius: 4px;
-  transition: background-color 0.2s ease, color 0.2s ease;
   cursor: pointer;
-  font-family: inherit;
-  font-size: 1rem;
+  transition: all 0.3s ease;
+  margin-left: 10px;
 }
 
 .nav-settings-btn:hover {
-  background-color: #3498db;
-  color: white;
-}
-
-.nav-settings-item {
-  display: flex;
-  align-items: center;
+  background-color: var(--primary);
+  color: var(--bg);
 }
 
 /* Main Content Area */
 .main-content {
   flex-grow: 1;
-  padding: 20px;
-  max-width: 1200px;
-  /* <--- This limits the width */
-  margin: 20px auto;
-  /* <--- This centers it horizontally */
+  padding: 40px 20px;
+  max-width: 1100px;
+  margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
 }
 
 /* --- Page Specific Styles --- */
 
-/* HomePage & Generic Page Container */
+/* Generic Page Container */
 .Home-page,
-/* Keep existing class name or use a new one */
-.page-container {
-  background-color: #ffffff;
-  /* White background for content boxes */
-  padding: 30px;
+.page-container,
+.character-creation-form {
+  background-color: var(--surface);
+  padding: 40px;
   border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 8px 32px var(--shadow);
+  border: 1px solid var(--border);
+  position: relative;
   text-align: left;
-  /* Align text left for readability */
 }
 
-.Home-page h1,
-.Home-page h2 {
+/* Thematic topper for cards */
+.Home-page::before,
+.page-container::before,
+.character-creation-form::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+}
+
+/* HomePage Styles */
+.hero-section {
   text-align: center;
-  /* Center headings on home page */
+  margin-bottom: 40px;
 }
 
-.Home-page nav {
+.hero-section h1 {
+  font-size: 3.5rem;
+  margin-bottom: 0.2em;
+  text-shadow: 0 4px 8px var(--shadow);
+}
+
+.subtitle {
+  font-family: var(--header-font);
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.home-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.home-nav-card {
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
-  /* Center internal navigation links */
-  margin-bottom: 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  color: var(--text);
+  box-shadow: 0 4px 6px var(--shadow);
 }
 
-.Home-page nav p {
-  margin-bottom: 10px;
+.home-nav-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--primary);
+  box-shadow: 0 12px 24px var(--shadow);
+  background-color: var(--shadow);
 }
 
-/* API Key Form Styling (HomePage.js) */
+.primary-card {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  flex-direction: row;
+  justify-content: center;
+  gap: 20px;
+  padding: 30px;
+}
+
+.primary-card .card-icon {
+  font-size: 2.5rem;
+}
+
+.primary-card .card-content h3 {
+  color: var(--bg);
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.primary-card .card-content p {
+  color: var(--bg);
+  opacity: 0.8;
+  margin: 5px 0 0 0;
+}
+
+.primary-card:hover {
+  background-color: transparent;
+}
+
+.primary-card:hover .card-content h3,
+.primary-card:hover .card-content p {
+  color: var(--primary);
+}
+
+.card-icon {
+  font-size: 2rem;
+  margin-bottom: 15px;
+}
+
+.home-nav-card h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-family: var(--header-font);
+}
+
+.home-nav-card p {
+  margin: 10px 0 0 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.home-footer {
+  margin-top: 50px;
+  text-align: center;
+  border-top: 1px solid var(--border);
+  padding-top: 30px;
+}
+
+.settings-shortcut-btn {
+  background: none;
+  border: 1px dashed var(--primary);
+  color: var(--primary);
+  padding: 10px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: var(--header-font);
+}
+
+.settings-shortcut-btn:hover {
+  background-color: var(--shadow);
+  transform: scale(1.05);
+}
+
 .api-key-form {
   margin-top: 20px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border);
   padding-top: 20px;
 }
 
@@ -144,16 +270,6 @@ nav.main-nav a.active {
 }
 
 /* Character Creation Form - Container Layout */
-.character-creation-form {
-  background-color: #ffffff;
-  padding: 30px;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-  /* Remove main grid layout */
-  /* display: grid; */
-  /* grid-template-columns: 2fr 1fr; */
-  /* gap: 25px 40px; */
-}
 
 /* Remove grid-area specific classes if they exist */
 /* .form-section-header, .form-section-pic, ... {} */
@@ -242,7 +358,7 @@ nav.main-nav a.active {
   width: 110px;
   margin-bottom: 0;
   font-weight: normal;
-  color: #555;
+  color: var(--text-secondary);
 }
 
 .stats-section .stat-input input {
@@ -259,7 +375,7 @@ nav.main-nav a.active {
   gap: 20px;
   margin-top: 20px;
   padding-top: 20px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid var(--border);
 }
 
 .profile-pictures .picture-options {
@@ -301,7 +417,7 @@ nav.main-nav a.active {
 
 .profile-pictures label.selected,
 .profile-pictures label:hover {
-  border-color: #3498db;
+  border-color: var(--primary);
   /* Highlight selected/hovered picture */
 }
 
@@ -316,21 +432,15 @@ nav.main-nav a.active {
 }
 
 .character-item {
-  background-color: #ffffff;
-  /* White background */
-  border: 1px solid #e0e0e0;
-  /* Light grey border */
+  background-color: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  /* Subtle shadow */
-  padding: 15px;
+  box-shadow: 0 4px 12px var(--shadow);
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  /* Stack elements vertically */
   align-items: center;
-  /* Center align content */
-  transition: box-shadow 0.3s ease;
-  /* Smooth shadow transition on hover */
+  transition: all 0.3s ease;
 }
 
 .character-item:hover {
@@ -347,7 +457,7 @@ nav.main-nav a.active {
   /* Clip image to circle */
   margin-bottom: 15px;
   /* Space below image */
-  border: 3px solid #f0f0f0;
+  border: 3px solid var(--border);
   /* Light border around image */
 }
 
@@ -370,19 +480,20 @@ nav.main-nav a.active {
 .character-item-info h3 {
   margin-top: 0;
   margin-bottom: 10px;
-  color: #333;
+  color: var(--text);
   font-size: 1.4em;
+  font-family: var(--header-font);
 }
 
 .character-item-info p {
   margin: 5px 0;
-  color: #555;
+  color: var(--text-secondary);
   font-size: 0.95em;
 }
 
 .detail-label {
   font-weight: bold;
-  color: #444;
+  color: var(--text);
 }
 
 .character-item-stats {
@@ -398,12 +509,13 @@ nav.main-nav a.active {
 }
 
 .character-item-stats li {
-  background-color: #f8f8f8;
+  background-color: var(--bg);
   /* Light background for stats */
   padding: 3px 8px;
   border-radius: 4px;
   font-size: 0.85em;
-  color: #666;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
 }
 
 .character-item-actions {
@@ -634,13 +746,13 @@ nav.main-nav a.active {
   /* Allow main area content to scroll */
   order: 1;
   /* Place main area on the left */
-  background-color: #ffffff;
-  /* Give main area a distinct background? */
+  background-color: var(--surface);
+  /* Give main area a distinct background */
 }
 
 .game-top {
   padding-bottom: 15px;
-  border-bottom: 1px solid #dce4e8;
+  border-bottom: 1px solid var(--border);
   margin-bottom: 15px;
   text-align: center;
 }
@@ -657,6 +769,11 @@ nav.main-nav a.active {
   align-items: flex-start;
   /* Align items to top */
   gap: 20px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
 }
 
 .game-top .game-info-header p {
@@ -664,6 +781,7 @@ nav.main-nav a.active {
   /* Reduce margin for header info */
   text-align: left;
   /* Align info left */
+  color: var(--text-secondary);
 }
 
 /* New style for the button group */
@@ -765,8 +883,8 @@ nav.main-nav a.active {
 }
 
 .message.user {
-  background-color: #3498db;
-  color: white;
+  background-color: var(--primary);
+  color: var(--bg);
   border-bottom-right-radius: 5px;
   /* Slightly different shape */
   align-self: flex-end;
@@ -775,9 +893,9 @@ nav.main-nav a.active {
 }
 
 .message.ai {
-  background-color: #ffffff;
-  color: #333;
-  border: 1px solid #e0e0e0;
+  background-color: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
   border-bottom-left-radius: 5px;
   /* Slightly different shape */
   align-self: flex-start;
@@ -1025,20 +1143,21 @@ nav.main-nav a.active {
 .debug-info-box h4 {
   margin-top: 0;
   margin-bottom: 10px;
-  color: #333;
-  border-bottom: 2px solid #ddd;
+  color: var(--text);
+  border-bottom: 2px solid var(--border);
   padding-bottom: 4px;
 }
 
 .debug-section {
   margin-bottom: 8px;
   padding: 6px;
-  background-color: white;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 4px;
 }
 
 .debug-section strong {
-  color: #555;
+  color: var(--text);
   display: block;
   margin-bottom: 4px;
 }
@@ -1124,7 +1243,7 @@ nav.main-nav a.active {
   width: 110px;
   margin-bottom: 0;
   font-weight: normal;
-  color: #555;
+  color: var(--text-secondary);
 }
 
 .stats-section .stat-input input {
@@ -1185,12 +1304,12 @@ nav.main-nav a.active {
 .summary-details p {
   margin: 5px 0;
   line-height: 1.5;
-  color: #555;
+  color: var(--text-secondary);
 }
 
 .summary-details .detail-label {
-  font-weight: 500;
-  color: #333;
+  font-weight: 600;
+  color: var(--text);
   display: inline-block;
   min-width: 90px;
   /* Align labels */
@@ -1349,12 +1468,12 @@ button {
   margin-top: 0;
   margin-bottom: 15px;
   /* Space below headings */
-  color: #34495e;
+  color: var(--primary);
 }
 
 .game-settings-page h3 {
   margin-bottom: 8px;
-  color: #555;
+  color: var(--text);
   display: inline-block;
   /* Needed for tooltip relative positioning */
   position: relative;
@@ -1365,23 +1484,19 @@ button {
   margin: 0 0 10px 0;
   /* Consistent paragraph spacing */
   line-height: 1.5;
-  color: #555;
+  color: var(--text-secondary);
 }
 
 /* Textarea Styling */
 .game-settings-page .settings-textarea {
   width: 100%;
   max-width: 600px;
-  /* Limit max width */
   padding: 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border);
   border-radius: 4px;
-  font-family: inherit;
-  /* Use app's font */
-  font-size: 1rem;
-  box-sizing: border-box;
+  background-color: var(--bg);
+  color: var(--text);
   resize: vertical;
-  /* Allow vertical resizing */
 }
 
 /* Mood Selectors Layout (Existing) */
@@ -1409,14 +1524,15 @@ button {
 .game-settings-page .settings-select {
   width: 100%;
   padding: 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background-color: white;
+  background-color: var(--bg);
+  color: var(--text);
   font-size: 1rem;
   box-sizing: border-box;
   /* Add a subtle arrow indicator */
   appearance: none;
-  background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23007CB2%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+  background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23d4af37%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
   background-repeat: no-repeat;
   background-position: right 10px top 50%;
   background-size: .65em auto;
@@ -1720,32 +1836,38 @@ button {
 }
 
 .modal-content {
-  background-color: #fff;
+  background-color: var(--surface);
   padding: 30px 40px;
   border-radius: 8px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 32px var(--shadow);
   width: 90%;
   max-width: 600px;
   /* Limit maximum width */
-  max-height: 80vh;
+  max-height: 85vh;
   /* Limit maximum height */
   overflow-y: auto;
   /* Enable scroll if content is too long */
   position: relative;
+  border: 1px solid var(--border);
   /* For positioning the close button */
 }
 
 .modal-content h2 {
   margin-top: 0;
   margin-bottom: 20px;
-  color: #34495e;
+  color: var(--primary);
   text-align: center;
+  font-family: var(--header-font);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 10px;
 }
 
 .modal-section {
   margin-bottom: 20px;
   padding-bottom: 15px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--border);
 }
 
 .modal-section:last-of-type {
@@ -1757,17 +1879,17 @@ button {
 .modal-section h4 {
   margin-top: 0;
   margin-bottom: 10px;
-  color: #555;
+  color: var(--text-secondary);
 }
 
 .modal-content p {
   margin: 5px 0;
   line-height: 1.5;
-  color: #333;
+  color: var(--text);
 }
 
 .modal-content p strong {
-  color: #34495e;
+  color: var(--primary);
   min-width: 100px;
   /* Optional: align labels */
   display: inline-block;
@@ -1778,30 +1900,142 @@ button {
   /* Make it a block element */
   margin: 25px auto 0 auto;
   /* Center the button horizontally with top margin */
-  padding: 10px 20px;
-  background-color: #95a5a6;
-  /* Grey */
-  color: white;
-  border: none;
+  padding: 10px 30px;
+  background-color: var(--primary);
+  color: var(--bg);
+  border: 1px solid var(--primary);
   border-radius: 4px;
+  font-family: var(--header-font);
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.2s ease;
   font-size: 1rem;
 }
 
 .modal-close-button:hover {
-  background-color: #7f8c8d;
+  background-color: transparent;
+  color: var(--primary);
 }
 
 /* Optional: Specific styles for the map modal content area */
 .map-modal-content {
-  /* Example: Make it wider? */
-  /* max-width: 800px; */
-
-  /* Center the map grid within the modal */
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px var(--shadow);
+  color: var(--text);
+  padding: 30px;
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
+}
+
+.dice-modal {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 32px var(--shadow);
+  color: var(--text);
+  padding: 25px;
+  border-radius: 12px;
+}
+
+.dice-mode-toggle {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  justify-content: center;
+}
+
+.dice-mode-toggle button {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 16px;
+  border-radius: 4px;
+}
+
+.dice-mode-toggle button.active {
+  background: var(--primary);
+  color: var(--bg);
+  border-color: var(--primary);
+}
+
+/* Dice Roller specific controls */
+.dice-controls {
+  background: var(--bg);
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.control-group {
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.control-group label {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.character-stats-preview {
+  background: rgba(var(--primary-rgb, 212, 175, 55), 0.1);
+  padding: 10px;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  border-left: 3px solid var(--primary);
+  color: var(--text-secondary);
+}
+
+.roll-result {
+  margin-top: 20px;
+  padding: 20px;
+  background: var(--bg);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.roll-value {
+  font-size: 3rem;
+  font-family: var(--header-font);
+  color: var(--primary);
+  display: block;
+}
+
+.roll-value.crit-success {
+  color: #27ae60;
+  text-shadow: 0 0 10px rgba(39, 174, 96, 0.4);
+}
+
+.roll-value.crit-fail {
+  color: #e74c3c;
+}
+
+.roll-details {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-top: 10px;
+}
+
+.crit-text {
+  display: block;
+  font-weight: bold;
+  margin-top: 5px;
+}
+
+.warning-text {
+  color: var(--accent);
+  font-style: italic;
+  margin-bottom: 10px;
+}
+
+.town-entrance-warning {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 5px;
 }
 
 /* Ensure map grid margins are suitable inside modal */
@@ -1970,11 +2204,11 @@ button {
 }
 
 .conversation-item {
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 20px;
-  background-color: #f9f9f9;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: var(--surface);
+  box-shadow: 0 4px 12px var(--shadow);
 }
 
 .conversation-header {
@@ -2043,15 +2277,15 @@ button {
 .conversation-details p {
   margin: 5px 0;
   font-size: 0.9rem;
-  color: #555;
+  color: var(--text-secondary);
 }
 
 .conversation-settings {
   /* Right column */
-  background-color: #fff;
+  background-color: var(--bg);
   padding: 15px;
   border-radius: 6px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid var(--border);
 }
 
 .conversation-settings h4 {
@@ -2066,7 +2300,7 @@ button {
 .conversation-settings p {
   margin: 5px 0;
   font-size: 0.85rem;
-  color: #555;
+  color: var(--text-secondary);
 }
 
 /* Responsive: stack on smaller screens */
@@ -2193,13 +2427,13 @@ button {
 }
 
 .character-background-text {
-  background: #fdfdfd;
+  background: var(--bg);
   padding: 15px;
   border-radius: 8px;
-  border-left: 4px solid #3498db;
+  border-left: 4px solid var(--primary);
   font-size: 0.95rem;
   line-height: 1.6;
-  color: #444;
+  color: var(--text);
   font-style: italic;
   white-space: pre-wrap;
 }
@@ -2228,21 +2462,21 @@ button {
 
 /* Refined Game Header */
 .game-info-header {
-  background: #f8f9fa;
+  background: var(--bg);
   padding: 15px 20px;
   border-radius: 12px;
-  border: 1px solid #e9ecef;
+  border: 1px solid var(--border);
   margin-top: 10px;
 }
 
 .game-info-header p {
   margin: 5px 0 !important;
-  color: #495057;
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
 .game-info-header strong {
-  color: #212529;
+  color: var(--text);
   font-weight: 600;
 }
 
@@ -2253,12 +2487,12 @@ button {
 
 /* Game Settings Restoration Styles */
 .story-settings-section {
-  background: #ffffff;
+  background: var(--surface);
   padding: 30px;
   border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 20px var(--shadow);
   margin-bottom: 30px;
-  border: 1px solid #edf2f7;
+  border: 1px solid var(--border);
 }
 
 .settings-row {
@@ -2280,7 +2514,7 @@ button {
 .settings-group label {
   font-size: 0.85rem;
   font-weight: 700;
-  color: #4a5568;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -2289,18 +2523,20 @@ button {
 .settings-select {
   padding: 12px 16px;
   border-radius: 8px;
-  border: 2px solid #e2e8f0;
+  border: 1px solid var(--border);
   font-size: 1rem;
   transition: all 0.2s ease;
-  background-color: #f8fafc;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--ui-font);
 }
 
 .settings-textarea:focus,
 .settings-select:focus {
-  border-color: #3498db;
+  border-color: var(--primary);
   outline: none;
-  background-color: #fff;
-  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+  background-color: var(--bg);
+  box-shadow: 0 0 0 3px var(--shadow);
 }
 
 .settings-textarea {
@@ -2309,9 +2545,10 @@ button {
 }
 
 .settings-modal-refined {
-  background: #ffffff;
+  background: var(--surface);
   border-radius: 20px;
   padding: 35px;
+  border: 1px solid var(--border);
 }
 
 .settings-modal-refined h2 {
@@ -2331,8 +2568,8 @@ button {
 }
 
 .template-card {
-  background: #ffffff;
-  border: 2px solid #e2e8f0;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 15px;
   display: flex;
@@ -2344,20 +2581,20 @@ button {
 }
 
 .template-card:hover {
-  border-color: #cbd5e0;
+  border-color: var(--primary);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px var(--shadow);
 }
 
 .template-card.active {
-  border-color: #3498db;
-  background-color: #f0f9ff;
-  box-shadow: 0 0 0 1px #3498db;
+  border-color: var(--primary);
+  background-color: var(--shadow);
+  box-shadow: 0 0 0 1px var(--primary);
 }
 
 .template-icon {
   font-size: 2rem;
-  background: #f8fafc;
+  background: var(--bg);
   width: 50px;
   height: 50px;
   display: flex;
@@ -2368,19 +2605,20 @@ button {
 }
 
 .template-card.active .template-icon {
-  background: #fff;
+  background: var(--surface);
 }
 
 .template-info h5 {
   margin: 0 0 4px 0;
   font-size: 1rem;
-  color: #2d3748;
+  color: var(--text);
+  font-family: var(--header-font);
 }
 
 .template-info p {
   margin: 0;
   font-size: 0.75rem;
-  color: #718096;
+  color: var(--text-secondary);
   line-height: 1.3;
 }
 

@@ -236,9 +236,9 @@ const GameSettings = () => {
             </button>
 
             {showStoryDebug && (
-              <div style={{ marginTop: '10px', padding: '10px', background: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6', fontSize: '0.8rem' }}>
-                <h5 style={{ margin: '0 0 5px 0' }}>Raw AI Response:</h5>
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#636e72', maxHeight: '200px', overflowY: 'auto' }}>
+              <div style={{ marginTop: '10px', padding: '10px', background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.8rem' }}>
+                <h5 style={{ margin: '0 0 5px 0', color: 'var(--text)' }}>Raw AI Response:</h5>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: 'var(--text-secondary)', maxHeight: '200px', overflowY: 'auto' }}>
                   {rawAiResponse || 'No data yet. Generate a story to see output.'}
                 </pre>
               </div>
@@ -436,12 +436,12 @@ const GameSettings = () => {
         )}
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: '40px', marginBottom: '40px', padding: '15px', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #dee2e6' }}>
-        <h4 style={{ margin: '0 0 10px 0', color: '#7f8c8d', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>🤖 Global AI Configuration</h4>
-        <p style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: '#2c3e50' }}>Current: <strong>{selectedProvider}</strong> / <strong>{selectedModel}</strong></p>
+      <div style={{ textAlign: 'center', marginTop: '40px', marginBottom: '40px', padding: '20px', background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: '0 4px 12px var(--shadow)' }}>
+        <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>🤖 Global AI Configuration</h4>
+        <p style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: 'var(--text)' }}>Current: <strong>{selectedProvider}</strong> / <strong>{selectedModel}</strong></p>
         <button
           onClick={() => setIsSettingsModalOpen(true)}
-          style={{ padding: '8px 20px', background: 'transparent', color: '#3498db', border: '2px solid #3498db', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}
+          style={{ padding: '8px 20px', background: 'transparent', color: 'var(--primary)', border: '2px solid var(--primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}
         >
           ⚙️ Technical AI Settings
         </button>

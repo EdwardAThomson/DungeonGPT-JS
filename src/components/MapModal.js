@@ -41,7 +41,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                                     {isInsideTown ? `View ${currentTile.townName || currentTile.poi} Map` : `Enter ${currentTile.townName || currentTile.poi}`}
                                 </button>
                                 {!hasAdventureStarted && (
-                                    <p style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
+                                    <p className="town-entrance-warning">
                                         Start your adventure to enter towns
                                     </p>
                                 )}

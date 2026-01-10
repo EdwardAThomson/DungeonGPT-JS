@@ -10,35 +10,54 @@ const HomePage = () => {
   const { setIsSettingsModalOpen } = useContext(SettingsContext);
 
   return (
-    <div className="Home-page">
-      <h1>Welcome to the Character Creator & AI Game!</h1>
-      <p>
-        Use the links below to manage characters or start a new game.
-      </p>
-      <nav>
-        <p><Link to="/character-creation">Create a New Character</Link></p>
-        <p><Link to="/all-characters">View All Characters</Link></p>
-        <p><Link to="/game-settings">Start a New Game</Link></p>
-      </nav>
+    <div className="Home-page main-card">
+      <div className="hero-section">
+        <h1>DungeonGPT</h1>
+        <p className="subtitle">Enter the realm of infinite stories</p>
+      </div>
 
-      <hr />
+      <div className="home-navigation">
+        <Link to="/game-settings" className="home-nav-card primary-card">
+          <div className="card-icon">⚔️</div>
+          <div className="card-content">
+            <h3>Start Adventure</h3>
+            <p>Begin a new story with your party</p>
+          </div>
+        </Link>
 
-      <div style={{ textAlign: 'center', marginTop: '20px' }}>
-        <h3>AI Configuration</h3>
-        <p>Configure your AI providers, models, and API keys.</p>
+        <div className="home-grid">
+          <Link to="/character-creation" className="home-nav-card">
+            <div className="card-icon">🧙‍♂️</div>
+            <div className="card-content">
+              <h3>Create Hero</h3>
+              <p>Forge a new legend</p>
+            </div>
+          </Link>
+
+          <Link to="/all-characters" className="home-nav-card">
+            <div className="card-icon">📜</div>
+            <div className="card-content">
+              <h3>Hall of Heroes</h3>
+              <p>View your collection</p>
+            </div>
+          </Link>
+
+          <Link to="/saved-conversations" className="home-nav-card">
+            <div className="card-icon">📖</div>
+            <div className="card-content">
+              <h3>Chronicles</h3>
+              <p>Resume your journeys</p>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      <div className="home-footer">
         <button
           onClick={() => setIsSettingsModalOpen(true)}
-          style={{
-            padding: '10px 20px',
-            fontSize: '1rem',
-            backgroundColor: '#3498db',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-          }}
+          className="settings-shortcut-btn"
         >
-          ⚙️ Open Global Settings
+          ⚙️ Configure AI Engine
         </button>
       </div>
     </div>

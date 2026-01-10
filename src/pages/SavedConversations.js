@@ -22,7 +22,7 @@ const SavedConversations = () => {
         fetchConversations();
       }
     };
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
@@ -41,12 +41,12 @@ const SavedConversations = () => {
         console.log('First conversation full object:', data[0]);
         console.log('All fields in first conversation:', Object.keys(data[0]));
       }
-      
+
       // Sort by timestamp descending (newest first)
       const sortedData = data.sort((a, b) => {
         return new Date(b.timestamp) - new Date(a.timestamp);
       });
-      
+
       setConversations(sortedData);
     } catch (err) {
       setError(err.message);
@@ -87,8 +87,8 @@ const SavedConversations = () => {
         throw new Error('Failed to update conversation name');
       }
       // Update local state
-      setConversations(conversations.map(conv => 
-        conv.sessionId === sessionId 
+      setConversations(conversations.map(conv =>
+        conv.sessionId === sessionId
           ? { ...conv, conversation_name: conversationName }
           : conv
       ));
@@ -106,13 +106,13 @@ const SavedConversations = () => {
         throw new Error('Failed to load conversation');
       }
       const conversationData = await response.json();
-      
+
       // Navigate to game with the loaded conversation data
-      navigate('/game', { 
-        state: { 
+      navigate('/game', {
+        state: {
           loadedConversation: conversationData,
           selectedHeroes: conversationData.selected_heroes || []
-        } 
+        }
       });
     } catch (err) {
       setError(err.message);
@@ -158,7 +158,7 @@ const SavedConversations = () => {
     <div className="page-container">
       <h1>Saved Conversations</h1>
       <p>Manage your saved game sessions. Click "Load" to continue a previous adventure.</p>
-      
+
       {conversations.length === 0 ? (
         <p>No saved conversations found. Start a new game to create your first adventure!</p>
       ) : (
@@ -201,12 +201,12 @@ const SavedConversations = () => {
                   </h3>
                 )}
               </div>
-              
+
               <div className="conversation-content">
                 <div className="conversation-details">
                   <p><strong>Date:</strong> {formatDate(conversation.timestamp)}</p>
                   <p><strong>Provider:</strong> {formatProvider(conversation.provider)}</p>
-                  <p><strong>Model:</strong> {formatModel(conversation.model)} <span style={{fontSize: '0.8em', color: '#999'}}>(Raw: {conversation.model || 'undefined'})</span></p>
+                  <p><strong>Model:</strong> {formatModel(conversation.model)} <span style={{ fontSize: '0.8em', color: 'var(--text-secondary)' }}>(Raw: {conversation.model || 'undefined'})</span></p>
                   <p><strong>Session ID:</strong> {conversation.sessionId}</p>
                   {conversation.selected_heroes && (
                     <p><strong>Heroes:</strong> {JSON.parse(conversation.selected_heroes).map(h => h.characterName).join(', ')}</p>
@@ -218,13 +218,13 @@ const SavedConversations = () => {
                     <p><strong>Summary:</strong> {conversation.summary.substring(0, 100)}...</p>
                   )}
                 </div>
-                
+
                 {conversation.game_settings && (
                   <div className="conversation-settings">
                     <h4>Game Settings</h4>
                     {(() => {
-                      const settings = typeof conversation.game_settings === 'string' 
-                        ? JSON.parse(conversation.game_settings) 
+                      const settings = typeof conversation.game_settings === 'string'
+                        ? JSON.parse(conversation.game_settings)
                         : conversation.game_settings;
                       return (
                         <>
@@ -240,7 +240,7 @@ const SavedConversations = () => {
                   </div>
                 )}
               </div>
-              
+
               <div className="conversation-actions">
                 <button
                   onClick={() => loadConversation(conversation.sessionId)}
@@ -259,7 +259,7 @@ const SavedConversations = () => {
           ))}
         </div>
       )}
-      
+
       <div className="navigation-buttons">
         <button onClick={() => navigate('/')} className="back-button">
           Back to Home
