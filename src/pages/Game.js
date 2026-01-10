@@ -421,7 +421,6 @@ const Game = () => {
                   <img
                     src={hero.profilePicture}
                     alt={`${hero.characterName}'s profile`}
-                    width="80"
                     onClick={() => {
                       setSelectedHeroForModal(hero);
                       setIsCharacterModalOpen(true);
@@ -433,15 +432,6 @@ const Game = () => {
                 <div style={{ textAlign: 'center', marginTop: '5px' }}>
                   <button
                     className="view-details-btn"
-                    style={{
-                      background: 'none',
-                      border: '1px solid rgba(236, 240, 241, 0.3)',
-                      color: '#bdc3c7',
-                      fontSize: '0.7rem',
-                      borderRadius: '4px',
-                      padding: '2px 8px',
-                      cursor: 'pointer'
-                    }}
                     onClick={() => {
                       setSelectedHeroForModal(hero);
                       setIsCharacterModalOpen(true);

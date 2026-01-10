@@ -578,8 +578,8 @@
 /* Game Sidebars (Chat History & Party) */
 .game-chat-bar,
 .party-bar {
-  background-color: #34495e;
-  color: #ecf0f1;
+  background-color: var(--surface);
+  color: var(--text);
   width: 280px;
   flex-shrink: 0;
   /* Prevent sidebar from shrinking */
@@ -588,24 +588,10 @@
   flex-direction: column;
   overflow-y: auto;
   /* Allow sidebar itself to scroll */
-  box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
-  /* Shadow on the left */
+  box-shadow: -2px 0 5px var(--shadow);
   height: 100%;
   box-sizing: border-box;
-  order: 2;
-  /* Place party bar on the right */
-}
-
-/* Add/Ensure this rule for the title */
-.party-bar h2 {
-  color: #ecf0f1;
-  /* Explicitly set light color */
-  text-align: center;
-  /* Center the title */
-  margin-bottom: 15px;
-  /* Add space below title */
-  font-size: 1.4rem;
-  /* Adjust size if needed */
+  border-left: 1px solid var(--border);
 }
 
 .game-chat-bar {
@@ -616,19 +602,39 @@
   order: 3;
 }
 
+/* Add/Ensure this rule for the title */
+.party-bar h2 {
+  color: var(--primary);
+  /* Use primary theme color */
+  text-align: center;
+  /* Center the title */
+  margin-bottom: 20px;
+  /* Add space below title */
+  font-size: 1.4rem;
+  font-family: var(--header-font);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 10px;
+}
+
 .new-chat-button {
   background-color: transparent;
-  border: 1px solid #ecf0f1;
-  color: #ecf0f1;
+  border: 1px solid var(--primary);
+  color: var(--primary);
   border-radius: 20px;
   padding: 8px 15px;
   margin-bottom: 15px;
   text-align: center;
   font-weight: 500;
+  font-family: var(--header-font);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .new-chat-button:hover {
-  background-color: rgba(236, 240, 241, 0.1);
+  background-color: var(--primary);
+  color: var(--bg);
 }
 
 .history {
@@ -644,92 +650,118 @@
   border-radius: 4px;
   margin-bottom: 5px;
   transition: background-color 0.2s ease;
+  color: var(--text-secondary);
 }
 
 .history li:hover {
-  background-color: rgba(236, 240, 241, 0.1);
+  background-color: rgba(var(--primary-rgb, 212, 175, 55), 0.1);
+  color: var(--text);
 }
 
 .made-by {
-  border-top: 1px solid #7f8c8d;
+  border-top: 1px solid var(--border);
   padding-top: 10px;
   margin-top: auto;
   /* Pushes to bottom */
   text-align: center;
   font-size: 0.8rem;
-  color: #bdc3c7;
+  color: var(--text-secondary);
 }
 
 /* Party Member Styles */
 .party-member {
-  border-bottom: 1px solid #7f8c8d;
-  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border);
+  padding: 15px 10px;
   margin-bottom: 15px;
+  transition: background-color 0.3s ease;
+  border-radius: 8px;
 }
 
-.party-member:last-child {
-  border-bottom: none;
+.party-member:hover {
+  background-color: rgba(var(--primary-rgb, 212, 175, 55), 0.05);
 }
 
 .party-member img {
-  width: 60px;
-  height: 60px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
   object-fit: cover;
-  margin-bottom: 10px;
-  border: 2px solid #ecf0f1;
+  margin-bottom: 12px;
+  border: 2px solid var(--primary);
   display: block;
-  /* Center image if container is wider */
   margin-left: auto;
   margin-right: auto;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+}
+
+.party-member img:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 15px var(--primary);
 }
 
 .party-member h3 {
   margin: 0 0 5px 0;
-  color: #ecf0f1;
+  color: var(--text);
   text-align: center;
+  font-family: var(--header-font);
+  font-size: 1.1rem;
 }
 
 .party-member p {
   margin: 2px 0;
   font-size: 0.85rem;
-  color: #bdc3c7;
+  color: var(--text-secondary);
   text-align: center;
+}
+
+.view-details-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.view-details-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: rgba(var(--primary-rgb, 212, 175, 55), 0.1);
 }
 
 .party-member .stats {
   margin-top: 10px;
   text-align: center;
-  /* Center the heading */
 }
 
 .party-member .stats h4 {
   margin-bottom: 8px;
-  color: #ecf0f1;
+  color: var(--text);
   font-size: 0.9rem;
 }
 
-/* New Stats Grid Layout */
 .party-member .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  /* 3 columns */
   gap: 5px 8px;
-  /* Row gap, Column gap */
   padding: 0;
   margin: 0;
   font-size: 0.8rem;
-  color: #bdc3c7;
+  color: var(--text-secondary);
 }
 
 .party-member .stat-item {
-  background-color: rgba(0, 0, 0, 0.2);
-  /* Slightly darker background for items */
+  background-color: var(--bg);
+  border: 1px solid var(--border);
   padding: 3px 5px;
   border-radius: 3px;
   text-align: center;
   white-space: nowrap;
-  /* Prevent wrapping within a stat item */
 }
 
 /* Game Main Area */
@@ -2438,27 +2470,7 @@ button {
   white-space: pre-wrap;
 }
 
-/* Party Bar Hover Decorations */
-.party-member img {
-  cursor: pointer;
-  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease, border-color 0.3s ease;
-}
-
-.party-member img:hover {
-  transform: scale(1.15) rotate(2deg);
-  border-color: #3498db;
-  box-shadow: 0 0 15px rgba(52, 152, 219, 0.6);
-}
-
-.party-member {
-  transition: background-color 0.3s ease;
-  border-radius: 8px;
-  padding: 10px;
-}
-
-.party-member:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
+/* Party Bar Hover Decorations moved up */
 
 /* Refined Game Header */
 .game-info-header {
