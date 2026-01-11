@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { AVAILABLE_MODELS, DEFAULT_MODELS } from '../llm/llm_constants';
 import ApiKeysContext from '../contexts/ApiKeysContext';
 import SettingsContext from '../contexts/SettingsContext';
@@ -12,6 +12,7 @@ export const SettingsModalContent = ({
   assistantModel, setAssistantModel,
   worldSeed
 }) => {
+  const [activeTab, setActiveTab] = useState('story'); // 'story' or 'ai'
   const { apiKeys, setApiKeys } = useContext(ApiKeysContext);
   const { theme, setTheme } = useContext(SettingsContext);
 
@@ -35,150 +36,217 @@ export const SettingsModalContent = ({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content settings-modal-refined" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%', maxHeight: '85vh', overflowY: 'auto' }}>
-        <h2 style={{ borderBottom: '2px solid var(--primary)', paddingBottom: '10px', marginBottom: '20px', color: 'var(--primary)' }}>System Configuration</h2>
+      <div className="modal-content settings-modal-refined" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '20px 20px 10px 20px', borderBottom: '1px solid var(--border)' }}>
+          <h2 style={{ margin: 0, color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>⚙️ System Scroll</h2>
+        </div>
 
-        <div className="modal-section">
-          <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'var(--text)' }}>🤖 AI Engine Settings</h3>
+        {/* Tab Navigation */}
+        <div style={{ display: 'flex', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+          <button
+            onClick={() => setActiveTab('story')}
+            style={{
+              flex: 1,
+              padding: '12px',
+              background: activeTab === 'story' ? 'var(--surface)' : 'transparent',
+              color: activeTab === 'story' ? 'var(--primary)' : 'var(--text-secondary)',
+              border: 'none',
+              borderBottom: activeTab === 'story' ? '3px solid var(--primary)' : 'none',
+              fontFamily: 'var(--header-font)',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              textTransform: 'uppercase',
+              letterSpacing: '1px'
+            }}
+          >
+            📖 Story & Style
+          </button>
+          <button
+            onClick={() => setActiveTab('ai')}
+            style={{
+              flex: 1,
+              padding: '12px',
+              background: activeTab === 'ai' ? 'var(--surface)' : 'transparent',
+              color: activeTab === 'ai' ? 'var(--primary)' : 'var(--text-secondary)',
+              border: 'none',
+              borderBottom: activeTab === 'ai' ? '3px solid var(--primary)' : 'none',
+              fontFamily: 'var(--header-font)',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              textTransform: 'uppercase',
+              letterSpacing: '1px'
+            }}
+          >
+            🤖 AI Engine
+          </button>
+        </div>
 
-          <div style={{ marginBottom: '20px', background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Narrative AI (The DM)</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label style={labelStyle}>PROVIDER</label>
-                <select value={selectedProvider} onChange={(e) => handleProviderChange(e.target.value, 'game')} style={selectStyle}>
-                  <optgroup label="Cloud APIs">
-                    <option value="openai">OpenAI</option>
-                    <option value="gemini">Gemini</option>
-                    <option value="claude">Claude</option>
-                  </optgroup>
-                  <optgroup label="CLI Tools">
-                    <option value="codex">Codex CLI</option>
-                    <option value="claude-cli">Claude CLI</option>
-                    <option value="gemini-cli">Gemini CLI</option>
-                  </optgroup>
-                </select>
-              </div>
-              <div>
-                <label style={labelStyle}>MODEL</label>
-                <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} style={selectStyle}>
-                  {AVAILABLE_MODELS[selectedProvider]?.map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  )) || <option value="">Select Provider</option>}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: '20px', background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>Assistant AI (OOC Support)</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label style={labelStyle}>PROVIDER</label>
-                <select value={assistantProvider || selectedProvider} onChange={(e) => handleProviderChange(e.target.value, 'assistant')} style={selectStyle}>
-                  <optgroup label="Cloud APIs">
-                    <option value="openai">OpenAI</option>
-                    <option value="gemini">Gemini</option>
-                    <option value="claude">Claude</option>
-                  </optgroup>
-                  <optgroup label="CLI Tools">
-                    <option value="codex">Codex CLI</option>
-                    <option value="claude-cli">Claude CLI</option>
-                    <option value="gemini-cli">Gemini CLI</option>
-                  </optgroup>
-                </select>
-              </div>
-              <div>
-                <label style={labelStyle}>MODEL</label>
-                <select value={assistantModel || selectedModel} onChange={(e) => setAssistantModel(e.target.value)} style={selectStyle}>
-                  {AVAILABLE_MODELS[assistantProvider || selectedProvider]?.map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  )) || <option value="">Select Provider</option>}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-            <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>API Keys</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-              {['openai', 'gemini', 'claude'].map(prov => (
-                <div key={prov}>
-                  <label style={labelStyle}>{prov.toUpperCase()}</label>
-                  <input
-                    type="password"
-                    value={apiKeys[prov] || ''}
-                    onChange={(e) => setApiKeys({ [prov]: e.target.value })}
-                    placeholder="Key..."
-                    style={{ ...selectStyle, padding: '8px', fontSize: '11px' }}
-                  />
+        <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+          {activeTab === 'story' ? (
+            <>
+              {/* Story Profile Section */}
+              <div className="modal-section" style={{ marginBottom: '25px' }}>
+                <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>📖 Active Story Profile</h3>
+                <div style={{ fontSize: '0.9rem', color: 'var(--text)', background: 'var(--surface)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: 'inset 0 2px 4px var(--shadow)' }}>
+                  {settings.templateName && (
+                    <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'var(--primary)', letterSpacing: '0.5px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
+                      <strong>Template:</strong> {settings.templateName}
+                    </p>
+                  )}
+                  <p style={{ margin: '0 0 8px 0', fontSize: '1rem' }}><strong>Setting:</strong> {settings.shortDescription || 'Default Fantasy World'}</p>
+                  {settings.campaignGoal && (
+                    <div style={{ margin: '12px 0', padding: '10px', background: 'rgba(var(--primary-rgb, 212, 175, 55), 0.05)', borderLeft: '3px solid var(--primary)', borderRadius: '4px' }}>
+                      <p style={{ margin: '0', fontSize: '0.9rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>Current Quest</p>
+                      <p style={{ margin: '5px 0 0 0', color: 'var(--primary)', fontWeight: 'bold', fontSize: '1.1rem' }}>{settings.campaignGoal}</p>
+                    </div>
+                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    <span><strong>Mood:</strong> {settings.grimnessLevel || 'Neutral'} / {settings.darknessLevel || 'Neutral'}</span>
+                    <span><strong>Magic:</strong> {settings.magicLevel || 'Medium Magic'}</span>
+                    <span><strong>Tech:</strong> {settings.technologyLevel || 'Medieval'}</span>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
+                <p style={{ margin: '10px 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center' }}>
+                  * Story settings are woven at the start and cannot be changed here.
+                </p>
+              </div>
+
+              {/* Appearance Section */}
+              <div className="modal-section" style={{ borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
+                <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>🎭 Appearance</h3>
+                <div style={{ display: 'flex', gap: '15px' }}>
+                  <button
+                    onClick={() => setTheme('light-fantasy')}
+                    style={{
+                      flex: 1,
+                      padding: '16px',
+                      background: theme === 'light-fantasy' ? 'var(--primary)' : 'var(--bg)',
+                      color: theme === 'light-fantasy' ? 'var(--bg)' : 'var(--text)',
+                      border: '1px solid var(--primary)',
+                      fontFamily: 'var(--header-font)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      boxShadow: theme === 'light-fantasy' ? '0 4px 12px var(--shadow)' : 'none'
+                    }}
+                  >
+                    📜 Parchment (Light)
+                  </button>
+                  <button
+                    onClick={() => setTheme('dark-fantasy')}
+                    style={{
+                      flex: 1,
+                      padding: '16px',
+                      background: theme === 'dark-fantasy' ? 'var(--primary)' : 'var(--bg)',
+                      color: theme === 'dark-fantasy' ? 'var(--bg)' : 'var(--text)',
+                      border: '1px solid var(--primary)',
+                      fontFamily: 'var(--header-font)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      boxShadow: theme === 'dark-fantasy' ? '0 4px 12px var(--shadow)' : 'none'
+                    }}
+                  >
+                    🌑 Stone (Dark)
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* AI Engine Settings */}
+              <div className="modal-section">
+                <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'var(--text)' }}>🤖 AI Configuration</h3>
+
+                <div style={{ marginBottom: '20px', background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>Narrative DM</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={labelStyle}>PROVIDER</label>
+                      <select value={selectedProvider} onChange={(e) => handleProviderChange(e.target.value, 'game')} style={selectStyle}>
+                        <optgroup label="Cloud APIs">
+                          <option value="openai">OpenAI</option>
+                          <option value="gemini">Gemini</option>
+                          <option value="claude">Claude</option>
+                        </optgroup>
+                        <optgroup label="CLI Tools">
+                          <option value="codex">Codex CLI</option>
+                          <option value="claude-cli">Claude CLI</option>
+                          <option value="gemini-cli">Gemini CLI</option>
+                        </optgroup>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>MODEL</label>
+                      <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} style={selectStyle}>
+                        {AVAILABLE_MODELS[selectedProvider]?.map(m => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        )) || <option value="">Select Provider</option>}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '20px', background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>OOC Assistant</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div>
+                      <label style={labelStyle}>PROVIDER</label>
+                      <select value={assistantProvider || selectedProvider} onChange={(e) => handleProviderChange(e.target.value, 'assistant')} style={selectStyle}>
+                        <optgroup label="Cloud APIs">
+                          <option value="openai">OpenAI</option>
+                          <option value="gemini">Gemini</option>
+                          <option value="claude">Claude</option>
+                        </optgroup>
+                        <optgroup label="CLI Tools">
+                          <option value="codex">Codex CLI</option>
+                          <option value="claude-cli">Claude CLI</option>
+                          <option value="gemini-cli">Gemini CLI</option>
+                        </optgroup>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>MODEL</label>
+                      <select value={assistantModel || selectedModel} onChange={(e) => setAssistantModel(e.target.value)} style={selectStyle}>
+                        {AVAILABLE_MODELS[assistantProvider || selectedProvider]?.map(m => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        )) || <option value="">Select Provider</option>}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                  <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>API Keys</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                    {['openai', 'gemini', 'claude'].map(prov => (
+                      <div key={prov}>
+                        <label style={labelStyle}>{prov.toUpperCase()}</label>
+                        <input
+                          type="password"
+                          value={apiKeys[prov] || ''}
+                          onChange={(e) => setApiKeys({ [prov]: e.target.value })}
+                          placeholder="Key..."
+                          style={{ ...selectStyle, padding: '8px', fontSize: '11px' }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
-        <div className="modal-section" style={{ borderTop: '1px solid var(--border)', paddingTop: '15px', marginTop: '15px' }}>
-          <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>🎭 Appearance</h3>
-          <div style={{ display: 'flex', gap: '15px' }}>
-            <button
-              onClick={() => setTheme('light-fantasy')}
-              style={{
-                flex: 1,
-                padding: '12px',
-                background: theme === 'light-fantasy' ? 'var(--primary)' : 'var(--bg)',
-                color: theme === 'light-fantasy' ? 'var(--bg)' : 'var(--text)',
-                border: '1px solid var(--primary)',
-                fontFamily: 'var(--header-font)',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                opacity: theme === 'light-fantasy' ? 1 : 0.7,
-                boxShadow: theme === 'light-fantasy' ? '0 0 10px var(--primary)' : 'none'
-              }}
-            >
-              📜 Parchment
-            </button>
-            <button
-              onClick={() => setTheme('dark-fantasy')}
-              style={{
-                flex: 1,
-                padding: '12px',
-                background: theme === 'dark-fantasy' ? 'var(--primary)' : 'var(--bg)',
-                color: theme === 'dark-fantasy' ? 'var(--bg)' : 'var(--text)',
-                border: '1px solid var(--primary)',
-                fontFamily: 'var(--header-font)',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                opacity: theme === 'dark-fantasy' ? 1 : 0.7,
-                boxShadow: theme === 'dark-fantasy' ? '0 0 10px var(--primary)' : 'none'
-              }}
-            >
-              🌑 Stone
-            </button>
-          </div>
-        </div>
-
-        <div className="modal-section" style={{ marginTop: '20px', borderTop: '1px solid var(--border)', paddingTop: '15px' }}>
-          <h3 style={{ margin: '0 0 10px 0', fontSize: '1.1rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>📖 Active Story Profile (Frozen)</h3>
-          <div style={{ fontSize: '0.9rem', color: 'var(--text)', background: 'var(--surface)', padding: '10px', borderRadius: '6px', border: '1px solid var(--border)' }}>
-            <p style={{ margin: '0 0 5px 0' }}><strong>Setting:</strong> {settings.shortDescription || 'N/A'}</p>
-            {settings.campaignGoal && (
-              <p style={{ margin: '0 0 5px 0' }}><strong>Quest:</strong> <span style={{ color: '#d35400', fontWeight: 'bold' }}>{settings.campaignGoal}</span></p>
-            )}
-            <p style={{ margin: '0' }}><strong>Mood:</strong> {settings.grimnessLevel || 'Neutral'} / {settings.darknessLevel || 'Neutral'} | <strong>World:</strong> {settings.magicLevel || 'Low Magic'} ({settings.technologyLevel || 'Medieval'})</p>
-          </div>
-          <p style={{ margin: '5px 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-            Story settings are set during new game creation and cannot be changed during active play.
-          </p>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <button className="modal-close-button" onClick={onClose} style={{ padding: '10px 30px' }}>
-            Close
+        <div style={{ padding: '20px', borderTop: '1px solid var(--border)', textAlign: 'center', background: 'var(--bg)' }}>
+          <button className="modal-close-button" onClick={onClose} style={{ padding: '12px 60px', borderRadius: '30px', fontFamily: 'var(--header-font)', textTransform: 'uppercase', letterSpacing: '2px' }}>
+            Accept & Close
           </button>
         </div>
       </div>
-    </div >
+    </div>
   );
 };
 

@@ -59,6 +59,9 @@ const DebugMenu = () => {
                     <div style={{ fontWeight: 'bold', borderBottom: '1px solid #eee', paddingBottom: '5px', marginBottom: '5px' }}>
                         Debug Menu
                     </div>
+                    <Link to="/terrain-studio" style={{ ...linkStyle, color: '#4a90e2', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
+                        🧪 Terrain Studio
+                    </Link>
                     <Link to="/dice-test" style={linkStyle} onClick={() => setIsOpen(false)}>
                         🎲 Dice Test
                     </Link>

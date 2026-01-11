@@ -307,11 +307,9 @@ const Game = () => {
             <h2>Adventure Log</h2>
             <div className="game-info-header">
               <div>
-                <p><strong>Setting:</strong> {settings.shortDescription || "Not set"}</p>
                 {settings.campaignGoal && (
-                  <p><strong>Quest:</strong> <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>{settings.campaignGoal}</span></p>
+                  <p><strong>Quest:</strong> <span style={{ color: 'var(--text-secondary)', fontWeight: 'bold' }}>{settings.campaignGoal}</span></p>
                 )}
-                <p><strong>Mood:</strong> {settings.grimnessLevel || "Neutral"} / {settings.darknessLevel || "Neutral"} | <strong>World:</strong> {settings.magicLevel || "Low Magic"} ({settings.technologyLevel || "Medieval"})</p>
                 <p><strong>Location:</strong> ({mapHook.playerPosition.x}, {mapHook.playerPosition.y}) - {currentBiome}</p>
               </div>
               <div className="header-button-group">

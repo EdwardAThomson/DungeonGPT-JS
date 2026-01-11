@@ -165,6 +165,10 @@ const GameSettings = () => {
 
     setFormError('');
 
+    const templateName = selectedTemplate === 'ai' ? 'AI Generated World' :
+      selectedTemplate === 'custom' || !selectedTemplate ? 'Custom Tale' :
+        storyTemplates.find(t => t.id === selectedTemplate)?.name || 'Unknown Template';
+
     const settingsData = {
       shortDescription,
       grimnessLevel,
@@ -175,6 +179,7 @@ const GameSettings = () => {
       campaignGoal,
       milestones: milestones.split('\n').filter(m => m.trim() !== ''),
       worldSeed,
+      templateName
     };
 
     if (!generatedMap) {

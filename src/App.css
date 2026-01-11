@@ -795,26 +795,7 @@
   /* Add space below title */
 }
 
-.game-top .game-info-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  /* Align items to top */
-  gap: 20px;
-  background-color: var(--surface);
-  border: 1px solid var(--border);
-  padding: 15px;
-  border-radius: 8px;
-  margin-bottom: 15px;
-}
-
-.game-top .game-info-header p {
-  margin: 2px 0;
-  /* Reduce margin for header info */
-  text-align: left;
-  /* Align info left */
-  color: var(--text-secondary);
-}
+/* Consolidating .game-info-header styles below (around line 2486) */
 
 /* New style for the button group */
 .header-button-group {
@@ -830,27 +811,27 @@
 .how-to-play-button,
 .view-map-button,
 .manual-save-button {
-  /* Added save button */
-  background-color: #ecf0f1;
-  /* Even lighter grey */
-  color: #34495e;
-  border: 1px solid #bdc3c7;
-  /* Light border */
-  padding: 6px 12px;
-  border-radius: 4px;
+  background-color: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
   white-space: nowrap;
+  box-shadow: 0 2px 5px var(--shadow);
 }
 
 .view-settings-button:hover,
 .how-to-play-button:hover,
 .view-map-button:hover,
 .manual-save-button:hover {
-  /* Added save button */
-  background-color: #dfe4e7;
-  border-color: #aeb5ba;
+  background-color: var(--surface);
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-1px);
 }
 
 .conversation {
@@ -876,8 +857,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: rgba(255, 255, 255, 0.7);
-  /* Semi-transparent white background */
+  background-color: var(--shadow);
+  backdrop-filter: blur(4px);
   z-index: 5;
   /* Ensure it's above messages but below modals */
 }
@@ -935,11 +916,21 @@
   /* Push to left */
 }
 
-.message.system,
+.message.system {
+  background-color: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  align-self: center;
+  text-align: center;
+  font-style: italic;
+  font-size: 0.9rem;
+  max-width: 90%;
+}
+
 .message.error {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background-color: rgba(255, 82, 82, 0.1);
+  color: #ff5252;
+  border: 1px solid rgba(255, 82, 82, 0.3);
   align-self: center;
   text-align: center;
   font-style: italic;
@@ -979,7 +970,7 @@
 .info {
   text-align: center;
   font-size: 0.8rem;
-  color: #777;
+  color: var(--text-secondary);
   margin-top: 10px;
 }
 
@@ -988,7 +979,7 @@
   text-align: center;
   font-size: 0.75rem;
   /* Even smaller */
-  color: #999;
+  color: var(--text-secondary);
   /* Lighter grey */
   margin-top: 5px;
   /* Space above */
@@ -1048,7 +1039,7 @@
 /* Session info styling */
 .session-info {
   font-size: 0.7rem;
-  color: #aaa;
+  color: var(--text-secondary);
   margin: 0;
   font-family: monospace;
   flex: 1;
@@ -1060,7 +1051,7 @@
   align-items: center;
   gap: 6px;
   font-size: 0.7rem;
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .status-light {
@@ -1121,14 +1112,16 @@
   text-align: center;
   margin-top: 10px;
   font-size: 0.85rem;
-  color: #7f8c8d;
-  background: #f8f9fa;
-  padding: 4px 10px;
-  border-radius: 4px;
-  border: 1px solid #eee;
-  display: inline-block;
-  margin-left: 50%;
-  transform: translateX(-50%);
+  color: var(--text-secondary);
+  background: var(--bg);
+  padding: 6px 15px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  display: block;
+  white-space: nowrap;
+  width: fit-content;
+  min-width: 250px;
+  margin: 10px auto;
 }
 
 .model-label {
@@ -1137,7 +1130,7 @@
 }
 
 .model-value {
-  color: #2c3e50;
+  color: var(--primary);
   font-family: monospace;
 }
 
@@ -1288,7 +1281,7 @@
 .summary-container {
   /* Inherits base styles from .page-container if used, */
   /* or add similar styles here */
-  background-color: #ffffff;
+  background-color: var(--surface);
   padding: 30px 40px;
   /* More padding */
   border-radius: 8px;
@@ -2474,27 +2467,48 @@ button {
 
 /* Refined Game Header */
 .game-info-header {
-  background: var(--bg);
-  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  background: var(--surface);
+  padding: 20px 25px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  margin-top: 10px;
+  margin: 15px 0;
+  box-shadow: 0 4px 12px var(--shadow);
 }
 
 .game-info-header p {
-  margin: 5px 0 !important;
+  margin: 4px 0 !important;
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .game-info-header strong {
-  color: var(--text);
-  font-weight: 600;
+  color: var(--primary);
+  font-weight: 700;
+  font-family: var(--header-font);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 4px;
 }
 
 .header-button-group {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  max-width: 450px;
+}
+
+.header-button-group button {
+  padding: 8px 16px;
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  white-space: nowrap;
 }
 
 /* Game Settings Restoration Styles */
