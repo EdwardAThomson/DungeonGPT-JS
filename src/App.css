@@ -914,6 +914,10 @@
   align-self: flex-start;
   margin-right: auto;
   /* Push to left */
+  white-space: pre-line;
+  /* Preserve paragraph breaks while allowing natural word wrapping */
+  text-align: left;
+  /* Left-align text for better readability */
 }
 
 .message.system {
@@ -1140,37 +1144,55 @@
   padding: 4px 8px;
   margin: 4px auto;
   display: block;
-  background-color: #f0f0f0;
-  border: 1px solid #ccc;
+  background-color: var(--bg);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
 }
 
 .debug-toggle-button:hover {
-  background-color: #e0e0e0;
+  background-color: var(--surface);
+  color: var(--primary);
+  border-color: var(--primary);
 }
 
 /* Debug info box */
 .debug-info-box {
   margin: 10px auto;
   padding: 12px;
-  background-color: #f9f9f9;
-  border: 1px solid #ddd;
-  border-radius: 6px;
+  background-color: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   max-width: 600px;
-  max-height: 400px;
+  max-height: 500px;
   overflow-y: auto;
   font-size: 0.75rem;
   text-align: left;
+  box-shadow: 0 4px 15px var(--shadow);
 }
 
 .debug-info-box h4 {
   margin-top: 0;
-  margin-bottom: 10px;
-  color: var(--text);
-  border-bottom: 2px solid var(--border);
-  padding-bottom: 4px;
+  margin-bottom: 12px;
+  color: var(--primary);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 5px;
+}
+
+.debug-prompt-pre {
+  white-space: pre-wrap;
+  font-size: 0.7rem;
+  background: var(--bg);
+  color: var(--text-secondary);
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  max-height: 350px;
+  overflow-y: auto;
+  font-family: monospace;
 }
 
 .debug-section {
@@ -1190,9 +1212,10 @@
 .debug-section pre {
   margin: 0;
   padding: 6px;
-  background-color: #f5f5f5;
-  border: 1px solid #e0e0e0;
-  border-radius: 3px;
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 4px;
   font-size: 0.7rem;
   overflow-x: auto;
   white-space: pre-wrap;

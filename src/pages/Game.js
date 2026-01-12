@@ -13,6 +13,7 @@ import { getTile } from '../utils/mapGenerator';
 import AiAssistantPanel from '../components/AiAssistantPanel';
 import CharacterModal from '../components/CharacterModal';
 import { llmService } from '../services/llmService';
+import { DM_PROTOCOL } from '../data/prompts';
 
 const Game = () => {
   const { state } = useLocation();
@@ -61,8 +62,8 @@ const Game = () => {
 
   const interactionHook = useGameInteraction(
     loadedConversation,
-    apiKeys,
     settings,
+    setSettings,
     selectedProvider,
     selectedModel,
     selectedHeroes,
@@ -262,11 +263,14 @@ const Game = () => {
     const gameContext = `Setting: ${settings.shortDescription}. Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
     const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${interactionHook.currentSummary}\n\n${locationInfo}\n\nDescribe what the player sees upon arriving at this new location.`;
 
+    const fullPrompt = DM_PROTOCOL + prompt;
+    interactionHook.setLastPrompt(fullPrompt);
+
     try {
       const aiResponse = await llmService.generateText({
         provider: selectedProvider,
         model,
-        prompt,
+        prompt: fullPrompt,
         maxTokens: 1600,
         temperature: 0.7
       });
@@ -404,6 +408,12 @@ const Game = () => {
                   <strong>Stats:</strong>
                   <pre>Session: {sessionIdRef.current}</pre>
                   <pre>Map: {mapHook.worldMap ? 'Loaded' : 'No'}</pre>
+                </div>
+                <div className="debug-section" style={{ marginTop: '10px' }}>
+                  <strong>Last Sent Prompt:</strong>
+                  <pre className="debug-prompt-pre">
+                    {interactionHook.lastPrompt || 'No prompt sent yet.'}
+                  </pre>
                 </div>
               </div>
             )}

@@ -16,6 +16,7 @@ import NPCTest from './pages/NPCTest';
 import SeedDebugTest from './pages/SeedDebugTest';
 import WorldMapTest from './pages/WorldMapTest';
 import TerrainStudio from './pages/TerrainStudio.js';
+import MilestoneTest from './pages/MilestoneTest';
 
 import "./App.css";
 
@@ -114,6 +115,7 @@ const App = () => {
             <Route path="/seed-debug-test" element={<SeedDebugTest />} />
             <Route path="/world-map-test" element={<WorldMapTest />} />
             <Route path="/terrain-studio" element={<TerrainStudio />} />
+            <Route path="/milestone-test" element={<MilestoneTest />} />
           </Routes>
         </div>
 

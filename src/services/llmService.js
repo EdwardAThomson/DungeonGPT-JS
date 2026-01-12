@@ -1,5 +1,29 @@
 const API_URL = 'http://localhost:5000/api/llm';
 
+const sanitizeResponse = (text) => {
+    if (!text) return '';
+
+    // Remove protocol block if it exists
+    let sanitized = text.replace(/\[STRICT DUNGEON MASTER PROTOCOL\][\s\S]*?\[\/STRICT DUNGEON MASTER PROTOCOL\]/gi, '');
+
+    // Remove common prompt markers
+    const markers = [
+        /\[ADVENTURE START\]/gi,
+        /\[GAME INFORMATION\]/gi,
+        /\[TASK\]/gi,
+        /\[CONTEXT\]/gi,
+        /\[SUMMARY\]/gi,
+        /\[PLAYER ACTION\]/gi,
+        /\[NARRATE\]/gi
+    ];
+
+    markers.forEach(marker => {
+        sanitized = sanitized.replace(marker, '');
+    });
+
+    return sanitized.trim();
+};
+
 export const llmService = {
     /**
      * Standard text generation (non-streaming)
@@ -86,20 +110,21 @@ export const llmService = {
                     if (update.type === 'log' && update.data.stream === 'stdout') {
                         fullText += update.data.line + '\n';
                     } else if (update.type === 'done') {
-                        resolve(fullText.trim());
+                        resolve(sanitizeResponse(fullText));
                     } else if (update.type === 'error') {
                         reject(new Error(update.data));
                     }
                 });
             });
         } else {
-            return await this.generateText({
+            const responseText = await this.generateText({
                 provider,
                 model,
                 prompt,
                 maxTokens: maxTokens || 1000,
                 temperature: temperature || 0.7
             });
+            return sanitizeResponse(responseText);
         }
     }
 };
