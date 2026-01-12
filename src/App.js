@@ -22,7 +22,7 @@ import "./App.css";
 
 import DebugMenu from './components/DebugMenu';
 import SettingsContext from "./contexts/SettingsContext";
-import { SettingsModalContent } from "./components/Modals";
+import { AISettingsModalContent } from "./components/Modals";
 
 const App = () => {
   const [characters, setCharacters] = useState([]);
@@ -65,10 +65,9 @@ const App = () => {
           </ul>
         </nav>
 
-        <SettingsModalContent
+        <AISettingsModalContent
           isOpen={isSettingsModalOpen}
           onClose={() => setIsSettingsModalOpen(false)}
-          settings={settings}
           selectedProvider={selectedProvider}
           setSelectedProvider={setSelectedProvider}
           selectedModel={selectedModel}

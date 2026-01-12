@@ -3,8 +3,172 @@ import { AVAILABLE_MODELS, DEFAULT_MODELS } from '../llm/llm_constants';
 import ApiKeysContext from '../contexts/ApiKeysContext';
 import SettingsContext from '../contexts/SettingsContext';
 
-// --- Settings Modal --- //
-export const SettingsModalContent = ({
+// --- AI-Only Settings Modal (for Navbar/Homepage) --- //
+export const AISettingsModalContent = ({
+  isOpen, onClose,
+  selectedProvider, setSelectedProvider,
+  selectedModel, setSelectedModel,
+  assistantProvider, setAssistantProvider,
+  assistantModel, setAssistantModel
+}) => {
+  const { apiKeys, setApiKeys } = useContext(ApiKeysContext);
+  const { theme, setTheme } = useContext(SettingsContext);
+
+  if (!isOpen) return null;
+
+  const handleProviderChange = (newProvider, type) => {
+    if (type === 'game') {
+      setSelectedProvider(newProvider);
+      setSelectedModel(DEFAULT_MODELS[newProvider]);
+    } else {
+      setAssistantProvider(newProvider);
+      setAssistantModel(DEFAULT_MODELS[newProvider]);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content settings-modal-refined" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+        <div style={{ padding: '20px 20px 10px 20px', borderBottom: '1px solid var(--border)' }}>
+          <h2 style={{ margin: 0, color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>⚙️ AI Settings</h2>
+        </div>
+
+        <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+          {/* AI Engine Settings */}
+          <div className="modal-section">
+            <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'var(--text)' }}>🤖 AI Configuration</h3>
+
+            <div style={{ marginBottom: '20px', background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>Narrative DM</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={labelStyle}>PROVIDER</label>
+                  <select value={selectedProvider} onChange={(e) => handleProviderChange(e.target.value, 'game')} style={selectStyle}>
+                    <optgroup label="Cloud APIs">
+                      <option value="openai">OpenAI</option>
+                      <option value="gemini">Gemini</option>
+                      <option value="claude">Claude</option>
+                    </optgroup>
+                    <optgroup label="CLI Tools">
+                      <option value="codex">Codex CLI</option>
+                      <option value="claude-cli">Claude CLI</option>
+                      <option value="gemini-cli">Gemini CLI</option>
+                    </optgroup>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>MODEL</label>
+                  <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} style={selectStyle}>
+                    {AVAILABLE_MODELS[selectedProvider]?.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    )) || <option value="">Select Provider</option>}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '20px', background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>OOC Assistant</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div>
+                  <label style={labelStyle}>PROVIDER</label>
+                  <select value={assistantProvider || selectedProvider} onChange={(e) => handleProviderChange(e.target.value, 'assistant')} style={selectStyle}>
+                    <optgroup label="Cloud APIs">
+                      <option value="openai">OpenAI</option>
+                      <option value="gemini">Gemini</option>
+                      <option value="claude">Claude</option>
+                    </optgroup>
+                    <optgroup label="CLI Tools">
+                      <option value="codex">Codex CLI</option>
+                      <option value="claude-cli">Claude CLI</option>
+                      <option value="gemini-cli">Gemini CLI</option>
+                    </optgroup>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>MODEL</label>
+                  <select value={assistantModel || selectedModel} onChange={(e) => setAssistantModel(e.target.value)} style={selectStyle}>
+                    {AVAILABLE_MODELS[assistantProvider || selectedProvider]?.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    )) || <option value="">Select Provider</option>}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>API Keys</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                {['openai', 'gemini', 'claude'].map(prov => (
+                  <div key={prov}>
+                    <label style={labelStyle}>{prov.toUpperCase()}</label>
+                    <input
+                      type="password"
+                      value={apiKeys[prov] || ''}
+                      onChange={(e) => setApiKeys({ [prov]: e.target.value })}
+                      placeholder="Key..."
+                      style={{ ...selectStyle, padding: '8px', fontSize: '11px' }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Theme Selection */}
+          <div className="modal-section" style={{ marginTop: '25px' }}>
+            <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>🎭 Appearance</h3>
+            <div style={{ display: 'flex', gap: '15px' }}>
+              <button
+                onClick={() => setTheme('light-fantasy')}
+                style={{
+                  flex: 1,
+                  padding: '16px',
+                  background: theme === 'light-fantasy' ? 'var(--primary)' : 'var(--bg)',
+                  color: theme === 'light-fantasy' ? 'var(--bg)' : 'var(--text)',
+                  border: '1px solid var(--primary)',
+                  fontFamily: 'var(--header-font)',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: theme === 'light-fantasy' ? '0 4px 12px var(--shadow)' : 'none'
+                }}
+              >
+                📜 Parchment (Light)
+              </button>
+              <button
+                onClick={() => setTheme('dark-fantasy')}
+                style={{
+                  flex: 1,
+                  padding: '16px',
+                  background: theme === 'dark-fantasy' ? 'var(--primary)' : 'var(--bg)',
+                  color: theme === 'dark-fantasy' ? 'var(--bg)' : 'var(--text)',
+                  border: '1px solid var(--primary)',
+                  fontFamily: 'var(--header-font)',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease',
+                  boxShadow: theme === 'dark-fantasy' ? '0 4px 12px var(--shadow)' : 'none'
+                }}
+              >
+                🌑 Stone (Dark)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: '20px', borderTop: '1px solid var(--border)', textAlign: 'center', background: 'var(--bg)' }}>
+          <button className="modal-close-button" onClick={onClose} style={{ padding: '12px 60px', borderRadius: '30px', fontFamily: 'var(--header-font)', textTransform: 'uppercase', letterSpacing: '2px' }}>
+            Accept & Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Story Settings Modal (for Game Page) --- //
+export const StorySettingsModalContent = ({
   isOpen, onClose, settings, setSettings,
   selectedProvider, setSelectedProvider,
   selectedModel, setSelectedModel,

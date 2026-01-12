@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import ApiKeysContext from '../contexts/ApiKeysContext';
 import SettingsContext from "../contexts/SettingsContext";
-import { SettingsModalContent, HowToPlayModalContent } from '../components/Modals';
+import { StorySettingsModalContent, HowToPlayModalContent } from '../components/Modals';
 import MapModal from '../components/MapModal';
 import EncounterModal from '../components/EncounterModal';
 import DiceRoller from '../components/DiceRoller';
@@ -457,7 +457,7 @@ const Game = () => {
       </div>
 
       {/* --- Modals --- */}
-      <SettingsModalContent
+      <StorySettingsModalContent
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
         settings={settings}
