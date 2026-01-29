@@ -1,10 +1,9 @@
 ---
-
-Title: Building an AI-Powered Quest System: Milestone Tracking with LLM Tool Calls
-Date: "2026-01-29"
-Category: "artificial-intelligence"
-Tags: AI, JavaScript, React, OpenAI, Gemini, Game Development, Tool Calls, Quest System
-Description: "How we built an intelligent quest tracking system that uses LLM tool calls to automatically detect and celebrate player achievements in DungeonGPT."
+title: "Building an AI-Powered Quest System: Milestone Tracking with LLM Tool Calls"
+date: "2026-01-30"
+category: "artificial-intelligence"
+tags: AI, JavaScript, React, OpenAI, Gemini, Game Development, Tool Calls, Quest System
+description: "How we built an intelligent quest tracking system that uses LLM tool calls to automatically detect and celebrate player achievements in DungeonGPT."
 
 ---
 
