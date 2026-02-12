@@ -99,6 +99,8 @@ const TerrainStudioV2 = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [viewMode, setViewMode] = useState('3d');
     const [generating, setGenerating] = useState(false);
+    const [treeDensity, setTreeDensity] = useState(50);
+    const [maxTowns, setMaxTowns] = useState(8);
 
     // Initial terrain
     const [terrainData, setTerrainData] = useState(() =>
@@ -125,7 +127,7 @@ const TerrainStudioV2 = () => {
         }}>
             {/* 3D Viewport */}
             <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}>
-                <TerrainMesh3D terrainData={terrainData} isOrthographic={viewMode === '2d'} />
+                <TerrainMesh3D terrainData={terrainData} isOrthographic={viewMode === '2d'} treeDensity={treeDensity} maxTowns={maxTowns} />
             </div>
 
             {/* Generating overlay */}
@@ -207,6 +209,14 @@ const TerrainStudioV2 = () => {
 
                         <Slider label="Domain Warp Strength" value={warpStrength} min={0} max={2.5} step={0.1} color="#ab47bc" onChange={setWarpStrength} />
                         <Slider label="Peak Exponent" value={exponent} min={1.0} max={3.0} step={0.1} color="#ff7043" onChange={setExponent} />
+
+                        {/* Section: Vegetation */}
+                        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', marginTop: '4px', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '0.65rem', color: '#555', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '12px' }}>Vegetation</div>
+                        </div>
+
+                        <Slider label="Tree Density" value={treeDensity} min={0} max={100} step={5} color="#43a047" unit="%" onChange={setTreeDensity} />
+                        <Slider label="Towns" value={maxTowns} min={0} max={15} step={1} color="#8d6e63" onChange={setMaxTowns} />
 
                         {/* Section: Erosion */}
                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', marginTop: '4px', marginBottom: '8px' }}>

@@ -114,16 +114,20 @@ function redistribute(elevation, exponent) {
 function erode(heightmap, width, height, opts) {
     const {
         particles = 70000,
-        erosionRate = 0.3,
-        depositionRate = 0.3,
-        evaporationRate = 0.01,
-        maxLifetime = 80
+        erosionRate = 0.15,
+        depositionRate = 0.15,
+        evaporationRate = 0.02,
+        maxLifetime = 60
     } = opts;
 
+    // Clamp indices to valid range (edge-clamping, not returning 0)
+    const clampX = (x) => Math.max(0, Math.min(width - 2, x));
+    const clampY = (y) => Math.max(0, Math.min(height - 2, y));
+
     const getHeight = (x, y) => {
-        const ix = Math.floor(x), iy = Math.floor(y);
-        if (ix < 0 || ix >= width - 1 || iy < 0 || iy >= height - 1) return 0;
-        const fx = x - ix, fy = y - iy;
+        const cx = clampX(x), cy = clampY(y);
+        const ix = Math.floor(cx), iy = Math.floor(cy);
+        const fx = cx - ix, fy = cy - iy;
         const h00 = heightmap[iy * width + ix];
         const h10 = heightmap[iy * width + ix + 1];
         const h01 = heightmap[(iy + 1) * width + ix];
@@ -132,11 +136,26 @@ function erode(heightmap, width, height, opts) {
     };
 
     const getGradient = (x, y) => {
-        const eps = 1.0;
         return {
-            x: (getHeight(x + eps, y) - getHeight(x - eps, y)) / (2 * eps),
-            y: (getHeight(x, y + eps) - getHeight(x, y - eps)) / (2 * eps)
+            x: getHeight(x + 1, y) - getHeight(x - 1, y),
+            y: getHeight(x, y + 1) - getHeight(x, y - 1)
         };
+    };
+
+    // Safe heightmap modification with bilinear splatting
+    const deposit = (x, y, amount) => {
+        if (!isFinite(amount)) return;
+        const ix = Math.floor(x), iy = Math.floor(y);
+        if (ix < 0 || ix >= width - 1 || iy < 0 || iy >= height - 1) return;
+        const fx = x - ix, fy = y - iy;
+        const w00 = (1 - fx) * (1 - fy);
+        const w10 = fx * (1 - fy);
+        const w01 = (1 - fx) * fy;
+        const w11 = fx * fy;
+        heightmap[iy * width + ix] += amount * w00;
+        heightmap[iy * width + ix + 1] += amount * w10;
+        heightmap[(iy + 1) * width + ix] += amount * w01;
+        heightmap[(iy + 1) * width + ix + 1] += amount * w11;
     };
 
     // Seeded random for reproducibility
@@ -144,47 +163,63 @@ function erode(heightmap, width, height, opts) {
     const rng = () => { rngState = (rngState * 9301 + 49297) % 233280; return rngState / 233280; };
 
     for (let p = 0; p < particles; p++) {
-        let px = rng() * (width - 2) + 1;
-        let py = rng() * (height - 2) + 1;
-        let sediment = 0, water = 1, speed = 1;
+        let px = rng() * (width - 4) + 2;
+        let py = rng() * (height - 4) + 2;
+        let sediment = 0, water = 1, speed = 0.5;
+        let dirX = 0, dirY = 0;
 
         for (let step = 0; step < maxLifetime; step++) {
             const grad = getGradient(px, py);
             const gradLen = Math.sqrt(grad.x * grad.x + grad.y * grad.y);
-            if (gradLen < 0.0001) break;
 
-            const dirX = -grad.x / gradLen;
-            const dirY = -grad.y / gradLen;
+            // Blend gradient direction with previous direction for inertia
+            const inertia = 0.3;
+            dirX = dirX * inertia - grad.x * (1 - inertia);
+            dirY = dirY * inertia - grad.y * (1 - inertia);
+            const dirLen = Math.sqrt(dirX * dirX + dirY * dirY);
+            if (dirLen < 0.0001) break;
+            dirX /= dirLen;
+            dirY /= dirLen;
+
             const oldHeight = getHeight(px, py);
+            const newPx = px + dirX;
+            const newPy = py + dirY;
 
-            px += dirX;
-            py += dirY;
+            // Bounds check
+            if (newPx < 2 || newPx >= width - 3 || newPy < 2 || newPy >= height - 3) break;
 
-            if (px < 1 || px >= width - 2 || py < 1 || py >= height - 2) break;
-
-            const newHeight = getHeight(px, py);
+            const newHeight = getHeight(newPx, newPy);
             const heightDiff = newHeight - oldHeight;
 
-            speed = Math.sqrt(Math.max(0.01, speed * speed - heightDiff * 4));
-            const capacity = Math.max(-heightDiff * 8, 0.01) * speed * water;
-
-            const ix = Math.floor(px), iy = Math.floor(py);
-            const idx = iy * width + ix;
+            // Carrying capacity based on slope and speed
+            const capacity = Math.max(Math.abs(heightDiff), 0.001) * speed * water * 6;
 
             if (sediment > capacity || heightDiff > 0) {
-                const deposit = (heightDiff > 0)
-                    ? Math.min(heightDiff, sediment)
-                    : (sediment - capacity) * depositionRate;
-                sediment -= deposit;
-                heightmap[idx] += deposit * 0.5;
+                // Deposit sediment
+                const depositAmount = (heightDiff > 0)
+                    ? Math.min(heightDiff * 0.5, sediment)
+                    : Math.min((sediment - capacity) * depositionRate, sediment);
+                sediment -= depositAmount;
+                deposit(px, py, depositAmount);
             } else {
-                const erodeAmount = Math.min((capacity - sediment) * erosionRate, -heightDiff) * 0.5;
+                // Erode terrain
+                const erodeAmount = Math.min((capacity - sediment) * erosionRate, 0.05);
                 sediment += erodeAmount;
-                heightmap[idx] -= erodeAmount;
+                deposit(px, py, -erodeAmount);
             }
 
+            // Update particle
+            speed = Math.sqrt(Math.max(0.01, speed * speed + heightDiff));
+            speed = Math.min(speed, 5); // cap speed
             water *= (1 - evaporationRate);
+            px = newPx;
+            py = newPy;
         }
+    }
+
+    // Final safety pass: clamp any NaN/Infinity values
+    for (let i = 0; i < heightmap.length; i++) {
+        if (!isFinite(heightmap[i])) heightmap[i] = 0;
     }
 }
 
@@ -227,6 +262,7 @@ export function generateLayeredTerrain(width, height, params = {}) {
     const terrainNoise = new PerlinNoise(seed);
     const continentNoise = new PerlinNoise(seed + 100);
     const warpNoise = new PerlinNoise(seed + 200);
+    const forestNoise = new PerlinNoise(seed + 300);
 
     const heightmap = new Float32Array(width * height);
 
@@ -259,12 +295,154 @@ export function generateLayeredTerrain(width, height, params = {}) {
         erode(heightmap, width, height, erosion);
     }
 
+    // ─── Forest density map ────────────────────────────────────────────
+    // Forests grow in mid-elevation land — not on beaches, water, or snow.
+    const forestMap = new Float32Array(width * height);
+    let hMin = Infinity, hMax = -Infinity;
+    for (let i = 0; i < heightmap.length; i++) {
+        if (heightmap[i] < hMin) hMin = heightmap[i];
+        if (heightmap[i] > hMax) hMax = heightmap[i];
+    }
+    const hRange = hMax - hMin || 1;
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const wx = (x / width) * WORLD_SIZE;
+            const wy = (y / height) * WORLD_SIZE;
+            const h = heightmap[y * width + x];
+            const norm = (h - hMin) / hRange; // 0..1
+
+            // Elevation suitability: forests between 0.32 and 0.72 (land, not snow)
+            let suitability = 0;
+            if (norm > 0.32 && norm < 0.72) {
+                // Ramp up from 0.32, peak at 0.45-0.60, ramp down to 0.72
+                if (norm < 0.45) suitability = (norm - 0.32) / 0.13;
+                else if (norm < 0.60) suitability = 1.0;
+                else suitability = (0.72 - norm) / 0.12;
+            }
+
+            // Forest noise — multi-octave for clumpy, natural distribution
+            let fNoise = 0, fAmp = 1, fFreq = 0.03, fMaxAmp = 0;
+            for (let o = 0; o < 3; o++) {
+                fNoise += fAmp * forestNoise.noise2D(wx * fFreq, wy * fFreq);
+                fMaxAmp += fAmp;
+                fAmp *= 0.5;
+                fFreq *= 2.0;
+            }
+            fNoise = (fNoise / fMaxAmp + 1) / 2; // normalise to 0..1
+
+            forestMap[y * width + x] = suitability * fNoise;
+        }
+    }
+
+    // ─── Town placement ────────────────────────────────────────────────
+    // Score-based: prefer flat, mid-elevation, coastal areas
+    const towns = [];
+    const candidateStride = Math.max(8, Math.floor(Math.min(width, height) / 20));
+    const candidates = [];
+
+    // Seeded RNG for town placement
+    let townRng = seed * 7 + 31;
+    const tRng = () => { townRng = (townRng * 9301 + 49297) % 233280; return townRng / 233280; };
+
+    // Water threshold for town placement — reuse hMin/hRange from forest section
+    const sortedForTowns = [...heightmap].sort((a, b) => a - b);
+    const waterThreshold = sortedForTowns[Math.floor(sortedForTowns.length * 0.3)];
+    const waterNorm = (waterThreshold - hMin) / hRange;
+
+    for (let y = candidateStride; y < height - candidateStride; y += candidateStride) {
+        for (let x = candidateStride; x < width - candidateStride; x += candidateStride) {
+            // Add jitter
+            const jx = Math.floor(x + (tRng() - 0.5) * candidateStride * 0.6);
+            const jy = Math.floor(y + (tRng() - 0.5) * candidateStride * 0.6);
+            const cx = Math.max(2, Math.min(width - 3, jx));
+            const cy = Math.max(2, Math.min(height - 3, jy));
+
+            const h = heightmap[cy * width + cx];
+            const norm = (h - hMin) / hRange;
+
+            // Skip underwater and extreme elevations
+            if (norm <= waterNorm + 0.03 || norm > 0.75) continue;
+
+            // Flatness score: low local height variance is good
+            let variance = 0;
+            const r = 3;
+            let count = 0;
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    const nx = cx + dx, ny = cy + dy;
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        const diff = heightmap[ny * width + nx] - h;
+                        variance += diff * diff;
+                        count++;
+                    }
+                }
+            }
+            variance /= count;
+            const flatness = Math.max(0, 1 - variance * 500); // 0=rough, 1=flat
+
+            // Elevation suitability: prefer 0.35-0.50 (plains/lowlands)
+            let elevScore = 0;
+            if (norm > 0.33 && norm < 0.55) elevScore = 1.0;
+            else if (norm >= 0.55 && norm < 0.70) elevScore = (0.70 - norm) / 0.15;
+            else if (norm > waterNorm + 0.03 && norm <= 0.33) elevScore = (norm - waterNorm - 0.03) / 0.10;
+
+            // Coastal proximity bonus: check if water is nearby
+            let coastalBonus = 0;
+            const coastR = 8;
+            for (let dy = -coastR; dy <= coastR; dy += 2) {
+                for (let dx = -coastR; dx <= coastR; dx += 2) {
+                    const nx = cx + dx, ny = cy + dy;
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        const nh = (heightmap[ny * width + nx] - hMin) / hRange;
+                        if (nh <= waterNorm) { coastalBonus = 0.3; break; }
+                    }
+                }
+                if (coastalBonus > 0) break;
+            }
+
+            const score = flatness * 0.5 + elevScore * 0.3 + coastalBonus + tRng() * 0.1;
+            if (score > 0.3) {
+                candidates.push({ x: cx, y: cy, elevation: h, norm, score });
+            }
+        }
+    }
+
+    // Sort by score descending
+    candidates.sort((a, b) => b.score - a.score);
+
+    // Pick top candidates with minimum spacing
+    const minSpacing = Math.min(width, height) * 0.08;
+    const selectedTowns = [];
+
+    for (const c of candidates) {
+        let tooClose = false;
+        for (const t of selectedTowns) {
+            const dx = c.x - t.x, dy = c.y - t.y;
+            if (Math.sqrt(dx * dx + dy * dy) < minSpacing) { tooClose = true; break; }
+        }
+        if (!tooClose) {
+            selectedTowns.push(c);
+            if (selectedTowns.length >= 15) break; // max 15 towns
+        }
+    }
+
+    // Assign sizes based on rank
+    selectedTowns.forEach((t, i) => {
+        if (i < 2) t.size = 'city';
+        else if (i < 6) t.size = 'town';
+        else t.size = 'village';
+        towns.push(t);
+    });
+
     return {
         heightmap,
+        forestMap,
+        towns,
         width,
         height,
         seaLevel: continentOpts.seaLevel
     };
 }
 
-export default generateLayeredTerrain;
+export default generateLayeredTerrain; // v2.1
