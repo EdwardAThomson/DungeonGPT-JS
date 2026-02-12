@@ -116,7 +116,7 @@ const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, heightScale = 125 }) =>
 };
 
 // ─── Forest Layer ──────────────────────────────────────────────────────────────
-const ForestLayer = ({ heightmap, forestMap, mapWidth, mapHeight, heightScale = 125, waterThreshold, treeDensity = 50 }) => {
+const ForestLayer = ({ heightmap, forestMap, mapWidth, mapHeight, heightScale = 125, waterThreshold, treeDensity = 50, towns = [] }) => {
     const { trunkMesh, canopyMesh } = useMemo(() => {
         if (!forestMap || !heightmap || treeDensity <= 0) return { trunkMesh: null, canopyMesh: null };
 
@@ -153,6 +153,16 @@ const ForestLayer = ({ heightmap, forestMap, mapWidth, mapHeight, heightScale = 
                 // Skip if underwater
                 if (h < waterThreshold) continue;
 
+                // Skip if inside a town radius (prevent tree-building overlap)
+                let inTown = false;
+                for (const t of towns) {
+                    const config = { city: 8, town: 6, village: 4 };
+                    const exclusionR = config[t.size] || 4;
+                    const tdx = jx - t.x, tdy = jy - t.y;
+                    if (tdx * tdx + tdy * tdy < exclusionR * exclusionR) { inTown = true; break; }
+                }
+                if (inTown) continue;
+
                 const scale = 0.6 + rng() * 0.8; // tree size variation
                 const rotation = rng() * Math.PI * 2;
                 positions.push({ x: wx, y: wy, z: wz, scale, rotation });
@@ -186,7 +196,7 @@ const ForestLayer = ({ heightmap, forestMap, mapWidth, mapHeight, heightScale = 
         cMesh.instanceMatrix.needsUpdate = true;
 
         return { trunkMesh: tMesh, canopyMesh: cMesh };
-    }, [heightmap, forestMap, mapWidth, mapHeight, heightScale, waterThreshold, treeDensity]);
+    }, [heightmap, forestMap, mapWidth, mapHeight, heightScale, waterThreshold, treeDensity, towns]);
 
     if (!trunkMesh || !canopyMesh) return null;
 
@@ -200,98 +210,210 @@ const ForestLayer = ({ heightmap, forestMap, mapWidth, mapHeight, heightScale = 
 
 // ─── Town Layer ────────────────────────────────────────────────────────────────
 const TOWN_CONFIG = {
-    city: { buildings: 25, radius: 8, maxHeight: 4.0, minHeight: 1.5 },
-    town: { buildings: 12, radius: 5, maxHeight: 2.5, minHeight: 1.0 },
-    village: { buildings: 5, radius: 3, maxHeight: 1.8, minHeight: 0.8 }
+    city: { buildings: 10, radius: 7, maxStoreys: 3, hasKeep: true },
+    town: { buildings: 7, radius: 5, maxStoreys: 2, hasKeep: true },
+    village: { buildings: 4, radius: 3, maxStoreys: 1, hasKeep: false }
 };
 
-const BUILDING_COLORS = ['#c4a882', '#b89b78', '#a68b6b', '#d4a574', '#c9956e', '#8b7355', '#a0522d'];
+const FLOOR_HEIGHT = 0.6;
+
+const STONE_COLORS = ['#b0b0b0', '#a3a3a3', '#999999', '#b8b8b8', '#ababab', '#9e9e9e', '#c0c0c0'];
+const ROOF_COLORS = ['#8b4513', '#6b3410', '#7a3d15', '#5c2e0e', '#944a18'];
 
 const TownLayer = ({ towns, heightmap, mapWidth, mapHeight, heightScale = 125, waterThreshold, maxTowns = 8 }) => {
-    const buildingMesh = useMemo(() => {
-        if (!towns || towns.length === 0 || !heightmap || maxTowns <= 0) return null;
+    const { wallMesh, roofMesh, keepGroup } = useMemo(() => {
+        if (!towns || towns.length === 0 || !heightmap || maxTowns <= 0)
+            return { wallMesh: null, roofMesh: null, keepGroup: null };
 
         const visibleTowns = towns.slice(0, maxTowns);
-        const allBuildings = [];
+        const walls = [];   // box buildings
+        const roofs = [];   // pyramid roofs
+        const keeps = [];   // keep/tower buildings
 
         let rngState = 999;
         const rng = () => { rngState = (rngState * 9301 + 49297) % 233280; return rngState / 233280; };
 
+        const getTerrainY = (bx, by) => {
+            const ix = Math.floor(Math.max(0, Math.min(mapWidth - 1, bx)));
+            const iy = Math.floor(Math.max(0, Math.min(mapHeight - 1, by)));
+            const h = heightmap[iy * mapWidth + ix];
+            if (h < waterThreshold) return null;
+            return Math.max(h, waterThreshold) * heightScale;
+        };
+
         for (const town of visibleTowns) {
             const config = TOWN_CONFIG[town.size] || TOWN_CONFIG.village;
 
-            for (let b = 0; b < config.buildings; b++) {
-                // Random position within town radius
+            // Place keep at town center for cities/towns
+            if (config.hasKeep) {
+                const wy = getTerrainY(town.x, town.y);
+                if (wy !== null) {
+                    const wx = town.x - mapWidth / 2;
+                    const wz = town.y - mapHeight / 2;
+                    const keepStoreys = town.size === 'city' ? 4 : 3;
+                    const keepH = keepStoreys * FLOOR_HEIGHT;
+                    const keepW = 1.2;
+                    keeps.push({
+                        x: wx, y: wy, z: wz,
+                        height: keepH, width: keepW, depth: keepW,
+                        rotation: rng() * Math.PI * 0.25,
+                        roofHeight: keepH * 0.5
+                    });
+                }
+            }
+
+            // Place buildings around the town (with collision avoidance)
+            const placedPositions = []; // track placed building centers in map space
+            if (config.hasKeep) placedPositions.push({ x: town.x, y: town.y, r: 1.0 });
+            let attempts = 0;
+            let placed = 0;
+
+            while (placed < config.buildings && attempts < config.buildings * 4) {
+                attempts++;
                 const angle = rng() * Math.PI * 2;
-                const dist = rng() * config.radius;
+                const minDist = config.hasKeep ? 2.0 : 0;
+                const dist = minDist + rng() * (config.radius - minDist);
                 const bx = town.x + Math.cos(angle) * dist;
                 const by = town.y + Math.sin(angle) * dist;
 
-                // Get terrain height at building position
-                const ix = Math.floor(Math.max(0, Math.min(mapWidth - 1, bx)));
-                const iy = Math.floor(Math.max(0, Math.min(mapHeight - 1, by)));
-                const h = heightmap[iy * mapWidth + ix];
+                const wy = getTerrainY(bx, by);
+                if (wy === null) continue;
 
-                // Skip if underwater
-                if (h < waterThreshold) continue;
+                // Check collision with already-placed buildings
+                let collision = false;
+                for (const p of placedPositions) {
+                    const dx = bx - p.x, dy = by - p.y;
+                    if (Math.sqrt(dx * dx + dy * dy) < 1.3) { collision = true; break; }
+                }
+                if (collision) continue;
 
-                const clampedH = Math.max(h, waterThreshold);
+                placedPositions.push({ x: bx, y: by, r: 0.6 });
+                placed++;
 
-                // World position (centered geometry)
                 const wx = bx - mapWidth / 2;
                 const wz = by - mapHeight / 2;
-                const wy = clampedH * heightScale;
 
-                // Building dimensions
-                const bHeight = config.minHeight + rng() * (config.maxHeight - config.minHeight);
-                const bWidth = 0.4 + rng() * 0.6;
-                const bDepth = 0.4 + rng() * 0.6;
-                const rotation = rng() * Math.PI * 0.5; // slight random rotation
-                const colorIdx = Math.floor(rng() * BUILDING_COLORS.length);
+                // Discrete storey count: 1, 2, or rarely 3
+                let storeys;
+                const roll = rng();
+                if (config.maxStoreys >= 3 && roll > 0.85) storeys = 3;
+                else if (config.maxStoreys >= 2 && roll > 0.4) storeys = 2;
+                else storeys = 1;
 
-                allBuildings.push({
+                const bHeight = storeys * FLOOR_HEIGHT;
+                const bWidth = 0.7 + rng() * 0.5;   // thicker (0.7–1.2)
+                const bDepth = 0.7 + rng() * 0.5;
+                const rotation = rng() * Math.PI * 0.5;
+                const colorIdx = Math.floor(rng() * STONE_COLORS.length);
+                const roofColorIdx = Math.floor(rng() * ROOF_COLORS.length);
+
+                walls.push({
                     x: wx, y: wy, z: wz,
                     height: bHeight, width: bWidth, depth: bDepth,
                     rotation, colorIdx
                 });
+
+                // Roof: pyramid sitting on top of the building (matches building footprint)
+                roofs.push({
+                    x: wx, y: wy + bHeight, z: wz,
+                    width: bWidth, depth: bDepth,
+                    height: 0.5 + rng() * 0.3,
+                    rotation, colorIdx: roofColorIdx
+                });
             }
         }
 
-        if (allBuildings.length === 0) return null;
+        // ── Build wall instances ──
+        let wallResult = null;
+        if (walls.length > 0) {
+            const wallGeo = new THREE.BoxGeometry(1, 1, 1);
+            wallGeo.translate(0, 0.5, 0);
+            const wallMat = new THREE.MeshStandardMaterial({ color: '#888', roughness: 0.9, metalness: 0.05 });
+            const wMesh = new THREE.InstancedMesh(wallGeo, wallMat, walls.length);
+            const wallColors = new Float32Array(walls.length * 3);
+            const tmpC = new THREE.Color();
+            const dummy = new THREE.Object3D();
 
-        // Use a single box geometry scaled per-instance
-        const geo = new THREE.BoxGeometry(1, 1, 1);
-        geo.translate(0, 0.5, 0); // pivot at bottom
-        const mat = new THREE.MeshStandardMaterial({ color: '#c4a882', roughness: 0.85, metalness: 0.05 });
-        const mesh = new THREE.InstancedMesh(geo, mat, allBuildings.length);
+            walls.forEach((w, i) => {
+                dummy.position.set(w.x, w.y, w.z);
+                dummy.scale.set(w.width, w.height, w.depth);
+                dummy.rotation.set(0, w.rotation, 0);
+                dummy.updateMatrix();
+                wMesh.setMatrixAt(i, dummy.matrix);
+                tmpC.set(STONE_COLORS[w.colorIdx]);
+                wallColors[i * 3] = tmpC.r;
+                wallColors[i * 3 + 1] = tmpC.g;
+                wallColors[i * 3 + 2] = tmpC.b;
+            });
+            wMesh.instanceMatrix.needsUpdate = true;
+            wMesh.instanceColor = new THREE.InstancedBufferAttribute(wallColors, 3);
+            wallResult = wMesh;
+        }
 
-        // Per-instance colors
-        const colorAttr = new Float32Array(allBuildings.length * 3);
-        const tmpColor = new THREE.Color();
+        // ── Build roof instances ──
+        let roofResult = null;
+        if (roofs.length > 0) {
+            const roofGeo = new THREE.ConeGeometry(0.5 * Math.SQRT2, 1, 4); // sqrt(2) radius so pyramid edges align with box faces
+            roofGeo.translate(0, 0.5, 0);
+            roofGeo.rotateY(Math.PI / 4); // align edges with box faces
+            const roofMat = new THREE.MeshStandardMaterial({ color: '#7a3d15', roughness: 0.85, metalness: 0.0 });
+            const rMesh = new THREE.InstancedMesh(roofGeo, roofMat, roofs.length);
+            const roofColors = new Float32Array(roofs.length * 3);
+            const tmpC = new THREE.Color();
+            const dummy = new THREE.Object3D();
 
-        const dummy = new THREE.Object3D();
-        allBuildings.forEach((b, i) => {
-            dummy.position.set(b.x, b.y, b.z);
-            dummy.scale.set(b.width, b.height, b.depth);
-            dummy.rotation.set(0, b.rotation, 0);
-            dummy.updateMatrix();
-            mesh.setMatrixAt(i, dummy.matrix);
+            roofs.forEach((r, i) => {
+                dummy.position.set(r.x, r.y, r.z);
+                dummy.scale.set(r.width, r.height, r.depth);
+                dummy.rotation.set(0, r.rotation, 0);
+                dummy.updateMatrix();
+                rMesh.setMatrixAt(i, dummy.matrix);
+                tmpC.set(ROOF_COLORS[r.colorIdx]);
+                roofColors[i * 3] = tmpC.r;
+                roofColors[i * 3 + 1] = tmpC.g;
+                roofColors[i * 3 + 2] = tmpC.b;
+            });
+            rMesh.instanceMatrix.needsUpdate = true;
+            rMesh.instanceColor = new THREE.InstancedBufferAttribute(roofColors, 3);
+            roofResult = rMesh;
+        }
 
-            tmpColor.set(BUILDING_COLORS[b.colorIdx]);
-            colorAttr[i * 3] = tmpColor.r;
-            colorAttr[i * 3 + 1] = tmpColor.g;
-            colorAttr[i * 3 + 2] = tmpColor.b;
-        });
+        // ── Build keep meshes (small count, use individual meshes in a group) ──
+        let keepResult = null;
+        if (keeps.length > 0) {
+            const group = new THREE.Group();
+            keeps.forEach(k => {
+                // Tower body
+                const towerGeo = new THREE.BoxGeometry(k.width, k.height, k.depth);
+                towerGeo.translate(0, k.height / 2, 0);
+                const towerMat = new THREE.MeshStandardMaterial({ color: '#5a5a5a', roughness: 0.95 });
+                const tower = new THREE.Mesh(towerGeo, towerMat);
+                tower.position.set(k.x, k.y, k.z);
+                tower.rotation.set(0, k.rotation, 0);
+                group.add(tower);
 
-        mesh.instanceMatrix.needsUpdate = true;
-        mesh.instanceColor = new THREE.InstancedBufferAttribute(colorAttr, 3);
+                // Keep roof — taller pointed cone
+                const keepRoofGeo = new THREE.ConeGeometry(k.width * 0.7, k.roofHeight, 4);
+                keepRoofGeo.translate(0, k.height + k.roofHeight / 2, 0);
+                const keepRoofMat = new THREE.MeshStandardMaterial({ color: '#4a3520', roughness: 0.85 });
+                const keepRoof = new THREE.Mesh(keepRoofGeo, keepRoofMat);
+                keepRoof.position.set(k.x, k.y, k.z);
+                keepRoof.rotation.set(0, k.rotation + Math.PI / 4, 0);
+                group.add(keepRoof);
+            });
+            keepResult = group;
+        }
 
-        return mesh;
+        return { wallMesh: wallResult, roofMesh: roofResult, keepGroup: keepResult };
     }, [towns, heightmap, mapWidth, mapHeight, heightScale, waterThreshold, maxTowns]);
 
-    if (!buildingMesh) return null;
-
-    return <primitive object={buildingMesh} />;
+    return (
+        <group>
+            {wallMesh && <primitive object={wallMesh} />}
+            {roofMesh && <primitive object={roofMesh} />}
+            {keepGroup && <primitive object={keepGroup} />}
+        </group>
+    );
 };
 
 // ─── Water Plane ───────────────────────────────────────────────────────────────
@@ -434,6 +556,7 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                     mapHeight={height}
                     waterThreshold={waterThreshold}
                     treeDensity={treeDensity}
+                    towns={towns || []}
                 />
 
                 <TownLayer

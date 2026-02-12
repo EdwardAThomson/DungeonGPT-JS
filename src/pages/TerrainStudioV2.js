@@ -99,7 +99,7 @@ const TerrainStudioV2 = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [viewMode, setViewMode] = useState('3d');
     const [generating, setGenerating] = useState(false);
-    const [treeDensity, setTreeDensity] = useState(50);
+    const [treeDensity, setTreeDensity] = useState(30);
     const [maxTowns, setMaxTowns] = useState(8);
 
     // Initial terrain
