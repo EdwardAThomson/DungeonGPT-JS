@@ -19,14 +19,19 @@ const Minimap = ({ heightmap, width, height }) => {
         }
         const range = max - min || 1;
 
+        // Use same 30th-percentile water threshold as the 3D terrain
+        const sorted = [...heightmap].sort((a, b) => a - b);
+        const waterThreshold = sorted[Math.floor(sorted.length * 0.3)];
+        const waterNorm = (waterThreshold - min) / range;
+
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
                 const h = (heightmap[y * width + x] - min) / range;
                 let color;
-                if (h < 0.28) color = `rgb(${Math.floor(20 + h * 100)}, ${Math.floor(60 + h * 180)}, ${Math.floor(140 + h * 100)})`;
-                else if (h < 0.35) color = '#f0e6a8';
-                else if (h < 0.60) color = `rgb(${Math.floor(60 + (1 - h) * 80)}, ${Math.floor(140 + (1 - h) * 60)}, ${Math.floor(50 + (1 - h) * 30)})`;
-                else if (h < 0.80) color = `rgb(${Math.floor(90 + h * 40)}, ${Math.floor(80 + h * 20)}, ${Math.floor(50 + h * 20)})`;
+                if (h <= waterNorm) color = `rgb(${Math.floor(20 + h * 100)}, ${Math.floor(60 + h * 180)}, ${Math.floor(140 + h * 100)})`;
+                else if (h < waterNorm + 0.07) color = '#f0e6a8';
+                else if (h < 0.70) color = `rgb(${Math.floor(60 + (1 - h) * 80)}, ${Math.floor(140 + (1 - h) * 60)}, ${Math.floor(50 + (1 - h) * 30)})`;
+                else if (h < 0.85) color = `rgb(${Math.floor(90 + h * 40)}, ${Math.floor(80 + h * 20)}, ${Math.floor(50 + h * 20)})`;
                 else color = `rgb(${Math.floor(180 + h * 60)}, ${Math.floor(180 + h * 60)}, ${Math.floor(180 + h * 60)})`;
 
                 ctx.fillStyle = color;
@@ -49,6 +54,107 @@ const Minimap = ({ heightmap, width, height }) => {
             <canvas ref={canvasRef} width={180} height={180} />
             <div style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', color: '#ffd700', fontSize: '12px', fontWeight: 'bold' }}>N</div>
         </div>
+    );
+};
+
+// ─── Debug Path Map ────────────────────────────────────────────────────────────
+const DebugPathMap = ({ terrainData }) => {
+    const canvasRef = React.useRef(null);
+    const canvasSize = 400;
+
+    React.useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || !terrainData?.heightmap) return;
+        const ctx = canvas.getContext('2d');
+        const { heightmap, width, height, towns, roads, ports } = terrainData;
+        const sx = canvasSize / width;
+        const sy = canvasSize / height;
+
+        // Draw heightmap
+        let min = Infinity, max = -Infinity;
+        for (let i = 0; i < heightmap.length; i++) {
+            if (heightmap[i] < min) min = heightmap[i];
+            if (heightmap[i] > max) max = heightmap[i];
+        }
+        const range = max - min || 1;
+
+        // Use same 30th-percentile water threshold as the 3D terrain
+        const sorted = [...heightmap].sort((a, b) => a - b);
+        const waterThreshold = sorted[Math.floor(sorted.length * 0.3)];
+        const waterNorm = (waterThreshold - min) / range;
+
+        const imgData = ctx.createImageData(canvasSize, canvasSize);
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const h = (heightmap[y * width + x] - min) / range;
+                let r, g, b;
+                if (h <= waterNorm) { r = 30; g = Math.floor(60 + h * 200); b = 160; }
+                else if (h < waterNorm + 0.07) { r = 200; g = 190; b = 120; }
+                else if (h < 0.70) { r = Math.floor(50 + (1 - h) * 60); g = Math.floor(130 + (1 - h) * 70); b = 40; }
+                else { r = Math.floor(100 + h * 80); g = Math.floor(90 + h * 60); b = Math.floor(60 + h * 40); }
+
+                // Fill scaled pixels
+                const px0 = Math.floor(x * sx), py0 = Math.floor(y * sy);
+                const px1 = Math.floor((x + 1) * sx), py1 = Math.floor((y + 1) * sy);
+                for (let py = py0; py < py1 && py < canvasSize; py++) {
+                    for (let px = px0; px < px1 && px < canvasSize; px++) {
+                        const idx = (py * canvasSize + px) * 4;
+                        imgData.data[idx] = r;
+                        imgData.data[idx + 1] = g;
+                        imgData.data[idx + 2] = b;
+                        imgData.data[idx + 3] = 255;
+                    }
+                }
+            }
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        // Draw roads
+        if (roads) {
+            ctx.strokeStyle = '#ff3333';
+            ctx.lineWidth = 1.5;
+            for (const path of roads) {
+                if (path.length < 2) continue;
+                ctx.beginPath();
+                ctx.moveTo(path[0].x * sx, path[0].y * sy);
+                for (let i = 1; i < path.length; i++) {
+                    ctx.lineTo(path[i].x * sx, path[i].y * sy);
+                }
+                ctx.stroke();
+            }
+        }
+
+        // Draw towns
+        if (towns) {
+            const sizeMap = { city: 5, town: 4, village: 3 };
+            const colorMap = { city: '#ff0', town: '#ffa500', village: '#fff' };
+            for (const t of towns) {
+                ctx.beginPath();
+                ctx.arc(t.x * sx, t.y * sy, sizeMap[t.size] || 3, 0, Math.PI * 2);
+                ctx.fillStyle = colorMap[t.size] || '#fff';
+                ctx.fill();
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+        }
+
+        // Draw ports
+        if (ports) {
+            for (const p of ports) {
+                ctx.fillStyle = '#0ff';
+                ctx.fillRect(p.x * sx - 2, p.y * sy - 2, 4, 4);
+            }
+        }
+    }, [terrainData]);
+
+    return (
+        <canvas
+            ref={canvasRef}
+            width={canvasSize}
+            height={canvasSize}
+            style={{ border: '2px solid #555', borderRadius: '4px', width: '100%', maxWidth: '400px' }}
+        />
     );
 };
 
@@ -76,12 +182,13 @@ const Slider = ({ label, value, min, max, step = 1, color = '#4a90e2', unit = ''
 const defaultSeed = 42;
 const defaultResolution = 256;
 
-const buildParams = (seed, octaves, persistence, seaLevel, warpStrength, exponent, erosionEnabled, erosionParticles) => ({
+const buildParams = (seed, octaves, persistence, seaLevel, warpStrength, exponent, erosionEnabled, erosionParticles, maxTowns = 8) => ({
     seed: parseInt(seed) || 42,
     terrain: { octaves, persistence, lacunarity: 2.0, baseFreq: 0.01 },
     continent: { freq: 0.005, seaLevel: (seaLevel - 50) * 0.008 },
     warp: { strength: warpStrength, freq: 0.008 },
     exponent,
+    maxTowns,
     erosion: erosionEnabled ? { particles: erosionParticles, erosionRate: 0.3, depositionRate: 0.3, evaporationRate: 0.01 } : null
 });
 
@@ -101,6 +208,7 @@ const TerrainStudioV2 = () => {
     const [generating, setGenerating] = useState(false);
     const [treeDensity, setTreeDensity] = useState(30);
     const [maxTowns, setMaxTowns] = useState(8);
+    const [showDebugMap, setShowDebugMap] = useState(false);
 
     // Initial terrain
     const [terrainData, setTerrainData] = useState(() =>
@@ -112,12 +220,12 @@ const TerrainStudioV2 = () => {
         // Use setTimeout to let the UI update before heavy computation
         setTimeout(() => {
             const data = generateLayeredTerrain(resolution, resolution,
-                buildParams(seed, octaves, persistence, seaLevel, warpStrength, exponent, erosionEnabled, erosionParticles)
+                buildParams(seed, octaves, persistence, seaLevel, warpStrength, exponent, erosionEnabled, erosionParticles, maxTowns)
             );
             setTerrainData(data);
             setGenerating(false);
         }, 50);
-    }, [seed, resolution, octaves, persistence, seaLevel, warpStrength, exponent, erosionEnabled, erosionParticles]);
+    }, [seed, resolution, octaves, persistence, seaLevel, warpStrength, exponent, erosionEnabled, erosionParticles, maxTowns]);
 
     return (
         <div style={{
@@ -218,6 +326,11 @@ const TerrainStudioV2 = () => {
                         <Slider label="Tree Density" value={treeDensity} min={0} max={100} step={5} color="#43a047" unit="%" onChange={setTreeDensity} />
                         <Slider label="Towns" value={maxTowns} min={0} max={15} step={1} color="#8d6e63" onChange={setMaxTowns} />
 
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                            <input type="checkbox" checked={showDebugMap} onChange={(e) => setShowDebugMap(e.target.checked)} />
+                            <span style={{ fontSize: '0.72rem', color: '#888' }}>Show Road Debug Map</span>
+                        </div>
+
                         {/* Section: Erosion */}
                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', marginTop: '4px', marginBottom: '8px' }}>
                             <div style={{ fontSize: '0.65rem', color: '#555', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '12px' }}>Erosion</div>
@@ -315,6 +428,24 @@ const TerrainStudioV2 = () => {
             {/* Top Right: Minimap + View Toggle */}
             <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '20px' }}>
                 {terrainData && <Minimap heightmap={terrainData.heightmap} width={terrainData.width} height={terrainData.height} />}
+
+                {/* Debug Path Map Overlay */}
+                {showDebugMap && terrainData && (
+                    <div style={{
+                        background: 'rgba(0,0,0,0.85)', borderRadius: '8px',
+                        border: '1px solid rgba(255,255,255,0.15)', padding: '8px',
+                    }}>
+                        <div style={{ fontSize: '0.65rem', color: '#888', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                            Road Debug Map
+                            <span style={{ color: '#ff3333', marginLeft: '8px' }}>■ roads</span>
+                            <span style={{ color: '#ff0', marginLeft: '6px' }}>● city</span>
+                            <span style={{ color: '#ffa500', marginLeft: '6px' }}>● town</span>
+                            <span style={{ color: '#fff', marginLeft: '6px' }}>● village</span>
+                            <span style={{ color: '#0ff', marginLeft: '6px' }}>■ port</span>
+                        </div>
+                        <DebugPathMap terrainData={terrainData} />
+                    </div>
+                )}
 
                 <div style={{
                     background: 'rgba(26, 26, 26, 0.8)',

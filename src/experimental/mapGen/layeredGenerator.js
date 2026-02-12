@@ -238,6 +238,7 @@ export function generateLayeredTerrain(width, height, params = {}) {
         continent = {},
         warp = {},
         exponent = 1.8,
+        maxTowns = 8,
         erosion = null
     } = params;
 
@@ -361,8 +362,8 @@ export function generateLayeredTerrain(width, height, params = {}) {
             const h = heightmap[cy * width + cx];
             const norm = (h - hMin) / hRange;
 
-            // Skip underwater and extreme elevations
-            if (norm <= waterNorm + 0.03 || norm > 0.75) continue;
+            // Skip underwater and near-shore areas (generous buffer)
+            if (norm <= waterNorm + 0.06 || norm > 0.75) continue;
 
             // Flatness score: low local height variance is good
             let variance = 0;
@@ -423,7 +424,7 @@ export function generateLayeredTerrain(width, height, params = {}) {
         }
         if (!tooClose) {
             selectedTowns.push(c);
-            if (selectedTowns.length >= 15) break; // max 15 towns
+            if (selectedTowns.length >= maxTowns) break; // respect maxTowns param
         }
     }
 
@@ -435,10 +436,243 @@ export function generateLayeredTerrain(width, height, params = {}) {
         towns.push(t);
     });
 
+    // Flatten terrain under towns so buildings sit nicely
+    towns.forEach(t => {
+        const r = t.size === 'city' ? 6 : (t.size === 'town' ? 4 : 2);
+        let sum = 0, count = 0;
+
+        // limited scan for average height
+        for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+                const nx = t.x + dx, ny = t.y + dy;
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                    sum += heightmap[ny * width + nx];
+                    count++;
+                }
+            }
+        }
+        const avgH = sum / count;
+
+        // Flatten with radial falloff
+        for (let dy = -r - 2; dy <= r + 2; dy++) {
+            for (let dx = -r - 2; dx <= r + 2; dx++) {
+                const nx = t.x + dx, ny = t.y + dy;
+                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    let factor = 0;
+                    if (dist <= r) factor = 0.8; // mostly flat center
+                    else if (dist <= r + 2) factor = 0.8 * (1 - (dist - r) / 2); // falloff
+
+                    if (factor > 0) {
+                        const idx = ny * width + nx;
+                        heightmap[idx] = heightmap[idx] * (1 - factor) + avgH * factor;
+                    }
+                }
+            }
+        }
+    });
+
+    // ─── Road pathfinding between towns ─────────────────────────────────
+    const roads = [];
+    const ports = []; // water-crossing endpoints
+    const roadMap = new Uint8Array(width * height); // track existing road tiles for path reuse
+
+    if (towns.length >= 2) {
+        // A* on the heightmap with slope-based costs
+        const posKey = (x, y) => x + y * width;
+
+        const pathfind = (startX, startY, goalX, goalY) => {
+            const sx = Math.round(startX), sy = Math.round(startY);
+            const gx = Math.round(goalX), gy = Math.round(goalY);
+
+            const gScore = new Float32Array(width * height).fill(Infinity);
+            const fScore = new Float32Array(width * height).fill(Infinity);
+            const cameFrom = new Int32Array(width * height).fill(-1);
+            const closed = new Uint8Array(width * height);
+
+            // Simple sorted open list (good enough for our grid sizes)
+            const open = [];
+            const startKey = posKey(sx, sy);
+            gScore[startKey] = 0;
+            fScore[startKey] = Math.abs(gx - sx) + Math.abs(gy - sy);
+            open.push({ x: sx, y: sy, f: fScore[startKey] });
+
+            const dirs = [
+                { dx: 0, dy: -1 }, { dx: 1, dy: 0 },
+                { dx: 0, dy: 1 }, { dx: -1, dy: 0 },
+                { dx: 1, dy: -1 }, { dx: 1, dy: 1 },
+                { dx: -1, dy: 1 }, { dx: -1, dy: -1 }
+            ];
+
+            while (open.length > 0) {
+                // Pop lowest f
+                let bestIdx = 0;
+                for (let i = 1; i < open.length; i++) {
+                    if (open[i].f < open[bestIdx].f) bestIdx = i;
+                }
+                const cur = open[bestIdx];
+                open.splice(bestIdx, 1);
+
+                if (cur.x === gx && cur.y === gy) {
+                    // Reconstruct path
+                    const path = [];
+                    let key = posKey(gx, gy);
+                    while (key !== -1) {
+                        const py = Math.floor(key / width);
+                        const px = key - py * width;
+                        path.unshift({ x: px, y: py });
+                        key = cameFrom[key];
+                    }
+                    return path;
+                }
+
+                const curKey = posKey(cur.x, cur.y);
+                if (closed[curKey]) continue;
+                closed[curKey] = 1;
+
+                const curH = heightmap[curKey];
+                const curNorm = (curH - hMin) / hRange;
+                const curIsWater = curNorm <= waterNorm;
+
+                for (const d of dirs) {
+                    const nx = cur.x + d.dx, ny = cur.y + d.dy;
+                    if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+
+                    const nKey = posKey(nx, ny);
+                    if (closed[nKey]) continue;
+
+                    const nH = heightmap[nKey];
+                    const nNorm = (nH - hMin) / hRange;
+                    const nIsWater = nNorm <= waterNorm;
+
+                    // Cost: base + gentle slope awareness + water penalty
+                    // Low slope cost — roads should be fairly direct, not loop around gentle hills
+                    // High water cost — roads should hug coastline, only cross water if no land route
+                    // Road reuse bonus — cheaper to travel on existing roads (0.2 vs 1.0)
+                    const isDiag = d.dx !== 0 && d.dy !== 0;
+                    const baseCost = isDiag ? 1.414 : 1.0;
+                    const heightDiff = Math.abs(nH - curH);
+                    const slopeCost = heightDiff * 8;
+                    const waterPen = nIsWater ? 1000 : 0;
+                    // Beach penalty: stay away from the water's edge (wet shoreline)
+                    const beachPen = (!nIsWater && nNorm < waterNorm + 0.05) ? 20 : 0;
+
+                    // Huge discount for using existing roads (encourage merging)
+                    const roadBonus = roadMap[nKey] ? 0.2 : 1.0;
+
+                    const cost = (baseCost + slopeCost + waterPen + beachPen) * roadBonus;
+
+                    const tentG = gScore[curKey] + cost;
+                    if (tentG < gScore[nKey]) {
+                        cameFrom[nKey] = curKey;
+                        gScore[nKey] = tentG;
+                        const h = Math.abs(gx - nx) + Math.abs(gy - ny);
+                        fScore[nKey] = tentG + h * 2.0; // heavily weighted for direct paths
+                        open.push({ x: nx, y: ny, f: fScore[nKey] });
+                    }
+                }
+            }
+            return null; // no path
+        };
+
+        // ── Minimum Spanning Tree (Kruskal's) for road network ──
+        // Build complete graph of town pairs sorted by Euclidean distance
+        const edges = [];
+        for (let i = 0; i < towns.length; i++) {
+            for (let j = i + 1; j < towns.length; j++) {
+                edges.push({
+                    i, j,
+                    dist: Math.hypot(towns[i].x - towns[j].x, towns[i].y - towns[j].y)
+                });
+            }
+        }
+        edges.sort((a, b) => a.dist - b.dist);
+
+        // Union-Find
+        const parent = towns.map((_, i) => i);
+        const rank = new Uint8Array(towns.length);
+        const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+        const union = (a, b) => {
+            a = find(a); b = find(b);
+            if (a === b) return false;
+            if (rank[a] < rank[b]) [a, b] = [b, a];
+            parent[b] = a;
+            if (rank[a] === rank[b]) rank[a]++;
+            return true;
+        };
+
+        // Pick MST edges
+        const mstEdges = [];
+        for (const e of edges) {
+            if (union(e.i, e.j)) {
+                mstEdges.push(e);
+                if (mstEdges.length === towns.length - 1) break;
+            }
+        }
+
+        // Run A* pathfinding only for MST edges
+        for (const { i, j } of mstEdges) {
+            const a = towns[i], b = towns[j];
+            const path = pathfind(a.x, a.y, b.x, b.y);
+            if (path) {
+                // Detect water crossings
+                const pathPorts = [];
+                for (let k = 1; k < path.length; k++) {
+                    const prevH = (heightmap[path[k - 1].y * width + path[k - 1].x] - hMin) / hRange;
+                    const curH = (heightmap[path[k].y * width + path[k].x] - hMin) / hRange;
+                    const prevWater = prevH <= waterNorm;
+                    const curWater = curH <= waterNorm;
+
+                    if (!prevWater && curWater) {
+                        pathPorts.push({ x: path[k - 1].x, y: path[k - 1].y, type: 'departure' });
+                    } else if (prevWater && !curWater) {
+                        pathPorts.push({ x: path[k].x, y: path[k].y, type: 'arrival' });
+                    }
+                }
+
+                roads.push(path);
+                ports.push(...pathPorts);
+
+                // Mark path on roadMap so future paths can reuse it
+                for (const p of path) {
+                    roadMap[p.y * width + p.x] = 1;
+                }
+            }
+        }
+
+        // Post-process: flatten terrain under roads ("cut and fill")
+        // This prevents roads from clipping into steep slopes
+        for (const path of roads) {
+            for (let i = 0; i < path.length; i++) {
+                const p = path[i];
+                const idx = p.y * width + p.x;
+
+                // Simple 3x3 blur for roadbed
+                let sum = 0, count = 0;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const nx = p.x + dx, ny = p.y + dy;
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            sum += heightmap[ny * width + nx];
+                            count++;
+                        }
+                    }
+                }
+                const avg = sum / count;
+
+                // Blend current height slightly towards average to flatten spikes/dips
+                heightmap[idx] = heightmap[idx] * 0.4 + avg * 0.6;
+            }
+        }
+    }
+
     return {
         heightmap,
+        roadMap, // exported for building avoidance
         forestMap,
         towns,
+        roads,
+        ports,
         width,
         height,
         seaLevel: continentOpts.seaLevel
