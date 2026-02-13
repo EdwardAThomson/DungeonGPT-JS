@@ -55,8 +55,8 @@ export const colorStops = [
     { t: 0.00, color: new THREE.Color('#0a2a5e') }, // deep ocean
     { t: 0.15, color: new THREE.Color('#1a5fa0') }, // ocean
     { t: 0.28, color: new THREE.Color('#4a90d9') }, // shallow water
-    { t: 0.32, color: new THREE.Color('#f0e6a8') }, // beach/sand
-    { t: 0.38, color: new THREE.Color('#8bc34a') }, // lowland grass
+    { t: 0.29, color: new THREE.Color('#f0e6a8') }, // beach/sand (Sharpened transition)
+    { t: 0.35, color: new THREE.Color('#8bc34a') }, // lowland grass
     { t: 0.50, color: new THREE.Color('#4caf50') }, // plains
     { t: 0.62, color: new THREE.Color('#2d7d32') }, // forest
     { t: 0.75, color: new THREE.Color('#6d5c3e') }, // highland rock
@@ -82,7 +82,7 @@ export function elevationToColor(t, out) {
 }
 
 // ─── Terrain Mesh ──────────────────────────────────────────────────────────────
-const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, heightScale, towns = [] }) => {
+const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, heightScale, towns = [], terrainDataWaterThreshold }) => {
     const meshRef = useRef();
     // heightScale can affect mountain height I think
 
@@ -97,9 +97,8 @@ const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, heightScale, towns = []
         }
         const range = max - min || 1;
 
-        // Calculate water threshold to paint underwater pixels uniformly
-        const sorted = [...heightmap].sort((a, b) => a - b);
-        const waterThreshold = sorted[Math.floor(sorted.length * 0.3)];
+        // Use the threshold provided by the generator for perfect synchronization.
+        const waterThreshold = terrainDataWaterThreshold;
         const waterNorm = (waterThreshold - min) / range;
 
         const tmpColor = new THREE.Color();
@@ -171,9 +170,8 @@ const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, heightScale, towns = []
 
         const positions = geo.attributes.position;
 
-        // Calculate water threshold (30th percentile) to flatten terrain below water
-        const sorted = [...heightmap].sort((a, b) => a - b);
-        const waterThreshold = sorted[Math.floor(sorted.length * 0.3)];
+        // Use the threshold provided by the generator
+        const waterThreshold = terrainDataWaterThreshold;
 
         for (let i = 0; i < mapWidth * mapHeight; i++) {
             const h = heightmap[i];
@@ -183,16 +181,14 @@ const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, heightScale, towns = []
 
         positions.needsUpdate = true;
         geo.computeVertexNormals();
-
         return geo;
-    }, [heightmap, mapWidth, mapHeight]);
+    }, [heightmap, mapWidth, mapHeight, terrainDataWaterThreshold, heightScale]);
 
     const skirtGeometries = useMemo(() => {
         if (!heightmap) return [];
         const base = -10; // depth of the skirt base
 
-        const sorted = [...heightmap].sort((a, b) => a - b);
-        const waterThreshold = sorted[Math.floor(sorted.length * 0.3)];
+        const waterThreshold = terrainDataWaterThreshold;
 
         // Define the 4 sides: [North, South, West, East]
         // Alignment is now precise to (mapWidth-1)/2
@@ -226,7 +222,7 @@ const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, heightScale, towns = []
             geo.computeVertexNormals();
             return { geo, pos: side.pos, rotY: side.rotY };
         });
-    }, [heightmap, mapWidth, mapHeight]);
+    }, [heightmap, mapWidth, mapHeight, terrainDataWaterThreshold, heightScale]);
 
     const skirtMaterial = useMemo(() => new THREE.MeshStandardMaterial({
         color: '#4d3a2b',
@@ -619,7 +615,7 @@ const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThresh
         }
 
         return { wallMesh: wallResult, roofMesh: roofResult, keepGroup: keepResult };
-    }, [towns, heightmap, roadMap, mapWidth, mapHeight, waterThreshold, maxTowns]);
+    }, [towns, heightmap, roadMap, mapWidth, mapHeight, waterThreshold, maxTowns, heightScale]);
 
     return (
         <group>
@@ -1098,6 +1094,7 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                     mapHeight={height}
                     heightScale={heightScale}
                     towns={towns}
+                    terrainDataWaterThreshold={waterThreshold}
                 />
 
                 <ForestLayer

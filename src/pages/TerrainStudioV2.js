@@ -4,7 +4,7 @@ import { generateLayeredTerrain } from '../experimental/mapGen/layeredGenerator'
 import * as THREE from 'three';
 
 // ─── Minimap ───────────────────────────────────────────────────────────────────
-const Minimap = ({ heightmap, width, height }) => {
+const Minimap = ({ heightmap, width, height, terrainDataWaterThreshold }) => {
     const canvasRef = useRef(null);
 
     useEffect(() => {
@@ -20,9 +20,8 @@ const Minimap = ({ heightmap, width, height }) => {
         }
         const range = max - min || 1;
 
-        // Use same 30th-percentile water threshold as the 3D terrain
-        const sorted = [...heightmap].sort((a, b) => a - b);
-        const waterThreshold = sorted[Math.floor(sorted.length * 0.3)];
+        // Use the threshold provided by the generator
+        const waterThreshold = terrainDataWaterThreshold;
         const waterNorm = (waterThreshold - min) / range;
 
         const tmpColor = new THREE.Color();
@@ -66,7 +65,7 @@ const Minimap = ({ heightmap, width, height }) => {
 };
 
 // ─── Debug Path Map ────────────────────────────────────────────────────────────
-const DebugPathMap = ({ terrainData }) => {
+const DebugPathMap = ({ terrainData, terrainDataWaterThreshold }) => {
     const canvasRef = useRef(null);
     const canvasSize = 400;
 
@@ -86,9 +85,8 @@ const DebugPathMap = ({ terrainData }) => {
         }
         const range = max - min || 1;
 
-        // Use same 30th-percentile water threshold as the 3D terrain
-        const sorted = [...heightmap].sort((a, b) => a - b);
-        const waterThreshold = sorted[Math.floor(sorted.length * 0.3)];
+        // Use the threshold provided by the generator
+        const waterThreshold = terrainDataWaterThreshold;
         const waterNorm = (waterThreshold - min) / range;
 
         const imgData = ctx.createImageData(canvasSize, canvasSize);
@@ -484,7 +482,7 @@ const TerrainStudioV2 = () => {
 
             {/* Top Right: Minimap + View Toggle */}
             <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '20px' }}>
-                {terrainData && <Minimap heightmap={terrainData.heightmap} width={terrainData.width} height={terrainData.height} />}
+                {terrainData && <Minimap heightmap={terrainData.heightmap} width={terrainData.width} height={terrainData.height} terrainDataWaterThreshold={terrainData.waterThreshold} />}
 
                 {/* Debug Path Map Overlay */}
                 {showDebugMap && terrainData && (
@@ -500,7 +498,7 @@ const TerrainStudioV2 = () => {
                             <span style={{ color: '#fff', marginLeft: '6px' }}>● village</span>
                             <span style={{ color: '#0ff', marginLeft: '6px' }}>■ port</span>
                         </div>
-                        <DebugPathMap terrainData={terrainData} />
+                        <DebugPathMap terrainData={terrainData} terrainDataWaterThreshold={terrainData.waterThreshold} />
                     </div>
                 )}
 
