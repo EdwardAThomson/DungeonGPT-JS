@@ -224,6 +224,7 @@ const TerrainStudioV2 = () => {
     const [treeDensity, setTreeDensity] = useState(30);
     const [maxTowns, setMaxTowns] = useState(8);
     const [showDebugMap, setShowDebugMap] = useState(false);
+    const [showTownNames, setShowTownNames] = useState(true);
 
     // Initial terrain
     const [terrainData, setTerrainData] = useState(() =>
@@ -250,7 +251,13 @@ const TerrainStudioV2 = () => {
         }}>
             {/* 3D Viewport */}
             <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 1 }}>
-                <TerrainMesh3D terrainData={terrainData} isOrthographic={viewMode === '2d'} treeDensity={treeDensity} maxTowns={maxTowns} />
+                <TerrainMesh3D
+                    terrainData={terrainData}
+                    isOrthographic={viewMode === '2d'}
+                    treeDensity={treeDensity}
+                    maxTowns={maxTowns}
+                    showTownNames={showTownNames}
+                />
             </div>
 
             {/* Generating overlay */}
@@ -341,9 +348,15 @@ const TerrainStudioV2 = () => {
                         <Slider label="Tree Density" value={treeDensity} min={0} max={100} step={5} color="#43a047" unit="%" onChange={setTreeDensity} />
                         <Slider label="Towns" value={maxTowns} min={0} max={15} step={1} color="#8d6e63" onChange={setMaxTowns} />
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                            <input type="checkbox" checked={showDebugMap} onChange={(e) => setShowDebugMap(e.target.checked)} />
-                            <span style={{ fontSize: '0.72rem', color: '#888' }}>Show Road Debug Map</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input type="checkbox" checked={showTownNames} onChange={(e) => setShowTownNames(e.target.checked)} />
+                                <span style={{ fontSize: '0.72rem', color: '#eee' }}>Show Town Names</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input type="checkbox" checked={showDebugMap} onChange={(e) => setShowDebugMap(e.target.checked)} />
+                                <span style={{ fontSize: '0.72rem', color: '#888' }}>Show Road Debug Map</span>
+                            </div>
                         </div>
 
                         {/* Section: Erosion */}
@@ -509,14 +522,14 @@ const TerrainStudioV2 = () => {
             }}>
                 {viewMode === '3d' ? (
                     <>
-                        <span>🖱️ <b>Rotate:</b> Drag / Q-E</span>
+                        <span>🖱️ <b>Rotate:</b> Drag / Q-E / R-F</span>
                         <span>🖱️ <b>Pan:</b> Right Click / WASD</span>
-                        <span>🖱️ <b>Zoom:</b> Scroll</span>
+                        <span>🖱️ <b>Zoom:</b> Scroll / Z-X</span>
                     </>
                 ) : (
                     <>
                         <span>🖱️ <b>Pan:</b> Drag / WASD</span>
-                        <span>🖱️ <b>Zoom:</b> Scroll</span>
+                        <span>🖱️ <b>Zoom:</b> Scroll / Z-X</span>
                         <span style={{ color: '#4a90e2' }}>📍 Top-Down Render</span>
                     </>
                 )}

@@ -1,7 +1,52 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Sky, Environment } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Sky, Environment, Html } from '@react-three/drei';
 import * as THREE from 'three';
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const PARCHMENT_STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600&display=swap');
+  
+  .town-parchment {
+    position: relative;
+    background: radial-gradient(circle, #f4e4bc 0%, #e8d4a8 100%);
+    color: #4a2c1d;
+    padding: 3px 18px;
+    font-family: 'Cinzel', serif;
+    font-weight: 600;
+    font-size: 13px;
+    white-space: nowrap;
+    box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    pointer-events: none;
+    user-select: none;
+    border-top: 1px solid rgba(255,255,255,0.3);
+    border-bottom: 2px solid rgba(0,0,0,0.2);
+  }
+
+  .town-parchment::before,
+  .town-parchment::after {
+    content: '';
+    position: absolute;
+    top: 5px;
+    bottom: -5px;
+    width: 12px;
+    background: #cbb98f;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+    z-index: -1;
+  }
+
+  .town-parchment::before {
+    left: -8px;
+    border-radius: 4px 0 0 4px;
+    transform: perspective(100px) rotateY(-30deg);
+  }
+
+  .town-parchment::after {
+    right: -8px;
+    border-radius: 0 4px 4px 0;
+    transform: perspective(100px) rotateY(30deg);
+  }
+`;
 
 // ─── Shared Constants ──────────────────────────────────────────────────────────
 const HEIGHT_SCALE = 75;
@@ -120,10 +165,11 @@ const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, towns = [] }) => {
     }, [heightmap, mapWidth, mapHeight, towns]);
 
     const geometry = useMemo(() => {
-        const geo = new THREE.PlaneGeometry(mapWidth, mapHeight, mapWidth - 1, mapHeight - 1);
+        // Pixel-perfect alignment: mesh width is (pixels - 1) so each segment is exactly 1 unit.
+        const geo = new THREE.PlaneGeometry(mapWidth - 1, mapHeight - 1, mapWidth - 1, mapHeight - 1);
         geo.rotateX(-Math.PI / 2);
 
-        const positions = geo.attributes.position.array;
+        const positions = geo.attributes.position;
 
         // Calculate water threshold (30th percentile) to flatten terrain below water
         const sorted = [...heightmap].sort((a, b) => a - b);
@@ -131,25 +177,79 @@ const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, towns = [] }) => {
 
         for (let i = 0; i < mapWidth * mapHeight; i++) {
             const h = heightmap[i];
-            // Clamp terrain below water level to be flat
-            positions[i * 3 + 1] = Math.max(h, waterThreshold) * HEIGHT_SCALE;
+            const finalY = Math.max(h, waterThreshold) * HEIGHT_SCALE;
+            positions.setY(i, finalY);
         }
 
-        geo.attributes.position.needsUpdate = true;
+        positions.needsUpdate = true;
         geo.computeVertexNormals();
 
         return geo;
     }, [heightmap, mapWidth, mapHeight]);
 
+    const skirtGeometries = useMemo(() => {
+        if (!heightmap) return [];
+        const base = -10; // depth of the skirt base
+
+        const sorted = [...heightmap].sort((a, b) => a - b);
+        const waterThreshold = sorted[Math.floor(sorted.length * 0.3)];
+
+        // Define the 4 sides: [North, South, West, East]
+        // Alignment is now precise to (mapWidth-1)/2
+        const wLimit = (mapWidth - 1) / 2;
+        const hLimit = (mapHeight - 1) / 2;
+
+        const sideConfigs = [
+            { name: 'N', axis: 'x', segments: mapWidth - 1, length: mapWidth - 1, mapY: 0, rotY: Math.PI, pos: [0, 0, -hLimit] },
+            { name: 'S', axis: 'x', segments: mapWidth - 1, length: mapWidth - 1, mapY: mapHeight - 1, rotY: 0, pos: [0, 0, hLimit] },
+            { name: 'W', axis: 'y', segments: mapHeight - 1, length: mapHeight - 1, mapX: 0, rotY: -Math.PI / 2, pos: [-wLimit, 0, 0] },
+            { name: 'E', axis: 'y', segments: mapHeight - 1, length: mapHeight - 1, mapX: mapWidth - 1, rotY: Math.PI / 2, pos: [wLimit, 0, 0] }
+        ];
+
+        return sideConfigs.map(side => {
+            const geo = new THREE.PlaneGeometry(side.length, 1, side.segments, 1);
+            const pos = geo.attributes.position;
+
+            for (let i = 0; i <= side.segments; i++) {
+                // Correct sampling logic for each side
+                const sampleIdx = (side.name === 'N' || side.name === 'E') ? side.segments - i : i;
+                const x = side.axis === 'x' ? sampleIdx : (side.mapX || 0);
+                const y = side.axis === 'y' ? sampleIdx : (side.mapY || 0);
+                const h = Math.max(heightmap[y * mapWidth + x], waterThreshold) * HEIGHT_SCALE;
+
+                // Correcting vertex ordering: 
+                // In PlaneGeometry(..., segments, 1), vertices 0..segments are Row 0 (TOP)
+                // and vertices segments+1..2*segments+1 are Row 1 (BOTTOM).
+                pos.setY(i, h); // Map terrain height to top edge
+                pos.setY(i + side.segments + 1, base); // Map base depth to bottom edge
+            }
+            geo.computeVertexNormals();
+            return { geo, pos: side.pos, rotY: side.rotY };
+        });
+    }, [heightmap, mapWidth, mapHeight]);
+
+    const skirtMaterial = useMemo(() => new THREE.MeshStandardMaterial({
+        color: '#4d3a2b',
+        roughness: 0.9,
+        metalness: 0,
+        side: THREE.DoubleSide // Ensure visibility from all angles
+    }), []);
+
     return (
-        <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow>
-            <meshStandardMaterial
-                map={texture}
-                flatShading
-                roughness={0.85}
-                metalness={0.05}
-            />
-        </mesh>
+        <group>
+            <mesh ref={meshRef} geometry={geometry} castShadow receiveShadow>
+                <meshStandardMaterial
+                    map={texture}
+                    flatShading
+                    roughness={0.85}
+                    metalness={0.05}
+                />
+            </mesh>
+            {/* Skirt Walls */}
+            {skirtGeometries.map((s, i) => (
+                <mesh key={i} geometry={s.geo} material={skirtMaterial} position={s.pos} rotation={[0, s.rotY, 0]} />
+            ))}
+        </group>
     );
 };
 
@@ -186,8 +286,8 @@ const ForestLayer = ({ heightmap, forestMap, mapWidth, mapHeight, waterThreshold
                 const clampedH = Math.max(h, waterThreshold);
 
                 // World position: PlaneGeometry centered at origin
-                const wx = jx - mapWidth / 2;
-                const wz = jy - mapHeight / 2;
+                const wx = jx - (mapWidth - 1) / 2;
+                const wz = jy - (mapHeight - 1) / 2;
                 const wy = clampedH * HEIGHT_SCALE;
 
                 // Skip if underwater
@@ -275,7 +375,7 @@ const FLOOR_HEIGHT = 0.6;
 const STONE_COLORS = ['#b0b0b0', '#a3a3a3', '#999999', '#b8b8b8', '#ababab', '#9e9e9e', '#c0c0c0'];
 const ROOF_COLORS = ['#8b4513', '#6b3410', '#7a3d15', '#5c2e0e', '#944a18'];
 
-const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThreshold, maxTowns = 8 }) => {
+const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThreshold, maxTowns = 8, showTownNames = true }) => {
     const { wallMesh, roofMesh, keepGroup } = useMemo(() => {
         if (!towns || towns.length === 0 || !heightmap || maxTowns <= 0)
             return { wallMesh: null, roofMesh: null, keepGroup: null };
@@ -320,8 +420,8 @@ const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThresh
             if (config.hasKeep) {
                 const wy = getTerrainY(town.x, town.y);
                 if (wy !== null) {
-                    const wx = town.x - mapWidth / 2;
-                    const wz = town.y - mapHeight / 2;
+                    const wx = town.x - (mapWidth - 1) / 2;
+                    const wz = town.y - (mapHeight - 1) / 2;
                     const keepStoreys = town.size === 'city' ? 4 : 3;
                     const keepH = keepStoreys * FLOOR_HEIGHT;
                     const keepW = 1.2;
@@ -388,8 +488,8 @@ const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThresh
                 placedPositions.push({ x: bx, y: by, r: 0.6 });
                 placed++;
 
-                const wx = bx - mapWidth / 2;
-                const wz = by - mapHeight / 2;
+                const wx = bx - (mapWidth - 1) / 2;
+                const wz = by - (mapHeight - 1) / 2;
 
                 // Discrete storey count: 1, 2, or rarely 3
                 let storeys;
@@ -510,6 +610,22 @@ const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThresh
             {wallMesh && <primitive object={wallMesh} />}
             {roofMesh && <primitive object={roofMesh} />}
             {keepGroup && <primitive object={keepGroup} />}
+            {showTownNames && towns.slice(0, maxTowns).map((t, i) => (
+                <Html
+                    key={i}
+                    position={[
+                        t.x - mapWidth / 2,
+                        (heightmap[Math.floor(t.y) * mapWidth + Math.floor(t.x)] * HEIGHT_SCALE) + 14,
+                        t.y - mapHeight / 2
+                    ]}
+                    center
+                    distanceFactor={35}
+                >
+                    <div className="town-parchment">
+                        {t.name || `Settlement ${i}`}
+                    </div>
+                </Html>
+            ))}
         </group>
     );
 };
@@ -646,8 +762,8 @@ const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshol
                 const p = sp[i];
 
                 const water = isWaterAt(p.x, p.z);
-                const wx = p.x - mapWidth / 2;
-                const wz = p.z - mapHeight / 2;
+                const wx = p.x - (mapWidth - 1) / 2;
+                const wz = p.z - (mapHeight - 1) / 2;
                 const wy = water ? getWaterY() : getY(p.x, p.z);
                 const pt = { x: wx, y: wy, z: wz };
 
@@ -690,8 +806,8 @@ const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshol
             const portRoofMat = new THREE.MeshStandardMaterial({ color: '#4a3520', roughness: 0.85 });
 
             for (const port of ports) {
-                const wx = port.x - mapWidth / 2;
-                const wz = port.y - mapHeight / 2;
+                const wx = port.x - (mapWidth - 1) / 2;
+                const wz = port.y - (mapHeight - 1) / 2;
                 const wy = getY(port.x, port.y);
 
                 const pm = new THREE.Mesh(portGeo, portMat);
@@ -712,9 +828,9 @@ const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshol
 };
 
 // ─── Water Plane ───────────────────────────────────────────────────────────────
-const WaterPlane = ({ size, level }) => (
+const WaterPlane = ({ sizeX, sizeZ, level }) => (
     <mesh position={[0, level + 0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[size, size]} />
+        <planeGeometry args={[sizeX, sizeZ]} />
         <meshStandardMaterial
             color="#3a7dd8"
             transparent
@@ -726,7 +842,7 @@ const WaterPlane = ({ size, level }) => (
 );
 
 // ─── Camera Controls ───────────────────────────────────────────────────────────
-const CameraControls = ({ mapSize, isOrthographic }) => {
+const CameraControls = ({ mapSize, isOrthographic, heightmap, mapWidth, mapHeight }) => {
     const { camera, gl } = useThree();
     const controlsRef = useRef();
     const keys = useRef({});
@@ -744,33 +860,80 @@ const CameraControls = ({ mapSize, isOrthographic }) => {
 
     useFrame((state, delta) => {
         if (!controlsRef.current) return;
-        const moveSpeed = 20 * delta;
-        const rotateSpeed = 1.5 * delta;
+        const moveSpeed = 25 * delta;
+        const rotateSpeed = 2.5 * delta;
+        const zoomSpeed = 40 * delta;
+
+        // Panning (Camera-Relative)
+        const forward = new THREE.Vector3();
+        camera.getWorldDirection(forward);
+        forward.y = 0; // Keep movement on the X/Z plane
+        forward.normalize();
+
+        const right = new THREE.Vector3();
+        right.crossVectors(forward, camera.up).normalize();
 
         if (keys.current['KeyW'] || keys.current['ArrowUp']) {
-            controlsRef.current.target.z -= moveSpeed;
-            camera.position.z -= moveSpeed;
+            const move = forward.clone().multiplyScalar(moveSpeed);
+            controlsRef.current.target.add(move);
+            camera.position.add(move);
         }
         if (keys.current['KeyS'] || keys.current['ArrowDown']) {
-            controlsRef.current.target.z += moveSpeed;
-            camera.position.z += moveSpeed;
+            const move = forward.clone().multiplyScalar(-moveSpeed);
+            controlsRef.current.target.add(move);
+            camera.position.add(move);
         }
         if (keys.current['KeyA'] || keys.current['ArrowLeft']) {
-            controlsRef.current.target.x -= moveSpeed;
-            camera.position.x -= moveSpeed;
+            const move = right.clone().multiplyScalar(-moveSpeed);
+            controlsRef.current.target.add(move);
+            camera.position.add(move);
         }
         if (keys.current['KeyD'] || keys.current['ArrowRight']) {
-            controlsRef.current.target.x += moveSpeed;
-            camera.position.x += moveSpeed;
+            const move = right.clone().multiplyScalar(moveSpeed);
+            controlsRef.current.target.add(move);
+            camera.position.add(move);
         }
+
         if (!isOrthographic) {
-            if (keys.current['KeyQ']) controlsRef.current.setAzimuthalAngle(controlsRef.current.getAzimuthalAngle() + rotateSpeed);
-            if (keys.current['KeyE']) controlsRef.current.setAzimuthalAngle(controlsRef.current.getAzimuthalAngle() - rotateSpeed);
+            // Horizontal Rotation
+            if (keys.current['KeyQ']) controlsRef.current.setAzimuthalAngle(controlsRef.current.getAzimuthalAngle() - rotateSpeed);
+            if (keys.current['KeyE']) controlsRef.current.setAzimuthalAngle(controlsRef.current.getAzimuthalAngle() + rotateSpeed);
+
+            // Vertical Rotation (Pitch)
+            if (keys.current['KeyR']) controlsRef.current.setPolarAngle(Math.max(0.1, controlsRef.current.getPolarAngle() - rotateSpeed * 0.6));
+            if (keys.current['KeyF']) controlsRef.current.setPolarAngle(Math.min(Math.PI / 2.1, controlsRef.current.getPolarAngle() + rotateSpeed * 0.6));
+
+            // Keyboard Zooming
+            if (keys.current['KeyZ'] || keys.current['KeyX']) {
+                const direction = new THREE.Vector3();
+                direction.subVectors(camera.position, controlsRef.current.target).normalize();
+                const zoomDir = keys.current['KeyZ'] ? -1 : 1;
+
+                // Proposed new position
+                const newPos = camera.position.clone().add(direction.multiplyScalar(zoomDir * zoomSpeed));
+                const newDist = newPos.distanceTo(controlsRef.current.target);
+
+                // Clamp distance
+                if (newDist >= 8 && newDist <= mapSize * 2.5) {
+                    camera.position.copy(newPos);
+                }
+            }
         }
+
         controlsRef.current.update();
 
-        // Enforce minimum camera height so it never goes through the terrain
-        const minY = 5;
+        // Enforce dynamic minimum camera height based on terrain
+        let groundY = 0;
+        if (heightmap && mapWidth && mapHeight) {
+            const tx = Math.floor(camera.position.x + (mapWidth - 1) / 2);
+            const tz = Math.floor(camera.position.z + (mapHeight - 1) / 2);
+            if (tx >= 0 && tx < mapWidth && tz >= 0 && tz < mapHeight) {
+                groundY = heightmap[tz * mapWidth + tx] * HEIGHT_SCALE;
+            }
+        }
+
+        const safetyBuffer = 3;
+        const minY = groundY + safetyBuffer;
         if (camera.position.y < minY) {
             camera.position.y = minY;
         }
@@ -782,9 +945,9 @@ const CameraControls = ({ mapSize, isOrthographic }) => {
             args={[camera, gl.domElement]}
             enablePan
             enableZoom
-            minDistance={15}
+            minDistance={8}
             maxDistance={mapSize * 2.5}
-            maxPolarAngle={isOrthographic ? 0 : Math.PI / 2.4}
+            maxPolarAngle={isOrthographic ? 0 : Math.PI / 2.1}
             minPolarAngle={isOrthographic ? 0 : 0.1}
             enableRotate={!isOrthographic}
         />
@@ -792,7 +955,7 @@ const CameraControls = ({ mapSize, isOrthographic }) => {
 };
 
 // ─── Main Component ────────────────────────────────────────────────────────────
-const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, maxTowns = 8 }) => {
+const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, maxTowns = 8, showTownNames = true }) => {
     const heightmap = terrainData?.heightmap;
     const forestMap = terrainData?.forestMap;
     const towns = terrainData?.towns;
@@ -804,6 +967,7 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
 
     const { waterY, waterThreshold } = useMemo(() => {
         if (!heightmap) return { waterY: 0, waterThreshold: 0 };
+        // We reuse the 30% percentile as the water threshold for consistency
         const sorted = [...heightmap].sort((a, b) => a - b);
         const threshold = sorted[Math.floor(sorted.length * 0.3)];
         return { waterY: threshold * HEIGHT_SCALE, waterThreshold: threshold };
@@ -813,7 +977,8 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
 
     return (
         <div style={{ width: '100%', height: '100%', backgroundColor: '#000', overflow: 'hidden' }}>
-            <Canvas shadows gl={{ antialias: true }}>
+            <style>{PARCHMENT_STYLES}</style>
+            <Canvas shadows gl={{ antialias: true }} dpr={[1, 2]}>
                 {isOrthographic ? (
                     <orthographicCamera
                         makeDefault
@@ -826,7 +991,13 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                     <PerspectiveCamera makeDefault position={[mapSize * 0.7, mapSize * 0.5, mapSize * 0.7]} fov={50} />
                 )}
 
-                <CameraControls mapSize={mapSize} isOrthographic={isOrthographic} />
+                <CameraControls
+                    mapSize={mapSize}
+                    isOrthographic={isOrthographic}
+                    heightmap={heightmap}
+                    mapWidth={width}
+                    mapHeight={height}
+                />
 
                 <ambientLight intensity={0.4} />
                 <directionalLight
@@ -866,6 +1037,7 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                     mapHeight={height}
                     waterThreshold={waterThreshold}
                     maxTowns={maxTowns}
+                    showTownNames={showTownNames}
                 />
 
                 <RoadLayer
@@ -878,7 +1050,7 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                     towns={towns}
                 />
 
-                <WaterPlane size={mapSize * 1.5} level={waterY} />
+                <WaterPlane sizeX={width - 1} sizeZ={height - 1} level={waterY} />
             </Canvas>
         </div>
     );

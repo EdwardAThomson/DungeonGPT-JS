@@ -2,6 +2,7 @@
  * Layered Terrain Generator
  * 5-layer noise pipeline: Multi-octave → Continental Mask → Domain Warping → Power Redistribution → Hydraulic Erosion
  */
+import { generateTownName } from '../../utils/townNameGenerator';
 
 
 // Re-export a local Noise instance factory since the existing module exports generateHeightMap
@@ -428,11 +429,33 @@ export function generateLayeredTerrain(width, height, params = {}) {
         }
     }
 
-    // Assign sizes based on rank
+    // Assign sizes and names based on rank and local biome
     selectedTowns.forEach((t, i) => {
         if (i < 2) t.size = 'city';
         else if (i < 6) t.size = 'town';
         else t.size = 'village';
+
+        // Determine biome for naming
+        let b = 'plains';
+        if (t.norm > 0.7) b = 'mountain';
+        else if (forestMap[t.y * width + t.x] > 0.3) b = 'forest';
+        else {
+            // Check for coastal (water biome)
+            let nearWater = false;
+            for (let dy = -3; dy <= 3; dy++) {
+                for (let dx = -3; dx <= 3; dx++) {
+                    const nx = t.x + dx, ny = t.y + dy;
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        const nh = (heightmap[ny * width + nx] - hMin) / hRange;
+                        if (nh <= waterNorm) { nearWater = true; break; }
+                    }
+                }
+                if (nearWater) break;
+            }
+            if (nearWater) b = 'water';
+        }
+
+        t.name = generateTownName(t.size, b, tRng);
         towns.push(t);
     });
 
