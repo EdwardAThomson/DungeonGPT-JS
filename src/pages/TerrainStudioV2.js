@@ -28,13 +28,11 @@ const Minimap = ({ heightmap, width, height, terrainDataWaterThreshold }) => {
 
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                const normalised = (heightmap[y * width + x] - min) / range;
+                const h = heightmap[y * width + x];
+                const normalised = (h - min) / range;
                 let color;
 
-                if (normalised <= waterNorm) {
-                    // Match the SmoothTerrain water blue
-                    color = '#296b1'; // Approximate #296bad / rgb(0.16, 0.42, 0.68)
-                    // Better to use hex for Canvas filling
+                if (h <= waterThreshold) {
                     color = '#296bad';
                 } else {
                     elevationToColor(normalised, tmpColor);
@@ -45,7 +43,7 @@ const Minimap = ({ heightmap, width, height, terrainDataWaterThreshold }) => {
                 ctx.fillRect(x * scale, y * scale, scale + 0.5, scale + 0.5);
             }
         }
-    }, [heightmap, width, height]);
+    }, [heightmap, width, height, terrainDataWaterThreshold]);
 
     return (
         <div style={{
@@ -94,10 +92,11 @@ const DebugPathMap = ({ terrainData, terrainDataWaterThreshold }) => {
 
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                const normalised = (heightmap[y * width + x] - min) / range;
+                const h = heightmap[y * width + x];
+                const normalised = (h - min) / range;
                 let r, g, b;
 
-                if (normalised <= waterNorm) {
+                if (h <= waterThreshold) {
                     r = 41; g = 107; b = 173; // #296bad
                 } else {
                     elevationToColor(normalised, tmpColor);
@@ -159,7 +158,7 @@ const DebugPathMap = ({ terrainData, terrainDataWaterThreshold }) => {
                 ctx.fillRect(p.x * sx - 2, p.y * sy - 2, 4, 4);
             }
         }
-    }, [terrainData]);
+    }, [terrainData, terrainDataWaterThreshold]);
 
     return (
         <canvas

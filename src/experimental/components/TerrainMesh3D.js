@@ -105,8 +105,9 @@ const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, heightScale, towns = []
         const waterColor = { r: 0.16, g: 0.42, b: 0.68 }; // uniform water blue
 
         for (let i = 0; i < mapWidth * mapHeight; i++) {
-            const normalised = (heightmap[i] - min) / range;
-            if (normalised <= waterNorm) {
+            const h = heightmap[i];
+            const normalised = (h - min) / range;
+            if (h <= waterThreshold) {
                 // Uniform color for all underwater terrain
                 data[i * 4 + 0] = Math.floor(waterColor.r * 255);
                 data[i * 4 + 1] = Math.floor(waterColor.g * 255);
@@ -644,7 +645,7 @@ const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThresh
 
 // ─── Road Layer ────────────────────────────────────────────────────────────────
 const ROAD_WIDTH = 0.3;
-const ROAD_Y_OFFSET = 0.5; // raised to sit above flat-shaded terrain triangles
+const ROAD_Y_OFFSET = 0.7; // raised to sit above flat-shaded terrain triangles
 
 const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshold, heightScale, towns = [] }) => {
     const roadGroup = useMemo(() => {

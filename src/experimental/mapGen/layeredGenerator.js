@@ -597,7 +597,7 @@ export function generateLayeredTerrain(width, height, params = {}) {
                     if (closed[nKey]) continue;
 
                     const nH = heightmap[nKey];
-                    const nIsWater = isWaterMap[nKey];
+                    const nIsWater = nH <= waterThreshold;
 
                     // Cost calculation
                     const isDiag = d.dx !== 0 && d.dy !== 0;
@@ -605,6 +605,22 @@ export function generateLayeredTerrain(width, height, params = {}) {
                     const heightDiff = Math.abs(nH - curH);
                     const slopeCost = heightDiff * 50; // Increased to respect elevation more
                     const waterPen = nIsWater ? 100000 : 0; // Extremely expensive to enter water
+
+                    // Coastline penalty: discourage roads from hugging the water edge
+                    let coastPen = 0;
+                    if (!nIsWater) {
+                        // Check neighbors for water to identify shorelines
+                        const adjDirs = [{ dx: -1, dy: 0 }, { dx: 1, dy: 0 }, { dx: 0, dy: -1 }, { dx: 0, dy: 1 }];
+                        for (const ad of adjDirs) {
+                            const anx = nx + ad.dx, any = ny + ad.dy;
+                            if (anx >= 0 && anx < width && any >= 0 && any < height) {
+                                if (heightmap[any * width + anx] <= waterThreshold) {
+                                    coastPen = 2000;
+                                    break;
+                                }
+                            }
+                        }
+                    }
 
                     // Port transition cost: switching between land and water is expensive
                     let transitionCost = 0;
@@ -618,12 +634,12 @@ export function generateLayeredTerrain(width, height, params = {}) {
                         }
                     }
 
+                    const beachPen = (!nIsWater && nH < waterThreshold + 0.05) ? 500 : 0; // Use raw height for beach check
                     const nNorm = (nH - hMin) / hRange;
-                    const beachPen = (!nIsWater && nNorm < waterNorm + 0.05) ? 100 : 0; // Keep roads away from the waterline
                     const elevPen = Math.pow(nNorm, 4) * 8000; // Exponential penalty for high peaks
 
                     const roadBonus = roadMap[nKey] ? 0.2 : 1.0;
-                    const cost = (baseCost + slopeCost + waterPen + beachPen + elevPen + transitionCost) * roadBonus;
+                    const cost = (baseCost + slopeCost + waterPen + beachPen + coastPen + elevPen + transitionCost) * roadBonus;
 
                     const tentG = gScore[curKey] + cost;
                     if (tentG < gScore[nKey]) {
