@@ -1,12 +1,13 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import TerrainMesh3D from '../experimental/components/TerrainMesh3D';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import TerrainMesh3D, { colorStops, elevationToColor } from '../experimental/components/TerrainMesh3D';
 import { generateLayeredTerrain } from '../experimental/mapGen/layeredGenerator';
+import * as THREE from 'three';
 
 // ─── Minimap ───────────────────────────────────────────────────────────────────
 const Minimap = ({ heightmap, width, height }) => {
-    const canvasRef = React.useRef(null);
+    const canvasRef = useRef(null);
 
-    React.useEffect(() => {
+    useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas || !heightmap) return;
         const ctx = canvas.getContext('2d');
@@ -24,15 +25,22 @@ const Minimap = ({ heightmap, width, height }) => {
         const waterThreshold = sorted[Math.floor(sorted.length * 0.3)];
         const waterNorm = (waterThreshold - min) / range;
 
+        const tmpColor = new THREE.Color();
+
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                const h = (heightmap[y * width + x] - min) / range;
+                const normalised = (heightmap[y * width + x] - min) / range;
                 let color;
-                if (h <= waterNorm) color = `rgb(${Math.floor(20 + h * 100)}, ${Math.floor(60 + h * 180)}, ${Math.floor(140 + h * 100)})`;
-                else if (h < waterNorm + 0.07) color = '#f0e6a8';
-                else if (h < 0.70) color = `rgb(${Math.floor(60 + (1 - h) * 80)}, ${Math.floor(140 + (1 - h) * 60)}, ${Math.floor(50 + (1 - h) * 30)})`;
-                else if (h < 0.85) color = `rgb(${Math.floor(90 + h * 40)}, ${Math.floor(80 + h * 20)}, ${Math.floor(50 + h * 20)})`;
-                else color = `rgb(${Math.floor(180 + h * 60)}, ${Math.floor(180 + h * 60)}, ${Math.floor(180 + h * 60)})`;
+
+                if (normalised <= waterNorm) {
+                    // Match the SmoothTerrain water blue
+                    color = '#296b1'; // Approximate #296bad / rgb(0.16, 0.42, 0.68)
+                    // Better to use hex for Canvas filling
+                    color = '#296bad';
+                } else {
+                    elevationToColor(normalised, tmpColor);
+                    color = `#${tmpColor.getHexString()}`;
+                }
 
                 ctx.fillStyle = color;
                 ctx.fillRect(x * scale, y * scale, scale + 0.5, scale + 0.5);
@@ -59,10 +67,10 @@ const Minimap = ({ heightmap, width, height }) => {
 
 // ─── Debug Path Map ────────────────────────────────────────────────────────────
 const DebugPathMap = ({ terrainData }) => {
-    const canvasRef = React.useRef(null);
+    const canvasRef = useRef(null);
     const canvasSize = 400;
 
-    React.useEffect(() => {
+    useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas || !terrainData?.heightmap) return;
         const ctx = canvas.getContext('2d');
@@ -84,14 +92,21 @@ const DebugPathMap = ({ terrainData }) => {
         const waterNorm = (waterThreshold - min) / range;
 
         const imgData = ctx.createImageData(canvasSize, canvasSize);
+        const tmpColor = new THREE.Color();
+
         for (let y = 0; y < height; y++) {
             for (let x = 0; x < width; x++) {
-                const h = (heightmap[y * width + x] - min) / range;
+                const normalised = (heightmap[y * width + x] - min) / range;
                 let r, g, b;
-                if (h <= waterNorm) { r = 30; g = Math.floor(60 + h * 200); b = 160; }
-                else if (h < waterNorm + 0.07) { r = 200; g = 190; b = 120; }
-                else if (h < 0.70) { r = Math.floor(50 + (1 - h) * 60); g = Math.floor(130 + (1 - h) * 70); b = 40; }
-                else { r = Math.floor(100 + h * 80); g = Math.floor(90 + h * 60); b = Math.floor(60 + h * 40); }
+
+                if (normalised <= waterNorm) {
+                    r = 41; g = 107; b = 173; // #296bad
+                } else {
+                    elevationToColor(normalised, tmpColor);
+                    r = Math.floor(tmpColor.r * 255);
+                    g = Math.floor(tmpColor.g * 255);
+                    b = Math.floor(tmpColor.b * 255);
+                }
 
                 // Fill scaled pixels
                 const px0 = Math.floor(x * sx), py0 = Math.floor(y * sy);

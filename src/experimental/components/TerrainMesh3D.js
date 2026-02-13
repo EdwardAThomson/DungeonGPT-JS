@@ -6,7 +6,7 @@ import * as THREE from 'three';
 // ─── Shared Constants ──────────────────────────────────────────────────────────
 const HEIGHT_SCALE = 75;
 // ─── Elevation → Color ────────────────────────────────────────────────────────
-const colorStops = [
+export const colorStops = [
     { t: 0.00, color: new THREE.Color('#0a2a5e') }, // deep ocean
     { t: 0.15, color: new THREE.Color('#1a5fa0') }, // ocean
     { t: 0.28, color: new THREE.Color('#4a90d9') }, // shallow water
@@ -20,7 +20,7 @@ const colorStops = [
     { t: 1.00, color: new THREE.Color('#f5f5f5') }, // snow
 ];
 
-function elevationToColor(t, out) {
+export function elevationToColor(t, out) {
     const clamped = Math.max(0, Math.min(1, t));
     const target = out || new THREE.Color();
     for (let i = 1; i < colorStops.length; i++) {
