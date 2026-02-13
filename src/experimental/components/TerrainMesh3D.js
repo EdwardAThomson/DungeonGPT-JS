@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Sky, Environment, Html } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Sky, Environment, Html, Line } from '@react-three/drei';
 import * as THREE from 'three';
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -11,12 +11,12 @@ const PARCHMENT_STYLES = `
     position: relative;
     background: radial-gradient(circle, #f4e4bc 0%, #e8d4a8 100%);
     color: #4a2c1d;
-    padding: 3px 18px;
+    padding: 6px 36px;
     font-family: 'Cinzel', serif;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 26px;
     white-space: nowrap;
-    box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.4);
     pointer-events: none;
     user-select: none;
     border-top: 1px solid rgba(255,255,255,0.3);
@@ -27,24 +27,24 @@ const PARCHMENT_STYLES = `
   .town-parchment::after {
     content: '';
     position: absolute;
-    top: 5px;
-    bottom: -5px;
-    width: 12px;
+    top: 10px;
+    bottom: -10px;
+    width: 24px;
     background: #cbb98f;
-    box-shadow: inset 0 0 5px rgba(0,0,0,0.3);
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
     z-index: -1;
   }
 
   .town-parchment::before {
-    left: -8px;
-    border-radius: 4px 0 0 4px;
-    transform: perspective(100px) rotateY(-30deg);
+    left: -16px;
+    border-radius: 8px 0 0 8px;
+    transform: perspective(200px) rotateY(-30deg);
   }
 
   .town-parchment::after {
-    right: -8px;
-    border-radius: 0 4px 4px 0;
-    transform: perspective(100px) rotateY(30deg);
+    right: -16px;
+    border-radius: 0 8px 8px 0;
+    transform: perspective(200px) rotateY(30deg);
   }
 `;
 
@@ -351,7 +351,7 @@ const ForestLayer = ({ heightmap, forestMap, mapWidth, mapHeight, waterThreshold
         cMesh.instanceMatrix.needsUpdate = true;
 
         return { trunkMesh: tMesh, canopyMesh: cMesh };
-    }, [heightmap, forestMap, mapWidth, mapHeight, waterThreshold, treeDensity, towns]);
+    }, [heightmap, forestMap, mapWidth, mapHeight, waterThreshold, treeDensity, towns, roadMap]);
 
     if (!trunkMesh || !canopyMesh) return null;
 
@@ -473,9 +473,11 @@ const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThresh
                 if (wy === null) continue;
 
                 // Extra check for roads at building center
-                const ix = Math.floor(Math.max(0, Math.min(mapWidth - 1, bx)));
-                const iy = Math.floor(Math.max(0, Math.min(mapHeight - 1, by)));
-                if (roadMap && roadMap[iy * mapWidth + ix]) continue;
+                if (roadMap) {
+                    const ix = Math.floor(Math.max(0, Math.min(mapWidth - 1, bx)));
+                    const iy = Math.floor(Math.max(0, Math.min(mapHeight - 1, by)));
+                    if (roadMap[iy * mapWidth + ix]) continue;
+                }
 
                 // Check collision with already-placed buildings
                 let collision = false;
@@ -614,9 +616,9 @@ const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThresh
                 <Html
                     key={i}
                     position={[
-                        t.x - mapWidth / 2,
-                        (heightmap[Math.floor(t.y) * mapWidth + Math.floor(t.x)] * HEIGHT_SCALE) + 14,
-                        t.y - mapHeight / 2
+                        t.x - (mapWidth - 1) / 2,
+                        (heightmap[Math.floor(t.y) * mapWidth + Math.floor(t.x)] * HEIGHT_SCALE) + 18,
+                        t.y - (mapHeight - 1) / 2
                     ]}
                     center
                     distanceFactor={35}
@@ -667,21 +669,20 @@ const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshol
         const getWaterY = () => waterThreshold * HEIGHT_SCALE + 0.45;
 
         const isWaterAt = (px, py) => {
-            const ix = Math.floor(Math.max(0, Math.min(mapWidth - 1, px)));
-            const iy = Math.floor(Math.max(0, Math.min(mapHeight - 1, py)));
             const h = sampleHeight(px, py);
             return h <= waterThreshold;
         };
 
         // Helper: check if point is near any town center
-        const isNearTown = (px, py) => {
-            for (const t of towns) {
-                const dx = px - t.x;
-                const dy = py - t.y;
-                if (dx * dx + dy * dy < 16) return true; // 4 unit radius squared
-            }
-            return false;
-        };
+        // (Unused but kept as reference for future clipping)
+        // const isNearTown = (px, py) => {
+        //     for (const t of towns) {
+        //         const dx = px - t.x;
+        //         const dy = py - t.y;
+        //         if (dx * dx + dy * dy < 16) return true; 
+        //     }
+        //     return false;
+        // };
 
         const roadMat = new THREE.MeshStandardMaterial({
             color: '#795548', // Brown (Material 500)
@@ -756,7 +757,7 @@ const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshol
             const segments = [];
             let currentSegmentPoints = [];
             let currentSegmentIsWater = false;
-            let lastPointWasClipped = false;
+            // let lastPointWasClipped = false;
 
             for (let i = 0; i < sp.length; i++) {
                 const p = sp[i];
@@ -840,6 +841,63 @@ const WaterPlane = ({ sizeX, sizeZ, level }) => (
         />
     </mesh>
 );
+
+// ─── Terrain Grid ───────────────────────────────────────────────────────────────
+const TerrainGrid = ({ heightmap, mapWidth, mapHeight, waterThreshold, color = '#ffffff', opacity = 0.4 }) => {
+    const gridLines = useMemo(() => {
+        if (!heightmap) return [];
+        const lines = [];
+        const w = mapWidth - 1;
+        const h = mapHeight - 1;
+        const wCenter = w / 2;
+        const hCenter = h / 2;
+        const cells = 5;
+
+        // Vertical lines (constant X)
+        for (let i = 0; i <= cells; i++) {
+            const frac = i / cells;
+            const mapX = Math.round(frac * (mapWidth - 1));
+            const worldX = mapX - wCenter;
+            const points = [];
+            // Subdivide the line to follow terrain
+            for (let j = 0; j < mapHeight; j++) {
+                const terrainH = Math.max(heightmap[j * mapWidth + mapX], waterThreshold) * HEIGHT_SCALE;
+                points.push(new THREE.Vector3(worldX, terrainH + 0.1, j - hCenter));
+            }
+            lines.push(points);
+        }
+
+        // Horizontal lines (constant Z)
+        for (let i = 0; i <= cells; i++) {
+            const frac = i / cells;
+            const mapY = Math.round(frac * (mapHeight - 1));
+            const worldZ = mapY - hCenter;
+            const points = [];
+            for (let j = 0; j < mapWidth; j++) {
+                const terrainH = Math.max(heightmap[mapY * mapWidth + j], waterThreshold) * HEIGHT_SCALE;
+                points.push(new THREE.Vector3(j - wCenter, terrainH + 0.1, worldZ));
+            }
+            lines.push(points);
+        }
+        return lines;
+    }, [heightmap, mapWidth, mapHeight, waterThreshold]);
+
+    return (
+        <group>
+            {gridLines.map((points, i) => (
+                <Line
+                    key={i}
+                    points={points}
+                    color={color}
+                    lineWidth={1.5}
+                    transparent
+                    opacity={opacity}
+                    depthTest={true}
+                />
+            ))}
+        </group>
+    );
+};
 
 // ─── Camera Controls ───────────────────────────────────────────────────────────
 const CameraControls = ({ mapSize, isOrthographic, heightmap, mapWidth, mapHeight }) => {
@@ -955,7 +1013,7 @@ const CameraControls = ({ mapSize, isOrthographic, heightmap, mapWidth, mapHeigh
 };
 
 // ─── Main Component ────────────────────────────────────────────────────────────
-const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, maxTowns = 8, showTownNames = true }) => {
+const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, maxTowns = 8, showTownNames = true, showGrid = false }) => {
     const heightmap = terrainData?.heightmap;
     const forestMap = terrainData?.forestMap;
     const towns = terrainData?.towns;
@@ -1051,6 +1109,14 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                 />
 
                 <WaterPlane sizeX={width - 1} sizeZ={height - 1} level={waterY} />
+                {showGrid && (
+                    <TerrainGrid
+                        heightmap={heightmap}
+                        mapWidth={width}
+                        mapHeight={height}
+                        waterThreshold={waterThreshold}
+                    />
+                )}
             </Canvas>
         </div>
     );

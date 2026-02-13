@@ -171,7 +171,7 @@ function erode(heightmap, width, height, opts) {
 
         for (let step = 0; step < maxLifetime; step++) {
             const grad = getGradient(px, py);
-            const gradLen = Math.sqrt(grad.x * grad.x + grad.y * grad.y);
+            // const gradLen = Math.sqrt(grad.x * grad.x + grad.y * grad.y);
 
             // Blend gradient direction with previous direction for inertia
             const inertia = 0.3;
@@ -555,7 +555,7 @@ export function generateLayeredTerrain(width, height, params = {}) {
 
                 const curH = heightmap[curKey];
                 const curNorm = (curH - hMin) / hRange;
-                const curIsWater = curNorm <= waterNorm;
+                // const curIsWater = curNorm <= waterNorm;
 
                 for (const d of dirs) {
                     const nx = cur.x + d.dx, ny = cur.y + d.dy;

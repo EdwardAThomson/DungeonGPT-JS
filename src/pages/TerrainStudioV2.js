@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import TerrainMesh3D, { colorStops, elevationToColor } from '../experimental/components/TerrainMesh3D';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import TerrainMesh3D, { elevationToColor } from '../experimental/components/TerrainMesh3D';
 import { generateLayeredTerrain } from '../experimental/mapGen/layeredGenerator';
 import * as THREE from 'three';
 
@@ -225,6 +225,7 @@ const TerrainStudioV2 = () => {
     const [maxTowns, setMaxTowns] = useState(8);
     const [showDebugMap, setShowDebugMap] = useState(false);
     const [showTownNames, setShowTownNames] = useState(true);
+    const [showGrid, setShowGrid] = useState(false);
 
     // Initial terrain
     const [terrainData, setTerrainData] = useState(() =>
@@ -257,6 +258,7 @@ const TerrainStudioV2 = () => {
                     treeDensity={treeDensity}
                     maxTowns={maxTowns}
                     showTownNames={showTownNames}
+                    showGrid={showGrid}
                 />
             </div>
 
@@ -352,6 +354,10 @@ const TerrainStudioV2 = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <input type="checkbox" checked={showTownNames} onChange={(e) => setShowTownNames(e.target.checked)} />
                                 <span style={{ fontSize: '0.72rem', color: '#eee' }}>Show Town Names</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <input type="checkbox" checked={showGrid} onChange={(e) => setShowGrid(e.target.checked)} />
+                                <span style={{ fontSize: '0.72rem', color: '#eee' }}>Show Tactical Grid (5x5)</span>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <input type="checkbox" checked={showDebugMap} onChange={(e) => setShowDebugMap(e.target.checked)} />
