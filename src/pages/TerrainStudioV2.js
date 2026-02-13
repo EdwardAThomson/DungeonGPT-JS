@@ -193,12 +193,23 @@ const Slider = ({ label, value, min, max, step = 1, color = '#4a90e2', unit = ''
     </div>
 );
 
-// ─── Default Params ────────────────────────────────────────────────────────────
-const defaultSeed = 42;
-const defaultResolution = 256;
+// ─── Default Config ────────────────────────────────────────────────────────────
+const DEFAULT_CONFIG = {
+    seed: 421,
+    resolution: 512,
+    octaves: 6,
+    persistence: 0.5,
+    seaLevel: 30,
+    warpStrength: 0.6,
+    exponent: 1.5,
+    erosionEnabled: false,
+    erosionParticles: 70000,
+    treeDensity: 30,
+    maxTowns: 8
+};
 
 const buildParams = (seed, octaves, persistence, seaLevel, warpStrength, exponent, erosionEnabled, erosionParticles, maxTowns = 8) => ({
-    seed: parseInt(seed) || 42,
+    seed: parseInt(seed) || DEFAULT_CONFIG.seed,
     terrain: { octaves, persistence, lacunarity: 2.0, baseFreq: 0.01 },
     continent: { freq: 0.005, seaLevel: (seaLevel - 50) * 0.008 },
     warp: { strength: warpStrength, freq: 0.008 },
@@ -209,27 +220,39 @@ const buildParams = (seed, octaves, persistence, seaLevel, warpStrength, exponen
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 const TerrainStudioV2 = () => {
-    const [seed, setSeed] = useState(String(defaultSeed));
-    const [resolution, setResolution] = useState(defaultResolution);
-    const [octaves, setOctaves] = useState(6);
-    const [persistence, setPersistence] = useState(0.5);
-    const [seaLevel, setSeaLevel] = useState(30);
-    const [warpStrength, setWarpStrength] = useState(1.5);
-    const [exponent, setExponent] = useState(1.5);
-    const [erosionEnabled, setErosionEnabled] = useState(false);
-    const [erosionParticles, setErosionParticles] = useState(70000);
+    const [seed, setSeed] = useState(String(DEFAULT_CONFIG.seed));
+    const [resolution, setResolution] = useState(DEFAULT_CONFIG.resolution);
+    const [octaves, setOctaves] = useState(DEFAULT_CONFIG.octaves);
+    const [persistence, setPersistence] = useState(DEFAULT_CONFIG.persistence);
+    const [seaLevel, setSeaLevel] = useState(DEFAULT_CONFIG.seaLevel);
+    const [warpStrength, setWarpStrength] = useState(DEFAULT_CONFIG.warpStrength);
+    const [exponent, setExponent] = useState(DEFAULT_CONFIG.exponent);
+    const [erosionEnabled, setErosionEnabled] = useState(DEFAULT_CONFIG.erosionEnabled);
+    const [erosionParticles, setErosionParticles] = useState(DEFAULT_CONFIG.erosionParticles);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [viewMode, setViewMode] = useState('3d');
     const [generating, setGenerating] = useState(false);
-    const [treeDensity, setTreeDensity] = useState(30);
-    const [maxTowns, setMaxTowns] = useState(8);
+    const [treeDensity, setTreeDensity] = useState(DEFAULT_CONFIG.treeDensity);
+    const [maxTowns, setMaxTowns] = useState(DEFAULT_CONFIG.maxTowns);
     const [showDebugMap, setShowDebugMap] = useState(false);
     const [showTownNames, setShowTownNames] = useState(true);
     const [showGrid, setShowGrid] = useState(false);
 
     // Initial terrain
     const [terrainData, setTerrainData] = useState(() =>
-        generateLayeredTerrain(defaultResolution, defaultResolution, buildParams(defaultSeed, 6, 0.5, 30, 1.5, 1.5, false, 70000))
+        generateLayeredTerrain(DEFAULT_CONFIG.resolution, DEFAULT_CONFIG.resolution,
+            buildParams(
+                DEFAULT_CONFIG.seed,
+                DEFAULT_CONFIG.octaves,
+                DEFAULT_CONFIG.persistence,
+                DEFAULT_CONFIG.seaLevel,
+                DEFAULT_CONFIG.warpStrength,
+                DEFAULT_CONFIG.exponent,
+                DEFAULT_CONFIG.erosionEnabled,
+                DEFAULT_CONFIG.erosionParticles,
+                DEFAULT_CONFIG.maxTowns
+            )
+        )
     );
 
     const handleGenerate = useCallback(() => {
@@ -330,8 +353,8 @@ const TerrainStudioV2 = () => {
                             <div style={{ fontSize: '0.65rem', color: '#555', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '12px' }}>Noise Layers</div>
                         </div>
 
-                        <Slider label="Octaves" value={octaves} min={2} max={8} color="#66bb6a" onChange={setOctaves} />
-                        <Slider label="Persistence (Roughness)" value={persistence} min={0.3} max={0.7} step={0.05} color="#66bb6a" onChange={setPersistence} />
+                        <Slider label="Octaves" value={octaves} min={3} max={8} color="#66bb6a" onChange={setOctaves} />
+                        <Slider label="Persistence (Roughness)" value={persistence} min={0.3} max={0.5} step={0.05} color="#66bb6a" onChange={setPersistence} />
                         <Slider label="Sea Level" value={seaLevel} min={0} max={100} color="#4a90e2" unit="%" onChange={setSeaLevel} />
 
                         {/* Section: Shaping */}
@@ -339,15 +362,15 @@ const TerrainStudioV2 = () => {
                             <div style={{ fontSize: '0.65rem', color: '#555', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '12px' }}>Shaping</div>
                         </div>
 
-                        <Slider label="Domain Warp Strength" value={warpStrength} min={0} max={2.5} step={0.1} color="#ab47bc" onChange={setWarpStrength} />
-                        <Slider label="Peak Exponent" value={exponent} min={1.0} max={3.0} step={0.1} color="#ff7043" onChange={setExponent} />
+                        <Slider label="Domain Warp Strength" value={warpStrength} min={0} max={0.6} step={0.1} color="#ab47bc" onChange={setWarpStrength} />
+                        <Slider label="Peak Exponent" value={exponent} min={1.3} max={2.0} step={0.1} color="#ff7043" onChange={setExponent} />
 
                         {/* Section: Vegetation */}
                         <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '12px', marginTop: '4px', marginBottom: '8px' }}>
                             <div style={{ fontSize: '0.65rem', color: '#555', textTransform: 'uppercase', letterSpacing: '2px', marginBottom: '12px' }}>Vegetation</div>
                         </div>
 
-                        <Slider label="Tree Density" value={treeDensity} min={0} max={100} step={5} color="#43a047" unit="%" onChange={setTreeDensity} />
+                        <Slider label="Tree Density" value={treeDensity} min={0} max={50} step={5} color="#43a047" unit="%" onChange={setTreeDensity} />
                         <Slider label="Towns" value={maxTowns} min={0} max={15} step={1} color="#8d6e63" onChange={setMaxTowns} />
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>

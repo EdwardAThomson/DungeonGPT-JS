@@ -49,7 +49,7 @@ const PARCHMENT_STYLES = `
 `;
 
 // ─── Shared Constants ──────────────────────────────────────────────────────────
-const HEIGHT_SCALE = 75;
+// HEIGHT_SCALE is now dynamic based on resolution (75 at 256px, 100 at 512px)
 // ─── Elevation → Color ────────────────────────────────────────────────────────
 export const colorStops = [
     { t: 0.00, color: new THREE.Color('#0a2a5e') }, // deep ocean
@@ -82,7 +82,7 @@ export function elevationToColor(t, out) {
 }
 
 // ─── Terrain Mesh ──────────────────────────────────────────────────────────────
-const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, towns = [] }) => {
+const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, heightScale, towns = [] }) => {
     const meshRef = useRef();
     // heightScale can affect mountain height I think
 
@@ -177,7 +177,7 @@ const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, towns = [] }) => {
 
         for (let i = 0; i < mapWidth * mapHeight; i++) {
             const h = heightmap[i];
-            const finalY = Math.max(h, waterThreshold) * HEIGHT_SCALE;
+            const finalY = Math.max(h, waterThreshold) * heightScale;
             positions.setY(i, finalY);
         }
 
@@ -215,7 +215,7 @@ const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, towns = [] }) => {
                 const sampleIdx = (side.name === 'N' || side.name === 'E') ? side.segments - i : i;
                 const x = side.axis === 'x' ? sampleIdx : (side.mapX || 0);
                 const y = side.axis === 'y' ? sampleIdx : (side.mapY || 0);
-                const h = Math.max(heightmap[y * mapWidth + x], waterThreshold) * HEIGHT_SCALE;
+                const h = Math.max(heightmap[y * mapWidth + x], waterThreshold) * heightScale;
 
                 // Correcting vertex ordering: 
                 // In PlaneGeometry(..., segments, 1), vertices 0..segments are Row 0 (TOP)
@@ -254,7 +254,7 @@ const SmoothTerrain = ({ heightmap, mapWidth, mapHeight, towns = [] }) => {
 };
 
 // ─── Forest Layer ──────────────────────────────────────────────────────────────
-const ForestLayer = ({ heightmap, forestMap, mapWidth, mapHeight, waterThreshold, treeDensity = 50, towns = [], roadMap = null }) => {
+const ForestLayer = ({ heightmap, forestMap, mapWidth, mapHeight, waterThreshold, heightScale, treeDensity = 50, towns = [], roadMap = null }) => {
     const { trunkMesh, canopyMesh } = useMemo(() => {
         if (!forestMap || !heightmap || treeDensity <= 0) return { trunkMesh: null, canopyMesh: null };
 
@@ -271,6 +271,19 @@ const ForestLayer = ({ heightmap, forestMap, mapWidth, mapHeight, waterThreshold
         let rngState = 777;
         const rng = () => { rngState = (rngState * 9301 + 49297) % 233280; return rngState / 233280; };
 
+        // Bilinear helper for smooth height sampling
+        const getInterpHeight = (px, py) => {
+            const fx = Math.max(0, Math.min(mapWidth - 1.001, px));
+            const fy = Math.max(0, Math.min(mapHeight - 1.001, py));
+            const ix = Math.floor(fx), iy = Math.floor(fy);
+            const tx = fx - ix, ty = fy - iy;
+            const h00 = heightmap[iy * mapWidth + ix];
+            const h10 = heightmap[iy * mapWidth + ix + 1];
+            const h01 = heightmap[(iy + 1) * mapWidth + ix];
+            const h11 = heightmap[(iy + 1) * mapWidth + ix + 1];
+            return h00 * (1 - tx) * (1 - ty) + h10 * tx * (1 - ty) + h01 * (1 - tx) * ty + h11 * tx * ty;
+        };
+
         for (let y = stride; y < mapHeight - stride; y += stride) {
             for (let x = stride; x < mapWidth - stride; x += stride) {
                 const density = forestMap[y * mapWidth + x];
@@ -279,19 +292,18 @@ const ForestLayer = ({ heightmap, forestMap, mapWidth, mapHeight, waterThreshold
                 // Jitter position for natural look
                 const jx = x + (rng() - 0.5) * stride * 0.8;
                 const jy = y + (rng() - 0.5) * stride * 0.8;
-                const ix = Math.floor(Math.max(0, Math.min(mapWidth - 1, jx)));
-                const iy = Math.floor(Math.max(0, Math.min(mapHeight - 1, jy)));
 
-                const h = heightmap[iy * mapWidth + ix];
-                const clampedH = Math.max(h, waterThreshold);
+                // Use interpolated height at the jittered position
+                const h = getInterpHeight(jx, jy);
+
+                // Skip if underwater or TOO close to water (shoreline check)
+                // We add a +0.1 buffer to h vs waterThreshold to prevent visually submerged bases
+                if (h <= waterThreshold + 0.005) continue;
 
                 // World position: PlaneGeometry centered at origin
                 const wx = jx - (mapWidth - 1) / 2;
                 const wz = jy - (mapHeight - 1) / 2;
-                const wy = clampedH * HEIGHT_SCALE;
-
-                // Skip if underwater
-                if (h < waterThreshold) continue;
+                const wy = h * heightScale;
 
                 // Skip if inside a town radius (prevent tree-building overlap)
                 let inTown = false;
@@ -305,6 +317,8 @@ const ForestLayer = ({ heightmap, forestMap, mapWidth, mapHeight, waterThreshold
 
                 // Skip if on or near a road
                 if (roadMap) {
+                    const ix = Math.floor(Math.max(0, Math.min(mapWidth - 1, jx)));
+                    const iy = Math.floor(Math.max(0, Math.min(mapHeight - 1, jy)));
                     let onRoad = false;
                     for (let dy = -1; dy <= 1; dy++) {
                         for (let dx = -1; dx <= 1; dx++) {
@@ -375,7 +389,7 @@ const FLOOR_HEIGHT = 0.6;
 const STONE_COLORS = ['#b0b0b0', '#a3a3a3', '#999999', '#b8b8b8', '#ababab', '#9e9e9e', '#c0c0c0'];
 const ROOF_COLORS = ['#8b4513', '#6b3410', '#7a3d15', '#5c2e0e', '#944a18'];
 
-const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThreshold, maxTowns = 8, showTownNames = true }) => {
+const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThreshold, heightScale, maxTowns = 8, showTownNames = true }) => {
     const { wallMesh, roofMesh, keepGroup } = useMemo(() => {
         if (!towns || towns.length === 0 || !heightmap || maxTowns <= 0)
             return { wallMesh: null, roofMesh: null, keepGroup: null };
@@ -408,7 +422,7 @@ const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThresh
             // Reject if at or near water — buffer zone prevents shore-edge buildings
             const buffer = waterThreshold * 1.05;
             if (h <= buffer) return null;
-            return h * HEIGHT_SCALE;
+            return h * heightScale;
         };
 
         for (const town of visibleTowns) {
@@ -617,7 +631,7 @@ const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThresh
                     key={i}
                     position={[
                         t.x - (mapWidth - 1) / 2,
-                        (heightmap[Math.floor(t.y) * mapWidth + Math.floor(t.x)] * HEIGHT_SCALE) + 18,
+                        (heightmap[Math.floor(t.y) * mapWidth + Math.floor(t.x)] * heightScale) + 18,
                         t.y - (mapHeight - 1) / 2
                     ]}
                     center
@@ -634,9 +648,9 @@ const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThresh
 
 // ─── Road Layer ────────────────────────────────────────────────────────────────
 const ROAD_WIDTH = 0.3;
-const ROAD_Y_OFFSET = 0.4; // raised to sit above flat-shaded terrain triangles
+const ROAD_Y_OFFSET = 0.5; // raised to sit above flat-shaded terrain triangles
 
-const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshold, towns = [] }) => {
+const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshold, heightScale, towns = [] }) => {
     const roadGroup = useMemo(() => {
         if (!roads || roads.length === 0 || !heightmap) return null;
 
@@ -662,11 +676,11 @@ const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshol
 
         const getY = (px, py) => {
             const h = sampleHeight(px, py);
-            return Math.max(h, waterThreshold) * HEIGHT_SCALE + ROAD_Y_OFFSET;
+            return Math.max(h, waterThreshold) * heightScale + ROAD_Y_OFFSET;
         };
 
-        // Water segments need to sit above the water plane (which is at waterThreshold * heightScale + 0.3)
-        const getWaterY = () => waterThreshold * HEIGHT_SCALE + 0.45;
+        // Water segments need to sit slightly below the water plane (at +0.3) for a submerged ripple effect
+        const getWaterY = () => waterThreshold * heightScale + 0.2;
 
         const isWaterAt = (px, py) => {
             const h = sampleHeight(px, py);
@@ -843,7 +857,7 @@ const WaterPlane = ({ sizeX, sizeZ, level }) => (
 );
 
 // ─── Terrain Grid ───────────────────────────────────────────────────────────────
-const TerrainGrid = ({ heightmap, mapWidth, mapHeight, waterThreshold, color = '#ffffff', opacity = 0.4 }) => {
+const TerrainGrid = ({ heightmap, mapWidth, mapHeight, waterThreshold, heightScale, color = '#ffffff', opacity = 0.4 }) => {
     const gridLines = useMemo(() => {
         if (!heightmap) return [];
         const lines = [];
@@ -861,7 +875,7 @@ const TerrainGrid = ({ heightmap, mapWidth, mapHeight, waterThreshold, color = '
             const points = [];
             // Subdivide the line to follow terrain
             for (let j = 0; j < mapHeight; j++) {
-                const terrainH = Math.max(heightmap[j * mapWidth + mapX], waterThreshold) * HEIGHT_SCALE;
+                const terrainH = Math.max(heightmap[j * mapWidth + mapX], waterThreshold) * heightScale;
                 points.push(new THREE.Vector3(worldX, terrainH + 0.1, j - hCenter));
             }
             lines.push(points);
@@ -874,7 +888,7 @@ const TerrainGrid = ({ heightmap, mapWidth, mapHeight, waterThreshold, color = '
             const worldZ = mapY - hCenter;
             const points = [];
             for (let j = 0; j < mapWidth; j++) {
-                const terrainH = Math.max(heightmap[mapY * mapWidth + j], waterThreshold) * HEIGHT_SCALE;
+                const terrainH = Math.max(heightmap[mapY * mapWidth + j], waterThreshold) * heightScale;
                 points.push(new THREE.Vector3(j - wCenter, terrainH + 0.1, worldZ));
             }
             lines.push(points);
@@ -900,7 +914,7 @@ const TerrainGrid = ({ heightmap, mapWidth, mapHeight, waterThreshold, color = '
 };
 
 // ─── Camera Controls ───────────────────────────────────────────────────────────
-const CameraControls = ({ mapSize, isOrthographic, heightmap, mapWidth, mapHeight }) => {
+const CameraControls = ({ mapSize, isOrthographic, heightmap, mapWidth, mapHeight, heightScale }) => {
     const { camera, gl } = useThree();
     const controlsRef = useRef();
     const keys = useRef({});
@@ -986,7 +1000,7 @@ const CameraControls = ({ mapSize, isOrthographic, heightmap, mapWidth, mapHeigh
             const tx = Math.floor(camera.position.x + (mapWidth - 1) / 2);
             const tz = Math.floor(camera.position.z + (mapHeight - 1) / 2);
             if (tx >= 0 && tx < mapWidth && tz >= 0 && tz < mapHeight) {
-                groundY = heightmap[tz * mapWidth + tx] * HEIGHT_SCALE;
+                groundY = heightmap[tz * mapWidth + tx] * heightScale;
             }
         }
 
@@ -1023,13 +1037,21 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
     const height = terrainData?.height || 1;
     const mapSize = Math.max(width, height);
 
+    // Higher resolution = taller mountains (75 at 256px, 100 at 512px)
+    // quick find scale height / heightScale -- do not delete line
+    const heightScale = useMemo(() => 50 + (width / 256) * 25, [width]);
+
     const { waterY, waterThreshold } = useMemo(() => {
         if (!heightmap) return { waterY: 0, waterThreshold: 0 };
-        // We reuse the 30% percentile as the water threshold for consistency
-        const sorted = [...heightmap].sort((a, b) => a - b);
-        const threshold = sorted[Math.floor(sorted.length * 0.3)];
-        return { waterY: threshold * HEIGHT_SCALE, waterThreshold: threshold };
-    }, [heightmap]);
+        // Use the threshold provided by the generator for perfect synchronization.
+        // Fallback to 30% percentile only if missing.
+        let threshold = terrainData.waterThreshold;
+        if (threshold === undefined) {
+            const sorted = [...heightmap].sort((a, b) => a - b);
+            threshold = sorted[Math.floor(sorted.length * 0.3)];
+        }
+        return { waterY: threshold * heightScale, waterThreshold: threshold };
+    }, [heightmap, terrainData.waterThreshold, heightScale]);
 
     if (!terrainData || !heightmap) return <div>Loading Terrain...</div>;
 
@@ -1055,6 +1077,7 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                     heightmap={heightmap}
                     mapWidth={width}
                     mapHeight={height}
+                    heightScale={heightScale}
                 />
 
                 <ambientLight intensity={0.4} />
@@ -1073,6 +1096,7 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                     heightmap={heightmap}
                     mapWidth={width}
                     mapHeight={height}
+                    heightScale={heightScale}
                     towns={towns}
                 />
 
@@ -1082,6 +1106,7 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                     mapWidth={width}
                     mapHeight={height}
                     waterThreshold={waterThreshold}
+                    heightScale={heightScale}
                     treeDensity={treeDensity}
                     towns={towns || []}
                     roadMap={terrainData?.roadMap}
@@ -1094,6 +1119,7 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                     mapWidth={width}
                     mapHeight={height}
                     waterThreshold={waterThreshold}
+                    heightScale={heightScale}
                     maxTowns={maxTowns}
                     showTownNames={showTownNames}
                 />
@@ -1105,6 +1131,7 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                     mapWidth={width}
                     mapHeight={height}
                     waterThreshold={waterThreshold}
+                    heightScale={heightScale}
                     towns={towns}
                 />
 
@@ -1115,6 +1142,7 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                         mapWidth={width}
                         mapHeight={height}
                         waterThreshold={waterThreshold}
+                        heightScale={heightScale}
                     />
                 )}
             </Canvas>

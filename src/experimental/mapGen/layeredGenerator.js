@@ -171,7 +171,7 @@ function erode(heightmap, width, height, opts) {
 
         for (let step = 0; step < maxLifetime; step++) {
             const grad = getGradient(px, py);
-            // const gradLen = Math.sqrt(grad.x * grad.x + grad.y * grad.y);
+            const gradLen = Math.sqrt(grad.x * grad.x + grad.y * grad.y);
 
             // Blend gradient direction with previous direction for inertia
             const inertia = 0.3;
@@ -337,6 +337,46 @@ export function generateLayeredTerrain(width, height, params = {}) {
         }
     }
 
+
+    // ─── Pre-calculate Water and Port Maps ──────────────────────────────
+    const sortedForThreshold = [...heightmap].sort((a, b) => a - b);
+    const waterThreshold = sortedForThreshold[Math.floor(sortedForThreshold.length * 0.3)];
+    const waterNorm = (waterThreshold - hMin) / hRange;
+
+    // We pre-calculate these to ensure consistency and performance during pathfinding
+    const isWaterMap = new Uint8Array(width * height);
+    const isSignificantMap = new Uint8Array(width * height);
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const idx = y * width + x;
+            const h = (heightmap[idx] - hMin) / hRange;
+            if (h <= waterNorm) {
+                isWaterMap[idx] = 1;
+            }
+        }
+    }
+
+    // Now calculate significance based on the water map
+    for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+            const idx = y * width + x;
+            if (isWaterMap[idx]) continue; // significance only matters for land
+
+            let landCount = 0;
+            const r = 2; // 5x5 check
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    const nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        if (!isWaterMap[ny * width + nx]) landCount++;
+                    }
+                }
+            }
+            if (landCount >= 12) isSignificantMap[idx] = 1;
+        }
+    }
+
     // ─── Town placement ────────────────────────────────────────────────
     // Score-based: prefer flat, mid-elevation, coastal areas
     const towns = [];
@@ -347,11 +387,6 @@ export function generateLayeredTerrain(width, height, params = {}) {
     let townRng = seed * 7 + 31;
     const tRng = () => { townRng = (townRng * 9301 + 49297) % 233280; return townRng / 233280; };
 
-    // Water threshold for town placement — reuse hMin/hRange from forest section
-    const sortedForTowns = [...heightmap].sort((a, b) => a - b);
-    const waterThreshold = sortedForTowns[Math.floor(sortedForTowns.length * 0.3)];
-    const waterNorm = (waterThreshold - hMin) / hRange;
-
     for (let y = candidateStride; y < height - candidateStride; y += candidateStride) {
         for (let x = candidateStride; x < width - candidateStride; x += candidateStride) {
             // Add jitter
@@ -360,11 +395,14 @@ export function generateLayeredTerrain(width, height, params = {}) {
             const cx = Math.max(2, Math.min(width - 3, jx));
             const cy = Math.max(2, Math.min(height - 3, jy));
 
-            const h = heightmap[cy * width + cx];
+            const idx = cy * width + cx;
+            const h = heightmap[idx];
             const norm = (h - hMin) / hRange;
 
-            // Skip underwater and near-shore areas (generous buffer)
-            if (norm <= waterNorm + 0.06 || norm > 0.75) continue;
+            // Skip underwater (using precomputed map) and mountains
+            if (isWaterMap[idx] || norm > 0.75) continue;
+            // Near-shore buffer
+            if (norm <= waterNorm + 0.05) continue;
 
             // Flatness score: low local height variance is good
             let variance = 0;
@@ -396,8 +434,7 @@ export function generateLayeredTerrain(width, height, params = {}) {
                 for (let dx = -coastR; dx <= coastR; dx += 2) {
                     const nx = cx + dx, ny = cy + dy;
                     if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                        const nh = (heightmap[ny * width + nx] - hMin) / hRange;
-                        if (nh <= waterNorm) { coastalBonus = 0.3; break; }
+                        if (isWaterMap[ny * width + nx]) { coastalBonus = 0.3; break; }
                     }
                 }
                 if (coastalBonus > 0) break;
@@ -446,8 +483,7 @@ export function generateLayeredTerrain(width, height, params = {}) {
                 for (let dx = -3; dx <= 3; dx++) {
                     const nx = t.x + dx, ny = t.y + dy;
                     if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                        const nh = (heightmap[ny * width + nx] - hMin) / hRange;
-                        if (nh <= waterNorm) { nearWater = true; break; }
+                        if (isWaterMap[ny * width + nx]) { nearWater = true; break; }
                     }
                 }
                 if (nearWater) break;
@@ -513,7 +549,6 @@ export function generateLayeredTerrain(width, height, params = {}) {
             const cameFrom = new Int32Array(width * height).fill(-1);
             const closed = new Uint8Array(width * height);
 
-            // Simple sorted open list (good enough for our grid sizes)
             const open = [];
             const startKey = posKey(sx, sy);
             gScore[startKey] = 0;
@@ -528,7 +563,6 @@ export function generateLayeredTerrain(width, height, params = {}) {
             ];
 
             while (open.length > 0) {
-                // Pop lowest f
                 let bestIdx = 0;
                 for (let i = 1; i < open.length; i++) {
                     if (open[i].f < open[bestIdx].f) bestIdx = i;
@@ -537,7 +571,6 @@ export function generateLayeredTerrain(width, height, params = {}) {
                 open.splice(bestIdx, 1);
 
                 if (cur.x === gx && cur.y === gy) {
-                    // Reconstruct path
                     const path = [];
                     let key = posKey(gx, gy);
                     while (key !== -1) {
@@ -554,8 +587,7 @@ export function generateLayeredTerrain(width, height, params = {}) {
                 closed[curKey] = 1;
 
                 const curH = heightmap[curKey];
-                const curNorm = (curH - hMin) / hRange;
-                // const curIsWater = curNorm <= waterNorm;
+                const curIsWater = isWaterMap[curKey];
 
                 for (const d of dirs) {
                     const nx = cur.x + d.dx, ny = cur.y + d.dy;
@@ -565,53 +597,56 @@ export function generateLayeredTerrain(width, height, params = {}) {
                     if (closed[nKey]) continue;
 
                     const nH = heightmap[nKey];
-                    const nNorm = (nH - hMin) / hRange;
-                    const nIsWater = nNorm <= waterNorm;
+                    const nIsWater = isWaterMap[nKey];
 
-                    // Cost: base + gentle slope awareness + water penalty
-                    // Low slope cost — roads should be fairly direct, not loop around gentle hills
-                    // High water cost — roads should hug coastline, only cross water if no land route
-                    // Road reuse bonus — cheaper to travel on existing roads (0.2 vs 1.0)
+                    // Cost calculation
                     const isDiag = d.dx !== 0 && d.dy !== 0;
                     const baseCost = isDiag ? 1.414 : 1.0;
                     const heightDiff = Math.abs(nH - curH);
-                    const slopeCost = heightDiff * 8;
-                    const waterPen = nIsWater ? 1000 : 0;
-                    // Beach penalty: stay away from the water's edge (wet shoreline)
-                    const beachPen = (!nIsWater && nNorm < waterNorm + 0.05) ? 20 : 0;
+                    const slopeCost = heightDiff * 50; // Increased to respect elevation more
+                    const waterPen = nIsWater ? 100000 : 0; // Extremely expensive to enter water
 
-                    // Huge discount for using existing roads (encourage merging)
+                    // Port transition cost: switching between land and water is expensive
+                    let transitionCost = 0;
+                    if (curIsWater !== nIsWater) {
+                        // High penalty for entering/exiting water
+                        transitionCost = 2000;
+                        // Even higher if the land spot is not a significant landmass (prevent double hops)
+                        const landPoint = curIsWater ? nKey : curKey;
+                        if (!isSignificantMap[landPoint]) {
+                            transitionCost += 5000;
+                        }
+                    }
+
+                    const nNorm = (nH - hMin) / hRange;
+                    const beachPen = (!nIsWater && nNorm < waterNorm + 0.05) ? 100 : 0; // Keep roads away from the waterline
+                    const elevPen = Math.pow(nNorm, 4) * 8000; // Exponential penalty for high peaks
+
                     const roadBonus = roadMap[nKey] ? 0.2 : 1.0;
-
-                    const cost = (baseCost + slopeCost + waterPen + beachPen) * roadBonus;
+                    const cost = (baseCost + slopeCost + waterPen + beachPen + elevPen + transitionCost) * roadBonus;
 
                     const tentG = gScore[curKey] + cost;
                     if (tentG < gScore[nKey]) {
                         cameFrom[nKey] = curKey;
                         gScore[nKey] = tentG;
-                        const h = Math.abs(gx - nx) + Math.abs(gy - ny);
-                        fScore[nKey] = tentG + h * 2.0; // heavily weighted for direct paths
+                        const dist = Math.abs(gx - nx) + Math.abs(gy - ny);
+                        fScore[nKey] = tentG + dist * 1.2; // less greedy than 2.0
                         open.push({ x: nx, y: ny, f: fScore[nKey] });
                     }
                 }
             }
-            return null; // no path
+            return null;
         };
 
-        // ── Minimum Spanning Tree (Kruskal's) for road network ──
-        // Build complete graph of town pairs sorted by Euclidean distance
+        // ── MST Logic ──
         const edges = [];
         for (let i = 0; i < towns.length; i++) {
             for (let j = i + 1; j < towns.length; j++) {
-                edges.push({
-                    i, j,
-                    dist: Math.hypot(towns[i].x - towns[j].x, towns[i].y - towns[j].y)
-                });
+                edges.push({ i, j, dist: Math.hypot(towns[i].x - towns[j].x, towns[i].y - towns[j].y) });
             }
         }
         edges.sort((a, b) => a.dist - b.dist);
 
-        // Union-Find
         const parent = towns.map((_, i) => i);
         const rank = new Uint8Array(towns.length);
         const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
@@ -624,7 +659,6 @@ export function generateLayeredTerrain(width, height, params = {}) {
             return true;
         };
 
-        // Pick MST edges
         const mstEdges = [];
         for (const e of edges) {
             if (union(e.i, e.j)) {
@@ -633,44 +667,56 @@ export function generateLayeredTerrain(width, height, params = {}) {
             }
         }
 
-        // Run A* pathfinding only for MST edges
+        const getNudgedPort = (px, py) => {
+            let avgX = 0, avgY = 0, count = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const nx = px + dx, ny = py + dy;
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        if (!isWaterMap[ny * width + nx]) {
+                            avgX += dx; avgY += dy; count++;
+                        }
+                    }
+                }
+            }
+            if (count === 0) return { x: px, y: py };
+            const len = Math.sqrt(avgX * avgX + avgY * avgY) || 1;
+            // Nudge 0.7 units toward land center for stability
+            return { x: px + (avgX / len) * 0.7, y: py + (avgY / len) * 0.7 };
+        };
+
         for (const { i, j } of mstEdges) {
             const a = towns[i], b = towns[j];
             const path = pathfind(a.x, a.y, b.x, b.y);
             if (path) {
-                // Detect water crossings
                 const pathPorts = [];
                 for (let k = 1; k < path.length; k++) {
-                    const prevH = (heightmap[path[k - 1].y * width + path[k - 1].x] - hMin) / hRange;
-                    const curH = (heightmap[path[k].y * width + path[k].x] - hMin) / hRange;
-                    const prevWater = prevH <= waterNorm;
-                    const curWater = curH <= waterNorm;
+                    const idxPrev = path[k - 1].y * width + path[k - 1].x;
+                    const idxCur = path[k].y * width + path[k].x;
+                    const prevIsWater = isWaterMap[idxPrev];
+                    const curIsWater = isWaterMap[idxCur];
 
-                    if (!prevWater && curWater) {
-                        pathPorts.push({ x: path[k - 1].x, y: path[k - 1].y, type: 'departure' });
-                    } else if (prevWater && !curWater) {
-                        pathPorts.push({ x: path[k].x, y: path[k].y, type: 'arrival' });
+                    if (!prevIsWater && curIsWater) {
+                        // Land -> Water
+                        const nudged = getNudgedPort(path[k - 1].x, path[k - 1].y);
+                        pathPorts.push({ x: nudged.x, y: nudged.y, type: 'departure' });
+                    } else if (prevIsWater && !curIsWater) {
+                        // Water -> Land
+                        const nudged = getNudgedPort(path[k].x, path[k].y);
+                        pathPorts.push({ x: nudged.x, y: nudged.y, type: 'arrival' });
                     }
                 }
-
                 roads.push(path);
                 ports.push(...pathPorts);
-
-                // Mark path on roadMap so future paths can reuse it
-                for (const p of path) {
-                    roadMap[p.y * width + p.x] = 1;
-                }
+                for (const p of path) { roadMap[p.y * width + p.x] = 1; }
             }
         }
 
-        // Post-process: flatten terrain under roads ("cut and fill")
-        // This prevents roads from clipping into steep slopes
+        // Post-process roadbed flattening
         for (const path of roads) {
-            for (let i = 0; i < path.length; i++) {
-                const p = path[i];
+            for (const p of path) {
                 const idx = p.y * width + p.x;
-
-                // Simple 3x3 blur for roadbed
+                if (isWaterMap[idx]) continue; // don't flatten under water paths
                 let sum = 0, count = 0;
                 for (let dy = -1; dy <= 1; dy++) {
                     for (let dx = -1; dx <= 1; dx++) {
@@ -682,8 +728,6 @@ export function generateLayeredTerrain(width, height, params = {}) {
                     }
                 }
                 const avg = sum / count;
-
-                // Blend current height slightly towards average to flatten spikes/dips
                 heightmap[idx] = heightmap[idx] * 0.4 + avg * 0.6;
             }
         }
@@ -691,13 +735,14 @@ export function generateLayeredTerrain(width, height, params = {}) {
 
     return {
         heightmap,
-        roadMap, // exported for building avoidance
+        roadMap,
         forestMap,
         towns,
         roads,
         ports,
         width,
         height,
+        waterThreshold, // Pass the threshold used for all logic
         seaLevel: continentOpts.seaLevel
     };
 }
