@@ -645,7 +645,7 @@ const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThresh
 
 // ─── Road Layer ────────────────────────────────────────────────────────────────
 const ROAD_WIDTH = 0.3;
-const ROAD_Y_OFFSET = 0.7; // raised to sit above flat-shaded terrain triangles
+const ROAD_Y_OFFSET = 0.05; // grounded, using polygonOffset for Z-fighting
 
 const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshold, heightScale, towns = [] }) => {
     const roadGroup = useMemo(() => {
@@ -698,7 +698,10 @@ const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshol
         const roadMat = new THREE.MeshStandardMaterial({
             color: '#795548', // Brown (Material 500)
             roughness: 0.9,
-            side: THREE.DoubleSide
+            side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1
         });
         const waterRoadMat = new THREE.MeshStandardMaterial({
             color: '#607090', roughness: 0.6, metalness: 0.1,
