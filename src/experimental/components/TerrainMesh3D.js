@@ -386,7 +386,7 @@ const FLOOR_HEIGHT = 0.6;
 const STONE_COLORS = ['#b0b0b0', '#a3a3a3', '#999999', '#b8b8b8', '#ababab', '#9e9e9e', '#c0c0c0'];
 const ROOF_COLORS = ['#8b4513', '#6b3410', '#7a3d15', '#5c2e0e', '#944a18'];
 
-const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThreshold, heightScale, maxTowns = 8, showTownNames = true }) => {
+const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThreshold, heightScale, maxTowns = 8, showTownNames = true, isOrthographic = false }) => {
     const { wallMesh, roofMesh, keepGroup } = useMemo(() => {
         if (!towns || towns.length === 0 || !heightmap || maxTowns <= 0)
             return { wallMesh: null, roofMesh: null, keepGroup: null };
@@ -632,7 +632,7 @@ const TownLayer = ({ towns, heightmap, roadMap, mapWidth, mapHeight, waterThresh
                         t.y - (mapHeight - 1) / 2
                     ]}
                     center
-                    distanceFactor={35}
+                    distanceFactor={isOrthographic ? 200 : 150} // distance factor for name plates?
                 >
                     <div className="town-parchment">
                         {t.name || `Settlement ${i}`}
@@ -913,8 +913,19 @@ const TerrainGrid = ({ heightmap, mapWidth, mapHeight, waterThreshold, heightSca
     );
 };
 
+// ─── Scene Rotation Wrapper (for 2D Q/E rotation) ─────────────────────────────
+const RotatingScene = ({ rotationRef, children }) => {
+    const groupRef = useRef();
+    useFrame(() => {
+        if (groupRef.current) {
+            groupRef.current.rotation.y = rotationRef.current;
+        }
+    });
+    return <group ref={groupRef}>{children}</group>;
+};
+
 // ─── Camera Controls ───────────────────────────────────────────────────────────
-const CameraControls = ({ mapSize, isOrthographic, heightmap, mapWidth, mapHeight, heightScale }) => {
+const CameraControls = ({ mapSize, isOrthographic, heightmap, mapWidth, mapHeight, heightScale, sceneRotationRef }) => {
     const { camera, gl } = useThree();
     const controlsRef = useRef();
     const keys = useRef({});
@@ -932,7 +943,7 @@ const CameraControls = ({ mapSize, isOrthographic, heightmap, mapWidth, mapHeigh
 
     useFrame((state, delta) => {
         if (!controlsRef.current) return;
-        const moveSpeed = 25 * delta;
+        const moveSpeed = 80 * delta;
         const rotateSpeed = 2.5 * delta;
         const zoomSpeed = 40 * delta;
 
@@ -966,30 +977,32 @@ const CameraControls = ({ mapSize, isOrthographic, heightmap, mapWidth, mapHeigh
             camera.position.add(move);
         }
 
-        if (!isOrthographic) {
-            // Horizontal Rotation
-            if (keys.current['KeyQ']) controlsRef.current.setAzimuthalAngle(controlsRef.current.getAzimuthalAngle() - rotateSpeed);
-            if (keys.current['KeyE']) controlsRef.current.setAzimuthalAngle(controlsRef.current.getAzimuthalAngle() + rotateSpeed);
+        // Keyboard Zooming — dispatch through OrbitControls for consistent behavior
+        if (keys.current['KeyZ'] || keys.current['KeyX']) {
+            // Z = zoom in (negative deltaY), X = zoom out (positive deltaY)
+            const deltaY = keys.current['KeyZ'] ? -120 : 120;
+            gl.domElement.dispatchEvent(new WheelEvent('wheel', {
+                deltaY,
+                clientX: gl.domElement.clientWidth / 2,
+                clientY: gl.domElement.clientHeight / 2,
+                bubbles: true,
+            }));
+        }
 
-            // Vertical Rotation (Pitch)
+        // Horizontal Rotation (Q/E works in both 2D and 3D)
+        if (keys.current['KeyQ'] || keys.current['KeyE']) {
+            const rotDir = keys.current['KeyQ'] ? -1 : 1;
+            if (isOrthographic && sceneRotationRef) {
+                sceneRotationRef.current += rotateSpeed * 0.5 * rotDir;
+            } else {
+                controlsRef.current.setAzimuthalAngle(controlsRef.current.getAzimuthalAngle() + rotateSpeed * rotDir);
+            }
+        }
+
+        if (!isOrthographic) {
+            // Vertical Rotation (Pitch) — 3D only
             if (keys.current['KeyR']) controlsRef.current.setPolarAngle(Math.max(0.1, controlsRef.current.getPolarAngle() - rotateSpeed * 0.6));
             if (keys.current['KeyF']) controlsRef.current.setPolarAngle(Math.min(Math.PI / 2.1, controlsRef.current.getPolarAngle() + rotateSpeed * 0.6));
-
-            // Keyboard Zooming
-            if (keys.current['KeyZ'] || keys.current['KeyX']) {
-                const direction = new THREE.Vector3();
-                direction.subVectors(camera.position, controlsRef.current.target).normalize();
-                const zoomDir = keys.current['KeyZ'] ? -1 : 1;
-
-                // Proposed new position
-                const newPos = camera.position.clone().add(direction.multiplyScalar(zoomDir * zoomSpeed));
-                const newDist = newPos.distanceTo(controlsRef.current.target);
-
-                // Clamp distance
-                if (newDist >= 8 && newDist <= mapSize * 2.5) {
-                    camera.position.copy(newPos);
-                }
-            }
         }
 
         controlsRef.current.update();
@@ -1028,6 +1041,7 @@ const CameraControls = ({ mapSize, isOrthographic, heightmap, mapWidth, mapHeigh
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, maxTowns = 8, showTownNames = true, showGrid = false }) => {
+    const sceneRotationRef = useRef(0);
     const heightmap = terrainData?.heightmap;
     const forestMap = terrainData?.forestMap;
     const towns = terrainData?.towns;
@@ -1078,6 +1092,7 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                     mapWidth={width}
                     mapHeight={height}
                     heightScale={heightScale}
+                    sceneRotationRef={sceneRotationRef}
                 />
 
                 <ambientLight intensity={0.4} />
@@ -1092,60 +1107,63 @@ const TerrainMesh3D = ({ terrainData, isOrthographic = false, treeDensity = 50, 
                 <Sky sunPosition={[100, 30, 100]} />
                 <Environment preset="forest" />
 
-                <SmoothTerrain
-                    heightmap={heightmap}
-                    mapWidth={width}
-                    mapHeight={height}
-                    heightScale={heightScale}
-                    towns={towns}
-                    terrainDataWaterThreshold={waterThreshold}
-                />
+                <RotatingScene rotationRef={sceneRotationRef}>
+                    <SmoothTerrain
+                        heightmap={heightmap}
+                        mapWidth={width}
+                        mapHeight={height}
+                        heightScale={heightScale}
+                        towns={towns}
+                        terrainDataWaterThreshold={waterThreshold}
+                    />
 
-                <ForestLayer
-                    heightmap={heightmap}
-                    forestMap={forestMap}
-                    mapWidth={width}
-                    mapHeight={height}
-                    waterThreshold={waterThreshold}
-                    heightScale={heightScale}
-                    treeDensity={treeDensity}
-                    towns={towns || []}
-                    roadMap={terrainData?.roadMap}
-                />
+                    <ForestLayer
+                        heightmap={heightmap}
+                        forestMap={forestMap}
+                        mapWidth={width}
+                        mapHeight={height}
+                        waterThreshold={waterThreshold}
+                        heightScale={heightScale}
+                        treeDensity={treeDensity}
+                        towns={towns || []}
+                        roadMap={terrainData?.roadMap}
+                    />
 
-                <TownLayer
-                    towns={towns}
-                    heightmap={heightmap}
-                    roadMap={terrainData?.roadMap}
-                    mapWidth={width}
-                    mapHeight={height}
-                    waterThreshold={waterThreshold}
-                    heightScale={heightScale}
-                    maxTowns={maxTowns}
-                    showTownNames={showTownNames}
-                />
+                    <TownLayer
+                        towns={towns}
+                        heightmap={heightmap}
+                        roadMap={terrainData?.roadMap}
+                        mapWidth={width}
+                        mapHeight={height}
+                        waterThreshold={waterThreshold}
+                        heightScale={heightScale}
+                        maxTowns={maxTowns}
+                        showTownNames={showTownNames}
+                        isOrthographic={isOrthographic}
+                    />
 
-                <RoadLayer
-                    roads={roads}
-                    ports={ports}
-                    heightmap={heightmap}
-                    mapWidth={width}
-                    mapHeight={height}
-                    waterThreshold={waterThreshold}
-                    heightScale={heightScale}
-                    towns={towns}
-                />
-
-                <WaterPlane sizeX={width - 1} sizeZ={height - 1} level={waterY} />
-                {showGrid && (
-                    <TerrainGrid
+                    <RoadLayer
+                        roads={roads}
+                        ports={ports}
                         heightmap={heightmap}
                         mapWidth={width}
                         mapHeight={height}
                         waterThreshold={waterThreshold}
                         heightScale={heightScale}
+                        towns={towns}
                     />
-                )}
+
+                    <WaterPlane sizeX={width - 1} sizeZ={height - 1} level={waterY} />
+                    {showGrid && (
+                        <TerrainGrid
+                            heightmap={heightmap}
+                            mapWidth={width}
+                            mapHeight={height}
+                            waterThreshold={waterThreshold}
+                            heightScale={heightScale}
+                        />
+                    )}
+                </RotatingScene>
             </Canvas>
         </div>
     );
