@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import CharacterContext from "../contexts/CharacterContext";
 import SettingsContext from "../contexts/SettingsContext";
@@ -7,6 +7,43 @@ import WorldMapDisplay from "../components/WorldMapDisplay";
 import { storyTemplates } from "../data/storyTemplates";
 import { llmService } from "../services/llmService";
 
+// Resolve milestone location names to map coordinates by matching town and mountain names
+const resolveMilestoneCoords = (milestones, mapData) => {
+  if (!milestones || !mapData) return milestones;
+
+  // Build a lookup of named locations -> coordinates from the map
+  const locationLookup = {};
+  for (let y = 0; y < mapData.length; y++) {
+    for (let x = 0; x < mapData[y].length; x++) {
+      const tile = mapData[y][x];
+      if (tile.poi === 'town' && tile.townName) {
+        locationLookup[tile.townName.toLowerCase()] = { x, y };
+      }
+      // For mountains, store the first tile found for each range name
+      if (tile.poi === 'mountain' && tile.mountainName) {
+        const key = tile.mountainName.toLowerCase();
+        if (!locationLookup[key]) {
+          locationLookup[key] = { x, y };
+        }
+      }
+    }
+  }
+
+  return milestones
+    .filter(m => m.text && m.text.trim())
+    .map(m => {
+      const resolved = { ...m };
+      if (m.location) {
+        const coords = locationLookup[m.location.toLowerCase()];
+        if (coords) {
+          resolved.mapX = coords.x;
+          resolved.mapY = coords.y;
+        }
+      }
+      return resolved;
+    });
+};
+
 const GameSettings = () => {
 
   // characters should be saved in Context
@@ -14,6 +51,11 @@ const GameSettings = () => {
   // Get settings, provider, and model state from context
   const { settings, setSettings, selectedProvider, setSelectedProvider, selectedModel, setSelectedModel } = useContext(SettingsContext);
   const navigate = useNavigate();
+
+  // Clear any stale session ID when starting a new game
+  useEffect(() => {
+    localStorage.removeItem('activeGameSessionId');
+  }, []);
 
   // Existing state
   const [shortDescription, setShortDescription] = useState(settings?.shortDescription || '');
@@ -25,7 +67,11 @@ const GameSettings = () => {
   const [technologyLevel, setTechnologyLevel] = useState(settings?.technologyLevel || 'Medieval'); // Default example
   const [responseVerbosity, setResponseVerbosity] = useState(settings?.responseVerbosity || 'Moderate'); // Default example
   const [campaignGoal, setCampaignGoal] = useState(settings?.campaignGoal || '');
-  const [milestones, setMilestones] = useState(settings?.milestones?.join('\n') || '');
+  const [milestones, setMilestones] = useState(() => {
+    if (!settings?.milestones || settings.milestones.length === 0) return [];
+    if (typeof settings.milestones[0] === 'object') return settings.milestones;
+    return settings.milestones.map(text => ({ text, location: null }));
+  });
 
   // State for validation error message
   const [formError, setFormError] = useState('');
@@ -35,7 +81,7 @@ const GameSettings = () => {
   const [worldSeed, setWorldSeed] = useState(settings?.worldSeed || null);
   const [showMapPreview, setShowMapPreview] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [customNames, setCustomNames] = useState([]);
+  const [customNames, setCustomNames] = useState({ towns: [], mountains: [] });
 
   // AI Generation state
   const [isAiGenerating, setIsAiGenerating] = useState(false);
@@ -55,6 +101,9 @@ const GameSettings = () => {
 
   const { setIsSettingsModalOpen } = useContext(SettingsContext);
 
+  // Fields are locked when a preset template or AI-generated story is selected (only custom is editable)
+  const isTemplateLocked = selectedTemplate && selectedTemplate !== 'custom';
+
   const applyTemplate = (template) => {
     setSelectedTemplate(template.id);
     setShortDescription(template.settings.shortDescription);
@@ -64,8 +113,8 @@ const GameSettings = () => {
     setTechnologyLevel(template.settings.technologyLevel);
     setResponseVerbosity(template.settings.responseVerbosity);
     setCampaignGoal(template.settings.campaignGoal || '');
-    setMilestones(template.settings.milestones?.join('\n') || '');
-    setCustomNames(template.customNames || []);
+    setMilestones(template.settings.milestones || []);
+    setCustomNames(template.customNames || { towns: [], mountains: [] });
   };
 
   const handleAiGenerateStory = async () => {
@@ -77,13 +126,13 @@ const GameSettings = () => {
     Provide the output in STRICT JSON format with the following keys:
     - shortDescription: A 2-sentence overview of the world and the conflict.
     - campaignGoal: The ultimate objective of the campaign (1 sentence).
-    - milestones: An array of 3 intermediate objectives to achieve that goal.
+    - milestones: An array of 3 objects, each with "text" (the objective) and "location" (one of the town or mountain names where it takes place, or null if it's an unknown location).
     - grimnessLevel: Choose one [Noble, Neutral, Bleak, Grim].
     - darknessLevel: Choose one [Bright, Neutral, Grey, Dark].
     - magicLevel: Choose one [No Magic, Low Magic, High Magic, Arcane Tech].
     - technologyLevel: Choose one [Ancient, Medieval, Renaissance, Industrial].
     - responseVerbosity: Choose one [Concise, Moderate, Descriptive].
-    - customNames: An array of 4 thematic town names (First name should be the most important/Capital).
+    - customNames: An object with two arrays: "towns" (4 thematic town names, first should be the capital) and "mountains" (1 thematic mountain range name).
 
     Make it creative and atmospheric. Do not include any text other than the JSON object.`;
 
@@ -132,13 +181,22 @@ const GameSettings = () => {
       // Apply the generated data
       setShortDescription(data.shortDescription || '');
       setCampaignGoal(data.campaignGoal || '');
-      setMilestones((data.milestones || []).join('\n'));
+      setMilestones((data.milestones || []).map(m => {
+        if (typeof m === 'object' && m.text) return { text: m.text, location: m.location || null };
+        return { text: String(m), location: null };
+      }));
       setGrimnessLevel(data.grimnessLevel || 'Neutral');
       setDarknessLevel(data.darknessLevel || 'Neutral');
       setMagicLevel(data.magicLevel || 'Low Magic');
       setTechnologyLevel(data.technologyLevel || 'Medieval');
       setResponseVerbosity(data.responseVerbosity || 'Moderate');
-      setCustomNames(data.customNames || []);
+      // Normalize customNames: support both structured object and legacy flat array
+      const rawNames = data.customNames || [];
+      if (Array.isArray(rawNames)) {
+        setCustomNames({ towns: rawNames, mountains: [] });
+      } else {
+        setCustomNames({ towns: rawNames.towns || [], mountains: rawNames.mountains || [] });
+      }
 
     } catch (error) {
       console.error("AI Story Generation failed:", error);
@@ -177,7 +235,7 @@ const GameSettings = () => {
       technologyLevel,
       responseVerbosity,
       campaignGoal,
-      milestones: milestones.split('\n').filter(m => m.trim() !== ''),
+      milestones: resolveMilestoneCoords(milestones, generatedMap),
       worldSeed,
       templateName
     };
@@ -187,8 +245,12 @@ const GameSettings = () => {
       return;
     }
 
+    // Generate a fresh game session ID for this new game
+    const gameSessionId = `game-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    localStorage.setItem('activeGameSessionId', gameSessionId);
+
     setSettings(settingsData);
-    navigate('/hero-selection', { state: { characters, generatedMap, worldSeed } });
+    navigate('/hero-selection', { state: { characters, generatedMap, worldSeed, gameSessionId } });
   };
 
   return (
@@ -268,9 +330,9 @@ const GameSettings = () => {
               className={`template-card ${selectedTemplate === 'custom' || !selectedTemplate ? 'active' : ''}`}
               onClick={() => {
                 setSelectedTemplate('custom');
-                setCustomNames([]);
+                setCustomNames({ towns: [], mountains: [] });
                 setCampaignGoal('');
-                setMilestones('');
+                setMilestones([]);
               }}
             >
               <div className="template-icon">✍️</div>
@@ -282,6 +344,12 @@ const GameSettings = () => {
           </div>
         </div>
 
+        {isTemplateLocked && (
+          <div style={{ padding: '10px 14px', background: 'rgba(var(--primary-rgb, 212, 175, 55), 0.1)', border: '1px solid var(--primary)', borderRadius: '8px', marginBottom: '20px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            🔒 Story fields are locked to keep milestones in sync with map locations. Choose <strong>Custom Tale</strong> for full editing freedom.
+          </div>
+        )}
+
         <div className="settings-row">
           <div className="settings-group full-width">
             <label htmlFor="shortDescription">Adventure Description</label>
@@ -291,6 +359,8 @@ const GameSettings = () => {
               onChange={(e) => setShortDescription(e.target.value)}
               placeholder="e.g., A group of mercenaries investigating a haunted mine..."
               className="settings-textarea"
+              readOnly={isTemplateLocked}
+              style={isTemplateLocked ? { opacity: 0.7, cursor: 'not-allowed' } : {}}
             />
           </div>
         </div>
@@ -304,7 +374,8 @@ const GameSettings = () => {
               onChange={(e) => setCampaignGoal(e.target.value)}
               placeholder="e.g., Defeat the dragon terrorizing the kingdom..."
               className="settings-textarea"
-              style={{ minHeight: '60px' }}
+              readOnly={isTemplateLocked}
+              style={{ minHeight: '60px', ...(isTemplateLocked ? { opacity: 0.7, cursor: 'not-allowed' } : {}) }}
             />
           </div>
         </div>
@@ -314,19 +385,42 @@ const GameSettings = () => {
             <label htmlFor="milestones">Intermediate Milestones (one per line)</label>
             <textarea
               id="milestones"
-              value={milestones}
-              onChange={(e) => setMilestones(e.target.value)}
+              value={milestones.map(m => m.text).join('\n')}
+              onChange={(e) => {
+                if (isTemplateLocked) return;
+                const lines = e.target.value.split('\n');
+                setMilestones(lines.map((line, i) => {
+                  const existing = milestones[i];
+                  if (existing && existing.text === line) return existing;
+                  return { text: line, location: existing?.location || null };
+                }));
+              }}
               placeholder="e.g., Find the ancient key&#10;Bribe the castle guard..."
               className="settings-textarea"
-              style={{ minHeight: '80px' }}
+              readOnly={isTemplateLocked}
+              style={{ minHeight: '80px', ...(isTemplateLocked ? { opacity: 0.7, cursor: 'not-allowed' } : {}) }}
             />
+            {milestones.some(m => m.location) && (
+              <div style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                {milestones.filter(m => m.text.trim()).map((m, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                    <span style={{ opacity: 0.7 }}>{i + 1}.</span>
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.text}</span>
+                    {m.location
+                      ? <span style={{ color: 'var(--primary)', fontWeight: 'bold', whiteSpace: 'nowrap' }}>📍 {m.location}</span>
+                      : <span style={{ opacity: 0.4, whiteSpace: 'nowrap' }}>No location</span>
+                    }
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
         <div className="settings-grid">
           <div className="settings-group">
             <label htmlFor="grimness">Grimness</label>
-            <select id="grimness" value={grimnessLevel} onChange={(e) => setGrimnessLevel(e.target.value)} className="settings-select">
+            <select id="grimness" value={grimnessLevel} onChange={(e) => setGrimnessLevel(e.target.value)} className="settings-select" disabled={isTemplateLocked}>
               <option value="">Select...</option>
               {grimnessOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
@@ -334,7 +428,7 @@ const GameSettings = () => {
 
           <div className="settings-group">
             <label htmlFor="darkness">Darkness</label>
-            <select id="darkness" value={darknessLevel} onChange={(e) => setDarknessLevel(e.target.value)} className="settings-select">
+            <select id="darkness" value={darknessLevel} onChange={(e) => setDarknessLevel(e.target.value)} className="settings-select" disabled={isTemplateLocked}>
               <option value="">Select...</option>
               {darknessOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
@@ -342,21 +436,21 @@ const GameSettings = () => {
 
           <div className="settings-group">
             <label htmlFor="magic">Magic Level</label>
-            <select id="magic" value={magicLevel} onChange={(e) => setMagicLevel(e.target.value)} className="settings-select">
+            <select id="magic" value={magicLevel} onChange={(e) => setMagicLevel(e.target.value)} className="settings-select" disabled={isTemplateLocked}>
               {magicOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           </div>
 
           <div className="settings-group">
             <label htmlFor="tech">Technology</label>
-            <select id="tech" value={technologyLevel} onChange={(e) => setTechnologyLevel(e.target.value)} className="settings-select">
+            <select id="tech" value={technologyLevel} onChange={(e) => setTechnologyLevel(e.target.value)} className="settings-select" disabled={isTemplateLocked}>
               {technologyOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           </div>
 
           <div className="settings-group">
             <label htmlFor="verbosity">Narrative Style</label>
-            <select id="verbosity" value={responseVerbosity} onChange={(e) => setResponseVerbosity(e.target.value)} className="settings-select">
+            <select id="verbosity" value={responseVerbosity} onChange={(e) => setResponseVerbosity(e.target.value)} className="settings-select" disabled={isTemplateLocked}>
               {verbosityOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           </div>

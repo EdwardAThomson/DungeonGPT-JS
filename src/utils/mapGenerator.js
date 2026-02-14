@@ -3,7 +3,7 @@
 // Random but sensible map generator
 // Creates varied world maps with forests, mountains, and towns
 
-import { generateTownName } from './townNameGenerator';
+import { generateTownName, generateMountainName } from './townNameGenerator';
 import { generateTownPaths, markPathTiles } from './pathfinding';
 
 /**
@@ -11,10 +11,14 @@ import { generateTownPaths, markPathTiles } from './pathfinding';
  * @param {number} width - Map width (default 10)
  * @param {number} height - Map height (default 10)
  * @param {number} seed - Optional seed for reproducible maps
- * @param {Array} customNames - Optional array of strings for town names
+ * @param {Object|Array} customNames - Optional names: { towns: [...], mountains: [...] } or legacy array of town names
  * @returns {Array} 2D array of map tiles
  */
-export const generateMapData = (width = 10, height = 10, seed = null, customNames = []) => {
+export const generateMapData = (width = 10, height = 10, seed = null, customNames = {}) => {
+  // Normalize customNames: support legacy flat array or new structured object
+  const normalizedNames = Array.isArray(customNames)
+    ? { towns: customNames, mountains: [] }
+    : { towns: customNames?.towns || [], mountains: customNames?.mountains || [] };
   // Use seed for reproducible maps, or random
   const rng = seed !== null ? seededRandom(seed) : Math.random;
 
@@ -52,12 +56,14 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
     placeForestCluster(mapData, width, height, rng);
   }
 
-  // 4. Generate 2-3 mountain ranges
-  const numMountainRanges = 2 + Math.floor(rng() * 2);
-  const mountainTiles = []; // Track mountains for river sources
+  // 4. Generate 2-3 mountain ranges (guarantee at least 1)
+  const numMountainRanges = Math.max(1, 2 + Math.floor(rng() * 2));
+  const mountainTiles = []; // Flat list for river sources
   for (let i = 0; i < numMountainRanges; i++) {
     const range = placeMountainRange(mapData, width, height, rng);
-    if (range) mountainTiles.push(...range);
+    if (range && range.length > 0) {
+      mountainTiles.push(...range);
+    }
   }
 
   // 5. Generate Rivers (from mountains to lakes/coast)
@@ -86,7 +92,7 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
     mapData[startingTown.y][startingTown.x].isStartingTown = true;
 
     // Assign sizes and names to all towns
-    assignTownSizesAndNames(mapData, townsList, rng, customNames);
+    assignTownSizesAndNames(mapData, townsList, rng, normalizedNames.towns);
 
     const startingTile = mapData[startingTown.y][startingTown.x];
     console.log(`[MAP_GENERATION] Selected starting town: ${startingTile.townName} (${startingTile.townSize}) at (${startingTown.x}, ${startingTown.y})`);
@@ -101,13 +107,15 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
     markPathTiles(mapData, paths);
   }
 
+  // Harmonize mountain names: flood-fill adjacent tiles into clusters, assign one name per cluster
+  harmonizeMountainNames(mapData, rng, normalizedNames.mountains);
+
   // Debug: Log all towns on the map
   console.log('[MAP_GENERATION] Map generation complete. Towns on map:');
   townsList.forEach(town => {
     const tile = mapData[town.y][town.x];
     console.log(`  ${tile.townName} (${tile.townSize}) at (${town.x}, ${town.y})${tile.isStartingTown ? ' ⭐ STARTING TOWN' : ''}`);
   });
-
   return mapData;
 };
 
@@ -333,6 +341,92 @@ function assignTownSizesAndNames(mapData, townsList, rng, customNames = []) {
     tile.descriptionSeed = sizeDescriptions[size] || 'A settlement';
 
     console.log(`[ASSIGN_TOWNS] ${tile.townName} (${size}) at (${town.x}, ${town.y})`);
+  });
+}
+
+// Harmonize mountain names across the map using flood-fill connected components.
+// Adjacent mountain tiles are grouped into clusters. Each cluster gets one name.
+// Custom names (from templates/milestones) are prioritized and never overwritten.
+function harmonizeMountainNames(mapData, rng, customMountainNames = []) {
+  const height = mapData.length;
+  const width = mapData[0].length;
+  const visited = Array.from({ length: height }, () => Array(width).fill(false));
+  const clusters = [];
+
+  // Flood-fill to find connected components of mountain tiles (4-directional)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (visited[y][x] || mapData[y][x].poi !== 'mountain') continue;
+
+      const cluster = [];
+      const queue = [{ x, y }];
+      visited[y][x] = true;
+
+      while (queue.length > 0) {
+        const { x: cx, y: cy } = queue.shift();
+        cluster.push(mapData[cy][cx]);
+
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height
+            && !visited[ny][nx] && mapData[ny][nx].poi === 'mountain') {
+            visited[ny][nx] = true;
+            queue.push({ x: nx, y: ny });
+          }
+        }
+      }
+
+      clusters.push(cluster);
+    }
+  }
+
+  console.log(`[HARMONIZE_MOUNTAINS] Found ${clusters.length} mountain clusters`);
+
+  // Build a set of custom names for priority detection
+  const customNameSet = new Set(customMountainNames.map(n => n.toLowerCase()));
+  const remainingCustomNames = [...customMountainNames];
+
+  clusters.forEach((cluster, i) => {
+    // Collect any existing names in this cluster, prioritizing custom names
+    let chosenName = null;
+
+    // First pass: look for a custom name already assigned to a tile in this cluster
+    for (const tile of cluster) {
+      if (tile.mountainName && customNameSet.has(tile.mountainName.toLowerCase())) {
+        chosenName = tile.mountainName;
+        break;
+      }
+    }
+
+    // Second pass: if no custom name on tiles, try assigning one from the remaining pool
+    if (!chosenName && remainingCustomNames.length > 0) {
+      chosenName = remainingCustomNames.shift();
+    }
+
+    // Third pass: use any existing generated name in the cluster
+    if (!chosenName) {
+      for (const tile of cluster) {
+        if (tile.mountainName) {
+          chosenName = tile.mountainName;
+          break;
+        }
+      }
+    }
+
+    // Last resort: generate a new name
+    if (!chosenName) {
+      chosenName = generateMountainName(rng);
+    }
+
+    // Apply the chosen name to every tile in the cluster
+    cluster.forEach((tile, j) => {
+      tile.mountainName = chosenName;
+      tile.descriptionSeed = `The ${chosenName}`;
+      tile.isFirstMountainInRange = (j === 0);
+    });
+
+    console.log(`[HARMONIZE_MOUNTAINS] "${chosenName}" (${cluster.length} tiles) near (${cluster[0].x}, ${cluster[0].y})`);
   });
 }
 

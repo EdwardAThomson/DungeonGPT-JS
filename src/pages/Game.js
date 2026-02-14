@@ -17,7 +17,7 @@ import { DM_PROTOCOL } from '../data/prompts';
 
 const Game = () => {
   const { state } = useLocation();
-  const { selectedHeroes: stateHeroes, loadedConversation, worldSeed: stateSeed } = state || { selectedHeroes: [], loadedConversation: null, worldSeed: null };
+  const { selectedHeroes: stateHeroes, loadedConversation, worldSeed: stateSeed, gameSessionId: stateGameSessionId } = state || { selectedHeroes: [], loadedConversation: null, worldSeed: null, gameSessionId: null };
   const selectedHeroes = loadedConversation?.selected_heroes || stateHeroes || [];
 
   // Robust seed extraction
@@ -55,7 +55,7 @@ const Game = () => {
     hasAdventureStarted,
     setHasAdventureStarted,
     saveConversationToBackend
-  } = useGameSession(loadedConversation, setSettings, setSelectedProvider, setSelectedModel);
+  } = useGameSession(loadedConversation, setSettings, setSelectedProvider, setSelectedModel, stateGameSessionId);
 
   // Pass dummy/empty functions for now where we handle logic in Game.js wrapper
   const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed);
@@ -87,6 +87,7 @@ const Game = () => {
   const isInsideTownRef = useRef(mapHook.isInsideTown);
   const townMapsCacheRef = useRef(mapHook.townMapsCache);
   const currentMapLevelRef = useRef(mapHook.currentMapLevel);
+  const hasAdventureStartedRef = useRef(hasAdventureStarted);
 
   useEffect(() => {
     conversationRef.current = interactionHook.conversation;
@@ -102,15 +103,28 @@ const Game = () => {
     isInsideTownRef.current = mapHook.isInsideTown;
     townMapsCacheRef.current = mapHook.townMapsCache;
     currentMapLevelRef.current = mapHook.currentMapLevel;
+    hasAdventureStartedRef.current = hasAdventureStarted;
   }, [
     interactionHook.conversation, sessionId, selectedProvider, selectedModel,
     mapHook.worldMap, mapHook.playerPosition, settings,
     mapHook.currentTownMap, mapHook.townPlayerPosition, mapHook.currentTownTile,
-    mapHook.isInsideTown, mapHook.townMapsCache, mapHook.currentMapLevel
+    mapHook.isInsideTown, mapHook.townMapsCache, mapHook.currentMapLevel,
+    hasAdventureStarted
   ]);
 
-  const performSave = () => {
+  const performSave = (isUnmount = false) => {
     if (!sessionIdRef.current) return;
+
+    // Don't save empty/unstarted sessions
+    if (!hasAdventureStartedRef.current) {
+      if (isUnmount) console.log('[SAVE] Skipping unmount save - adventure not started');
+      return;
+    }
+    const convo = conversationRef.current;
+    if (!convo || convo.length === 0) {
+      if (isUnmount) console.log('[SAVE] Skipping unmount save - no conversation data');
+      return;
+    }
 
     const sub_maps = {
       currentTownMap: currentTownMapRef.current,
@@ -149,7 +163,7 @@ const Game = () => {
   useEffect(() => {
     return () => {
       console.log('[UNMOUNT SAVE]');
-      performSave();
+      performSave(true);
     };
   }, []);
 
@@ -259,7 +273,7 @@ const Game = () => {
     locationInfo += ` Description seed: ${targetTile.descriptionSeed || 'Describe the area.'}`;
 
     const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
-    const milestonesInfo = settings.milestones && settings.milestones.length > 0 ? `\nKey Milestones to achieve: ${settings.milestones.join(', ')}` : '';
+    const milestonesInfo = settings.milestones && settings.milestones.length > 0 ? `\nKey Milestones to achieve: ${settings.milestones.map(m => typeof m === 'object' ? m.text : m).join(', ')}` : '';
     const gameContext = `Setting: ${settings.shortDescription}. Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
     const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${interactionHook.currentSummary}\n\n${locationInfo}\n\nDescribe what the player sees upon arriving at this new location.`;
 

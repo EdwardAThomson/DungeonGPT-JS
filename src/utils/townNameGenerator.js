@@ -355,4 +355,29 @@ export const generateManorName = (rng = Math.random) => {
 
   return `${surname} ${type}`;
 };
+/**
+ * Generate a mountain range name
+ * @param {Function} rng - Random number generator function (optional)
+ * @returns {string} Generated mountain name
+ */
+export const generateMountainName = (rng = Math.random) => {
+  const prefixes = [
+    'Iron', 'Stone', 'Thunder', 'Storm', 'Frost', 'Fire', 'Shadow', 'Crystal',
+    'Silver', 'Gold', 'Granite', 'Obsidian', 'Amber', 'Crimson', 'Azure',
+    'White', 'Black', 'Grey', 'Red', 'Bone', 'Cinder', 'Ash', 'Dusk', 'Dawn',
+    'Dragon', 'Eagle', 'Wolf', 'Serpent', 'Giant', 'Titan', 'Ancient', 'Broken',
+    'Jagged', 'Shattered', 'Frozen', 'Burning', 'Howling', 'Silent', 'Lonely'
+  ];
+
+  const suffixes = [
+    'Mountains', 'Peaks', 'Ridge', 'Range', 'Heights', 'Spires', 'Crags',
+    'Pinnacles', 'Summits', 'Teeth', 'Spine', 'Crown', 'Horns', 'Cliffs'
+  ];
+
+  const prefix = prefixes[Math.floor(rng() * prefixes.length)];
+  const suffix = suffixes[Math.floor(rng() * suffixes.length)];
+
+  return `${prefix} ${suffix}`;
+};
+
 export default generateTownName;

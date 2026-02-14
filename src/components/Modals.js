@@ -279,7 +279,7 @@ export const StorySettingsModalContent = ({
                       if (typeof milestones[0] === 'object' && milestones[0].hasOwnProperty('text')) {
                         return milestones;
                       }
-                      return milestones.map((text, index) => ({ id: index + 1, text, completed: false }));
+                      return milestones.map((text, index) => ({ id: index + 1, text, completed: false, location: null }));
                     };
 
                     const normalized = normalizeMilestones(settings.milestones);

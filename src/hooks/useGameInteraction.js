@@ -20,7 +20,8 @@ const normalizeMilestones = (milestones) => {
     return milestones.map((text, index) => ({
         id: index + 1,
         text,
-        completed: false
+        completed: false,
+        location: null
     }));
 };
 

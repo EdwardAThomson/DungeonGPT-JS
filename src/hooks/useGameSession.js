@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 
-const useGameSession = (loadedConversation, setSettings, setSelectedProvider, setSelectedModel) => {
+const useGameSession = (loadedConversation, setSettings, setSelectedProvider, setSelectedModel, gameSessionId = null) => {
+    // Session ID priority: loadedConversation > navigation state > localStorage > generate new
     const [sessionId, setSessionId] = useState(() => {
-        const id = loadedConversation?.sessionId || null;
-        return id;
+        if (loadedConversation?.sessionId) return loadedConversation.sessionId;
+        if (gameSessionId) return gameSessionId;
+        const stored = localStorage.getItem('activeGameSessionId');
+        if (stored) return stored;
+        return null;
     });
 
     // Determine if adventure has started
@@ -19,14 +23,14 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
         return false;
     });
 
-    // Generate session ID on mount if needed and restore settings
+    // Resolve session ID on mount and restore settings from loaded conversation
     useEffect(() => {
-        if (!loadedConversation && !sessionId) {
-            const newSessionId = `session-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-            setSessionId(newSessionId);
-            console.log("Generated NEW Session ID:", newSessionId);
-        } else if (loadedConversation) {
-            console.log("Loaded conversation with Session ID:", loadedConversation.sessionId);
+        if (loadedConversation) {
+            console.log("[SESSION] Loaded conversation with Session ID:", loadedConversation.sessionId);
+            // Persist loaded game's session ID so refreshes keep using it
+            if (loadedConversation.sessionId) {
+                localStorage.setItem('activeGameSessionId', loadedConversation.sessionId);
+            }
 
             // Restore game settings
             if (loadedConversation.game_settings) {
@@ -43,6 +47,16 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
             if (loadedConversation.model) {
                 setSelectedModel(loadedConversation.model);
             }
+        } else if (!sessionId) {
+            // Last resort: no ID from any source, generate one (shouldn't normally happen)
+            const newSessionId = `game-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+            setSessionId(newSessionId);
+            localStorage.setItem('activeGameSessionId', newSessionId);
+            console.log("[SESSION] Generated fallback Session ID:", newSessionId);
+        } else {
+            // Ensure localStorage is in sync with the resolved session ID
+            localStorage.setItem('activeGameSessionId', sessionId);
+            console.log("[SESSION] Using Session ID:", sessionId);
         }
     }, []);
 

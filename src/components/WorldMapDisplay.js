@@ -200,7 +200,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero }) =>
                 position: 'relative', // For player marker positioning
               }}
               onClick={() => onTileClick(tile.x, tile.y)}
-              title={`${tile.townName || `(${tile.x}, ${tile.y})`} - ${tile.biome}${tile.poi ? ` (${tile.poi})` : ''}${tile.townSize ? ` [${tile.townSize}]` : ''}${tile.isExplored ? ' (Explored)' : ''}`} // Tooltip
+              title={`${tile.townName || tile.mountainName || `(${tile.x}, ${tile.y})`} - ${tile.biome}${tile.poi ? ` (${tile.poi})` : ''}${tile.townSize ? ` [${tile.townSize}]` : ''}${tile.isExplored ? ' (Explored)' : ''}`} // Tooltip
             >
               {/* Render river overlay (below POI) */}
               {renderRiverOverlay(tile)}
@@ -225,6 +225,26 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero }) =>
               }}>
                 {poiContent}
               </span>
+
+              {/* Display name label for towns and named mountains */}
+              {(tile.townName || (tile.mountainName && tile.isFirstMountainInRange)) && (
+                <span style={{
+                  position: 'absolute',
+                  bottom: '-6px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  fontSize: '7px',
+                  fontWeight: 'bold',
+                  color: tile.townName ? '#2c1810' : '#4a3728',
+                  whiteSpace: 'nowrap',
+                  zIndex: 4,
+                  pointerEvents: 'none',
+                  textShadow: '0 0 2px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.7)',
+                  lineHeight: 1,
+                }}>
+                  {tile.townName || tile.mountainName}
+                </span>
+              )}
 
               {/* Display player marker when on this tile */}
               {isPlayerHere && firstHero && (
