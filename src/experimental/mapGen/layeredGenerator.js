@@ -597,7 +597,7 @@ export function generateLayeredTerrain(width, height, params = {}) {
                     if (closed[nKey]) continue;
 
                     const nH = heightmap[nKey];
-                    const nIsWater = nH <= waterThreshold;
+                    const nIsWater = isWaterMap[nKey];
 
                     // Cost calculation
                     const isDiag = d.dx !== 0 && d.dy !== 0;
@@ -738,13 +738,20 @@ export function generateLayeredTerrain(width, height, params = {}) {
                     for (let dx = -1; dx <= 1; dx++) {
                         const nx = p.x + dx, ny = p.y + dy;
                         if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                            sum += heightmap[ny * width + nx];
-                            count++;
+                            const nIdx = ny * width + nx;
+                            // Only average with non-water neighbors to prevent
+                            // coastal road tiles from being dragged below waterThreshold
+                            if (!isWaterMap[nIdx]) {
+                                sum += heightmap[nIdx];
+                                count++;
+                            }
                         }
                     }
                 }
-                const avg = sum / count;
-                heightmap[idx] = heightmap[idx] * 0.4 + avg * 0.6;
+                if (count > 0) {
+                    const avg = sum / count;
+                    heightmap[idx] = heightmap[idx] * 0.4 + avg * 0.6;
+                }
             }
         }
     }

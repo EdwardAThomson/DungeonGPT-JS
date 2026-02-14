@@ -676,8 +676,8 @@ const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshol
             return Math.max(h, waterThreshold) * heightScale + ROAD_Y_OFFSET;
         };
 
-        // Water segments need to sit slightly below the water plane (at +0.3) for a submerged ripple effect
-        const getWaterY = () => waterThreshold * heightScale + 0.2;
+        // Water segments need to sit slightly below the water plane for a submerged ripple effect
+        const getWaterY = () => waterThreshold * heightScale - 0.1;
 
         const isWaterAt = (px, py) => {
             const h = sampleHeight(px, py);
@@ -844,7 +844,7 @@ const RoadLayer = ({ roads, ports, heightmap, mapWidth, mapHeight, waterThreshol
 
 // ─── Water Plane ───────────────────────────────────────────────────────────────
 const WaterPlane = ({ sizeX, sizeZ, level }) => (
-    <mesh position={[0, level + 0.3, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+    <mesh position={[0, level + 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[sizeX, sizeZ]} />
         <meshStandardMaterial
             color="#3a7dd8"
