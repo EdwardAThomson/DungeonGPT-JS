@@ -4,6 +4,7 @@ import React, { useState, useContext, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import CharacterContext from '../contexts/CharacterContext';
 import SettingsContext from '../contexts/SettingsContext';
+import { initializeHP } from '../utils/healthSystem';
 
 const HeroSelection = () => {
   const { state } = useLocation();
@@ -69,7 +70,10 @@ const HeroSelection = () => {
     }
     setSelectionError('');
 
-    navigate('/game', { state: { selectedHeroes, generatedMap, worldSeed, gameSessionId } });
+    // Initialize HP for all selected heroes
+    const heroesWithHP = selectedHeroes.map(hero => initializeHP(hero));
+
+    navigate('/game', { state: { selectedHeroes: heroesWithHP, generatedMap, worldSeed, gameSessionId } });
 
   };
 

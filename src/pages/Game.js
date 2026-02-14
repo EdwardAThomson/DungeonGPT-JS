@@ -14,6 +14,7 @@ import AiAssistantPanel from '../components/AiAssistantPanel';
 import CharacterModal from '../components/CharacterModal';
 import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
+import { getHPStatus } from '../utils/healthSystem';
 
 const Game = () => {
   const { state } = useLocation();
@@ -451,6 +452,44 @@ const Game = () => {
                 )}
                 <h3>{hero.characterName}</h3>
                 <p>Level {hero.characterLevel} {hero.characterRace} {hero.characterClass}</p>
+                
+                {/* HP Bar */}
+                {hero.maxHP && (
+                  <div style={{ margin: '10px 0', padding: '8px', background: 'var(--surface-light)', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: 'bold' }}>HP:</span>
+                      <span style={{ color: getHPStatus(hero.currentHP, hero.maxHP).color, fontWeight: 'bold' }}>
+                        {hero.currentHP}/{hero.maxHP}
+                      </span>
+                    </div>
+                    <div style={{ 
+                      width: '100%', 
+                      height: '12px', 
+                      background: 'var(--border)', 
+                      borderRadius: '6px', 
+                      overflow: 'hidden',
+                      border: '1px solid var(--border)'
+                    }}>
+                      <div style={{ 
+                        width: `${(hero.currentHP / hero.maxHP) * 100}%`, 
+                        height: '100%', 
+                        background: getHPStatus(hero.currentHP, hero.maxHP).color,
+                        transition: 'width 0.5s ease'
+                      }} />
+                    </div>
+                    {hero.currentHP <= hero.maxHP * 0.25 && hero.currentHP > 0 && (
+                      <div style={{ fontSize: '10px', color: '#e74c3c', marginTop: '4px', fontStyle: 'italic' }}>
+                        {getHPStatus(hero.currentHP, hero.maxHP).description}
+                      </div>
+                    )}
+                    {hero.currentHP === 0 && (
+                      <div style={{ fontSize: '10px', color: '#e74c3c', marginTop: '4px', fontWeight: 'bold' }}>
+                        💀 DEFEATED
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <div style={{ textAlign: 'center', marginTop: '5px' }}>
                   <button
                     className="view-details-btn"
