@@ -220,6 +220,190 @@ export const encounterTemplates = {
       failure: 'The child was bait for bandits, but you escape their ambush.',
       criticalFailure: 'You fall for the trap completely and are robbed by the child\'s accomplices.'
     }
+  },
+
+  // === TOWN ENCOUNTERS ===
+
+  'tavern_brawl': {
+    name: 'Tavern Brawl',
+    icon: '🍺',
+    description: 'A drunken argument erupts into a full-blown brawl at the local tavern. Chairs fly and fists swing!',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Join the Fight', skill: 'Athletics', description: 'Wade in and start throwing punches' },
+      { label: 'Break It Up', skill: 'Intimidation', description: 'Bellow for order and separate the fighters' },
+      { label: 'Slip Away', skill: 'Stealth', description: 'Grab your drink and find a quiet corner' },
+      { label: 'Pick Pockets', skill: 'Sleight of Hand', description: 'Use the chaos to lighten some purses' }
+    ],
+    rewards: { xp: 30, gold: '1d8', items: ['ale_mug:50%', 'bar_stool_leg:20%'] },
+    consequences: {
+      criticalSuccess: 'You emerge as the hero of the tavern, earning free drinks and a useful contact.',
+      success: 'You handle the situation well and earn some respect from the locals.',
+      failure: 'You get a black eye but nothing worse. The barkeep gives you a dirty look.',
+      criticalFailure: 'You get knocked out cold and wake up missing some coin.'
+    }
+  },
+
+  'town_market': {
+    name: 'Bustling Market',
+    icon: '🏪',
+    description: 'The town market is alive with vendors hawking exotic wares, fresh produce, and mysterious trinkets.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Browse Wares', skill: 'Persuasion', description: 'Haggle with merchants for supplies' },
+      { label: 'Gather Rumors', skill: 'Perception', description: 'Listen to gossip among the crowd' },
+      { label: 'Perform', skill: 'Performance', description: 'Entertain the crowd for coin' },
+      { label: 'Look Around', skill: null, description: 'Take in the sights and move on' }
+    ],
+    rewards: { xp: 20, gold: '2d6', items: ['rations:60%', 'healing_potion:30%', 'map_fragment:15%'] },
+    consequences: {
+      criticalSuccess: 'A merchant takes a shine to you and offers a rare item at a steep discount.',
+      success: 'You find good deals and pick up useful information about the region.',
+      failure: 'Prices are high and the merchants are tight-lipped today.',
+      criticalFailure: 'A pickpocket lifts some of your coin while you browse.'
+    }
+  },
+
+  'town_quest_board': {
+    name: 'Quest Board',
+    icon: '📜',
+    description: 'A weathered notice board stands in the town square, covered with requests for help and warnings.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Read Notices', skill: 'Perception', description: 'Study the postings carefully' },
+      { label: 'Ask Locals', skill: 'Persuasion', description: 'Chat with townsfolk about the notices' },
+      { label: 'Take a Job', skill: null, description: 'Accept a bounty or errand' },
+      { label: 'Move On', skill: null, description: 'Nothing catches your eye' }
+    ],
+    rewards: { xp: 25, gold: '0', items: ['quest_clue:60%', 'map_fragment:30%'] },
+    consequences: {
+      criticalSuccess: 'You find a highly lucrative posting and learn crucial information about your quest.',
+      success: 'You pick up a useful lead and learn something about the area.',
+      failure: 'Most of the postings are outdated or irrelevant.',
+      criticalFailure: 'You accidentally accept a job that turns out to be a scam.'
+    }
+  },
+
+  'town_healer': {
+    name: 'Traveling Healer',
+    icon: '⚕️',
+    description: 'A kindly healer has set up a tent near the town well, offering remedies and blessings to weary travelers.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Seek Healing', skill: 'Persuasion', description: 'Ask for treatment of injuries' },
+      { label: 'Buy Potions', skill: 'Persuasion', description: 'Purchase healing supplies' },
+      { label: 'Trade Knowledge', skill: 'Medicine', description: 'Exchange medical knowledge' },
+      { label: 'Decline', skill: null, description: 'Thank them and move on' }
+    ],
+    rewards: { xp: 15, gold: '0', items: ['healing_potion:70%', 'antidote:40%', 'herbal_remedy:50%'] },
+    consequences: {
+      criticalSuccess: 'The healer mends your wounds completely and gifts you a powerful restorative.',
+      success: 'You receive helpful treatment and affordable potions.',
+      failure: 'The healer is busy but offers a minor remedy.',
+      criticalFailure: 'The healer\'s remedy has an unpleasant side effect, though it wears off.'
+    }
+  },
+
+  'suspicious_stranger': {
+    name: 'Suspicious Stranger',
+    icon: '🕵️',
+    description: 'A hooded figure approaches you in a quiet alley, claiming to have information... for a price.',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Listen', skill: 'Perception', description: 'Hear them out while staying alert' },
+      { label: 'Intimidate', skill: 'Intimidation', description: 'Demand they speak plainly' },
+      { label: 'Pay Up', skill: 'Persuasion', description: 'Offer coin for information' },
+      { label: 'Walk Away', skill: null, description: 'Ignore the stranger and leave' }
+    ],
+    rewards: { xp: 40, gold: '1d10', items: ['quest_clue:50%', 'stolen_goods:20%', 'poisoned_dagger:10%'] },
+    consequences: {
+      criticalSuccess: 'The stranger reveals critical intelligence about dangers ahead and a hidden cache.',
+      success: 'You learn useful information, though you\'re not sure how much to trust.',
+      failure: 'The information seems dubious at best. You may have wasted your time.',
+      criticalFailure: 'It was a setup! Thugs emerge from the shadows, though you manage to escape.'
+    }
+  },
+
+  // === ADDITIONAL WILDERNESS ENCOUNTERS ===
+
+  'herb_gathering': {
+    name: 'Medicinal Herbs',
+    icon: '🌿',
+    description: 'You spot a patch of rare medicinal herbs growing among the wildflowers.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Gather Herbs', skill: 'Nature', description: 'Carefully harvest the plants' },
+      { label: 'Study Plants', skill: 'Medicine', description: 'Identify their properties' },
+      { label: 'Take All', skill: 'Survival', description: 'Harvest everything you can carry' },
+      { label: 'Leave Them', skill: null, description: 'Continue your journey' }
+    ],
+    rewards: { xp: 15, gold: '0', items: ['healing_herbs:80%', 'rare_ingredient:30%', 'healing_potion:20%'] },
+    consequences: {
+      criticalSuccess: 'You find an exceptionally rare specimen worth a small fortune to the right buyer.',
+      success: 'You gather a useful supply of medicinal herbs.',
+      failure: 'You pick the wrong plants and end up with worthless weeds.',
+      criticalFailure: 'You disturb a nest of insects hidden among the plants and get badly stung.'
+    }
+  },
+
+  'abandoned_campsite': {
+    name: 'Abandoned Campsite',
+    icon: '🏕️',
+    description: 'You come across an abandoned campsite. The fire is cold, but supplies remain scattered about.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Search Camp', skill: 'Investigation', description: 'Look through what was left behind' },
+      { label: 'Track Owners', skill: 'Survival', description: 'Follow the trail of whoever was here' },
+      { label: 'Set Up Camp', skill: 'Survival', description: 'Rest here for a while' },
+      { label: 'Move On', skill: null, description: 'Best not to linger' }
+    ],
+    rewards: { xp: 20, gold: '1d8', items: ['rations:60%', 'rope:40%', 'journal_page:25%'] },
+    consequences: {
+      criticalSuccess: 'You find a hidden stash of valuable supplies and a journal with useful information.',
+      success: 'You salvage some useful supplies from the abandoned camp.',
+      failure: 'The camp has been picked clean — nothing of value remains.',
+      criticalFailure: 'The camp was abandoned for a reason — you trigger a trap left for looters.'
+    }
+  },
+
+  'mountain_hermit': {
+    name: 'Mountain Hermit',
+    icon: '🧙',
+    description: 'A weathered hermit sits outside a cave, eyes twinkling with ancient knowledge.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Seek Wisdom', skill: 'Persuasion', description: 'Ask the hermit for guidance' },
+      { label: 'Trade Stories', skill: 'Persuasion', description: 'Share tales of your adventures' },
+      { label: 'Request Training', skill: 'Athletics', description: 'Ask for combat or survival tips' },
+      { label: 'Leave', skill: null, description: 'Respect the hermit\'s solitude' }
+    ],
+    rewards: { xp: 35, gold: '0', items: ['ancient_knowledge:50%', 'quest_clue:40%', 'rare_herb:30%'] },
+    consequences: {
+      criticalSuccess: 'The hermit shares a powerful secret that will aid you greatly on your quest.',
+      success: 'You gain useful wisdom and a sense of clarity about your journey.',
+      failure: 'The hermit speaks in riddles you can\'t decipher.',
+      criticalFailure: 'The hermit is annoyed by your intrusion and curses you with bad luck.'
+    }
+  },
+
+  'elf_patrol': {
+    name: 'Elven Patrol',
+    icon: '🧝',
+    description: 'Silent elven rangers emerge from the treeline, bows drawn but not hostile — they wish to know your business.',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Explain Yourself', skill: 'Persuasion', description: 'State your purpose honestly' },
+      { label: 'Show Respect', skill: 'Religion', description: 'Honor their customs and traditions' },
+      { label: 'Offer Trade', skill: 'Persuasion', description: 'Propose a mutually beneficial exchange' },
+      { label: 'Stand Down', skill: null, description: 'Lower weapons and cooperate' }
+    ],
+    rewards: { xp: 50, gold: '0', items: ['elven_rations:50%', 'forest_map:30%', 'elven_blessing:20%'] },
+    consequences: {
+      criticalSuccess: 'The elves welcome you as friends and share valuable forest lore and supplies.',
+      success: 'The patrol lets you pass and offers directions through the forest.',
+      failure: 'The elves are suspicious but allow you through with a warning.',
+      criticalFailure: 'The elves escort you out of their territory, costing you time and dignity.'
+    }
   }
 };
 

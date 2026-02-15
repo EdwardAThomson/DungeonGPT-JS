@@ -23,19 +23,25 @@
 - **NPC Population** - Towns are populated with NPCs on first entry
 - **Dice System** - D20 skill checks with advantage/disadvantage, critical success/failure
 - **Character Stats Integration** - Modifiers calculated from character attributes
+- **Encounter Data Structures** (Phase 1.1) - 10+ encounter templates in `encounters.js`
+- **Encounter Resolution System** (Phase 1.2) - `encounterResolver.js` with AI narration, dice rolls, loot
+- **Encounter Action Modal** (Phase 1.3) - Choice-driven UI in `EncounterActionModal.js`
+- **Multi-Round Combat** - Round-by-round combat with morale, advantage, enemy HP tracking
+- **HP System** - Player and enemy HP tracking, damage calculation, defeat states
+- **Encounter Test Page** - `/encounter-test` for testing encounters in isolation
 
 ### ❌ Missing Features
-- Random encounters while traveling
-- AI-driven encounter resolution
-- Encounter outcome narration
+- Random encounters while traveling (Phase 2 - IN PROGRESS)
+- Biome-specific encounter tables
+- Encounter frequency based on tile visit history
 - Consequence tracking (injuries, reputation, time)
 - Loot distribution through story
 - Experience and progression
-- Enhanced POI encounters (caves, ruins, forests)
+- Non-hostile town encounters
 
 ---
 
-## Phase 1: AI-Driven Encounter Resolution (FOUNDATION)
+## Phase 1: AI-Driven Encounter Resolution (FOUNDATION) ✅ COMPLETED
 
 ### 1.1 Encounter Data Structures
 
@@ -765,13 +771,13 @@ const applyReputationChange = (encounter, outcome) => {
 
 ## Implementation Priority
 
-### Phase 1: Foundation (CRITICAL)
+### Phase 1: Foundation (CRITICAL) ✅ COMPLETED
 **Goal:** Get basic encounter system working with AI narration
-1. **Encounter Data Structures** (1.1) - Define 5-10 core encounter templates
-2. **Encounter Resolution System** (1.2) - Build `encounterResolver.js` with AI integration
-3. **Encounter Action Modal** (1.3) - Create choice-driven UI
+1. ✅ **Encounter Data Structures** (1.1) - 10+ encounter templates with multi-round combat support
+2. ✅ **Encounter Resolution System** (1.2) - `encounterResolver.js` with AI narration + `multiRoundEncounter.js`
+3. ✅ **Encounter Action Modal** (1.3) - Choice-driven UI with HP bars, damage display, victory/defeat states
 
-**Success Criteria:** Player can trigger an encounter, choose an action, roll dice, and receive AI-narrated outcome.
+**Success Criteria:** ✅ Player can trigger an encounter, choose an action, roll dice, and receive AI-narrated outcome.
 
 ### Phase 2: Random Encounters (HIGH PRIORITY)
 **Goal:** Populate the world with dynamic encounters

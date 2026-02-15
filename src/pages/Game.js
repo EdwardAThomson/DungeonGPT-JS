@@ -5,6 +5,8 @@ import SettingsContext from "../contexts/SettingsContext";
 import { StorySettingsModalContent, HowToPlayModalContent } from '../components/Modals';
 import MapModal from '../components/MapModal';
 import EncounterModal from '../components/EncounterModal';
+import EncounterActionModal from '../components/EncounterActionModal';
+import { checkForEncounter } from '../utils/encounterGenerator';
 import DiceRoller from '../components/DiceRoller';
 import useGameSession from '../hooks/useGameSession';
 import useGameMap from '../hooks/useGameMap';
@@ -48,6 +50,11 @@ const Game = () => {
   const [isCharacterModalOpen, setIsCharacterModalOpen] = useState(false);
   const [selectedHeroForModal, setSelectedHeroForModal] = useState(null);
   const [currentEncounter, setCurrentEncounter] = useState(null);
+  const [actionEncounter, setActionEncounter] = useState(null);
+  const [isActionEncounterOpen, setIsActionEncounterOpen] = useState(false);
+  const [movesSinceEncounter, setMovesSinceEncounter] = useState(
+    loadedConversation?.sub_maps?.movesSinceEncounter || 0
+  );
   const [showDebugInfo, setShowDebugInfo] = useState(false);
 
   // --- HOOKS ---
@@ -90,6 +97,7 @@ const Game = () => {
   const currentMapLevelRef = useRef(mapHook.currentMapLevel);
   const hasAdventureStartedRef = useRef(hasAdventureStarted);
   const selectedHeroesRef = useRef(selectedHeroes);
+  const movesSinceEncounterRef = useRef(movesSinceEncounter);
   const lastSaveFingerprintRef = useRef(null);
 
   useEffect(() => {
@@ -108,12 +116,13 @@ const Game = () => {
     currentMapLevelRef.current = mapHook.currentMapLevel;
     hasAdventureStartedRef.current = hasAdventureStarted;
     selectedHeroesRef.current = selectedHeroes;
+    movesSinceEncounterRef.current = movesSinceEncounter;
   }, [
     interactionHook.conversation, sessionId, selectedProvider, selectedModel,
     mapHook.worldMap, mapHook.playerPosition, settings,
     mapHook.currentTownMap, mapHook.townPlayerPosition, mapHook.currentTownTile,
     mapHook.isInsideTown, mapHook.townMapsCache, mapHook.currentMapLevel,
-    hasAdventureStarted, selectedHeroes
+    hasAdventureStarted, selectedHeroes, movesSinceEncounter
   ]);
 
   const performSave = (isUnmount = false) => {
@@ -158,6 +167,7 @@ const Game = () => {
       townMapsCache: townMapsCacheRef.current,
       visitedBiomes: Array.from(mapHook.visitedBiomes),
       visitedTowns: Array.from(mapHook.visitedTowns),
+      movesSinceEncounter: movesSinceEncounterRef.current,
     };
 
     saveConversationToBackend(sessionIdRef.current, {
@@ -198,6 +208,44 @@ const Game = () => {
     ));
   };
 
+  // --- Town Tile Click Wrapper (adds encounter checks) ---
+  const handleTownTileClick = (clickedX, clickedY) => {
+    // Delegate movement to the hook
+    mapHook.handleTownTileClick(clickedX, clickedY, interactionHook.setConversation, interactionHook.conversation);
+
+    // Check for town encounter after moving
+    // Create a synthetic tile that the encounter generator recognizes as 'town'
+    const syntheticTownTile = { poi: 'town', biome: 'plains' };
+    const townEncounter = checkForEncounter(syntheticTownTile, false, settings, movesSinceEncounter);
+
+    if (townEncounter) {
+      setActionEncounter(townEncounter);
+      setIsActionEncounterOpen(true);
+      setMovesSinceEncounter(0);
+    } else {
+      setMovesSinceEncounter(prev => prev + 1);
+    }
+  };
+
+  // --- Load Reminder: notify player of their location on game load ---
+  const hasShownLoadReminder = useRef(false);
+  useEffect(() => {
+    if (!hasAdventureStarted || hasShownLoadReminder.current) return;
+    if (!loadedConversation) return;
+
+    const subMaps = loadedConversation.sub_maps || loadedConversation.subMaps;
+    if (subMaps?.isInsideTown && subMaps?.currentTownTile) {
+      const townName = subMaps.currentTownTile.townName || 'town';
+      const pos = subMaps.townPlayerPosition;
+      const locationMsg = {
+        role: 'system',
+        content: `📍 You are currently inside ${townName}${pos ? ` at position (${pos.x}, ${pos.y})` : ''}.`
+      };
+      interactionHook.setConversation(prev => [...prev, locationMsg]);
+      hasShownLoadReminder.current = true;
+    }
+  }, [hasAdventureStarted, loadedConversation]);
+
   // --- Effect to monitor AI Check Requests ---
   useEffect(() => {
     if (interactionHook.checkRequest) {
@@ -220,6 +268,10 @@ const Game = () => {
       interactionHook.setError("You can only move to adjacent tiles.");
       return;
     }
+
+    // Check if tile was previously explored (before marking it)
+    const originalTile = getTile(mapHook.worldMap, clickedX, clickedY);
+    const wasExplored = originalTile?.isExplored || false;
 
     // Update Map State
     const newMap = mapHook.worldMap.map(row =>
@@ -247,7 +299,8 @@ const Game = () => {
       mapHook.trackTownVisit(townName);
     }
 
-    // POI Check (for Modal)
+    // POI Check (for location Modal — towns, etc.)
+    const isTownPoi = targetTile.poi && ['town', 'city', 'village', 'hamlet'].includes(targetTile.poiType || targetTile.poi);
     if (targetTile.poi) {
       const poiType = targetTile.poiType || targetTile.poi;
       const encounter = {
@@ -259,6 +312,23 @@ const Game = () => {
       };
       setCurrentEncounter(encounter);
       setIsEncounterModalOpen(true);
+    }
+
+    // --- Random Encounter Check ---
+    // Check on all tiles: wilderness gets combat/exploration encounters, towns get social encounters
+    const isFirstVisitToTile = !wasExplored;
+    const randomEncounter = checkForEncounter(targetTile, isFirstVisitToTile, settings, movesSinceEncounter);
+    
+    if (randomEncounter) {
+      // Delay action encounter slightly if POI modal is also showing
+      const delay = targetTile.poi ? 800 : 0;
+      setTimeout(() => {
+        setActionEncounter(randomEncounter);
+        setIsActionEncounterOpen(true);
+      }, delay);
+      setMovesSinceEncounter(0);
+    } else {
+      setMovesSinceEncounter(prev => prev + 1);
     }
 
     // Determine if we need an AI description
@@ -331,6 +401,7 @@ const Game = () => {
 
   const currentTile = getTile(mapHook.worldMap, mapHook.playerPosition.x, mapHook.playerPosition.y);
   const currentBiome = currentTile?.biome || 'Unknown Area';
+  const townName = mapHook.isInsideTown ? (mapHook.currentTownTile?.townName || 'Town') : null;
 
   const getCurrentSelection = () => {
     if (selectedProvider && selectedModel) return `${selectedProvider}:${selectedModel}`;
@@ -359,10 +430,13 @@ const Game = () => {
                 {settings.campaignGoal && (
                   <p><strong>Quest:</strong> <span style={{ color: 'var(--text-secondary)', fontWeight: 'bold' }}>{settings.campaignGoal}</span></p>
                 )}
-                <p><strong>Location:</strong> ({mapHook.playerPosition.x}, {mapHook.playerPosition.y}) - {currentBiome}</p>
+                <p><strong>Location:</strong> {townName 
+                  ? `${townName} (${mapHook.townPlayerPosition?.x}, ${mapHook.townPlayerPosition?.y})`
+                  : `(${mapHook.playerPosition.x}, ${mapHook.playerPosition.y}) - ${currentBiome}`
+                }</p>
               </div>
               <div className="header-button-group">
-                <button onClick={() => mapHook.setIsMapModalOpen(true)} className="view-map-button">View Map</button>
+                <button onClick={() => mapHook.setIsMapModalOpen(true)} className="view-map-button">{townName ? `View ${townName} Map` : 'View Map'}</button>
                 <button onClick={() => setIsDiceModalOpen(true)} className="view-settings-button">🎲 Roll Dice</button>
                 <button onClick={() => setIsHowToPlayModalOpen(true)} className="how-to-play-button">How to Play</button>
                 <button onClick={() => setIsSettingsModalOpen(true)} className="view-settings-button">View Full Settings</button>
@@ -582,7 +656,7 @@ const Game = () => {
         townMapData={mapHook.currentTownMap}
         townPlayerPosition={mapHook.townPlayerPosition}
         onLeaveTown={() => mapHook.handleLeaveTown(interactionHook.setConversation, interactionHook.conversation)}
-        onTownTileClick={(x, y) => mapHook.handleTownTileClick(x, y, interactionHook.setConversation, interactionHook.conversation)}
+        onTownTileClick={(x, y) => handleTownTileClick(x, y)}
         currentTile={currentTile}
         onEnterCurrentTown={() => mapHook.handleEnterCurrentTown(interactionHook.setConversation, interactionHook.conversation)}
         isInsideTown={mapHook.isInsideTown}
@@ -599,6 +673,26 @@ const Game = () => {
         isOpen={isCharacterModalOpen}
         onClose={() => setIsCharacterModalOpen(false)}
         character={selectedHeroForModal}
+      />
+      <EncounterActionModal
+        isOpen={isActionEncounterOpen}
+        onClose={() => {
+          setIsActionEncounterOpen(false);
+          setActionEncounter(null);
+        }}
+        encounter={actionEncounter}
+        character={selectedHeroes.length > 0 ? selectedHeroes[0] : null}
+        onResolve={(result) => {
+          console.log('[ENCOUNTER] Resolved:', result);
+          // Add encounter outcome to conversation
+          if (result?.narration) {
+            const encounterMsg = { role: 'ai', content: `⚔️ **${actionEncounter?.name || 'Encounter'}**: ${result.narration}` };
+            interactionHook.setConversation(prev => [...prev, encounterMsg]);
+          }
+          setIsActionEncounterOpen(false);
+          setActionEncounter(null);
+        }}
+        onCharacterUpdate={handleHeroUpdate}
       />
       <DiceRoller
         isOpen={isDiceModalOpen}
