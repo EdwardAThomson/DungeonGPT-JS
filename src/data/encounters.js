@@ -541,6 +541,562 @@ export const encounterTemplates = {
       failure: 'The smoke was from a controlled burn - nothing of interest.',
       criticalFailure: 'You stumble into a bandit camp and must fight or flee.'
     }
+  },
+
+  // === PHASE 3: POI ENCOUNTERS - CAVES (3.1) ===
+
+  'cave_entrance': {
+    name: 'Mysterious Cave',
+    icon: '🕳️',
+    encounterTier: 'narrative',
+    poiType: 'cave',
+    narrativeHook: 'a dark cave mouth yawning open in the hillside',
+    aiContext: 'A cave entrance beckons from the rocky terrain. Cold air drifts from within, carrying unfamiliar scents. The darkness inside could hide treasure, danger, or both.',
+    description: 'A cave entrance looms before you, dark and mysterious. Strange sounds echo from within.',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Enter Cautiously', skill: 'Stealth', description: 'Slip inside quietly' },
+      { label: 'Light Torch', skill: 'Survival', description: 'Illuminate before entering' },
+      { label: 'Listen', skill: 'Perception', description: 'Try to hear what\'s inside' },
+      { label: 'Pass By', skill: null, description: 'Continue on your journey' }
+    ],
+    rewards: { xp: 50, gold: '3d12', items: ['cave_mushrooms:60%', 'raw_gems:40%', 'ancient_artifact:15%'] },
+    consequences: {
+      criticalSuccess: 'You discover a hidden cache of treasure and valuable minerals.',
+      success: 'The cave offers shelter and you find useful supplies.',
+      failure: 'The cave is empty but provides brief respite.',
+      criticalFailure: 'You disturb sleeping creatures who attack!'
+    }
+  },
+
+  'cave_bats': {
+    name: 'Bat Swarm',
+    icon: '🦇',
+    encounterTier: 'immediate',
+    poiType: 'cave',
+    description: 'A massive swarm of bats erupts from the cave, filling the air with leathery wings and piercing screeches!',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Duck and Cover', skill: 'Acrobatics', description: 'Protect yourself from the swarm' },
+      { label: 'Wait It Out', skill: 'Constitution', description: 'Endure the chaos' },
+      { label: 'Run', skill: 'Athletics', description: 'Flee the swarm' },
+      { label: 'Create Light', skill: 'Arcana', description: 'Use magic to scatter them' }
+    ],
+    rewards: { xp: 20, gold: '0', items: ['bat_guano:70%', 'cave_map:20%'] },
+    consequences: {
+      criticalSuccess: 'You avoid the swarm entirely and notice they fled from something deeper in.',
+      success: 'The bats pass quickly, leaving you unharmed.',
+      failure: 'You suffer minor scratches and bites from the panicked swarm.',
+      criticalFailure: 'The bats leave you disoriented and several follow, attracting predators.'
+    }
+  },
+
+  'cave_spider_nest': {
+    name: 'Spider Nest',
+    icon: '🕷️',
+    encounterTier: 'immediate',
+    poiType: 'cave',
+    description: 'Thick webs coat the cave walls, and massive spiders descend from the darkness above!',
+    difficulty: 'hard',
+    multiRound: true,
+    enemyHP: 45,
+    suggestedActions: [
+      { label: 'Attack', skill: 'Athletics', description: 'Fight the spiders' },
+      { label: 'Burn Webs', skill: 'Survival', description: 'Use fire to clear a path' },
+      { label: 'Dodge', skill: 'Acrobatics', description: 'Evade their attacks' },
+      { label: 'Retreat', skill: 'Athletics', description: 'Run back the way you came' }
+    ],
+    rewards: { xp: 80, gold: '2d10', items: ['spider_silk:80%', 'poison_vial:40%', 'wrapped_corpse_loot:50%'] },
+    consequences: {
+      criticalSuccess: 'You defeat the spiders and find valuable silk and a wrapped corpse with treasure.',
+      success: 'You fight through the spiders and continue deeper.',
+      failure: 'You defeat the spiders but suffer venomous bites.',
+      criticalFailure: 'The spiders overwhelm you - you barely escape, poisoned and weakened.'
+    }
+  },
+
+  'cave_underground_lake': {
+    name: 'Underground Lake',
+    icon: '🌊',
+    encounterTier: 'narrative',
+    poiType: 'cave',
+    narrativeHook: 'the sound of dripping water echoing from deep within',
+    aiContext: 'The cave opens into a vast underground chamber containing a still, dark lake. Phosphorescent fungi provide dim light. Something might lurk in the depths.',
+    description: 'A subterranean lake stretches before you, its dark waters reflecting strange glowing fungi.',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Drink', skill: 'Nature', description: 'Test if the water is safe' },
+      { label: 'Fish', skill: 'Survival', description: 'Try to catch cave fish' },
+      { label: 'Swim Across', skill: 'Athletics', description: 'Reach the far shore' },
+      { label: 'Skirt Around', skill: 'Acrobatics', description: 'Edge along the narrow shore' }
+    ],
+    rewards: { xp: 40, gold: '1d20', items: ['glowing_fungi:70%', 'cave_fish:60%', 'pearl:25%', 'drowned_treasure:20%'] },
+    consequences: {
+      criticalSuccess: 'You discover the lake hides drowned treasure from past explorers.',
+      success: 'The lake provides fresh water and useful fungi.',
+      failure: 'The water is too mineral-rich to drink safely.',
+      criticalFailure: 'Something in the lake grabs at you - you escape but lose equipment.'
+    }
+  },
+
+  'cave_treasure_guardian': {
+    name: 'Treasure Guardian',
+    icon: '🐉',
+    encounterTier: 'immediate',
+    poiType: 'cave',
+    description: 'A fearsome creature guards a hoard of treasure, awakening as you approach!',
+    difficulty: 'deadly',
+    multiRound: true,
+    enemyHP: 80,
+    suggestedActions: [
+      { label: 'Fight', skill: 'Athletics', description: 'Battle the guardian' },
+      { label: 'Negotiate', skill: 'Persuasion', description: 'Try to reason with it' },
+      { label: 'Distract', skill: 'Deception', description: 'Create a diversion to grab treasure' },
+      { label: 'Flee', skill: 'Athletics', description: 'Run for your life' }
+    ],
+    rewards: { xp: 150, gold: '10d20', items: ['rare_gem:70%', 'magic_weapon:40%', 'ancient_artifact:30%', 'dragon_scale:20%'] },
+    consequences: {
+      criticalSuccess: 'You defeat the guardian and claim its entire hoard!',
+      success: 'You defeat the guardian after a fierce battle.',
+      failure: 'You grab some treasure but take heavy damage escaping.',
+      criticalFailure: 'The guardian drives you out, wounded and empty-handed.'
+    }
+  },
+
+  // === PHASE 3: POI ENCOUNTERS - RUINS (3.2) ===
+
+  'ruin_entrance': {
+    name: 'Ancient Ruins',
+    icon: '🏛️',
+    encounterTier: 'narrative',
+    poiType: 'ruins',
+    narrativeHook: 'crumbling stone pillars emerging from the overgrowth',
+    aiContext: 'Ancient ruins rise from the landscape, their original purpose lost to time. Weathered carvings hint at a forgotten civilization. The ruins might hold secrets, treasure, or lingering dangers.',
+    description: 'Moss-covered ruins stand before you, remnants of a civilization long forgotten.',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Explore', skill: 'Investigation', description: 'Search the ruins thoroughly' },
+      { label: 'Decipher', skill: 'History', description: 'Study the ancient carvings' },
+      { label: 'Check for Traps', skill: 'Perception', description: 'Look for dangers' },
+      { label: 'Move On', skill: null, description: 'Continue your journey' }
+    ],
+    rewards: { xp: 55, gold: '2d20', items: ['ancient_scroll:40%', 'old_coins:60%', 'artifact_fragment:30%'] },
+    consequences: {
+      criticalSuccess: 'You uncover a hidden chamber filled with ancient treasures.',
+      success: 'You find valuable artifacts and learn about the ancient civilization.',
+      failure: 'The ruins yield little of value.',
+      criticalFailure: 'You trigger an ancient trap and must escape quickly.'
+    }
+  },
+
+  'ruin_ghost': {
+    name: 'Restless Spirit',
+    icon: '👻',
+    encounterTier: 'immediate',
+    poiType: 'ruins',
+    description: 'A spectral figure materializes among the ruins, its hollow eyes fixing upon you!',
+    difficulty: 'hard',
+    multiRound: true,
+    enemyHP: 40,
+    suggestedActions: [
+      { label: 'Attack', skill: 'Athletics', description: 'Fight the spirit' },
+      { label: 'Turn Undead', skill: 'Religion', description: 'Use holy power against it' },
+      { label: 'Communicate', skill: 'Persuasion', description: 'Try to speak with the spirit' },
+      { label: 'Flee', skill: 'Athletics', description: 'Run from the haunted place' }
+    ],
+    rewards: { xp: 70, gold: '3d10', items: ['ectoplasm:50%', 'ghostly_trinket:35%', 'spirit_essence:20%'] },
+    consequences: {
+      criticalSuccess: 'The spirit shares ancient knowledge before departing peacefully.',
+      success: 'You defeat or calm the spirit.',
+      failure: 'The spirit curses you before fading, imposing a minor hex.',
+      criticalFailure: 'The spirit possesses a party member temporarily, causing chaos.'
+    }
+  },
+
+  'ruin_treasure_vault': {
+    name: 'Hidden Vault',
+    icon: '🗝️',
+    encounterTier: 'narrative',
+    poiType: 'ruins',
+    narrativeHook: 'an ornate door half-buried in rubble',
+    aiContext: 'Behind fallen stones, an ornate door with ancient locks hints at a sealed vault. Whatever the ancients locked away might still be inside - treasure, knowledge, or something dangerous.',
+    description: 'A sealed vault door bears arcane symbols and complex locks, promising secrets within.',
+    difficulty: 'hard',
+    suggestedActions: [
+      { label: 'Pick Lock', skill: 'Sleight of Hand', description: 'Try to open the locks' },
+      { label: 'Force Open', skill: 'Athletics', description: 'Break through the door' },
+      { label: 'Dispel Magic', skill: 'Arcana', description: 'Remove magical protections' },
+      { label: 'Leave It', skill: null, description: 'The vault is too risky' }
+    ],
+    rewards: { xp: 90, gold: '5d20', items: ['ancient_gold:80%', 'magic_scroll:50%', 'legendary_weapon:15%'] },
+    consequences: {
+      criticalSuccess: 'The vault opens to reveal untouched treasure from the ancient era.',
+      success: 'You access the vault and find valuable items.',
+      failure: 'The vault is mostly looted but you find a few coins.',
+      criticalFailure: 'Opening the vault releases a trapped creature!'
+    }
+  },
+
+  'ruin_cultists': {
+    name: 'Dark Ritual',
+    icon: '🕯️',
+    encounterTier: 'immediate',
+    poiType: 'ruins',
+    description: 'Hooded figures chant around a glowing altar in the ruins - you\'ve stumbled upon a dark ritual!',
+    difficulty: 'hard',
+    multiRound: true,
+    enemyHP: 60,
+    suggestedActions: [
+      { label: 'Attack', skill: 'Athletics', description: 'Interrupt the ritual by force' },
+      { label: 'Sneak Away', skill: 'Stealth', description: 'Leave before being noticed' },
+      { label: 'Disrupt Ritual', skill: 'Arcana', description: 'Counter the magic' },
+      { label: 'Infiltrate', skill: 'Deception', description: 'Pretend to be a cultist' }
+    ],
+    rewards: { xp: 100, gold: '4d12', items: ['ritual_dagger:60%', 'dark_tome:40%', 'cult_treasure:50%', 'cursed_item:30%'] },
+    consequences: {
+      criticalSuccess: 'You stop the ritual and capture the cult leader for questioning.',
+      success: 'You defeat the cultists and prevent the ritual.',
+      failure: 'You defeat them but the ritual partially completes - something stirs.',
+      criticalFailure: 'The ritual completes - you must face what they summoned!'
+    }
+  },
+
+  'ruin_ancient_library': {
+    name: 'Forgotten Library',
+    icon: '📚',
+    encounterTier: 'narrative',
+    poiType: 'ruins',
+    narrativeHook: 'rows of dusty shelves visible through a collapsed wall',
+    aiContext: 'A partially intact library contains scrolls and tomes that have survived the ages. The knowledge here could be invaluable - magical formulae, historical secrets, or maps to hidden places.',
+    description: 'Ancient books and scrolls line crumbling shelves, their knowledge preserved through centuries.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Study', skill: 'History', description: 'Read the ancient texts' },
+      { label: 'Search', skill: 'Investigation', description: 'Look for valuable tomes' },
+      { label: 'Copy Spells', skill: 'Arcana', description: 'Transcribe magical formulae' },
+      { label: 'Take Books', skill: null, description: 'Grab what looks valuable' }
+    ],
+    rewards: { xp: 45, gold: '1d10', items: ['spell_scroll:50%', 'history_tome:60%', 'treasure_map:25%', 'forbidden_knowledge:15%'] },
+    consequences: {
+      criticalSuccess: 'You discover a complete spellbook and maps to other ruins.',
+      success: 'You gain useful knowledge and a few valuable scrolls.',
+      failure: 'Most texts are too damaged to read.',
+      criticalFailure: 'A guardian construct activates to protect the library!'
+    }
+  },
+
+  // === PHASE 3: POI ENCOUNTERS - GROVES/FORESTS (3.3) ===
+
+  'sacred_grove': {
+    name: 'Sacred Grove',
+    icon: '🌳',
+    encounterTier: 'narrative',
+    poiType: 'grove',
+    narrativeHook: 'an ancient circle of trees radiating peaceful energy',
+    aiContext: 'A ring of ancient trees marks a sacred grove. The air feels charged with natural magic. Druids or forest spirits might dwell here, and the grove could offer healing or blessings.',
+    description: 'A circle of towering ancient trees surrounds a peaceful clearing, humming with natural magic.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Meditate', skill: 'Religion', description: 'Commune with nature spirits' },
+      { label: 'Offer Gift', skill: 'Nature', description: 'Leave an offering' },
+      { label: 'Rest', skill: null, description: 'Take shelter in the grove' },
+      { label: 'Harvest', skill: 'Survival', description: 'Gather rare herbs' }
+    ],
+    rewards: { xp: 35, gold: '0', items: ['healing_herbs:70%', 'nature_blessing:40%', 'druid_token:25%', 'rare_flower:35%'] },
+    consequences: {
+      criticalSuccess: 'The grove\'s guardian appears and grants you a powerful blessing.',
+      success: 'You feel refreshed and find useful herbs.',
+      failure: 'The grove offers rest but no special benefits.',
+      criticalFailure: 'You offend the forest spirits who curse your passage.'
+    }
+  },
+
+  'dryad_encounter': {
+    name: 'Dryad Guardian',
+    icon: '🧚',
+    encounterTier: 'narrative',
+    poiType: 'grove',
+    narrativeHook: 'a beautiful figure seeming to emerge from an ancient tree',
+    aiContext: 'A dryad, guardian of the grove, reveals herself. She might offer aid to those who respect the forest, or punish those who harm it. Her favor could open paths through the deepest woods.',
+    description: 'A beautiful spirit steps from an ancient oak, her form shifting between woman and tree.',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Greet Respectfully', skill: 'Persuasion', description: 'Show proper respect' },
+      { label: 'Offer Service', skill: 'Nature', description: 'Promise to help the forest' },
+      { label: 'Ask for Aid', skill: 'Persuasion', description: 'Request her assistance' },
+      { label: 'Back Away', skill: 'Stealth', description: 'Leave without disturbing her' }
+    ],
+    rewards: { xp: 50, gold: '0', items: ['dryad_blessing:50%', 'enchanted_seed:40%', 'forest_map:60%', 'nature_charm:30%'] },
+    consequences: {
+      criticalSuccess: 'The dryad marks you as a friend of the forest - all woodland creatures will aid you.',
+      success: 'The dryad shares forest secrets and safe paths.',
+      failure: 'The dryad is indifferent and lets you pass.',
+      criticalFailure: 'The dryad sees threat and entangles you in vines.'
+    }
+  },
+
+  'forest_beast': {
+    name: 'Awakened Beast',
+    icon: '🐗',
+    encounterTier: 'immediate',
+    poiType: 'grove',
+    description: 'A massive boar, its eyes glowing with unnatural intelligence, charges from the undergrowth!',
+    difficulty: 'hard',
+    multiRound: true,
+    enemyHP: 55,
+    suggestedActions: [
+      { label: 'Fight', skill: 'Athletics', description: 'Stand and fight' },
+      { label: 'Calm', skill: 'Animal Handling', description: 'Try to pacify the beast' },
+      { label: 'Dodge', skill: 'Acrobatics', description: 'Evade its charge' },
+      { label: 'Climb', skill: 'Athletics', description: 'Get to the trees' }
+    ],
+    rewards: { xp: 75, gold: '0', items: ['beast_hide:70%', 'enchanted_tusk:40%', 'primal_essence:25%'] },
+    consequences: {
+      criticalSuccess: 'You calm the beast and it becomes a temporary ally.',
+      success: 'You defeat or drive off the beast.',
+      failure: 'You escape but suffer injuries from its tusks.',
+      criticalFailure: 'The beast gores you badly before you escape.'
+    }
+  },
+
+  'fairy_ring': {
+    name: 'Fairy Ring',
+    icon: '🍄',
+    encounterTier: 'narrative',
+    poiType: 'grove',
+    narrativeHook: 'a perfect circle of mushrooms glowing softly in the twilight',
+    aiContext: 'A ring of luminescent mushrooms marks a fairy crossing. Stepping inside could transport you elsewhere, attract fey attention, or grant strange gifts - but fairy bargains are tricky.',
+    description: 'Glowing mushrooms form a perfect circle, the air within shimmering with otherworldly light.',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Step Inside', skill: 'Arcana', description: 'Enter the fairy ring' },
+      { label: 'Speak to Fey', skill: 'Persuasion', description: 'Call out to fairy folk' },
+      { label: 'Harvest Mushrooms', skill: 'Nature', description: 'Gather the magical fungi' },
+      { label: 'Avoid', skill: null, description: 'Steer clear of fey magic' }
+    ],
+    rewards: { xp: 60, gold: '2d20', items: ['fairy_dust:60%', 'fey_charm:40%', 'enchanted_mushroom:50%', 'pixie_gold:30%'] },
+    consequences: {
+      criticalSuccess: 'Friendly fey grant you a wish or powerful boon.',
+      success: 'You gain fairy gifts and useful magical items.',
+      failure: 'The fey play tricks but cause no lasting harm.',
+      criticalFailure: 'You\'re transported elsewhere and must find your way back.'
+    }
+  },
+
+  // === PHASE 3: POI ENCOUNTERS - MOUNTAINS (3.4) ===
+
+  'mountain_pass': {
+    name: 'Treacherous Pass',
+    icon: '🏔️',
+    encounterTier: 'narrative',
+    poiType: 'mountain',
+    narrativeHook: 'a narrow path winding along a sheer cliff face',
+    aiContext: 'The mountain pass is narrow and dangerous, with sheer drops and loose rocks. One wrong step could be fatal, but it\'s the only way through the peaks.',
+    description: 'A narrow trail clings to the mountainside, with deadly drops on one side and unstable rocks above.',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Proceed Carefully', skill: 'Acrobatics', description: 'Navigate with extreme care' },
+      { label: 'Climb Above', skill: 'Athletics', description: 'Find a higher route' },
+      { label: 'Scout Ahead', skill: 'Perception', description: 'Identify the safest path' },
+      { label: 'Turn Back', skill: null, description: 'Find another way' }
+    ],
+    rewards: { xp: 45, gold: '0', items: ['mountain_crystal:50%', 'eagle_feather:30%', 'rare_ore:25%'] },
+    consequences: {
+      criticalSuccess: 'You find a hidden shortcut and rare mountain treasures.',
+      success: 'You cross safely and continue your journey.',
+      failure: 'The crossing is slow and exhausting.',
+      criticalFailure: 'A rockslide blocks the path - you must dig through or retreat.'
+    }
+  },
+
+  'mountain_dragon': {
+    name: 'Dragon\'s Lair',
+    icon: '🐲',
+    encounterTier: 'immediate',
+    poiType: 'mountain',
+    description: 'A dragon emerges from its mountain lair, ancient and terrible, demanding tribute or combat!',
+    difficulty: 'deadly',
+    multiRound: true,
+    enemyHP: 120,
+    suggestedActions: [
+      { label: 'Fight', skill: 'Athletics', description: 'Battle the dragon' },
+      { label: 'Negotiate', skill: 'Persuasion', description: 'Offer tribute or service' },
+      { label: 'Flee', skill: 'Athletics', description: 'Run for your lives' },
+      { label: 'Riddle', skill: 'Intelligence', description: 'Challenge it to a battle of wits' }
+    ],
+    rewards: { xp: 200, gold: '20d20', items: ['dragon_scale:80%', 'dragon_gold:90%', 'legendary_artifact:25%', 'dragon_egg:5%'] },
+    consequences: {
+      criticalSuccess: 'You slay or outsmart the dragon and claim its hoard!',
+      success: 'You survive the encounter and escape with some treasure.',
+      failure: 'You escape with your lives but nothing else.',
+      criticalFailure: 'The dragon pursues you - lose equipment and take heavy damage.'
+    }
+  },
+
+  'mountain_hermit': {
+    name: 'Mountain Hermit',
+    icon: '🧙',
+    encounterTier: 'narrative',
+    poiType: 'mountain',
+    narrativeHook: 'smoke rising from a cave dwelling high on the mountainside',
+    aiContext: 'A hermit dwells in a mountain cave, having left civilization behind to seek wisdom or hide from their past. They might share knowledge, trade, or prefer to be left alone.',
+    description: 'An elderly hermit tends a fire outside their mountain cave, eyeing your approach with suspicion.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Greet Friendly', skill: 'Persuasion', description: 'Approach with respect' },
+      { label: 'Offer Trade', skill: 'Persuasion', description: 'Propose an exchange' },
+      { label: 'Ask for Wisdom', skill: 'Insight', description: 'Seek their knowledge' },
+      { label: 'Leave Alone', skill: null, description: 'Respect their solitude' }
+    ],
+    rewards: { xp: 40, gold: '1d10', items: ['hermit_wisdom:60%', 'mountain_herbs:50%', 'old_map:35%', 'enchanted_staff:15%'] },
+    consequences: {
+      criticalSuccess: 'The hermit was once a great wizard and teaches you powerful secrets.',
+      success: 'The hermit shares useful knowledge about the mountains.',
+      failure: 'The hermit is unfriendly but not hostile.',
+      criticalFailure: 'The hermit is paranoid and attacks, or their past catches up.'
+    }
+  },
+
+  'mountain_eagle_nest': {
+    name: 'Giant Eagle Nest',
+    icon: '🦅',
+    encounterTier: 'narrative',
+    poiType: 'mountain',
+    narrativeHook: 'massive feathers scattered on a high ledge',
+    aiContext: 'A giant eagle\'s nest sits on a high ledge, containing eggs or fledglings. The eagles are intelligent and might be befriended or could attack intruders.',
+    description: 'A massive nest of woven branches perches on a ledge, the screech of giant eagles echoing off the peaks.',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Approach Slowly', skill: 'Animal Handling', description: 'Try to befriend the eagles' },
+      { label: 'Offer Food', skill: 'Survival', description: 'Share your rations' },
+      { label: 'Climb to Nest', skill: 'Athletics', description: 'Investigate the nest' },
+      { label: 'Observe', skill: 'Perception', description: 'Watch from a safe distance' }
+    ],
+    rewards: { xp: 55, gold: '0', items: ['giant_feather:80%', 'eagle_blessing:30%', 'mountain_view:50%', 'eagle_ally:20%'] },
+    consequences: {
+      criticalSuccess: 'You befriend the eagles - they offer to carry you where you need to go.',
+      success: 'The eagles accept you and you gather valuable feathers.',
+      failure: 'The eagles tolerate your presence but nothing more.',
+      criticalFailure: 'The eagles attack to protect their nest!'
+    }
+  },
+
+  // === PHASE 3: ENVIRONMENTAL ENCOUNTERS ===
+
+  'sudden_storm': {
+    name: 'Sudden Storm',
+    icon: '⛈️',
+    encounterTier: 'immediate',
+    environmental: true,
+    description: 'Dark clouds gather with unnatural speed and a violent storm breaks overhead!',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Find Shelter', skill: 'Survival', description: 'Locate cover quickly' },
+      { label: 'Press On', skill: 'Constitution', description: 'Endure the storm' },
+      { label: 'Make Camp', skill: 'Survival', description: 'Set up emergency shelter' },
+      { label: 'Arcane Shield', skill: 'Arcana', description: 'Use magic for protection' }
+    ],
+    rewards: { xp: 30, gold: '0', items: ['rainwater:70%', 'storm_crystal:20%'] },
+    consequences: {
+      criticalSuccess: 'You find excellent shelter and the storm uncovers hidden treasures.',
+      success: 'You weather the storm with minimal difficulty.',
+      failure: 'The storm soaks your equipment and slows travel.',
+      criticalFailure: 'Lightning strikes nearby - you take damage and lose supplies.'
+    }
+  },
+
+  'thick_fog': {
+    name: 'Unnatural Fog',
+    icon: '🌫️',
+    encounterTier: 'narrative',
+    environmental: true,
+    narrativeHook: 'a wall of thick fog rolling across the land',
+    aiContext: 'Dense fog blankets the area, reducing visibility to nearly nothing. Strange sounds echo through the mist. The fog might be natural, magical, or hiding something.',
+    description: 'Impenetrable fog rolls in, reducing visibility to mere feet. Strange sounds echo in the whiteness.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Navigate', skill: 'Survival', description: 'Try to maintain direction' },
+      { label: 'Wait', skill: null, description: 'Let the fog pass' },
+      { label: 'Listen', skill: 'Perception', description: 'Identify sounds in the fog' },
+      { label: 'Dispel', skill: 'Arcana', description: 'Clear the fog magically' }
+    ],
+    rewards: { xp: 25, gold: '0', items: ['fog_essence:40%', 'hidden_path:30%'] },
+    consequences: {
+      criticalSuccess: 'You navigate perfectly and find something hidden by the fog.',
+      success: 'You make it through without incident.',
+      failure: 'You get turned around and lose time.',
+      criticalFailure: 'You stumble into danger hidden by the fog.'
+    }
+  },
+
+  'earthquake': {
+    name: 'Earthquake',
+    icon: '🌋',
+    encounterTier: 'immediate',
+    environmental: true,
+    description: 'The ground shakes violently as an earthquake strikes!',
+    difficulty: 'hard',
+    suggestedActions: [
+      { label: 'Drop and Cover', skill: 'Acrobatics', description: 'Protect yourself from debris' },
+      { label: 'Find Open Ground', skill: 'Athletics', description: 'Get away from structures' },
+      { label: 'Stabilize Footing', skill: 'Acrobatics', description: 'Keep your balance' },
+      { label: 'Help Others', skill: 'Athletics', description: 'Assist party members' }
+    ],
+    rewards: { xp: 50, gold: '0', items: ['exposed_minerals:50%', 'uncovered_ruins:25%', 'fallen_treasure:30%'] },
+    consequences: {
+      criticalSuccess: 'You help everyone stay safe and the quake reveals something valuable.',
+      success: 'You weather the earthquake without injury.',
+      failure: 'You take minor injuries from falling debris.',
+      criticalFailure: 'You fall into a fissure and must be rescued.'
+    }
+  },
+
+  'heat_wave': {
+    name: 'Scorching Heat',
+    icon: '🔥',
+    encounterTier: 'narrative',
+    environmental: true,
+    narrativeHook: 'the air shimmering with intense heat',
+    aiContext: 'An oppressive heat wave makes travel dangerous. Dehydration and heat exhaustion threaten the party. Finding water and shade becomes critical.',
+    description: 'The sun beats down mercilessly, the air so hot it shimmers. Every step is exhausting.',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Find Water', skill: 'Survival', description: 'Search for a water source' },
+      { label: 'Travel at Night', skill: 'Survival', description: 'Rest during the day' },
+      { label: 'Create Shade', skill: 'Survival', description: 'Improvise sun protection' },
+      { label: 'Push Through', skill: 'Constitution', description: 'Endure the heat' }
+    ],
+    rewards: { xp: 30, gold: '0', items: ['survival_experience:60%', 'desert_flower:30%'] },
+    consequences: {
+      criticalSuccess: 'You find an oasis with cool water and shade.',
+      success: 'You manage the heat effectively.',
+      failure: 'The heat saps your strength - travel is slower.',
+      criticalFailure: 'Someone collapses from heat exhaustion.'
+    }
+  },
+
+  'strange_lights': {
+    name: 'Strange Lights',
+    icon: '✨',
+    encounterTier: 'narrative',
+    environmental: true,
+    narrativeHook: 'mysterious lights dancing on the horizon',
+    aiContext: 'Unexplained lights appear in the sky or floating above the ground. They could be will-o-wisps, magical phenomena, or signals from other travelers.',
+    description: 'Eerie lights dance in the distance, their colors shifting and their movement almost purposeful.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Follow', skill: 'Survival', description: 'Track the lights to their source' },
+      { label: 'Study', skill: 'Arcana', description: 'Analyze the magical nature' },
+      { label: 'Signal Back', skill: 'Survival', description: 'Try to communicate' },
+      { label: 'Ignore', skill: null, description: 'Continue on your way' }
+    ],
+    rewards: { xp: 35, gold: '1d20', items: ['wisp_essence:40%', 'magical_discovery:50%', 'traveler_contact:30%'] },
+    consequences: {
+      criticalSuccess: 'The lights lead you to treasure or helpful allies.',
+      success: 'You discover the lights are a natural phenomenon and gain knowledge.',
+      failure: 'The lights lead nowhere interesting.',
+      criticalFailure: 'The lights were a trap - you\'re ambushed or lost.'
+    }
   }
 
 };
