@@ -89,6 +89,7 @@ const Game = () => {
   const townMapsCacheRef = useRef(mapHook.townMapsCache);
   const currentMapLevelRef = useRef(mapHook.currentMapLevel);
   const hasAdventureStartedRef = useRef(hasAdventureStarted);
+  const lastSaveFingerprintRef = useRef(null);
 
   useEffect(() => {
     conversationRef.current = interactionHook.conversation;
@@ -127,6 +128,24 @@ const Game = () => {
       return;
     }
 
+    // Build a lightweight fingerprint to detect changes
+    const pos = playerPositionRef.current;
+    const fingerprint = [
+      convo.length,
+      pos?.x, pos?.y,
+      currentMapLevelRef.current,
+      isInsideTownRef.current,
+      townPlayerPositionRef.current?.x, townPlayerPositionRef.current?.y,
+      interactionHook.currentSummary?.length || 0,
+      settingsRef.current?.storyTitle || '',
+    ].join('|');
+
+    // Skip save if nothing has changed (unless unmount)
+    if (!isUnmount && fingerprint === lastSaveFingerprintRef.current) {
+      console.log('[AUTO-SAVE] No changes detected, skipping save');
+      return;
+    }
+
     const sub_maps = {
       currentTownMap: currentTownMapRef.current,
       townPlayerPosition: townPlayerPositionRef.current,
@@ -150,12 +169,13 @@ const Game = () => {
       hasAdventureStarted: hasAdventureStarted,
       sub_maps: sub_maps
     });
+
+    lastSaveFingerprintRef.current = fingerprint;
   };
 
   useEffect(() => {
     if (!sessionId || !hasAdventureStarted) return;
     const interval = setInterval(() => {
-      console.log('[AUTO-SAVE]');
       performSave();
     }, 30000);
     return () => clearInterval(interval);
