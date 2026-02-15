@@ -18,11 +18,34 @@ import CharacterModal from '../components/CharacterModal';
 import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
 import { getHPStatus } from '../utils/healthSystem';
+import { awardXP, getLevelUpSummary } from '../utils/progressionSystem';
+import { addItem, addGold } from '../utils/inventorySystem';
 
 const Game = () => {
   const { state } = useLocation();
   const { selectedHeroes: stateHeroes, loadedConversation, worldSeed: stateSeed, gameSessionId: stateGameSessionId } = state || { selectedHeroes: [], loadedConversation: null, worldSeed: null, gameSessionId: null };
-  const [selectedHeroes, setSelectedHeroes] = useState(loadedConversation?.selected_heroes || stateHeroes || []);
+  const [selectedHeroes, setSelectedHeroes] = useState(() => {
+    // Initialize heroes with progression fields if missing
+    const heroes = loadedConversation?.selected_heroes || stateHeroes || [];
+    return heroes.map(hero => {
+      if (hero.xp === undefined) {
+        const conMod = Math.floor(((hero.stats?.Constitution || 10) - 10) / 2);
+        const hitDice = { 'Barbarian': 12, 'Fighter': 10, 'Paladin': 10, 'Ranger': 10, 'Cleric': 8, 'Druid': 8, 'Monk': 8, 'Rogue': 8, 'Warlock': 8, 'Bard': 8, 'Sorcerer': 6, 'Wizard': 6 };
+        const hd = hitDice[hero.characterClass] || 8;
+        const maxHP = hero.maxHP || (hd + conMod);
+        return {
+          ...hero,
+          xp: hero.xp || 0,
+          level: hero.level || 1,
+          gold: hero.gold || 0,
+          inventory: hero.inventory || [],
+          maxHP,
+          currentHP: hero.currentHP ?? maxHP
+        };
+      }
+      return hero;
+    });
+  });
 
   // Robust seed extraction
   const settingsObj = typeof loadedConversation?.game_settings === 'string'
@@ -705,6 +728,52 @@ const Game = () => {
         character={selectedHeroes.length > 0 ? selectedHeroes[0] : null}
         onResolve={(result) => {
           console.log('[ENCOUNTER] Resolved:', result);
+          
+          // Apply rewards to character if any
+          if (result?.rewards && selectedHeroes.length > 0) {
+            let updatedHero = { ...selectedHeroes[0] };
+            const rewards = result.rewards;
+            let rewardMessages = [];
+            
+            // Award XP
+            if (rewards.xp > 0) {
+              const xpResult = awardXP(updatedHero, rewards.xp);
+              updatedHero = xpResult.character;
+              rewardMessages.push(`+${rewards.xp} XP`);
+              
+              if (xpResult.leveledUp) {
+                const summary = getLevelUpSummary(xpResult.previousLevel, xpResult.newLevel, updatedHero);
+                rewardMessages.push(`🎉 LEVEL UP! Now level ${summary.newLevel}!`);
+              }
+            }
+            
+            // Award gold
+            if (rewards.gold > 0) {
+              updatedHero = addGold(updatedHero, rewards.gold);
+              rewardMessages.push(`+${rewards.gold} gold`);
+            }
+            
+            // Award items
+            if (rewards.items && rewards.items.length > 0) {
+              for (const itemName of rewards.items) {
+                const itemKey = itemName.replace(/ /g, '_').toLowerCase();
+                updatedHero = {
+                  ...updatedHero,
+                  inventory: addItem(updatedHero.inventory || [], itemKey)
+                };
+              }
+              rewardMessages.push(`Found: ${rewards.items.join(', ')}`);
+            }
+            
+            // Update hero state
+            handleHeroUpdate(updatedHero);
+            
+            // Log rewards
+            if (rewardMessages.length > 0) {
+              console.log('[PROGRESSION] Rewards applied:', rewardMessages.join(', '));
+            }
+          }
+          
           // Add encounter outcome to conversation
           if (result?.narration) {
             const encounterMsg = { role: 'ai', content: `⚔️ **${actionEncounter?.name || 'Encounter'}**: ${result.narration}` };

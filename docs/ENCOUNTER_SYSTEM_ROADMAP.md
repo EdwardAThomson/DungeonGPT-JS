@@ -1074,19 +1074,27 @@ const applyReputationChange = (encounter, outcome) => {
 **Success Criteria:** ✅ Traveling between towns triggers appropriate random encounters based on biome and settings.
 **Phase 2.4 Success Criteria:** Immediate encounters suppress AI prompts; narrative encounters enhance them without conflict.
 
-### Phase 3: Content Expansion (MEDIUM PRIORITY)
+### Phase 3: Content Expansion (MEDIUM PRIORITY) ✅ COMPLETED
 **Goal:** Add variety and depth to encounters
-7. **Enhanced POI Encounters** (3.1-3.4) - Caves, ruins, groves, mountains
-8. **More Encounter Templates** - Expand to 30+ unique encounters
-9. **Environmental Encounters** - Weather, hazards, discoveries
+7. ✅ **Enhanced POI Encounters** (3.1-3.4) - Caves, ruins, groves, mountains
+8. ✅ **More Encounter Templates** - Expanded to 40+ unique encounters
+9. ✅ **Environmental Encounters** - Weather, hazards, discoveries
 
-**Success Criteria:** Every POI type has unique, story-rich encounters.
+**Success Criteria:** ✅ Every POI type has unique, story-rich encounters.
 
-### Phase 4: Progression Systems (MEDIUM PRIORITY)
+### Phase 4: Progression Systems (MEDIUM PRIORITY) 🔄 IN PROGRESS
 **Goal:** Make encounters meaningful long-term
-10. **Experience & Leveling** (4.1) - Track XP and level-ups
-11. **Inventory System** (4.2) - Manage gold and items
-12. **Loot Narration** (4.3) - AI describes treasure acquisition
+10. ✅ **Experience & Leveling** (4.1) - Track XP and level-ups (`progressionSystem.js`)
+11. ✅ **Inventory System** (4.2) - Manage gold and items (`inventorySystem.js`)
+12. 🔄 **Loot Narration** (4.3) - AI describes treasure acquisition (IN PROGRESS)
+
+**Implementation Notes:**
+- XP thresholds: D&D 5e-inspired, slow progression (~20-30 encounters per level)
+- Level cap: 20, with ASI at levels 4, 8, 12, 16, 19
+- HP calculated per class hit die + CON modifier
+- Inventory with rarity system (common → legendary)
+- Gold and items awarded on successful encounters
+- Progression test page: `/progression-test`
 
 **Success Criteria:** Encounter rewards persist and affect character progression.
 

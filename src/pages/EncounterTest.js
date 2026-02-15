@@ -6,6 +6,35 @@ import { initializeHP, applyDamage, getHPStatus } from '../utils/healthSystem';
 const EncounterTest = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEncounter, setSelectedEncounter] = useState(null);
+  const [categoryFilter, setCategoryFilter] = useState('all');
+
+  // Categorize encounters
+  const categorizeEncounter = (key, encounter) => {
+    if (encounter.environmental) return 'environmental';
+    if (encounter.poiType === 'cave') return 'cave';
+    if (encounter.poiType === 'ruins') return 'ruins';
+    if (encounter.poiType === 'grove') return 'grove';
+    if (encounter.poiType === 'mountain') return 'mountain';
+    if (encounter.encounterTier === 'narrative') return 'narrative';
+    if (encounter.encounterTier === 'immediate') return 'immediate';
+    return 'other';
+  };
+
+  const categories = [
+    { id: 'all', label: '🎲 All', color: '#9b59b6' },
+    { id: 'immediate', label: '⚔️ Immediate', color: '#e74c3c' },
+    { id: 'narrative', label: '📖 Narrative', color: '#3498db' },
+    { id: 'cave', label: '🕳️ Caves', color: '#7f8c8d' },
+    { id: 'ruins', label: '🏛️ Ruins', color: '#d35400' },
+    { id: 'grove', label: '🌳 Groves', color: '#27ae60' },
+    { id: 'mountain', label: '🏔️ Mountains', color: '#2c3e50' },
+    { id: 'environmental', label: '🌦️ Environmental', color: '#1abc9c' }
+  ];
+
+  const filteredEncounters = Object.entries(encounterTemplates).filter(([key, enc]) => {
+    if (categoryFilter === 'all') return true;
+    return categorizeEncounter(key, enc) === categoryFilter;
+  });
 
   // Mock character for testing with HP
   const [testCharacter, setTestCharacter] = useState(() => {
@@ -50,8 +79,34 @@ const EncounterTest = () => {
         Click an encounter below to test the narrative-first encounter resolution system.
       </p>
 
+      {/* Category Filter */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
+        {categories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setCategoryFilter(cat.id)}
+            style={{
+              padding: '8px 16px',
+              background: categoryFilter === cat.id ? cat.color : 'var(--surface)',
+              color: categoryFilter === cat.id ? 'white' : 'var(--text)',
+              border: `2px solid ${cat.color}`,
+              borderRadius: '20px',
+              cursor: 'pointer',
+              fontWeight: categoryFilter === cat.id ? 'bold' : 'normal',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
+      <p style={{ marginBottom: '15px', color: 'var(--text-secondary)' }}>
+        Showing {filteredEncounters.length} encounters
+      </p>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '20px' }}>
-        {Object.entries(encounterTemplates).map(([key, encounter]) => (
+        {filteredEncounters.map(([key, encounter]) => (
           <button
             key={key}
             onClick={() => handleEncounterSelect(key)}
