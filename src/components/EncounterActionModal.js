@@ -26,16 +26,17 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
     }
   }, [isOpen, character]);
   
-  // Initialize multi-round state when encounter opens
+  // Initialize multi-round state ONLY when modal first opens with a new encounter
   useEffect(() => {
     if (isOpen && encounter && encounter.multiRound) {
       setIsMultiRound(true);
-      setRoundState(createMultiRoundEncounter(encounter, currentCharacter, settings));
+      setRoundState(createMultiRoundEncounter(encounter, character, settings));
     } else {
       setIsMultiRound(false);
       setRoundState(null);
     }
-  }, [isOpen, encounter, currentCharacter, settings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, encounter]);
 
   if (!isOpen || !encounter) return null;
 
@@ -58,7 +59,9 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
         }
         
         setCurrentRoundResult(roundResult);
-        setRoundResults(prev => [...prev, { round: roundState.currentRound, result: roundResult }]);
+        // Store the round number from the history that was just added
+        const completedRound = updatedState.roundHistory[updatedState.roundHistory.length - 1];
+        setRoundResults(prev => [...prev, { round: completedRound.round, result: roundResult }]);
         setRoundState(updatedState);
         
         // Check if encounter is resolved
@@ -184,7 +187,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
                 </div>
               )}
               
-              {/* HP Bar */}
+              {/* Player HP Bar */}
               {currentCharacter.maxHP && (
                 <div className="encounter-hp-bar">
                   <div className="hp-label">
@@ -204,9 +207,55 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
                   </div>
                 </div>
               )}
+              
+              {/* Enemy HP Bar */}
+              {isMultiRound && roundState && roundState.enemyMaxHP && (
+                <div className="encounter-hp-bar enemy-hp-bar">
+                  <div className="hp-label">
+                    <span>{encounter.name}</span>
+                    <span style={{ color: roundState.enemyCurrentHP <= roundState.enemyMaxHP * 0.3 ? '#e74c3c' : '#f39c12' }}>
+                      {roundState.enemyCurrentHP} / {roundState.enemyMaxHP} HP
+                    </span>
+                  </div>
+                  <div className="hp-bar-container">
+                    <div 
+                      className="hp-bar-fill" 
+                      style={{ 
+                        width: `${(roundState.enemyCurrentHP / roundState.enemyMaxHP) * 100}%`,
+                        background: roundState.enemyCurrentHP <= roundState.enemyMaxHP * 0.3 ? '#e74c3c' : '#f39c12'
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             
-            {currentRoundResult ? (
+            {isDefeated && !result ? (
+              // Character is defeated mid-encounter
+              <>
+                <div className="defeat-warning">
+                  <h3 style={{ color: '#e74c3c', margin: '0 0 10px 0' }}>💀 You are defeated!</h3>
+                  <p>You cannot continue fighting in your current condition.</p>
+                  <button className="primary-button" onClick={onClose} style={{ background: '#e74c3c', marginTop: '15px' }}>
+                    Retreat from Combat
+                  </button>
+                </div>
+              </>
+            ) : roundState && roundState.enemyCurrentHP <= 0 && !result ? (
+              // Enemy is defeated
+              <>
+                <div className="victory-banner">
+                  <h3 style={{ color: '#27ae60', margin: '0 0 10px 0' }}>⚔️ Victory!</h3>
+                  <p>The {encounter.name.toLowerCase()} has been defeated!</p>
+                  <button className="primary-button" onClick={async () => {
+                    const summary = await generateEncounterSummary(roundState);
+                    setResult(summary);
+                  }} style={{ background: '#27ae60', marginTop: '15px' }}>
+                    Claim Victory
+                  </button>
+                </div>
+              </>
+            ) : currentRoundResult ? (
               // Show current round result before continuing
               <>
                 <div className={getOutcomeBadgeClass(currentRoundResult.outcomeTier)}>
@@ -225,6 +274,24 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
                 
                 <div className="ai-narration">
                   {currentRoundResult.narration}
+                </div>
+                
+                <div className="combat-damage-summary">
+                  {currentRoundResult.enemyDamage > 0 && (
+                    <div className="enemy-damage-section">
+                      <h4>⚔️ Damage Dealt</h4>
+                      <div className="damage-amount" style={{ color: '#f39c12' }}>{currentRoundResult.enemyDamage} HP</div>
+                      <p className="damage-description">You strike the {encounter.name.toLowerCase()}!</p>
+                    </div>
+                  )}
+                  
+                  {currentRoundResult.hpDamage > 0 && (
+                    <div className="player-damage-section">
+                      <h4>🩸 Damage Taken</h4>
+                      <div className="damage-amount" style={{ color: '#e74c3c' }}>{currentRoundResult.hpDamage} HP</div>
+                      <p className="damage-description">The {encounter.name.toLowerCase()} strikes back!</p>
+                    </div>
+                  )}
                 </div>
                 
                 {roundState && (
@@ -248,9 +315,20 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
                   </div>
                 )}
                 
-                <button className="primary-button" onClick={handleNextRound}>
-                  Continue Fighting →
-                </button>
+                <div className="round-action-buttons">
+                  <button className="primary-button fight-button" onClick={() => {
+                    handleNextRound();
+                    const fightAction = encounter.suggestedActions.find(a => a.label === 'Fight');
+                    if (fightAction) {
+                      setTimeout(() => handleAction(fightAction), 50);
+                    }
+                  }}>
+                    ⚔️ Fight!
+                  </button>
+                  <button className="secondary-button" onClick={handleNextRound}>
+                    Choose Action →
+                  </button>
+                </div>
               </>
             ) : (
               <>

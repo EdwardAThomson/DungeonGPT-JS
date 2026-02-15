@@ -8,6 +8,7 @@ export const encounterTemplates = {
     description: 'A band of goblins leaps from the undergrowth, weapons drawn and eyes gleaming with malice!',
     difficulty: 'easy',
     multiRound: true,
+    enemyHP: 15,
     suggestedActions: [
       { label: 'Fight', skill: 'Athletics', description: 'Charge into battle with weapons ready' },
       { label: 'Intimidate', skill: 'Intimidation', description: 'Roar and brandish weapons to scare them off' },
@@ -29,6 +30,7 @@ export const encounterTemplates = {
     description: 'Hungry wolves circle your party, growling menacingly as their alpha watches from the shadows.',
     difficulty: 'medium',
     multiRound: true,
+    enemyHP: 20,
     suggestedActions: [
       { label: 'Fight', skill: 'Athletics', description: 'Defend against the pack with steel and courage' },
       { label: 'Scare Off', skill: 'Intimidation', description: 'Use fire and noise to frighten them' },
@@ -50,6 +52,7 @@ export const encounterTemplates = {
     description: 'Armed bandits block the road ahead, their leader demanding a toll for safe passage.',
     difficulty: 'medium',
     multiRound: true,
+    enemyHP: 25,
     suggestedActions: [
       { label: 'Fight', skill: 'Athletics', description: 'Draw weapons and fight your way through' },
       { label: 'Intimidate', skill: 'Intimidation', description: 'Show them you\'re not easy prey' },
@@ -121,6 +124,7 @@ export const encounterTemplates = {
     description: 'Massive webs stretch between the trees, and you hear the clicking of enormous mandibles.',
     difficulty: 'medium',
     multiRound: true,
+    enemyHP: 18,
     suggestedActions: [
       { label: 'Fight', skill: 'Athletics', description: 'Battle the spiders before they strike' },
       { label: 'Burn Webs', skill: 'Survival', description: 'Use fire to clear a path' },
@@ -142,6 +146,7 @@ export const encounterTemplates = {
     description: 'A massive bear rears up on its hind legs, roaring a challenge as you enter its territory.',
     difficulty: 'hard',
     multiRound: true,
+    enemyHP: 35,
     suggestedActions: [
       { label: 'Fight', skill: 'Athletics', description: 'Stand your ground and fight the beast' },
       { label: 'Intimidate', skill: 'Intimidation', description: 'Make yourself large and loud' },

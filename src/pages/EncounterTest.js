@@ -25,6 +25,12 @@ const EncounterTest = () => {
   });
 
   const handleEncounterSelect = (encounterKey) => {
+    // Check if character is defeated
+    if (testCharacter.currentHP <= 0) {
+      alert('Your character is defeated and cannot engage in combat! Use the Full Heal button to recover.');
+      return;
+    }
+    
     setSelectedEncounter(encounterTemplates[encounterKey]);
     setIsModalOpen(true);
   };

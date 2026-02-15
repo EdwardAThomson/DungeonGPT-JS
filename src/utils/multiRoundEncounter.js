@@ -15,6 +15,8 @@ export const createMultiRoundEncounter = (encounter, character, settings) => {
     roundHistory: [],
     enemyMorale: 100, // Drops with successful player actions
     playerAdvantage: 0, // Builds with successful tactics
+    enemyMaxHP: encounter.enemyHP || 20, // Enemy starting HP
+    enemyCurrentHP: encounter.enemyHP || 20, // Enemy current HP
     isResolved: false,
     outcome: null
   };
@@ -78,30 +80,50 @@ export const resolveRound = async (roundState, playerAction) => {
   
   // Update state based on outcome
   const updatedState = { ...roundState };
-  updatedState.currentRound += 1;
+  
+  // Store current round in history BEFORE incrementing
   updatedState.roundHistory.push({
     round: roundState.currentRound,
     action: playerAction,
     result
   });
   
-  // Adjust enemy morale and player advantage
+  // Now increment for next round
+  updatedState.currentRound += 1;
+  
+  // Calculate damage to enemy based on outcome
+  let enemyDamage = 0;
   if (result.outcomeTier === 'criticalSuccess') {
+    enemyDamage = Math.floor(updatedState.enemyMaxHP * 0.4); // 40% damage
     updatedState.enemyMorale -= 40;
     updatedState.playerAdvantage += 2;
   } else if (result.outcomeTier === 'success') {
+    enemyDamage = Math.floor(updatedState.enemyMaxHP * 0.2); // 20% damage
     updatedState.enemyMorale -= 20;
     updatedState.playerAdvantage += 1;
   } else if (result.outcomeTier === 'failure') {
+    enemyDamage = Math.floor(updatedState.enemyMaxHP * 0.05); // 5% damage
     updatedState.enemyMorale += 10;
     updatedState.playerAdvantage -= 1;
   } else if (result.outcomeTier === 'criticalFailure') {
+    enemyDamage = 0; // No damage on critical failure
     updatedState.enemyMorale += 20;
     updatedState.playerAdvantage -= 2;
   }
   
+  // Apply damage to enemy
+  updatedState.enemyCurrentHP = Math.max(0, updatedState.enemyCurrentHP - enemyDamage);
+  
+  // Add enemy damage to result for display
+  result.enemyDamage = enemyDamage;
+  result.enemyCurrentHP = updatedState.enemyCurrentHP;
+  result.enemyMaxHP = updatedState.enemyMaxHP;
+  
   // Check for resolution conditions
-  if (updatedState.enemyMorale <= 0) {
+  if (updatedState.enemyCurrentHP <= 0) {
+    updatedState.isResolved = true;
+    updatedState.outcome = 'victory';
+  } else if (updatedState.enemyMorale <= 0) {
     updatedState.isResolved = true;
     updatedState.outcome = 'victory';
   } else if (updatedState.playerAdvantage <= -3) {
