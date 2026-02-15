@@ -1,4 +1,5 @@
 import React from 'react';
+import { calculateMaxHP, getHPStatus } from '../utils/healthSystem';
 
 const CharacterModal = ({ isOpen, onClose, character }) => {
     if (!isOpen || !character) return null;
@@ -50,6 +51,32 @@ const CharacterModal = ({ isOpen, onClose, character }) => {
                         </div>
                     </div>
                 )}
+
+                {character.stats && (() => {
+                    const maxHP = character.maxHP || calculateMaxHP(character);
+                    const currentHP = character.currentHP ?? maxHP;
+                    const status = getHPStatus(currentHP, maxHP);
+                    return (
+                        <div className="modal-section">
+                            <h4>Health</h4>
+                            <div className="character-hp-display">
+                                <div className="character-hp-label">
+                                    <span>HP</span>
+                                    <span style={{ color: status.color, fontWeight: 'bold' }}>{currentHP}/{maxHP}</span>
+                                </div>
+                                <div className="character-hp-bar">
+                                    <div className="character-hp-fill" style={{ 
+                                        width: `${(currentHP / maxHP) * 100}%`,
+                                        background: status.color
+                                    }} />
+                                </div>
+                                <p style={{ fontSize: '12px', color: status.color, margin: '6px 0 0', fontStyle: 'italic' }}>
+                                    {status.description}
+                                </p>
+                            </div>
+                        </div>
+                    );
+                })()}
 
                 {character.characterAlignment && (
                     <div className="modal-section">

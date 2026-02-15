@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import CharacterContext from "../contexts/CharacterContext";
 import { generateName } from "../utils/npcGenerator";
+import { calculateMaxHP } from "../utils/healthSystem";
 
 
 const profilePictures = [
@@ -446,6 +447,9 @@ const CharacterCreation = () => {
               </div>
             ))}
           </div>
+          <p className="max-hp-text">
+            <span className="detail-label">Max HP:</span> {calculateMaxHP({ stats })}
+          </p>
         </div> {/* End Middle Right */}
       </div> {/* End Middle Container */}
 

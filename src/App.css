@@ -3305,3 +3305,43 @@ button {
 .round-action-buttons .secondary-button:hover {
   background: var(--border);
 }
+
+/* --- Character HP Display (shared across pages) --- */
+.character-hp-display {
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--surface-light);
+  border-radius: 8px;
+}
+
+.character-hp-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.character-hp-bar {
+  width: 100%;
+  height: 14px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.character-hp-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.5s ease, background 0.3s ease;
+}
+
+.summary-hp-section {
+  margin-top: 15px;
+}
+
+.summary-hp-section h4 {
+  margin-bottom: 5px;
+}

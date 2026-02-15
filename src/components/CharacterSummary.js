@@ -4,6 +4,7 @@ import React, { useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { downloadJSONFile } from "../utils/fileHelper";
 import CharacterContext from "../contexts/CharacterContext";
+import { calculateMaxHP, getHPStatus } from "../utils/healthSystem";
 
 const CharacterSummary = () => {
   const { characters, setCharacters } = useContext(CharacterContext);
@@ -123,6 +124,11 @@ const CharacterSummary = () => {
                 ))}
               </ul>
             </div>
+          )}
+          {newCharacter.stats && (
+            <p>
+              <span className="detail-label">Max HP:</span> {newCharacter.maxHP || calculateMaxHP(newCharacter)}
+            </p>
           )}
         </div>
       </div>

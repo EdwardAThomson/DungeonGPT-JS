@@ -19,7 +19,7 @@ import { getHPStatus } from '../utils/healthSystem';
 const Game = () => {
   const { state } = useLocation();
   const { selectedHeroes: stateHeroes, loadedConversation, worldSeed: stateSeed, gameSessionId: stateGameSessionId } = state || { selectedHeroes: [], loadedConversation: null, worldSeed: null, gameSessionId: null };
-  const selectedHeroes = loadedConversation?.selected_heroes || stateHeroes || [];
+  const [selectedHeroes, setSelectedHeroes] = useState(loadedConversation?.selected_heroes || stateHeroes || []);
 
   // Robust seed extraction
   const settingsObj = typeof loadedConversation?.game_settings === 'string'
@@ -89,6 +89,7 @@ const Game = () => {
   const townMapsCacheRef = useRef(mapHook.townMapsCache);
   const currentMapLevelRef = useRef(mapHook.currentMapLevel);
   const hasAdventureStartedRef = useRef(hasAdventureStarted);
+  const selectedHeroesRef = useRef(selectedHeroes);
   const lastSaveFingerprintRef = useRef(null);
 
   useEffect(() => {
@@ -106,12 +107,13 @@ const Game = () => {
     townMapsCacheRef.current = mapHook.townMapsCache;
     currentMapLevelRef.current = mapHook.currentMapLevel;
     hasAdventureStartedRef.current = hasAdventureStarted;
+    selectedHeroesRef.current = selectedHeroes;
   }, [
     interactionHook.conversation, sessionId, selectedProvider, selectedModel,
     mapHook.worldMap, mapHook.playerPosition, settings,
     mapHook.currentTownMap, mapHook.townPlayerPosition, mapHook.currentTownTile,
     mapHook.isInsideTown, mapHook.townMapsCache, mapHook.currentMapLevel,
-    hasAdventureStarted
+    hasAdventureStarted, selectedHeroes
   ]);
 
   const performSave = (isUnmount = false) => {
@@ -138,6 +140,7 @@ const Game = () => {
       townPlayerPositionRef.current?.x, townPlayerPositionRef.current?.y,
       interactionHook.currentSummary?.length || 0,
       settingsRef.current?.storyTitle || '',
+      JSON.stringify((selectedHeroesRef.current || []).map(h => h.currentHP)),
     ].join('|');
 
     // Skip save if nothing has changed (unless unmount)
@@ -162,7 +165,7 @@ const Game = () => {
       provider: selectedProviderRef.current,
       model: selectedModelRef.current,
       gameSettings: settingsRef.current,
-      selectedHeroes: selectedHeroes,
+      selectedHeroes: selectedHeroesRef.current,
       currentSummary: interactionHook.currentSummary,
       worldMap: worldMapRef.current,
       playerPosition: playerPositionRef.current,
@@ -187,6 +190,13 @@ const Game = () => {
       performSave(true);
     };
   }, []);
+
+  // --- Hero HP Update Handler ---
+  const handleHeroUpdate = (updatedHero) => {
+    setSelectedHeroes(prev => prev.map(h =>
+      h.characterId === updatedHero.characterId ? updatedHero : h
+    ));
+  };
 
   // --- Effect to monitor AI Check Requests ---
   useEffect(() => {
