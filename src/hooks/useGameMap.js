@@ -60,6 +60,29 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
     const [isInsideTown, setIsInsideTown] = useState(subMapsData?.isInsideTown || false);
     const [townMapsCache, setTownMapsCache] = useState(subMapsData?.townMapsCache || {});
 
+    // On mount: sync currentTownMap with cache to ensure discoveredBuildings is up to date
+    useEffect(() => {
+        if (currentTownMap && currentTownMap.townName && townMapsCache[currentTownMap.townName]) {
+            const cachedDiscovered = townMapsCache[currentTownMap.townName].discoveredBuildings || [];
+            const currentDiscovered = currentTownMap.discoveredBuildings || [];
+            
+            console.log('[MOUNT_SYNC] Initial sync check:', {
+                townName: currentTownMap.townName,
+                cachedDiscovered,
+                currentDiscovered
+            });
+            
+            if (cachedDiscovered.length > 0 && cachedDiscovered.length !== currentDiscovered.length) {
+                console.log('[MOUNT_SYNC] Syncing discoveredBuildings from cache on mount');
+                setCurrentTownMap(prev => ({
+                    ...prev,
+                    discoveredBuildings: cachedDiscovered
+                }));
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Run only on mount
+
     // Visited tracking
     const [visitedBiomes, setVisitedBiomes] = useState(() => new Set(subMapsData?.visitedBiomes || []));
     const [visitedTowns, setVisitedTowns] = useState(() => new Set(subMapsData?.visitedTowns || []));
@@ -86,11 +109,13 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
 
     const markBuildingDiscovered = (townName, x, y) => {
         if (!townName) return;
+        
+        const coord = `${x},${y}`;
+        
         setTownMapsCache(prev => {
             const townData = prev[townName];
             if (!townData) return prev;
 
-            const coord = `${x},${y}`;
             const discovered = townData.discoveredBuildings || [];
             if (discovered.includes(coord)) return prev;
 
@@ -103,6 +128,30 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             };
         });
     };
+
+    // Keep currentTownMap in sync with townMapsCache (for discoveredBuildings updates)
+    useEffect(() => {
+        if (currentTownMap && currentTownMap.townName) {
+            const cachedData = townMapsCache[currentTownMap.townName];
+            const currentDiscovered = currentTownMap.discoveredBuildings || [];
+            const cachedDiscovered = cachedData?.discoveredBuildings || [];
+            
+            console.log('[DISCOVERED_SYNC] Checking sync:', {
+                townName: currentTownMap.townName,
+                currentDiscovered,
+                cachedDiscovered,
+                needsSync: cachedDiscovered.length !== currentDiscovered.length
+            });
+            
+            if (cachedDiscovered.length > currentDiscovered.length) {
+                console.log('[DISCOVERED_SYNC] Syncing discoveredBuildings from cache');
+                setCurrentTownMap(prev => ({
+                    ...prev,
+                    discoveredBuildings: cachedDiscovered
+                }));
+            }
+        }
+    }, [townMapsCache, currentTownMap]);
 
     const [isMapModalOpen, setIsMapModalOpen] = useState(false);
     const [townError, setTownError] = useState(null);
@@ -207,6 +256,11 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         const townName = currentTile.townName || currentTile.poi;
 
         let townMapData = townMapsCache[townName];
+        
+        console.log('[TOWN_ENTRY] Cache lookup for:', townName, {
+            hasCachedData: !!townMapData,
+            cachedDiscoveredBuildings: townMapData?.discoveredBuildings || []
+        });
 
         if (!townMapData) {
             console.log('[TOWN_ENTRY] Generating new town map for:', townName);

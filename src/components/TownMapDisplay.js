@@ -15,15 +15,26 @@ import BuildingModal from './BuildingModal';
  */
 const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError, markBuildingDiscovered }) => {
   const [selectedBuilding, setSelectedBuilding] = useState(null);
+  const [distanceWarning, setDistanceWarning] = useState(false);
 
   if (!townMapData) return null;
 
   const discoveredBuildings = townMapData.discoveredBuildings || [];
 
   const handleBuildingClick = (tile) => {
-    // 1. Calculate distance
+    if (!playerPosition) return;
+    
+    // Calculate distance
     const distance = Math.abs(tile.x - playerPosition.x) + Math.abs(tile.y - playerPosition.y);
-    const isDiscovered = discoveredBuildings.includes(`${tile.x},${tile.y}`);
+    const coordString = `${tile.x},${tile.y}`;
+    const isDiscovered = discoveredBuildings.includes(coordString);
+    
+    console.log('Building click debug:', {
+      tileCoords: coordString,
+      discoveredBuildings,
+      isDiscovered,
+      distance
+    });
 
     // Allow seeing info if close enough (within 2 tiles) OR if already discovered
     if (distance <= 2 || isDiscovered) {
@@ -34,13 +45,13 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
 
       setSelectedBuilding({ ...tile, npcs: buildingNpcs });
 
-      // Mark as discovered if not already
-      if (!isDiscovered && markBuildingDiscovered) {
+      // Mark as discovered if not already and within range
+      if (!isDiscovered && distance <= 2 && markBuildingDiscovered) {
         markBuildingDiscovered(townMapData.townName, tile.x, tile.y);
       }
     } else {
-      // Too far and not discovered
-      alert("You are too far away to identify this building clearly.");
+      // Too far and not discovered - show modal warning
+      setDistanceWarning(true);
     }
   };
 
@@ -297,6 +308,20 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           npcs={selectedBuilding.npcs}
           onClose={() => setSelectedBuilding(null)}
         />
+      )}
+
+      {distanceWarning && (
+        <div className="modal-overlay" onClick={() => setDistanceWarning(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <h2>Too Far Away</h2>
+            <p>You are too far away to identify this building clearly. Move closer to discover what it is.</p>
+            <div style={{ textAlign: 'center', marginTop: '20px' }}>
+              <button onClick={() => setDistanceWarning(false)} className="primary-button">
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
