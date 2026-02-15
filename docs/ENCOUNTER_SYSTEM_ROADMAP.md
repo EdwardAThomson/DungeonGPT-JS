@@ -31,13 +31,13 @@
 - **Encounter Test Page** - `/encounter-test` for testing encounters in isolation
 
 ### ❌ Missing Features
-- Random encounters while traveling (Phase 2 - IN PROGRESS)
-- Biome-specific encounter tables
-- Encounter frequency based on tile visit history
+- Two-tier narrative encounter system (Phase 2.4 - IN PROGRESS)
+- AI prompt builder for narrative encounters
+- Encounter engagement detection in chat
 - Consequence tracking (injuries, reputation, time)
 - Loot distribution through story
 - Experience and progression
-- Non-hostile town encounters
+- Enhanced POI encounters (caves, ruins, etc.)
 
 ---
 
@@ -423,6 +423,291 @@ if (!targetTile.poi) {
 }
 ```
 
+### 2.4 Narrative Encounters (AI-Integrated)
+
+**Goal:** Resolve the conflict between AI movement prompts and immediate encounter popups by creating a two-tier encounter system.
+
+**Problem:** Currently, when a player moves to a new tile:
+1. AI receives a prompt to describe the new location
+2. Encounter check may trigger a modal popup
+3. These compete for attention and break narrative flow
+
+**Solution:** Distinguish between **immediate action encounters** (combat-focused, urgent) and **narrative encounters** (discovered through conversation).
+
+#### Encounter Tier System
+
+**File:** `src/data/encounters.js`
+
+Add `encounterTier` property to all encounter templates:
+
+```javascript
+// IMMEDIATE TIER - Pops up modal, suppresses AI movement prompt
+'goblin_ambush': {
+  name: 'Goblin Ambush',
+  encounterTier: 'immediate',  // NEW PROPERTY
+  icon: '👺',
+  description: 'A band of goblins leaps from the undergrowth!',
+  // ... rest of encounter
+},
+
+'bandit_roadblock': {
+  name: 'Bandit Roadblock',
+  encounterTier: 'immediate',
+  icon: '⚔️',
+  description: 'Armed bandits block the road ahead, weapons drawn.',
+  // ... rest of encounter
+},
+
+// NARRATIVE TIER - Revealed through AI conversation
+'mysterious_stranger': {
+  name: 'Mysterious Stranger',
+  encounterTier: 'narrative',  // NEW PROPERTY
+  icon: '🎭',
+  description: 'A hooded figure watches from the shadows.',
+  narrativeHook: 'a cloaked stranger observing you from a distance',  // NEW PROPERTY
+  aiContext: `
+    A mysterious hooded figure stands near the path, watching the party with interest.
+    They don't appear hostile, but something about them seems significant.
+    The stranger might have information, a quest, or hidden motives.
+  `,  // NEW PROPERTY
+  // Can still have suggestedActions if player engages
+  suggestedActions: [
+    { label: 'Approach', skill: 'Persuasion', description: 'Greet the stranger' },
+    { label: 'Observe', skill: 'Insight', description: 'Study them from afar' },
+    { label: 'Ignore', skill: null, description: 'Continue on your way' }
+  ],
+  // ... rest of encounter
+},
+
+'wounded_traveler': {
+  name: 'Wounded Traveler',
+  encounterTier: 'narrative',
+  icon: '🩹',
+  description: 'An injured traveler lies by the roadside.',
+  narrativeHook: 'someone lying injured beside the path',
+  aiContext: `
+    A wounded traveler is slumped against a tree, clutching their side.
+    They appear to have been attacked recently. Blood stains their clothing.
+    They might need help, or this could be a trap.
+  `,
+  suggestedActions: [
+    { label: 'Help', skill: 'Medicine', description: 'Tend to their wounds' },
+    { label: 'Question', skill: 'Insight', description: 'Ask what happened' },
+    { label: 'Search Area', skill: 'Investigation', description: 'Look for attackers' },
+    { label: 'Leave', skill: null, description: 'Walk away' }
+  ],
+  // ... rest of encounter
+},
+
+'hidden_treasure': {
+  name: 'Hidden Cache',
+  encounterTier: 'narrative',
+  icon: '💎',
+  description: 'Something glints in the undergrowth.',
+  narrativeHook: 'a metallic glint catching the light among the bushes',
+  aiContext: `
+    Sharp eyes notice something unusual - a metallic gleam partially hidden in the vegetation.
+    It could be treasure, a trap, or something left behind by previous travelers.
+  `,
+  suggestedActions: [
+    { label: 'Investigate', skill: 'Investigation', description: 'Examine the object' },
+    { label: 'Check for Traps', skill: 'Perception', description: 'Look for dangers' },
+    { label: 'Ignore', skill: null, description: 'Keep moving' }
+  ],
+  // ... rest of encounter
+}
+```
+
+#### Modified Encounter Tables
+
+**File:** `src/data/encounterTables.js`
+
+Update encounter tables to include both tiers:
+
+```javascript
+export const encounterTables = {
+  'plains': [
+    // Immediate encounters (combat/urgent)
+    { template: 'goblin_ambush', weight: 15, tier: 'immediate' },
+    { template: 'wolf_pack', weight: 12, tier: 'immediate' },
+    { template: 'bandit_roadblock', weight: 10, tier: 'immediate' },
+    
+    // Narrative encounters (discovered through conversation)
+    { template: 'mysterious_stranger', weight: 8, tier: 'narrative' },
+    { template: 'wounded_traveler', weight: 8, tier: 'narrative' },
+    { template: 'traveling_merchant', weight: 10, tier: 'narrative' },
+    { template: 'hidden_treasure', weight: 5, tier: 'narrative' },
+    { template: 'distant_smoke', weight: 7, tier: 'narrative' },
+    
+    { template: 'none', weight: 25 }
+  ],
+  // ... other biomes
+};
+
+// Encounter frequency by tier
+export const encounterFrequency = {
+  immediate: {
+    baseChance: 0.25,      // 25% base for combat encounters
+    revisitMultiplier: 0.3  // Much lower on revisited tiles
+  },
+  narrative: {
+    baseChance: 0.35,      // 35% base for narrative encounters
+    revisitMultiplier: 0.5  // Still fairly common on revisits
+  }
+};
+```
+
+#### Updated Movement Integration
+
+**File:** `src/pages/Game.js`
+
+Modify `handleMoveOnWorldMap` to handle both encounter tiers:
+
+```javascript
+const handleMoveOnWorldMap = async (clickedX, clickedY) => {
+  // ... existing movement validation ...
+
+  // Check for encounter
+  const randomEncounter = checkForEncounter(targetTile, isFirstVisitToTile, settings, movesSinceEncounter);
+  
+  if (randomEncounter) {
+    if (randomEncounter.encounterTier === 'immediate') {
+      // IMMEDIATE: Show modal, suppress AI prompt
+      setActionEncounter(randomEncounter);
+      setIsActionEncounterOpen(true);
+      setMovesSinceEncounter(0);
+      return; // Exit early - no AI movement prompt
+      
+    } else if (randomEncounter.encounterTier === 'narrative') {
+      // NARRATIVE: Inject into AI context, let AI reveal naturally
+      const encounterContext = {
+        type: 'narrative_encounter',
+        encounter: randomEncounter,
+        hook: randomEncounter.narrativeHook,
+        aiContext: randomEncounter.aiContext
+      };
+      
+      // Store for AI prompt injection
+      setNarrativeEncounter(encounterContext);
+      setMovesSinceEncounter(0);
+      
+      // Continue to AI movement prompt with encounter context
+    }
+  } else {
+    setMovesSinceEncounter(prev => prev + 1);
+  }
+
+  // Build AI prompt with optional narrative encounter context
+  const movementPrompt = buildMovementPrompt(
+    targetTile, 
+    settings, 
+    narrativeEncounter  // May be null
+  );
+  
+  // Send to AI
+  await interactionHook.sendMessage(movementPrompt);
+};
+```
+
+#### AI Prompt Builder
+
+**File:** `src/utils/promptBuilder.js` (new or existing)
+
+```javascript
+export const buildMovementPrompt = (tile, settings, narrativeEncounter = null) => {
+  const biomeDescription = getBiomeDescription(tile.biome);
+  
+  let prompt = `
+The party moves to a new location: ${biomeDescription}
+
+Coordinates: (${tile.x}, ${tile.y})
+Biome: ${tile.biome}
+  `.trim();
+
+  // Inject narrative encounter if present
+  if (narrativeEncounter) {
+    prompt += `\n\n**IMPORTANT - Encounter Hook:**\n${narrativeEncounter.aiContext}\n`;
+    prompt += `\nWeave this discovery naturally into your description. `;
+    prompt += `The players can choose to engage with it through conversation or ignore it.`;
+  }
+
+  prompt += `\n\nDescribe what the party sees and experiences. Keep it brief (2-3 sentences).`;
+  
+  return prompt;
+};
+```
+
+#### Player Engagement with Narrative Encounters
+
+When the AI reveals a narrative encounter, players can:
+1. **Ask about it in chat** - "I approach the stranger" → AI narrates, then can trigger `EncounterActionModal` if appropriate
+2. **Ignore it** - Continue conversation normally
+3. **Use a command** - `/engage encounter` to explicitly trigger the modal
+
+**File:** `src/hooks/useGameInteraction.js`
+
+Add detection for encounter engagement:
+
+```javascript
+// In message processing
+if (narrativeEncounter && messageContainsEngagement(userMessage, narrativeEncounter)) {
+  // Player is engaging with the narrative encounter
+  // Trigger the action modal
+  setActionEncounter(narrativeEncounter.encounter);
+  setIsActionEncounterOpen(true);
+  setNarrativeEncounter(null); // Clear it
+}
+
+const messageContainsEngagement = (message, encounter) => {
+  const engagementKeywords = [
+    'approach', 'investigate', 'talk to', 'examine', 
+    'help', 'attack', 'engage', 'interact'
+  ];
+  const messageLower = message.toLowerCase();
+  const hookLower = encounter.hook.toLowerCase();
+  
+  // Check if message references the encounter and includes action keyword
+  return engagementKeywords.some(keyword => messageLower.includes(keyword)) &&
+         (messageLower.includes(hookLower) || messageLower.includes('stranger') || 
+          messageLower.includes('traveler') || messageLower.includes('treasure'));
+};
+```
+
+#### Benefits of Two-Tier System
+
+1. **No Narrative Conflict** - Immediate encounters suppress AI prompt; narrative encounters enhance it
+2. **Player Agency** - Players can choose whether to engage with narrative encounters
+3. **Richer Storytelling** - AI can naturally weave discoveries into descriptions
+4. **Varied Pacing** - Combat encounters are urgent; narrative encounters allow exploration
+5. **Replayability** - Same tile might have different narrative encounters on different playthroughs
+
+#### Example Flow
+
+**Immediate Encounter:**
+```
+Player clicks tile → Encounter check → Goblin Ambush (immediate)
+→ EncounterActionModal pops up immediately
+→ No AI movement prompt sent
+→ Player resolves encounter → Returns to game
+```
+
+**Narrative Encounter:**
+```
+Player clicks tile → Encounter check → Mysterious Stranger (narrative)
+→ AI receives enhanced prompt with encounter context
+→ AI: "As you crest the hill, you notice a hooded figure watching you from beneath an old oak tree..."
+→ Player: "I approach the stranger"
+→ EncounterActionModal opens with stranger encounter
+→ Player chooses action → Resolves encounter
+```
+
+**No Encounter:**
+```
+Player clicks tile → No encounter
+→ AI receives normal movement prompt
+→ AI: "The plains stretch endlessly before you. Tall grass sways in the breeze..."
+```
+
 ---
 
 ## Phase 3: Enhanced POI Encounters
@@ -779,13 +1064,15 @@ const applyReputationChange = (encounter, outcome) => {
 
 **Success Criteria:** ✅ Player can trigger an encounter, choose an action, roll dice, and receive AI-narrated outcome.
 
-### Phase 2: Random Encounters (HIGH PRIORITY)
+### Phase 2: Random Encounters (HIGH PRIORITY) ✅ MOSTLY COMPLETED
 **Goal:** Populate the world with dynamic encounters
-4. **Biome Encounter Tables** (2.1) - Define tables for all biomes
-5. **Encounter Generation** (2.2) - Implement weighted random selection
-6. **Movement Integration** (2.3) - Trigger encounters during travel
+4. ✅ **Biome Encounter Tables** (2.1) - Define tables for all biomes
+5. ✅ **Encounter Generation** (2.2) - Implement weighted random selection
+6. ✅ **Movement Integration** (2.3) - Trigger encounters during travel
+7. 🔄 **Narrative Encounters** (2.4) - Two-tier encounter system (IN PROGRESS)
 
-**Success Criteria:** Traveling between towns triggers appropriate random encounters based on biome and settings.
+**Success Criteria:** ✅ Traveling between towns triggers appropriate random encounters based on biome and settings.
+**Phase 2.4 Success Criteria:** Immediate encounters suppress AI prompts; narrative encounters enhance them without conflict.
 
 ### Phase 3: Content Expansion (MEDIUM PRIORITY)
 **Goal:** Add variety and depth to encounters

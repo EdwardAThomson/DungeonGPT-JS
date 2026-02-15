@@ -5,6 +5,7 @@ export const encounterTemplates = {
   'goblin_ambush': {
     name: 'Goblin Ambush',
     icon: '👺',
+    encounterTier: 'immediate',
     description: 'A band of goblins leaps from the undergrowth, weapons drawn and eyes gleaming with malice!',
     difficulty: 'easy',
     multiRound: true,
@@ -27,6 +28,7 @@ export const encounterTemplates = {
   'wolf_pack': {
     name: 'Wolf Pack',
     icon: '🐺',
+    encounterTier: 'immediate',
     description: 'Hungry wolves circle your party, growling menacingly as their alpha watches from the shadows.',
     difficulty: 'medium',
     multiRound: true,
@@ -49,6 +51,7 @@ export const encounterTemplates = {
   'bandit_roadblock': {
     name: 'Bandit Roadblock',
     icon: '🗡️',
+    encounterTier: 'immediate',
     description: 'Armed bandits block the road ahead, their leader demanding a toll for safe passage.',
     difficulty: 'medium',
     multiRound: true,
@@ -77,6 +80,9 @@ export const encounterTemplates = {
   'traveling_merchant': {
     name: 'Traveling Merchant',
     icon: '🛒',
+    encounterTier: 'narrative',
+    narrativeHook: 'a merchant with a laden cart traveling the road',
+    aiContext: 'A traveling merchant with a colorful cart approaches along the road. They seem friendly and eager to trade goods or share news from other settlements.',
     description: 'A cheerful merchant with a laden cart waves you down, offering exotic wares and news from distant lands.',
     difficulty: 'easy',
     suggestedActions: [
@@ -101,6 +107,9 @@ export const encounterTemplates = {
   'wandering_minstrel': {
     name: 'Wandering Minstrel',
     icon: '🎵',
+    encounterTier: 'narrative',
+    narrativeHook: 'a bard playing music by the roadside',
+    aiContext: 'A traveling minstrel sits beneath a tree, playing a haunting melody on their lute. They seem lost in the music but might welcome company or have tales to share.',
     description: 'A bard sits by the roadside, playing a melancholy tune on a well-worn lute.',
     difficulty: 'easy',
     suggestedActions: [
@@ -121,6 +130,7 @@ export const encounterTemplates = {
   'giant_spiders': {
     name: 'Giant Spider Nest',
     icon: '🕷️',
+    encounterTier: 'immediate',
     description: 'Massive webs stretch between the trees, and you hear the clicking of enormous mandibles.',
     difficulty: 'medium',
     multiRound: true,
@@ -143,6 +153,7 @@ export const encounterTemplates = {
   'bear_encounter': {
     name: 'Angry Bear',
     icon: '🐻',
+    encounterTier: 'immediate',
     description: 'A massive bear rears up on its hind legs, roaring a challenge as you enter its territory.',
     difficulty: 'hard',
     multiRound: true,
@@ -165,6 +176,9 @@ export const encounterTemplates = {
   'mysterious_shrine': {
     name: 'Mysterious Shrine',
     icon: '⛩️',
+    encounterTier: 'narrative',
+    narrativeHook: 'an ancient shrine covered in glowing runes',
+    aiContext: 'An old shrine stands among the trees, its stone surface covered in moss and strange runes that pulse with faint magical light. It radiates an aura of forgotten power.',
     description: 'An ancient shrine stands before you, covered in moss and strange runes that seem to pulse with faint light.',
     difficulty: 'medium',
     suggestedActions: [
@@ -185,6 +199,7 @@ export const encounterTemplates = {
   'rockslide': {
     name: 'Rockslide',
     icon: '🪨',
+    encounterTier: 'immediate',
     description: 'The ground trembles and rocks begin tumbling down the mountainside toward you!',
     difficulty: 'medium',
     suggestedActions: [
@@ -205,6 +220,9 @@ export const encounterTemplates = {
   'lost_child': {
     name: 'Lost Child',
     icon: '👧',
+    encounterTier: 'narrative',
+    narrativeHook: 'a child crying alone by the roadside',
+    aiContext: 'A young child sits by the path, tears streaming down their face. They claim to be lost and separated from their family, but something about the situation feels uncertain.',
     description: 'A young child sits crying by the roadside, claiming to be separated from their family.',
     difficulty: 'easy',
     suggestedActions: [
@@ -227,6 +245,7 @@ export const encounterTemplates = {
   'tavern_brawl': {
     name: 'Tavern Brawl',
     icon: '🍺',
+    encounterTier: 'immediate',
     description: 'A drunken argument erupts into a full-blown brawl at the local tavern. Chairs fly and fists swing!',
     difficulty: 'easy',
     suggestedActions: [
@@ -247,6 +266,9 @@ export const encounterTemplates = {
   'town_market': {
     name: 'Bustling Market',
     icon: '🏪',
+    encounterTier: 'narrative',
+    narrativeHook: 'a bustling market square filled with vendors',
+    aiContext: 'The town market is alive with activity. Vendors hawk their wares, fresh produce is piled high, and mysterious trinkets catch the eye. The air is filled with the sounds of haggling and the smell of fresh bread.',
     description: 'The town market is alive with vendors hawking exotic wares, fresh produce, and mysterious trinkets.',
     difficulty: 'easy',
     suggestedActions: [
@@ -267,6 +289,9 @@ export const encounterTemplates = {
   'town_quest_board': {
     name: 'Quest Board',
     icon: '📜',
+    encounterTier: 'narrative',
+    narrativeHook: 'a notice board covered in postings and warnings',
+    aiContext: 'A weathered notice board stands prominently in the town square, its surface covered with parchments - bounties, requests for help, warnings about dangers, and notices of missing persons.',
     description: 'A weathered notice board stands in the town square, covered with requests for help and warnings.',
     difficulty: 'easy',
     suggestedActions: [
@@ -287,6 +312,9 @@ export const encounterTemplates = {
   'town_healer': {
     name: 'Traveling Healer',
     icon: '⚕️',
+    encounterTier: 'narrative',
+    narrativeHook: 'a healer\'s tent with the scent of medicinal herbs',
+    aiContext: 'A colorful tent stands near the town well, its entrance marked by bundles of drying herbs. A kindly healer tends to the sick and injured, offering remedies and blessings to those in need.',
     description: 'A kindly healer has set up a tent near the town well, offering remedies and blessings to weary travelers.',
     difficulty: 'easy',
     suggestedActions: [
@@ -307,6 +335,9 @@ export const encounterTemplates = {
   'suspicious_stranger': {
     name: 'Suspicious Stranger',
     icon: '🕵️',
+    encounterTier: 'narrative',
+    narrativeHook: 'a hooded figure lurking in the shadows',
+    aiContext: 'A mysterious hooded figure watches from a quiet alley, their face obscured. They seem to be waiting for someone - or watching for an opportunity. Something about them suggests they have secrets to share.',
     description: 'A hooded figure approaches you in a quiet alley, claiming to have information... for a price.',
     difficulty: 'medium',
     suggestedActions: [
@@ -329,6 +360,9 @@ export const encounterTemplates = {
   'herb_gathering': {
     name: 'Medicinal Herbs',
     icon: '🌿',
+    encounterTier: 'narrative',
+    narrativeHook: 'rare medicinal herbs growing among wildflowers',
+    aiContext: 'A patch of unusual plants catches your eye - rare medicinal herbs with distinctive leaves and flowers. They could be valuable for healing or trade.',
     description: 'You spot a patch of rare medicinal herbs growing among the wildflowers.',
     difficulty: 'easy',
     suggestedActions: [
@@ -349,6 +383,9 @@ export const encounterTemplates = {
   'abandoned_campsite': {
     name: 'Abandoned Campsite',
     icon: '🏕️',
+    encounterTier: 'narrative',
+    narrativeHook: 'an abandoned campsite with cold ashes',
+    aiContext: 'An abandoned campsite lies ahead. The fire pit is cold, supplies are scattered, and there are signs of a hasty departure. What happened here?',
     description: 'You come across an abandoned campsite. The fire is cold, but supplies remain scattered about.',
     difficulty: 'easy',
     suggestedActions: [
@@ -369,6 +406,9 @@ export const encounterTemplates = {
   'mountain_hermit': {
     name: 'Mountain Hermit',
     icon: '🧙',
+    encounterTier: 'narrative',
+    narrativeHook: 'a hermit meditating outside a mountain cave',
+    aiContext: 'A weathered hermit sits cross-legged outside a cave entrance, eyes closed in meditation. Their presence radiates wisdom and peace. They seem aware of your approach despite their closed eyes.',
     description: 'A weathered hermit sits outside a cave, eyes twinkling with ancient knowledge.',
     difficulty: 'easy',
     suggestedActions: [
@@ -389,6 +429,9 @@ export const encounterTemplates = {
   'elf_patrol': {
     name: 'Elven Patrol',
     icon: '🧝',
+    encounterTier: 'narrative',
+    narrativeHook: 'elven rangers watching from the forest',
+    aiContext: 'Silent figures emerge from the treeline - elven rangers in forest green cloaks. Their bows are drawn but not aimed. They watch with cautious curiosity, clearly guardians of this woodland realm.',
     description: 'Silent elven rangers emerge from the treeline, bows drawn but not hostile — they wish to know your business.',
     difficulty: 'medium',
     suggestedActions: [
@@ -404,7 +447,102 @@ export const encounterTemplates = {
       failure: 'The elves are suspicious but allow you through with a warning.',
       criticalFailure: 'The elves escort you out of their territory, costing you time and dignity.'
     }
+  },
+
+  // === NEW NARRATIVE ENCOUNTERS (Phase 2.4) ===
+
+  'mysterious_stranger': {
+    name: 'Mysterious Stranger',
+    icon: '🎭',
+    encounterTier: 'narrative',
+    narrativeHook: 'a cloaked stranger observing you from a distance',
+    aiContext: 'A mysterious hooded figure stands near the path, watching the party with interest. They don\'t appear hostile, but something about them seems significant. The stranger might have information, a quest, or hidden motives.',
+    description: 'A hooded figure watches from the shadows, their face obscured but their attention clearly fixed on you.',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Approach', skill: 'Persuasion', description: 'Greet the stranger openly' },
+      { label: 'Observe', skill: 'Insight', description: 'Study them from afar before deciding' },
+      { label: 'Ignore', skill: null, description: 'Continue on your way' },
+      { label: 'Confront', skill: 'Intimidation', description: 'Demand to know why they\'re watching' }
+    ],
+    rewards: { xp: 40, gold: '1d12', items: ['quest_clue:60%', 'mysterious_letter:30%', 'enchanted_trinket:15%'] },
+    consequences: {
+      criticalSuccess: 'The stranger reveals they\'ve been searching for someone like you and offers a lucrative quest.',
+      success: 'You learn valuable information about the road ahead and potential opportunities.',
+      failure: 'The stranger is evasive and disappears before you can learn much.',
+      criticalFailure: 'The stranger was scouting for bandits - you barely avoid an ambush.'
+    }
+  },
+
+  'wounded_traveler': {
+    name: 'Wounded Traveler',
+    icon: '🩹',
+    encounterTier: 'narrative',
+    narrativeHook: 'someone lying injured beside the path',
+    aiContext: 'A wounded traveler is slumped against a tree, clutching their side. They appear to have been attacked recently. Blood stains their clothing. They might need help, or this could be a trap.',
+    description: 'An injured traveler lies by the roadside, groaning in pain and calling weakly for help.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Help', skill: 'Medicine', description: 'Tend to their wounds' },
+      { label: 'Question', skill: 'Insight', description: 'Ask what happened while staying alert' },
+      { label: 'Search Area', skill: 'Investigation', description: 'Look for signs of attackers' },
+      { label: 'Leave', skill: null, description: 'Walk away - it might be a trap' }
+    ],
+    rewards: { xp: 30, gold: '2d8', items: ['healing_potion:40%', 'traveler_map:35%', 'family_heirloom:20%'] },
+    consequences: {
+      criticalSuccess: 'You save their life and they reward you with valuable information and a family treasure.',
+      success: 'You help the traveler and they share useful knowledge about the area.',
+      failure: 'Your aid is clumsy but the traveler survives and thanks you.',
+      criticalFailure: 'It was a trap! Bandits emerge, though you manage to fight them off.'
+    }
+  },
+
+  'hidden_treasure': {
+    name: 'Hidden Cache',
+    icon: '💎',
+    encounterTier: 'narrative',
+    narrativeHook: 'a metallic glint catching the light among the bushes',
+    aiContext: 'Sharp eyes notice something unusual - a metallic gleam partially hidden in the vegetation. It could be treasure, a trap, or something left behind by previous travelers.',
+    description: 'Something glints in the undergrowth - metal or perhaps gemstones catching the sunlight.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Investigate', skill: 'Investigation', description: 'Carefully examine the object' },
+      { label: 'Check for Traps', skill: 'Perception', description: 'Look for dangers before touching' },
+      { label: 'Dig Around', skill: 'Athletics', description: 'Excavate the area thoroughly' },
+      { label: 'Ignore', skill: null, description: 'Keep moving - could be trouble' }
+    ],
+    rewards: { xp: 25, gold: '3d10', items: ['gemstone:50%', 'gold_coins:60%', 'magic_item:15%', 'cursed_item:10%'] },
+    consequences: {
+      criticalSuccess: 'You discover a hidden cache of treasure - gold, gems, and a magical item!',
+      success: 'You find a modest amount of coin and valuables.',
+      failure: 'The glint was just broken glass or worthless metal.',
+      criticalFailure: 'You trigger a trap protecting the cache and take damage.'
+    }
+  },
+
+  'distant_smoke': {
+    name: 'Distant Smoke',
+    icon: '💨',
+    encounterTier: 'narrative',
+    narrativeHook: 'a column of smoke rising in the distance',
+    aiContext: 'A thin column of smoke rises from beyond the next hill. It could be a campfire, a settlement, or something burning. The source is unclear but investigating might reveal something important.',
+    description: 'You notice smoke rising in the distance. Is it a campfire, a village, or something more sinister?',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Investigate', skill: 'Survival', description: 'Track the smoke to its source' },
+      { label: 'Approach Cautiously', skill: 'Stealth', description: 'Scout ahead quietly' },
+      { label: 'Observe from Distance', skill: 'Perception', description: 'Study the smoke pattern' },
+      { label: 'Avoid', skill: null, description: 'Steer clear - not your problem' }
+    ],
+    rewards: { xp: 45, gold: '2d10', items: ['quest_clue:50%', 'survivor_reward:30%', 'salvaged_goods:40%'] },
+    consequences: {
+      criticalSuccess: 'You discover survivors of an attack who reward you and share critical information.',
+      success: 'You find a campsite or small settlement and make useful contacts.',
+      failure: 'The smoke was from a controlled burn - nothing of interest.',
+      criticalFailure: 'You stumble into a bandit camp and must fight or flee.'
+    }
   }
+
 };
 
 // Difficulty Class (DC) table for skill checks

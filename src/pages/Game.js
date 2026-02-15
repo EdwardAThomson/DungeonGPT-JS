@@ -7,6 +7,7 @@ import MapModal from '../components/MapModal';
 import EncounterModal from '../components/EncounterModal';
 import EncounterActionModal from '../components/EncounterActionModal';
 import { checkForEncounter } from '../utils/encounterGenerator';
+import { buildMovementPrompt, messageContainsEngagement } from '../utils/promptBuilder';
 import DiceRoller from '../components/DiceRoller';
 import useGameSession from '../hooks/useGameSession';
 import useGameMap from '../hooks/useGameMap';
@@ -55,6 +56,7 @@ const Game = () => {
   const [movesSinceEncounter, setMovesSinceEncounter] = useState(
     loadedConversation?.sub_maps?.movesSinceEncounter || 0
   );
+  const [narrativeEncounter, setNarrativeEncounter] = useState(null);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
 
   // --- HOOKS ---
@@ -314,19 +316,33 @@ const Game = () => {
       setIsEncounterModalOpen(true);
     }
 
-    // --- Random Encounter Check ---
-    // Check on all tiles: wilderness gets combat/exploration encounters, towns get social encounters
+    // --- Random Encounter Check (Phase 2.4: Two-Tier System) ---
     const isFirstVisitToTile = !wasExplored;
     const randomEncounter = checkForEncounter(targetTile, isFirstVisitToTile, settings, movesSinceEncounter);
     
     if (randomEncounter) {
-      // Delay action encounter slightly if POI modal is also showing
-      const delay = targetTile.poi ? 800 : 0;
-      setTimeout(() => {
-        setActionEncounter(randomEncounter);
-        setIsActionEncounterOpen(true);
-      }, delay);
-      setMovesSinceEncounter(0);
+      if (randomEncounter.encounterTier === 'immediate') {
+        // IMMEDIATE: Show modal immediately, suppress AI prompt
+        const delay = targetTile.poi ? 800 : 0;
+        setTimeout(() => {
+          setActionEncounter(randomEncounter);
+          setIsActionEncounterOpen(true);
+        }, delay);
+        setMovesSinceEncounter(0);
+        return; // Exit early - no AI movement prompt
+        
+      } else if (randomEncounter.encounterTier === 'narrative') {
+        // NARRATIVE: Store for AI prompt injection
+        const encounterContext = {
+          type: 'narrative_encounter',
+          encounter: randomEncounter,
+          hook: randomEncounter.narrativeHook,
+          aiContext: randomEncounter.aiContext
+        };
+        setNarrativeEncounter(encounterContext);
+        setMovesSinceEncounter(0);
+        // Continue to AI movement prompt with encounter context
+      }
     } else {
       setMovesSinceEncounter(prev => prev + 1);
     }
@@ -365,6 +381,10 @@ const Game = () => {
     interactionHook.setIsLoading(true);
 
     const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
+    
+    // Build movement prompt with optional narrative encounter context
+    const movementDescription = buildMovementPrompt(targetTile, settings, narrativeEncounter);
+    
     let locationInfo = `Player has moved to coordinates (${clickedX}, ${clickedY}) in a ${targetTile.biome} biome.`;
     if (targetTile.poi === 'town' && targetTile.townName) {
       locationInfo += ` The party has arrived at ${targetTile.townName}, a ${targetTile.townSize || 'settlement'}. They are standing at the edge of the town.`;
@@ -376,7 +396,7 @@ const Game = () => {
     const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
     const milestonesInfo = settings.milestones && settings.milestones.length > 0 ? `\nKey Milestones to achieve: ${settings.milestones.map(m => typeof m === 'object' ? m.text : m).join(', ')}` : '';
     const gameContext = `Setting: ${settings.shortDescription}. Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
-    const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${interactionHook.currentSummary}\n\n${locationInfo}\n\nDescribe what the player sees upon arriving at this new location.`;
+    const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${interactionHook.currentSummary}\n\n${movementDescription}`;
 
     const fullPrompt = DM_PROTOCOL + prompt;
     interactionHook.setLastPrompt(fullPrompt);
@@ -662,6 +682,7 @@ const Game = () => {
         isInsideTown={mapHook.isInsideTown}
         hasAdventureStarted={hasAdventureStarted}
         townError={mapHook.townError}
+        markBuildingDiscovered={mapHook.markBuildingDiscovered}
       />
       <EncounterModal
         isOpen={isEncounterModalOpen}
