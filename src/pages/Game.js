@@ -17,9 +17,9 @@ import AiAssistantPanel from '../components/AiAssistantPanel';
 import CharacterModal from '../components/CharacterModal';
 import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
-import { getHPStatus } from '../utils/healthSystem';
+import { getHPStatus, calculateMaxHP } from '../utils/healthSystem';
 import { awardXP, getLevelUpSummary } from '../utils/progressionSystem';
-import { addItem, addGold } from '../utils/inventorySystem';
+import { addItem, addGold, ITEM_CATALOG } from '../utils/inventorySystem';
 
 const Game = () => {
   const { state } = useLocation();
@@ -29,10 +29,8 @@ const Game = () => {
     const heroes = loadedConversation?.selected_heroes || stateHeroes || [];
     return heroes.map(hero => {
       if (hero.xp === undefined) {
-        const conMod = Math.floor(((hero.stats?.Constitution || 10) - 10) / 2);
-        const hitDice = { 'Barbarian': 12, 'Fighter': 10, 'Paladin': 10, 'Ranger': 10, 'Cleric': 8, 'Druid': 8, 'Monk': 8, 'Rogue': 8, 'Warlock': 8, 'Bard': 8, 'Sorcerer': 6, 'Wizard': 6 };
-        const hd = hitDice[hero.characterClass] || 8;
-        const maxHP = hero.maxHP || (hd + conMod);
+        // Use healthSystem's calculateMaxHP for consistency
+        const maxHP = hero.maxHP || calculateMaxHP(hero);
         return {
           ...hero,
           xp: hero.xp || 0,
@@ -71,6 +69,7 @@ const Game = () => {
   const [isHowToPlayModalOpen, setIsHowToPlayModalOpen] = useState(false);
   const [isEncounterModalOpen, setIsEncounterModalOpen] = useState(false);
   const [isDiceModalOpen, setIsDiceModalOpen] = useState(false);
+  const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
   const [isCharacterModalOpen, setIsCharacterModalOpen] = useState(false);
   const [selectedHeroForModal, setSelectedHeroForModal] = useState(null);
   const [currentEncounter, setCurrentEncounter] = useState(null);
@@ -173,13 +172,15 @@ const Game = () => {
     }
 
     // Build a lightweight fingerprint to detect changes
+    // Use refs which are synced via useEffect to avoid stale closures in setInterval
     const pos = playerPositionRef.current;
+    const townPos = townPlayerPositionRef.current;
     const fingerprint = [
       convo.length,
       pos?.x, pos?.y,
       currentMapLevelRef.current,
       isInsideTownRef.current,
-      townPlayerPositionRef.current?.x, townPlayerPositionRef.current?.y,
+      townPos?.x, townPos?.y,
       interactionHook.currentSummary?.length || 0,
       settingsRef.current?.storyTitle || '',
       JSON.stringify((selectedHeroesRef.current || []).map(h => h.currentHP)),
@@ -260,24 +261,7 @@ const Game = () => {
     }
   };
 
-  // --- Load Reminder: notify player of their location on game load ---
-  const hasShownLoadReminder = useRef(false);
-  useEffect(() => {
-    if (!hasAdventureStarted || hasShownLoadReminder.current) return;
-    if (!loadedConversation) return;
-
-    const subMaps = loadedConversation.sub_maps || loadedConversation.subMaps;
-    if (subMaps?.isInsideTown && subMaps?.currentTownTile) {
-      const townName = subMaps.currentTownTile.townName || 'town';
-      const pos = subMaps.townPlayerPosition;
-      const locationMsg = {
-        role: 'system',
-        content: `📍 You are currently inside ${townName}${pos ? ` at position (${pos.x}, ${pos.y})` : ''}.`
-      };
-      interactionHook.setConversation(prev => [...prev, locationMsg]);
-      hasShownLoadReminder.current = true;
-    }
-  }, [hasAdventureStarted, loadedConversation]);
+  // Location is shown in the header bar, no need for chat reminders
 
   // --- Effect to monitor AI Check Requests ---
   useEffect(() => {
@@ -488,7 +472,7 @@ const Game = () => {
               </div>
               <div className="header-button-group">
                 <button onClick={() => mapHook.setIsMapModalOpen(true)} className="view-map-button">{townName ? `View ${townName} Map` : 'View Map'}</button>
-                <button onClick={() => setIsDiceModalOpen(true)} className="view-settings-button">🎲 Roll Dice</button>
+                <button onClick={() => setIsInventoryModalOpen(true)} className="view-settings-button">📦 Inventory</button>
                 <button onClick={() => setIsHowToPlayModalOpen(true)} className="how-to-play-button">How to Play</button>
                 <button onClick={() => setIsSettingsModalOpen(true)} className="view-settings-button">View Full Settings</button>
                 <button
@@ -792,6 +776,109 @@ const Game = () => {
         }}
         onCharacterUpdate={handleHeroUpdate}
       />
+      {/* Inventory Modal */}
+      {isInventoryModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsInventoryModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <h2 style={{ marginBottom: '20px' }}>Party Inventory</h2>
+            
+            {/* Gold */}
+            <div style={{ 
+              padding: '15px', 
+              background: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)', 
+              borderRadius: '8px', 
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px'
+            }}>
+              <span style={{ fontSize: '32px' }}>💰</span>
+              <div>
+                <div style={{ fontSize: '12px', opacity: 0.9 }}>Gold Pieces</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
+                  {selectedHeroes.reduce((sum, h) => sum + (h.gold || 0), 0)} GP
+                </div>
+              </div>
+            </div>
+            
+            {/* Items */}
+            <h3 style={{ marginBottom: '10px' }}>Items</h3>
+            <div style={{ 
+              background: 'var(--surface)', 
+              borderRadius: '8px', 
+              padding: '15px',
+              minHeight: '100px'
+            }}>
+              {(() => {
+                const allItems = selectedHeroes.flatMap(h => h.inventory || []);
+                if (allItems.length === 0) {
+                  return <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No items yet. Complete encounters to find loot!</p>;
+                }
+                // Group items by key, summing quantities
+                const itemMap = {};
+                for (const item of allItems) {
+                  const key = typeof item === 'string' ? item : (item.key || 'unknown');
+                  // Look up in ITEM_CATALOG for proper name, fallback to item.name or formatted key
+                  const catalogEntry = ITEM_CATALOG[key];
+                  const name = catalogEntry?.name || item.name || key.replace(/_/g, ' ');
+                  const qty = item.quantity || 1;
+                  const rarity = catalogEntry?.rarity || item.rarity || 'common';
+                  if (itemMap[key]) {
+                    itemMap[key].quantity += qty;
+                  } else {
+                    itemMap[key] = { name, quantity: qty, rarity };
+                  }
+                }
+                const rarityColors = { common: '#9d9d9d', uncommon: '#1eff00', rare: '#0070dd', very_rare: '#a335ee', legendary: '#ff8000' };
+                return (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                    {Object.entries(itemMap).map(([key, { name, quantity, rarity }]) => (
+                      <div key={key} style={{
+                        padding: '8px 12px',
+                        background: 'var(--surface-light)',
+                        borderRadius: '4px',
+                        border: `1px solid ${rarityColors[rarity] || rarityColors.common}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}>
+                        <span style={{ color: rarityColors[rarity] || rarityColors.common }}>{name}</span>
+                        {quantity > 1 && <span style={{ 
+                          background: 'var(--primary)', 
+                          color: 'white', 
+                          borderRadius: '50%', 
+                          width: '20px', 
+                          height: '20px', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          fontSize: '12px'
+                        }}>x{quantity}</span>}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+            
+            <button 
+              onClick={() => setIsInventoryModalOpen(false)}
+              style={{
+                marginTop: '20px',
+                padding: '10px 20px',
+                background: 'var(--primary)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                width: '100%'
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
       <DiceRoller
         isOpen={isDiceModalOpen}
         onClose={() => {

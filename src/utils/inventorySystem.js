@@ -134,7 +134,12 @@ export const ITEM_CATALOG = {
   'gemstone': { name: 'Gemstone', rarity: 'uncommon', value: 100 },
   'pearl': { name: 'Pearl', rarity: 'uncommon', value: 100 },
   'old_coins': { name: 'Ancient Coins', rarity: 'common', value: 25 },
-  'treasure_map': { name: 'Treasure Map', rarity: 'rare', value: 0, type: 'quest_item' }
+  'treasure_map': { name: 'Treasure Map', rarity: 'rare', value: 0, type: 'quest_item' },
+  
+  // Quest items
+  'quest_clue': { name: 'Mysterious Clue', rarity: 'uncommon', value: 0, type: 'quest_item' },
+  'quest_key': { name: 'Ornate Key', rarity: 'rare', value: 0, type: 'quest_item' },
+  'quest_letter': { name: 'Sealed Letter', rarity: 'uncommon', value: 0, type: 'quest_item' }
 };
 
 /**

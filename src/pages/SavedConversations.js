@@ -211,9 +211,14 @@ const SavedConversations = () => {
                   {conversation.selected_heroes && (
                     <p><strong>Heroes:</strong> {JSON.parse(conversation.selected_heroes).map(h => h.characterName).join(', ')}</p>
                   )}
-                  {conversation.player_position && (
-                    <p><strong>Location:</strong> ({JSON.parse(conversation.player_position).x}, {JSON.parse(conversation.player_position).y})</p>
-                  )}
+                  {conversation.player_position && (() => {
+                    const pos = JSON.parse(conversation.player_position);
+                    const subMaps = conversation.sub_maps ? (typeof conversation.sub_maps === 'string' ? JSON.parse(conversation.sub_maps) : conversation.sub_maps) : null;
+                    if (subMaps?.isInsideTown && subMaps?.currentTownTile?.townName) {
+                      return <p><strong>Location:</strong> {subMaps.currentTownTile.townName} (world: {pos.x}, {pos.y})</p>;
+                    }
+                    return <p><strong>Location:</strong> ({pos.x}, {pos.y})</p>;
+                  })()}
                   {conversation.summary && (
                     <p><strong>Summary:</strong> {conversation.summary.substring(0, 100)}...</p>
                   )}
