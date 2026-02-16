@@ -163,6 +163,14 @@ const Game = () => {
       if (isUnmount) console.log('[SAVE] Skipping unmount save - no conversation data');
       return;
     }
+    
+    // Don't save if settings are empty but we loaded from a conversation that had settings
+    // This prevents race condition where settings haven't been restored yet
+    const currentSettings = settingsRef.current;
+    if (loadedConversation?.game_settings && (!currentSettings || Object.keys(currentSettings).length === 0)) {
+      console.log('[SAVE] Skipping save - settings not yet restored from loaded conversation');
+      return;
+    }
 
     // Build a lightweight fingerprint to detect changes
     const pos = playerPositionRef.current;
