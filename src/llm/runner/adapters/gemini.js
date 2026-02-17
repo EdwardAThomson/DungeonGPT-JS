@@ -17,7 +17,9 @@ class GeminiAdapter extends BaseAdapter {
             command: this.config.binPath,
             args,
             env: {},
-            responseFormat: 'json-stream'
+            responseFormat: 'json-stream',
+            // Run from empty sandbox to prevent Gemini CLI from detecting project context and enabling code tools
+            cwd: require('path').join(__dirname, '..', '..', '..', '..', '.gemini-sandbox')
         };
     }
 }

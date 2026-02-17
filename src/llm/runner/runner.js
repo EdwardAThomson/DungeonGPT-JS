@@ -47,7 +47,7 @@ function runTask(task, adapter) {
         console.log(`Spawning: ${invocation.command} ${invocation.args.join(' ')}`);
 
         const child = spawn(invocation.command, invocation.args, {
-            cwd: task.cwd,
+            cwd: invocation.cwd || task.cwd,
             env: { ...process.env, ...invocation.env },
             shell: false // Prevent shell escaping issues with complex prompts
         });
@@ -67,8 +67,9 @@ function runTask(task, adapter) {
                     if (!line.trim()) continue;
                     try {
                         const parsed = JSON.parse(line);
-                        // Only broadcast final messages to the UI to preserve immersion
-                        if (parsed.type === 'message' && parsed.content) {
+                        console.log(`[Task ${task.id}] JSON: type=${parsed.type} role=${parsed.role || '-'} content_len=${(parsed.content||'').length}`);
+                        // Only broadcast assistant messages to avoid echoing the prompt
+                        if (parsed.type === 'message' && parsed.role === 'assistant' && parsed.content) {
                             appendLog(task, parsed.content, 'stdout');
                         }
                     } catch (e) {
@@ -79,6 +80,22 @@ function runTask(task, adapter) {
                 }
             } else {
                 appendLog(task, chunk, 'stdout');
+            }
+        });
+
+        // Flush any remaining data in lineBuffer when stdout ends
+        child.stdout.on('end', () => {
+            if (invocation.responseFormat === 'json-stream' && lineBuffer.trim()) {
+                try {
+                    const parsed = JSON.parse(lineBuffer);
+                    console.log(`[Task ${task.id}] JSON (flush): type=${parsed.type} role=${parsed.role || '-'} content_len=${(parsed.content||'').length}`);
+                    if (parsed.type === 'message' && parsed.role === 'assistant' && parsed.content) {
+                        appendLog(task, parsed.content, 'stdout');
+                    }
+                } catch (e) {
+                    console.log(`[Task ${task.id} Debug] Suppressed non-JSON flush: ${lineBuffer}`);
+                }
+                lineBuffer = '';
             }
         });
 
@@ -136,6 +153,13 @@ function streamTask(id, res) {
     task.logs.forEach(log => {
         res.write(`data: ${JSON.stringify({ type: 'log', data: log })}\n\n`);
     });
+
+    // If task already finished, send done event and close immediately
+    if (task.status === 'completed' || task.status === 'error') {
+        res.write(`data: ${JSON.stringify({ type: 'done', data: { exit_code: task.status === 'completed' ? 0 : -1 } })}\n\n`);
+        res.end();
+        return;
+    }
 
     // Remove client on disconnect
     res.on('close', () => {

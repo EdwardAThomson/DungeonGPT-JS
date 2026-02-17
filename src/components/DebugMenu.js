@@ -86,6 +86,12 @@ const DebugMenu = () => {
                     <Link to="/milestone-test" style={linkStyle} onClick={() => setIsOpen(false)}>
                         🎯 Milestone Test
                     </Link>
+                    <Link to="/llm-debug" style={{ ...linkStyle, color: '#f44336', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
+                        🔧 LLM Pipeline Debug
+                    </Link>
+                    <Link to="/conversation-manager" style={{ ...linkStyle, color: '#64b5f6', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
+                        🗂️ Conversation Manager
+                    </Link>
                 </div>
             )}
             <button style={buttonStyle} onClick={toggleMenu} title="Debug Menu">

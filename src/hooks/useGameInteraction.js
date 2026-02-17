@@ -78,6 +78,7 @@ const useGameInteraction = (
     const [conversation, setConversation] = useState(loadedConversation?.conversation_data || []);
     const [currentSummary, setCurrentSummary] = useState(loadedConversation?.summary || '');
     const [isLoading, setIsLoading] = useState(false);
+    const [progressStatus, setProgressStatus] = useState(null); // { status, elapsed } for LLM progress
     const [error, setError] = useState(null);
     const [checkRequest, setCheckRequest] = useState(null); // { type: 'skill', skill: 'Perception' } or null
     const [lastPrompt, setLastPrompt] = useState('');
@@ -117,13 +118,18 @@ const useGameInteraction = (
 
     const summarizeConversation = async (summary, newMessages) => {
         const model = getCurrentModel();
-        const prompt = `Old summary: ${summary}\nRecent exchange: ${newMessages.map(msg => `${msg.role === 'ai' ? 'AI' : 'User'}: ${msg.content}`).join('\n')}\n\nCreate a concise new summary based on the old summary and recent exchange, capturing the key events and character actions.`;
+        const recentText = newMessages.map(msg => `${msg.role === 'ai' ? 'AI' : 'User'}: ${msg.content}`).join('\n');
+        const prompt = `You are a concise story summarizer. Combine the old summary with the recent exchange into a single brief summary (2-4 sentences) capturing key events, locations, and character actions. Output ONLY the summary text, nothing else.\n\nOld summary: ${summary || 'The adventure begins.'}\n\nRecent exchange:\n${recentText}\n\nNew summary:`;
 
         try {
-            // Summary is usually small and non-critical to stream, so we use API-style generation if possible
-            // But if ONLY CLI is selected, we should probably follow suit or just use a default safe API.
-            // For now, let's keep it simple and use generateResponse which handles both.
-            return await generateResponse(model, prompt);
+            // Summarization uses generateUnified directly without DM_PROTOCOL wrapper
+            return await llmService.generateUnified({
+                provider: selectedProvider,
+                model,
+                prompt,
+                maxTokens: 400,
+                temperature: 0.3
+            });
         } catch (error) {
             console.error("Summarization failed:", error);
             return summary;
@@ -197,6 +203,10 @@ const useGameInteraction = (
                 // aiResponse = aiResponse.replace(match[0], '').trim();
             }
 
+            if (!aiResponse || !aiResponse.trim()) {
+                console.warn('Empty AI response received, skipping');
+                return;
+            }
             const aiMessage = { role: 'ai', content: aiResponse };
 
             setConversation(prev => [...prev, aiMessage]);
@@ -320,6 +330,11 @@ const useGameInteraction = (
                 // aiResponse = aiResponse.replace(match[0], '').trim();
             }
 
+            if (!aiResponse || !aiResponse.trim()) {
+                console.warn('Empty AI response received, skipping');
+                setError('AI returned an empty response. Please try again.');
+                return;
+            }
             const aiMessage = { role: 'ai', content: aiResponse };
 
             setConversation([...tempConversation, aiMessage]);
@@ -330,7 +345,6 @@ const useGameInteraction = (
         } catch (error) {
             console.error('Failed to fetch AI response:', error);
             setError(`Error getting response from ${selectedProvider}: ${error.message}`);
-            setConversation([...tempConversation, { role: 'ai', content: `Error: Could not get response from ${selectedProvider}.` }]);
         } finally {
             setIsLoading(false);
         }
@@ -349,6 +363,8 @@ const useGameInteraction = (
         setCurrentSummary,
         isLoading,
         setIsLoading,
+        progressStatus,
+        setProgressStatus,
         error,
         setError,
         modelOptions,

@@ -98,20 +98,10 @@ export const AISettingsModalContent = ({
 
             <div style={{ background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
               <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>API Keys</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                {['openai', 'gemini', 'claude'].map(prov => (
-                  <div key={prov}>
-                    <label style={labelStyle}>{prov.toUpperCase()}</label>
-                    <input
-                      type="password"
-                      value={apiKeys[prov] || ''}
-                      onChange={(e) => setApiKeys({ [prov]: e.target.value })}
-                      placeholder="Key..."
-                      style={{ ...selectStyle, padding: '8px', fontSize: '11px' }}
-                    />
-                  </div>
-                ))}
-              </div>
+              <p style={{ margin: '0', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                Cloud API keys are configured in the <code style={{ background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '3px' }}>.env</code> file on the server.
+                <br/>Use <strong>gemini-cli</strong>, <strong>claude-cli</strong>, or <strong>codex</strong> providers for CLI-based access without API keys.
+              </p>
             </div>
           </div>
 
@@ -466,20 +456,10 @@ export const StorySettingsModalContent = ({
 
                 <div style={{ background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
                   <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>API Keys</h4>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
-                    {['openai', 'gemini', 'claude'].map(prov => (
-                      <div key={prov}>
-                        <label style={labelStyle}>{prov.toUpperCase()}</label>
-                        <input
-                          type="password"
-                          value={apiKeys[prov] || ''}
-                          onChange={(e) => setApiKeys({ [prov]: e.target.value })}
-                          placeholder="Key..."
-                          style={{ ...selectStyle, padding: '8px', fontSize: '11px' }}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                  <p style={{ margin: '0', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                    Cloud API keys are configured in the <code style={{ background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '3px' }}>.env</code> file on the server.
+                    <br/>Use <strong>gemini-cli</strong>, <strong>claude-cli</strong>, or <strong>codex</strong> providers for CLI-based access without API keys.
+                  </p>
                 </div>
               </div>
             </>

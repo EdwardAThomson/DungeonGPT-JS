@@ -79,6 +79,7 @@ const Game = () => {
     loadedConversation?.sub_maps?.movesSinceEncounter || 0
   );
   const [narrativeEncounter, setNarrativeEncounter] = useState(null);
+  const [pendingNarrativeTile, setPendingNarrativeTile] = useState(null);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
 
   // --- HOOKS ---
@@ -337,14 +338,22 @@ const Game = () => {
     
     if (randomEncounter) {
       if (randomEncounter.encounterTier === 'immediate') {
-        // IMMEDIATE: Show modal immediately, suppress AI prompt
+        // IMMEDIATE: Show modal immediately, defer AI narrative until after resolution
         const delay = targetTile.poi ? 800 : 0;
         setTimeout(() => {
           setActionEncounter(randomEncounter);
           setIsActionEncounterOpen(true);
         }, delay);
         setMovesSinceEncounter(0);
-        return; // Exit early - no AI movement prompt
+        // Store tile info for post-encounter narrative
+        setPendingNarrativeTile({
+          tile: targetTile,
+          coords: { x: clickedX, y: clickedY },
+          biomeType,
+          townName,
+          needsAiDescription: !isBiomeVisited || (townName && !isTownVisited)
+        });
+        return; // Exit early - AI narrative will trigger after encounter
         
       } else if (randomEncounter.encounterTier === 'narrative') {
         // NARRATIVE: Store for AI prompt injection
@@ -362,20 +371,10 @@ const Game = () => {
       setMovesSinceEncounter(prev => prev + 1);
     }
 
-    // Determine if we need an AI description
-    const needsAiDescription = !isBiomeVisited || (townName && !isTownVisited);
+    // Always generate AI narrative for world map movement
+    // First visit to a new biome/town gets a richer description
+    const isNewArea = !isBiomeVisited || (townName && !isTownVisited);
 
-    if (!needsAiDescription) {
-      // Just a system message for revisited areas
-      let returnMsg = `You continue through the ${biomeType}.`;
-      if (townName) {
-        returnMsg = `You have returned to ${townName}.`;
-      }
-      interactionHook.setConversation(prev => [...prev, { role: 'system', content: returnMsg }]);
-      return;
-    }
-
-    // AI Description for new areas
     const currentApiKey = apiKeys[selectedProvider];
     // Note: CLI providers don't need a key here, handled inside llmService/InteractionHook
     // But we check interactionHook.selectedProvider logic
@@ -387,9 +386,9 @@ const Game = () => {
 
     const model = interactionHook.modelOptions.find(opt => opt.provider === selectedProvider)?.model || 'gpt-5';
 
-    let systemMessageContent = `You moved to coordinates (${clickedX}, ${clickedY}).`;
+    let systemMessageContent = `You moved to ${biomeType} (${clickedX}, ${clickedY}).`;
     if (targetTile.poi === 'town' && targetTile.townName) {
-      systemMessageContent = `You arrived at ${targetTile.townName}, a ${targetTile.townSize || 'settlement'}.`;
+      systemMessageContent = `You arrived at ${targetTile.townName}, a ${targetTile.townSize || 'settlement'} (${clickedX}, ${clickedY}).`;
     }
     const systemMessage = { role: 'system', content: systemMessageContent };
     interactionHook.setConversation(prev => [...prev, systemMessage]);
@@ -407,6 +406,9 @@ const Game = () => {
       locationInfo += ` POI: ${targetTile.poi}.`;
     }
     locationInfo += ` Description seed: ${targetTile.descriptionSeed || 'Describe the area.'}`;
+    if (!isNewArea) {
+      locationInfo += ' The party has been to this type of terrain before. Keep the description brief (1 paragraph) and focus on what is new or different.';
+    }
 
     const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
     const milestonesInfo = settings.milestones && settings.milestones.length > 0 ? `\nKey Milestones to achieve: ${settings.milestones.map(m => typeof m === 'object' ? m.text : m).join(', ')}` : '';
@@ -417,18 +419,25 @@ const Game = () => {
     interactionHook.setLastPrompt(fullPrompt);
 
     try {
-      const aiResponse = await llmService.generateText({
+      const aiResponse = await llmService.generateUnified({
         provider: selectedProvider,
         model,
         prompt: fullPrompt,
         maxTokens: 1600,
-        temperature: 0.7
+        temperature: 0.7,
+        onProgress: (p) => interactionHook.setProgressStatus(p)
       });
+      interactionHook.setProgressStatus(null);
+      if (!aiResponse || !aiResponse.trim()) {
+        console.warn('Empty movement AI response, skipping');
+        return;
+      }
       const aiMessage = { role: 'ai', content: aiResponse };
       interactionHook.setConversation(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('Movement AI error:', error);
       interactionHook.setError(error.message);
+      interactionHook.setProgressStatus(null);
     } finally {
       interactionHook.setIsLoading(false);
     }
@@ -500,7 +509,13 @@ const Game = () => {
                 {msg.content}
               </p>
             ))}
-            {interactionHook.isLoading && <p className="message system">AI is thinking...</p>}
+            {interactionHook.isLoading && (
+              <p className="message system">
+                {interactionHook.progressStatus?.elapsed > 5 
+                  ? `AI is working... (${interactionHook.progressStatus.elapsed}s)`
+                  : 'AI is thinking...'}
+              </p>
+            )}
             {interactionHook.error && <p className="message error">{interactionHook.error}</p>}
           </div>
 
@@ -773,6 +788,63 @@ const Game = () => {
           }
           setIsActionEncounterOpen(false);
           setActionEncounter(null);
+          
+          // Trigger deferred AI narrative if there's a pending tile
+          if (pendingNarrativeTile) {
+            const { tile, coords, biomeType, townName, needsAiDescription } = pendingNarrativeTile;
+            setPendingNarrativeTile(null);
+            
+            if (needsAiDescription) {
+              // Generate AI narrative for the location
+              (async () => {
+                const currentApiKey = apiKeys[selectedProvider];
+                const isCli = ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider);
+                if (!currentApiKey && !isCli) return;
+                
+                const model = interactionHook.modelOptions.find(opt => opt.provider === selectedProvider)?.model || 'gpt-5';
+                const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
+                const movementDescription = buildMovementPrompt(tile, settings, null);
+                
+                let locationInfo = `Player has moved to coordinates (${coords.x}, ${coords.y}) in a ${tile.biome} biome.`;
+                if (tile.poi === 'town' && tile.townName) {
+                  locationInfo += ` The party has arrived at ${tile.townName}, a ${tile.townSize || 'settlement'}. They are standing at the edge of the town.`;
+                } else if (tile.poi) {
+                  locationInfo += ` POI: ${tile.poi}.`;
+                }
+                locationInfo += ` Description seed: ${tile.descriptionSeed || 'Describe the area.'}`;
+                
+                const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
+                const milestonesInfo = settings.milestones && settings.milestones.length > 0 ? `\nKey Milestones to achieve: ${settings.milestones.map(m => typeof m === 'object' ? m.text : m).join(', ')}` : '';
+                const gameContext = `Setting: ${settings.shortDescription}. Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
+                const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${interactionHook.currentSummary}\n\n${movementDescription}`;
+                const fullPrompt = DM_PROTOCOL + prompt;
+                
+                interactionHook.setIsLoading(true);
+                try {
+                  const aiResponse = await llmService.generateUnified({
+                    provider: selectedProvider,
+                    model,
+                    prompt: fullPrompt,
+                    maxTokens: 1600,
+                    temperature: 0.7,
+                    onProgress: (p) => interactionHook.setProgressStatus(p)
+                  });
+                  interactionHook.setProgressStatus(null);
+                  if (!aiResponse || !aiResponse.trim()) {
+                    console.warn('Empty post-encounter AI response, skipping');
+                    return;
+                  }
+                  const aiMessage = { role: 'ai', content: aiResponse };
+                  interactionHook.setConversation(prev => [...prev, aiMessage]);
+                } catch (error) {
+                  console.error('Post-encounter AI narrative error:', error);
+                  interactionHook.setProgressStatus(null);
+                } finally {
+                  interactionHook.setIsLoading(false);
+                }
+              })();
+            }
+          }
         }}
         onCharacterUpdate={handleHeroUpdate}
       />

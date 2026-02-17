@@ -270,7 +270,21 @@ app.post('/conversation', (req, res) => {
 
 // GET endpoint to fetch all conversations
 app.get('/conversations', (req, res) => {
-  const query = `SELECT * FROM conversations`;
+  const query = `SELECT * FROM conversations ORDER BY timestamp DESC`;
+
+  db.all(query, [], (err, rows) => {
+    if (err) {
+      console.error('Error retrieving conversations', err);
+      res.status(500).json({ error: 'Failed to retrieve conversations' });
+    } else {
+      res.json(rows);
+    }
+  });
+});
+
+// GET endpoint to fetch all conversations (API version)
+app.get('/api/conversations', (req, res) => {
+  const query = `SELECT * FROM conversations ORDER BY timestamp DESC`;
 
   db.all(query, [], (err, rows) => {
     if (err) {
@@ -389,6 +403,30 @@ app.get('/api/conversations/:sessionId', (req, res) => {
         sub_maps: row.sub_maps ? JSON.parse(row.sub_maps) : null
       };
       res.json(conversation);
+    }
+  });
+});
+
+// Update conversation data (messages)
+app.put('/api/conversations/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  const { conversation_data } = req.body;
+
+  if (!conversation_data) {
+    return res.status(400).json({ message: 'conversation_data is required' });
+  }
+
+  const conversationDataStr = JSON.stringify(conversation_data);
+  const query = `UPDATE conversations SET conversation_data = ? WHERE sessionId = ?`;
+
+  db.run(query, [conversationDataStr, sessionId], function (err) {
+    if (err) {
+      console.error('Error updating conversation data:', err);
+      res.status(500).json({ message: 'Server error updating conversation data' });
+    } else if (this.changes === 0) {
+      res.status(404).json({ message: 'Conversation not found' });
+    } else {
+      res.json({ message: 'Conversation data updated successfully' });
     }
   });
 });

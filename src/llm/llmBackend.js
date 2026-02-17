@@ -60,6 +60,10 @@ async function generateText({ provider, model, prompt, maxTokens, temperature })
             });
             return response.content[0].text.trim();
 
+        } else if (['codex', 'claude-cli', 'gemini-cli'].includes(provider)) {
+            // CLI providers are handled by llmService.js via the runner system
+            throw new Error(`CLI provider ${provider} should not reach llmBackend.js - use llmService instead`);
+
         } else {
             throw new Error(`Unsupported LLM provider: ${provider}`);
         }

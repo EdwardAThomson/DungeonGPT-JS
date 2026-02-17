@@ -93,8 +93,9 @@ export const llmService = {
 
     /**
      * Unified generation that handles both Cloud and CLI providers
+     * @param {Function} onProgress - Optional callback for progress updates: ({ status, elapsed, hasContent })
      */
-    async generateUnified({ provider, model, prompt, maxTokens, temperature }) {
+    async generateUnified({ provider, model, prompt, maxTokens, temperature, onProgress }) {
         const isCli = ['codex', 'claude-cli', 'gemini-cli'].includes(provider);
 
         if (isCli) {
@@ -103,15 +104,26 @@ export const llmService = {
             if (provider === 'gemini-cli') cliBackend = 'gemini';
 
             const { id } = await this.createTask(cliBackend, prompt, undefined, model);
+            const startTime = Date.now();
 
             return new Promise((resolve, reject) => {
                 let fullText = '';
+                let lastProgressUpdate = 0;
                 this.streamTask(id, (update) => {
+                    if (update.type === 'status' && onProgress) {
+                        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                        if (elapsed > lastProgressUpdate + 2) { // Throttle to every 3 seconds
+                            lastProgressUpdate = elapsed;
+                            onProgress({ status: update.data?.state || 'working', elapsed, hasContent: fullText.length > 0 });
+                        }
+                    }
                     if (update.type === 'log' && update.data.stream === 'stdout') {
                         fullText += update.data.line + '\n';
                     } else if (update.type === 'done') {
+                        if (onProgress) onProgress({ status: 'done', elapsed: Math.floor((Date.now() - startTime) / 1000), hasContent: true });
                         resolve(sanitizeResponse(fullText));
                     } else if (update.type === 'error') {
+                        if (onProgress) onProgress({ status: 'error', elapsed: Math.floor((Date.now() - startTime) / 1000), hasContent: false });
                         reject(new Error(update.data));
                     }
                 });

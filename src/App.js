@@ -20,6 +20,8 @@ import TerrainStudioV2 from './pages/TerrainStudioV2';
 import MilestoneTest from './pages/MilestoneTest';
 import EncounterTest from './pages/EncounterTest';
 import ProgressionTest from './pages/ProgressionTest';
+import LLMDebug from './pages/LLMDebug';
+import ConversationManager from './pages/ConversationManager';
 
 import "./App.css";
 
@@ -121,6 +123,8 @@ const App = () => {
             <Route path="/milestone-test" element={<MilestoneTest />} />
             <Route path="/encounter-test" element={<EncounterTest />} />
             <Route path="/progression-test" element={<ProgressionTest />} />
+            <Route path="/llm-debug" element={<LLMDebug />} />
+            <Route path="/conversation-manager" element={<ConversationManager />} />
           </Routes>
         </div>
 
