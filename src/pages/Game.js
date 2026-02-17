@@ -21,6 +21,30 @@ import { getHPStatus, calculateMaxHP } from '../utils/healthSystem';
 import { awardXP, getLevelUpSummary } from '../utils/progressionSystem';
 import { addItem, addGold, ITEM_CATALOG } from '../utils/inventorySystem';
 
+const renderMarkdown = (text) => {
+  if (!text) return '';
+  
+  let html = text;
+  
+  // Bold: **text** or __text__
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+  
+  // Italic: *text* or _text_
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+  
+  // Headers: # Header
+  html = html.replace(/^### (.+)$/gm, '<h3 style="margin: 10px 0 5px 0; color: var(--primary);">$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2 style="margin: 12px 0 6px 0; color: var(--primary);">$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1 style="margin: 15px 0 8px 0; color: var(--primary);">$1</h1>');
+  
+  // Line breaks
+  html = html.replace(/\n/g, '<br/>');
+  
+  return html;
+};
+
 const Game = () => {
   const { state } = useLocation();
   const { selectedHeroes: stateHeroes, loadedConversation, worldSeed: stateSeed, gameSessionId: stateGameSessionId } = state || { selectedHeroes: [], loadedConversation: null, worldSeed: null, gameSessionId: null };
@@ -80,6 +104,7 @@ const Game = () => {
   );
   const [narrativeEncounter, setNarrativeEncounter] = useState(null);
   const [pendingNarrativeTile, setPendingNarrativeTile] = useState(null);
+  const [aiNarrativeEnabled, setAiNarrativeEnabled] = useState(true);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
 
   // --- HOOKS ---
@@ -287,6 +312,9 @@ const Game = () => {
       return;
     }
 
+    // Close the map modal so encounter modals can be seen
+    mapHook.setIsMapModalOpen(false);
+
     // Check if tile was previously explored (before marking it)
     const originalTile = getTile(mapHook.worldMap, clickedX, clickedY);
     const wasExplored = originalTile?.isExplored || false;
@@ -334,7 +362,14 @@ const Game = () => {
 
     // --- Random Encounter Check (Phase 2.4: Two-Tier System) ---
     const isFirstVisitToTile = !wasExplored;
+    console.log('[GAME DEBUG] About to check for encounter:', {
+      targetTile: { biome: targetTile.biome, poi: targetTile.poi, x: targetTile.x, y: targetTile.y },
+      isFirstVisitToTile,
+      movesSinceEncounter,
+      settings: { grimnessLevel: settings?.grimnessLevel }
+    });
     const randomEncounter = checkForEncounter(targetTile, isFirstVisitToTile, settings, movesSinceEncounter);
+    console.log('[GAME DEBUG] checkForEncounter returned:', randomEncounter ? randomEncounter.name : null);
     
     if (randomEncounter) {
       if (randomEncounter.encounterTier === 'immediate') {
@@ -356,7 +391,18 @@ const Game = () => {
         return; // Exit early - AI narrative will trigger after encounter
         
       } else if (randomEncounter.encounterTier === 'narrative') {
-        // NARRATIVE: Store for AI prompt injection
+        // NARRATIVE: If AI is disabled, show modal instead; otherwise inject into AI prompt
+        if (!aiNarrativeEnabled) {
+          // Fallback: show modal when AI is off (for testing)
+          const delay = targetTile.poi ? 800 : 0;
+          setTimeout(() => {
+            setActionEncounter(randomEncounter);
+            setIsActionEncounterOpen(true);
+          }, delay);
+          setMovesSinceEncounter(0);
+          return;
+        }
+        // Normal flow: Store for AI prompt injection
         const encounterContext = {
           type: 'narrative_encounter',
           encounter: randomEncounter,
@@ -371,18 +417,17 @@ const Game = () => {
       setMovesSinceEncounter(prev => prev + 1);
     }
 
-    // Always generate AI narrative for world map movement
+    // Always generate AI narrative for world map movement (unless disabled)
     // First visit to a new biome/town gets a richer description
     const isNewArea = !isBiomeVisited || (townName && !isTownVisited);
 
-    const currentApiKey = apiKeys[selectedProvider];
-    // Note: CLI providers don't need a key here, handled inside llmService/InteractionHook
-    // But we check interactionHook.selectedProvider logic
-    const isCli = ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider);
-    if (!currentApiKey && !isCli) {
-      interactionHook.setError(`API Key for ${selectedProvider} is not set.`);
+    // Skip AI narrative if toggle is disabled (for testing)
+    if (!aiNarrativeEnabled) {
       return;
     }
+
+    // API keys are now configured server-side in .env file
+    // CLI providers use OAuth/local auth, cloud providers use server .env keys
 
     const model = interactionHook.modelOptions.find(opt => opt.provider === selectedProvider)?.model || 'gpt-5';
 
@@ -397,7 +442,7 @@ const Game = () => {
     const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
     
     // Build movement prompt with optional narrative encounter context
-    const movementDescription = buildMovementPrompt(targetTile, settings, narrativeEncounter);
+    const movementDescription = buildMovementPrompt(targetTile, settings, narrativeEncounter, mapHook.worldMap);
     
     let locationInfo = `Player has moved to coordinates (${clickedX}, ${clickedY}) in a ${targetTile.biome} biome.`;
     if (targetTile.poi === 'town' && targetTile.townName) {
@@ -505,9 +550,11 @@ const Game = () => {
             )}
 
             {interactionHook.conversation.map((msg, index) => (
-              <p key={index} className={`message ${msg.role}`}>
-                {msg.content}
-              </p>
+              <p 
+                key={index} 
+                className={`message ${msg.role}`}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+              />
             ))}
             {interactionHook.isLoading && (
               <p className="message system">
@@ -548,18 +595,18 @@ const Game = () => {
                 <span
                   className={`status-light ${['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
                     ? 'status-cli'
-                    : (apiKeys[selectedProvider] ? 'status-active' : 'status-inactive')
+                    : 'status-active'
                     }`}
                   title={
                     ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
-                      ? `${selectedProvider} is a CLI tool (No API Key required)`
-                      : (apiKeys[selectedProvider] ? `${selectedProvider} API key is set` : `${selectedProvider} API key is missing`)
+                      ? `${selectedProvider} uses local CLI (OAuth login)`
+                      : `${selectedProvider} uses server-side API key (.env file)`
                   }
                 ></span>
                 <span className="status-text">
                   {['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
                     ? 'CLI Mode'
-                    : (apiKeys[selectedProvider] ? 'API Key: Set' : 'API Key: Missing')}
+                    : 'Cloud API'}
                 </span>
               </div>
             </div>
@@ -568,6 +615,17 @@ const Game = () => {
               className="debug-toggle-button"
             >
               {showDebugInfo ? '🐛 Hide Debug' : '🐛 Show Debug'}
+            </button>
+            <button
+              onClick={() => setAiNarrativeEnabled(!aiNarrativeEnabled)}
+              className="debug-toggle-button"
+              style={{ 
+                marginLeft: '10px',
+                background: aiNarrativeEnabled ? '#4CAF50' : '#666'
+              }}
+              title={aiNarrativeEnabled ? 'AI narrative enabled' : 'AI narrative disabled (testing mode)'}
+            >
+              {aiNarrativeEnabled ? '🤖 AI: ON' : '🤖 AI: OFF'}
             </button>
 
             {showDebugInfo && (
@@ -733,12 +791,16 @@ const Game = () => {
         }}
         encounter={actionEncounter}
         character={selectedHeroes.length > 0 ? selectedHeroes[0] : null}
+        party={selectedHeroes}
         onResolve={(result) => {
           console.log('[ENCOUNTER] Resolved:', result);
           
-          // Apply rewards to character if any
-          if (result?.rewards && selectedHeroes.length > 0) {
-            let updatedHero = { ...selectedHeroes[0] };
+          // Determine which hero participated (from initiative system)
+          const heroIndex = result.heroIndex !== undefined ? result.heroIndex : 0;
+          
+          // Apply rewards to the hero who participated
+          if (result?.rewards && selectedHeroes.length > heroIndex) {
+            let updatedHero = { ...selectedHeroes[heroIndex] };
             const rewards = result.rewards;
             let rewardMessages = [];
             
@@ -772,12 +834,36 @@ const Game = () => {
               rewardMessages.push(`Found: ${rewards.items.join(', ')}`);
             }
             
-            // Update hero state
-            handleHeroUpdate(updatedHero);
+            // Update the specific hero who participated
+            const newHeroes = [...selectedHeroes];
+            newHeroes[heroIndex] = updatedHero;
+            setSelectedHeroes(newHeroes);
+            selectedHeroesRef.current = newHeroes;
             
             // Log rewards
             if (rewardMessages.length > 0) {
-              console.log('[PROGRESSION] Rewards applied:', rewardMessages.join(', '));
+              console.log(`[PROGRESSION] Rewards applied to ${updatedHero.characterName}:`, rewardMessages.join(', '));
+            }
+          }
+          
+          // Apply penalties to the hero who participated
+          if (result?.penalties && selectedHeroes.length > heroIndex) {
+            let updatedHero = { ...selectedHeroes[heroIndex] };
+            const penalties = result.penalties;
+            
+            // Deduct gold if penalty includes gold loss
+            if (penalties.goldLoss > 0) {
+              const currentGold = updatedHero.gold || 0;
+              const actualLoss = Math.min(penalties.goldLoss, currentGold);
+              updatedHero.gold = Math.max(0, currentGold - actualLoss);
+              
+              console.log(`[PROGRESSION] Gold penalty for ${updatedHero.characterName}: -${actualLoss} gold (${currentGold} → ${updatedHero.gold})`);
+              
+              // Update the specific hero who participated
+              const newHeroes = [...selectedHeroes];
+              newHeroes[heroIndex] = updatedHero;
+              setSelectedHeroes(newHeroes);
+              selectedHeroesRef.current = newHeroes;
             }
           }
           
@@ -794,16 +880,14 @@ const Game = () => {
             const { tile, coords, biomeType, townName, needsAiDescription } = pendingNarrativeTile;
             setPendingNarrativeTile(null);
             
-            if (needsAiDescription) {
-              // Generate AI narrative for the location
+            if (needsAiDescription && aiNarrativeEnabled) {
+              // Generate AI narrative for the location (if AI is enabled)
               (async () => {
-                const currentApiKey = apiKeys[selectedProvider];
-                const isCli = ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider);
-                if (!currentApiKey && !isCli) return;
+                // API keys are configured server-side in .env file
                 
                 const model = interactionHook.modelOptions.find(opt => opt.provider === selectedProvider)?.model || 'gpt-5';
                 const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
-                const movementDescription = buildMovementPrompt(tile, settings, null);
+                const movementDescription = buildMovementPrompt(tile, settings, null, mapHook.worldMap);
                 
                 let locationInfo = `Player has moved to coordinates (${coords.x}, ${coords.y}) in a ${tile.biome} biome.`;
                 if (tile.poi === 'town' && tile.townName) {

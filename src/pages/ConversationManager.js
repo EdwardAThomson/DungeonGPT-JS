@@ -1,6 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+const renderMarkdown = (text) => {
+  if (!text) return '';
+  
+  let html = text;
+  
+  // Bold: **text** or __text__
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+  
+  // Italic: *text* or _text_
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+  
+  // Headers: # Header
+  html = html.replace(/^### (.+)$/gm, '<h3 style="margin: 10px 0 5px 0; color: #64b5f6;">$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2 style="margin: 12px 0 6px 0; color: #64b5f6;">$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1 style="margin: 15px 0 8px 0; color: #64b5f6;">$1</h1>');
+  
+  // Line breaks
+  html = html.replace(/\n/g, '<br/>');
+  
+  return html;
+};
+
 const ConversationManager = () => {
   const navigate = useNavigate();
   const [conversations, setConversations] = useState([]);
@@ -279,15 +303,15 @@ const ConversationManager = () => {
                             🗑️ Delete
                           </button>
                         </div>
-                        <div style={{
-                          fontSize: '14px',
-                          lineHeight: '1.6',
-                          color: '#e0e0e0',
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-word'
-                        }}>
-                          {msg.content}
-                        </div>
+                        <div 
+                          style={{
+                            fontSize: '14px',
+                            lineHeight: '1.6',
+                            color: '#e0e0e0',
+                            wordBreak: 'break-word'
+                          }}
+                          dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                        />
                       </div>
                     ))}
                   </div>

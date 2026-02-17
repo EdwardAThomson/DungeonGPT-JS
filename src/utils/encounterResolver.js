@@ -143,6 +143,7 @@ const applyConsequences = (outcomeTier, rewards, rollResult, encounter) => {
 
 /**
  * Determines appropriate penalties based on encounter type
+ * Returns { messages: [], goldLoss: number, itemsLost: [] }
  */
 const determinePenalties = (outcomeTier, encounter) => {
   const isCritical = outcomeTier === 'criticalFailure';
@@ -157,39 +158,63 @@ const determinePenalties = (outcomeTier, encounter) => {
   const isSocial = socialEncounters.some(keyword => encounterName.includes(keyword));
   const isEnvironmental = environmentalEncounters.some(keyword => encounterName.includes(keyword));
   
-  // Hostile encounters: physical consequences
+  const penalties = {
+    messages: [],
+    goldLoss: 0,
+    itemsLost: []
+  };
+  
+  // Hostile encounters: physical consequences + gold loss
   if (isHostile) {
     if (isCritical) {
-      return ['Serious injuries sustained', 'Lost some supplies'];
+      penalties.messages.push('Serious injuries sustained');
+      penalties.goldLoss = rollDice(2, 10) + 10; // 12-30 gold
+      penalties.messages.push(`Lost ${penalties.goldLoss} gold in the chaos`);
     } else {
-      return ['Minor injuries sustained'];
+      penalties.messages.push('Minor injuries sustained');
+      penalties.goldLoss = rollDice(1, 10) + 5; // 6-15 gold
+      penalties.messages.push(`Lost ${penalties.goldLoss} gold escaping`);
     }
   }
   
   // Social encounters: reputation/resource consequences
-  if (isSocial) {
+  else if (isSocial) {
     if (isCritical) {
-      return ['Reputation damaged', 'Lost opportunity for trade'];
+      penalties.messages.push('Reputation damaged');
+      penalties.goldLoss = rollDice(1, 6) + 2; // 3-8 gold
+      penalties.messages.push(`Lost ${penalties.goldLoss} gold in the exchange`);
     } else {
-      return ['Missed opportunity'];
+      penalties.messages.push('Missed opportunity');
+      // No gold loss for minor social failures
     }
   }
   
   // Environmental encounters: situational consequences
-  if (isEnvironmental) {
+  else if (isEnvironmental) {
     if (isCritical) {
-      return ['Injured by hazard', 'Lost time recovering'];
+      penalties.messages.push('Injured by hazard');
+      penalties.goldLoss = rollDice(1, 6); // 1-6 gold (supplies damaged)
+      if (penalties.goldLoss > 0) {
+        penalties.messages.push(`Lost ${penalties.goldLoss} gold worth of supplies`);
+      }
     } else {
-      return ['Minor setback'];
+      penalties.messages.push('Minor setback');
+      // No gold loss for minor environmental setbacks
     }
   }
   
   // Default fallback
-  if (isCritical) {
-    return ['Significant setback'];
-  } else {
-    return ['Minor setback'];
+  else {
+    if (isCritical) {
+      penalties.messages.push('Significant setback');
+      penalties.goldLoss = rollDice(1, 8) + 2; // 3-10 gold
+      penalties.messages.push(`Lost ${penalties.goldLoss} gold`);
+    } else {
+      penalties.messages.push('Minor setback');
+    }
   }
+  
+  return penalties;
 };
 
 /**

@@ -139,7 +139,16 @@ export const ITEM_CATALOG = {
   // Quest items
   'quest_clue': { name: 'Mysterious Clue', rarity: 'uncommon', value: 0, type: 'quest_item' },
   'quest_key': { name: 'Ornate Key', rarity: 'rare', value: 0, type: 'quest_item' },
-  'quest_letter': { name: 'Sealed Letter', rarity: 'uncommon', value: 0, type: 'quest_item' }
+  'quest_letter': { name: 'Sealed Letter', rarity: 'uncommon', value: 0, type: 'quest_item' },
+  'mysterious_letter': { name: 'Mysterious Letter', rarity: 'uncommon', value: 0, type: 'quest_item' },
+  
+  // Monster drops
+  'wolf_pelt': { name: 'Wolf Pelt', rarity: 'common', value: 15, stackable: true },
+  'wolf_fang': { name: 'Wolf Fang', rarity: 'common', value: 10, stackable: true },
+  'goblin_ear': { name: 'Goblin Ear', rarity: 'common', value: 5, stackable: true },
+  'spider_venom': { name: 'Spider Venom', rarity: 'uncommon', value: 35 },
+  'bandit_badge': { name: 'Bandit Badge', rarity: 'common', value: 20 },
+  'bear_claw': { name: 'Bear Claw', rarity: 'uncommon', value: 25 }
 };
 
 /**

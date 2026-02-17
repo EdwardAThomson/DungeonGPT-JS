@@ -22,6 +22,7 @@ import EncounterTest from './pages/EncounterTest';
 import ProgressionTest from './pages/ProgressionTest';
 import LLMDebug from './pages/LLMDebug';
 import ConversationManager from './pages/ConversationManager';
+import EncounterDebug from './pages/EncounterDebug';
 
 import "./App.css";
 
@@ -125,6 +126,7 @@ const App = () => {
             <Route path="/progression-test" element={<ProgressionTest />} />
             <Route path="/llm-debug" element={<LLMDebug />} />
             <Route path="/conversation-manager" element={<ConversationManager />} />
+            <Route path="/encounter-debug" element={<EncounterDebug />} />
           </Routes>
         </div>
 

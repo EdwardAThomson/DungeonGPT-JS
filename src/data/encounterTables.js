@@ -8,7 +8,7 @@ export const encounterTables = {
     { template: 'goblin_ambush', weight: 12, hostile: true },
     { template: 'wolf_pack', weight: 10, hostile: true },
     { template: 'bandit_roadblock', weight: 10, hostile: true },
-    
+
     // Narrative encounters (discovered through conversation)
     { template: 'traveling_merchant', weight: 12, hostile: false },
     { template: 'wandering_minstrel', weight: 8, hostile: false },
@@ -18,7 +18,7 @@ export const encounterTables = {
     { template: 'mysterious_stranger', weight: 8, hostile: false },
     { template: 'wounded_traveler', weight: 7, hostile: false },
     { template: 'distant_smoke', weight: 6, hostile: false },
-    
+
     { template: 'none', weight: 5 }
   ],
 
@@ -27,7 +27,7 @@ export const encounterTables = {
     { template: 'giant_spiders', weight: 15, hostile: true },
     { template: 'bear_encounter', weight: 10, hostile: true },
     { template: 'wolf_pack', weight: 8, hostile: true },
-    
+
     // Narrative encounters
     { template: 'elf_patrol', weight: 10, hostile: false },
     { template: 'mysterious_shrine', weight: 7, hostile: false },
@@ -35,7 +35,7 @@ export const encounterTables = {
     { template: 'abandoned_campsite', weight: 7, hostile: false },
     { template: 'hidden_treasure', weight: 6, hostile: false },
     { template: 'distant_smoke', weight: 5, hostile: false },
-    
+
     { template: 'none', weight: 22 }
   ],
 
@@ -44,21 +44,21 @@ export const encounterTables = {
     { template: 'rockslide', weight: 15, hostile: true },
     { template: 'bandit_roadblock', weight: 12, hostile: true },
     { template: 'bear_encounter', weight: 8, hostile: true },
-    
+
     // Narrative encounters
     { template: 'mountain_hermit', weight: 12, hostile: false },
     { template: 'mysterious_shrine', weight: 8, hostile: false },
     { template: 'abandoned_campsite', weight: 7, hostile: false },
     { template: 'hidden_treasure', weight: 7, hostile: false },
     { template: 'distant_smoke', weight: 6, hostile: false },
-    
+
     { template: 'none', weight: 25 }
   ],
 
   'town': [
     // Immediate encounters (rare in towns)
     { template: 'tavern_brawl', weight: 8, hostile: false },
-    
+
     // Narrative encounters (common in towns)
     { template: 'town_market', weight: 20, hostile: false },
     { template: 'town_quest_board', weight: 18, hostile: false },
@@ -66,20 +66,20 @@ export const encounterTables = {
     { template: 'suspicious_stranger', weight: 12, hostile: false },
     { template: 'wandering_minstrel', weight: 8, hostile: false },
     { template: 'mysterious_stranger', weight: 10, hostile: false },
-    
+
     { template: 'none', weight: 9 }
   ],
 
   'beach': [
     // Immediate encounters
     { template: 'bandit_roadblock', weight: 8, hostile: true },
-    
+
     // Narrative encounters
     { template: 'traveling_merchant', weight: 12, hostile: false },
     { template: 'abandoned_campsite', weight: 12, hostile: false },
     { template: 'lost_child', weight: 8, hostile: false },
     { template: 'hidden_treasure', weight: 10, hostile: false },
-    
+
     { template: 'none', weight: 50 }
   ]
 };
@@ -87,7 +87,7 @@ export const encounterTables = {
 // Base encounter chance per biome (percentage as 0-1)
 // Towns are safest, wilderness varies
 export const biomeEncounterChance = {
-  'plains': 0.30,
+  'plains': 0.80,
   'forest': 0.35,
   'mountain': 0.30,
   'town': 0.40,     // High chance but encounters are non-hostile
@@ -128,11 +128,11 @@ export const caveEncounterTable = [
   { template: 'cave_bats', weight: 15, hostile: false },
   { template: 'cave_spider_nest', weight: 12, hostile: true },
   { template: 'cave_treasure_guardian', weight: 5, hostile: true },
-  
+
   // Narrative encounters
   { template: 'cave_entrance', weight: 20, hostile: false },
   { template: 'cave_underground_lake', weight: 15, hostile: false },
-  
+
   { template: 'none', weight: 33 }
 ];
 
@@ -141,12 +141,12 @@ export const ruinsEncounterTable = [
   // Immediate encounters
   { template: 'ruin_ghost', weight: 12, hostile: true },
   { template: 'ruin_cultists', weight: 8, hostile: true },
-  
+
   // Narrative encounters
   { template: 'ruin_entrance', weight: 20, hostile: false },
   { template: 'ruin_treasure_vault', weight: 12, hostile: false },
   { template: 'ruin_ancient_library', weight: 15, hostile: false },
-  
+
   { template: 'none', weight: 33 }
 ];
 
@@ -154,12 +154,12 @@ export const ruinsEncounterTable = [
 export const groveEncounterTable = [
   // Immediate encounters
   { template: 'forest_beast', weight: 10, hostile: true },
-  
+
   // Narrative encounters
   { template: 'sacred_grove', weight: 20, hostile: false },
   { template: 'dryad_encounter', weight: 15, hostile: false },
   { template: 'fairy_ring', weight: 12, hostile: false },
-  
+
   { template: 'none', weight: 43 }
 ];
 
@@ -167,12 +167,12 @@ export const groveEncounterTable = [
 export const mountainEncounterTable = [
   // Immediate encounters
   { template: 'mountain_dragon', weight: 5, hostile: true },
-  
+
   // Narrative encounters
   { template: 'mountain_pass', weight: 20, hostile: false },
   { template: 'mountain_hermit', weight: 18, hostile: false },
   { template: 'mountain_eagle_nest', weight: 15, hostile: false },
-  
+
   { template: 'none', weight: 42 }
 ];
 
@@ -181,12 +181,12 @@ export const environmentalEncounterTable = [
   // Immediate
   { template: 'sudden_storm', weight: 15, hostile: false },
   { template: 'earthquake', weight: 5, hostile: false },
-  
+
   // Narrative
   { template: 'thick_fog', weight: 20, hostile: false },
   { template: 'heat_wave', weight: 12, hostile: false },
   { template: 'strange_lights', weight: 15, hostile: false },
-  
+
   { template: 'none', weight: 33 }
 ];
 

@@ -1,14 +1,23 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import { resolveEncounter } from '../utils/encounterResolver';
 import { createMultiRoundEncounter, resolveRound, getRoundActions, generateEncounterSummary } from '../utils/multiRoundEncounter';
 import { applyDamage, getHPStatus } from '../utils/healthSystem';
 import SettingsContext from '../contexts/SettingsContext';
 
-const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve, onCharacterUpdate }) => {
+const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, onResolve, onCharacterUpdate }) => {
   const { settings } = useContext(SettingsContext);
   const [selectedAction, setSelectedAction] = useState(null);
   const [isResolving, setIsResolving] = useState(false);
   const [result, setResult] = useState(null);
+  
+  // Hero selection state
+  const [selectedHeroIndex, setSelectedHeroIndex] = useState(0);
+  const [initiativeResult, setInitiativeResult] = useState(null);
+  const [showHeroSelection, setShowHeroSelection] = useState(true);
+  const [heroConfirmed, setHeroConfirmed] = useState(false);
+  
+  // Track which encounter we've initialized for (prevents re-init on character updates)
+  const initializedEncounterRef = useRef(null);
   
   // Track character state locally to show HP changes
   const [currentCharacter, setCurrentCharacter] = useState(character);
@@ -19,26 +28,85 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
   const [roundResults, setRoundResults] = useState([]);
   const [currentRoundResult, setCurrentRoundResult] = useState(null);
   
-  // Sync character state when modal opens
+  // Initialize state ONLY when modal opens with a NEW encounter
   useEffect(() => {
-    if (isOpen) {
-      setCurrentCharacter(character);
-    }
-  }, [isOpen, character]);
-  
-  // Initialize multi-round state ONLY when modal first opens with a new encounter
-  useEffect(() => {
-    if (isOpen && encounter && encounter.multiRound) {
-      setIsMultiRound(true);
-      setRoundState(createMultiRoundEncounter(encounter, character, settings));
-    } else {
-      setIsMultiRound(false);
-      setRoundState(null);
+    if (isOpen && encounter) {
+      // Check if this is a new encounter (different from what we initialized)
+      const encounterId = encounter.name + encounter.description;
+      if (initializedEncounterRef.current !== encounterId) {
+        // New encounter - reset everything
+        initializedEncounterRef.current = encounterId;
+        setCurrentCharacter(character);
+        setSelectedHeroIndex(0);
+        setInitiativeResult(null);
+        setResult(null);
+        setSelectedAction(null);
+        setRoundResults([]);
+        setCurrentRoundResult(null);
+        
+        // Determine if we need hero selection
+        const needsHeroSelection = party && party.length > 1;
+        setShowHeroSelection(needsHeroSelection);
+        setHeroConfirmed(!needsHeroSelection);
+        
+        // For single hero, initialize multi-round state immediately
+        if (!needsHeroSelection && encounter.multiRound) {
+          setIsMultiRound(true);
+          setRoundState(createMultiRoundEncounter(encounter, character, settings));
+        } else if (!needsHeroSelection) {
+          setIsMultiRound(false);
+          setRoundState(null);
+        } else {
+          // Multi-hero: wait for hero selection before initializing
+          setIsMultiRound(false);
+          setRoundState(null);
+        }
+      }
+    } else if (!isOpen) {
+      // Modal closed - clear the ref so next open is fresh
+      initializedEncounterRef.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, encounter]);
 
   if (!isOpen || !encounter) return null;
+
+  const handleHeroConfirm = () => {
+    // Roll initiative check (15% chance of failure)
+    const initiativeRoll = Math.random();
+    const initiativeFailed = initiativeRoll < 0.15;
+    
+    let actualHeroIndex = selectedHeroIndex;
+    let message = null;
+    
+    if (initiativeFailed && party && party.length > 1) {
+      // Random hero is forced to act instead
+      const availableIndices = party.map((_, idx) => idx).filter(idx => idx !== selectedHeroIndex);
+      actualHeroIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+      const forcedHero = party[actualHeroIndex];
+      message = `⚡ Initiative failed! ${forcedHero.characterName} is forced to act instead!`;
+    }
+    
+    setInitiativeResult({
+      success: !initiativeFailed,
+      actualHeroIndex,
+      message
+    });
+    
+    // Update current character to the one who will actually act
+    const actingHero = party ? party[actualHeroIndex] : character;
+    setCurrentCharacter(actingHero);
+    
+    // Mark hero as confirmed and hide selection
+    setHeroConfirmed(true);
+    setShowHeroSelection(false);
+    
+    // Initialize multi-round state if needed
+    if (encounter.multiRound) {
+      setIsMultiRound(true);
+      setRoundState(createMultiRoundEncounter(encounter, actingHero, settings));
+    }
+  };
 
   const handleAction = async (action) => {
     setSelectedAction(action);
@@ -86,12 +154,23 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
       }
     } catch (error) {
       console.error('[ENCOUNTER] Resolution failed:', error);
+      console.error('[ENCOUNTER] Error details:', {
+        message: error.message,
+        stack: error.stack,
+        encounter: encounter?.name,
+        action: action?.label,
+        character: currentCharacter?.characterName
+      });
       setResult({
-        narration: 'An error occurred while resolving the encounter.',
+        narration: `An error occurred while resolving the encounter: ${error.message || 'Unknown error'}`,
         rollResult: null,
         outcomeTier: 'failure',
         rewards: null,
-        penalties: ['Encounter resolution failed']
+        penalties: {
+          messages: ['Encounter resolution failed'],
+          goldLoss: 0,
+          itemsLost: []
+        }
       });
     } finally {
       setIsResolving(false);
@@ -101,19 +180,71 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
   const handleNextRound = () => {
     setCurrentRoundResult(null);
     setSelectedAction(null);
+    // Don't reset hero selection - keep the same hero through all rounds
+  };
+  
+  const handleFleeEncounter = () => {
+    // Fleeing from combat has consequences
+    const fleeRoll = Math.random();
+    const fleeSuccess = fleeRoll > 0.3; // 70% chance to flee successfully
+    
+    if (fleeSuccess) {
+      setResult({
+        narration: `${currentCharacter.characterName} successfully breaks away from combat and flees to safety.`,
+        rollResult: null,
+        outcomeTier: 'success',
+        rewards: null,
+        penalties: {
+          messages: ['Fled from combat'],
+          goldLoss: 0,
+          itemsLost: []
+        }
+      });
+    } else {
+      // Failed flee - take damage and lose gold
+      const fleeDamage = Math.floor(currentCharacter.maxHP * 0.15); // 15% max HP damage
+      const goldLoss = Math.floor(Math.random() * 10) + 5; // 5-15 gold
+      
+      const updatedChar = applyDamage(currentCharacter, fleeDamage);
+      setCurrentCharacter(updatedChar);
+      if (onCharacterUpdate) {
+        onCharacterUpdate(updatedChar);
+      }
+      
+      setResult({
+        narration: `${currentCharacter.characterName} attempts to flee but is caught! They take ${fleeDamage} damage escaping.`,
+        rollResult: null,
+        outcomeTier: 'failure',
+        rewards: null,
+        penalties: {
+          messages: ['Failed to flee cleanly', `Took ${fleeDamage} damage`, `Lost ${goldLoss} gold in the chaos`],
+          goldLoss: goldLoss,
+          itemsLost: []
+        },
+        hpDamage: fleeDamage
+      });
+    }
   };
 
   const handleContinue = () => {
     if (onResolve) {
-      onResolve(result);
+      // Include which hero actually participated
+      const resultWithHero = {
+        ...result,
+        heroIndex: initiativeResult ? initiativeResult.actualHeroIndex : (party ? selectedHeroIndex : 0)
+      };
+      onResolve(resultWithHero);
     }
-    // Reset all state
+    // Reset all state - the ref will be cleared when modal closes via useEffect
     setSelectedAction(null);
     setResult(null);
     setIsMultiRound(false);
     setRoundState(null);
     setRoundResults([]);
     setCurrentRoundResult(null);
+    setShowHeroSelection(true);
+    setHeroConfirmed(false);
+    setInitiativeResult(null);
     onClose();
   };
   
@@ -148,7 +279,68 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content encounter-action-modal" onClick={(e) => e.stopPropagation()}>
-        {isDefeated && result ? (
+        {showHeroSelection && !heroConfirmed && party && party.length > 1 ? (
+          // Hero selection phase
+          <>
+            <h2>⚔️ {encounter.name}</h2>
+            <div className="encounter-description">
+              <p>{encounter.description}</p>
+            </div>
+            
+            <div className="hero-selection-section" style={{ marginTop: '20px' }}>
+              <h3>Choose Your Champion</h3>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '15px' }}>
+                Select which hero will lead the encounter. (15% chance initiative fails and a random hero acts instead)
+              </p>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {party.map((hero, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => setSelectedHeroIndex(idx)}
+                    style={{
+                      padding: '15px',
+                      border: selectedHeroIndex === idx ? '2px solid var(--primary)' : '2px solid #444',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      background: selectedHeroIndex === idx ? 'rgba(76, 175, 80, 0.1)' : '#2a2a2a',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <strong>{hero.characterName}</strong>
+                        <span style={{ marginLeft: '10px', color: 'var(--text-secondary)' }}>
+                          {hero.characterClass}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                        HP: {hero.currentHP}/{hero.maxHP} | Level {hero.level}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              <button
+                onClick={handleHeroConfirm}
+                style={{
+                  marginTop: '20px',
+                  padding: '12px 24px',
+                  fontSize: '16px',
+                  width: '100%'
+                }}
+                className="primary-button"
+              >
+                Confirm Hero
+              </button>
+            </div>
+            
+            <button className="modal-close-button" onClick={onClose}>
+              Flee Encounter
+            </button>
+          </>
+        ) : isDefeated && result ? (
           // Defeat state
           <>
             <div className="defeat-header">
@@ -184,6 +376,21 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
               {isMultiRound && roundState && (
                 <div className="round-indicator">
                   Round {roundState.currentRound} of {roundState.maxRounds}
+                </div>
+              )}
+              
+              {/* Initiative result notification */}
+              {initiativeResult && initiativeResult.message && (
+                <div style={{
+                  padding: '10px',
+                  margin: '10px 0',
+                  background: '#ff9800',
+                  color: '#000',
+                  borderRadius: '4px',
+                  fontWeight: 'bold',
+                  textAlign: 'center'
+                }}>
+                  {initiativeResult.message}
                 </div>
               )}
               
@@ -365,6 +572,23 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
                   </button>
                 ))}
               </div>
+              
+              {/* Flee button for multi-round encounters */}
+              {isMultiRound && roundState && !roundState.isResolved && (
+                <button
+                  className="secondary-button"
+                  onClick={handleFleeEncounter}
+                  disabled={isResolving}
+                  style={{
+                    marginTop: '15px',
+                    width: '100%',
+                    background: '#e67e22',
+                    borderColor: '#d35400'
+                  }}
+                >
+                  🏃 Attempt to Flee (70% success, risks damage/gold loss)
+                </button>
+              )}
             </div>
               </>
             )}
@@ -437,15 +661,23 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, onResolve
                 </div>
               )}
 
-              {result.penalties && result.penalties.length > 0 && (
-                <div className="penalties-section">
-                  <h4>⚠️ Consequences</h4>
-                  <ul>
-                    {result.penalties.map((penalty, idx) => (
-                      <li key={idx}>{penalty}</li>
-                    ))}
-                  </ul>
-                </div>
+              {result.penalties && (
+                (() => {
+                  // Handle both array and object formats for penalties
+                  const penaltyMessages = Array.isArray(result.penalties) 
+                    ? result.penalties 
+                    : (result.penalties.messages || []);
+                  return penaltyMessages.length > 0 ? (
+                    <div className="penalties-section">
+                      <h4>⚠️ Consequences</h4>
+                      <ul>
+                        {penaltyMessages.map((penalty, idx) => (
+                          <li key={idx}>{penalty}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null;
+                })()
               )}
 
               {result.affectedFactions && (

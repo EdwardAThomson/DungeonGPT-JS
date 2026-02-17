@@ -25,10 +25,14 @@ const getEncounterBiome = (tile) => {
   if (tile.poi === 'forest') return 'forest';
   if (tile.poi === 'mountain') return 'mountain';
 
-  // Fall back to tile biome
+  // Check tile biome property
   if (tile.biome === 'water') return 'water';
   if (tile.biome === 'beach') return 'beach';
+  if (tile.biome === 'forest') return 'forest';
+  if (tile.biome === 'mountain') return 'mountain';
+  if (tile.biome === 'plains') return 'plains';
 
+  // Default fallback
   return 'plains';
 };
 
@@ -65,6 +69,7 @@ export const shouldTriggerEncounter = (tile, isFirstVisit, settings, movesSinceL
 
   // Get base chance for this biome
   let chance = biomeEncounterChance[biome] || 0.25;
+  const baseChance = chance;
 
   // Reduce chance on revisited tiles
   if (!isFirstVisit) {
@@ -93,7 +98,19 @@ export const shouldTriggerEncounter = (tile, isFirstVisit, settings, movesSinceL
   // Cap at 70% — always some chance of peaceful travel
   chance = Math.min(chance, 0.70);
 
-  return Math.random() < chance;
+  const roll = Math.random();
+  console.log('[ENCOUNTER DEBUG] shouldTriggerEncounter calc:', {
+    baseChance,
+    isFirstVisit,
+    revisitMultiplier: !isFirstVisit ? (revisitEncounterMultiplier[biome] || 0.3) : 1,
+    grimness: settings?.grimnessLevel,
+    moveBonus: movesSinceLastEncounter >= 5 ? 0.25 : (movesSinceLastEncounter >= 3 ? 0.10 : 0),
+    finalChance: chance,
+    roll,
+    triggered: roll < chance
+  });
+
+  return roll < chance;
 };
 
 /**
@@ -141,6 +158,7 @@ export const rollRandomEncounter = (tile, settings) => {
     ...template,
     templateKey: roll.template,
     isHostile: roll.hostile !== false,
+    encounterTier: roll.hostile !== false ? 'immediate' : 'narrative',
     sourceBiome: biome,
     sourcePoiType: poiType
   };
@@ -184,6 +202,7 @@ export const rollEnvironmentalEncounter = (tile, settings) => {
     templateKey: roll.template,
     isHostile: false,
     isEnvironmental: true,
+    encounterTier: 'immediate',  // Environmental encounters show modal immediately
     sourceBiome: biome
   };
 };
@@ -234,6 +253,7 @@ export const checkForPoiEncounter = (tile, isFirstVisit, settings) => {
     ...template,
     templateKey: roll.template,
     isHostile: roll.hostile !== false,
+    encounterTier: roll.hostile !== false ? 'immediate' : 'narrative',
     sourcePoiType: poiType
   };
 };
@@ -250,6 +270,15 @@ export const checkForPoiEncounter = (tile, isFirstVisit, settings) => {
  * @returns {Object|null} The encounter or null
  */
 export const checkForEncounter = (tile, isFirstVisit, settings, movesSinceLastEncounter = 0) => {
+  const biome = getEncounterBiome(tile);
+  console.log('[ENCOUNTER DEBUG] checkForEncounter called:', {
+    tile: { biome: tile?.biome, poi: tile?.poi },
+    effectiveBiome: biome,
+    isFirstVisit,
+    movesSinceLastEncounter,
+    baseChance: biomeEncounterChance[biome]
+  });
+  
   // First check for POI-specific encounters (higher priority)
   const poiEncounter = checkForPoiEncounter(tile, isFirstVisit, settings);
   if (poiEncounter) {
@@ -265,13 +294,18 @@ export const checkForEncounter = (tile, isFirstVisit, settings, movesSinceLastEn
   }
   
   // Fall back to regular biome encounters
-  if (!shouldTriggerEncounter(tile, isFirstVisit, settings, movesSinceLastEncounter)) {
+  const willTrigger = shouldTriggerEncounter(tile, isFirstVisit, settings, movesSinceLastEncounter);
+  console.log('[ENCOUNTER DEBUG] shouldTriggerEncounter result:', willTrigger);
+  
+  if (!willTrigger) {
     return null;
   }
 
   const encounter = rollRandomEncounter(tile, settings);
   if (encounter) {
     console.log('[ENCOUNTER] Biome encounter triggered:', encounter.name);
+  } else {
+    console.log('[ENCOUNTER DEBUG] rollRandomEncounter returned null (rolled "none")');
   }
   return encounter;
 };

@@ -92,6 +92,9 @@ const DebugMenu = () => {
                     <Link to="/conversation-manager" style={{ ...linkStyle, color: '#64b5f6', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
                         🗂️ Conversation Manager
                     </Link>
+                    <Link to="/encounter-debug" style={linkStyle} onClick={() => setIsOpen(false)}>
+                        ⚔️ Encounter Debug
+                    </Link>
                 </div>
             )}
             <button style={buttonStyle} onClick={toggleMenu} title="Debug Menu">
