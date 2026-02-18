@@ -87,7 +87,7 @@ export const encounterTables = {
 // Base encounter chance per biome (percentage as 0-1)
 // Towns are safest, wilderness varies
 export const biomeEncounterChance = {
-  'plains': 0.80,
+  'plains': 0.30,
   'forest': 0.35,
   'mountain': 0.30,
   'town': 0.40,     // High chance but encounters are non-hostile

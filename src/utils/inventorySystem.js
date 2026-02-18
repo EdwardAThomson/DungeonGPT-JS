@@ -148,7 +148,27 @@ export const ITEM_CATALOG = {
   'goblin_ear': { name: 'Goblin Ear', rarity: 'common', value: 5, stackable: true },
   'spider_venom': { name: 'Spider Venom', rarity: 'uncommon', value: 35 },
   'bandit_badge': { name: 'Bandit Badge', rarity: 'common', value: 20 },
-  'bear_claw': { name: 'Bear Claw', rarity: 'uncommon', value: 25 }
+  'bear_claw': { name: 'Bear Claw', rarity: 'uncommon', value: 25 },
+  'bear_pelt': { name: 'Bear Pelt', rarity: 'uncommon', value: 40 },
+  'venom_sac': { name: 'Venom Sac', rarity: 'uncommon', value: 45 },
+  
+  // Encounter loot
+  'rusty_dagger': { name: 'Rusty Dagger', rarity: 'common', value: 5, type: 'weapon' },
+  'shortsword': { name: 'Shortsword', rarity: 'common', value: 25, type: 'weapon' },
+  'leather_armor': { name: 'Leather Armor', rarity: 'common', value: 30, type: 'armor' },
+  'map_fragment': { name: 'Map Fragment', rarity: 'uncommon', value: 0, type: 'quest_item' },
+  'inspiration': { name: 'Bardic Inspiration', rarity: 'uncommon', value: 0, type: 'buff' },
+  'divine_blessing': { name: 'Divine Blessing', rarity: 'rare', value: 0, type: 'blessing' },
+  'ancient_knowledge': { name: 'Ancient Knowledge', rarity: 'rare', value: 0, type: 'lore' },
+  'cursed_item': { name: 'Cursed Trinket', rarity: 'rare', value: 0, type: 'cursed' },
+  'rare_ore': { name: 'Rare Ore', rarity: 'uncommon', value: 60 },
+  'family_heirloom': { name: 'Family Heirloom', rarity: 'uncommon', value: 50 },
+  'ale_mug': { name: 'Tavern Mug', rarity: 'common', value: 1 },
+  'bar_stool_leg': { name: 'Bar Stool Leg', rarity: 'common', value: 1, type: 'weapon' },
+  'herbal_remedy': { name: 'Herbal Remedy', rarity: 'common', value: 15, effect: 'heal', amount: '1d4' },
+  'stolen_goods': { name: 'Stolen Goods', rarity: 'uncommon', value: 35 },
+  'poisoned_dagger': { name: 'Poisoned Dagger', rarity: 'uncommon', value: 75, type: 'weapon' },
+  'rare_ingredient': { name: 'Rare Ingredient', rarity: 'uncommon', value: 40 }
 };
 
 /**

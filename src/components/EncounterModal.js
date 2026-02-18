@@ -1,6 +1,6 @@
 import React from 'react';
 
-const EncounterModal = ({ isOpen, onClose, encounter, onEnterLocation }) => {
+const EncounterModal = ({ isOpen, onClose, encounter, onEnterLocation, onViewMap }) => {
     if (!isOpen || !encounter) return null;
 
     const getLocationIcon = (poiType) => {
@@ -47,7 +47,7 @@ const EncounterModal = ({ isOpen, onClose, encounter, onEnterLocation }) => {
                         className="secondary-button"
                         onClick={() => {
                             onClose();
-                            // Will open map modal - handled by parent
+                            if (onViewMap) onViewMap();
                         }}
                     >
                         View Map

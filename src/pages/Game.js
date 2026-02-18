@@ -201,6 +201,7 @@ const Game = () => {
     // Use refs which are synced via useEffect to avoid stale closures in setInterval
     const pos = playerPositionRef.current;
     const townPos = townPlayerPositionRef.current;
+    const heroes = selectedHeroesRef.current || [];
     const fingerprint = [
       convo.length,
       pos?.x, pos?.y,
@@ -209,7 +210,13 @@ const Game = () => {
       townPos?.x, townPos?.y,
       interactionHook.currentSummary?.length || 0,
       settingsRef.current?.storyTitle || '',
-      JSON.stringify((selectedHeroesRef.current || []).map(h => h.currentHP)),
+      // Track HP, gold, XP, and inventory for each hero
+      JSON.stringify(heroes.map(h => ({
+        hp: h.currentHP,
+        gold: h.gold || 0,
+        xp: h.xp || 0,
+        inv: (h.inventory || []).length
+      }))),
     ].join('|');
 
     // Skip save if nothing has changed (unless unmount)
@@ -458,7 +465,18 @@ const Game = () => {
     const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
     const milestonesInfo = settings.milestones && settings.milestones.length > 0 ? `\nKey Milestones to achieve: ${settings.milestones.map(m => typeof m === 'object' ? m.text : m).join(', ')}` : '';
     const gameContext = `Setting: ${settings.shortDescription}. Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
-    const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${interactionHook.currentSummary}\n\n${movementDescription}`;
+    
+    // Get last few AI responses to avoid repetition
+    const recentAiMessages = interactionHook.conversation
+      .filter(msg => msg.role === 'ai')
+      .slice(-3)
+      .map(msg => msg.content.substring(0, 150))
+      .join(' | ');
+    const recentContext = recentAiMessages 
+      ? `\n\n**Recent descriptions (DO NOT repeat similar phrases):**\n${recentAiMessages}` 
+      : '';
+    
+    const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${interactionHook.currentSummary}${recentContext}\n\n${movementDescription}`;
 
     const fullPrompt = DM_PROTOCOL + prompt;
     interactionHook.setLastPrompt(fullPrompt);
@@ -777,6 +795,7 @@ const Game = () => {
         onClose={() => setIsEncounterModalOpen(false)}
         encounter={currentEncounter}
         onEnterLocation={() => mapHook.handleEnterLocation(currentEncounter, interactionHook.setConversation, interactionHook.conversation)}
+        onViewMap={() => mapHook.setIsMapModalOpen(true)}
       />
       <CharacterModal
         isOpen={isCharacterModalOpen}
@@ -874,6 +893,9 @@ const Game = () => {
           }
           setIsActionEncounterOpen(false);
           setActionEncounter(null);
+          
+          // Trigger immediate save after encounter to preserve loot/rewards
+          setTimeout(() => performSave(), 500);
           
           // Trigger deferred AI narrative if there's a pending tile
           if (pendingNarrativeTile) {
