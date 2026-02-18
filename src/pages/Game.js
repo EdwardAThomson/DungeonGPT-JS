@@ -853,6 +853,26 @@ const Game = () => {
               rewardMessages.push(`Found: ${rewards.items.join(', ')}`);
             }
             
+            // Apply healing (from healer encounters)
+            if (rewards.healing) {
+              const currentHP = updatedHero.currentHP || 0;
+              const maxHP = updatedHero.maxHP || 20;
+              
+              if (rewards.healing === 'full') {
+                // Full heal
+                updatedHero.currentHP = maxHP;
+                rewardMessages.push(`💚 Fully healed to ${maxHP} HP!`);
+              } else if (typeof rewards.healing === 'number' && rewards.healing > 0) {
+                // Partial heal
+                const newHP = Math.min(currentHP + rewards.healing, maxHP);
+                const actualHeal = newHP - currentHP;
+                updatedHero.currentHP = newHP;
+                if (actualHeal > 0) {
+                  rewardMessages.push(`💚 Healed for ${actualHeal} HP (${currentHP} → ${newHP})`);
+                }
+              }
+            }
+            
             // Update the specific hero who participated
             const newHeroes = [...selectedHeroes];
             newHeroes[heroIndex] = updatedHero;

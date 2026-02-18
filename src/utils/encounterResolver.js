@@ -130,7 +130,12 @@ const applyConsequences = (outcomeTier, rewards, rollResult, encounter) => {
 
   // Success tiers grant rewards
   if (outcomeTier === 'success' || outcomeTier === 'criticalSuccess') {
-    result.rewards = generateLoot(rewards, rollResult, outcomeTier);
+    result.rewards = generateLoot(rewards, rollResult, outcomeTier, encounter);
+  }
+  
+  // Failure tiers may still get healing from healer encounters
+  if ((outcomeTier === 'failure' || outcomeTier === 'criticalFailure') && encounter?.healingByTier) {
+    result.rewards = generateLoot(rewards, rollResult, outcomeTier, encounter);
   }
 
   // Failure tiers may have penalties (context-aware)
@@ -220,13 +225,14 @@ const determinePenalties = (outcomeTier, encounter) => {
 /**
  * Generates loot based on rewards template and roll result
  */
-const generateLoot = (rewards, rollResult, outcomeTier) => {
+const generateLoot = (rewards, rollResult, outcomeTier, encounter) => {
   if (!rewards) return null;
 
   const loot = {
     xp: rewards.xp || 0,
     gold: 0,
-    items: []
+    items: [],
+    healing: 0
   };
 
   // Gold rewards (roll dice formula)
@@ -252,6 +258,17 @@ const generateLoot = (rewards, rollResult, outcomeTier) => {
     }
   }
 
+  // Healing rewards (from healer encounters)
+  if (encounter?.healingByTier) {
+    const healingFormula = encounter.healingByTier[outcomeTier];
+    if (healingFormula === 'full') {
+      loot.healing = 'full';  // Will be handled in Game.js to restore to max HP
+    } else if (healingFormula) {
+      const healRoll = parseDiceFormulaWithBonus(healingFormula);
+      loot.healing = rollDice(healRoll.count, healRoll.sides) + healRoll.bonus;
+    }
+  }
+
   return loot;
 };
 
@@ -266,6 +283,21 @@ const parseDiceFormula = (formula) => {
   return {
     count: parseInt(match[1]),
     sides: parseInt(match[2])
+  };
+};
+
+/**
+ * Parses dice formula with optional bonus like "2d8+4" into {count, sides, bonus}
+ */
+const parseDiceFormulaWithBonus = (formula) => {
+  const match = formula.match(/(\d+)d(\d+)(?:\+(\d+))?/);
+  if (!match) {
+    return { count: 1, sides: 6, bonus: 0 };
+  }
+  return {
+    count: parseInt(match[1]),
+    sides: parseInt(match[2]),
+    bonus: match[3] ? parseInt(match[3]) : 0
   };
 };
 

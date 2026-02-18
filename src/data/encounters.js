@@ -323,12 +323,18 @@ export const encounterTemplates = {
       { label: 'Trade Knowledge', skill: 'Medicine', description: 'Exchange medical knowledge' },
       { label: 'Decline', skill: null, description: 'Thank them and move on' }
     ],
-    rewards: { xp: 15, gold: '0', items: ['healing_potion:70%', 'antidote:40%', 'herbal_remedy:50%'] },
+    rewards: { xp: 15, gold: '0', items: ['healing_potion:70%', 'antidote:40%', 'herbal_remedy:50%'], healing: '2d8+4' },
     consequences: {
       criticalSuccess: 'The healer mends your wounds completely and gifts you a powerful restorative.',
-      success: 'You receive helpful treatment and affordable potions.',
-      failure: 'The healer is busy but offers a minor remedy.',
-      criticalFailure: 'The healer\'s remedy has an unpleasant side effect, though it wears off.'
+      success: 'You receive helpful treatment and your wounds begin to close.',
+      failure: 'The healer is busy but applies a minor salve to your wounds.',
+      criticalFailure: 'The healer\'s remedy stings painfully, though it does provide minor relief.'
+    },
+    healingByTier: {
+      criticalSuccess: 'full',  // Full heal
+      success: '2d8+4',         // Good healing
+      failure: '1d4',           // Minor healing
+      criticalFailure: '1d4'    // Minor healing despite side effects
     }
   },
 
