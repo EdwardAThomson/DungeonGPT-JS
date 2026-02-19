@@ -720,6 +720,42 @@ const Game = () => {
                   </div>
                 )}
                 
+                {/* XP Bar */}
+                <div style={{ margin: '8px 0', padding: '8px', background: 'var(--surface-light)', borderRadius: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                    <span style={{ fontWeight: 'bold' }}>XP:</span>
+                    <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>
+                      {hero.xp || 0} (Lvl {hero.level || 1})
+                    </span>
+                  </div>
+                  <div style={{ 
+                    width: '100%', 
+                    height: '8px', 
+                    background: '#2c3e50', 
+                    borderRadius: '4px', 
+                    overflow: 'hidden'
+                  }}>
+                    {(() => {
+                      const xp = hero.xp || 0;
+                      const level = hero.level || 1;
+                      const XP_THRESHOLDS = [0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000];
+                      const currentThreshold = XP_THRESHOLDS[level - 1] || 0;
+                      const nextThreshold = XP_THRESHOLDS[level] || XP_THRESHOLDS[level - 1];
+                      const progress = nextThreshold > currentThreshold 
+                        ? ((xp - currentThreshold) / (nextThreshold - currentThreshold)) * 100 
+                        : 100;
+                      return (
+                        <div style={{ 
+                          width: `${Math.min(100, progress)}%`, 
+                          height: '100%', 
+                          background: 'linear-gradient(90deg, #f39c12, #f1c40f)',
+                          transition: 'width 0.5s ease'
+                        }} />
+                      );
+                    })()}
+                  </div>
+                </div>
+                
                 <div style={{ textAlign: 'center', marginTop: '5px' }}>
                   <button
                     className="view-details-btn"

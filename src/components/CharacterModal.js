@@ -1,5 +1,6 @@
 import React from 'react';
 import { calculateMaxHP, getHPStatus } from '../utils/healthSystem';
+import { getLevelProgress, calculateLevel } from '../utils/progressionSystem';
 
 const CharacterModal = ({ isOpen, onClose, character }) => {
     if (!isOpen || !character) return null;
@@ -73,6 +74,43 @@ const CharacterModal = ({ isOpen, onClose, character }) => {
                                 <p style={{ fontSize: '12px', color: status.color, margin: '6px 0 0', fontStyle: 'italic' }}>
                                     {status.description}
                                 </p>
+                            </div>
+                        </div>
+                    );
+                })()}
+
+                {(() => {
+                    const xp = character.xp || 0;
+                    const level = character.level || calculateLevel(xp);
+                    const progress = getLevelProgress(xp);
+                    return (
+                        <div className="modal-section">
+                            <h4>Experience</h4>
+                            <div className="character-xp-display">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                    <span><strong>Level {level}</strong></span>
+                                    <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>{xp} XP</span>
+                                </div>
+                                {!progress.isMaxLevel ? (
+                                    <>
+                                        <div className="character-hp-bar" style={{ background: '#2c3e50' }}>
+                                            <div style={{ 
+                                                width: `${progress.percentage}%`,
+                                                height: '100%',
+                                                background: 'linear-gradient(90deg, #f39c12, #f1c40f)',
+                                                borderRadius: '4px',
+                                                transition: 'width 0.5s ease'
+                                            }} />
+                                        </div>
+                                        <p style={{ fontSize: '12px', color: '#95a5a6', margin: '6px 0 0' }}>
+                                            {progress.current} / {progress.required} XP to next level ({progress.percentage}%)
+                                        </p>
+                                    </>
+                                ) : (
+                                    <p style={{ fontSize: '12px', color: '#f1c40f', margin: '6px 0 0', fontStyle: 'italic' }}>
+                                        ⭐ Maximum Level Reached!
+                                    </p>
+                                )}
                             </div>
                         </div>
                     );
