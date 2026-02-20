@@ -53,6 +53,7 @@ Thumbs.db
 temp/
 new_temp/
 *.gemini-sandbox
+temp/server1.js
 
 # Special docs
 docs/deployment_*.md

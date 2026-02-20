@@ -939,8 +939,8 @@ export const encounterTemplates = {
     }
   },
 
-  'mountain_hermit': {
-    name: 'Mountain Hermit',
+  'mountain_hermit_cave': {
+    name: 'Mountain Cave Hermit',
     icon: '🧙',
     encounterTier: 'narrative',
     poiType: 'mountain',
