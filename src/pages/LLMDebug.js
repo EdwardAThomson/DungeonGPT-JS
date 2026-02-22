@@ -1,8 +1,9 @@
 import React, { useState, useRef, useContext } from 'react';
 import SettingsContext from '../contexts/SettingsContext';
 import { DM_PROTOCOL } from '../data/prompts';
+import { apiFetch, buildApiUrl } from '../services/apiClient';
 
-const API_URL = 'http://localhost:5000/api/llm';
+const API_PATH = '/api/llm';
 
 // ── Shared styles ──
 const card = { background: '#1e1e2e', border: '1px solid #333', borderRadius: 8, padding: 16, marginBottom: 20 };
@@ -50,7 +51,7 @@ const LLMDebug = () => {
   const runTest1 = async () => {
     setT1Running(true); setT1Status(null);
     try {
-      const resp = await fetch(`${API_URL}/tasks`, {
+      const resp = await apiFetch(`${API_PATH}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ backend: 'gemini', prompt: 'Say hello', model }),
@@ -62,7 +63,7 @@ const LLMDebug = () => {
         setT1Status({ ok: true, msg: `Server is reachable. Task created: ${data.id} (status: ${data.status})`, taskId: data.id });
       }
     } catch (e) {
-      setT1Status({ ok: false, msg: `Cannot reach server at ${API_URL}. Error: ${e.message}\n\nMake sure the backend is running: node src/server.js` });
+      setT1Status({ ok: false, msg: `Cannot reach server at ${buildApiUrl(API_PATH)}. Error: ${e.message}\n\nMake sure the backend is running: node src/server.js` });
     }
     setT1Running(false);
   };
@@ -78,7 +79,7 @@ const LLMDebug = () => {
     // Create task first
     let id;
     try {
-      const resp = await fetch(`${API_URL}/tasks`, {
+      const resp = await apiFetch(`${API_PATH}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ backend: 'gemini', prompt: 'Say the word "pineapple" and nothing else.', model }),
@@ -93,7 +94,7 @@ const LLMDebug = () => {
 
     const events = [];
     let responseText = '';
-    const es = new EventSource(`${API_URL}/tasks/${id}/stream`);
+    const es = new EventSource(buildApiUrl(`${API_PATH}/tasks/${id}/stream`));
     t2EsRef.current = es;
     let gotDone = false;
 
@@ -162,7 +163,7 @@ const LLMDebug = () => {
 
     let id;
     try {
-      const resp = await fetch(`${API_URL}/tasks`, {
+      const resp = await apiFetch(`${API_PATH}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ backend: 'gemini', prompt, model }),
@@ -175,7 +176,7 @@ const LLMDebug = () => {
       return;
     }
 
-    const es = new EventSource(`${API_URL}/tasks/${id}/stream`);
+    const es = new EventSource(buildApiUrl(`${API_PATH}/tasks/${id}/stream`));
     let fullText = '';
     let gotDone = false;
     const events = [];
@@ -235,7 +236,7 @@ const LLMDebug = () => {
 
     let id;
     try {
-      const resp = await fetch(`${API_URL}/tasks`, {
+      const resp = await apiFetch(`${API_PATH}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ backend: 'gemini', prompt, model }),
@@ -248,7 +249,7 @@ const LLMDebug = () => {
       return;
     }
 
-    const es = new EventSource(`${API_URL}/tasks/${id}/stream`);
+    const es = new EventSource(buildApiUrl(`${API_PATH}/tasks/${id}/stream`));
     let fullText = '';
     let gotDone = false;
 
@@ -365,7 +366,7 @@ const LLMDebug = () => {
     return new Promise(async (resolve, reject) => {
       let id;
       try {
-        const resp = await fetch(`${API_URL}/tasks`, {
+        const resp = await apiFetch(`${API_PATH}/tasks`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ backend: 'gemini', prompt, model }),
@@ -374,7 +375,7 @@ const LLMDebug = () => {
         id = data.id;
       } catch (e) { reject(e); return; }
 
-      const es = new EventSource(`${API_URL}/tasks/${id}/stream`);
+      const es = new EventSource(buildApiUrl(`${API_PATH}/tasks/${id}/stream`));
       let fullText = '';
       let done = false;
       es.onmessage = (event) => {

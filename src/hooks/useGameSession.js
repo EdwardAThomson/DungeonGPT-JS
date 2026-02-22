@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { conversationsApi } from '../services/conversationsApi';
 
 const useGameSession = (loadedConversation, setSettings, setSelectedProvider, setSelectedModel, gameSessionId = null) => {
     // Session ID priority: loadedConversation > navigation state > localStorage > generate new
@@ -64,25 +65,12 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
         try {
             console.log('[SAVE] Starting save operation...');
             // Adjust URL to your backend endpoint
-            const response = await fetch('http://localhost:5000/api/conversations', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    sessionId: currentSessionId,
-                    timestamp: new Date().toISOString(),
-                    conversationName: `Adventure - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
-                    ...gameState // spread the rest of the game state
-                }),
+            const result = await conversationsApi.save({
+                sessionId: currentSessionId,
+                timestamp: new Date().toISOString(),
+                conversationName: `Adventure - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
+                ...gameState // spread the rest of the game state
             });
-
-            if (!response.ok) {
-                const errorData = await response.text();
-                throw new Error(`Failed to save conversation: ${response.statusText} - ${errorData}`);
-            }
-
-            const result = await response.json();
             console.log('Conversation saved successfully:', result);
 
         } catch (error) {

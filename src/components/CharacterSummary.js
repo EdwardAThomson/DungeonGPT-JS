@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { downloadJSONFile } from "../utils/fileHelper";
 import CharacterContext from "../contexts/CharacterContext";
 import { calculateMaxHP, getHPStatus } from "../utils/healthSystem";
+import { charactersApi } from "../services/charactersApi";
 
 const CharacterSummary = () => {
   const { characters, setCharacters } = useContext(CharacterContext);
@@ -21,11 +22,6 @@ const CharacterSummary = () => {
 
     // Determine endpoint and method based on whether it's an edit or add
     const isUpdate = isEditing;
-    const method = isUpdate ? 'PUT' : 'POST';
-    const endpoint = isUpdate
-      ? `http://localhost:5000/characters/${newCharacter.characterId}`
-      : 'http://localhost:5000/characters';
-
     // Update local context/state first for immediate UI feedback
     let updatedCharacters;
     if (isUpdate) {
@@ -41,25 +37,14 @@ const CharacterSummary = () => {
 
     // Attempt to save/update on the server
     try {
-      const response = await fetch(endpoint, {
-        method: method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newCharacter),
-      });
+      const result = isUpdate
+        ? await charactersApi.update(newCharacter.characterId, newCharacter)
+        : await charactersApi.create(newCharacter);
 
-      const result = await response.json();
-      if (response.ok) {
-        console.log(`Character ${isUpdate ? 'updated' : 'added'} in database. Response:`, result);
-        alert(`Character ${isUpdate ? 'updated' : 'added'} successfully`);
-        // Proceed with navigation after successful save/update
-        handleProgress(updatedCharacters); // Pass updated characters to navigate function
-      } else {
-        // Handle server error - maybe revert context state?
-        console.error("Server error:", result);
-        throw new Error(result.message || 'Unknown server error');
-      }
+      console.log(`Character ${isUpdate ? 'updated' : 'added'} in database. Response:`, result);
+      alert(`Character ${isUpdate ? 'updated' : 'added'} successfully`);
+      // Proceed with navigation after successful save/update
+      handleProgress(updatedCharacters); // Pass updated characters to navigate function
     } catch (error) {
       console.error(`Error ${isUpdate ? 'updating' : 'adding'} character in DB:`, error);
       alert(`Failed to ${isUpdate ? 'update' : 'add'} character in database: ${error.message}. Changes applied locally only.`);

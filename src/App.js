@@ -1,7 +1,7 @@
 // App.js
 
-import React, { useState, useContext } from "react";
-import { BrowserRouter as Router, Route, Link, Routes } from "react-router-dom";
+import React, { useState, useContext, Suspense, lazy } from "react";
+import { BrowserRouter as Router, Route, Link, Routes, Navigate } from "react-router-dom";
 import CharacterCreation from "./pages/CharacterCreation";
 import CharacterSummary from "./components/CharacterSummary";
 import AllCharacters from "./pages/AllCharacters";
@@ -10,29 +10,20 @@ import GameSettings from "./pages/GameSettings";
 import HeroSelection from './pages/HeroSelection';
 import Game from './pages/Game';
 import SavedConversations from './pages/SavedConversations';
-import TownMapTest from './pages/TownMapTest';
-import DiceTest from './pages/DiceTest';
-import NPCTest from './pages/NPCTest';
-import SeedDebugTest from './pages/SeedDebugTest';
-import WorldMapTest from './pages/WorldMapTest';
-import TerrainStudio from './pages/TerrainStudio.js';
-import TerrainStudioV2 from './pages/TerrainStudioV2';
-import MilestoneTest from './pages/MilestoneTest';
-import EncounterTest from './pages/EncounterTest';
-import ProgressionTest from './pages/ProgressionTest';
-import LLMDebug from './pages/LLMDebug';
-import ConversationManager from './pages/ConversationManager';
-import EncounterDebug from './pages/EncounterDebug';
 
 import "./App.css";
 
 import DebugMenu from './components/DebugMenu';
 import SettingsContext from "./contexts/SettingsContext";
 import { AISettingsModalContent } from "./components/Modals";
+import ErrorBoundary from "./components/ErrorBoundary";
+
+const DebugRoutes = lazy(() => import('./pages/DebugRoutes'));
 
 const App = () => {
   const [characters, setCharacters] = useState([]);
   const [editingCharacterIndex, setEditingCharacterIndex] = useState(null);
+  const isDebugEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEBUG_ROUTES === 'true';
 
   const {
     settings,
@@ -86,51 +77,44 @@ const App = () => {
 
         {/* === Add this wrapper div === */}
         <div className="main-content">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route
-              path="/character-creation"
-              element={
-                <CharacterCreation
-                  // Pass necessary props
-                  // Note: characters/setCharacters defined here are passed down,
-                  // but CharacterContext is also used inside? Might need cleanup later.
-                  characters={characters}
-                  setCharacters={setCharacters}
-                  editingCharacterIndex={editingCharacterIndex}
-                  setEditingCharacterIndex={setEditingCharacterIndex}
+          <ErrorBoundary>
+            <Suspense fallback={<div className="page-container">Loading...</div>}>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route
+                  path="/character-creation"
+                  element={
+                    <CharacterCreation
+                      // Pass necessary props
+                      // Note: characters/setCharacters defined here are passed down,
+                      // but CharacterContext is also used inside? Might need cleanup later.
+                      characters={characters}
+                      setCharacters={setCharacters}
+                      editingCharacterIndex={editingCharacterIndex}
+                      setEditingCharacterIndex={setEditingCharacterIndex}
+                    />
+                  }
                 />
-              }
-            />
-            <Route
-              path="/character-summary"
-              element={<CharacterSummary characters={characters} setCharacters={setCharacters} />}
-            />
-            <Route
-              path="/all-characters"
-              element={<AllCharacters characters={characters} setEditingCharacterIndex={setEditingCharacterIndex} />}
-            />
-            <Route path="/game-settings" element={<GameSettings />} />
-            <Route path="/hero-selection" element={<HeroSelection />} />
-            <Route path="/game" element={<Game />} />
-            <Route path="/saved-conversations" element={<SavedConversations />} />
-            <Route path="/town-map-test" element={<TownMapTest />} />
-            <Route path="/dice-test" element={<DiceTest />} />
-            <Route path="/npc-test" element={<NPCTest />} />
-            <Route path="/seed-debug-test" element={<SeedDebugTest />} />
-            <Route path="/world-map-test" element={<WorldMapTest />} />
-            <Route path="/terrain-studio" element={<TerrainStudio />} />
-            <Route path="/terrain-studio-v2" element={<TerrainStudioV2 />} />
-            <Route path="/milestone-test" element={<MilestoneTest />} />
-            <Route path="/encounter-test" element={<EncounterTest />} />
-            <Route path="/progression-test" element={<ProgressionTest />} />
-            <Route path="/llm-debug" element={<LLMDebug />} />
-            <Route path="/conversation-manager" element={<ConversationManager />} />
-            <Route path="/encounter-debug" element={<EncounterDebug />} />
-          </Routes>
+                <Route
+                  path="/character-summary"
+                  element={<CharacterSummary characters={characters} setCharacters={setCharacters} />}
+                />
+                <Route
+                  path="/all-characters"
+                  element={<AllCharacters characters={characters} setEditingCharacterIndex={setEditingCharacterIndex} />}
+                />
+                <Route path="/game-settings" element={<GameSettings />} />
+                <Route path="/hero-selection" element={<HeroSelection />} />
+                <Route path="/game" element={<Game />} />
+                <Route path="/saved-conversations" element={<SavedConversations />} />
+                {isDebugEnabled && <Route path="/debug/*" element={<DebugRoutes />} />}
+                {!isDebugEnabled && <Route path="/debug/*" element={<Navigate to="/" replace />} />}
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </div>
 
-        <DebugMenu />
+        {isDebugEnabled && <DebugMenu />}
       </div>
     </Router>
   );

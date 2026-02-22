@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import CharacterContext from '../contexts/CharacterContext';
 import SettingsContext from '../contexts/SettingsContext';
 import { initializeHP } from '../utils/healthSystem';
+import { charactersApi } from '../services/charactersApi';
 
 const HeroSelection = () => {
   const { state } = useLocation();
@@ -24,11 +25,7 @@ const HeroSelection = () => {
   useEffect(() => {
     const fetchCharacters = async () => {
       try {
-        const response = await fetch('http://localhost:5000/characters');
-        if (!response.ok) {
-          throw new Error(`Failed to fetch characters: ${response.statusText}`);
-        }
-        const data = await response.json();
+        const data = await charactersApi.list();
         setCharacters(data);
       } catch (error) {
         console.error('Error fetching characters:', error);

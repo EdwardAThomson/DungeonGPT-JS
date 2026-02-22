@@ -1,29 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-const renderMarkdown = (text) => {
-  if (!text) return '';
-  
-  let html = text;
-  
-  // Bold: **text** or __text__
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
-  
-  // Italic: *text* or _text_
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/_(.+?)_/g, '<em>$1</em>');
-  
-  // Headers: # Header
-  html = html.replace(/^### (.+)$/gm, '<h3 style="margin: 10px 0 5px 0; color: #64b5f6;">$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2 style="margin: 12px 0 6px 0; color: #64b5f6;">$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1 style="margin: 15px 0 8px 0; color: #64b5f6;">$1</h1>');
-  
-  // Line breaks
-  html = html.replace(/\n/g, '<br/>');
-  
-  return html;
-};
+import { conversationsApi } from '../services/conversationsApi';
+import SafeMarkdownMessage from '../components/SafeMarkdownMessage';
 
 const ConversationManager = () => {
   const navigate = useNavigate();
@@ -41,9 +19,7 @@ const ConversationManager = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('http://localhost:5000/api/conversations');
-      if (!response.ok) throw new Error('Failed to load conversations');
-      const data = await response.json();
+      const data = await conversationsApi.list();
       setConversations(data);
     } catch (err) {
       setError(err.message);
@@ -56,9 +32,7 @@ const ConversationManager = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`http://localhost:5000/api/conversations/${convId}`);
-      if (!response.ok) throw new Error('Failed to load conversation');
-      const data = await response.json();
+      const data = await conversationsApi.getById(convId);
       setMessages(data.conversation_data || []);
       setSelectedConvId(convId);
     } catch (err) {
@@ -74,14 +48,7 @@ const ConversationManager = () => {
     const updatedMessages = messages.filter((_, idx) => idx !== messageIndex);
     
     try {
-      const response = await fetch(`http://localhost:5000/api/conversations/${selectedConvId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_data: updatedMessages })
-      });
-      
-      if (!response.ok) throw new Error('Failed to update conversation');
-      
+      await conversationsApi.updateMessages(selectedConvId, updatedMessages);
       setMessages(updatedMessages);
     } catch (err) {
       setError(err.message);
@@ -92,14 +59,7 @@ const ConversationManager = () => {
     if (!selectedConvId || !window.confirm('Delete ALL messages from this conversation?')) return;
     
     try {
-      const response = await fetch(`http://localhost:5000/api/conversations/${selectedConvId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation_data: [] })
-      });
-      
-      if (!response.ok) throw new Error('Failed to clear conversation');
-      
+      await conversationsApi.updateMessages(selectedConvId, []);
       setMessages([]);
     } catch (err) {
       setError(err.message);
@@ -110,12 +70,7 @@ const ConversationManager = () => {
     if (!window.confirm('Delete this entire conversation? This cannot be undone.')) return;
     
     try {
-      const response = await fetch(`http://localhost:5000/api/conversations/${convId}`, {
-        method: 'DELETE'
-      });
-      
-      if (!response.ok) throw new Error('Failed to delete conversation');
-      
+      await conversationsApi.remove(convId);
       if (selectedConvId === convId) {
         setSelectedConvId(null);
         setMessages([]);
@@ -310,8 +265,9 @@ const ConversationManager = () => {
                             color: '#e0e0e0',
                             wordBreak: 'break-word'
                           }}
-                          dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-                        />
+                        >
+                          <SafeMarkdownMessage content={msg.content} />
+                        </div>
                       </div>
                     ))}
                   </div>

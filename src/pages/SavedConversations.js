@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { conversationsApi } from '../services/conversationsApi';
 
 const SavedConversations = () => {
   const [conversations, setConversations] = useState([]);
@@ -30,11 +31,7 @@ const SavedConversations = () => {
   const fetchConversations = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/conversations');
-      if (!response.ok) {
-        throw new Error('Failed to fetch conversations');
-      }
-      const data = await response.json();
+      const data = await conversationsApi.list();
       console.log('Fetched conversations:', data);
       if (data.length > 0) {
         console.log('First conversation model field:', data[0]?.model);
@@ -61,12 +58,7 @@ const SavedConversations = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:5000/api/conversations/${sessionId}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        throw new Error('Failed to delete conversation');
-      }
+      await conversationsApi.remove(sessionId);
       // Remove from local state
       setConversations(conversations.filter(conv => conv.sessionId !== sessionId));
     } catch (err) {
@@ -76,16 +68,7 @@ const SavedConversations = () => {
 
   const updateConversationName = async (sessionId, conversationName) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/conversations/${sessionId}/name`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ conversationName }),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to update conversation name');
-      }
+      await conversationsApi.updateName(sessionId, conversationName);
       // Update local state
       setConversations(conversations.map(conv =>
         conv.sessionId === sessionId
@@ -101,11 +84,7 @@ const SavedConversations = () => {
 
   const loadConversation = async (sessionId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/conversations/${sessionId}`);
-      if (!response.ok) {
-        throw new Error('Failed to load conversation');
-      }
-      const conversationData = await response.json();
+      const conversationData = await conversationsApi.getById(sessionId);
 
       // Navigate to game with the loaded conversation data
       navigate('/game', {

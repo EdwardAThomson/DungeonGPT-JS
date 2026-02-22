@@ -7,10 +7,238 @@ const runner = require('./llm/runner/runner');
 
 dotenv.config();
 
-const app = express();
-const port = 5000;
+if (process.env.NODE_ENV === 'production' && process.env.ENABLE_SERVER_CONSOLE_LOGS !== 'true') {
+  console.log = () => {};
+}
 
-app.use(cors());
+const app = express();
+const port = Number(process.env.PORT || 5000);
+const isProduction = process.env.NODE_ENV === 'production';
+
+const sendError = (res, status, message, details = null) => {
+  const payload = { error: { message } };
+  if (details) payload.error.details = details;
+  return res.status(status).json(payload);
+};
+
+const parseCsv = (value) => (value || '')
+  .split(',')
+  .map((v) => v.trim())
+  .filter(Boolean);
+
+const corsAllowedOrigins = parseCsv(process.env.CORS_ALLOWED_ORIGINS);
+const defaultDevOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+const effectiveAllowedOrigins = corsAllowedOrigins.length > 0
+  ? corsAllowedOrigins
+  : (isProduction ? [] : defaultDevOrigins);
+
+const corsOptions = {
+  origin(origin, callback) {
+    // Allow non-browser requests (curl/postman/server-to-server)
+    if (!origin) return callback(null, true);
+    if (effectiveAllowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Origin not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Token'],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+
+const isNonEmptyString = (value) => typeof value === 'string' && value.trim().length > 0;
+const isPlainObject = (value) => typeof value === 'object' && value !== null && !Array.isArray(value);
+const isFiniteNumber = (value) => typeof value === 'number' && Number.isFinite(value);
+
+const buildValidationError = (res, errors) => sendError(res, 400, 'Validation failed', errors);
+
+const requireApiAuth = process.env.REQUIRE_API_AUTH === 'true';
+const apiAuthToken = process.env.API_AUTH_TOKEN || '';
+
+const extractAuthToken = (req) => {
+  const headerToken = req.get('x-api-token');
+  if (isNonEmptyString(headerToken)) return headerToken.trim();
+
+  const authHeader = req.get('authorization');
+  if (isNonEmptyString(authHeader) && authHeader.startsWith('Bearer ')) {
+    return authHeader.slice(7).trim();
+  }
+  return '';
+};
+
+const requireApiAuthMiddleware = (req, res, next) => {
+  if (!requireApiAuth) return next();
+  if (!apiAuthToken) {
+    return sendError(res, 500, 'Server auth is enabled but API_AUTH_TOKEN is missing.');
+  }
+  const providedToken = extractAuthToken(req);
+  if (!providedToken || providedToken !== apiAuthToken) {
+    return sendError(res, 401, 'Unauthorized');
+  }
+  return next();
+};
+
+const validateCharacterPayload = (payload) => {
+  const errors = [];
+
+  if (!isPlainObject(payload)) {
+    return ['Request body must be a JSON object.'];
+  }
+
+  const requiredStringFields = [
+    'characterId',
+    'characterName',
+    'characterGender',
+    'profilePicture',
+    'characterRace',
+    'characterClass',
+    'characterBackground',
+    'characterAlignment'
+  ];
+
+  requiredStringFields.forEach((field) => {
+    if (!isNonEmptyString(payload[field])) {
+      errors.push(`${field} must be a non-empty string.`);
+    }
+  });
+
+  if (!Number.isInteger(payload.characterLevel) || payload.characterLevel < 1 || payload.characterLevel > 20) {
+    errors.push('characterLevel must be an integer between 1 and 20.');
+  }
+
+  if (!isPlainObject(payload.stats)) {
+    errors.push('stats must be an object.');
+  } else {
+    const requiredStats = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
+    requiredStats.forEach((statKey) => {
+      if (!isFiniteNumber(payload.stats[statKey])) {
+        errors.push(`stats.${statKey} must be a number.`);
+      }
+    });
+  }
+
+  return errors;
+};
+
+const validateConversationSavePayload = (payload) => {
+  const errors = [];
+  if (!isPlainObject(payload)) {
+    return ['Request body must be a JSON object.'];
+  }
+
+  if (!isNonEmptyString(payload.sessionId)) {
+    errors.push('sessionId must be a non-empty string.');
+  }
+  if (!Array.isArray(payload.conversation)) {
+    errors.push('conversation must be an array.');
+  }
+  if (payload.timestamp && Number.isNaN(Date.parse(payload.timestamp))) {
+    errors.push('timestamp must be a valid ISO datetime string.');
+  }
+  if (payload.provider && !isNonEmptyString(payload.provider)) {
+    errors.push('provider must be a non-empty string when provided.');
+  }
+  if (payload.model && !isNonEmptyString(payload.model)) {
+    errors.push('model must be a non-empty string when provided.');
+  }
+  if (payload.conversationName && !isNonEmptyString(payload.conversationName)) {
+    errors.push('conversationName must be a non-empty string when provided.');
+  }
+  if (payload.gameSettings && !isPlainObject(payload.gameSettings)) {
+    errors.push('gameSettings must be an object when provided.');
+  }
+  if (payload.selectedHeroes && !Array.isArray(payload.selectedHeroes)) {
+    errors.push('selectedHeroes must be an array when provided.');
+  }
+  if (payload.worldMap && !Array.isArray(payload.worldMap)) {
+    errors.push('worldMap must be an array when provided.');
+  }
+  if (payload.playerPosition) {
+    if (!isPlainObject(payload.playerPosition)) {
+      errors.push('playerPosition must be an object when provided.');
+    } else {
+      if (!isFiniteNumber(payload.playerPosition.x) || !isFiniteNumber(payload.playerPosition.y)) {
+        errors.push('playerPosition.x and playerPosition.y must be numbers.');
+      }
+    }
+  }
+  if (payload.sub_maps && !isPlainObject(payload.sub_maps)) {
+    errors.push('sub_maps must be an object when provided.');
+  }
+  if (payload.subMaps && !isPlainObject(payload.subMaps)) {
+    errors.push('subMaps must be an object when provided.');
+  }
+
+  return errors;
+};
+
+const validateConversationMessagesPayload = (payload) => {
+  if (!isPlainObject(payload) || !Array.isArray(payload.conversation_data)) {
+    return ['conversation_data is required and must be an array.'];
+  }
+  return [];
+};
+
+const validateConversationNamePayload = (payload) => {
+  const errors = [];
+  if (!isPlainObject(payload) || !isNonEmptyString(payload.conversationName)) {
+    errors.push('conversationName is required and must be a non-empty string.');
+  } else if (payload.conversationName.trim().length > 140) {
+    errors.push('conversationName must be 140 characters or fewer.');
+  }
+  return errors;
+};
+
+const validateLlmGeneratePayload = (payload) => {
+  const errors = [];
+  const allowedProviders = ['openai', 'gemini', 'claude'];
+  if (!isPlainObject(payload)) return ['Request body must be a JSON object.'];
+  if (!allowedProviders.includes(payload.provider)) {
+    errors.push(`provider must be one of: ${allowedProviders.join(', ')}.`);
+  }
+  if (!isNonEmptyString(payload.model)) {
+    errors.push('model is required and must be a non-empty string.');
+  }
+  if (!isNonEmptyString(payload.prompt)) {
+    errors.push('prompt is required and must be a non-empty string.');
+  }
+  if (payload.maxTokens !== undefined && (!Number.isInteger(payload.maxTokens) || payload.maxTokens <= 0 || payload.maxTokens > 8000)) {
+    errors.push('maxTokens must be an integer between 1 and 8000 when provided.');
+  }
+  if (payload.temperature !== undefined && (!isFiniteNumber(payload.temperature) || payload.temperature < 0 || payload.temperature > 2)) {
+    errors.push('temperature must be a number between 0 and 2 when provided.');
+  }
+  return errors;
+};
+
+const validateLlmTaskPayload = (payload) => {
+  const errors = [];
+  const allowedBackends = ['codex', 'claude', 'gemini', 'claude-cli', 'gemini-cli'];
+  if (!isPlainObject(payload)) return ['Request body must be a JSON object.'];
+  if (!allowedBackends.includes(payload.backend)) {
+    errors.push(`backend must be one of: ${allowedBackends.join(', ')}.`);
+  }
+  if (!isNonEmptyString(payload.prompt)) {
+    errors.push('prompt is required and must be a non-empty string.');
+  }
+  if (payload.cwd !== undefined && !isNonEmptyString(payload.cwd)) {
+    errors.push('cwd must be a non-empty string when provided.');
+  }
+  if (payload.model !== undefined && !isNonEmptyString(payload.model)) {
+    errors.push('model must be a non-empty string when provided.');
+  }
+  return errors;
+};
+
+app.use(cors(corsOptions));
+app.use((err, req, res, next) => {
+  if (err && err.message === 'Origin not allowed by CORS') {
+    return sendError(res, 403, err.message);
+  }
+  return next(err);
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -149,6 +377,12 @@ const db = new sqlite3.Database('./src/game.db', (err) => {
 // Define routes
 // These are the API methods
 
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, service: 'dungeongpt-js-api' });
+});
+
+app.use(['/characters', '/api/conversations', '/api/llm'], requireApiAuthMiddleware);
+
 
 /* // First route: a route to add a new character
   0. characterId
@@ -159,6 +393,11 @@ const db = new sqlite3.Database('./src/game.db', (err) => {
 
 // Route to add a new character
 app.post('/characters', (req, res) => {
+  const validationErrors = validateCharacterPayload(req.body);
+  if (validationErrors.length > 0) {
+    return buildValidationError(res, validationErrors);
+  }
+
   const { characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, stats } = req.body;
   console.log('Adding character:', [characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, JSON.stringify(stats)]);
 
@@ -168,7 +407,7 @@ app.post('/characters', (req, res) => {
   db.run(query, params, function (err) {
     if (err) {
       console.error('Error adding character', err);
-      res.status(500).json({ error: 'Failed to add character' });
+      return sendError(res, 500, 'Failed to add character');
     } else {
       res.json({ id: this.lastID });
     }
@@ -178,6 +417,19 @@ app.post('/characters', (req, res) => {
 // Route to update an existing character
 app.put('/characters/:characterId', (req, res) => {
   const { characterId } = req.params;
+  if (!isNonEmptyString(characterId)) {
+    return buildValidationError(res, ['characterId route parameter is required.']);
+  }
+
+  const validationErrors = validateCharacterPayload(req.body);
+  if (validationErrors.length > 0) {
+    return buildValidationError(res, validationErrors);
+  }
+
+  if (req.body.characterId !== characterId) {
+    return buildValidationError(res, ['characterId in body must match route parameter.']);
+  }
+
   const { characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, stats } = req.body;
 
   console.log('Updating character:', characterId, [characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, JSON.stringify(stats)]);
@@ -211,9 +463,9 @@ app.put('/characters/:characterId', (req, res) => {
   db.run(query, params, function (err) {
     if (err) {
       console.error('Error updating character', err);
-      res.status(500).json({ error: 'Failed to update character' });
+      return sendError(res, 500, 'Failed to update character');
     } else if (this.changes === 0) {
-      res.status(404).json({ error: 'Character not found' });
+      return sendError(res, 404, 'Character not found');
     } else {
       res.json({ message: 'Character updated successfully' });
     }
@@ -227,7 +479,7 @@ app.get('/characters', (req, res) => {
 
     if (err) {
       console.error('Error retrieving characters', err);
-      res.status(500).json({ error: 'Failed to retrieve characters' });
+      return sendError(res, 500, 'Failed to retrieve characters');
     } else {
 
       //old res.json(rows);
@@ -244,44 +496,6 @@ app.get('/characters', (req, res) => {
 
 });
 
-
-app.post('/conversation', (req, res) => {
-
-  const query = `
-    INSERT INTO conversations (conversation_id, conversation_text, summary_text, timestamp)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT (conversation_id) 
-    DO UPDATE SET 
-      conversation_text = excluded.conversation_text,
-      summary_text = excluded.summary_text,
-      timestamp = CURRENT_TIMESTAMP;
-  `;
-
-  db.run(query, [conversationId, conversationText, summaryText], (err) => {
-    if (err) {
-      console.error("Error saving conversation:", err);
-    } else {
-      console.log("Conversation saved successfully.");
-    }
-  });
-
-});
-
-
-// GET endpoint to fetch all conversations
-app.get('/conversations', (req, res) => {
-  const query = `SELECT * FROM conversations ORDER BY timestamp DESC`;
-
-  db.all(query, [], (err, rows) => {
-    if (err) {
-      console.error('Error retrieving conversations', err);
-      res.status(500).json({ error: 'Failed to retrieve conversations' });
-    } else {
-      res.json(rows);
-    }
-  });
-});
-
 // GET endpoint to fetch all conversations (API version)
 app.get('/api/conversations', (req, res) => {
   const query = `SELECT * FROM conversations ORDER BY timestamp DESC`;
@@ -289,24 +503,21 @@ app.get('/api/conversations', (req, res) => {
   db.all(query, [], (err, rows) => {
     if (err) {
       console.error('Error retrieving conversations', err);
-      res.status(500).json({ error: 'Failed to retrieve conversations' });
+      return sendError(res, 500, 'Failed to retrieve conversations');
     } else {
       res.json(rows);
     }
   });
 });
 
-
-
-
-app.get('/test', (req, res) => {
-  console.log("Received request for /test");
-  res.json([{ name: "Test Character" }]);
-});
-
 // --- New Conversation Saving Endpoint (SQLite Version) ---
 app.post('/api/conversations', (req, res) => {
   try {
+    const validationErrors = validateConversationSavePayload(req.body);
+    if (validationErrors.length > 0) {
+      return buildValidationError(res, validationErrors);
+    }
+
     const { sessionId, conversation, provider, model, timestamp, conversationName, gameSettings, selectedHeroes, currentSummary, worldMap, playerPosition, sub_maps, subMaps } = req.body;
     const effectiveSubMaps = sub_maps || subMaps;
 
@@ -315,12 +526,6 @@ app.post('/api/conversations', (req, res) => {
     console.log('[SERVER] Provider:', provider);
     console.log('[SERVER] Model:', model);
     console.log('[SERVER] Model type:', typeof model);
-
-    // Basic validation
-    if (!sessionId || !conversation || !Array.isArray(conversation)) {
-      return res.status(400).json({ message: 'Missing required session ID or conversation data.' });
-    }
-
     // Convert conversation array to JSON string for storage
     const conversationJson = JSON.stringify(conversation);
     const settingsJson = gameSettings ? JSON.stringify(gameSettings) : null;
@@ -366,7 +571,7 @@ app.post('/api/conversations', (req, res) => {
     db.run(query, params, function (err) {
       if (err) {
         console.error('Error saving conversation to SQLite:', err);
-        return res.status(500).json({ message: 'Server error saving conversation', error: err.message });
+        return sendError(res, 500, 'Server error saving conversation', err.message);
       }
 
       console.log(`Conversation saved/updated for session: ${sessionId}. Rows affected: ${this.changes}`);
@@ -375,22 +580,25 @@ app.post('/api/conversations', (req, res) => {
 
   } catch (error) {
     console.error('Unexpected error in /api/conversations:', error);
-    res.status(500).json({ message: 'Unexpected server error', error: error.message });
+    return sendError(res, 500, 'Unexpected server error', error.message);
   }
 });
 
 // Get a specific conversation by sessionId
 app.get('/api/conversations/:sessionId', (req, res) => {
   const { sessionId } = req.params;
+  if (!isNonEmptyString(sessionId)) {
+    return buildValidationError(res, ['sessionId route parameter is required.']);
+  }
 
   const query = `SELECT * FROM conversations WHERE sessionId = ?`;
 
   db.get(query, [sessionId], (err, row) => {
     if (err) {
       console.error('Error retrieving conversation:', err);
-      res.status(500).json({ error: 'Failed to retrieve conversation' });
+      return sendError(res, 500, 'Failed to retrieve conversation');
     } else if (!row) {
-      res.status(404).json({ error: 'Conversation not found' });
+      return sendError(res, 404, 'Conversation not found');
     } else {
       // Parse JSON fields back to objects
       const conversation = {
@@ -410,11 +618,14 @@ app.get('/api/conversations/:sessionId', (req, res) => {
 // Update conversation data (messages)
 app.put('/api/conversations/:sessionId', (req, res) => {
   const { sessionId } = req.params;
-  const { conversation_data } = req.body;
-
-  if (!conversation_data) {
-    return res.status(400).json({ message: 'conversation_data is required' });
+  if (!isNonEmptyString(sessionId)) {
+    return buildValidationError(res, ['sessionId route parameter is required.']);
   }
+  const validationErrors = validateConversationMessagesPayload(req.body);
+  if (validationErrors.length > 0) {
+    return buildValidationError(res, validationErrors);
+  }
+  const { conversation_data } = req.body;
 
   const conversationDataStr = JSON.stringify(conversation_data);
   const query = `UPDATE conversations SET conversation_data = ? WHERE sessionId = ?`;
@@ -422,9 +633,9 @@ app.put('/api/conversations/:sessionId', (req, res) => {
   db.run(query, [conversationDataStr, sessionId], function (err) {
     if (err) {
       console.error('Error updating conversation data:', err);
-      res.status(500).json({ message: 'Server error updating conversation data' });
+      return sendError(res, 500, 'Server error updating conversation data');
     } else if (this.changes === 0) {
-      res.status(404).json({ message: 'Conversation not found' });
+      return sendError(res, 404, 'Conversation not found');
     } else {
       res.json({ message: 'Conversation data updated successfully' });
     }
@@ -434,20 +645,23 @@ app.put('/api/conversations/:sessionId', (req, res) => {
 // Update conversation name
 app.put('/api/conversations/:sessionId/name', (req, res) => {
   const { sessionId } = req.params;
-  const { conversationName } = req.body;
-
-  if (!conversationName || !conversationName.trim()) {
-    return res.status(400).json({ message: 'Conversation name is required' });
+  if (!isNonEmptyString(sessionId)) {
+    return buildValidationError(res, ['sessionId route parameter is required.']);
   }
+  const validationErrors = validateConversationNamePayload(req.body);
+  if (validationErrors.length > 0) {
+    return buildValidationError(res, validationErrors);
+  }
+  const { conversationName } = req.body;
 
   const query = `UPDATE conversations SET conversation_name = ? WHERE sessionId = ?`;
 
   db.run(query, [conversationName.trim(), sessionId], function (err) {
     if (err) {
       console.error('Error updating conversation name:', err);
-      res.status(500).json({ message: 'Server error updating conversation name' });
+      return sendError(res, 500, 'Server error updating conversation name');
     } else if (this.changes === 0) {
-      res.status(404).json({ message: 'Conversation not found' });
+      return sendError(res, 404, 'Conversation not found');
     } else {
       res.json({ message: 'Conversation name updated successfully' });
     }
@@ -457,15 +671,18 @@ app.put('/api/conversations/:sessionId/name', (req, res) => {
 // Delete a conversation
 app.delete('/api/conversations/:sessionId', (req, res) => {
   const { sessionId } = req.params;
+  if (!isNonEmptyString(sessionId)) {
+    return buildValidationError(res, ['sessionId route parameter is required.']);
+  }
 
   const query = `DELETE FROM conversations WHERE sessionId = ?`;
 
   db.run(query, [sessionId], function (err) {
     if (err) {
       console.error('Error deleting conversation:', err);
-      res.status(500).json({ message: 'Server error deleting conversation' });
+      return sendError(res, 500, 'Server error deleting conversation');
     } else if (this.changes === 0) {
-      res.status(404).json({ message: 'Conversation not found' });
+      return sendError(res, 404, 'Conversation not found');
     } else {
       res.json({ message: 'Conversation deleted successfully' });
     }
@@ -476,23 +693,31 @@ app.delete('/api/conversations/:sessionId', (req, res) => {
 
 // Standard generation (SDK-based)
 app.post('/api/llm/generate', async (req, res) => {
+  const validationErrors = validateLlmGeneratePayload(req.body);
+  if (validationErrors.length > 0) {
+    return buildValidationError(res, validationErrors);
+  }
   try {
     const response = await llmBackend.generateText(req.body);
     res.json({ text: response });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 });
 
 // CLI Task Creation
 app.post('/api/llm/tasks', (req, res) => {
+  const validationErrors = validateLlmTaskPayload(req.body);
+  if (validationErrors.length > 0) {
+    return buildValidationError(res, validationErrors);
+  }
   const { backend, prompt, cwd, model } = req.body;
   try {
     const taskId = runner.createTask({ backend, prompt, cwd, model });
     res.json({ id: taskId, status: 'queued' });
   } catch (error) {
     console.error('Task creation failed:', error);
-    res.status(500).json({ error: error.message });
+    return sendError(res, 500, error.message);
   }
 });
 

@@ -59,40 +59,40 @@ const DebugMenu = () => {
                     <div style={{ fontWeight: 'bold', borderBottom: '1px solid #eee', paddingBottom: '5px', marginBottom: '5px' }}>
                         Debug Menu
                     </div>
-                    <Link to="/terrain-studio-v2" style={{ ...linkStyle, color: '#4a90e2', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
+                    <Link to="/debug/terrain-studio-v2" style={{ ...linkStyle, color: '#4a90e2', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
                         🧪 Terrain Studio V2
                     </Link>
-                    <Link to="/terrain-studio" style={linkStyle} onClick={() => setIsOpen(false)}>
+                    <Link to="/debug/terrain-studio" style={linkStyle} onClick={() => setIsOpen(false)}>
                         🧪 Terrain Studio (Old)
                     </Link>
-                    <Link to="/encounter-test" style={{ ...linkStyle, color: '#e74c3c', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
+                    <Link to="/debug/encounter-test" style={{ ...linkStyle, color: '#e74c3c', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
                         ⚔️ Encounter Test
                     </Link>
-                    <Link to="/dice-test" style={linkStyle} onClick={() => setIsOpen(false)}>
+                    <Link to="/debug/dice-test" style={linkStyle} onClick={() => setIsOpen(false)}>
                         🎲 Dice Test
                     </Link>
-                    <Link to="/town-map-test" style={linkStyle} onClick={() => setIsOpen(false)}>
+                    <Link to="/debug/town-map-test" style={linkStyle} onClick={() => setIsOpen(false)}>
                         🗺️ Map Test
                     </Link>
-                    <Link to="/npc-test" style={linkStyle} onClick={() => setIsOpen(false)}>
+                    <Link to="/debug/npc-test" style={linkStyle} onClick={() => setIsOpen(false)}>
                         👤 NPC Test
                     </Link>
-                    <Link to="/seed-debug-test" style={linkStyle} onClick={() => setIsOpen(false)}>
+                    <Link to="/debug/seed-debug-test" style={linkStyle} onClick={() => setIsOpen(false)}>
                         🌱 Seed Debug
                     </Link>
-                    <Link to="/world-map-test" style={linkStyle} onClick={() => setIsOpen(false)}>
+                    <Link to="/debug/world-map-test" style={linkStyle} onClick={() => setIsOpen(false)}>
                         🌍 World Map Test
                     </Link>
-                    <Link to="/milestone-test" style={linkStyle} onClick={() => setIsOpen(false)}>
+                    <Link to="/debug/milestone-test" style={linkStyle} onClick={() => setIsOpen(false)}>
                         🎯 Milestone Test
                     </Link>
-                    <Link to="/llm-debug" style={{ ...linkStyle, color: '#f44336', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
+                    <Link to="/debug/llm-debug" style={{ ...linkStyle, color: '#f44336', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
                         🔧 LLM Pipeline Debug
                     </Link>
-                    <Link to="/conversation-manager" style={{ ...linkStyle, color: '#64b5f6', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
+                    <Link to="/debug/conversation-manager" style={{ ...linkStyle, color: '#64b5f6', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
                         🗂️ Conversation Manager
                     </Link>
-                    <Link to="/encounter-debug" style={linkStyle} onClick={() => setIsOpen(false)}>
+                    <Link to="/debug/encounter-debug" style={linkStyle} onClick={() => setIsOpen(false)}>
                         ⚔️ Encounter Debug
                     </Link>
                 </div>

@@ -12,6 +12,7 @@ import DiceRoller from '../components/DiceRoller';
 import useGameSession from '../hooks/useGameSession';
 import useGameMap from '../hooks/useGameMap';
 import useGameInteraction from '../hooks/useGameInteraction';
+import SafeMarkdownMessage from '../components/SafeMarkdownMessage';
 import { getTile } from '../utils/mapGenerator';
 import AiAssistantPanel from '../components/AiAssistantPanel';
 import CharacterModal from '../components/CharacterModal';
@@ -20,30 +21,6 @@ import { DM_PROTOCOL } from '../data/prompts';
 import { getHPStatus, calculateMaxHP } from '../utils/healthSystem';
 import { awardXP, getLevelUpSummary } from '../utils/progressionSystem';
 import { addItem, addGold, ITEM_CATALOG } from '../utils/inventorySystem';
-
-const renderMarkdown = (text) => {
-  if (!text) return '';
-  
-  let html = text;
-  
-  // Bold: **text** or __text__
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
-  
-  // Italic: *text* or _text_
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
-  html = html.replace(/_(.+?)_/g, '<em>$1</em>');
-  
-  // Headers: # Header
-  html = html.replace(/^### (.+)$/gm, '<h3 style="margin: 10px 0 5px 0; color: var(--primary);">$1</h3>');
-  html = html.replace(/^## (.+)$/gm, '<h2 style="margin: 12px 0 6px 0; color: var(--primary);">$1</h2>');
-  html = html.replace(/^# (.+)$/gm, '<h1 style="margin: 15px 0 8px 0; color: var(--primary);">$1</h1>');
-  
-  // Line breaks
-  html = html.replace(/\n/g, '<br/>');
-  
-  return html;
-};
 
 const Game = () => {
   const { state } = useLocation();
@@ -568,11 +545,9 @@ const Game = () => {
             )}
 
             {interactionHook.conversation.map((msg, index) => (
-              <p 
-                key={index} 
-                className={`message ${msg.role}`}
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-              />
+              <div key={index} className={`message ${msg.role}`}>
+                <SafeMarkdownMessage content={msg.content} />
+              </div>
             ))}
             {interactionHook.isLoading && (
               <p className="message system">

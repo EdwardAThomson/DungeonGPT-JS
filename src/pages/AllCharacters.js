@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { downloadJSONFile } from "../utils/fileHelper";
 import CharacterContext from "../contexts/CharacterContext";
 import { calculateMaxHP, getHPStatus } from "../utils/healthSystem";
+import { charactersApi } from "../services/charactersApi";
 
 const AllCharacters = () => {
   const { characters, setCharacters, setEditingCharacterIndex } = useContext(CharacterContext);
@@ -16,12 +17,7 @@ const AllCharacters = () => {
   useEffect(() => {
     const fetchCharacters = async () => {
       try {
-        const response = await fetch('http://localhost:5000/characters');
-        if (!response.ok) {
-          // Handle non-OK responses (like 404, 500)
-          throw new Error(`Failed to fetch characters: ${response.statusText}`);
-        }
-        const data = await response.json();
+        const data = await charactersApi.list();
         setCharacters(data);
       } catch (error) {
         console.error('Error fetching characters:', error);

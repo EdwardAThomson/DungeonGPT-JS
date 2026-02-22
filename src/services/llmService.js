@@ -1,4 +1,6 @@
-const API_URL = 'http://localhost:5000/api/llm';
+import { apiFetch, buildApiUrl } from './apiClient';
+
+const API_PATH = '/api/llm';
 
 const sanitizeResponse = (text) => {
     if (!text) return '';
@@ -29,15 +31,16 @@ export const llmService = {
      * Standard text generation (non-streaming)
      */
     async generateText({ provider, model, prompt, maxTokens, temperature }) {
-        const response = await fetch(`${API_URL}/generate`, {
+        const response = await apiFetch(`${API_PATH}/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ provider, model, prompt, maxTokens, temperature }),
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || `Failed to generate text: ${response.statusText}`);
+            const error = await response.json().catch(() => null);
+            const errorMessage = error?.error?.message || error?.error || `Failed to generate text: ${response.statusText}`;
+            throw new Error(errorMessage);
         }
 
         const data = await response.json();
@@ -48,14 +51,16 @@ export const llmService = {
      * Create a streaming task (CLI based)
      */
     async createTask(backend, prompt, cwd, model) {
-        const response = await fetch(`${API_URL}/tasks`, {
+        const response = await apiFetch(`${API_PATH}/tasks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ backend, prompt, cwd, model }),
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to create task: ${response.statusText}`);
+            const error = await response.json().catch(() => null);
+            const errorMessage = error?.error?.message || error?.error || `Failed to create task: ${response.statusText}`;
+            throw new Error(errorMessage);
         }
 
         return response.json();
@@ -65,7 +70,7 @@ export const llmService = {
      * Stream output from a task using SSE
      */
     streamTask(taskId, onUpdate) {
-        const eventSource = new EventSource(`${API_URL}/tasks/${taskId}/stream`);
+        const eventSource = new EventSource(buildApiUrl(`${API_PATH}/tasks/${taskId}/stream`));
 
         eventSource.onmessage = (event) => {
             try {
