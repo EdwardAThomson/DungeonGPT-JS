@@ -151,15 +151,15 @@ export default function AiAssistantPanel({ gameState, backend, model }) {
                 borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
             }}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#d8b4fe', fontWeight: 'bold' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--state-violet-soft)', fontWeight: 'bold' }}>
                         <span>🤖 Rules & Mechanics Assistant</span>
-                        {status === 'running' && <span style={{ color: '#4ade80' }}>●</span>}
+                        {status === 'running' && <span style={{ color: 'var(--state-success)' }}>●</span>}
                     </div>
-                    <div style={{ fontSize: '9px', color: 'rgba(167, 139, 250, 0.7)', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: '9px', color: 'var(--encounter-violet-glow-50)', textTransform: 'uppercase' }}>
                         Backend: <span style={{ color: 'white' }}>{backend?.toUpperCase()}</span>
                     </div>
                 </div>
-                <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: '18px' }}>✕</button>
+                <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--state-muted)', cursor: 'pointer', fontSize: '18px' }}>✕</button>
             </div>
 
             {/* Terminal Output */}
@@ -173,11 +173,11 @@ export default function AiAssistantPanel({ gameState, backend, model }) {
                 gap: '4px'
             }}>
                 {logs.length === 0 && (
-                    <div style={{ color: '#4b5563', fontStyle: 'italic' }}>How can I help you, adventurer?</div>
+                    <div style={{ color: 'var(--text-secondary-soft)', fontStyle: 'italic' }}>How can I help you, adventurer?</div>
                 )}
                 {logs.map((log, i) => (
-                    <div key={i} style={{ color: log.stream === 'stderr' ? '#f87171' : '#d1d5db', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                        <span style={{ color: '#4b5563', marginRight: '8px' }}>[{new Date(log.ts).toLocaleTimeString()}]</span>
+                    <div key={i} style={{ color: log.stream === 'stderr' ? 'var(--state-danger-bright)' : 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                        <span style={{ color: 'var(--text-secondary-soft)', marginRight: '8px' }}>[{new Date(log.ts).toLocaleTimeString()}]</span>
                         {log.line}
                     </div>
                 ))}

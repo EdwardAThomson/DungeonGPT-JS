@@ -4,14 +4,15 @@ import React, { useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { downloadJSONFile } from "../utils/fileHelper";
 import CharacterContext from "../contexts/CharacterContext";
-import { calculateMaxHP, getHPStatus } from "../utils/healthSystem";
+import { calculateMaxHP } from "../utils/healthSystem";
 import { charactersApi } from "../services/charactersApi";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger('all-characters');
 
 const AllCharacters = () => {
   const { characters, setCharacters, setEditingCharacterIndex } = useContext(CharacterContext);
   const navigate = useNavigate();
-
-  // console.log('im here, so far, going to database');
 
   // insert database retrieval here
   useEffect(() => {
@@ -20,7 +21,7 @@ const AllCharacters = () => {
         const data = await charactersApi.list();
         setCharacters(data);
       } catch (error) {
-        console.error('Error fetching characters:', error);
+        logger.error('Error fetching characters:', error);
         // Optionally, provide feedback to the user in the UI
       }
     };
@@ -35,7 +36,7 @@ const AllCharacters = () => {
       // Pass the specific character to edit as newCharacter state
       navigate("/character-creation", { state: { newCharacter: character, editing: true } });
     } else {
-      console.error("Character not found for editing:", character.characterId);
+      logger.error("Character not found for editing:", character.characterId);
     }
   };
 

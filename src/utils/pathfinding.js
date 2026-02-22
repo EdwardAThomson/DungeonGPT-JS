@@ -1,6 +1,10 @@
 // pathfinding.js
 // A* pathfinding algorithm for generating paths between towns
 
+import { createLogger } from './logger';
+
+const logger = createLogger('pathfinding');
+
 /**
  * A* pathfinding implementation
  * @param {Array} mapData - 2D array of map tiles
@@ -143,7 +147,7 @@ export const findNearestTowns = (town, townsList, count = 2) => {
  * @returns {Array} Array of paths, where each path is an array of positions
  */
 export const generateTownPaths = (mapData, townsList) => {
-  console.log('[PATHFINDING] Generating paths between towns...');
+  logger.debug('[PATHFINDING] Generating paths between towns...');
   const allPaths = [];
   const connectedPairs = new Set();
 
@@ -170,14 +174,14 @@ export const generateTownPaths = (mapData, townsList) => {
       if (path) {
         allPaths.push(path);
         connectedPairs.add(pairKey);
-        console.log(`[PATHFINDING] Path created: (${town.x},${town.y}) -> (${targetTown.x},${targetTown.y}) [${path.length} tiles]`);
+        logger.debug(`[PATHFINDING] Path created: (${town.x},${town.y}) -> (${targetTown.x},${targetTown.y}) [${path.length} tiles]`);
       } else {
-        console.warn(`[PATHFINDING] No path found between (${town.x},${town.y}) and (${targetTown.x},${targetTown.y})`);
+        logger.warn(`[PATHFINDING] No path found between (${town.x},${town.y}) and (${targetTown.x},${targetTown.y})`);
       }
     });
   });
 
-  console.log(`[PATHFINDING] Generated ${allPaths.length} paths`);
+  logger.debug(`[PATHFINDING] Generated ${allPaths.length} paths`);
   return allPaths;
 };
 
@@ -240,7 +244,7 @@ export const calculatePathDirection = (tile, path) => {
  * @param {Array} paths - Array of paths
  */
 export const markPathTiles = (mapData, paths) => {
-  console.log('[PATHFINDING] Marking path tiles...');
+  logger.debug('[PATHFINDING] Marking path tiles...');
   let markedCount = 0;
 
   paths.forEach(path => {
@@ -282,7 +286,7 @@ export const markPathTiles = (mapData, paths) => {
     });
   });
 
-  console.log(`[PATHFINDING] Marked ${markedCount} tiles with paths`);
+  logger.debug(`[PATHFINDING] Marked ${markedCount} tiles with paths`);
 };
 
 /**
@@ -291,7 +295,7 @@ export const markPathTiles = (mapData, paths) => {
  * @param {Array} rivers - Array of river paths
  */
 export const markRiverTiles = (mapData, rivers) => {
-  console.log('[PATHFINDING] Marking river tiles...');
+  logger.debug('[PATHFINDING] Marking river tiles...');
   let markedCount = 0;
 
   rivers.forEach(river => {
@@ -354,5 +358,5 @@ export const markRiverTiles = (mapData, rivers) => {
     });
   });
 
-  console.log(`[PATHFINDING] Marked ${markedCount} tiles with rivers`);
+  logger.debug(`[PATHFINDING] Marked ${markedCount} tiles with rivers`);
 };

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { conversationsApi } from '../services/conversationsApi';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('saved-conversations');
 
 const SavedConversations = () => {
   const [conversations, setConversations] = useState([]);
@@ -11,7 +14,7 @@ const SavedConversations = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log('SavedConversations: Component mounted, fetching conversations...');
+    logger.debug('SavedConversations: Component mounted, fetching conversations...');
     fetchConversations();
   }, []); // Fetch on mount
 
@@ -19,7 +22,7 @@ const SavedConversations = () => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('SavedConversations: Page visible, refetching...');
+        logger.debug('SavedConversations: Page visible, refetching...');
         fetchConversations();
       }
     };
@@ -32,11 +35,11 @@ const SavedConversations = () => {
     try {
       setLoading(true);
       const data = await conversationsApi.list();
-      console.log('Fetched conversations:', data);
+      logger.debug('Fetched conversations:', data);
       if (data.length > 0) {
-        console.log('First conversation model field:', data[0]?.model);
-        console.log('First conversation full object:', data[0]);
-        console.log('All fields in first conversation:', Object.keys(data[0]));
+        logger.debug('First conversation model field:', data[0]?.model);
+        logger.debug('First conversation full object:', data[0]);
+        logger.debug('All fields in first conversation:', Object.keys(data[0]));
       }
 
       // Sort by timestamp descending (newest first)

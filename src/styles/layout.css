@@ -1,0 +1,48 @@
+/* layout.css
+ * Purpose: app shell and shared page container/card framing styles.
+ * Depends on: theme tokens from src/index.css.
+ * Font usage: body inherits --body-font; headings/buttons inherit global theme styles.
+ */
+
+.App {
+  text-align: center;
+  min-height: 100vh;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--body-font);
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content {
+  flex-grow: 1;
+  padding: 40px 20px;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.Home-page,
+.page-container,
+.character-creation-form {
+  background-color: var(--surface);
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px var(--shadow);
+  border: 1px solid var(--border);
+  position: relative;
+  text-align: left;
+}
+
+.Home-page::before,
+.page-container::before,
+.character-creation-form::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+}

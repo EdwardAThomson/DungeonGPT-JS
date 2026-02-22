@@ -1,0 +1,19 @@
+/* index.css
+ * Purpose: feature-style manifest and ordered imports for modular CSS architecture.
+ * Depends on: theme tokens from src/index.css.
+ * Font usage: inherits theme fonts via --header-font / --body-font / --ui-font from src/index.css.
+ */
+
+@import './navigation.css';
+@import './layout.css';
+@import './home.css';
+@import './game.css';
+@import './party.css';
+@import './modals.css';
+@import './encounters.css';
+@import './maps.css';
+@import './forms.css';
+@import './settings.css';
+@import './characters.css';
+@import './conversations.css';
+@import './character-creation.css';

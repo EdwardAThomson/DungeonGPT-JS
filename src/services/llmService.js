@@ -1,6 +1,8 @@
 import { apiFetch, buildApiUrl } from './apiClient';
+import { createLogger } from '../utils/logger';
 
 const API_PATH = '/api/llm';
+const logger = createLogger('llm-service');
 
 const sanitizeResponse = (text) => {
     if (!text) return '';
@@ -81,12 +83,12 @@ export const llmService = {
                     eventSource.close();
                 }
             } catch (err) {
-                console.error('Failed to parse SSE message', err);
+                logger.error('Failed to parse SSE message', err);
             }
         };
 
         eventSource.onerror = (err) => {
-            console.error('EventSource error:', err);
+            logger.error('EventSource error:', err);
             eventSource.close();
             onUpdate({ type: 'error', data: 'Connection lost' });
         };

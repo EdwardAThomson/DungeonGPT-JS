@@ -1,0 +1,170 @@
+/* conversations.css
+ * Purpose: saved conversation list/cards, edit-name flow, and action controls.
+ * Depends on: theme tokens from src/index.css.
+ * Font usage: inherits --body-font; buttons/labels inherit global button styles.
+ */
+
+.conversations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.conversation-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  background-color: var(--surface);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.conversation-header {
+  margin-bottom: 15px;
+}
+
+.conversation-title {
+  margin: 0;
+  color: var(--ink-strong);
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.conversation-title:hover {
+  background-color: var(--surface-soft);
+}
+
+.edit-name-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.edit-name-form input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+}
+
+.edit-name-form button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.edit-name-form button:first-of-type {
+  background-color: var(--state-success-strong);
+  color: white;
+}
+
+.edit-name-form button:first-of-type:disabled {
+  background-color: var(--state-muted);
+  cursor: not-allowed;
+}
+
+.edit-name-form button:last-of-type {
+  background-color: var(--state-muted);
+  color: white;
+}
+
+.conversation-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 15px;
+}
+
+.conversation-details p {
+  margin: 5px 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.conversation-settings {
+  background-color: var(--bg);
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.conversation-settings h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: var(--ink-strong);
+  font-size: 1rem;
+  border-bottom: 2px solid var(--state-info);
+  padding-bottom: 5px;
+}
+
+.conversation-settings p {
+  margin: 5px 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.conversation-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.load-button {
+  background-color: var(--state-info);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.load-button:hover {
+  background-color: var(--state-info-strong);
+}
+
+.delete-button {
+  background-color: var(--state-danger);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.delete-button:hover {
+  background-color: var(--state-danger-strong);
+}
+
+.navigation-buttons {
+  margin-top: 30px;
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+}
+
+.new-game-button {
+  background-color: var(--state-success-strong);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.new-game-button:hover {
+  background-color: var(--state-success-deep);
+}
+
+@media (max-width: 768px) {
+  .conversation-content {
+    grid-template-columns: 1fr;
+  }
+}

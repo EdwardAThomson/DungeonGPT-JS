@@ -3,9 +3,12 @@ import { resolveEncounter } from '../utils/encounterResolver';
 import { createMultiRoundEncounter, resolveRound, getRoundActions, generateEncounterSummary } from '../utils/multiRoundEncounter';
 import { applyDamage, getHPStatus } from '../utils/healthSystem';
 import SettingsContext from '../contexts/SettingsContext';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('encounter-action-modal');
 
 const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, onResolve, onCharacterUpdate }) => {
-  const { settings } = useContext(SettingsContext);
+  const { settings, selectedProvider, selectedModel } = useContext(SettingsContext);
   const [selectedAction, setSelectedAction] = useState(null);
   const [isResolving, setIsResolving] = useState(false);
   const [result, setResult] = useState(null);
@@ -52,7 +55,12 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
         // For single hero, initialize multi-round state immediately
         if (!needsHeroSelection && encounter.multiRound) {
           setIsMultiRound(true);
-          setRoundState(createMultiRoundEncounter(encounter, character, settings));
+          setRoundState(
+            createMultiRoundEncounter(encounter, character, settings, {
+              provider: selectedProvider,
+              model: selectedModel
+            })
+          );
         } else if (!needsHeroSelection) {
           setIsMultiRound(false);
           setRoundState(null);
@@ -104,7 +112,12 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
     // Initialize multi-round state if needed
     if (encounter.multiRound) {
       setIsMultiRound(true);
-      setRoundState(createMultiRoundEncounter(encounter, actingHero, settings));
+      setRoundState(
+        createMultiRoundEncounter(encounter, actingHero, settings, {
+          provider: selectedProvider,
+          model: selectedModel
+        })
+      );
     }
   };
 
@@ -139,7 +152,13 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
         }
       } else {
         // Single-round resolution
-        const outcome = await resolveEncounter(encounter, action.label, currentCharacter, settings);
+        const outcome = await resolveEncounter(
+          encounter,
+          action.label,
+          currentCharacter,
+          settings,
+          { provider: selectedProvider, model: selectedModel }
+        );
         
         // Apply HP damage if any
         if (outcome.hpDamage > 0) {
@@ -153,8 +172,8 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
         setResult(outcome);
       }
     } catch (error) {
-      console.error('[ENCOUNTER] Resolution failed:', error);
-      console.error('[ENCOUNTER] Error details:', {
+      logger.error('[ENCOUNTER] Resolution failed:', error);
+      logger.error('[ENCOUNTER] Error details:', {
         message: error.message,
         stack: error.stack,
         encounter: encounter?.name,
@@ -364,7 +383,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
               </ul>
             </div>
             
-            <button className="primary-button" onClick={handleContinue} style={{ background: '#e74c3c' }}>
+            <button className="primary-button" onClick={handleContinue} style={{ background: 'var(--state-danger)' }}>
               Retreat to Safety
             </button>
           </>
@@ -420,7 +439,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                 <div className="encounter-hp-bar enemy-hp-bar">
                   <div className="hp-label">
                     <span>{encounter.name}</span>
-                    <span style={{ color: roundState.enemyCurrentHP <= roundState.enemyMaxHP * 0.3 ? '#e74c3c' : '#f39c12' }}>
+                    <span style={{ color: roundState.enemyCurrentHP <= roundState.enemyMaxHP * 0.3 ? 'var(--state-danger)' : 'var(--state-warning)' }}>
                       {roundState.enemyCurrentHP} / {roundState.enemyMaxHP} HP
                     </span>
                   </div>
@@ -429,7 +448,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                       className="hp-bar-fill" 
                       style={{ 
                         width: `${(roundState.enemyCurrentHP / roundState.enemyMaxHP) * 100}%`,
-                        background: roundState.enemyCurrentHP <= roundState.enemyMaxHP * 0.3 ? '#e74c3c' : '#f39c12'
+                        background: roundState.enemyCurrentHP <= roundState.enemyMaxHP * 0.3 ? 'var(--state-danger)' : 'var(--state-warning)'
                       }}
                     />
                   </div>
@@ -441,9 +460,9 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
               // Character is defeated mid-encounter
               <>
                 <div className="defeat-warning">
-                  <h3 style={{ color: '#e74c3c', margin: '0 0 10px 0' }}>💀 You are defeated!</h3>
+                  <h3 style={{ color: 'var(--state-danger)', margin: '0 0 10px 0' }}>💀 You are defeated!</h3>
                   <p>You cannot continue fighting in your current condition.</p>
-                  <button className="primary-button" onClick={onClose} style={{ background: '#e74c3c', marginTop: '15px' }}>
+                  <button className="primary-button" onClick={onClose} style={{ background: 'var(--state-danger)', marginTop: '15px' }}>
                     Retreat from Combat
                   </button>
                 </div>
@@ -452,12 +471,12 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
               // Enemy is defeated
               <>
                 <div className="victory-banner">
-                  <h3 style={{ color: '#27ae60', margin: '0 0 10px 0' }}>⚔️ Victory!</h3>
+                  <h3 style={{ color: 'var(--state-success-strong)', margin: '0 0 10px 0' }}>⚔️ Victory!</h3>
                   <p>The {encounter.name.toLowerCase()} has been defeated!</p>
                   <button className="primary-button" onClick={async () => {
                     const summary = await generateEncounterSummary(roundState);
                     setResult(summary);
-                  }} style={{ background: '#27ae60', marginTop: '15px' }}>
+                  }} style={{ background: 'var(--state-success-strong)', marginTop: '15px' }}>
                     Claim Victory
                   </button>
                 </div>
@@ -487,7 +506,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                   {currentRoundResult.enemyDamage > 0 && (
                     <div className="enemy-damage-section">
                       <h4>⚔️ Damage Dealt</h4>
-                      <div className="damage-amount" style={{ color: '#f39c12' }}>{currentRoundResult.enemyDamage} HP</div>
+                      <div className="damage-amount" style={{ color: 'var(--state-warning)' }}>{currentRoundResult.enemyDamage} HP</div>
                       <p className="damage-description">You strike the {encounter.name.toLowerCase()}!</p>
                     </div>
                   )}
@@ -495,7 +514,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                   {currentRoundResult.hpDamage > 0 && (
                     <div className="player-damage-section">
                       <h4>🩸 Damage Taken</h4>
-                      <div className="damage-amount" style={{ color: '#e74c3c' }}>{currentRoundResult.hpDamage} HP</div>
+                      <div className="damage-amount" style={{ color: 'var(--state-danger)' }}>{currentRoundResult.hpDamage} HP</div>
                       <p className="damage-description">The {encounter.name.toLowerCase()} strikes back!</p>
                     </div>
                   )}

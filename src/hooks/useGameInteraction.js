@@ -1,7 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { getTile } from '../utils/mapGenerator';
 import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
+import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('game-interaction');
 
 const TRIGGER_REGEX = /\[(CHECK|ROLL):\s*([a-zA-Z0-9\s]+)\]/i;
 const MILESTONE_COMPLETE_REGEX = /\[COMPLETE_MILESTONE:\s*(.+?)\]/i;
@@ -83,33 +87,19 @@ const useGameInteraction = (
     const [checkRequest, setCheckRequest] = useState(null); // { type: 'skill', skill: 'Perception' } or null
     const [lastPrompt, setLastPrompt] = useState('');
 
-    // Sync conversation ref for parent use if needed, but setState is enough for React updates
-
-    // Model options mapping (could be moved to a constants file)
-    const modelOptions = [
-        { provider: 'openai', model: 'gpt-5', label: 'OpenAI - GPT-5' },
-        { provider: 'openai', model: 'gpt-5-mini', label: 'OpenAI - GPT-5 Mini' },
-        { provider: 'openai', model: 'o4-mini', label: 'OpenAI - O4 Mini' },
-        { provider: 'gemini', model: 'gemini-2.5-pro', label: 'Gemini - 2.5 Pro' },
-        { provider: 'gemini', model: 'gemini-2.5-flash', label: 'Gemini - 2.5 Flash' },
-        { provider: 'claude', model: 'claude-sonnet-4-5-20250929', label: 'Claude - Sonnet 4.5' }
-    ];
+    const modelOptions = useMemo(() => buildModelOptions(), []);
 
     const getCurrentModel = () => {
-        if (selectedModel) return selectedModel;
-        if (selectedProvider) {
-            const firstModel = modelOptions.find(opt => opt.provider === selectedProvider);
-            if (firstModel) return firstModel.model;
-        }
-        return 'gpt-5';
+        return resolveProviderAndModel(selectedProvider, selectedModel).model;
     };
 
     const generateResponse = async (model, prompt) => {
         const fullPrompt = DM_PROTOCOL + prompt;
         setLastPrompt(fullPrompt);
+        const resolved = resolveProviderAndModel(selectedProvider, model);
         return await llmService.generateUnified({
-            provider: selectedProvider,
-            model,
+            provider: resolved.provider,
+            model: resolved.model,
             prompt: fullPrompt,
             maxTokens: 1600,
             temperature: 0.7
@@ -117,21 +107,21 @@ const useGameInteraction = (
     };
 
     const summarizeConversation = async (summary, newMessages) => {
-        const model = getCurrentModel();
+        const resolved = resolveProviderAndModel(selectedProvider, getCurrentModel());
         const recentText = newMessages.map(msg => `${msg.role === 'ai' ? 'AI' : 'User'}: ${msg.content}`).join('\n');
         const prompt = `You are a concise story summarizer. Combine the old summary with the recent exchange into a single brief summary (2-4 sentences) capturing key events, locations, and character actions. Output ONLY the summary text, nothing else.\n\nOld summary: ${summary || 'The adventure begins.'}\n\nRecent exchange:\n${recentText}\n\nNew summary:`;
 
         try {
             // Summarization uses generateUnified directly without DM_PROTOCOL wrapper
             return await llmService.generateUnified({
-                provider: selectedProvider,
-                model,
+                provider: resolved.provider,
+                model: resolved.model,
                 prompt,
                 maxTokens: 400,
                 temperature: 0.3
             });
         } catch (error) {
-            console.error("Summarization failed:", error);
+            logger.error('Summarization failed', error);
             return summary;
         }
     };
@@ -194,7 +184,7 @@ const useGameInteraction = (
             if (match) {
                 const type = match[1].toUpperCase();
                 const value = match[2].trim();
-                console.log(`[AI TRIGGER] ${type}: ${value}`);
+                logger.debug(`AI trigger detected: ${type}`, value);
 
                 if (type === 'CHECK') {
                     setCheckRequest({ type: 'skill', skill: value });
@@ -204,7 +194,7 @@ const useGameInteraction = (
             }
 
             if (!aiResponse || !aiResponse.trim()) {
-                console.warn('Empty AI response received, skipping');
+                logger.warn('Empty AI response received at adventure start, skipping');
                 return;
             }
             const aiMessage = { role: 'ai', content: aiResponse };
@@ -214,7 +204,7 @@ const useGameInteraction = (
             const updatedSummary = await summarizeConversation(currentSummary, [aiMessage]);
             setCurrentSummary(updatedSummary);
         } catch (error) {
-            console.error('Failed to fetch initial AI response:', error);
+            logger.error('Failed to fetch initial AI response', error);
             setError(`Error starting adventure: ${error.message}`);
             setConversation(prev => [...prev, { role: 'ai', content: `Error: Could not start the adventure. ${error.message}` }]);
         } finally {
@@ -272,7 +262,7 @@ const useGameInteraction = (
             const milestoneMatch = aiResponse.match(MILESTONE_COMPLETE_REGEX);
             if (milestoneMatch) {
                 const milestoneText = milestoneMatch[1].trim();
-                console.log(`[MILESTONE COMPLETE] ${milestoneText}`);
+                logger.info(`Milestone complete signaled: ${milestoneText}`);
 
                 // Find and mark milestone as complete
                 const normalized = normalizeMilestones(settings.milestones);
@@ -300,7 +290,7 @@ const useGameInteraction = (
             // Check for campaign completion
             const campaignMatch = aiResponse.match(CAMPAIGN_COMPLETE_REGEX);
             if (campaignMatch) {
-                console.log('[CAMPAIGN COMPLETE]');
+                logger.info('Campaign complete signaled');
 
                 // Mark campaign as complete
                 setSettings({ ...settings, campaignComplete: true });
@@ -321,7 +311,7 @@ const useGameInteraction = (
             if (match) {
                 const type = match[1].toUpperCase();
                 const value = match[2].trim();
-                console.log(`[AI TRIGGER] ${type}: ${value}`);
+                logger.debug(`AI trigger detected: ${type}`, value);
 
                 if (type === 'CHECK') {
                     setCheckRequest({ type: 'skill', skill: value });
@@ -331,7 +321,7 @@ const useGameInteraction = (
             }
 
             if (!aiResponse || !aiResponse.trim()) {
-                console.warn('Empty AI response received, skipping');
+                logger.warn('Empty AI response received, skipping');
                 setError('AI returned an empty response. Please try again.');
                 return;
             }
@@ -343,7 +333,7 @@ const useGameInteraction = (
             setCurrentSummary(updatedSummary);
 
         } catch (error) {
-            console.error('Failed to fetch AI response:', error);
+            logger.error('Failed to fetch AI response', error);
             setError(`Error getting response from ${selectedProvider}: ${error.message}`);
         } finally {
             setIsLoading(false);

@@ -1,0 +1,72 @@
+/* navigation.css
+ * Purpose: top navigation and related controls.
+ * Depends on: theme tokens from src/index.css.
+ * Font usage: --header-font for nav links/buttons.
+ */
+
+.main-nav {
+  background-color: var(--surface);
+  border-bottom: 2px solid var(--primary);
+  padding: 0 20px;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 4px 12px var(--shadow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.main-nav ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 70px;
+  gap: 15px;
+}
+
+.main-nav li {
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.main-nav a {
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 500;
+  font-family: var(--header-font);
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  padding: 10px 15px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+}
+
+.main-nav a:hover {
+  color: var(--primary);
+  background-color: var(--shadow);
+}
+
+.nav-settings-btn {
+  background: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  font-family: var(--header-font);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-left: 10px;
+}
+
+.nav-settings-btn:hover {
+  background-color: var(--primary);
+  color: var(--bg);
+}

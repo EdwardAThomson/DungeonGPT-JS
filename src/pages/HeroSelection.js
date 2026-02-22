@@ -6,6 +6,9 @@ import CharacterContext from '../contexts/CharacterContext';
 import SettingsContext from '../contexts/SettingsContext';
 import { initializeHP } from '../utils/healthSystem';
 import { charactersApi } from '../services/charactersApi';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('hero-selection');
 
 const HeroSelection = () => {
   const { state } = useLocation();
@@ -28,7 +31,7 @@ const HeroSelection = () => {
         const data = await charactersApi.list();
         setCharacters(data);
       } catch (error) {
-        console.error('Error fetching characters:', error);
+        logger.error('Error fetching characters:', error);
         setSelectionError('Failed to load characters. Please ensure the server is running.');
       }
     };

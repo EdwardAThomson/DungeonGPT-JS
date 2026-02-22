@@ -1,0 +1,349 @@
+/* settings.css
+ * Purpose: game settings page and settings modal/story template presentation styles.
+ * Depends on: theme tokens from src/index.css and shared form primitives from forms.css.
+ * Font usage: --header-font for headings/cards, --ui-font for controls.
+ */
+
+.game-settings-page .form-section {
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.game-settings-page .form-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.game-settings-page h2 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: var(--primary);
+}
+
+.game-settings-page h3 {
+  margin-bottom: 8px;
+  color: var(--text);
+  display: inline-block;
+  position: relative;
+}
+
+.game-settings-page p {
+  margin: 0 0 10px 0;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.game-settings-page .settings-textarea {
+  width: 100%;
+  max-width: 600px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background-color: var(--bg);
+  color: var(--text);
+  resize: vertical;
+}
+
+.game-settings-page .mood-selectors,
+.game-settings-page .world-settings-selectors,
+.game-settings-page .ai-settings-selectors {
+  display: flex;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+.game-settings-page .mood-selector-item,
+.game-settings-page .world-setting-item,
+.game-settings-page .ai-setting-item {
+  flex: 1;
+  min-width: 200px;
+}
+
+.game-settings-page .settings-select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background-color: var(--bg);
+  color: var(--text);
+  font-size: 1rem;
+  box-sizing: border-box;
+  appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23d4af37%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E');
+  background-repeat: no-repeat;
+  background-position: right 10px top 50%;
+  background-size: .65em auto;
+  padding-right: 2.5em;
+}
+
+.game-settings-page .provider-select,
+.game-settings-page .verbosity-select {
+  max-width: 300px;
+}
+
+.tooltip-trigger {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 0.8em;
+  color: var(--state-info);
+  border: 1px solid var(--state-info);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  cursor: help;
+  position: relative;
+}
+
+.tooltip-trigger::before,
+.tooltip-trigger::after {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.tooltip-trigger::before {
+  content: attr(data-tooltip);
+  background-color: var(--ink-strong);
+  color: var(--on-dark);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  white-space: pre-wrap;
+  bottom: 150%;
+  width: max-content;
+  max-width: 250px;
+  line-height: 1.4;
+}
+
+.tooltip-trigger::after {
+  content: '';
+  border: 5px solid transparent;
+  border-top-color: var(--ink-strong);
+  bottom: 150%;
+  margin-bottom: -10px;
+}
+
+.tooltip-trigger:hover::before,
+.tooltip-trigger:hover::after {
+  opacity: 1;
+}
+
+.game-settings-page .form-actions {
+  margin-top: 30px;
+  position: relative;
+  text-align: center;
+}
+
+.game-settings-page .error-message {
+  color: var(--state-danger);
+  font-weight: bold;
+  margin-bottom: 15px;
+  font-size: 0.95rem;
+}
+
+.game-settings-page .settings-submit-button {
+  padding: 12px 25px;
+  font-size: 1.1rem;
+  background-color: var(--state-info);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.game-settings-page .settings-submit-button:hover {
+  background-color: var(--state-info-strong);
+}
+
+.story-settings-section {
+  background: var(--surface);
+  padding: 30px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px var(--shadow);
+  margin-bottom: 30px;
+  border: 1px solid var(--border);
+}
+
+.settings-row {
+  margin-bottom: 25px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-group label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.settings-textarea,
+.settings-select {
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--ui-font);
+}
+
+.settings-textarea:focus,
+.settings-select:focus {
+  border-color: var(--primary);
+  outline: none;
+  background-color: var(--bg);
+  box-shadow: 0 0 0 3px var(--shadow);
+}
+
+.settings-textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.settings-modal-refined {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 35px;
+  border: 1px solid var(--border);
+}
+
+.settings-modal-refined h2 {
+  font-size: 1.8rem;
+  margin-top: 0;
+}
+
+.settings-modal-refined label {
+  font-weight: 600;
+}
+
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 15px;
+}
+
+.template-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.template-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--shadow);
+}
+
+.template-card.active {
+  border-color: var(--primary);
+  background-color: var(--shadow);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.template-icon {
+  font-size: 2rem;
+  background: var(--bg);
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.template-card.active .template-icon {
+  background: var(--surface);
+}
+
+.template-info h5 {
+  margin: 0 0 4px 0;
+  font-size: 1rem;
+  color: var(--text);
+  font-family: var(--header-font);
+}
+
+.template-info p {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}
+
+@keyframes ai-pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 4px 15px var(--encounter-violet-glow-30);
+  }
+
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 4px 25px var(--encounter-violet-glow-50);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 4px 15px var(--encounter-violet-glow-30);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.ai-generate-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  box-shadow: 0 6px 20px var(--encounter-violet-glow-40);
+}
+
+.ai-generate-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.ai-generate-button.loading {
+  animation: ai-pulse 1.5s infinite ease-in-out;
+  cursor: wait;
+  background: linear-gradient(90deg, var(--state-violet), var(--state-violet-soft), var(--state-violet));
+  background-size: 200% 100%;
+  animation: ai-pulse 1.5s infinite ease-in-out, shimmer 2s infinite linear;
+}
+
+.ai-generate-button:disabled {
+  opacity: 0.8;
+  cursor: wait;
+}

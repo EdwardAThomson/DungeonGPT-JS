@@ -1,11 +1,14 @@
 import React, { useState, useContext, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import CharacterContext from "../contexts/CharacterContext";
 import SettingsContext from "../contexts/SettingsContext";
 import { generateMapData, findStartingTown } from "../utils/mapGenerator";
 import WorldMapDisplay from "../components/WorldMapDisplay";
 import { storyTemplates } from "../data/storyTemplates";
 import { llmService } from "../services/llmService";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger('game-settings');
 
 // Resolve milestone location names to map coordinates by matching town and mountain names
 const resolveMilestoneCoords = (milestones, mapData) => {
@@ -49,7 +52,7 @@ const GameSettings = () => {
   // characters should be saved in Context
   const { characters } = useContext(CharacterContext);
   // Get settings, provider, and model state from context
-  const { settings, setSettings, selectedProvider, setSelectedProvider, selectedModel, setSelectedModel } = useContext(SettingsContext);
+  const { settings, setSettings, selectedProvider, selectedModel } = useContext(SettingsContext);
   const navigate = useNavigate();
 
   // Clear any stale session ID when starting a new game
@@ -199,7 +202,7 @@ const GameSettings = () => {
       }
 
     } catch (error) {
-      console.error("AI Story Generation failed:", error);
+      logger.error("AI Story Generation failed:", error);
       setAiError(error.message);
     } finally {
       setIsAiGenerating(false);
@@ -267,7 +270,7 @@ const GameSettings = () => {
 
         <div className="template-selector" style={{ marginBottom: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-            <h4 style={{ margin: 0, fontSize: '0.9rem', color: '#7f8c8d', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Quick Templates</h4>
+            <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--state-muted-strong)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Quick Templates</h4>
             <button
               onClick={handleAiGenerateStory}
               disabled={isAiGenerating}
@@ -297,7 +300,7 @@ const GameSettings = () => {
             <button
               type="button"
               onClick={() => setShowStoryDebug(!showStoryDebug)}
-              style={{ background: 'none', border: 'none', color: '#7f8c8d', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+              style={{ background: 'none', border: 'none', color: 'var(--state-muted-strong)', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
             >
               {showStoryDebug ? 'Hide AI Debug' : 'Show AI Debug Info'}
             </button>
@@ -345,7 +348,7 @@ const GameSettings = () => {
         </div>
 
         {isTemplateLocked && (
-          <div style={{ padding: '10px 14px', background: 'rgba(var(--primary-rgb, 212, 175, 55), 0.1)', border: '1px solid var(--primary)', borderRadius: '8px', marginBottom: '20px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+          <div style={{ padding: '10px 14px', background: 'var(--primary-tint-10)', border: '1px solid var(--primary)', borderRadius: '8px', marginBottom: '20px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             🔒 Story fields are locked to keep milestones in sync with map locations. Choose <strong>Custom Tale</strong> for full editing freedom.
           </div>
         )}
@@ -472,7 +475,7 @@ const GameSettings = () => {
               onChange={(e) => setWorldSeed(e.target.value)}
               placeholder="Leave empty for random"
               className="settings-input"
-              style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc', width: '150px' }}
+              style={{ padding: '8px', borderRadius: '4px', border: '1px solid var(--border-soft)', width: '150px' }}
             />
             <button
               type="button"
@@ -516,7 +519,7 @@ const GameSettings = () => {
                 try {
                   return findStartingTown(generatedMap);
                 } catch (error) {
-                  console.error('Error finding starting town in preview:', error);
+                  logger.error('Error finding starting town in preview:', error);
                   // Find any town as fallback for preview
                   for (let y = 0; y < generatedMap.length; y++) {
                     for (let x = 0; x < generatedMap[y].length; x++) {

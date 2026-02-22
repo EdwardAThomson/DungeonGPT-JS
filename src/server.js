@@ -4,12 +4,10 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const llmBackend = require('./llm/llmBackend');
 const runner = require('./llm/runner/runner');
+const { createLogger } = require('./server/logger');
 
 dotenv.config();
-
-if (process.env.NODE_ENV === 'production' && process.env.ENABLE_SERVER_CONSOLE_LOGS !== 'true') {
-  console.log = () => {};
-}
+const logger = createLogger('server');
 
 const app = express();
 const port = Number(process.env.PORT || 5000);
@@ -280,9 +278,9 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 const db = new sqlite3.Database('./src/game.db', (err) => {
   if (err) {
-    console.error('Error opening database', err);
+    logger.error('Error opening database', err);
   } else {
-    console.log('Connected to SQLite database');
+    logger.info('Connected to SQLite database');
     // language=SQL format=false
     db.run(`CREATE TABLE IF NOT EXISTS characterstable (
              characterId TEXT PRIMARY KEY,
@@ -297,9 +295,9 @@ const db = new sqlite3.Database('./src/game.db', (err) => {
              stats TEXT
            )`, (err) => {
       if (err) {
-        console.error('Error creating table', err);
+        logger.error('Error creating table', err);
       } else {
-        console.log('Table created or already exists (re: Characters Table)');
+        logger.debug('Characters table created or already exists');
       }
     });
 
@@ -317,56 +315,56 @@ const db = new sqlite3.Database('./src/game.db', (err) => {
              sub_maps TEXT
            )`, (err) => {
       if (err) {
-        console.error('Error creating conversations table', err);
+        logger.error('Error creating conversations table', err);
       } else {
-        console.log('Table created or already exists (re: Conversations Table)');
+        logger.debug('Conversations table created or already exists');
 
         // Add new columns if they don't exist (for existing databases)
         db.run(`ALTER TABLE conversations ADD COLUMN conversation_name TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
-            console.error('Error adding conversation_name column:', err);
+            logger.error('Error adding conversation_name column', err);
           }
         });
 
         db.run(`ALTER TABLE conversations ADD COLUMN game_settings TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
-            console.error('Error adding game_settings column:', err);
+            logger.error('Error adding game_settings column', err);
           }
         });
 
         db.run(`ALTER TABLE conversations ADD COLUMN selected_heroes TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
-            console.error('Error adding selected_heroes column:', err);
+            logger.error('Error adding selected_heroes column', err);
           }
         });
 
         db.run(`ALTER TABLE conversations ADD COLUMN summary TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
-            console.error('Error adding summary column:', err);
+            logger.error('Error adding summary column', err);
           }
         });
 
         db.run(`ALTER TABLE conversations ADD COLUMN world_map TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
-            console.error('Error adding world_map column:', err);
+            logger.error('Error adding world_map column', err);
           }
         });
 
         db.run(`ALTER TABLE conversations ADD COLUMN player_position TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
-            console.error('Error adding player_position column:', err);
+            logger.error('Error adding player_position column', err);
           }
         });
 
         db.run(`ALTER TABLE conversations ADD COLUMN model TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
-            console.error('Error adding model column:', err);
+            logger.error('Error adding model column', err);
           }
         });
 
         db.run(`ALTER TABLE conversations ADD COLUMN sub_maps TEXT`, (err) => {
           if (err && !err.message.includes('duplicate column name')) {
-            console.error('Error adding sub_maps column:', err);
+            logger.error('Error adding sub_maps column', err);
           }
         });
       }
@@ -399,14 +397,14 @@ app.post('/characters', (req, res) => {
   }
 
   const { characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, stats } = req.body;
-  console.log('Adding character:', [characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, JSON.stringify(stats)]);
+  logger.debug('Adding character', [characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, JSON.stringify(stats)]);
 
   const query = `INSERT INTO characterstable (characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, stats) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const params = [characterId, characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, JSON.stringify(stats)];
 
   db.run(query, params, function (err) {
     if (err) {
-      console.error('Error adding character', err);
+      logger.error('Error adding character', err);
       return sendError(res, 500, 'Failed to add character');
     } else {
       res.json({ id: this.lastID });
@@ -432,7 +430,7 @@ app.put('/characters/:characterId', (req, res) => {
 
   const { characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, stats } = req.body;
 
-  console.log('Updating character:', characterId, [characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, JSON.stringify(stats)]);
+  logger.debug('Updating character', characterId, [characterName, characterGender, profilePicture, characterRace, characterClass, characterLevel, characterBackground, characterAlignment, JSON.stringify(stats)]);
 
   const query = `
     UPDATE characterstable 
@@ -462,7 +460,7 @@ app.put('/characters/:characterId', (req, res) => {
 
   db.run(query, params, function (err) {
     if (err) {
-      console.error('Error updating character', err);
+      logger.error('Error updating character', err);
       return sendError(res, 500, 'Failed to update character');
     } else if (this.changes === 0) {
       return sendError(res, 404, 'Character not found');
@@ -478,7 +476,7 @@ app.get('/characters', (req, res) => {
   db.all('SELECT * FROM characterstable', [], (err, rows) => {
 
     if (err) {
-      console.error('Error retrieving characters', err);
+      logger.error('Error retrieving characters', err);
       return sendError(res, 500, 'Failed to retrieve characters');
     } else {
 
@@ -502,7 +500,7 @@ app.get('/api/conversations', (req, res) => {
 
   db.all(query, [], (err, rows) => {
     if (err) {
-      console.error('Error retrieving conversations', err);
+      logger.error('Error retrieving conversations', err);
       return sendError(res, 500, 'Failed to retrieve conversations');
     } else {
       res.json(rows);
@@ -521,11 +519,12 @@ app.post('/api/conversations', (req, res) => {
     const { sessionId, conversation, provider, model, timestamp, conversationName, gameSettings, selectedHeroes, currentSummary, worldMap, playerPosition, sub_maps, subMaps } = req.body;
     const effectiveSubMaps = sub_maps || subMaps;
 
-    console.log('[SERVER] Received save request');
-    console.log('[SERVER] Session ID:', sessionId);
-    console.log('[SERVER] Provider:', provider);
-    console.log('[SERVER] Model:', model);
-    console.log('[SERVER] Model type:', typeof model);
+    logger.debug('Received save request', {
+      sessionId,
+      provider,
+      model,
+      modelType: typeof model
+    });
     // Convert conversation array to JSON string for storage
     const conversationJson = JSON.stringify(conversation);
     const settingsJson = gameSettings ? JSON.stringify(gameSettings) : null;
@@ -570,16 +569,16 @@ app.post('/api/conversations', (req, res) => {
 
     db.run(query, params, function (err) {
       if (err) {
-        console.error('Error saving conversation to SQLite:', err);
+        logger.error('Error saving conversation to SQLite', err);
         return sendError(res, 500, 'Server error saving conversation', err.message);
       }
 
-      console.log(`Conversation saved/updated for session: ${sessionId}. Rows affected: ${this.changes}`);
+      logger.debug(`Conversation saved/updated for session ${sessionId}. Rows affected: ${this.changes}`);
       res.status(201).json({ message: 'Conversation saved successfully', sessionId });
     });
 
   } catch (error) {
-    console.error('Unexpected error in /api/conversations:', error);
+    logger.error('Unexpected error in /api/conversations', error);
     return sendError(res, 500, 'Unexpected server error', error.message);
   }
 });
@@ -595,7 +594,7 @@ app.get('/api/conversations/:sessionId', (req, res) => {
 
   db.get(query, [sessionId], (err, row) => {
     if (err) {
-      console.error('Error retrieving conversation:', err);
+      logger.error('Error retrieving conversation', err);
       return sendError(res, 500, 'Failed to retrieve conversation');
     } else if (!row) {
       return sendError(res, 404, 'Conversation not found');
@@ -632,7 +631,7 @@ app.put('/api/conversations/:sessionId', (req, res) => {
 
   db.run(query, [conversationDataStr, sessionId], function (err) {
     if (err) {
-      console.error('Error updating conversation data:', err);
+      logger.error('Error updating conversation data', err);
       return sendError(res, 500, 'Server error updating conversation data');
     } else if (this.changes === 0) {
       return sendError(res, 404, 'Conversation not found');
@@ -658,7 +657,7 @@ app.put('/api/conversations/:sessionId/name', (req, res) => {
 
   db.run(query, [conversationName.trim(), sessionId], function (err) {
     if (err) {
-      console.error('Error updating conversation name:', err);
+      logger.error('Error updating conversation name', err);
       return sendError(res, 500, 'Server error updating conversation name');
     } else if (this.changes === 0) {
       return sendError(res, 404, 'Conversation not found');
@@ -679,7 +678,7 @@ app.delete('/api/conversations/:sessionId', (req, res) => {
 
   db.run(query, [sessionId], function (err) {
     if (err) {
-      console.error('Error deleting conversation:', err);
+      logger.error('Error deleting conversation', err);
       return sendError(res, 500, 'Server error deleting conversation');
     } else if (this.changes === 0) {
       return sendError(res, 404, 'Conversation not found');
@@ -716,7 +715,7 @@ app.post('/api/llm/tasks', (req, res) => {
     const taskId = runner.createTask({ backend, prompt, cwd, model });
     res.json({ id: taskId, status: 'queued' });
   } catch (error) {
-    console.error('Task creation failed:', error);
+    logger.error('Task creation failed', error);
     return sendError(res, 500, error.message);
   }
 });
@@ -731,7 +730,7 @@ app.get('/api/llm/tasks/:id/stream', (req, res) => {
   try {
     runner.streamTask(id, res);
   } catch (error) {
-    console.error('Stream failed:', error);
+    logger.error('Stream failed', error);
     res.write(`data: ${JSON.stringify({ type: 'error', data: error.message })}\n\n`);
     res.end();
   }
@@ -747,7 +746,7 @@ app.get('/api/llm/tasks/:id/stream', (req, res) => {
 //   .catch(err => console.error('MongoDB Connection Error:', err));
 
 app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
+  logger.info(`Server running on http://localhost:${port}`);
 });
 
 

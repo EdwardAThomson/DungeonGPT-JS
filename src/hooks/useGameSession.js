@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { conversationsApi } from '../services/conversationsApi';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('game-session');
 
 const useGameSession = (loadedConversation, setSettings, setSelectedProvider, setSelectedModel, gameSessionId = null) => {
     // Session ID priority: loadedConversation > navigation state > localStorage > generate new
@@ -27,7 +30,7 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
     // Resolve session ID on mount and restore settings from loaded conversation
     useEffect(() => {
         if (loadedConversation) {
-            console.log("[SESSION] Loaded conversation with Session ID:", loadedConversation.sessionId);
+            logger.info('Loaded conversation session', loadedConversation.sessionId);
             // Persist loaded game's session ID so refreshes keep using it
             if (loadedConversation.sessionId) {
                 localStorage.setItem('activeGameSessionId', loadedConversation.sessionId);
@@ -53,17 +56,17 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
             const newSessionId = `game-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
             setSessionId(newSessionId);
             localStorage.setItem('activeGameSessionId', newSessionId);
-            console.log("[SESSION] Generated fallback Session ID:", newSessionId);
+            logger.info('Generated fallback session ID', newSessionId);
         } else {
             // Ensure localStorage is in sync with the resolved session ID
             localStorage.setItem('activeGameSessionId', sessionId);
-            console.log("[SESSION] Using Session ID:", sessionId);
+            logger.debug('Using session ID', sessionId);
         }
     }, []);
 
     const saveConversationToBackend = async (currentSessionId, gameState) => {
         try {
-            console.log('[SAVE] Starting save operation...');
+            logger.debug('Starting save operation');
             // Adjust URL to your backend endpoint
             const result = await conversationsApi.save({
                 sessionId: currentSessionId,
@@ -71,10 +74,10 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
                 conversationName: `Adventure - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
                 ...gameState // spread the rest of the game state
             });
-            console.log('Conversation saved successfully:', result);
+            logger.debug('Conversation saved successfully', result);
 
         } catch (error) {
-            console.error('Error saving conversation:', error);
+            logger.error('Error saving conversation', error);
         }
     };
 

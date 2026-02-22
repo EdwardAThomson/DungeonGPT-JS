@@ -1,6 +1,9 @@
 const { OpenAI } = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Anthropic = require('@anthropic-ai/sdk');
+const { createLogger } = require('../server/logger');
+
+const logger = createLogger('llm-backend');
 
 /**
  * Server-side LLM Backend
@@ -8,7 +11,7 @@ const Anthropic = require('@anthropic-ai/sdk');
  */
 
 async function generateText({ provider, model, prompt, maxTokens, temperature }) {
-    console.log(`[BACKEND] Generating text with ${provider}, model: ${model}`);
+    logger.debug(`Generating text with provider=${provider}, model=${model}`);
 
     const systemPromptContent = `You are a dungeon master acting as the narrator and world simulator for a text-based RPG. Keep responses concise (1-3 paragraphs), focused on the game narrative, describing the results of the user's actions and the current situation. Do not speak OOC or give instructions.`;
 
@@ -68,7 +71,7 @@ async function generateText({ provider, model, prompt, maxTokens, temperature })
             throw new Error(`Unsupported LLM provider: ${provider}`);
         }
     } catch (error) {
-        console.error(`[BACKEND] Error with ${provider}:`, error.message);
+        logger.error(`LLM backend error for provider=${provider}`, error.message);
         throw error;
     }
 }

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { getTownTileEmoji } from '../utils/townMapGenerator';
 import BuildingModal from './BuildingModal';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('town-map-display');
 
 /**
  * TownMapDisplay - Renders a town map with paths, buildings, and player position
@@ -29,7 +32,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
     const coordString = `${tile.x},${tile.y}`;
     const isDiscovered = discoveredBuildings.includes(coordString);
     
-    console.log('Building click debug:', {
+    logger.debug('Building click debug:', {
       tileCoords: coordString,
       discoveredBuildings,
       isDiscovered,

@@ -1,26 +1,38 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import ApiKeysContext from '../contexts/ApiKeysContext';
 import SettingsContext from "../contexts/SettingsContext";
-import { StorySettingsModalContent, HowToPlayModalContent } from '../components/Modals';
-import MapModal from '../components/MapModal';
-import EncounterModal from '../components/EncounterModal';
-import EncounterActionModal from '../components/EncounterActionModal';
 import { checkForEncounter } from '../utils/encounterGenerator';
-import { buildMovementPrompt, messageContainsEngagement } from '../utils/promptBuilder';
-import DiceRoller from '../components/DiceRoller';
 import useGameSession from '../hooks/useGameSession';
 import useGameMap from '../hooks/useGameMap';
 import useGameInteraction from '../hooks/useGameInteraction';
-import SafeMarkdownMessage from '../components/SafeMarkdownMessage';
+import useGamePersistence from '../hooks/useGamePersistence';
 import { getTile } from '../utils/mapGenerator';
-import AiAssistantPanel from '../components/AiAssistantPanel';
-import CharacterModal from '../components/CharacterModal';
-import { llmService } from '../services/llmService';
-import { DM_PROTOCOL } from '../data/prompts';
-import { getHPStatus, calculateMaxHP } from '../utils/healthSystem';
-import { awardXP, getLevelUpSummary } from '../utils/progressionSystem';
-import { addItem, addGold, ITEM_CATALOG } from '../utils/inventorySystem';
+import PartySidebar from '../components/PartySidebar';
+import GameMainPanel from '../components/GameMainPanel';
+import GameModals from '../components/GameModals';
+import { calculateMaxHP } from '../utils/healthSystem';
+import { composeMovementNarrativePrompt } from '../game/promptComposer';
+import { generateMovementNarrative } from '../game/movementController';
+import {
+  applyWorldMapMove,
+  buildMovementSystemMessage,
+  buildPendingNarrativeTile,
+  buildPoiEncounter,
+  getAreaIdentifiers,
+  getAreaVisitState,
+  isAdjacentWorldMove,
+  trackAreaVisits
+} from '../game/worldMoveController';
+import {
+  applyEncounterOutcomeToParty,
+  planWorldTileEncounterFlow,
+  formatEncounterPenaltyLog,
+  formatEncounterRewardLog
+} from '../game/encounterController';
+import { resolveProviderAndModel } from '../llm/modelResolver';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('game');
 
 const Game = () => {
   const { state } = useLocation();
@@ -52,7 +64,6 @@ const Game = () => {
     : loadedConversation?.game_settings;
   const worldSeed = settingsObj?.worldSeed || stateSeed;
 
-  const { apiKeys } = useContext(ApiKeysContext);
   const {
     settings,
     setSettings,
@@ -79,7 +90,6 @@ const Game = () => {
   const [movesSinceEncounter, setMovesSinceEncounter] = useState(
     loadedConversation?.sub_maps?.movesSinceEncounter || 0
   );
-  const [narrativeEncounter, setNarrativeEncounter] = useState(null);
   const [pendingNarrativeTile, setPendingNarrativeTile] = useState(null);
   const [aiNarrativeEnabled, setAiNarrativeEnabled] = useState(true);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
@@ -107,143 +117,20 @@ const Game = () => {
     hasAdventureStarted,
     setHasAdventureStarted
   );
-
-  // --- REFS FOR SAVING ---
-  const conversationRef = useRef(interactionHook.conversation);
-  const sessionIdRef = useRef(sessionId);
-  const selectedProviderRef = useRef(selectedProvider);
-  const selectedModelRef = useRef(selectedModel);
-  const worldMapRef = useRef(mapHook.worldMap);
-  const playerPositionRef = useRef(mapHook.playerPosition);
-  const settingsRef = useRef(settings);
-  const currentTownMapRef = useRef(mapHook.currentTownMap);
-  const townPlayerPositionRef = useRef(mapHook.townPlayerPosition);
-  const currentTownTileRef = useRef(mapHook.currentTownTile);
-  const isInsideTownRef = useRef(mapHook.isInsideTown);
-  const townMapsCacheRef = useRef(mapHook.townMapsCache);
-  const currentMapLevelRef = useRef(mapHook.currentMapLevel);
-  const hasAdventureStartedRef = useRef(hasAdventureStarted);
-  const selectedHeroesRef = useRef(selectedHeroes);
-  const movesSinceEncounterRef = useRef(movesSinceEncounter);
-  const lastSaveFingerprintRef = useRef(null);
-
-  useEffect(() => {
-    conversationRef.current = interactionHook.conversation;
-    sessionIdRef.current = sessionId;
-    selectedProviderRef.current = selectedProvider;
-    selectedModelRef.current = selectedModel;
-    worldMapRef.current = mapHook.worldMap;
-    playerPositionRef.current = mapHook.playerPosition;
-    settingsRef.current = settings;
-    currentTownMapRef.current = mapHook.currentTownMap;
-    townPlayerPositionRef.current = mapHook.townPlayerPosition;
-    currentTownTileRef.current = mapHook.currentTownTile;
-    isInsideTownRef.current = mapHook.isInsideTown;
-    townMapsCacheRef.current = mapHook.townMapsCache;
-    currentMapLevelRef.current = mapHook.currentMapLevel;
-    hasAdventureStartedRef.current = hasAdventureStarted;
-    selectedHeroesRef.current = selectedHeroes;
-    movesSinceEncounterRef.current = movesSinceEncounter;
-  }, [
-    interactionHook.conversation, sessionId, selectedProvider, selectedModel,
-    mapHook.worldMap, mapHook.playerPosition, settings,
-    mapHook.currentTownMap, mapHook.townPlayerPosition, mapHook.currentTownTile,
-    mapHook.isInsideTown, mapHook.townMapsCache, mapHook.currentMapLevel,
-    hasAdventureStarted, selectedHeroes, movesSinceEncounter
-  ]);
-
-  const performSave = (isUnmount = false) => {
-    if (!sessionIdRef.current) return;
-
-    // Don't save empty/unstarted sessions
-    if (!hasAdventureStartedRef.current) {
-      if (isUnmount) console.log('[SAVE] Skipping unmount save - adventure not started');
-      return;
-    }
-    const convo = conversationRef.current;
-    if (!convo || convo.length === 0) {
-      if (isUnmount) console.log('[SAVE] Skipping unmount save - no conversation data');
-      return;
-    }
-    
-    // Don't save if settings are empty but we loaded from a conversation that had settings
-    // This prevents race condition where settings haven't been restored yet
-    const currentSettings = settingsRef.current;
-    if (loadedConversation?.game_settings && (!currentSettings || Object.keys(currentSettings).length === 0)) {
-      console.log('[SAVE] Skipping save - settings not yet restored from loaded conversation');
-      return;
-    }
-
-    // Build a lightweight fingerprint to detect changes
-    // Use refs which are synced via useEffect to avoid stale closures in setInterval
-    const pos = playerPositionRef.current;
-    const townPos = townPlayerPositionRef.current;
-    const heroes = selectedHeroesRef.current || [];
-    const fingerprint = [
-      convo.length,
-      pos?.x, pos?.y,
-      currentMapLevelRef.current,
-      isInsideTownRef.current,
-      townPos?.x, townPos?.y,
-      interactionHook.currentSummary?.length || 0,
-      settingsRef.current?.storyTitle || '',
-      // Track HP, gold, XP, and inventory for each hero
-      JSON.stringify(heroes.map(h => ({
-        hp: h.currentHP,
-        gold: h.gold || 0,
-        xp: h.xp || 0,
-        inv: (h.inventory || []).length
-      }))),
-    ].join('|');
-
-    // Skip save if nothing has changed (unless unmount)
-    if (!isUnmount && fingerprint === lastSaveFingerprintRef.current) {
-      console.log('[AUTO-SAVE] No changes detected, skipping save');
-      return;
-    }
-
-    const sub_maps = {
-      currentTownMap: currentTownMapRef.current,
-      townPlayerPosition: townPlayerPositionRef.current,
-      currentTownTile: currentTownTileRef.current,
-      isInsideTown: isInsideTownRef.current,
-      currentMapLevel: currentMapLevelRef.current,
-      townMapsCache: townMapsCacheRef.current,
-      visitedBiomes: Array.from(mapHook.visitedBiomes),
-      visitedTowns: Array.from(mapHook.visitedTowns),
-      movesSinceEncounter: movesSinceEncounterRef.current,
-    };
-
-    saveConversationToBackend(sessionIdRef.current, {
-      conversation: conversationRef.current,
-      provider: selectedProviderRef.current,
-      model: selectedModelRef.current,
-      gameSettings: settingsRef.current,
-      selectedHeroes: selectedHeroesRef.current,
-      currentSummary: interactionHook.currentSummary,
-      worldMap: worldMapRef.current,
-      playerPosition: playerPositionRef.current,
-      hasAdventureStarted: hasAdventureStarted,
-      sub_maps: sub_maps
-    });
-
-    lastSaveFingerprintRef.current = fingerprint;
-  };
-
-  useEffect(() => {
-    if (!sessionId || !hasAdventureStarted) return;
-    const interval = setInterval(() => {
-      performSave();
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [sessionId, hasAdventureStarted]);
-
-  useEffect(() => {
-    return () => {
-      console.log('[UNMOUNT SAVE]');
-      performSave(true);
-    };
-  }, []);
+  const { performSave } = useGamePersistence({
+    sessionId,
+    hasAdventureStarted,
+    loadedConversation,
+    saveConversationToBackend,
+    interactionHook,
+    mapHook,
+    settings,
+    selectedProvider,
+    selectedModel,
+    selectedHeroes,
+    movesSinceEncounter,
+    logger
+  });
 
   // --- Hero HP Update Handler ---
   const handleHeroUpdate = (updatedHero) => {
@@ -276,7 +163,7 @@ const Game = () => {
   // --- Effect to monitor AI Check Requests ---
   useEffect(() => {
     if (interactionHook.checkRequest) {
-      console.log('Opening Dice Modal for:', interactionHook.checkRequest);
+      logger.debug('Opening dice modal for check request', interactionHook.checkRequest);
       setIsDiceModalOpen(true);
     }
   }, [interactionHook.checkRequest]);
@@ -285,13 +172,7 @@ const Game = () => {
   const handleMoveOnWorldMap = async (clickedX, clickedY) => {
     if (!hasAdventureStarted || interactionHook.isLoading) return;
 
-    const currentX = mapHook.playerPosition.x;
-    const currentY = mapHook.playerPosition.y;
-    const dx = Math.abs(clickedX - currentX);
-    const dy = Math.abs(clickedY - currentY);
-    const isAdjacent = dx <= 1 && dy <= 1 && (dx + dy) > 0;
-
-    if (!isAdjacent) {
+    if (!isAdjacentWorldMove(mapHook.playerPosition, clickedX, clickedY)) {
       interactionHook.setError("You can only move to adjacent tiles.");
       return;
     }
@@ -299,106 +180,85 @@ const Game = () => {
     // Close the map modal so encounter modals can be seen
     mapHook.setIsMapModalOpen(false);
 
-    // Check if tile was previously explored (before marking it)
-    const originalTile = getTile(mapHook.worldMap, clickedX, clickedY);
-    const wasExplored = originalTile?.isExplored || false;
-
-    // Update Map State
-    const newMap = mapHook.worldMap.map(row =>
-      row.map(tile =>
-        tile.x === clickedX && tile.y === clickedY ? { ...tile, isExplored: true } : tile
-      )
+    const { newMap, targetTile, wasExplored } = applyWorldMapMove(
+      mapHook.worldMap,
+      clickedX,
+      clickedY
     );
     mapHook.setWorldMap(newMap);
     mapHook.setPlayerPosition({ x: clickedX, y: clickedY });
-
-    const targetTile = getTile(newMap, clickedX, clickedY);
     if (!targetTile) return;
 
-    const biomeType = targetTile.biome || 'Unknown Area';
-    const townName = targetTile.townName || (targetTile.poi === 'town' ? 'Unknown Town' : null);
-
-    const isBiomeVisited = mapHook.visitedBiomes.has(biomeType);
-    const isTownVisited = townName ? mapHook.visitedTowns.has(townName) : true;
-
-    // Track new visits
-    if (!isBiomeVisited) {
-      mapHook.trackBiomeVisit(biomeType);
-    }
-    if (townName && !isTownVisited) {
-      mapHook.trackTownVisit(townName);
-    }
+    const { biomeType, townName } = getAreaIdentifiers(targetTile);
+    const { isBiomeVisited, isTownVisited } = getAreaVisitState({
+      biomeType,
+      townName,
+      visitedBiomes: mapHook.visitedBiomes,
+      visitedTowns: mapHook.visitedTowns
+    });
+    trackAreaVisits({
+      biomeType,
+      townName,
+      isBiomeVisited,
+      isTownVisited,
+      trackBiomeVisit: mapHook.trackBiomeVisit,
+      trackTownVisit: mapHook.trackTownVisit
+    });
 
     // POI Check (for location Modal — towns, etc.)
-    const isTownPoi = targetTile.poi && ['town', 'city', 'village', 'hamlet'].includes(targetTile.poiType || targetTile.poi);
-    if (targetTile.poi) {
-      const poiType = targetTile.poiType || targetTile.poi;
-      const encounter = {
-        name: targetTile.townName || targetTile.poi,
-        poiType: poiType,
-        description: targetTile.descriptionSeed || `You have arrived at ${targetTile.poi}.`,
-        canEnter: ['town', 'city', 'village', 'hamlet', 'dungeon'].includes(poiType),
-        tile: targetTile
-      };
+    const encounter = buildPoiEncounter(targetTile);
+    if (encounter) {
       setCurrentEncounter(encounter);
       setIsEncounterModalOpen(true);
     }
 
     // --- Random Encounter Check (Phase 2.4: Two-Tier System) ---
     const isFirstVisitToTile = !wasExplored;
-    console.log('[GAME DEBUG] About to check for encounter:', {
+    logger.debug('About to check for encounter', {
       targetTile: { biome: targetTile.biome, poi: targetTile.poi, x: targetTile.x, y: targetTile.y },
       isFirstVisitToTile,
       movesSinceEncounter,
       settings: { grimnessLevel: settings?.grimnessLevel }
     });
     const randomEncounter = checkForEncounter(targetTile, isFirstVisitToTile, settings, movesSinceEncounter);
-    console.log('[GAME DEBUG] checkForEncounter returned:', randomEncounter ? randomEncounter.name : null);
+    logger.debug('checkForEncounter returned', randomEncounter ? randomEncounter.name : null);
     
-    if (randomEncounter) {
-      if (randomEncounter.encounterTier === 'immediate') {
-        // IMMEDIATE: Show modal immediately, defer AI narrative until after resolution
-        const delay = targetTile.poi ? 800 : 0;
-        setTimeout(() => {
-          setActionEncounter(randomEncounter);
-          setIsActionEncounterOpen(true);
-        }, delay);
-        setMovesSinceEncounter(0);
-        // Store tile info for post-encounter narrative
-        setPendingNarrativeTile({
-          tile: targetTile,
-          coords: { x: clickedX, y: clickedY },
-          biomeType,
-          townName,
-          needsAiDescription: !isBiomeVisited || (townName && !isTownVisited)
-        });
-        return; // Exit early - AI narrative will trigger after encounter
-        
-      } else if (randomEncounter.encounterTier === 'narrative') {
-        // NARRATIVE: If AI is disabled, show modal instead; otherwise inject into AI prompt
-        if (!aiNarrativeEnabled) {
-          // Fallback: show modal when AI is off (for testing)
-          const delay = targetTile.poi ? 800 : 0;
-          setTimeout(() => {
-            setActionEncounter(randomEncounter);
-            setIsActionEncounterOpen(true);
-          }, delay);
-          setMovesSinceEncounter(0);
-          return;
-        }
-        // Normal flow: Store for AI prompt injection
-        const encounterContext = {
-          type: 'narrative_encounter',
-          encounter: randomEncounter,
-          hook: randomEncounter.narrativeHook,
-          aiContext: randomEncounter.aiContext
-        };
-        setNarrativeEncounter(encounterContext);
-        setMovesSinceEncounter(0);
-        // Continue to AI movement prompt with encounter context
-      }
-    } else {
-      setMovesSinceEncounter(prev => prev + 1);
+    const plannedEncounterFlow = planWorldTileEncounterFlow({
+      randomEncounter,
+      targetTile,
+      aiNarrativeEnabled,
+      pendingNarrativeTile: buildPendingNarrativeTile({
+        targetTile,
+        clickedX,
+        clickedY,
+        biomeType,
+        townName,
+        isBiomeVisited,
+        isTownVisited
+      })
+    });
+
+    if (plannedEncounterFlow.shouldResetMoves) {
+      setMovesSinceEncounter(0);
+    } else if (plannedEncounterFlow.shouldIncrementMoves) {
+      setMovesSinceEncounter((prev) => prev + 1);
+    }
+
+    if (plannedEncounterFlow.openActionEncounter) {
+      setTimeout(() => {
+        setActionEncounter(randomEncounter);
+        setIsActionEncounterOpen(true);
+      }, plannedEncounterFlow.delayMs || 0);
+    }
+
+    if (plannedEncounterFlow.flowType === 'immediate') {
+      setPendingNarrativeTile(plannedEncounterFlow.pendingNarrativeTile || null);
+      return; // AI narrative triggers after encounter resolution
+    }
+
+    let activeNarrativeEncounter = null;
+    if (plannedEncounterFlow.flowType === 'narrative_context') {
+      activeNarrativeEncounter = plannedEncounterFlow.narrativeEncounter;
     }
 
     // Always generate AI narrative for world map movement (unless disabled)
@@ -413,69 +273,47 @@ const Game = () => {
     // API keys are now configured server-side in .env file
     // CLI providers use OAuth/local auth, cloud providers use server .env keys
 
-    const model = interactionHook.modelOptions.find(opt => opt.provider === selectedProvider)?.model || 'gpt-5';
+    const resolvedModel = resolveProviderAndModel(selectedProvider, selectedModel);
 
-    let systemMessageContent = `You moved to ${biomeType} (${clickedX}, ${clickedY}).`;
-    if (targetTile.poi === 'town' && targetTile.townName) {
-      systemMessageContent = `You arrived at ${targetTile.townName}, a ${targetTile.townSize || 'settlement'} (${clickedX}, ${clickedY}).`;
-    }
-    const systemMessage = { role: 'system', content: systemMessageContent };
+    const systemMessage = buildMovementSystemMessage({
+      targetTile,
+      biomeType,
+      clickedX,
+      clickedY
+    });
     interactionHook.setConversation(prev => [...prev, systemMessage]);
     interactionHook.setIsLoading(true);
 
-    const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
-    
-    // Build movement prompt with optional narrative encounter context
-    const movementDescription = buildMovementPrompt(targetTile, settings, narrativeEncounter, mapHook.worldMap);
-    
-    let locationInfo = `Player has moved to coordinates (${clickedX}, ${clickedY}) in a ${targetTile.biome} biome.`;
-    if (targetTile.poi === 'town' && targetTile.townName) {
-      locationInfo += ` The party has arrived at ${targetTile.townName}, a ${targetTile.townSize || 'settlement'}. They are standing at the edge of the town.`;
-    } else if (targetTile.poi) {
-      locationInfo += ` POI: ${targetTile.poi}.`;
-    }
-    locationInfo += ` Description seed: ${targetTile.descriptionSeed || 'Describe the area.'}`;
-    if (!isNewArea) {
-      locationInfo += ' The party has been to this type of terrain before. Keep the description brief (1 paragraph) and focus on what is new or different.';
-    }
-
-    const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
-    const milestonesInfo = settings.milestones && settings.milestones.length > 0 ? `\nKey Milestones to achieve: ${settings.milestones.map(m => typeof m === 'object' ? m.text : m).join(', ')}` : '';
-    const gameContext = `Setting: ${settings.shortDescription}. Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
-    
-    // Get last few AI responses to avoid repetition
-    const recentAiMessages = interactionHook.conversation
-      .filter(msg => msg.role === 'ai')
-      .slice(-3)
-      .map(msg => msg.content.substring(0, 150))
-      .join(' | ');
-    const recentContext = recentAiMessages 
-      ? `\n\n**Recent descriptions (DO NOT repeat similar phrases):**\n${recentAiMessages}` 
-      : '';
-    
-    const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${interactionHook.currentSummary}${recentContext}\n\n${movementDescription}`;
-
-    const fullPrompt = DM_PROTOCOL + prompt;
+    const { fullPrompt } = composeMovementNarrativePrompt({
+      tile: targetTile,
+      coords: { x: clickedX, y: clickedY },
+      settings,
+      selectedHeroes,
+      currentSummary: interactionHook.currentSummary,
+      narrativeEncounter: activeNarrativeEncounter,
+      worldMap: mapHook.worldMap,
+      isNewArea,
+      conversation: interactionHook.conversation,
+      includeRecentContext: true
+    });
     interactionHook.setLastPrompt(fullPrompt);
 
     try {
-      const aiResponse = await llmService.generateUnified({
-        provider: selectedProvider,
-        model,
+      const aiResponse = await generateMovementNarrative({
+        provider: resolvedModel.provider,
+        model: resolvedModel.model,
         prompt: fullPrompt,
-        maxTokens: 1600,
-        temperature: 0.7,
         onProgress: (p) => interactionHook.setProgressStatus(p)
       });
       interactionHook.setProgressStatus(null);
       if (!aiResponse || !aiResponse.trim()) {
-        console.warn('Empty movement AI response, skipping');
+        logger.warn('Empty movement AI response, skipping');
         return;
       }
       const aiMessage = { role: 'ai', content: aiResponse };
       interactionHook.setConversation(prev => [...prev, aiMessage]);
     } catch (error) {
-      console.error('Movement AI error:', error);
+      logger.error('Movement AI error', error);
       interactionHook.setError(error.message);
       interactionHook.setProgressStatus(null);
     } finally {
@@ -483,22 +321,87 @@ const Game = () => {
     }
   };
 
+  const handleEncounterResolve = (result) => {
+    logger.info('Encounter resolved', result);
+
+    const {
+      updatedParty,
+      heroIndex,
+      rewardMessages,
+      penaltyMessages
+    } = applyEncounterOutcomeToParty({
+      party: selectedHeroes,
+      result
+    });
+    setSelectedHeroes(updatedParty);
+
+    const heroName = updatedParty[heroIndex]?.characterName || 'Hero';
+    const rewardLog = formatEncounterRewardLog(heroName, rewardMessages);
+    const penaltyLog = formatEncounterPenaltyLog(heroName, penaltyMessages);
+    if (rewardLog) logger.info(rewardLog);
+    if (penaltyLog) logger.info(penaltyLog);
+
+    const encounterName = actionEncounter?.name || 'Encounter';
+    if (result?.narration) {
+      const encounterMsg = { role: 'ai', content: `⚔️ **${encounterName}**: ${result.narration}` };
+      interactionHook.setConversation((prev) => [...prev, encounterMsg]);
+    }
+
+    setIsActionEncounterOpen(false);
+    setActionEncounter(null);
+
+    // Trigger immediate save after encounter to preserve rewards
+    setTimeout(() => performSave(), 500);
+
+    // Trigger deferred AI narrative if there's a pending tile
+    if (!pendingNarrativeTile) return;
+    const { tile, coords, needsAiDescription } = pendingNarrativeTile;
+    setPendingNarrativeTile(null);
+
+    if (!needsAiDescription || !aiNarrativeEnabled) return;
+
+    (async () => {
+      const resolvedModel = resolveProviderAndModel(selectedProvider, selectedModel);
+      const { fullPrompt } = composeMovementNarrativePrompt({
+        tile,
+        coords,
+        settings,
+        selectedHeroes: updatedParty,
+        currentSummary: interactionHook.currentSummary,
+        narrativeEncounter: null,
+        worldMap: mapHook.worldMap,
+        isNewArea: true,
+        conversation: interactionHook.conversation,
+        includeRecentContext: false
+      });
+
+      interactionHook.setIsLoading(true);
+      try {
+        const aiResponse = await generateMovementNarrative({
+          provider: resolvedModel.provider,
+          model: resolvedModel.model,
+          prompt: fullPrompt,
+          onProgress: (p) => interactionHook.setProgressStatus(p)
+        });
+        interactionHook.setProgressStatus(null);
+        if (!aiResponse || !aiResponse.trim()) {
+          logger.warn('Empty post-encounter AI response, skipping');
+          return;
+        }
+        const aiMessage = { role: 'ai', content: aiResponse };
+        interactionHook.setConversation((prev) => [...prev, aiMessage]);
+      } catch (error) {
+        logger.error('Post-encounter AI narrative error', error);
+        interactionHook.setProgressStatus(null);
+      } finally {
+        interactionHook.setIsLoading(false);
+      }
+    })();
+  };
+
   const currentTile = getTile(mapHook.worldMap, mapHook.playerPosition.x, mapHook.playerPosition.y);
   const currentBiome = currentTile?.biome || 'Unknown Area';
   const townName = mapHook.isInsideTown ? (mapHook.currentTownTile?.townName || 'Town') : null;
-
-  const getCurrentSelection = () => {
-    if (selectedProvider && selectedModel) return `${selectedProvider}:${selectedModel}`;
-    return '';
-  };
-
-  const handleModelSelection = (value) => {
-    const selected = interactionHook.modelOptions.find(opt => `${opt.provider}:${opt.model}` === value);
-    if (selected) {
-      setSelectedProvider(selected.provider);
-      setSelectedModel(selected.model);
-    }
-  };
 
   const diceSkill = interactionHook.checkRequest?.type === 'skill' ? interactionHook.checkRequest.skill : null;
   const diceMode = interactionHook.checkRequest?.type === 'skill' ? 'skill' : 'dice';
@@ -506,254 +409,50 @@ const Game = () => {
   return (
     <div className="game-page-wrapper">
       <div className="game-container">
-        <div className="game-main">
-          <div className="game-top">
-            <h2>Adventure Log</h2>
-            <div className="game-info-header">
-              <div>
-                {settings.campaignGoal && (
-                  <p><strong>Quest:</strong> <span style={{ color: 'var(--text-secondary)', fontWeight: 'bold' }}>{settings.campaignGoal}</span></p>
-                )}
-                <p><strong>Location:</strong> {townName 
-                  ? `${townName} (${mapHook.townPlayerPosition?.x}, ${mapHook.townPlayerPosition?.y})`
-                  : `(${mapHook.playerPosition.x}, ${mapHook.playerPosition.y}) - ${currentBiome}`
-                }</p>
-              </div>
-              <div className="header-button-group">
-                <button onClick={() => mapHook.setIsMapModalOpen(true)} className="view-map-button">{townName ? `View ${townName} Map` : 'View Map'}</button>
-                <button onClick={() => setIsInventoryModalOpen(true)} className="view-settings-button">📦 Inventory</button>
-                <button onClick={() => setIsHowToPlayModalOpen(true)} className="how-to-play-button">How to Play</button>
-                <button onClick={() => setIsSettingsModalOpen(true)} className="view-settings-button">View Full Settings</button>
-                <button
-                  onClick={() => performSave()}
-                  className="manual-save-button"
-                  disabled={!sessionId}
-                >
-                  💾 Save Now
-                </button>
-              </div>
-            </div>
-          </div>
+        <GameMainPanel
+          campaignGoal={settings.campaignGoal}
+          townName={townName}
+          townPosition={mapHook.townPlayerPosition}
+          worldPosition={mapHook.playerPosition}
+          currentBiome={currentBiome}
+          onOpenMap={() => mapHook.setIsMapModalOpen(true)}
+          onOpenInventory={() => setIsInventoryModalOpen(true)}
+          onOpenHowToPlay={() => setIsHowToPlayModalOpen(true)}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
+          onManualSave={() => performSave()}
+          canManualSave={!!sessionId}
+          hasAdventureStarted={hasAdventureStarted}
+          isLoading={interactionHook.isLoading}
+          onStartAdventure={interactionHook.handleStartAdventure}
+          conversation={interactionHook.conversation}
+          progressStatus={interactionHook.progressStatus}
+          error={interactionHook.error}
+          onSubmit={interactionHook.handleSubmit}
+          userInput={interactionHook.userInput}
+          onInputChange={interactionHook.handleInputChange}
+          selectedModel={selectedModel}
+          selectedProvider={selectedProvider}
+          sessionId={sessionId}
+          onToggleDebug={() => setShowDebugInfo((prev) => !prev)}
+          showDebugInfo={showDebugInfo}
+          onToggleAiNarrative={() => setAiNarrativeEnabled((prev) => !prev)}
+          aiNarrativeEnabled={aiNarrativeEnabled}
+          isMapLoaded={!!mapHook.worldMap}
+          lastPrompt={interactionHook.lastPrompt}
+        />
 
-          <div className="conversation">
-            {!hasAdventureStarted && !interactionHook.isLoading && (
-              <div className="start-adventure-overlay">
-                <button onClick={interactionHook.handleStartAdventure} className="start-adventure-button">
-                  Start the Adventure!
-                </button>
-              </div>
-            )}
-
-            {interactionHook.conversation.map((msg, index) => (
-              <div key={index} className={`message ${msg.role}`}>
-                <SafeMarkdownMessage content={msg.content} />
-              </div>
-            ))}
-            {interactionHook.isLoading && (
-              <p className="message system">
-                {interactionHook.progressStatus?.elapsed > 5 
-                  ? `AI is working... (${interactionHook.progressStatus.elapsed}s)`
-                  : 'AI is thinking...'}
-              </p>
-            )}
-            {interactionHook.error && <p className="message error">{interactionHook.error}</p>}
-          </div>
-
-          <div className="game-lower-section">
-            <form onSubmit={interactionHook.handleSubmit}>
-              <textarea
-                value={interactionHook.userInput}
-                onChange={interactionHook.handleInputChange}
-                placeholder={hasAdventureStarted ? "Type your action..." : "Click 'Start Adventure' above..."}
-                rows="4"
-                className="user-input"
-                disabled={!hasAdventureStarted || interactionHook.isLoading}
-              />
-              <button
-                type="submit"
-                className="game-send-button"
-                disabled={!hasAdventureStarted || !interactionHook.userInput.trim() || interactionHook.isLoading}
-              >
-                {interactionHook.isLoading ? '...' : '↑ Send'}
-              </button>
-            </form>
-            <p className="info">AI responses may not always be accurate or coherent.</p>
-            <div className="model-info-text">
-              <span className="model-label">Active Model:</span>
-              <span className="model-value">{selectedModel} ({selectedProvider.toUpperCase()})</span>
-            </div>
-            <div className="status-bar">
-              <p className="session-info">Session ID: {sessionId || 'Generating...'}</p>
-              <div className="api-key-status">
-                <span
-                  className={`status-light ${['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
-                    ? 'status-cli'
-                    : 'status-active'
-                    }`}
-                  title={
-                    ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
-                      ? `${selectedProvider} uses local CLI (OAuth login)`
-                      : `${selectedProvider} uses server-side API key (.env file)`
-                  }
-                ></span>
-                <span className="status-text">
-                  {['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
-                    ? 'CLI Mode'
-                    : 'Cloud API'}
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowDebugInfo(!showDebugInfo)}
-              className="debug-toggle-button"
-            >
-              {showDebugInfo ? '🐛 Hide Debug' : '🐛 Show Debug'}
-            </button>
-            <button
-              onClick={() => setAiNarrativeEnabled(!aiNarrativeEnabled)}
-              className="debug-toggle-button"
-              style={{ 
-                marginLeft: '10px',
-                background: aiNarrativeEnabled ? '#4CAF50' : '#666'
-              }}
-              title={aiNarrativeEnabled ? 'AI narrative enabled' : 'AI narrative disabled (testing mode)'}
-            >
-              {aiNarrativeEnabled ? '🤖 AI: ON' : '🤖 AI: OFF'}
-            </button>
-
-            {showDebugInfo && (
-              <div className="debug-info-box">
-                <h4>Debug Information</h4>
-                <div className="debug-section">
-                  <strong>Stats:</strong>
-                  <pre>Session: {sessionIdRef.current}</pre>
-                  <pre>Map: {mapHook.worldMap ? 'Loaded' : 'No'}</pre>
-                </div>
-                <div className="debug-section" style={{ marginTop: '10px' }}>
-                  <strong>Last Sent Prompt:</strong>
-                  <pre className="debug-prompt-pre">
-                    {interactionHook.lastPrompt || 'No prompt sent yet.'}
-                  </pre>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="party-bar">
-          <h2>Party Members</h2>
-          {selectedHeroes && selectedHeroes.length > 0 ? (
-            selectedHeroes.map(hero => (
-              <div key={hero.characterId || hero.characterName} className="party-member">
-                {hero.profilePicture && (
-                  <img
-                    src={hero.profilePicture}
-                    alt={`${hero.characterName}'s profile`}
-                    onClick={() => {
-                      setSelectedHeroForModal(hero);
-                      setIsCharacterModalOpen(true);
-                    }}
-                  />
-                )}
-                <h3>{hero.characterName}</h3>
-                <p>Level {hero.characterLevel} {hero.characterRace} {hero.characterClass}</p>
-                
-                {/* HP Bar */}
-                {hero.maxHP && (
-                  <div style={{ margin: '10px 0', padding: '8px', background: 'var(--surface-light)', borderRadius: '6px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 'bold' }}>HP:</span>
-                      <span style={{ color: getHPStatus(hero.currentHP, hero.maxHP).color, fontWeight: 'bold' }}>
-                        {hero.currentHP}/{hero.maxHP}
-                      </span>
-                    </div>
-                    <div style={{ 
-                      width: '100%', 
-                      height: '12px', 
-                      background: 'var(--border)', 
-                      borderRadius: '6px', 
-                      overflow: 'hidden',
-                      border: '1px solid var(--border)'
-                    }}>
-                      <div style={{ 
-                        width: `${(hero.currentHP / hero.maxHP) * 100}%`, 
-                        height: '100%', 
-                        background: getHPStatus(hero.currentHP, hero.maxHP).color,
-                        transition: 'width 0.5s ease'
-                      }} />
-                    </div>
-                    {hero.currentHP <= hero.maxHP * 0.25 && hero.currentHP > 0 && (
-                      <div style={{ fontSize: '10px', color: '#e74c3c', marginTop: '4px', fontStyle: 'italic' }}>
-                        {getHPStatus(hero.currentHP, hero.maxHP).description}
-                      </div>
-                    )}
-                    {hero.currentHP === 0 && (
-                      <div style={{ fontSize: '10px', color: '#e74c3c', marginTop: '4px', fontWeight: 'bold' }}>
-                        💀 DEFEATED
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                {/* XP Bar */}
-                <div style={{ margin: '8px 0', padding: '8px', background: 'var(--surface-light)', borderRadius: '6px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: 'bold' }}>XP:</span>
-                    <span style={{ color: '#f1c40f', fontWeight: 'bold' }}>
-                      {hero.xp || 0} (Lvl {hero.level || 1})
-                    </span>
-                  </div>
-                  <div style={{ 
-                    width: '100%', 
-                    height: '8px', 
-                    background: '#2c3e50', 
-                    borderRadius: '4px', 
-                    overflow: 'hidden'
-                  }}>
-                    {(() => {
-                      const xp = hero.xp || 0;
-                      const level = hero.level || 1;
-                      const XP_THRESHOLDS = [0, 300, 900, 2700, 6500, 14000, 23000, 34000, 48000, 64000];
-                      const currentThreshold = XP_THRESHOLDS[level - 1] || 0;
-                      const nextThreshold = XP_THRESHOLDS[level] || XP_THRESHOLDS[level - 1];
-                      const progress = nextThreshold > currentThreshold 
-                        ? ((xp - currentThreshold) / (nextThreshold - currentThreshold)) * 100 
-                        : 100;
-                      return (
-                        <div style={{ 
-                          width: `${Math.min(100, progress)}%`, 
-                          height: '100%', 
-                          background: 'linear-gradient(90deg, #f39c12, #f1c40f)',
-                          transition: 'width 0.5s ease'
-                        }} />
-                      );
-                    })()}
-                  </div>
-                </div>
-                
-                <div style={{ textAlign: 'center', marginTop: '5px' }}>
-                  <button
-                    className="view-details-btn"
-                    onClick={() => {
-                      setSelectedHeroForModal(hero);
-                      setIsCharacterModalOpen(true);
-                    }}
-                  >
-                    View Details
-                  </button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p>No heroes selected.</p>
-          )}
-        </div>
+        <PartySidebar
+          selectedHeroes={selectedHeroes}
+          onOpenCharacter={(hero) => {
+            setSelectedHeroForModal(hero);
+            setIsCharacterModalOpen(true);
+          }}
+        />
       </div>
 
-      {/* --- Modals --- */}
-      <StorySettingsModalContent
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
+      <GameModals
+        isSettingsModalOpen={isSettingsModalOpen}
+        setIsSettingsModalOpen={setIsSettingsModalOpen}
         settings={settings}
         setSettings={setSettings}
         selectedProvider={selectedProvider}
@@ -765,340 +464,33 @@ const Game = () => {
         assistantModel={assistantModel}
         setAssistantModel={setAssistantModel}
         worldSeed={worldSeed}
-      />
-      <HowToPlayModalContent
-        isOpen={isHowToPlayModalOpen}
-        onClose={() => setIsHowToPlayModalOpen(false)}
-      />
-
-      {/* AI Assistant Panel */}
-      <AiAssistantPanel
-        gameState={{
-          selectedHeroes,
-          playerPosition: mapHook.playerPosition,
-          isInsideTown: mapHook.isInsideTown,
-          currentTownMap: mapHook.currentTownMap
-        }}
-        backend={assistantProvider || selectedProvider}
-        model={assistantModel || selectedModel}
-      />
-      <MapModal
-        isOpen={mapHook.isMapModalOpen}
-        onClose={() => mapHook.setIsMapModalOpen(false)}
-        mapData={mapHook.worldMap}
-        playerPosition={mapHook.playerPosition}
-        onTileClick={handleMoveOnWorldMap}
-        firstHero={selectedHeroes && selectedHeroes.length > 0 ? selectedHeroes[0] : null}
-        mapLevel={mapHook.currentMapLevel}
-        townMapData={mapHook.currentTownMap}
-        townPlayerPosition={mapHook.townPlayerPosition}
-        onLeaveTown={() => mapHook.handleLeaveTown(interactionHook.setConversation, interactionHook.conversation)}
-        onTownTileClick={(x, y) => handleTownTileClick(x, y)}
+        isHowToPlayModalOpen={isHowToPlayModalOpen}
+        setIsHowToPlayModalOpen={setIsHowToPlayModalOpen}
+        selectedHeroes={selectedHeroes}
+        mapHook={mapHook}
+        handleMoveOnWorldMap={handleMoveOnWorldMap}
+        interactionHook={interactionHook}
         currentTile={currentTile}
-        onEnterCurrentTown={() => mapHook.handleEnterCurrentTown(interactionHook.setConversation, interactionHook.conversation)}
-        isInsideTown={mapHook.isInsideTown}
         hasAdventureStarted={hasAdventureStarted}
-        townError={mapHook.townError}
-        markBuildingDiscovered={mapHook.markBuildingDiscovered}
-      />
-      <EncounterModal
-        isOpen={isEncounterModalOpen}
-        onClose={() => setIsEncounterModalOpen(false)}
-        encounter={currentEncounter}
-        onEnterLocation={() => mapHook.handleEnterLocation(currentEncounter, interactionHook.setConversation, interactionHook.conversation)}
-        onViewMap={() => mapHook.setIsMapModalOpen(true)}
-      />
-      <CharacterModal
-        isOpen={isCharacterModalOpen}
-        onClose={() => setIsCharacterModalOpen(false)}
-        character={selectedHeroForModal}
-      />
-      <EncounterActionModal
-        isOpen={isActionEncounterOpen}
-        onClose={() => {
-          setIsActionEncounterOpen(false);
-          setActionEncounter(null);
-        }}
-        encounter={actionEncounter}
-        character={selectedHeroes.length > 0 ? selectedHeroes[0] : null}
-        party={selectedHeroes}
-        onResolve={(result) => {
-          console.log('[ENCOUNTER] Resolved:', result);
-          
-          // Determine which hero participated (from initiative system)
-          const heroIndex = result.heroIndex !== undefined ? result.heroIndex : 0;
-          
-          // Apply rewards to the hero who participated
-          if (result?.rewards && selectedHeroes.length > heroIndex) {
-            let updatedHero = { ...selectedHeroes[heroIndex] };
-            const rewards = result.rewards;
-            let rewardMessages = [];
-            
-            // Award XP
-            if (rewards.xp > 0) {
-              const xpResult = awardXP(updatedHero, rewards.xp);
-              updatedHero = xpResult.character;
-              rewardMessages.push(`+${rewards.xp} XP`);
-              
-              if (xpResult.leveledUp) {
-                const summary = getLevelUpSummary(xpResult.previousLevel, xpResult.newLevel, updatedHero);
-                rewardMessages.push(`🎉 LEVEL UP! Now level ${summary.newLevel}!`);
-              }
-            }
-            
-            // Award gold
-            if (rewards.gold > 0) {
-              updatedHero = addGold(updatedHero, rewards.gold);
-              rewardMessages.push(`+${rewards.gold} gold`);
-            }
-            
-            // Award items
-            if (rewards.items && rewards.items.length > 0) {
-              for (const itemName of rewards.items) {
-                const itemKey = itemName.replace(/ /g, '_').toLowerCase();
-                updatedHero = {
-                  ...updatedHero,
-                  inventory: addItem(updatedHero.inventory || [], itemKey)
-                };
-              }
-              rewardMessages.push(`Found: ${rewards.items.join(', ')}`);
-            }
-            
-            // Apply healing (from healer encounters)
-            if (rewards.healing) {
-              const currentHP = updatedHero.currentHP || 0;
-              const maxHP = updatedHero.maxHP || 20;
-              
-              if (rewards.healing === 'full') {
-                // Full heal
-                updatedHero.currentHP = maxHP;
-                rewardMessages.push(`💚 Fully healed to ${maxHP} HP!`);
-              } else if (typeof rewards.healing === 'number' && rewards.healing > 0) {
-                // Partial heal
-                const newHP = Math.min(currentHP + rewards.healing, maxHP);
-                const actualHeal = newHP - currentHP;
-                updatedHero.currentHP = newHP;
-                if (actualHeal > 0) {
-                  rewardMessages.push(`💚 Healed for ${actualHeal} HP (${currentHP} → ${newHP})`);
-                }
-              }
-            }
-            
-            // Update the specific hero who participated
-            const newHeroes = [...selectedHeroes];
-            newHeroes[heroIndex] = updatedHero;
-            setSelectedHeroes(newHeroes);
-            selectedHeroesRef.current = newHeroes;
-            
-            // Log rewards
-            if (rewardMessages.length > 0) {
-              console.log(`[PROGRESSION] Rewards applied to ${updatedHero.characterName}:`, rewardMessages.join(', '));
-            }
-          }
-          
-          // Apply penalties to the hero who participated
-          if (result?.penalties && selectedHeroes.length > heroIndex) {
-            let updatedHero = { ...selectedHeroes[heroIndex] };
-            const penalties = result.penalties;
-            
-            // Deduct gold if penalty includes gold loss
-            if (penalties.goldLoss > 0) {
-              const currentGold = updatedHero.gold || 0;
-              const actualLoss = Math.min(penalties.goldLoss, currentGold);
-              updatedHero.gold = Math.max(0, currentGold - actualLoss);
-              
-              console.log(`[PROGRESSION] Gold penalty for ${updatedHero.characterName}: -${actualLoss} gold (${currentGold} → ${updatedHero.gold})`);
-              
-              // Update the specific hero who participated
-              const newHeroes = [...selectedHeroes];
-              newHeroes[heroIndex] = updatedHero;
-              setSelectedHeroes(newHeroes);
-              selectedHeroesRef.current = newHeroes;
-            }
-          }
-          
-          // Add encounter outcome to conversation
-          if (result?.narration) {
-            const encounterMsg = { role: 'ai', content: `⚔️ **${actionEncounter?.name || 'Encounter'}**: ${result.narration}` };
-            interactionHook.setConversation(prev => [...prev, encounterMsg]);
-          }
-          setIsActionEncounterOpen(false);
-          setActionEncounter(null);
-          
-          // Trigger immediate save after encounter to preserve loot/rewards
-          setTimeout(() => performSave(), 500);
-          
-          // Trigger deferred AI narrative if there's a pending tile
-          if (pendingNarrativeTile) {
-            const { tile, coords, biomeType, townName, needsAiDescription } = pendingNarrativeTile;
-            setPendingNarrativeTile(null);
-            
-            if (needsAiDescription && aiNarrativeEnabled) {
-              // Generate AI narrative for the location (if AI is enabled)
-              (async () => {
-                // API keys are configured server-side in .env file
-                
-                const model = interactionHook.modelOptions.find(opt => opt.provider === selectedProvider)?.model || 'gpt-5';
-                const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
-                const movementDescription = buildMovementPrompt(tile, settings, null, mapHook.worldMap);
-                
-                let locationInfo = `Player has moved to coordinates (${coords.x}, ${coords.y}) in a ${tile.biome} biome.`;
-                if (tile.poi === 'town' && tile.townName) {
-                  locationInfo += ` The party has arrived at ${tile.townName}, a ${tile.townSize || 'settlement'}. They are standing at the edge of the town.`;
-                } else if (tile.poi) {
-                  locationInfo += ` POI: ${tile.poi}.`;
-                }
-                locationInfo += ` Description seed: ${tile.descriptionSeed || 'Describe the area.'}`;
-                
-                const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
-                const milestonesInfo = settings.milestones && settings.milestones.length > 0 ? `\nKey Milestones to achieve: ${settings.milestones.map(m => typeof m === 'object' ? m.text : m).join(', ')}` : '';
-                const gameContext = `Setting: ${settings.shortDescription}. Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
-                const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${interactionHook.currentSummary}\n\n${movementDescription}`;
-                const fullPrompt = DM_PROTOCOL + prompt;
-                
-                interactionHook.setIsLoading(true);
-                try {
-                  const aiResponse = await llmService.generateUnified({
-                    provider: selectedProvider,
-                    model,
-                    prompt: fullPrompt,
-                    maxTokens: 1600,
-                    temperature: 0.7,
-                    onProgress: (p) => interactionHook.setProgressStatus(p)
-                  });
-                  interactionHook.setProgressStatus(null);
-                  if (!aiResponse || !aiResponse.trim()) {
-                    console.warn('Empty post-encounter AI response, skipping');
-                    return;
-                  }
-                  const aiMessage = { role: 'ai', content: aiResponse };
-                  interactionHook.setConversation(prev => [...prev, aiMessage]);
-                } catch (error) {
-                  console.error('Post-encounter AI narrative error:', error);
-                  interactionHook.setProgressStatus(null);
-                } finally {
-                  interactionHook.setIsLoading(false);
-                }
-              })();
-            }
-          }
-        }}
-        onCharacterUpdate={handleHeroUpdate}
-      />
-      {/* Inventory Modal */}
-      {isInventoryModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsInventoryModalOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-            <h2 style={{ marginBottom: '20px' }}>Party Inventory</h2>
-            
-            {/* Gold */}
-            <div style={{ 
-              padding: '15px', 
-              background: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)', 
-              borderRadius: '8px', 
-              marginBottom: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px'
-            }}>
-              <span style={{ fontSize: '32px' }}>💰</span>
-              <div>
-                <div style={{ fontSize: '12px', opacity: 0.9 }}>Gold Pieces</div>
-                <div style={{ fontSize: '24px', fontWeight: 'bold' }}>
-                  {selectedHeroes.reduce((sum, h) => sum + (h.gold || 0), 0)} GP
-                </div>
-              </div>
-            </div>
-            
-            {/* Items */}
-            <h3 style={{ marginBottom: '10px' }}>Items</h3>
-            <div style={{ 
-              background: 'var(--surface)', 
-              borderRadius: '8px', 
-              padding: '15px',
-              minHeight: '100px'
-            }}>
-              {(() => {
-                const allItems = selectedHeroes.flatMap(h => h.inventory || []);
-                if (allItems.length === 0) {
-                  return <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No items yet. Complete encounters to find loot!</p>;
-                }
-                // Group items by key, summing quantities
-                const itemMap = {};
-                for (const item of allItems) {
-                  const key = typeof item === 'string' ? item : (item.key || 'unknown');
-                  // Look up in ITEM_CATALOG for proper name, fallback to item.name or formatted key
-                  const catalogEntry = ITEM_CATALOG[key];
-                  const name = catalogEntry?.name || item.name || key.replace(/_/g, ' ');
-                  const qty = item.quantity || 1;
-                  const rarity = catalogEntry?.rarity || item.rarity || 'common';
-                  if (itemMap[key]) {
-                    itemMap[key].quantity += qty;
-                  } else {
-                    itemMap[key] = { name, quantity: qty, rarity };
-                  }
-                }
-                const rarityColors = { common: '#9d9d9d', uncommon: '#1eff00', rare: '#0070dd', very_rare: '#a335ee', legendary: '#ff8000' };
-                return (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                    {Object.entries(itemMap).map(([key, { name, quantity, rarity }]) => (
-                      <div key={key} style={{
-                        padding: '8px 12px',
-                        background: 'var(--surface-light)',
-                        borderRadius: '4px',
-                        border: `1px solid ${rarityColors[rarity] || rarityColors.common}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '6px'
-                      }}>
-                        <span style={{ color: rarityColors[rarity] || rarityColors.common }}>{name}</span>
-                        {quantity > 1 && <span style={{ 
-                          background: 'var(--primary)', 
-                          color: 'white', 
-                          borderRadius: '50%', 
-                          width: '20px', 
-                          height: '20px', 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          fontSize: '12px'
-                        }}>x{quantity}</span>}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-            
-            <button 
-              onClick={() => setIsInventoryModalOpen(false)}
-              style={{
-                marginTop: '20px',
-                padding: '10px 20px',
-                background: 'var(--primary)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                width: '100%'
-              }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-      <DiceRoller
-        isOpen={isDiceModalOpen}
-        onClose={() => {
-          setIsDiceModalOpen(false);
-          if (interactionHook.checkRequest) {
-            interactionHook.setCheckRequest(null);
-          }
-        }}
-        preselectedSkill={diceSkill}
-        initialMode={diceMode}
-        character={selectedHeroes.length > 0 ? selectedHeroes[0] : null}
+        handleTownTileClick={handleTownTileClick}
+        isEncounterModalOpen={isEncounterModalOpen}
+        setIsEncounterModalOpen={setIsEncounterModalOpen}
+        currentEncounter={currentEncounter}
+        isCharacterModalOpen={isCharacterModalOpen}
+        setIsCharacterModalOpen={setIsCharacterModalOpen}
+        selectedHeroForModal={selectedHeroForModal}
+        isActionEncounterOpen={isActionEncounterOpen}
+        setIsActionEncounterOpen={setIsActionEncounterOpen}
+        setActionEncounter={setActionEncounter}
+        actionEncounter={actionEncounter}
+        handleEncounterResolve={handleEncounterResolve}
+        handleHeroUpdate={handleHeroUpdate}
+        isInventoryModalOpen={isInventoryModalOpen}
+        setIsInventoryModalOpen={setIsInventoryModalOpen}
+        isDiceModalOpen={isDiceModalOpen}
+        setIsDiceModalOpen={setIsDiceModalOpen}
+        diceSkill={diceSkill}
+        diceMode={diceMode}
       />
     </div>
   );

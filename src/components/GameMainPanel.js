@@ -1,0 +1,161 @@
+import React from 'react';
+import SafeMarkdownMessage from './SafeMarkdownMessage';
+
+const GameMainPanel = ({
+  campaignGoal,
+  townName,
+  townPosition,
+  worldPosition,
+  currentBiome,
+  onOpenMap,
+  onOpenInventory,
+  onOpenHowToPlay,
+  onOpenSettings,
+  onManualSave,
+  canManualSave,
+  hasAdventureStarted,
+  isLoading,
+  onStartAdventure,
+  conversation,
+  progressStatus,
+  error,
+  onSubmit,
+  userInput,
+  onInputChange,
+  selectedModel,
+  selectedProvider,
+  sessionId,
+  onToggleDebug,
+  showDebugInfo,
+  onToggleAiNarrative,
+  aiNarrativeEnabled,
+  isMapLoaded,
+  lastPrompt
+}) => {
+  return (
+    <div className="game-main">
+      <div className="game-top">
+        <h2>Adventure Log</h2>
+        <div className="game-info-header">
+          <div>
+            {campaignGoal && (
+              <p><strong>Quest:</strong> <span style={{ color: 'var(--text-secondary)', fontWeight: 'bold' }}>{campaignGoal}</span></p>
+            )}
+            <p><strong>Location:</strong> {townName
+              ? `${townName} (${townPosition?.x}, ${townPosition?.y})`
+              : `(${worldPosition.x}, ${worldPosition.y}) - ${currentBiome}`
+            }</p>
+          </div>
+          <div className="header-button-group">
+            <button onClick={onOpenMap} className="view-map-button">{townName ? `View ${townName} Map` : 'View Map'}</button>
+            <button onClick={onOpenInventory} className="view-settings-button">📦 Inventory</button>
+            <button onClick={onOpenHowToPlay} className="how-to-play-button">How to Play</button>
+            <button onClick={onOpenSettings} className="view-settings-button">View Full Settings</button>
+            <button onClick={onManualSave} className="manual-save-button" disabled={!canManualSave}>
+              💾 Save Now
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="conversation">
+        {!hasAdventureStarted && !isLoading && (
+          <div className="start-adventure-overlay">
+            <button onClick={onStartAdventure} className="start-adventure-button">
+              Start the Adventure!
+            </button>
+          </div>
+        )}
+
+        {conversation.map((msg, index) => (
+          <div key={index} className={`message ${msg.role}`}>
+            <SafeMarkdownMessage content={msg.content} />
+          </div>
+        ))}
+        {isLoading && (
+          <p className="message system">
+            {progressStatus?.elapsed > 5
+              ? `AI is working... (${progressStatus.elapsed}s)`
+              : 'AI is thinking...'}
+          </p>
+        )}
+        {error && <p className="message error">{error}</p>}
+      </div>
+
+      <div className="game-lower-section">
+        <form onSubmit={onSubmit}>
+          <textarea
+            value={userInput}
+            onChange={onInputChange}
+            placeholder={hasAdventureStarted ? "Type your action..." : "Click 'Start Adventure' above..."}
+            rows="4"
+            className="user-input"
+            disabled={!hasAdventureStarted || isLoading}
+          />
+          <button type="submit" className="game-send-button" disabled={!hasAdventureStarted || !userInput.trim() || isLoading}>
+            {isLoading ? '...' : '↑ Send'}
+          </button>
+        </form>
+        <p className="info">AI responses may not always be accurate or coherent.</p>
+        <div className="model-info-text">
+          <span className="model-label">Active Model:</span>
+          <span className="model-value">{selectedModel} ({selectedProvider.toUpperCase()})</span>
+        </div>
+        <div className="status-bar">
+          <p className="session-info">Session ID: {sessionId || 'Generating...'}</p>
+          <div className="api-key-status">
+            <span
+              className={`status-light ${['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
+                ? 'status-cli'
+                : 'status-active'
+                }`}
+              title={
+                ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
+                  ? `${selectedProvider} uses local CLI (OAuth login)`
+                  : `${selectedProvider} uses server-side API key (.env file)`
+              }
+            ></span>
+            <span className="status-text">
+              {['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
+                ? 'CLI Mode'
+                : 'Cloud API'}
+            </span>
+          </div>
+        </div>
+        <button onClick={onToggleDebug} className="debug-toggle-button">
+          {showDebugInfo ? '🐛 Hide Debug' : '🐛 Show Debug'}
+        </button>
+        <button
+          onClick={onToggleAiNarrative}
+          className="debug-toggle-button"
+          style={{
+            marginLeft: '10px',
+            background: aiNarrativeEnabled ? '#4CAF50' : '#666'
+          }}
+          title={aiNarrativeEnabled ? 'AI narrative enabled' : 'AI narrative disabled (testing mode)'}
+        >
+          {aiNarrativeEnabled ? '🤖 AI: ON' : '🤖 AI: OFF'}
+        </button>
+
+        {showDebugInfo && (
+          <div className="debug-info-box">
+            <h4>Debug Information</h4>
+            <div className="debug-section">
+              <strong>Stats:</strong>
+              <pre>Session: {sessionId}</pre>
+              <pre>Map: {isMapLoaded ? 'Loaded' : 'No'}</pre>
+            </div>
+            <div className="debug-section" style={{ marginTop: '10px' }}>
+              <strong>Last Sent Prompt:</strong>
+              <pre className="debug-prompt-pre">
+                {lastPrompt || 'No prompt sent yet.'}
+              </pre>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default GameMainPanel;

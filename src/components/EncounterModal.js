@@ -53,7 +53,7 @@ const EncounterModal = ({ isOpen, onClose, encounter, onEnterLocation, onViewMap
                         View Map
                     </button>
                 </div>
-                <p style={{ fontSize: '12px', color: '#666', marginTop: '20px', fontStyle: 'italic' }}>
+                <p style={{ fontSize: '12px', color: 'var(--state-muted-strong)', marginTop: '20px', fontStyle: 'italic' }}>
                     💡 Tip: Use the Map button in the top-right to navigate the world
                 </p>
             </div>

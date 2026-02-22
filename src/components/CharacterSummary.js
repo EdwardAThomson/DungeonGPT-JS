@@ -4,8 +4,11 @@ import React, { useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { downloadJSONFile } from "../utils/fileHelper";
 import CharacterContext from "../contexts/CharacterContext";
-import { calculateMaxHP, getHPStatus } from "../utils/healthSystem";
+import { calculateMaxHP } from "../utils/healthSystem";
 import { charactersApi } from "../services/charactersApi";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger('character-summary');
 
 const CharacterSummary = () => {
   const { characters, setCharacters } = useContext(CharacterContext);
@@ -33,7 +36,7 @@ const CharacterSummary = () => {
     }
     setCharacters(updatedCharacters); // Update context
 
-    console.log(isUpdate ? "Updating character..." : "Adding character....", newCharacter);
+    logger.debug(isUpdate ? "Updating character..." : "Adding character....", newCharacter);
 
     // Attempt to save/update on the server
     try {
@@ -41,12 +44,12 @@ const CharacterSummary = () => {
         ? await charactersApi.update(newCharacter.characterId, newCharacter)
         : await charactersApi.create(newCharacter);
 
-      console.log(`Character ${isUpdate ? 'updated' : 'added'} in database. Response:`, result);
+      logger.debug(`Character ${isUpdate ? 'updated' : 'added'} in database. Response:`, result);
       alert(`Character ${isUpdate ? 'updated' : 'added'} successfully`);
       // Proceed with navigation after successful save/update
       handleProgress(updatedCharacters); // Pass updated characters to navigate function
     } catch (error) {
-      console.error(`Error ${isUpdate ? 'updating' : 'adding'} character in DB:`, error);
+      logger.error(`Error ${isUpdate ? 'updating' : 'adding'} character in DB:`, error);
       alert(`Failed to ${isUpdate ? 'update' : 'add'} character in database: ${error.message}. Changes applied locally only.`);
       // Optionally revert context change if DB save fails
       // setCharacters(characters); // Revert to original characters array

@@ -8,6 +8,9 @@ import {
   environmentalEncounterChance
 } from '../data/encounterTables';
 import { encounterTemplates } from '../data/encounters';
+import { createLogger } from './logger';
+
+const logger = createLogger('encounter-generator');
 
 /**
  * Determines the effective biome for encounter purposes.
@@ -99,7 +102,7 @@ export const shouldTriggerEncounter = (tile, isFirstVisit, settings, movesSinceL
   chance = Math.min(chance, 0.70);
 
   const roll = Math.random();
-  console.log('[ENCOUNTER DEBUG] shouldTriggerEncounter calc:', {
+  logger.debug('[ENCOUNTER DEBUG] shouldTriggerEncounter calc:', {
     baseChance,
     isFirstVisit,
     revisitMultiplier: !isFirstVisit ? (revisitEncounterMultiplier[biome] || 0.3) : 1,
@@ -150,7 +153,7 @@ export const rollRandomEncounter = (tile, settings) => {
 
   const template = encounterTemplates[roll.template];
   if (!template) {
-    console.warn(`[ENCOUNTER] Template not found: ${roll.template}`);
+    logger.warn(`[ENCOUNTER] Template not found: ${roll.template}`);
     return null;
   }
 
@@ -193,7 +196,7 @@ export const rollEnvironmentalEncounter = (tile, settings) => {
   
   const template = encounterTemplates[roll.template];
   if (!template) {
-    console.warn(`[ENCOUNTER] Environmental template not found: ${roll.template}`);
+    logger.warn(`[ENCOUNTER] Environmental template not found: ${roll.template}`);
     return null;
   }
   
@@ -245,7 +248,7 @@ export const checkForPoiEncounter = (tile, isFirstVisit, settings) => {
   
   const template = encounterTemplates[roll.template];
   if (!template) {
-    console.warn(`[ENCOUNTER] POI template not found: ${roll.template}`);
+    logger.warn(`[ENCOUNTER] POI template not found: ${roll.template}`);
     return null;
   }
   
@@ -271,7 +274,7 @@ export const checkForPoiEncounter = (tile, isFirstVisit, settings) => {
  */
 export const checkForEncounter = (tile, isFirstVisit, settings, movesSinceLastEncounter = 0) => {
   const biome = getEncounterBiome(tile);
-  console.log('[ENCOUNTER DEBUG] checkForEncounter called:', {
+  logger.debug('[ENCOUNTER DEBUG] checkForEncounter called:', {
     tile: { biome: tile?.biome, poi: tile?.poi },
     effectiveBiome: biome,
     isFirstVisit,
@@ -282,20 +285,20 @@ export const checkForEncounter = (tile, isFirstVisit, settings, movesSinceLastEn
   // First check for POI-specific encounters (higher priority)
   const poiEncounter = checkForPoiEncounter(tile, isFirstVisit, settings);
   if (poiEncounter) {
-    console.log('[ENCOUNTER] POI encounter triggered:', poiEncounter.name);
+    logger.debug('[ENCOUNTER] POI encounter triggered:', poiEncounter.name);
     return poiEncounter;
   }
   
   // Then check for environmental encounters
   const envEncounter = rollEnvironmentalEncounter(tile, settings);
   if (envEncounter) {
-    console.log('[ENCOUNTER] Environmental encounter triggered:', envEncounter.name);
+    logger.debug('[ENCOUNTER] Environmental encounter triggered:', envEncounter.name);
     return envEncounter;
   }
   
   // Fall back to regular biome encounters
   const willTrigger = shouldTriggerEncounter(tile, isFirstVisit, settings, movesSinceLastEncounter);
-  console.log('[ENCOUNTER DEBUG] shouldTriggerEncounter result:', willTrigger);
+  logger.debug('[ENCOUNTER DEBUG] shouldTriggerEncounter result:', willTrigger);
   
   if (!willTrigger) {
     return null;
@@ -303,9 +306,9 @@ export const checkForEncounter = (tile, isFirstVisit, settings, movesSinceLastEn
 
   const encounter = rollRandomEncounter(tile, settings);
   if (encounter) {
-    console.log('[ENCOUNTER] Biome encounter triggered:', encounter.name);
+    logger.debug('[ENCOUNTER] Biome encounter triggered:', encounter.name);
   } else {
-    console.log('[ENCOUNTER DEBUG] rollRandomEncounter returned null (rolled "none")');
+    logger.debug('[ENCOUNTER DEBUG] rollRandomEncounter returned null (rolled "none")');
   }
   return encounter;
 };

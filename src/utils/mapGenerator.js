@@ -5,6 +5,9 @@
 
 import { generateTownName, generateMountainName } from './townNameGenerator';
 import { generateTownPaths, markPathTiles } from './pathfinding';
+import { createLogger } from './logger';
+
+const logger = createLogger('map-generator');
 
 /**
  * Generate a random world map with natural-looking feature placement
@@ -73,7 +76,7 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
 
   // 6. Place 2-4 towns
   const numTowns = 2 + Math.floor(rng() * 3);
-  console.log(`[MAP_GENERATION] Placing ${numTowns} towns...`);
+  logger.debug(`[MAP_GENERATION] Placing ${numTowns} towns...`);
 
   for (let i = 0; i < numTowns; i++) {
     const townPosition = placeTown(mapData, width, height, rng, townsList);
@@ -95,14 +98,14 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
     assignTownSizesAndNames(mapData, townsList, rng, normalizedNames.towns);
 
     const startingTile = mapData[startingTown.y][startingTown.x];
-    console.log(`[MAP_GENERATION] Selected starting town: ${startingTile.townName} (${startingTile.townSize}) at (${startingTown.x}, ${startingTown.y})`);
+    logger.debug(`[MAP_GENERATION] Selected starting town: ${startingTile.townName} (${startingTile.townSize}) at (${startingTown.x}, ${startingTown.y})`);
   } else {
-    console.error('[MAP_GENERATION] No towns were placed! This should not happen.');
+    logger.error('[MAP_GENERATION] No towns were placed! This should not happen.');
   }
 
   // Generate paths between towns
   if (townsList.length > 1) {
-    console.log('[MAP_GENERATION] Generating paths between towns...');
+    logger.debug('[MAP_GENERATION] Generating paths between towns...');
     const paths = generateTownPaths(mapData, townsList);
     markPathTiles(mapData, paths);
   }
@@ -111,10 +114,10 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   harmonizeMountainNames(mapData, rng, normalizedNames.mountains);
 
   // Debug: Log all towns on the map
-  console.log('[MAP_GENERATION] Map generation complete. Towns on map:');
+  logger.debug('[MAP_GENERATION] Map generation complete. Towns on map:');
   townsList.forEach(town => {
     const tile = mapData[town.y][town.x];
-    console.log(`  ${tile.townName} (${tile.townSize}) at (${town.x}, ${town.y})${tile.isStartingTown ? ' ⭐ STARTING TOWN' : ''}`);
+    logger.debug(`  ${tile.townName} (${tile.townSize}) at (${town.x}, ${town.y})${tile.isStartingTown ? ' ⭐ STARTING TOWN' : ''}`);
   });
   return mapData;
 };
@@ -242,13 +245,13 @@ function placeTown(mapData, width, height, rng, existingTowns = []) {
       if (!tooClose) {
         mapData[y][x].poi = 'town';
         mapData[y][x].descriptionSeed = townNames[Math.floor(rng() * townNames.length)];
-        console.log(`[PLACE_TOWN] Placed town at (${x}, ${y}): "${mapData[y][x].descriptionSeed}"`);
+        logger.debug(`[PLACE_TOWN] Placed town at (${x}, ${y}): "${mapData[y][x].descriptionSeed}"`);
         return { x, y }; // Return the position
       }
     }
   }
 
-  console.warn('[PLACE_TOWN] Failed to place town after 30 attempts');
+  logger.warn('[PLACE_TOWN] Failed to place town after 30 attempts');
   return null; // Return null if placement failed
 }
 
@@ -287,7 +290,7 @@ function placeCave(mapData, width, height, rng) {
 
 // Assign sizes and names to all towns on the map
 function assignTownSizesAndNames(mapData, townsList, rng, customNames = []) {
-  console.log(`[ASSIGN_TOWNS] Assigning sizes and names to ${townsList.length} towns (Custom names: ${customNames.length})...`);
+  logger.debug(`[ASSIGN_TOWNS] Assigning sizes and names to ${townsList.length} towns (Custom names: ${customNames.length})...`);
 
   const sizeOrder = { 'city': 0, 'town': 1, 'village': 2, 'hamlet': 3 };
   const sizeDistribution = ['hamlet', 'village', 'town', 'city'];
@@ -340,7 +343,7 @@ function assignTownSizesAndNames(mapData, townsList, rng, customNames = []) {
     };
     tile.descriptionSeed = sizeDescriptions[size] || 'A settlement';
 
-    console.log(`[ASSIGN_TOWNS] ${tile.townName} (${size}) at (${town.x}, ${town.y})`);
+    logger.debug(`[ASSIGN_TOWNS] ${tile.townName} (${size}) at (${town.x}, ${town.y})`);
   });
 }
 
@@ -381,7 +384,7 @@ function harmonizeMountainNames(mapData, rng, customMountainNames = []) {
     }
   }
 
-  console.log(`[HARMONIZE_MOUNTAINS] Found ${clusters.length} mountain clusters`);
+  logger.debug(`[HARMONIZE_MOUNTAINS] Found ${clusters.length} mountain clusters`);
 
   // Build a set of custom names for priority detection
   const customNameSet = new Set(customMountainNames.map(n => n.toLowerCase()));
@@ -426,7 +429,7 @@ function harmonizeMountainNames(mapData, rng, customMountainNames = []) {
       tile.isFirstMountainInRange = (j === 0);
     });
 
-    console.log(`[HARMONIZE_MOUNTAINS] "${chosenName}" (${cluster.length} tiles) near (${cluster[0].x}, ${cluster[0].y})`);
+    logger.debug(`[HARMONIZE_MOUNTAINS] "${chosenName}" (${cluster.length} tiles) near (${cluster[0].x}, ${cluster[0].y})`);
   });
 }
 
@@ -459,12 +462,12 @@ function improveMapDistribution(mapData, width, height, rng) {
       }
     }
 
-    console.log(`${quadrant.name} quadrant: ${featureCount} features, ${plainsTiles.length} plains tiles`);
+    logger.debug(`${quadrant.name} quadrant: ${featureCount} features, ${plainsTiles.length} plains tiles`);
 
     // If this quadrant has too few features, add some deterministically
     const featuresNeeded = minFeaturesPerQuadrant - featureCount;
     if (featuresNeeded > 0 && plainsTiles.length > 0) {
-      console.log(`Adding ${featuresNeeded} features to ${quadrant.name} quadrant`);
+      logger.debug(`Adding ${featuresNeeded} features to ${quadrant.name} quadrant`);
       addFeaturesToQuadrant(mapData, plainsTiles, featuresNeeded, rng);
     }
   }
@@ -487,7 +490,7 @@ function addFeaturesToQuadrant(mapData, plainsTiles, featuresNeeded, rng) {
 
     mapData[tile.y][tile.x].poi = featureType;
     mapData[tile.y][tile.x].descriptionSeed = featureType === 'forest' ? 'Dense woods' : 'Rocky peaks';
-    console.log(`Placed ${featureType} at (${tile.x}, ${tile.y})`);
+    logger.debug(`Placed ${featureType} at (${tile.x}, ${tile.y})`);
   }
 }
 
@@ -506,13 +509,13 @@ export const getTile = (mapData, x, y) => {
   if (mapData && y >= 0 && y < mapData.length && x >= 0 && x < mapData[y].length) {
     return mapData[y][x];
   }
-  console.warn(`Attempted to get invalid tile coordinates: ${x}, ${y}`);
+  logger.warn(`Attempted to get invalid tile coordinates: ${x}, ${y}`);
   return null; // Or return a default 'void' tile object
 };
 
 // Find the starting town position (for player starting location)
 export const findStartingTown = (mapData) => {
-  console.log('[FIND_STARTING_TOWN] Searching for starting town...');
+  logger.debug('[FIND_STARTING_TOWN] Searching for starting town...');
 
   // Look for the town marked as starting town
   for (let y = 0; y < mapData.length; y++) {
@@ -520,50 +523,50 @@ export const findStartingTown = (mapData) => {
       if (mapData[y][x].poi === 'town' && mapData[y][x].isStartingTown) {
         const townName = mapData[y][x].townName || 'Unknown';
         const townSize = mapData[y][x].townSize || 'unknown';
-        console.log(`[FIND_STARTING_TOWN] Found starting town: ${townName} (${townSize}) at (${x}, ${y})`);
+        logger.debug(`[FIND_STARTING_TOWN] Found starting town: ${townName} (${townSize}) at (${x}, ${y})`);
         return { x, y };
       }
     }
   }
 
   // Fallback: look for the specific starting town description (backward compatibility)
-  console.log('[FIND_STARTING_TOWN] No marked starting town found, looking for "A small village"...');
+  logger.debug('[FIND_STARTING_TOWN] No marked starting town found, looking for "A small village"...');
   for (let y = 0; y < mapData.length; y++) {
     for (let x = 0; x < mapData[y].length; x++) {
       if (mapData[y][x].poi === 'town' && mapData[y][x].descriptionSeed === "A small village") {
-        console.log('[FIND_STARTING_TOWN] Found starting town by description at:', { x, y });
+        logger.debug('[FIND_STARTING_TOWN] Found starting town by description at:', { x, y });
         return { x, y };
       }
     }
   }
 
   // Final fallback: look for any town
-  console.log('[FIND_STARTING_TOWN] No starting town found, looking for any town...');
+  logger.debug('[FIND_STARTING_TOWN] No starting town found, looking for any town...');
   for (let y = 0; y < mapData.length; y++) {
     for (let x = 0; x < mapData[y].length; x++) {
       if (mapData[y][x].poi === 'town') {
-        console.log('[FIND_STARTING_TOWN] Found any town at:', { x, y }, 'with description:', mapData[y][x].descriptionSeed);
+        logger.debug('[FIND_STARTING_TOWN] Found any town at:', { x, y }, 'with description:', mapData[y][x].descriptionSeed);
         return { x, y };
       }
     }
   }
 
   // This should never happen with the new system
-  console.error('[FIND_STARTING_TOWN] No towns found on map! This indicates a serious error in map generation.');
+  logger.error('[FIND_STARTING_TOWN] No towns found on map! This indicates a serious error in map generation.');
   throw new Error('No towns found on map - map generation failed');
 };
 
 // Test function to verify map generation and town finding
 export const testMapGeneration = () => {
-  console.log('=== TESTING MAP GENERATION ===');
+  logger.debug('=== TESTING MAP GENERATION ===');
   const testMap = generateMapData(10, 10, 12345); // Use fixed seed for reproducible results
   const foundTown = findStartingTown(testMap);
-  console.log('Test result - Found starting town at:', foundTown);
+  logger.debug('Test result - Found starting town at:', foundTown);
 
   // Verify the town actually exists at that position
   const tileAtPosition = getTile(testMap, foundTown.x, foundTown.y);
-  console.log('Tile at found position:', tileAtPosition);
-  console.log('=== TEST COMPLETE ===');
+  logger.debug('Tile at found position:', tileAtPosition);
+  logger.debug('=== TEST COMPLETE ===');
 
   return { map: testMap, startingPosition: foundTown };
 };

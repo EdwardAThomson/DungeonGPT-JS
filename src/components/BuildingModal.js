@@ -8,19 +8,19 @@ const BuildingModal = ({ building, npcs, onClose }) => {
             <div
                 className="modal-content building-modal"
                 onClick={(e) => e.stopPropagation()}
-                style={{ maxWidth: '400px', width: '90%', border: '2px solid #8b4513' }}
+                style={{ maxWidth: '400px', width: '90%', border: '2px solid var(--state-warning-deep)' }}
             >
                 <div style={{ textAlign: 'center', marginBottom: '15px' }}>
-                    <h2 style={{ color: '#8b4513', marginBottom: '5px' }}>
+                    <h2 style={{ color: 'var(--state-warning-deep)', marginBottom: '5px' }}>
                         {building.buildingName || building.buildingType.charAt(0).toUpperCase() + building.buildingType.slice(1)}
                     </h2>
-                    <div style={{ fontSize: '12px', color: '#666', fontStyle: 'italic' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--state-muted-strong)', fontStyle: 'italic' }}>
                         Type: {building.buildingType} | Location: ({building.x}, {building.y})
                     </div>
                 </div>
 
                 <div className="modal-section">
-                    <h4 style={{ borderBottom: '1px solid #ddd', paddingBottom: '5px' }}>Inhabitants & Workers</h4>
+                    <h4 style={{ borderBottom: '1px solid var(--border-soft)', paddingBottom: '5px' }}>Inhabitants & Workers</h4>
                     {npcs.length > 0 ? (
                         <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0' }}>
                             {npcs.map(npc => (
@@ -31,14 +31,14 @@ const BuildingModal = ({ building, npcs, onClose }) => {
                                     flexDirection: 'column'
                                 }}>
                                     <span style={{ fontWeight: 'bold' }}>{npc.name}</span>
-                                    <span style={{ fontSize: '11px', color: '#555' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--state-muted-strong)' }}>
                                         {npc.job || npc.title || 'Resident'}
                                     </span>
                                 </li>
                             ))}
                         </ul>
                     ) : (
-                        <p style={{ fontStyle: 'italic', color: '#888', textAlign: 'center' }}>No one seems to be here right now.</p>
+                        <p style={{ fontStyle: 'italic', color: 'var(--state-muted-strong)', textAlign: 'center' }}>No one seems to be here right now.</p>
                     )}
                 </div>
 

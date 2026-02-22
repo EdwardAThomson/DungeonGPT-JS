@@ -251,13 +251,13 @@ export const StorySettingsModalContent = ({
                   )}
                   <p style={{ margin: '0 0 8px 0', fontSize: '1rem' }}><strong>Setting:</strong> {settings.shortDescription || 'Default Fantasy World'}</p>
                   {settings.campaignComplete && (
-                    <div style={{ margin: '12px 0', padding: '12px', background: 'rgba(76, 175, 80, 0.15)', borderLeft: '4px solid #4caf50', borderRadius: '6px', textAlign: 'center' }}>
-                      <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#4caf50' }}>🏆 CAMPAIGN COMPLETE 🏆</div>
+                    <div style={{ margin: '12px 0', padding: '12px', background: 'var(--success-tint-20)', borderLeft: '4px solid var(--state-success)', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--state-success)' }}>🏆 CAMPAIGN COMPLETE 🏆</div>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Victory Achieved!</div>
                     </div>
                   )}
                   {settings.campaignGoal && (
-                    <div style={{ margin: '12px 0', padding: '14px', background: 'rgba(var(--primary-rgb, 212, 175, 55), 0.08)', borderLeft: '4px solid var(--primary)', borderRadius: '6px', boxShadow: '0 2px 4px var(--shadow)' }}>
+                    <div style={{ margin: '12px 0', padding: '14px', background: 'var(--primary-tint-10)', borderLeft: '4px solid var(--primary)', borderRadius: '6px', boxShadow: '0 2px 4px var(--shadow)' }}>
                       <p style={{ margin: '0', fontSize: '1rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px', fontWeight: '600' }}>Quest</p>
                       <p style={{ margin: '8px 0 0 0', color: 'var(--primary)', fontWeight: 'bold', fontSize: '1.35rem', lineHeight: '1.4' }}>{settings.campaignGoal}</p>
                     </div>
@@ -292,7 +292,7 @@ export const StorySettingsModalContent = ({
 
                         {/* Current Milestone */}
                         {current && (
-                          <div style={{ margin: '12px 0', padding: '12px', background: 'rgba(var(--primary-rgb, 212, 175, 55), 0.08)', borderLeft: '4px solid var(--primary)', borderRadius: '6px' }}>
+                          <div style={{ margin: '12px 0', padding: '12px', background: 'var(--primary-tint-10)', borderLeft: '4px solid var(--primary)', borderRadius: '6px' }}>
                             <p style={{ margin: '0', fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
                               Current Milestone
                             </p>
@@ -304,7 +304,7 @@ export const StorySettingsModalContent = ({
 
                         {/* Completed Milestones */}
                         {completed.length > 0 && (
-                          <div style={{ margin: '12px 0', padding: '10px', background: 'rgba(var(--primary-rgb, 212, 175, 55), 0.03)', borderLeft: '3px solid #4caf50', borderRadius: '6px' }}>
+                          <div style={{ margin: '12px 0', padding: '10px', background: 'var(--primary-tint-05)', borderLeft: '3px solid var(--state-success)', borderRadius: '6px' }}>
                             <p style={{ margin: '0 0 6px 0', fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
                               Completed
                             </p>
@@ -318,7 +318,7 @@ export const StorySettingsModalContent = ({
 
                         {/* Remaining Milestones (excluding current) */}
                         {remaining.length > 1 && (
-                          <div style={{ margin: '12px 0', padding: '10px', background: 'rgba(var(--primary-rgb, 212, 175, 55), 0.02)', borderLeft: '2px solid var(--border)', borderRadius: '6px' }}>
+                          <div style={{ margin: '12px 0', padding: '10px', background: 'var(--primary-tint-05)', borderLeft: '2px solid var(--border)', borderRadius: '6px' }}>
                             <p style={{ margin: '0 0 6px 0', fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
                               Remaining ({remaining.length - 1})
                             </p>

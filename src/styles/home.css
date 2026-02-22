@@ -1,0 +1,132 @@
+/* home.css
+ * Purpose: homepage hero and navigation card presentation.
+ * Depends on: shared container styles from layout.css and theme tokens from src/index.css.
+ * Font usage: --header-font for title accents and CTA button.
+ */
+
+.hero-section {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.hero-section h1 {
+  font-size: 3.5rem;
+  margin-bottom: 0.2em;
+  text-shadow: 0 4px 8px var(--shadow);
+}
+
+.subtitle {
+  font-family: var(--header-font);
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.home-navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.home-nav-card {
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  color: var(--text);
+  box-shadow: 0 4px 6px var(--shadow);
+}
+
+.home-nav-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--primary);
+  box-shadow: 0 12px 24px var(--shadow);
+  background-color: var(--shadow);
+}
+
+.primary-card {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  flex-direction: row;
+  justify-content: center;
+  gap: 20px;
+  padding: 30px;
+}
+
+.primary-card .card-icon {
+  font-size: 2.5rem;
+}
+
+.primary-card .card-content h3 {
+  color: var(--bg);
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.primary-card .card-content p {
+  color: var(--bg);
+  opacity: 0.8;
+  margin: 5px 0 0 0;
+}
+
+.primary-card:hover {
+  background-color: transparent;
+}
+
+.primary-card:hover .card-content h3,
+.primary-card:hover .card-content p {
+  color: var(--primary);
+}
+
+.card-icon {
+  font-size: 2rem;
+  margin-bottom: 15px;
+}
+
+.home-nav-card h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-family: var(--header-font);
+}
+
+.home-nav-card p {
+  margin: 10px 0 0 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.home-footer {
+  margin-top: 50px;
+  text-align: center;
+  border-top: 1px solid var(--border);
+  padding-top: 30px;
+}
+
+.settings-shortcut-btn {
+  background: none;
+  border: 1px dashed var(--primary);
+  color: var(--primary);
+  padding: 10px 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: var(--header-font);
+}
+
+.settings-shortcut-btn:hover {
+  background-color: var(--shadow);
+  transform: scale(1.05);
+}

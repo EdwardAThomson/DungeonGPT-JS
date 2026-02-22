@@ -1,0 +1,79 @@
+/* forms.css
+ * Purpose: reusable form layout/input patterns shared across pages.
+ * Depends on: theme tokens from src/index.css.
+ * Font usage: labels/headings use --header-font from global styles; inputs use --ui-font.
+ */
+
+.api-key-form {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.api-key-input-group {
+  margin-bottom: 15px;
+}
+
+.api-key-input-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.api-key-input-group input {
+  width: calc(100% - 22px);
+  /* Adjust width if needed */
+}
+
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-items: flex-end;
+}
+
+.form-row .form-item {
+  flex: 1;
+  min-width: 130px;
+}
+
+.form-row .form-item label {
+  margin-bottom: 5px;
+  font-size: 0.9rem;
+}
+
+.form-row .form-item input,
+.form-row .form-item select {
+  width: 100%;
+  margin-bottom: 0;
+  padding: 8px;
+}
+
+.stats-section .stat-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.stats-section .stat-input label {
+  width: 110px;
+  margin-bottom: 0;
+  font-weight: normal;
+  color: var(--text-secondary);
+}
+
+.stats-section .stat-input input {
+  width: 70px;
+  margin-bottom: 0;
+  padding: 8px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}

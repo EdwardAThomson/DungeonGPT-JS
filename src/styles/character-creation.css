@@ -1,0 +1,143 @@
+/* character-creation.css
+ * Purpose: character creation page-specific layout and controls.
+ * Depends on: theme tokens from src/index.css and shared form primitives from forms.css.
+ * Font usage: inherits --body-font globally; form controls continue to use --ui-font.
+ */
+
+/* Top Container: Header + Pictures */
+.top-container {
+  margin-bottom: 30px;
+  /* Space below pictures */
+}
+
+.top-container .form-section {
+  margin-bottom: 25px;
+  /* Space between header/name and pictures */
+}
+
+.top-container .form-section:last-child {
+  margin-bottom: 0;
+  /* No extra margin after pictures */
+}
+
+/* Middle Container: Two Columns (Details Left, Stats Right) */
+.middle-container {
+  display: flex;
+  /* Use Flexbox for two columns */
+  gap: 40px;
+  /* Space between columns */
+  margin-bottom: 30px;
+  /* Space below middle section */
+}
+
+.middle-left {
+  flex: 2;
+  /* Take up 2/3 of the space */
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  /* Space between details row and background */
+}
+
+.middle-right {
+  flex: 1;
+  /* Take up 1/3 of the space */
+}
+
+.middle-right h2 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.profile-pictures .picture-options {
+  display: grid;
+  /* Use CSS Grid */
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  /* Create auto-fitting columns */
+  gap: 15px;
+  /* Space between pictures */
+  justify-content: start;
+  /* Align grid items to the start if the grid doesn't fill the container */
+}
+
+.profile-pictures label {
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 5px;
+  padding: 5px;
+  transition: border-color 0.2s ease;
+  display: inline-block;
+  /* Needed for grid items */
+  line-height: 0;
+  /* Prevent extra space below image */
+}
+
+.profile-pictures input[type="radio"] {
+  display: none;
+  /* Hide the actual radio button */
+}
+
+.profile-pictures img {
+  width: 100px;
+  /* Adjust size as needed */
+  height: 100px;
+  object-fit: cover;
+  border-radius: 4px;
+  display: block;
+}
+
+.profile-pictures label.selected,
+.profile-pictures label:hover {
+  border-color: var(--primary);
+  /* Highlight selected/hovered picture */
+}
+
+.name-section .name-input-group {
+  display: flex;
+  align-items: center;
+  /* Align input and button vertically */
+  gap: 10px;
+  /* Space between input and button */
+}
+
+.name-section input {
+  flex-grow: 1;
+  /* Allow input to take up available space */
+  margin-bottom: 0;
+  /* Remove default bottom margin if needed */
+}
+
+.generate-name-btn {
+  padding: 8px 12px;
+  /* Adjust padding */
+  font-size: 1.2rem;
+  /* Make dice icon larger */
+  line-height: 1;
+  /* Ensure button height matches input */
+  flex-shrink: 0;
+  /* Prevent button from shrinking */
+  background-color: var(--surface-soft);
+  color: var(--control-text);
+  border: 1px solid var(--control-border);
+}
+
+.generate-name-btn:hover {
+  background-color: var(--control-hover);
+}
+
+.template-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.template-controls select {
+  flex-grow: 1;
+  /* Allow select to take space */
+}
+
+.apply-template-btn {
+  padding: 8px 15px;
+  /* Match input height */
+  flex-shrink: 0;
+}

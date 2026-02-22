@@ -1,6 +1,9 @@
 const { spawn } = require('child_process');
 const { randomUUID } = require('crypto');
 const adapters = require('./adapters');
+const { createLogger } = require('../../server/logger');
+
+const logger = createLogger('llm-runner');
 
 // In-memory task store
 const tasks = new Map();
@@ -44,7 +47,7 @@ function runTask(task, adapter) {
             model: task.model
         });
 
-        console.log(`Spawning: ${invocation.command} ${invocation.args.join(' ')}`);
+        logger.debug(`Spawning command: ${invocation.command} ${invocation.args.join(' ')}`);
 
         const child = spawn(invocation.command, invocation.args, {
             cwd: invocation.cwd || task.cwd,
@@ -67,7 +70,9 @@ function runTask(task, adapter) {
                     if (!line.trim()) continue;
                     try {
                         const parsed = JSON.parse(line);
-                        console.log(`[Task ${task.id}] JSON: type=${parsed.type} role=${parsed.role || '-'} content_len=${(parsed.content||'').length}`);
+                        logger.debug(
+                            `[Task ${task.id}] JSON event type=${parsed.type} role=${parsed.role || '-'} content_len=${(parsed.content || '').length}`
+                        );
                         // Only broadcast assistant messages to avoid echoing the prompt
                         if (parsed.type === 'message' && parsed.role === 'assistant' && parsed.content) {
                             appendLog(task, parsed.content, 'stdout');
@@ -75,7 +80,7 @@ function runTask(task, adapter) {
                     } catch (e) {
                         // In json-stream mode, we suppress non-JSON lines to avoid breaking immersion.
                         // We only log them to the server console for debugging.
-                        console.log(`[Task ${task.id} Debug] Suppressed non-JSON stdout: ${line}`);
+                        logger.debug(`[Task ${task.id}] Suppressed non-JSON stdout`, line);
                     }
                 }
             } else {
@@ -88,12 +93,14 @@ function runTask(task, adapter) {
             if (invocation.responseFormat === 'json-stream' && lineBuffer.trim()) {
                 try {
                     const parsed = JSON.parse(lineBuffer);
-                    console.log(`[Task ${task.id}] JSON (flush): type=${parsed.type} role=${parsed.role || '-'} content_len=${(parsed.content||'').length}`);
+                    logger.debug(
+                        `[Task ${task.id}] JSON flush type=${parsed.type} role=${parsed.role || '-'} content_len=${(parsed.content || '').length}`
+                    );
                     if (parsed.type === 'message' && parsed.role === 'assistant' && parsed.content) {
                         appendLog(task, parsed.content, 'stdout');
                     }
                 } catch (e) {
-                    console.log(`[Task ${task.id} Debug] Suppressed non-JSON flush: ${lineBuffer}`);
+                    logger.debug(`[Task ${task.id}] Suppressed non-JSON flush`, lineBuffer);
                 }
                 lineBuffer = '';
             }
@@ -117,7 +124,7 @@ function runTask(task, adapter) {
         });
 
         child.on('error', (err) => {
-            console.error(`Task ${task.id} error:`, err);
+            logger.error(`Task ${task.id} error`, err);
             task.status = 'error';
             broadcast(task, { type: 'status', data: { state: 'error', error: err.message } });
             broadcast(task, { type: 'done', data: { exit_code: -1 } });
@@ -125,7 +132,7 @@ function runTask(task, adapter) {
         });
 
         child.on('close', (code) => {
-            console.log(`Task ${task.id} finished with code ${code}`);
+            logger.debug(`Task ${task.id} finished with code ${code}`);
             task.status = code === 0 ? 'completed' : 'error';
             broadcast(task, { type: 'status', data: { state: task.status } });
             broadcast(task, { type: 'done', data: { exit_code: code } });

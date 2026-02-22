@@ -5,11 +5,12 @@ import { resolveEncounter } from './encounterResolver';
  * Each round is a narrative beat with player choices
  */
 
-export const createMultiRoundEncounter = (encounter, character, settings) => {
+export const createMultiRoundEncounter = (encounter, character, settings, llmConfig = {}) => {
   return {
     encounter,
     character,
     settings,
+    llmConfig,
     currentRound: 1,
     maxRounds: 3, // Most encounters resolve in 3 rounds
     roundHistory: [],
@@ -75,7 +76,8 @@ export const resolveRound = async (roundState, playerAction) => {
     roundState.encounter,
     playerAction,
     roundState.character,
-    roundState.settings
+    roundState.settings,
+    roundState.llmConfig
   );
   
   // Update state based on outcome

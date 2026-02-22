@@ -1,4 +1,7 @@
 import { llmService } from '../services/llmService';
+import { createLogger } from './logger';
+
+const logger = createLogger('llm-helper');
 
 /**
  * Generates text using the specified LLM provider via the backend.
@@ -22,7 +25,7 @@ async function generateText(provider, apiKeys, model, prompt, maxTokens, tempera
 
 // Note: generateCharacter function still needs updating for multi-provider support if used.
 const generateCharacter = async (apiKey, prompt, maxTokens) => {
-  console.warn('generateCharacter function is using default OpenAI settings and needs updating for multi-provider support.');
+  logger.warn('generateCharacter function is using default OpenAI settings and needs updating for multi-provider support.');
   // Needs logic to determine provider and get the correct key from apiKeys context.
   const engine = "gpt-4o"; // Example model
   const temperature = 0.7;

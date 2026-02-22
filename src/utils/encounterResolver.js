@@ -3,12 +3,16 @@ import { rollCheck } from './dice';
 import { calculateModifier, SKILLS } from './rules';
 import { DIFFICULTY_DC } from '../data/encounters';
 import { calculateDamage, shouldDealDamage, getDamageDescription } from './healthSystem';
+import { resolveProviderAndModel } from '../llm/modelResolver';
+import { createLogger } from './logger';
+
+const logger = createLogger('encounter-resolver');
 
 /**
  * Resolves an encounter based on player action and dice roll
  * Returns AI-narrated outcome with rewards/penalties
  */
-export const resolveEncounter = async (encounter, playerAction, character, settings) => {
+export const resolveEncounter = async (encounter, playerAction, character, settings, llmConfig = {}) => {
   // 1. Determine relevant skill and modifier
   const action = encounter.suggestedActions.find(a => a.label === playerAction);
   
@@ -63,12 +67,16 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
   
   let aiNarration;
   try {
-    aiNarration = await llmService.generateResponse(prompt, {
+    const resolved = resolveProviderAndModel(llmConfig.provider, llmConfig.model);
+    aiNarration = await llmService.generateUnified({
+      provider: resolved.provider,
+      model: resolved.model,
+      prompt,
       temperature: 0.8,
       maxTokens: 200
     });
   } catch (error) {
-    console.error('[ENCOUNTER] AI narration failed, using base consequence:', error);
+    logger.error('[ENCOUNTER] AI narration failed, using base consequence:', error);
     // Fallback to base consequence if AI fails
     aiNarration = baseConsequence;
   }

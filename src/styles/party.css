@@ -1,0 +1,194 @@
+/* party.css
+ * Purpose: game sidebars (chat/history + party) and party member presentation.
+ * Depends on: theme tokens from src/index.css.
+ * Font usage: --header-font for party headings/actions; body text inherits --body-font.
+ */
+
+/* Game Sidebars (Chat History & Party) */
+.game-chat-bar,
+.party-bar {
+  background-color: var(--surface);
+  color: var(--text);
+  width: 280px;
+  flex-shrink: 0;
+  /* Prevent sidebar from shrinking */
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  /* Allow sidebar itself to scroll */
+  box-shadow: -2px 0 5px var(--shadow);
+  height: 100%;
+  box-sizing: border-box;
+  border-left: 1px solid var(--border);
+}
+
+.game-chat-bar {
+  order: 1;
+}
+
+.party-bar {
+  order: 3;
+}
+
+/* Add/Ensure this rule for the title */
+.party-bar h2 {
+  color: var(--primary);
+  /* Use primary theme color */
+  text-align: center;
+  /* Center the title */
+  margin-bottom: 20px;
+  /* Add space below title */
+  font-size: 1.4rem;
+  font-family: var(--header-font);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.new-chat-button {
+  background-color: transparent;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  border-radius: 20px;
+  padding: 8px 15px;
+  margin-bottom: 15px;
+  text-align: center;
+  font-weight: 500;
+  font-family: var(--header-font);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.new-chat-button:hover {
+  background-color: var(--primary);
+  color: var(--bg);
+}
+
+.history {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  flex-grow: 1;
+}
+
+.history li {
+  padding: 10px 5px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-bottom: 5px;
+  transition: background-color 0.2s ease;
+  color: var(--text-secondary);
+}
+
+.history li:hover {
+  background-color: var(--primary-tint-10);
+  color: var(--text);
+}
+
+.made-by {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: auto;
+  /* Pushes to bottom */
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Party Member Styles */
+.party-member {
+  border-bottom: 1px solid var(--border);
+  padding: 15px 10px;
+  margin-bottom: 15px;
+  transition: background-color 0.3s ease;
+  border-radius: 8px;
+}
+
+.party-member:hover {
+  background-color: var(--primary-tint-05);
+}
+
+.party-member img {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 12px;
+  border: 2px solid var(--primary);
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.3s ease;
+}
+
+.party-member img:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 15px var(--primary);
+}
+
+.party-member h3 {
+  margin: 0 0 5px 0;
+  color: var(--text);
+  text-align: center;
+  font-family: var(--header-font);
+  font-size: 1.1rem;
+}
+
+.party-member p {
+  margin: 2px 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.view-details-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.view-details-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--primary-tint-10);
+}
+
+.party-member .stats {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.party-member .stats h4 {
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.party-member .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px 8px;
+  padding: 0;
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.party-member .stat-item {
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  padding: 3px 5px;
+  border-radius: 3px;
+  text-align: center;
+  white-space: nowrap;
+}

@@ -1,0 +1,124 @@
+/* maps.css
+ * Purpose: world/town map grid tile visuals and player marker animations.
+ * Depends on: theme tokens from src/index.css and runtime inline tile colors from map components.
+ * Font usage: inherits defaults; icon/marker styling is visual-only.
+ */
+
+.world-map-container {
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid var(--state-muted-strong);
+  text-align: center;
+}
+
+.world-map-container h4 {
+  margin-bottom: 10px;
+  color: var(--surface-soft);
+}
+
+.world-map-grid {
+  margin: 10px auto;
+}
+
+.map-tile {
+  border: 1px solid var(--shadow-black-10);
+  transition: all 0.3s ease;
+}
+
+.map-tile:hover {
+  filter: brightness(1.1);
+  transform: scale(1.05);
+}
+
+.map-tile:active {
+  transform: scale(0.95);
+  transition: transform 0.1s ease;
+}
+
+.player-tile {
+  box-shadow: inset 0 0 0 3px var(--state-highlight);
+  filter: brightness(1.2);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.player-marker {
+  position: absolute;
+  font-size: 24px;
+  z-index: 10;
+  animation: bounce-in 0.5s ease-out;
+  filter: drop-shadow(0 2px 4px var(--shadow-black-30));
+}
+
+.player-marker-portrait {
+  position: absolute;
+  top: -18px;
+  left: -18px;
+  z-index: 15;
+  width: 32px;
+  height: 32px;
+}
+
+.player-marker-portrait img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid var(--state-highlight);
+  background: white;
+  display: block;
+  box-shadow: 0 2px 8px var(--shadow-black-40);
+  position: relative;
+  z-index: 1;
+}
+
+.player-marker-pointer {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-top: 7px solid transparent;
+  border-right: 9px solid var(--state-highlight);
+  border-bottom: 9px solid var(--state-highlight);
+  filter: drop-shadow(0 2px 4px var(--shadow-black-30));
+  transform: rotate(45deg);
+  transform-origin: bottom right;
+  z-index: 0;
+}
+
+/* Unexplored tiles - darker/foggy (disabled during development)
+ * .map-tile.unexplored {
+ *   filter: brightness(0.4) saturate(0.5);
+ *   opacity: 0.7;
+ * }
+ * .map-tile.unexplored:hover {
+ *   filter: brightness(0.5) saturate(0.6);
+ * }
+ */
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 3px var(--state-highlight);
+  }
+
+  50% {
+    box-shadow: inset 0 0 0 3px var(--state-highlight), 0 0 15px var(--glow-highlight-60);
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: scale(0) translateY(-20px);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1.2) translateY(0);
+  }
+
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}

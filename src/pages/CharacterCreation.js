@@ -133,7 +133,7 @@ const characterTemplates = {
 
 const CharacterCreation = () => {
 
-  const { characters, setCharacters, editingCharacterIndex, setEditingCharacterIndex } = useContext(CharacterContext);
+  const { characters, editingCharacterIndex } = useContext(CharacterContext);
 
   const { state } = useLocation();
   const characterToEdit = state?.newCharacter || characters[editingCharacterIndex];

@@ -2,6 +2,9 @@
 // Generates interior maps for towns based on their size
 
 import { generateTavernName, generateGuildName, generateBankName, generateShopName, generateManorName, generateTempleName } from './townNameGenerator';
+import { createLogger } from './logger';
+
+const logger = createLogger('town-map-generator');
 
 /**
  * Generate a town interior map based on town size
@@ -14,7 +17,7 @@ import { generateTavernName, generateGuildName, generateBankName, generateShopNa
  * @returns {Object} Town map data with tiles and metadata
  */
 export const generateTownMap = (townSize, townName, entryPoint = 'south', seed = null, hasRiver = false, riverDirection = 'NORTH_SOUTH') => {
-  console.log(`[TOWN_MAP] Generating ${townSize} map for ${townName}`);
+  logger.debug(`[TOWN_MAP] Generating ${townSize} map for ${townName}`);
 
   // Determine map size based on town size
   const sizeConfig = {
@@ -61,7 +64,7 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
 
   // Place town square/center
   const centerPos = { x: Math.floor(width / 2), y: Math.floor(height / 2) };
-  console.log('[TOWN_MAP] centerPos:', centerPos);
+  logger.debug('[TOWN_MAP] centerPos:', centerPos);
   placeTownCenter(mapData, centerPos, townSize);
 
   // Place city walls (cities only)
@@ -70,7 +73,7 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   }
 
   // Place buildings (including keep for cities)
-  console.log('[TOWN_MAP] Calling placeBuildings with:', {
+  logger.debug('[TOWN_MAP] Calling placeBuildings with:', {
     mapDataSnapshot: mapData ? `${mapData.length}x${mapData[0].length}` : 'undefined',
     buildingCount,
     townSize,
@@ -266,7 +269,7 @@ function placeCityWalls(mapData) {
     }
   }
 
-  console.log('[TOWN_MAP] Placed city walls around perimeter');
+  logger.debug('[TOWN_MAP] Placed city walls around perimeter');
 }
 
 // Place town center/square
@@ -302,7 +305,7 @@ function placeTownCenter(mapData, centerPos, townSize) {
 // Place buildings around the town - COMPLETELY REWRITTEN
 function placeBuildings(mapData, count, townSize, rng, centerPos) {
   if (!centerPos) {
-    console.warn('[TOWN_MAP] placeBuildings called with undefined centerPos, using map defaults');
+    logger.warn('[TOWN_MAP] placeBuildings called with undefined centerPos, using map defaults');
     centerPos = { x: Math.floor(mapData[0].length / 2), y: Math.floor(mapData.length / 2) };
   }
 
@@ -344,7 +347,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
   // Helper to check if occupied
   const isOccupied = (x, y) => {
     if (x === undefined || y === undefined) {
-      console.warn('[TOWN_MAP] isOccupied called with undefined coordinates:', { x, y });
+      logger.warn('[TOWN_MAP] isOccupied called with undefined coordinates:', { x, y });
       return true;
     }
     if (x < 0 || x >= mapData[0].length || y < 0 || y >= mapData.length) return true;
@@ -352,7 +355,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
 
     // Safety check mapData access
     if (!mapData[y] || !mapData[y][x]) {
-      console.warn('[TOWN_MAP] isOccupied: tile undefined at', { x, y });
+      logger.warn('[TOWN_MAP] isOccupied: tile undefined at', { x, y });
       return true;
     }
 
@@ -367,7 +370,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
 
   // STEP 0: Place keep at top of city (cities only)
   if (config.hasKeep) {
-    console.log('[TOWN_MAP] Placing keep at top of city...');
+    logger.debug('[TOWN_MAP] Placing keep at top of city...');
 
     // Place keep at top center, inside the walls
     const keepX = centerX;
@@ -412,12 +415,12 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
         pathY++;
       }
 
-      console.log(`[TOWN_MAP] Placed keep at (${keepX}, ${keepY}) with keep wall and path to square`);
+      logger.debug(`[TOWN_MAP] Placed keep at (${keepX}, ${keepY}) with keep wall and path to square`);
     }
   }
 
   // STEP 1: Place important buildings around town square clockwise
-  console.log(`[TOWN_MAP] Placing ${important.length} important buildings around square...`);
+  logger.debug(`[TOWN_MAP] Placing ${important.length} important buildings around square...`);
 
   // Get positions around the square (clockwise from top)
   const squarePositions = [];
@@ -531,10 +534,10 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
     }
   }
 
-  console.log(`[TOWN_MAP] Placed ${importantPlaced} important buildings`);
+  logger.debug(`[TOWN_MAP] Placed ${importantPlaced} important buildings`);
 
   // STEP 2: Place houses away from center (exclude rings based on town size)
-  console.log(`[TOWN_MAP] Placing ${houses} houses...`);
+  logger.debug(`[TOWN_MAP] Placing ${houses} houses...`);
 
   // Smaller exclusion zone for smaller towns
   const excludeRadius = {
@@ -580,8 +583,8 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
     }
   }
 
-  console.log(`[TOWN_MAP] Placed ${housesPlaced} houses`);
-  console.log(`[TOWN_MAP] Total buildings: ${importantPlaced + housesPlaced}`);
+  logger.debug(`[TOWN_MAP] Placed ${housesPlaced} houses`);
+  logger.debug(`[TOWN_MAP] Total buildings: ${importantPlaced + housesPlaced}`);
 }
 
 // Place decorative elements
@@ -793,7 +796,7 @@ function generateBuildingPaths(mapData, centerPos, rng) {
     unconnectedHouses = stillUnconnected;
   }
 
-  console.log(`[TOWN_MAP] Generated organic paths: ${directConnections} direct connections, ${houses.length - directConnections} house-to-house`);
+  logger.debug(`[TOWN_MAP] Generated organic paths: ${directConnections} direct connections, ${houses.length - directConnections} house-to-house`);
 }
 
 /**
