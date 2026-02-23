@@ -1,0 +1,18 @@
+node_modules
+dist
+build
+.wrangler
+coverage
+pnpm-lock.yaml
+
+# Legacy CRA source files — do not format
+src/
+public/
+server/
+
+# Legacy docs and config — do not reformat Edward's files
+blog/
+docs/
+*.md
+.claude/
+.project/

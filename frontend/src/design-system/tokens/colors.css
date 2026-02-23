@@ -1,0 +1,75 @@
+/*
+ * DungeonGPT Color Tokens
+ *
+ * Exact port of CSS custom properties from src/index.css.
+ * Both light-fantasy and dark-fantasy palettes preserved exactly.
+ * No values changed — pixel-perfect match required.
+ */
+
+:root {
+  /* Light Fantasy Theme (Parchment) */
+  --light-bg: #f4e4bc;
+  --light-surface: #fff9eb;
+  --light-primary: #5d4037;
+  --light-accent: #c0a080;
+  --light-text: #2c1e1a;
+  --light-text-secondary: #5d4037cc;
+  --light-border: #d4c4a8;
+  --light-shadow: rgba(93, 64, 55, 0.15);
+
+  /* Dark Fantasy Theme (Stone/Void) */
+  --dark-bg: #121212;
+  --dark-surface: #1e1e1e;
+  --dark-primary: #d4af37;
+  --dark-accent: #8e44ad;
+  --dark-text: #e0e0e0;
+  --dark-text-secondary: #b0b0b0;
+  --dark-border: #333333;
+  --dark-shadow: rgba(0, 0, 0, 0.5);
+
+  /* Semantic status colors (theme-independent) */
+  --success: #27ae60;
+  --success-hover: #229954;
+  --warning: #f39c12;
+  --warning-hover: #e67e22;
+  --danger: #e74c3c;
+  --danger-hover: #c0392b;
+  --info: #3498db;
+  --info-hover: #2980b9;
+  --gold: #f1c40f;
+
+  /* Surface variants */
+  --surface-light: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="light-fantasy"] {
+  --bg: var(--light-bg);
+  --surface: var(--light-surface);
+  --primary: var(--light-primary);
+  --accent: var(--light-accent);
+  --text: var(--light-text);
+  --text-secondary: var(--light-text-secondary);
+  --border: var(--light-border);
+  --shadow: var(--light-shadow);
+  --header-font: var(--font-header);
+  --body-font: var(--font-body);
+
+  /* Surface light for light theme */
+  --surface-light: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark-fantasy"] {
+  --bg: var(--dark-bg);
+  --surface: var(--dark-surface);
+  --primary: var(--dark-primary);
+  --accent: var(--dark-accent);
+  --text: var(--dark-text);
+  --text-secondary: var(--dark-text-secondary);
+  --border: var(--dark-border);
+  --shadow: var(--dark-shadow);
+  --header-font: var(--font-header);
+  --body-font: var(--font-body);
+
+  /* Surface light for dark theme */
+  --surface-light: rgba(255, 255, 255, 0.05);
+}

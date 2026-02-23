@@ -1,0 +1,99 @@
+/*
+ * DungeonGPT Spacing Tokens
+ *
+ * Consistent spacing scale derived from actual padding/margin values
+ * used throughout src/App.css and src/index.css.
+ *
+ * Common values found in the existing CSS:
+ *   4px, 5px, 8px, 10px, 12px, 15px, 20px, 24px, 25px, 30px, 40px, 50px
+ *
+ * These are codified as CSS custom properties for design system consistency.
+ */
+
+:root {
+  /* Spacing scale — derived from App.css padding/margin values */
+  --space-0: 0px;
+  --space-px: 1px;
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 5px;
+  --space-2: 8px;
+  --space-2-5: 10px;
+  --space-3: 12px;
+  --space-4: 15px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 25px;
+  --space-8: 30px;
+  --space-9: 35px;
+  --space-10: 40px;
+  --space-12: 50px;
+
+  /* Layout-specific sizes — from App.css */
+  --sidebar-width: 280px;
+  --nav-height: 70px;
+  --container-max: 1200px;
+  --content-max: 1100px;
+  --modal-max: 600px;
+  --encounter-modal-max: 700px;
+
+  /* Border widths */
+  --border-width: 1px;
+  --border-width-2: 2px;
+  --border-width-3: 3px;
+  --border-width-4: 4px;
+
+  /* Transition durations — from App.css */
+  --duration-fast: 0.1s;
+  --duration-normal: 0.2s;
+  --duration-slow: 0.3s;
+  --duration-slower: 0.5s;
+}
+
+/*
+ * Base element spacing — ported from src/index.css.
+ * These provide the form control foundation.
+ */
+input[type="text"],
+input[type="number"],
+input[type="password"],
+textarea,
+select {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  color: var(--text);
+  border-radius: 4px;
+  box-sizing: border-box;
+  font-family: var(--font-ui), sans-serif;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--shadow);
+}
+
+/*
+ * Base button styles removed — the Button component (button.tsx)
+ * handles all variants via Tailwind utility classes. Global button
+ * styles caused specificity conflicts with component-level styling.
+ */
+
+/* Error message — from index.css */
+.error-message {
+  color: #ff5252;
+  background-color: rgba(255, 82, 82, 0.1);
+  border: 1px solid #ff52524d;
+  padding: 12px;
+  border-radius: 4px;
+  margin-top: 10px;
+  font-family: var(--font-ui), sans-serif;
+  font-size: 0.9rem;
+}

@@ -1,0 +1,57 @@
+# DungeonGPT Backend Worker
+# Cloudflare Workers configuration
+
+account_id = "" # Set your Cloudflare account ID
+name = "dungeongpt-api"
+main = "src/index.ts"
+compatibility_date = "2025-02-14"
+compatibility_flags = ["nodejs_compat"]
+
+# ── D1 Database Binding ────────────────────────────────────────────────────
+[[d1_databases]]
+binding = "DB"
+database_name = "dungeongpt-db"
+database_id = "" # Set your D1 database ID
+migrations_dir = "migrations"
+
+# ── Workers AI Binding ─────────────────────────────────────────────────────
+# All AI models run on Workers AI — no external API keys needed.
+[ai]
+binding = "AI"
+
+# ── Environment Variables ──────────────────────────────────────────────────
+[vars]
+ENVIRONMENT = "development"
+
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
+
+# ── Development Environment ────────────────────────────────────────────────
+[env.dev]
+name = "dungeongpt-api-dev"
+[env.dev.vars]
+ENVIRONMENT = "development"
+
+# ── Staging Environment ────────────────────────────────────────────────────
+[env.staging]
+name = "dungeongpt-api-staging"
+[env.staging.vars]
+ENVIRONMENT = "staging"
+
+# ── Production Environment ─────────────────────────────────────────────────
+[env.production]
+name = "dungeongpt-api"
+[env.production.vars]
+ENVIRONMENT = "production"

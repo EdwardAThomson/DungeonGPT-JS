@@ -1,0 +1,95 @@
+@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;700&display=swap");
+
+@import "tailwindcss";
+@import "../tokens/colors.css";
+@import "../tokens/typography.css";
+@import "../tokens/spacing.css";
+
+/*
+ * Tailwind v4 @theme directive
+ * Maps all existing CSS custom properties from index.css to Tailwind tokens.
+ * These values are exact ports — no changes to colors, fonts, or spacing.
+ */
+@theme {
+  /* ── Color tokens (resolved from CSS custom properties) ── */
+
+  /* Light Fantasy palette */
+  --color-light-bg: #f4e4bc;
+  --color-light-surface: #fff9eb;
+  --color-light-primary: #5d4037;
+  --color-light-accent: #c0a080;
+  --color-light-text: #2c1e1a;
+  --color-light-text-secondary: rgba(93, 64, 55, 0.8);
+  --color-light-border: #d4c4a8;
+  --color-light-shadow: rgba(93, 64, 55, 0.15);
+
+  /* Dark Fantasy palette */
+  --color-dark-bg: #121212;
+  --color-dark-surface: #1e1e1e;
+  --color-dark-primary: #d4af37;
+  --color-dark-accent: #8e44ad;
+  --color-dark-text: #e0e0e0;
+  --color-dark-text-secondary: #b0b0b0;
+  --color-dark-border: #333333;
+  --color-dark-shadow: rgba(0, 0, 0, 0.5);
+
+  /* Semantic status colors (used across both themes) */
+  --color-success: #27ae60;
+  --color-success-hover: #229954;
+  --color-warning: #f39c12;
+  --color-warning-hover: #e67e22;
+  --color-danger: #e74c3c;
+  --color-danger-hover: #c0392b;
+  --color-info: #3498db;
+  --color-info-hover: #2980b9;
+  --color-gold: #f1c40f;
+  --color-crit-success: #00b894;
+  --color-crit-fail: #d63031;
+
+  /* ── Font family tokens ── */
+  --font-header: "Cinzel", serif;
+  --font-body: "Lora", serif;
+  --font-ui: "Inter", sans-serif;
+  --font-mono: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+
+  /* ── Font size scale ── */
+  --font-size-xs: 0.7rem;
+  --font-size-sm: 0.85rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.1rem;
+  --font-size-xl: 1.2rem;
+  --font-size-2xl: 1.55rem;
+  --font-size-3xl: 1.88rem;
+  --font-size-4xl: 2.22rem;
+  --font-size-5xl: 3.5rem;
+
+  /* ── Spacing scale ── */
+  --spacing-0: 0px;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 10px;
+  --spacing-4: 12px;
+  --spacing-5: 15px;
+  --spacing-6: 20px;
+  --spacing-7: 24px;
+  --spacing-8: 30px;
+  --spacing-9: 40px;
+  --spacing-10: 50px;
+
+  /* ── Border radius ── */
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 50%;
+  --radius-pill: 20px;
+
+  /* ── Sidebar widths ── */
+  --width-sidebar: 280px;
+  --width-nav-height: 70px;
+  --width-container: 1200px;
+  --width-content: 1100px;
+  --width-modal: 600px;
+}

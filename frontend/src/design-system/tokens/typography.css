@@ -1,0 +1,118 @@
+/*
+ * DungeonGPT Typography Tokens
+ *
+ * Exact port from src/index.css.
+ * Font families: Cinzel (headers), Lora (body/narrative), Inter (UI).
+ * Google Fonts import preserved exactly.
+ */
+
+/* Google Fonts import is in tailwind.css (must be first @import in the bundle) */
+
+:root {
+  /* Font Families — exact values from index.css */
+  --font-header: "Cinzel", serif;
+  --font-body: "Lora", serif;
+  --font-ui: "Inter", sans-serif;
+  --font-mono: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+
+  /* Font size scale — derived from index.css heading sizes and element styling */
+  --text-xs: 0.7rem;
+  --text-sm: 0.85rem;
+  --text-base: 1rem;
+  --text-lg: 1.1rem;
+  --text-xl: 1.2rem;
+  --text-2xl: 1.55rem;
+  --text-3xl: 1.88rem;
+  --text-4xl: 2.22rem;
+  --text-5xl: 3.5rem;
+
+  /* Font weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Line heights */
+  --leading-tight: 1.4;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.6;
+  --leading-loose: 1.8;
+
+  /* Letter spacing */
+  --tracking-tight: 0.05em;
+  --tracking-normal: 0.1em;
+  --tracking-wide: 0.2em;
+}
+
+/*
+ * Base typography rules — ported from src/index.css body, heading, and
+ * element styles. These provide the foundation that all components inherit.
+ */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body), serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-header);
+  color: var(--primary);
+  margin-top: 1.5em;
+  margin-bottom: 0.8em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+h1 {
+  font-size: 2.22rem;
+}
+
+h2 {
+  font-size: 1.88rem;
+}
+
+h3 {
+  font-size: 1.55rem;
+}
+
+code {
+  font-family: var(--font-mono);
+  background-color: #e9ecef;
+  padding: 0.2em 0.4em;
+  border-radius: 3px;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-family: var(--font-header);
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid transparent;
+}
+
+a:hover {
+  border-bottom-color: var(--primary);
+}

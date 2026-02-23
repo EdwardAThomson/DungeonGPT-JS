@@ -1,0 +1,34 @@
+# DungeonGPT Frontend — Workers Static Assets + API proxy
+# Serves Vite build output and proxies /api/* to the backend Worker.
+
+account_id = "" # Set your Cloudflare account ID
+name = "dungeongpt"
+main = "worker/index.ts"
+compatibility_date = "2025-02-14"
+compatibility_flags = ["nodejs_compat"]
+
+# Serve static files from the Vite build output
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Service Binding — proxy /api/* to the backend Worker
+[[services]]
+binding = "BACKEND"
+service = "dungeongpt-api"
+
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1

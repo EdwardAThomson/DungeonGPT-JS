@@ -1,35 +1,26 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
+# Dependencies
 node_modules/
 /.pnp
 .pnp.js
 
-# testing
-/coverage
-
-# production
+# Build output
 /build
+dist/
+.wrangler/
+
 # Environment variables
 .env
-.env.local
-.env.development
-.env.production
+.env.*
 !.env.example
 
 # Database files
 *.db
 *.sqlite
 *.sqlite3
-src/game.db
-*.sql
 
 # Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 *.log
+npm-debug.log*
 
 # IDE and editor files
 .vscode/
@@ -40,20 +31,18 @@ yarn-error.log*
 
 # OS generated files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
 # Temporary files
 *.tmp
 *.temp
 temp/
-new_temp/
-*.gemini-sandbox
-temp/server1.js
+
+# Claude Code
+.claude/
+
+# Drizzle migrations (generated, tracked separately)
+# backend/migrations/ is tracked
 
 # Special docs
 docs/deployment_*.md
