@@ -297,7 +297,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content encounter-action-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content encounter-action-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '95%' }}>
         {showHeroSelection && !heroConfirmed && party && party.length > 1 ? (
           // Hero selection phase
           <>
@@ -323,10 +323,26 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                       borderRadius: '8px',
                       cursor: 'pointer',
                       background: selectedHeroIndex === idx ? 'rgba(76, 175, 80, 0.1)' : '#2a2a2a',
-                      transition: 'all 0.2s'
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '15px'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {hero.profilePicture && (
+                      <img
+                        src={hero.profilePicture}
+                        alt={hero.characterName}
+                        style={{
+                          width: '60px',
+                          height: '60px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '2px solid var(--primary)'
+                        }}
+                      />
+                    )}
+                    <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <strong>{hero.characterName}</strong>
                         <span style={{ marginLeft: '10px', color: 'var(--text-secondary)' }}>

@@ -10,7 +10,7 @@ const CharacterModal = ({ isOpen, onClose, character }) => {
             <div
                 className="modal-content character-details-modal"
                 onClick={(e) => e.stopPropagation()}
-                style={{ maxWidth: '500px', width: '90%' }}
+                style={{ maxWidth: '700px', width: '90%' }}
             >
                 <div className="modal-header-with-image">
                     {character.profilePicture && (

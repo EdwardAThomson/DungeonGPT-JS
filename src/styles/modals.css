@@ -76,6 +76,9 @@
 
 .modal-content p strong {
   color: var(--primary);
+}
+
+.modal-content p.kv-row strong {
   min-width: 100px;
   /* Optional: align labels */
   display: inline-block;

@@ -207,16 +207,16 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
-  max-width: 450px;
 }
 
 .header-button-group button {
-  padding: 8px 16px;
-  font-size: 0.75rem;
-  letter-spacing: 1px;
+  padding: 8px 12px;
+  font-size: 0.7rem;
+  letter-spacing: 0.5px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .game-info-header {

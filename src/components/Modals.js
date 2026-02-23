@@ -98,9 +98,8 @@ export const AISettingsModalContent = ({
 
             <div style={{ background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
               <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>API Keys</h4>
-              <p style={{ margin: '0', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                Cloud API keys are configured in the <code style={{ background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '3px' }}>.env</code> file on the server.
-                <br/>Use <strong>gemini-cli</strong>, <strong>claude-cli</strong>, or <strong>codex</strong> providers for CLI-based access without API keys.
+              <p style={{ margin: '0', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6', textAlign: 'left' }}>
+                Cloud API keys are configured in the <code style={{ background: 'var(--surface-soft)', padding: '2px 6px', borderRadius: '3px' }}>.env</code> file on the server. Use <strong>gemini-cli</strong>, <strong>claude-cli</strong>, or <strong>codex</strong> providers for CLI-based access without API keys.
               </p>
             </div>
           </div>
@@ -190,9 +189,16 @@ export const StorySettingsModalContent = ({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content settings-modal-refined" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+      <div className="modal-content settings-modal-refined" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '20px 20px 10px 20px', borderBottom: '1px solid var(--border)' }}>
-          <h2 style={{ margin: 0, color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>⚙️ System Scroll</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ margin: 0, color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>⚙️ System Scroll</h2>
+            {worldSeed && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
+                Session ID: {worldSeed}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Tab Navigation */}
@@ -456,9 +462,8 @@ export const StorySettingsModalContent = ({
 
                 <div style={{ background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
                   <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>API Keys</h4>
-                  <p style={{ margin: '0', fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                    Cloud API keys are configured in the <code style={{ background: 'var(--bg-secondary)', padding: '2px 6px', borderRadius: '3px' }}>.env</code> file on the server.
-                    <br/>Use <strong>gemini-cli</strong>, <strong>claude-cli</strong>, or <strong>codex</strong> providers for CLI-based access without API keys.
+                  <p style={{ margin: '0', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6', textAlign: 'left' }}>
+                    Cloud API keys are configured in the <code style={{ background: 'var(--surface-soft)', padding: '2px 6px', borderRadius: '3px' }}>.env</code> file on the server. Use <strong>gemini-cli</strong>, <strong>claude-cli</strong>, or <strong>codex</strong> providers for CLI-based access without API keys.
                   </p>
                 </div>
               </div>

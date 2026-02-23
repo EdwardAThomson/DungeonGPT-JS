@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { conversationsApi } from '../services/conversationsApi';
 import { createLogger } from '../utils/logger';
+import SavedGameDetailsModal from '../components/SavedGameDetailsModal';
 
 const logger = createLogger('saved-conversations');
 
@@ -11,6 +12,8 @@ const SavedConversations = () => {
   const [error, setError] = useState(null);
   const [editingName, setEditingName] = useState(null);
   const [newName, setNewName] = useState('');
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -56,7 +59,7 @@ const SavedConversations = () => {
   };
 
   const deleteConversation = async (sessionId) => {
-    if (!window.confirm('Are you sure you want to delete this conversation?')) {
+    if (!window.confirm('Delete this saved game permanently? This cannot be undone.')) {
       return;
     }
 
@@ -145,107 +148,139 @@ const SavedConversations = () => {
         <p>No saved conversations found. Start a new game to create your first adventure!</p>
       ) : (
         <div className="conversations-list">
-          {conversations.map((conversation) => (
-            <div key={conversation.sessionId} className="conversation-item">
-              <div className="conversation-header">
-                {editingName === conversation.sessionId ? (
-                  <div className="edit-name-form">
-                    <input
-                      type="text"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      placeholder="Enter new name"
-                      autoFocus
-                    />
-                    <button
-                      onClick={() => updateConversationName(conversation.sessionId, newName)}
-                      disabled={!newName.trim()}
-                    >
-                      Save
-                    </button>
-                    <button onClick={() => {
-                      setEditingName(null);
-                      setNewName('');
-                    }}>
-                      Cancel
-                    </button>
+          {conversations.map((conversation) => {
+            const heroes = conversation.selected_heroes ? JSON.parse(conversation.selected_heroes) : [];
+            const settings = conversation.game_settings 
+              ? (typeof conversation.game_settings === 'string' ? JSON.parse(conversation.game_settings) : conversation.game_settings)
+              : null;
+            
+            return (
+              <div key={conversation.sessionId} className="conversation-item" style={{ padding: '25px', minHeight: '180px', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', gap: '20px', marginBottom: '15px', flex: 1 }}>
+                  {/* Hero Portraits */}
+                  {heroes.length > 0 && (
+                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                      {heroes.slice(0, 4).map((hero, idx) => (
+                        hero.profilePicture ? (
+                          <img
+                            key={idx}
+                            src={hero.profilePicture}
+                            alt={hero.characterName}
+                            title={hero.characterName}
+                            style={{
+                              width: '60px',
+                              height: '60px',
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              border: '2px solid var(--primary)',
+                              boxShadow: '0 2px 8px var(--shadow)'
+                            }}
+                          />
+                        ) : null
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Content */}
+                  <div style={{ flex: 1 }}>
+                    {editingName === conversation.sessionId ? (
+                      <div className="edit-name-form" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          value={newName}
+                          onChange={(e) => setNewName(e.target.value)}
+                          placeholder="Enter new name"
+                          autoFocus
+                          style={{ flex: 1 }}
+                        />
+                        <button
+                          onClick={() => updateConversationName(conversation.sessionId, newName)}
+                          disabled={!newName.trim()}
+                          className="save-name-button"
+                        >
+                          Save
+                        </button>
+                        <button 
+                          onClick={() => {
+                            setEditingName(null);
+                            setNewName('');
+                          }}
+                          className="cancel-name-button"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <h3
+                        onClick={() => {
+                          setEditingName(conversation.sessionId);
+                          setNewName(conversation.conversation_name || 'Untitled Adventure');
+                        }}
+                        className="conversation-title"
+                        title="Click to edit name"
+                        style={{ margin: '0 0 12px 0', cursor: 'pointer', color: 'var(--primary)', fontSize: '1.2rem' }}
+                      >
+                        {conversation.conversation_name || 'Untitled Adventure'}
+                      </h3>
+                    )}
+                    {settings?.shortDescription && (
+                      <p style={{ margin: '8px 0', fontSize: '0.9rem', lineHeight: '1.5', color: 'var(--text)' }}>
+                        {settings.shortDescription.length > 120 
+                          ? settings.shortDescription.substring(0, 120) + '...' 
+                          : settings.shortDescription}
+                      </p>
+                    )}
+                    {heroes.length > 0 && (
+                      <p style={{ margin: '10px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                        <strong>Party:</strong> {heroes.map(h => h.characterName).join(', ')}
+                      </p>
+                    )}
                   </div>
-                ) : (
-                  <h3
-                    onClick={() => {
-                      setEditingName(conversation.sessionId);
-                      setNewName(conversation.conversation_name || 'Untitled Adventure');
-                    }}
-                    className="conversation-title"
-                    title="Click to edit name"
-                  >
-                    {conversation.conversation_name || 'Untitled Adventure'}
-                  </h3>
-                )}
-              </div>
-
-              <div className="conversation-content">
-                <div className="conversation-details">
-                  <p><strong>Date:</strong> {formatDate(conversation.timestamp)}</p>
-                  <p><strong>Provider:</strong> {formatProvider(conversation.provider)}</p>
-                  <p><strong>Model:</strong> {formatModel(conversation.model)} <span style={{ fontSize: '0.8em', color: 'var(--text-secondary)' }}>(Raw: {conversation.model || 'undefined'})</span></p>
-                  <p><strong>Session ID:</strong> {conversation.sessionId}</p>
-                  {conversation.selected_heroes && (
-                    <p><strong>Heroes:</strong> {JSON.parse(conversation.selected_heroes).map(h => h.characterName).join(', ')}</p>
-                  )}
-                  {conversation.player_position && (() => {
-                    const pos = JSON.parse(conversation.player_position);
-                    const subMaps = conversation.sub_maps ? (typeof conversation.sub_maps === 'string' ? JSON.parse(conversation.sub_maps) : conversation.sub_maps) : null;
-                    if (subMaps?.isInsideTown && subMaps?.currentTownTile?.townName) {
-                      return <p><strong>Location:</strong> {subMaps.currentTownTile.townName} (world: {pos.x}, {pos.y})</p>;
-                    }
-                    return <p><strong>Location:</strong> ({pos.x}, {pos.y})</p>;
-                  })()}
-                  {conversation.summary && (
-                    <p><strong>Summary:</strong> {conversation.summary.substring(0, 100)}...</p>
-                  )}
                 </div>
 
-                {conversation.game_settings && (
-                  <div className="conversation-settings">
-                    <h4>Game Settings</h4>
-                    {(() => {
-                      const settings = typeof conversation.game_settings === 'string'
-                        ? JSON.parse(conversation.game_settings)
-                        : conversation.game_settings;
-                      return (
-                        <>
-                          {settings.shortDescription && <p><strong>Story:</strong> {settings.shortDescription}</p>}
-                          {settings.grimnessLevel && <p><strong>Grimness:</strong> {settings.grimnessLevel}</p>}
-                          {settings.darknessLevel && <p><strong>Darkness:</strong> {settings.darknessLevel}</p>}
-                          {settings.magicLevel && <p><strong>Magic:</strong> {settings.magicLevel}</p>}
-                          {settings.technologyLevel && <p><strong>Tech:</strong> {settings.technologyLevel}</p>}
-                          {settings.responseVerbosity && <p><strong>Verbosity:</strong> {settings.responseVerbosity}</p>}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
+                <div className="conversation-actions" style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
+                  <button
+                    onClick={() => loadConversation(conversation.sessionId)}
+                    className="primary-button"
+                    style={{ padding: '10px 20px', fontSize: '0.9rem' }}
+                  >
+                    Load Game
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedConversation(conversation);
+                      setIsDetailsModalOpen(true);
+                    }}
+                    className="secondary-button"
+                    style={{ padding: '10px 20px', fontSize: '0.9rem' }}
+                  >
+                    Details
+                  </button>
+                  <button
+                    onClick={() => deleteConversation(conversation.sessionId)}
+                    className="danger-button"
+                    style={{ padding: '10px 20px', fontSize: '0.9rem' }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
-
-              <div className="conversation-actions">
-                <button
-                  onClick={() => loadConversation(conversation.sessionId)}
-                  className="load-button"
-                >
-                  Load Game
-                </button>
-                <button
-                  onClick={() => deleteConversation(conversation.sessionId)}
-                  className="delete-button"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      <SavedGameDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedConversation(null);
+        }}
+        conversation={selectedConversation}
+        formatDate={formatDate}
+        formatProvider={formatProvider}
+        formatModel={formatModel}
+      />
 
       <div className="navigation-buttons">
         <button onClick={() => navigate('/')} className="back-button">

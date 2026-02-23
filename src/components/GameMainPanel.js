@@ -47,12 +47,12 @@ const GameMainPanel = ({
             }</p>
           </div>
           <div className="header-button-group">
-            <button onClick={onOpenMap} className="view-map-button">{townName ? `View ${townName} Map` : 'View Map'}</button>
+            <button onClick={onOpenMap} className="view-map-button">{townName ? `${townName} Map` : 'Map'}</button>
             <button onClick={onOpenInventory} className="view-settings-button">📦 Inventory</button>
             <button onClick={onOpenHowToPlay} className="how-to-play-button">How to Play</button>
-            <button onClick={onOpenSettings} className="view-settings-button">View Full Settings</button>
+            <button onClick={onOpenSettings} className="view-settings-button">Full Settings</button>
             <button onClick={onManualSave} className="manual-save-button" disabled={!canManualSave}>
-              💾 Save Now
+              💾 Save
             </button>
           </div>
         </div>
@@ -102,7 +102,6 @@ const GameMainPanel = ({
           <span className="model-value">{selectedModel} ({selectedProvider.toUpperCase()})</span>
         </div>
         <div className="status-bar">
-          <p className="session-info">Session ID: {sessionId || 'Generating...'}</p>
           <div className="api-key-status">
             <span
               className={`status-light ${['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
@@ -122,20 +121,6 @@ const GameMainPanel = ({
             </span>
           </div>
         </div>
-        <button onClick={onToggleDebug} className="debug-toggle-button">
-          {showDebugInfo ? '🐛 Hide Debug' : '🐛 Show Debug'}
-        </button>
-        <button
-          onClick={onToggleAiNarrative}
-          className="debug-toggle-button"
-          style={{
-            marginLeft: '10px',
-            background: aiNarrativeEnabled ? '#4CAF50' : '#666'
-          }}
-          title={aiNarrativeEnabled ? 'AI narrative enabled' : 'AI narrative disabled (testing mode)'}
-        >
-          {aiNarrativeEnabled ? '🤖 AI: ON' : '🤖 AI: OFF'}
-        </button>
 
         {showDebugInfo && (
           <div className="debug-info-box">

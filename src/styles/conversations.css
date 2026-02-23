@@ -51,25 +51,36 @@
 
 .edit-name-form button {
   padding: 8px 16px;
-  border: none;
+  border: 1px solid var(--primary);
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.9rem;
+  font-family: var(--header-font);
+  letter-spacing: 0.08em;
+  transition: all 0.2s ease;
 }
 
-.edit-name-form button:first-of-type {
-  background-color: var(--state-success-strong);
-  color: white;
+.edit-name-form .save-name-button {
+  background-color: var(--primary);
+  color: var(--bg);
 }
 
-.edit-name-form button:first-of-type:disabled {
-  background-color: var(--state-muted);
+.edit-name-form .save-name-button:disabled {
+  background-color: var(--text-secondary);
+  border-color: var(--text-secondary);
   cursor: not-allowed;
+  opacity: 0.5;
 }
 
-.edit-name-form button:last-of-type {
-  background-color: var(--state-muted);
-  color: white;
+.edit-name-form .cancel-name-button {
+  background-color: transparent;
+  color: var(--primary);
+}
+
+.edit-name-form .cancel-name-button:hover,
+.edit-name-form .save-name-button:hover:not(:disabled) {
+  background-color: transparent;
+  color: var(--primary);
 }
 
 .conversation-content {
@@ -110,6 +121,7 @@
 .conversation-actions {
   display: flex;
   gap: 10px;
+  align-items: center;
 }
 
 .load-button {
@@ -141,6 +153,19 @@
   background-color: var(--state-danger-strong);
 }
 
+.conversation-actions .danger-button {
+  margin-left: auto;
+  border-color: var(--state-danger);
+  color: var(--state-danger);
+  background-color: transparent;
+}
+
+.conversation-actions .danger-button:hover:not(:disabled) {
+  background-color: var(--state-danger);
+  border-color: var(--state-danger);
+  color: var(--on-dark);
+}
+
 .navigation-buttons {
   margin-top: 30px;
   display: flex;
@@ -149,18 +174,19 @@
 }
 
 .new-game-button {
-  background-color: var(--state-success-strong);
-  color: white;
-  border: none;
+  background-color: var(--primary);
+  color: var(--bg);
+  border: 1px solid var(--primary);
   padding: 12px 24px;
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
-  transition: background-color 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .new-game-button:hover {
-  background-color: var(--state-success-deep);
+  background-color: transparent;
+  color: var(--primary);
 }
 
 @media (max-width: 768px) {
