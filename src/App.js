@@ -68,6 +68,22 @@ const AppContent = () => {
               ⚙️ Settings
             </button>
           </li>
+          {isGamePage && (
+            <li className="nav-settings-item">
+              <button
+                onClick={() => window.dispatchEvent(new CustomEvent('open-ai-assistant'))}
+                className="nav-settings-btn nav-ai-btn"
+                title="Open AI Assistant"
+              >
+                🤖 AI Assistant
+              </button>
+            </li>
+          )}
+          {isDebugEnabled && (
+            <li className="nav-settings-item">
+              <DebugMenu inNav />
+            </li>
+          )}
         </ul>
       </nav>
 
@@ -104,7 +120,6 @@ const AppContent = () => {
         </ErrorBoundary>
       </div>
 
-      {isDebugEnabled && <DebugMenu />}
     </div>
   );
 };

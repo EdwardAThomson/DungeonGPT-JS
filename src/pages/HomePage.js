@@ -1,12 +1,9 @@
 // HomePage.js
 
-import React, { useContext } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
-import SettingsContext from "../contexts/SettingsContext";
 
 const HomePage = () => {
-  const { setIsSettingsModalOpen } = useContext(SettingsContext);
-
   return (
     <div className="Home-page main-card">
       <div className="hero-section">
@@ -48,15 +45,6 @@ const HomePage = () => {
             </div>
           </Link>
         </div>
-      </div>
-
-      <div className="home-footer">
-        <button
-          onClick={() => setIsSettingsModalOpen(true)}
-          className="settings-shortcut-btn"
-        >
-          ⚙️ Configure AI Engine
-        </button>
       </div>
     </div>
   );

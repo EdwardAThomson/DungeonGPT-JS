@@ -81,6 +81,7 @@ const GameModals = ({
         }}
         backend={assistantProvider || selectedProvider}
         model={assistantModel || selectedModel}
+        showFloatingTrigger={false}
       />
       <MapModal
         isOpen={mapHook.isMapModalOpen}

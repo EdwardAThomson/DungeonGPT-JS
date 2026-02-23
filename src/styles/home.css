@@ -107,26 +107,3 @@
   font-size: 0.9rem;
   color: var(--text-secondary);
 }
-
-.home-footer {
-  margin-top: 50px;
-  text-align: center;
-  border-top: 1px solid var(--border);
-  padding-top: 30px;
-}
-
-.settings-shortcut-btn {
-  background: none;
-  border: 1px dashed var(--primary);
-  color: var(--primary);
-  padding: 10px 24px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-family: var(--header-font);
-}
-
-.settings-shortcut-btn:hover {
-  background-color: var(--shadow);
-  transform: scale(1.05);
-}

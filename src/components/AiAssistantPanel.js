@@ -24,7 +24,7 @@ Your goal is to help the player with rules, strategies, and facts about the worl
 `;
 }
 
-export default function AiAssistantPanel({ gameState, backend, model }) {
+export default function AiAssistantPanel({ gameState, backend, model, showFloatingTrigger = true }) {
     const [isOpen, setIsOpen] = useState(false);
     const [prompt, setPrompt] = useState('');
     const [status, setStatus] = useState('idle');
@@ -36,6 +36,12 @@ export default function AiAssistantPanel({ gameState, backend, model }) {
     useEffect(() => {
         logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [logs]);
+
+    useEffect(() => {
+        const handleOpenFromNav = () => setIsOpen(true);
+        window.addEventListener('open-ai-assistant', handleOpenFromNav);
+        return () => window.removeEventListener('open-ai-assistant', handleOpenFromNav);
+    }, []);
 
     const handleRun = async () => {
         if (!prompt.trim()) return;
@@ -98,6 +104,10 @@ export default function AiAssistantPanel({ gameState, backend, model }) {
         }
     };
 
+    if (!isOpen && !showFloatingTrigger) {
+        return null;
+    }
+
     if (!isOpen) {
         return (
             <button
@@ -106,12 +116,12 @@ export default function AiAssistantPanel({ gameState, backend, model }) {
                     position: 'fixed',
                     bottom: '20px',
                     right: '300px',
-                    backgroundColor: 'rgba(76, 29, 149, 0.8)',
-                    color: 'white',
+                    backgroundColor: 'var(--surface)',
+                    color: 'var(--primary)',
                     padding: '12px',
                     borderRadius: '50%',
-                    boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
-                    border: '1px solid rgba(139, 92, 246, 0.5)',
+                    boxShadow: '0 8px 16px var(--shadow)',
+                    border: '1px solid var(--primary)',
                     zIndex: 50,
                     cursor: 'pointer',
                     fontSize: '20px'
@@ -130,11 +140,12 @@ export default function AiAssistantPanel({ gameState, backend, model }) {
             right: '20px',
             width: '450px',
             height: '400px',
-            backgroundColor: '#0c0a09',
-            border: '1px solid rgba(139, 92, 246, 0.3)',
+            backgroundColor: 'var(--surface)',
+            color: 'var(--text)',
+            border: '1px solid var(--primary)',
             borderRadius: '8px',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
-            zIndex: 50,
+            boxShadow: '0 20px 40px var(--shadow-black-40)',
+            zIndex: 1300,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
@@ -146,20 +157,20 @@ export default function AiAssistantPanel({ gameState, backend, model }) {
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                backgroundColor: 'rgba(76, 29, 149, 0.2)',
+                backgroundColor: 'var(--primary-tint-10)',
                 padding: '8px',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                borderBottom: '1px solid var(--border)'
             }}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--state-violet-soft)', fontWeight: 'bold' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', fontWeight: 'bold' }}>
                         <span>🤖 Rules & Mechanics Assistant</span>
                         {status === 'running' && <span style={{ color: 'var(--state-success)' }}>●</span>}
                     </div>
-                    <div style={{ fontSize: '9px', color: 'var(--encounter-violet-glow-50)', textTransform: 'uppercase' }}>
-                        Backend: <span style={{ color: 'white' }}>{backend?.toUpperCase()}</span>
+                    <div style={{ fontSize: '9px', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                        Backend: <span style={{ color: 'var(--text)' }}>{backend?.toUpperCase()}</span>
                     </div>
                 </div>
-                <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--state-muted)', cursor: 'pointer', fontSize: '18px' }}>✕</button>
+                <button onClick={() => setIsOpen(false)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '18px' }}>✕</button>
             </div>
 
             {/* Terminal Output */}
@@ -167,17 +178,17 @@ export default function AiAssistantPanel({ gameState, backend, model }) {
                 flex: 1,
                 overflow: 'auto',
                 padding: '16px',
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                backgroundColor: 'var(--bg)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '4px'
             }}>
                 {logs.length === 0 && (
-                    <div style={{ color: 'var(--text-secondary-soft)', fontStyle: 'italic' }}>How can I help you, adventurer?</div>
+                    <div style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>How can I help you, adventurer?</div>
                 )}
                 {logs.map((log, i) => (
-                    <div key={i} style={{ color: log.stream === 'stderr' ? 'var(--state-danger-bright)' : 'var(--text-secondary)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                        <span style={{ color: 'var(--text-secondary-soft)', marginRight: '8px' }}>[{new Date(log.ts).toLocaleTimeString()}]</span>
+                    <div key={i} style={{ color: log.stream === 'stderr' ? 'var(--state-danger)' : 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                        <span style={{ color: 'var(--text-secondary)', marginRight: '8px' }}>[{new Date(log.ts).toLocaleTimeString()}]</span>
                         {log.line}
                     </div>
                 ))}
@@ -187,8 +198,8 @@ export default function AiAssistantPanel({ gameState, backend, model }) {
             {/* Input Area */}
             <div style={{
                 padding: '12px',
-                backgroundColor: '#1c1917',
-                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                backgroundColor: 'var(--surface)',
+                borderTop: '1px solid var(--border)',
                 display: 'flex',
                 gap: '8px'
             }}>
@@ -200,9 +211,9 @@ export default function AiAssistantPanel({ gameState, backend, model }) {
                     placeholder="Ask about rules, stats, or mechanics..."
                     style={{
                         flex: 1,
-                        backgroundColor: '#292524',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        color: 'white',
+                        backgroundColor: 'var(--bg)',
+                        border: '1px solid var(--border)',
+                        color: 'var(--text)',
                         borderRadius: '4px',
                         padding: '8px',
                         outline: 'none'
@@ -213,9 +224,9 @@ export default function AiAssistantPanel({ gameState, backend, model }) {
                     onClick={handleRun}
                     disabled={status === 'running' || !prompt.trim()}
                     style={{
-                        backgroundColor: '#7c3aed',
-                        color: 'white',
-                        border: 'none',
+                        backgroundColor: 'var(--primary)',
+                        color: 'var(--bg)',
+                        border: '1px solid var(--primary)',
                         borderRadius: '4px',
                         padding: '8px 16px',
                         fontWeight: 'bold',
