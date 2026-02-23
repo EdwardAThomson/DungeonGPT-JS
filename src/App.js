@@ -47,10 +47,10 @@ const AppContent = () => {
         <ul>
           <li><Link to="/">Home</Link></li>
           <NavDropdown 
-            label="Characters" 
+            label="Heroes" 
             items={[
-              { label: "Create New Character", path: "/character-creation" },
-              { label: "All Characters", path: "/all-characters" }
+              { label: "Create New Hero", path: "/hero-creation" },
+              { label: "All Heroes", path: "/all-heroes" }
             ]}
           />
           <NavDropdown 
@@ -106,9 +106,9 @@ const AppContent = () => {
           <Suspense fallback={<div className="page-container">Loading...</div>}>
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/character-creation" element={<CharacterCreation />} />
-              <Route path="/character-summary" element={<CharacterSummary />} />
-              <Route path="/all-characters" element={<AllCharacters />} />
+              <Route path="/hero-creation" element={<CharacterCreation />} />
+              <Route path="/hero-summary" element={<CharacterSummary />} />
+              <Route path="/all-heroes" element={<AllCharacters />} />
               <Route path="/game-settings" element={<GameSettings />} />
               <Route path="/hero-selection" element={<HeroSelection />} />
               <Route path="/game" element={<Game />} />

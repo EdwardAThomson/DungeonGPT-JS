@@ -60,7 +60,7 @@ const HeroSelection = () => {
   };
 
   const handleCreateCharacter = () => {
-    navigate('/character-creation', { state: { returnToHeroSelection: true, settingsData: settings } });
+    navigate('/hero-creation', { state: { returnToHeroSelection: true, settingsData: settings } });
   };
 
   const handleNext = () => {
@@ -86,12 +86,12 @@ const HeroSelection = () => {
       <div className="page-header">
         <h2>Select Your Party (1-4 Heroes)</h2>
         <button onClick={handleCreateCharacter} className="create-new-button">
-          + Create New Character
+          + Create New Hero
         </button>
       </div>
 
       {characters.length === 0 ? (
-        <h3>No characters available. Please create a character.</h3>
+        <h3>No heroes available. Please create a hero.</h3>
       ) : (
         <ul className="all-characters-list hero-selection-list">
           {characters.map((char) => {

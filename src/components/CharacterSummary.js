@@ -1,6 +1,6 @@
 // CharacterSummary.js
 
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { downloadJSONFile } from "../utils/fileHelper";
 import CharacterContext from "../contexts/CharacterContext";
@@ -14,6 +14,7 @@ const CharacterSummary = () => {
   const { characters, setCharacters } = useContext(CharacterContext);
   const { state } = useLocation();
   const newCharacter = state?.newCharacter;
+  const [feedbackModal, setFeedbackModal] = useState(null);
 
   const navigate = useNavigate();
 
@@ -45,16 +46,18 @@ const CharacterSummary = () => {
         : await charactersApi.create(newCharacter);
 
       logger.debug(`Character ${isUpdate ? 'updated' : 'added'} in database. Response:`, result);
-      alert(`Character ${isUpdate ? 'updated' : 'added'} successfully`);
-      // Proceed with navigation after successful save/update
-      handleProgress(updatedCharacters); // Pass updated characters to navigate function
+      setFeedbackModal({
+        title: isUpdate ? "Hero Updated" : "Hero Added",
+        message: `Character ${isUpdate ? 'updated' : 'added'} successfully.`,
+        onConfirm: () => handleProgress(updatedCharacters)
+      });
     } catch (error) {
       logger.error(`Error ${isUpdate ? 'updating' : 'adding'} character in DB:`, error);
-      alert(`Failed to ${isUpdate ? 'update' : 'add'} character in database: ${error.message}. Changes applied locally only.`);
-      // Optionally revert context change if DB save fails
-      // setCharacters(characters); // Revert to original characters array
-      // Or still proceed with navigation, accepting local changes
-      handleProgress(updatedCharacters); // Navigate even if DB save fails, using the optimistic update
+      setFeedbackModal({
+        title: "Save Warning",
+        message: `Failed to ${isUpdate ? 'update' : 'add'} character in database: ${error.message}. Changes were applied locally.`,
+        onConfirm: () => handleProgress(updatedCharacters)
+      });
     }
   };
 
@@ -64,13 +67,19 @@ const CharacterSummary = () => {
     if (state?.returnToHeroSelection) {
       navigate('/hero-selection', { state: { characters: finalCharacters, settingsData: state.settingsData } });
     } else {
-      navigate("/all-characters");
+      navigate("/all-heroes");
     }
   };
 
   if (!newCharacter) {
     return <p className="page-container">No character data found. Please create a character first.</p>;
   }
+
+  const closeFeedbackModal = () => {
+    const onConfirm = feedbackModal?.onConfirm;
+    setFeedbackModal(null);
+    if (onConfirm) onConfirm();
+  };
 
   return (
     // Use a specific container class
@@ -85,19 +94,21 @@ const CharacterSummary = () => {
         {/* Details Column */}
         <div className="summary-details">
           <h2>{newCharacter.characterName}</h2>
-          <p>
-            <span className="detail-label">Level:</span> {newCharacter.characterLevel}
-          </p>
-          <p>
-            <span className="detail-label">Class:</span> {newCharacter.characterClass}
-          </p>
-          <p>
-            <span className="detail-label">Race:</span> {newCharacter.characterRace}
-          </p>
-          <p>
-            <span className="detail-label">Alignment:</span> {newCharacter.characterAlignment}
-          </p>
-          <p>
+          <div className="summary-info-grid">
+            <p className="kv-row">
+              <span className="detail-label">Level:</span> {newCharacter.characterLevel}
+            </p>
+            <p className="kv-row">
+              <span className="detail-label">Class:</span> {newCharacter.characterClass}
+            </p>
+            <p className="kv-row">
+              <span className="detail-label">Race:</span> {newCharacter.characterRace}
+            </p>
+            <p className="kv-row">
+              <span className="detail-label">Alignment:</span> {newCharacter.characterAlignment}
+            </p>
+          </div>
+          <p className="kv-row summary-background">
             <span className="detail-label">Background:</span> {newCharacter.characterBackground}
           </p>
           {/* Stats List */}
@@ -114,7 +125,7 @@ const CharacterSummary = () => {
             </div>
           )}
           {newCharacter.stats && (
-            <p>
+            <p className="kv-row summary-max-hp">
               <span className="detail-label">Max HP:</span> {newCharacter.maxHP || calculateMaxHP(newCharacter)}
             </p>
           )}
@@ -125,23 +136,37 @@ const CharacterSummary = () => {
       <div className="summary-actions">
         {/* Back Button - always takes you back to edit */}
         <button
-          onClick={() => { navigate("/character-creation", { state: { newCharacter, editing: true } }); }}
-          className="back-button"
+          onClick={() => { navigate("/hero-creation", { state: { newCharacter, editing: true } }); }}
+          className="summary-action-btn summary-back-btn"
         >
           Back (Edit)
         </button>
         {/* Save/Add Button - Text changes based on isEditing */}
-        <button onClick={handleSaveOrUpdate} className="add-button">
+        <button onClick={handleSaveOrUpdate} className="summary-action-btn summary-primary-btn">
           {isEditing ? "Save Changes & Continue" : "Add to Roster & Continue"}
         </button>
         {/* Download Button */}
         <button
           onClick={() => downloadJSONFile(`${newCharacter.characterName}-character.json`, newCharacter)}
-          className="download-button"
+          className="summary-action-btn summary-download-btn"
         >
           Download Character JSON
         </button>
       </div>
+
+      {feedbackModal && (
+        <div className="modal-overlay" onClick={closeFeedbackModal}>
+          <div className="modal-content summary-feedback-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{feedbackModal.title}</h3>
+            <p>{feedbackModal.message}</p>
+            <div className="summary-feedback-actions">
+              <button className="modal-close-button" onClick={closeFeedbackModal}>
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -231,7 +231,7 @@ const CharacterCreation = () => {
 
     // Check other required fields
     if (!characterName || !selectedRace || !selectedClass || !characterBackground || !alignment || !selectedGender || !level) {
-      alert("Please fill in all remaining character details (Name, Gender, Race, Class, Level, Alignment, Background).");
+      alert("Please fill in all remaining hero details (Name, Gender, Race, Class, Level, Alignment, Background).");
       return;
     }
 
@@ -260,10 +260,10 @@ const CharacterCreation = () => {
       navigate("/all-characters");
       */
       // Navigate back to summary page with the edited character data
-      navigate("/character-summary", { state: { newCharacter } });
+      navigate("/hero-summary", { state: { newCharacter } });
     } else {
       // This is for initial creation, navigate to summary
-      navigate("/character-summary", { state: { newCharacter } });
+      navigate("/hero-summary", { state: { newCharacter } });
     }
   };
 
@@ -278,9 +278,9 @@ const CharacterCreation = () => {
       <div className="top-container">
         {/* Header + Name */}
         <div className="form-section">
-          <h1>{state?.editing ? "Edit Character" : "Create Your Character"}</h1>
+          <h1>{state?.editing ? "Edit Hero" : "Create Your Hero"}</h1>
           <div className="name-section">
-            <label htmlFor="characterName">Character Name:</label>
+            <label htmlFor="characterName">Hero Name:</label>
             <div className="name-input-group">
               <input
                 type="text"
@@ -420,7 +420,7 @@ const CharacterCreation = () => {
               value={characterBackground}
               onChange={handleBackgroundChange}
               maxLength="200"
-              placeholder="Enter character background"
+              placeholder="Enter hero background"
               rows="4"
               required
             />
@@ -455,7 +455,7 @@ const CharacterCreation = () => {
 
       {/* Actions Row */}
       <div className="form-actions">
-        <button type="button" onClick={handleSubmit}>{state?.editing ? "Update Character" : "Create Character"}</button>
+        <button type="button" onClick={handleSubmit}>{state?.editing ? "Update Hero" : "Create Hero"}</button>
       </div>
     </div>
   );

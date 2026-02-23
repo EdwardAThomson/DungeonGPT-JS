@@ -34,7 +34,7 @@ const AllCharacters = () => {
     if (index !== -1) {
       setEditingCharacterIndex(index);
       // Pass the specific character to edit as newCharacter state
-      navigate("/character-creation", { state: { newCharacter: character, editing: true } });
+      navigate("/hero-creation", { state: { newCharacter: character, editing: true } });
     } else {
       logger.error("Character not found for editing:", character.characterId);
     }
@@ -44,20 +44,20 @@ const AllCharacters = () => {
     <div className="page-container all-characters-page">
       {/* Add a header container for Title + Button */}
       <div className="page-header">
-        <h2>All Characters</h2>
+        <h2>All Heroes</h2>
         {/* Wrapper for header buttons */}
         <div className="page-header-actions">
           <button onClick={() => navigate("/game-settings")} className="primary-button">
             + Start New Game
           </button>
-          <button onClick={() => navigate("/character-creation")} className="secondary-button">
-            + Create New Character
+          <button onClick={() => navigate("/hero-creation")} className="secondary-button">
+            + Create New Hero
           </button>
         </div>
       </div>
 
       {characters.length === 0 ? (
-        <h3>No characters found. Create one or make sure the server is running.</h3>
+        <h3>No heroes found. Create one or make sure the server is running.</h3>
       ) : (
         <ul className="all-characters-list">
           {characters.map((char) => (
