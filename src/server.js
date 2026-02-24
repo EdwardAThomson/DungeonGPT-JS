@@ -119,6 +119,48 @@ const validateCharacterPayload = (payload) => {
   return errors;
 };
 
+const validateHeroPayload = (payload) => {
+  const errors = [];
+
+  if (!isPlainObject(payload)) {
+    return ['Request body must be a JSON object.'];
+  }
+
+  const requiredStringFields = [
+    'heroId',
+    'heroName',
+    'heroGender',
+    'profilePicture',
+    'heroRace',
+    'heroClass',
+    'heroBackground',
+    'heroAlignment'
+  ];
+
+  requiredStringFields.forEach((field) => {
+    if (!isNonEmptyString(payload[field])) {
+      errors.push(`${field} must be a non-empty string.`);
+    }
+  });
+
+  if (!Number.isInteger(payload.heroLevel) || payload.heroLevel < 1 || payload.heroLevel > 20) {
+    errors.push('heroLevel must be an integer between 1 and 20.');
+  }
+
+  if (!isPlainObject(payload.stats)) {
+    errors.push('stats must be an object.');
+  } else {
+    const requiredStats = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
+    requiredStats.forEach((statKey) => {
+      if (!isFiniteNumber(payload.stats[statKey])) {
+        errors.push(`stats.${statKey} must be a number.`);
+      }
+    });
+  }
+
+  return errors;
+};
+
 const validateConversationSavePayload = (payload) => {
   const errors = [];
   if (!isPlainObject(payload)) {
@@ -518,7 +560,7 @@ app.get('/characters', (req, res) => {
 
 // Route to add a new hero
 app.post('/heroes', (req, res) => {
-  const validationErrors = validateCharacterPayload(req.body);
+  const validationErrors = validateHeroPayload(req.body);
   if (validationErrors.length > 0) {
     return buildValidationError(res, validationErrors);
   }
@@ -546,7 +588,7 @@ app.put('/heroes/:heroId', (req, res) => {
     return buildValidationError(res, ['heroId route parameter is required.']);
   }
 
-  const validationErrors = validateCharacterPayload(req.body);
+  const validationErrors = validateHeroPayload(req.body);
   if (validationErrors.length > 0) {
     return buildValidationError(res, validationErrors);
   }
@@ -611,6 +653,26 @@ app.get('/heroes', (req, res) => {
       }));
       res.json(parsedRows);
     }
+  });
+});
+
+// Route to delete a hero
+app.delete('/heroes/:heroId', (req, res) => {
+  const { heroId } = req.params;
+  if (!isNonEmptyString(heroId)) {
+    return buildValidationError(res, ['heroId route parameter is required.']);
+  }
+
+  db.run('DELETE FROM heroestable WHERE heroId = ?', [heroId], function(err) {
+    if (err) {
+      logger.error('Error deleting hero', err);
+      return sendError(res, 500, 'Failed to delete hero');
+    }
+    if (this.changes === 0) {
+      return sendError(res, 404, 'Hero not found');
+    }
+    logger.info(`Hero deleted: ${heroId}`);
+    res.json({ message: 'Hero deleted successfully', heroId });
   });
 });
 

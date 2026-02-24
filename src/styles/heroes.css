@@ -95,25 +95,106 @@
   margin-top: auto;
 }
 
-.hero-item-actions button {
-  padding: 6px 12px;
+.hero-item-actions .action-button {
+  padding: 8px 16px;
+  font-size: 0.9em;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  font-weight: 500;
+}
+
+.hero-item-actions .edit-button {
+  background-color: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.hero-item-actions .edit-button:hover {
+  background-color: var(--primary);
+  color: var(--bg);
+}
+
+.hero-item-actions .download-button {
+  background-color: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.hero-item-actions .download-button:hover {
+  background-color: var(--primary);
+  color: var(--bg);
+}
+
+.hero-item-actions .delete-button {
+  background-color: transparent;
+  color: var(--state-danger);
+  border: 1px solid var(--state-danger);
+}
+
+.hero-item-actions .delete-button:hover {
+  background-color: var(--state-danger);
+  color: var(--on-dark);
+}
+
+/* Delete confirmation modal */
+.delete-confirm-modal {
+  max-width: 450px;
+  text-align: center;
+}
+
+.delete-confirm-modal h3 {
+  margin-top: 0;
+  color: var(--state-danger);
+  font-family: var(--header-font);
+}
+
+.delete-confirm-modal p {
+  margin: 15px 0;
+  color: var(--text);
+}
+
+.delete-confirm-modal .warning-text {
+  color: var(--state-warning);
+  font-weight: 600;
   font-size: 0.9em;
 }
 
-.edit-button {
-  background-color: var(--state-info);
+.delete-confirm-modal .modal-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 25px;
 }
 
-.edit-button:hover {
-  background-color: var(--state-info-strong);
+.delete-confirm-modal .action-button {
+  padding: 10px 20px;
+  font-size: 1em;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
 }
 
-.download-button {
-  background-color: var(--state-muted);
+.delete-confirm-modal .cancel-button {
+  background-color: var(--surface-light);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
-.download-button:hover {
-  background-color: var(--state-muted-strong);
+.delete-confirm-modal .cancel-button:hover {
+  background-color: var(--border);
+}
+
+.delete-confirm-modal .delete-button {
+  background-color: var(--state-danger);
+  color: var(--on-dark);
+  border: 1px solid var(--state-danger);
+}
+
+.delete-confirm-modal .delete-button:hover {
+  background-color: var(--state-danger-strong);
 }
 
 .summary-container {

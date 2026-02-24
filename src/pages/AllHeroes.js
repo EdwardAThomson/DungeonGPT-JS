@@ -1,6 +1,6 @@
 // AllHeroes.js
 
-import React, { useContext, useEffect } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { downloadJSONFile } from "../utils/fileHelper";
 import HeroContext from "../contexts/HeroContext";
@@ -12,6 +12,7 @@ const logger = createLogger('all-heroes');
 
 const AllHeroes = () => {
   const { heroes, setHeroes, setEditingHeroIndex } = useContext(HeroContext);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const navigate = useNavigate();
 
   // insert database retrieval here
@@ -38,6 +39,28 @@ const AllHeroes = () => {
     } else {
       logger.error("Hero not found for editing:", hero.heroId);
     }
+  };
+
+  const handleDeleteClick = (hero) => {
+    setDeleteConfirm(hero);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm) return;
+    
+    try {
+      await heroesApi.delete(deleteConfirm.heroId);
+      setHeroes(heroes.filter(h => h.heroId !== deleteConfirm.heroId));
+      logger.info(`Hero deleted: ${deleteConfirm.heroName}`);
+      setDeleteConfirm(null);
+    } catch (error) {
+      logger.error('Error deleting hero:', error);
+      alert(`Failed to delete hero: ${error.message}`);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirm(null);
   };
 
   return (
@@ -97,19 +120,44 @@ const AllHeroes = () => {
               </div>
 
               <div className="hero-item-actions">
-                <button onClick={() => handleEdit(hero)} className="edit-button">
+                <button onClick={() => handleEdit(hero)} className="action-button edit-button">
                   Edit
                 </button>
                 <button
                   onClick={() => downloadJSONFile(`${hero.heroName}-hero.json`, hero)}
-                  className="download-button"
+                  className="action-button download-button"
                 >
                   Download
+                </button>
+                <button
+                  onClick={() => handleDeleteClick(hero)}
+                  className="action-button delete-button"
+                >
+                  Delete
                 </button>
               </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="modal-overlay" onClick={handleDeleteCancel}>
+          <div className="modal-content delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete Hero?</h3>
+            <p>Are you sure you want to delete <strong>{deleteConfirm.heroName}</strong>?</p>
+            <p className="warning-text">This action cannot be undone.</p>
+            <div className="modal-actions">
+              <button onClick={handleDeleteCancel} className="action-button cancel-button">
+                Cancel
+              </button>
+              <button onClick={handleDeleteConfirm} className="action-button delete-button">
+                Delete Hero
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -33,6 +33,17 @@ export const heroesApi = {
       throw new Error(await getErrorMessage(response, 'Failed to update hero'));
     }
     return response.json();
+  },
+
+  async delete(heroId) {
+    const response = await apiFetch(`/heroes/${heroId}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      throw new Error(await getErrorMessage(response, 'Failed to delete hero'));
+    }
+    return response.json();
   }
 };
 
