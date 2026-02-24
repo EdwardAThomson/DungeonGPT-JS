@@ -97,12 +97,12 @@ export const ITEM_CATALOG = {
   
   // Uncommon items
   'greater_healing_potion': { name: 'Greater Healing Potion', rarity: 'uncommon', value: 150, effect: 'heal', amount: '4d4+4' },
-  'scroll_fireball': { name: 'Scroll of Fireball', rarity: 'uncommon', value: 200, effect: 'spell', spell: 'fireball' },
+  'scroll_fireball': { name: 'Fire Scroll', rarity: 'uncommon', value: 200, effect: 'spell', spell: 'fireball' },
   'silver_dagger': { name: 'Silver Dagger', rarity: 'uncommon', value: 100, type: 'weapon' },
   
   // Rare items
   'magic_weapon': { name: 'Enchanted Blade', rarity: 'rare', value: 500, type: 'weapon', bonus: '+1' },
-  'ring_protection': { name: 'Ring of Protection', rarity: 'rare', value: 750, type: 'ring', bonus: '+1 AC' },
+  'ring_protection': { name: 'Protective Ring', rarity: 'rare', value: 750, type: 'ring', bonus: '+1 defense' },
   
   // Very Rare
   'legendary_weapon': { name: 'Legendary Weapon', rarity: 'very_rare', value: 2500, type: 'weapon', bonus: '+2' },
@@ -112,13 +112,13 @@ export const ITEM_CATALOG = {
   'cave_mushrooms': { name: 'Glowing Cave Mushrooms', rarity: 'common', value: 15, stackable: true },
   'raw_gems': { name: 'Raw Gemstones', rarity: 'uncommon', value: 75 },
   'spider_silk': { name: 'Giant Spider Silk', rarity: 'uncommon', value: 50 },
-  'bat_guano': { name: 'Bat Guano (Spell Component)', rarity: 'common', value: 10, stackable: true },
+  'bat_guano': { name: 'Alchemical Reagent', rarity: 'common', value: 10, stackable: true },
   'ancient_scroll': { name: 'Ancient Scroll', rarity: 'uncommon', value: 100 },
   'artifact_fragment': { name: 'Artifact Fragment', rarity: 'rare', value: 200 },
   'ectoplasm': { name: 'Ectoplasm', rarity: 'uncommon', value: 75 },
   'ritual_dagger': { name: 'Ritual Dagger', rarity: 'uncommon', value: 125, type: 'weapon' },
   'dark_tome': { name: 'Dark Tome', rarity: 'rare', value: 300 },
-  'spell_scroll': { name: 'Spell Scroll', rarity: 'uncommon', value: 150 },
+  'spell_scroll': { name: 'Magic Scroll', rarity: 'uncommon', value: 150 },
   'healing_herbs': { name: 'Healing Herbs', rarity: 'common', value: 20, stackable: true },
   'rare_flower': { name: 'Rare Flower', rarity: 'uncommon', value: 45 },
   'dryad_blessing': { name: 'Dryad\'s Blessing', rarity: 'rare', value: 0, type: 'blessing' },
@@ -157,7 +157,7 @@ export const ITEM_CATALOG = {
   'shortsword': { name: 'Shortsword', rarity: 'common', value: 25, type: 'weapon' },
   'leather_armor': { name: 'Leather Armor', rarity: 'common', value: 30, type: 'armor' },
   'map_fragment': { name: 'Map Fragment', rarity: 'uncommon', value: 0, type: 'quest_item' },
-  'inspiration': { name: 'Bardic Inspiration', rarity: 'uncommon', value: 0, type: 'buff' },
+  'inspiration': { name: 'Minstrel\'s Blessing', rarity: 'uncommon', value: 0, type: 'buff' },
   'divine_blessing': { name: 'Divine Blessing', rarity: 'rare', value: 0, type: 'blessing' },
   'ancient_knowledge': { name: 'Ancient Knowledge', rarity: 'rare', value: 0, type: 'lore' },
   'cursed_item': { name: 'Cursed Trinket', rarity: 'rare', value: 0, type: 'cursed' },

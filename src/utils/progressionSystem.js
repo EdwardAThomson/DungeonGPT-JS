@@ -2,7 +2,7 @@
 // XP curves, leveling, and stat bonuses
 
 // XP thresholds for each level (slow progression, narrative-focused)
-// Inspired by D&D 5e but scaled for encounter-based progression
+// Scaled for encounter-based progression
 // Expect ~20-30 encounters per level at early levels, scaling up
 export const XP_THRESHOLDS = [
   0,       // Level 1 (starting)

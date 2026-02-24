@@ -1,6 +1,6 @@
 
 /**
- * Calculates the ability score modifier based on the standard D&D 5e formula.
+ * Calculates the ability score modifier using the standard RPG formula.
  * Formula: floor((score - 10) / 2)
  * @param {number} score - The raw ability score (e.g., 10, 15, 20).
  * @returns {number} - The modifier (e.g., 0, +2, +5).

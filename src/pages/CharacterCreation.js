@@ -32,7 +32,7 @@ const profilePictures = [
 
 const characterGenders = ["Male", "Female"];
 const characterClasses = ["Barbarian", "Bard", "Cleric", "Druid", "Fighter", "Monk", "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard"]
-const characterRaces = ["Human", "Dwarf", "Elf", "Halfling", "Dragonborn", "Gnome", "Half-Elf", "Half-Orc", "Tiefling"];
+const characterRaces = ["Human", "Dwarf", "Elf", "Smallfolk", "Dragonkin", "Gnome", "Half-Elf", "Half-Orc", "Demonkin"];
 
 const alignmentOptions = [
   "Lawful Good",
@@ -94,7 +94,7 @@ const characterTemplates = {
     backgroundSnippet: "A practitioner of ancient martial arts, seeks inner harmony.",
   },
   Paladin: {
-    race: "Dragonborn",
+    race: "Dragonkin",
     stats: { Strength: 15, Dexterity: 10, Constitution: 13, Intelligence: 10, Wisdom: 12, Charisma: 14 },
     alignment: "Lawful Good",
     backgroundSnippet: "A holy warrior bound by an oath to uphold justice and righteousness.",
@@ -106,19 +106,19 @@ const characterTemplates = {
     backgroundSnippet: "A skilled hunter and tracker, comfortable in the wilderness.",
   },
   Rogue: {
-    race: "Halfling", // Lightfoot often
+    race: "Smallfolk",
     stats: { Strength: 8, Dexterity: 15, Constitution: 12, Intelligence: 14, Wisdom: 10, Charisma: 14 },
     alignment: "Chaotic Neutral",
     backgroundSnippet: "Operates in the shadows, relies on stealth and cunning.",
   },
   Sorcerer: {
-    race: "Tiefling",
+    race: "Demonkin",
     stats: { Strength: 8, Dexterity: 14, Constitution: 14, Intelligence: 12, Wisdom: 10, Charisma: 15 },
     alignment: "Chaotic Good",
     backgroundSnippet: "Wields innate magical power derived from an arcane bloodline.",
   },
   Warlock: {
-    race: "Tiefling",
+    race: "Demonkin",
     stats: { Strength: 8, Dexterity: 13, Constitution: 14, Intelligence: 12, Wisdom: 10, Charisma: 15 },
     alignment: "Chaotic Neutral",
     backgroundSnippet: "Gained magical abilities through a pact with an otherworldly patron.",

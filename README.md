@@ -126,10 +126,28 @@ The following images shows the chat interface of DungeonGPT:
 *   Unit and integration tests for core game loops
 *   Additional encounter types and world events
 
-## License
+## License & Attribution
 
 This project is licensed under the **Apache License 2.0**. See the [LICENSE](./LICENSE) file for details.
 
-Copyright and attribution notices are in the [NOTICE](./NOTICE) file.
+### Character Portrait Artwork
 
-For contribution guidelines, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+All character portrait images were generated using ChatGPT's AI image generation (DALL-E) and are owned by the project creator under OpenAI's Terms of Use. See [CREDITS.md](./CREDITS.md) for full attribution details.
+
+### Game Content
+
+All game content (character descriptions, encounter text, story elements) is original content created for this project. Race and class names use generic fantasy terms or original terminology to avoid trademark conflicts:
+
+- **Original race names:** Smallfolk, Demonkin, Dragonkin
+- **Generic race names:** Human, Dwarf, Elf, Gnome, Half-Elf, Half-Orc
+- **Generic class names:** Barbarian, Bard, Cleric, Druid, Fighter, Monk, Paladin, Ranger, Rogue, Sorcerer, Warlock, Wizard
+
+### Game Mechanics
+
+This project uses d20-based game mechanics (rolling a 20-sided die for skill checks and attacks), which are not copyrighted and are used across many role-playing games. This project does **not** use the Open Game License (OGL) and does not claim compatibility with any specific game system.
+
+### Third-Party Libraries
+
+This project uses various open-source libraries (React, Express, SQLite3, etc.) under their respective licenses. See [CREDITS.md](./CREDITS.md) for a complete list.
+
+For contribution guidelines, see [CONTRIBUTING.md](./CONTRIBUTING.md) if available.
