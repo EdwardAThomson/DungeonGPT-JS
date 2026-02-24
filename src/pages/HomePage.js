@@ -21,7 +21,7 @@ const HomePage = () => {
         </Link>
 
         <div className="home-grid">
-          <Link to="/character-creation" className="home-nav-card">
+          <Link to="/hero-creation" className="home-nav-card">
             <div className="card-icon">🧙‍♂️</div>
             <div className="card-content">
               <h3>Create Hero</h3>
@@ -29,7 +29,7 @@ const HomePage = () => {
             </div>
           </Link>
 
-          <Link to="/all-characters" className="home-nav-card">
+          <Link to="/all-heroes" className="home-nav-card">
             <div className="card-icon">📜</div>
             <div className="card-content">
               <h3>Hall of Heroes</h3>

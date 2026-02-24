@@ -14,6 +14,6 @@
 @import './maps.css';
 @import './forms.css';
 @import './settings.css';
-@import './characters.css';
+@import './heroes.css';
 @import './conversations.css';
-@import './character-creation.css';
+@import './hero-creation.css';

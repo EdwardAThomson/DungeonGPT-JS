@@ -1,10 +1,10 @@
-// CharacterCreation.js
+// HeroCreation.js
 
 import React, { useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
 
-import CharacterContext from "../contexts/CharacterContext";
+import HeroContext from "../contexts/HeroContext";
 import { generateName } from "../utils/npcGenerator";
 import { calculateMaxHP } from "../utils/healthSystem";
 
@@ -30,9 +30,9 @@ const profilePictures = [
   { imageId: 16, src: "female_druid.png", gender: "Female" },
 ];
 
-const characterGenders = ["Male", "Female"];
-const characterClasses = ["Barbarian", "Bard", "Cleric", "Druid", "Fighter", "Monk", "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard"]
-const characterRaces = ["Human", "Dwarf", "Elf", "Smallfolk", "Dragonkin", "Gnome", "Half-Elf", "Half-Orc", "Demonkin"];
+const heroGenders = ["Male", "Female"];
+const heroClasses = ["Barbarian", "Bard", "Cleric", "Druid", "Fighter", "Monk", "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard"]
+const heroRaces = ["Human", "Dwarf", "Elf", "Smallfolk", "Dragonkin", "Gnome", "Half-Elf", "Half-Orc", "Demonkin"];
 
 const alignmentOptions = [
   "Lawful Good",
@@ -55,8 +55,8 @@ const initialStats = {
   Charisma: 8,
 };
 
-// --- Character Class Templates (Level 1) ---
-const characterTemplates = {
+// --- Hero Class Templates (Level 1) ---
+const heroTemplates = {
   Barbarian: {
     race: "Half-Orc",
     stats: { Strength: 15, Dexterity: 13, Constitution: 14, Intelligence: 8, Wisdom: 12, Charisma: 10 },
@@ -131,12 +131,12 @@ const characterTemplates = {
   },
 };
 
-const CharacterCreation = () => {
+const HeroCreation = () => {
 
-  const { characters, editingCharacterIndex } = useContext(CharacterContext);
+  const { heroes, editingHeroIndex } = useContext(HeroContext);
 
   const { state } = useLocation();
-  const characterToEdit = state?.newCharacter || characters[editingCharacterIndex];
+  const heroToEdit = state?.newCharacter || heroes[editingHeroIndex];
 
 
   // State for selected template
@@ -153,15 +153,15 @@ const CharacterCreation = () => {
    Background
    Alignment
    */
-  const [characterName, setCharacterName] = useState(characterToEdit?.characterName || "");
-  const [selectedGender, setSelectedGender] = useState(characterToEdit?.characterGender || "");
-  const [selectedProfilePicture, setSelectedProfilePicture] = useState(characterToEdit?.profilePicture || null);
-  const [selectedRace, setSelectedRace] = useState(characterToEdit?.characterRace || "");
-  const [selectedClass, setSelectedClass] = useState(characterToEdit?.characterClass || "");
-  const [level, setLevel] = useState(characterToEdit?.characterLevel || 1);
-  const [stats, setStats] = useState(characterToEdit?.stats || initialStats);
-  const [characterBackground, setCharacterBackground] = useState(characterToEdit?.characterBackground || "");
-  const [alignment, setAlignment] = useState(characterToEdit?.characterAlignment || "");
+  const [heroName, setHeroName] = useState(heroToEdit?.heroName || "");
+  const [selectedGender, setSelectedGender] = useState(heroToEdit?.heroGender || "");
+  const [selectedProfilePicture, setSelectedProfilePicture] = useState(heroToEdit?.profilePicture || null);
+  const [selectedRace, setSelectedRace] = useState(heroToEdit?.heroRace || "");
+  const [selectedClass, setSelectedClass] = useState(heroToEdit?.heroClass || "");
+  const [level, setLevel] = useState(heroToEdit?.heroLevel || 1);
+  const [stats, setStats] = useState(heroToEdit?.stats || initialStats);
+  const [heroBackground, setHeroBackground] = useState(heroToEdit?.heroBackground || "");
+  const [alignment, setAlignment] = useState(heroToEdit?.heroAlignment || "");
 
   const navigate = useNavigate();
 
@@ -201,24 +201,24 @@ const CharacterCreation = () => {
 
   const handleAlignmentChange = (e) => setAlignment(e.target.value);
 
-  const handleNameChange = (e) => setCharacterName(e.target.value);
+  const handleNameChange = (e) => setHeroName(e.target.value);
 
-  const handleBackgroundChange = (e) => setCharacterBackground(e.target.value);
+  const handleBackgroundChange = (e) => setHeroBackground(e.target.value);
 
   // --- New Template Application Function ---
   const handleApplyTemplate = () => {
-    if (!selectedTemplate || !characterTemplates[selectedTemplate]) {
+    if (!selectedTemplate || !heroTemplates[selectedTemplate]) {
       alert("Please select a class template to apply.");
       return;
     }
-    const template = characterTemplates[selectedTemplate];
+    const template = heroTemplates[selectedTemplate];
 
     // Apply template values to state
     setSelectedClass(selectedTemplate); // Set class to the selected template key
     setSelectedRace(template.race);
     setStats(template.stats);
     setAlignment(template.alignment);
-    setCharacterBackground(template.backgroundSnippet);
+    setHeroBackground(template.backgroundSnippet);
     setLevel(1); // Always set level to 1 for templates
   };
 
@@ -230,64 +230,64 @@ const CharacterCreation = () => {
     }
 
     // Check other required fields
-    if (!characterName || !selectedRace || !selectedClass || !characterBackground || !alignment || !selectedGender || !level) {
+    if (!heroName || !selectedRace || !selectedClass || !heroBackground || !alignment || !selectedGender || !level) {
       alert("Please fill in all remaining hero details (Name, Gender, Race, Class, Level, Alignment, Background).");
       return;
     }
 
     // If all checks pass, proceed
-    const newCharacter = {
-      characterId: characterToEdit?.characterId || uuidv4(),
-      characterName: characterName,
-      characterGender: selectedGender,
+    const newHero = {
+      heroId: heroToEdit?.heroId || uuidv4(),
+      heroName: heroName,
+      heroGender: selectedGender,
       profilePicture: selectedProfilePicture,
-      characterRace: selectedRace,
-      characterClass: selectedClass,
-      characterLevel: level,
-      characterBackground: characterBackground,
-      characterAlignment: alignment,
+      heroRace: selectedRace,
+      heroClass: selectedClass,
+      heroLevel: level,
+      heroBackground: heroBackground,
+      heroAlignment: alignment,
       stats: stats,
     };
 
     if (state?.editing) {
       // Don't update context here, just navigate back to summary with updated data
       /*
-      const updatedCharacters = characters.map((char, index) =>
-        index === editingCharacterIndex ? newCharacter : char
+      const updatedHeroes = heroes.map((hero, index) =>
+        index === editingHeroIndex ? newHero : hero
       );
-      setCharacters(updatedCharacters);
-      setEditingCharacterIndex(null);
-      navigate("/all-characters");
+      setHeroes(updatedHeroes);
+      setEditingHeroIndex(null);
+      navigate("/all-heroes");
       */
-      // Navigate back to summary page with the edited character data
-      navigate("/hero-summary", { state: { newCharacter } });
+      // Navigate back to summary page with the edited hero data
+      navigate("/hero-summary", { state: { newCharacter: newHero } });
     } else {
       // This is for initial creation, navigate to summary
-      navigate("/hero-summary", { state: { newCharacter } });
+      navigate("/hero-summary", { state: { newCharacter: newHero } });
     }
   };
 
   // --- Update Name Generation Function --- // (Now using centralized dataset)
   const generateRandomName = () => {
-    setCharacterName(generateName(selectedGender));
+    setHeroName(generateName(selectedGender));
   };
 
   return (
-    <div className="Home-page character-creation-form">
+    <div className="Home-page hero-creation-form">
       {/* Top Container: Header, Name, Gender, and Pictures */}
       <div className="top-container">
         {/* Header + Name */}
         <div className="form-section">
           <h1>{state?.editing ? "Edit Hero" : "Create Your Hero"}</h1>
           <div className="name-section">
-            <label htmlFor="characterName">Hero Name:</label>
+            <label htmlFor="heroName">Hero Name:</label>
             <div className="name-input-group">
               <input
                 type="text"
-                id="characterName"
+                id="heroName"
                 maxLength="50"
                 placeholder="Enter or Generate Name"
-                value={characterName}
+                value={heroName}
                 onChange={handleNameChange}
                 required
               />
@@ -303,9 +303,9 @@ const CharacterCreation = () => {
           <label htmlFor="gender">Gender:</label>
           <select id="gender" value={selectedGender} onChange={handleGenderChange} required>
             <option value="">Select Gender</option>
-            {characterGenders.map((characterGender) => (
-              <option key={characterGender} value={characterGender}>
-                {characterGender}
+            {heroGenders.map((heroGender) => (
+              <option key={heroGender} value={heroGender}>
+                {heroGender}
               </option>
             ))}
           </select>
@@ -348,7 +348,7 @@ const CharacterCreation = () => {
                 onChange={(e) => setSelectedTemplate(e.target.value)}
               >
                 <option value="">Select Class Template</option>
-                {Object.keys(characterTemplates).map(className => (
+                {Object.keys(heroTemplates).map(className => (
                   <option key={className} value={className}>{className}</option>
                 ))}
               </select>
@@ -370,7 +370,7 @@ const CharacterCreation = () => {
               <label htmlFor="race">Race:</label>
               <select id="race" value={selectedRace} onChange={handleRaceChange} required>
                 <option value="">Select Race</option>
-                {characterRaces.map((race) => (
+                {heroRaces.map((race) => (
                   <option key={race} value={race}>{race}</option>
                 ))}
               </select>
@@ -380,7 +380,7 @@ const CharacterCreation = () => {
               <label htmlFor="class">Class:</label>
               <select id="class" value={selectedClass} onChange={handleClassChange} required>
                 <option value="">Select Class</option>
-                {characterClasses.map((cls) => (
+                {heroClasses.map((cls) => (
                   <option key={cls} value={cls}>{cls}</option>
                 ))}
               </select>
@@ -417,7 +417,7 @@ const CharacterCreation = () => {
             <label htmlFor="background">Background Story:</label>
             <textarea
               id="background"
-              value={characterBackground}
+              value={heroBackground}
               onChange={handleBackgroundChange}
               maxLength="200"
               placeholder="Enter hero background"
@@ -461,4 +461,4 @@ const CharacterCreation = () => {
   );
 };
 
-export default CharacterCreation;
+export default HeroCreation;

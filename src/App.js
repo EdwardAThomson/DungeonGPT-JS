@@ -2,9 +2,9 @@
 
 import React, { useContext, Suspense, lazy } from "react";
 import { BrowserRouter as Router, Route, Link, Routes, Navigate, useLocation } from "react-router-dom";
-import CharacterCreation from "./pages/CharacterCreation";
-import CharacterSummary from "./components/CharacterSummary";
-import AllCharacters from "./pages/AllCharacters";
+import HeroCreation from "./pages/HeroCreation";
+import HeroSummary from "./components/HeroSummary";
+import AllHeroes from "./pages/AllHeroes";
 import HomePage from "./pages/HomePage";
 import GameSettings from "./pages/GameSettings";
 import HeroSelection from './pages/HeroSelection';
@@ -106,9 +106,9 @@ const AppContent = () => {
           <Suspense fallback={<div className="page-container">Loading...</div>}>
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/hero-creation" element={<CharacterCreation />} />
-              <Route path="/hero-summary" element={<CharacterSummary />} />
-              <Route path="/all-heroes" element={<AllCharacters />} />
+              <Route path="/hero-creation" element={<HeroCreation />} />
+              <Route path="/hero-summary" element={<HeroSummary />} />
+              <Route path="/all-heroes" element={<AllHeroes />} />
               <Route path="/game-settings" element={<GameSettings />} />
               <Route path="/hero-selection" element={<HeroSelection />} />
               <Route path="/game" element={<Game />} />

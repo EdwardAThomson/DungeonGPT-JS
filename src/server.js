@@ -253,7 +253,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
   */
 
 
-/*  --- this comes from CharacterCreation.js
+/*  --- this comes from HeroCreation.js
      const newCharacter = {
       characterId: characterToEdit?.characterId || uuidv4(), //newCharacterId,
       characterName: characterName,
@@ -298,6 +298,26 @@ const db = new sqlite3.Database('./src/game.db', (err) => {
         logger.error('Error creating table', err);
       } else {
         logger.debug('Characters table created or already exists');
+      }
+    });
+
+    // Create heroestable (new schema with hero* column names)
+    db.run(`CREATE TABLE IF NOT EXISTS heroestable (
+             heroId TEXT PRIMARY KEY,
+             heroName TEXT,
+             heroGender TEXT,
+             profilePicture TEXT,
+             heroRace TEXT,
+             heroClass TEXT,
+             heroLevel INTEGER,
+             heroBackground TEXT,
+             heroAlignment TEXT,
+             stats TEXT
+           )`, (err) => {
+      if (err) {
+        logger.error('Error creating heroes table', err);
+      } else {
+        logger.debug('Heroes table created or already exists');
       }
     });
 
@@ -379,7 +399,7 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, service: 'dungeongpt-js-api' });
 });
 
-app.use(['/characters', '/api/conversations', '/api/llm'], requireApiAuthMiddleware);
+app.use(['/characters', '/heroes', '/api/conversations', '/api/llm'], requireApiAuthMiddleware);
 
 
 /* // First route: a route to add a new character
@@ -492,6 +512,106 @@ app.get('/characters', (req, res) => {
     }
   });
 
+});
+
+// ===== NEW HEROES API ENDPOINTS =====
+
+// Route to add a new hero
+app.post('/heroes', (req, res) => {
+  const validationErrors = validateCharacterPayload(req.body);
+  if (validationErrors.length > 0) {
+    return buildValidationError(res, validationErrors);
+  }
+
+  const { heroId, heroName, heroGender, profilePicture, heroRace, heroClass, heroLevel, heroBackground, heroAlignment, stats } = req.body;
+  logger.debug('Adding hero', [heroId, heroName, heroGender, profilePicture, heroRace, heroClass, heroLevel, heroBackground, heroAlignment, JSON.stringify(stats)]);
+
+  const query = `INSERT INTO heroestable (heroId, heroName, heroGender, profilePicture, heroRace, heroClass, heroLevel, heroBackground, heroAlignment, stats) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  const params = [heroId, heroName, heroGender, profilePicture, heroRace, heroClass, heroLevel, heroBackground, heroAlignment, JSON.stringify(stats)];
+
+  db.run(query, params, function (err) {
+    if (err) {
+      logger.error('Error adding hero', err);
+      return sendError(res, 500, 'Failed to add hero');
+    } else {
+      res.json({ id: this.lastID });
+    }
+  });
+});
+
+// Route to update an existing hero
+app.put('/heroes/:heroId', (req, res) => {
+  const { heroId } = req.params;
+  if (!isNonEmptyString(heroId)) {
+    return buildValidationError(res, ['heroId route parameter is required.']);
+  }
+
+  const validationErrors = validateCharacterPayload(req.body);
+  if (validationErrors.length > 0) {
+    return buildValidationError(res, validationErrors);
+  }
+
+  if (req.body.heroId !== heroId) {
+    return buildValidationError(res, ['heroId in body must match route parameter.']);
+  }
+
+  const { heroName, heroGender, profilePicture, heroRace, heroClass, heroLevel, heroBackground, heroAlignment, stats } = req.body;
+
+  logger.debug('Updating hero', heroId, [heroName, heroGender, profilePicture, heroRace, heroClass, heroLevel, heroBackground, heroAlignment, JSON.stringify(stats)]);
+
+  const query = `
+    UPDATE heroestable 
+    SET heroName = ?, 
+        heroGender = ?, 
+        profilePicture = ?, 
+        heroRace = ?, 
+        heroClass = ?, 
+        heroLevel = ?, 
+        heroBackground = ?, 
+        heroAlignment = ?, 
+        stats = ? 
+    WHERE heroId = ?`;
+
+  const params = [
+    heroName,
+    heroGender,
+    profilePicture,
+    heroRace,
+    heroClass,
+    heroLevel,
+    heroBackground,
+    heroAlignment,
+    JSON.stringify(stats),
+    heroId
+  ];
+
+  db.run(query, params, function (err) {
+    if (err) {
+      logger.error('Error updating hero', err);
+      return sendError(res, 500, 'Failed to update hero');
+    } else if (this.changes === 0) {
+      return sendError(res, 404, 'Hero not found');
+    } else {
+      res.json({ message: 'Hero updated successfully' });
+    }
+  });
+});
+
+// Route to get all heroes
+app.get('/heroes', (req, res) => {
+  db.all('SELECT * FROM heroestable', [], (err, rows) => {
+    if (err) {
+      logger.error('Error retrieving heroes', err);
+      return sendError(res, 500, 'Failed to retrieve heroes');
+    } else {
+      // Parse the stats JSON string for each row
+      const parsedRows = rows.map(row => ({
+        ...row,
+        stats: JSON.parse(row.stats)
+      }));
+      res.json(parsedRows);
+    }
+  });
 });
 
 // GET endpoint to fetch all conversations (API version)

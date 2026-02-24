@@ -1,10 +1,10 @@
-/* characters.css
- * Purpose: character roster, hero selection, and character summary page styles.
+/* heroes.css
+ * Purpose: hero roster, hero selection, and hero summary page styles.
  * Depends on: theme tokens from src/index.css and shared form primitives from forms.css.
  * Font usage: --header-font for headings/actions, --body-font for body copy, --ui-font inherited in controls.
  */
 
-.all-characters-list {
+.all-heroes-list {
   list-style: none;
   padding: 0;
   display: grid;
@@ -12,7 +12,7 @@
   gap: 20px;
 }
 
-.character-item {
+.hero-item {
   background-color: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -24,11 +24,11 @@
   transition: all 0.3s ease;
 }
 
-.character-item:hover {
+.hero-item:hover {
   box-shadow: 0 4px 10px var(--shadow-black-15);
 }
 
-.character-item-image {
+.hero-item-image {
   width: 100px;
   height: 100px;
   border-radius: 50%;
@@ -37,19 +37,19 @@
   border: 3px solid var(--border);
 }
 
-.character-item-image img {
+.hero-item-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.character-item-info {
+.hero-item-info {
   text-align: center;
   margin-bottom: 15px;
   width: 100%;
 }
 
-.character-item-info h3 {
+.hero-item-info h3 {
   margin-top: 0;
   margin-bottom: 10px;
   color: var(--text);
@@ -57,7 +57,7 @@
   font-family: var(--header-font);
 }
 
-.character-item-info p {
+.hero-item-info p {
   margin: 5px 0;
   color: var(--text-secondary);
   font-size: 0.95em;
@@ -68,7 +68,7 @@
   color: var(--text);
 }
 
-.character-item-stats {
+.hero-item-stats {
   list-style: none;
   padding: 0;
   margin-top: 10px;
@@ -78,7 +78,7 @@
   gap: 10px;
 }
 
-.character-item-stats li {
+.hero-item-stats li {
   background-color: var(--bg);
   padding: 3px 8px;
   border-radius: 4px;
@@ -87,7 +87,7 @@
   border: 1px solid var(--border);
 }
 
-.character-item-actions {
+.hero-item-actions {
   display: flex;
   justify-content: center;
   gap: 10px;
@@ -95,7 +95,7 @@
   margin-top: auto;
 }
 
-.character-item-actions button {
+.hero-item-actions button {
   padding: 6px 12px;
   font-size: 0.9em;
 }
@@ -296,7 +296,7 @@
   }
 }
 
-.all-characters-page .page-header {
+.all-heroes-page .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -305,7 +305,7 @@
   border-bottom: 1px solid var(--border-soft);
 }
 
-.all-characters-page .page-header h2 {
+.all-heroes-page .page-header h2 {
   margin: 0;
 }
 
@@ -314,7 +314,7 @@
   gap: 15px;
 }
 
-.all-characters-page .start-game-button {
+.all-heroes-page .start-game-button {
   background-color: var(--state-warning-strong);
   padding: 8px 15px;
   border: none;
@@ -324,11 +324,11 @@
   transition: background-color 0.3s ease;
 }
 
-.all-characters-page .start-game-button:hover {
+.all-heroes-page .start-game-button:hover {
   background-color: var(--state-warning-deep);
 }
 
-.all-characters-page .create-new-button {
+.all-heroes-page .create-new-button {
   background-color: var(--state-success);
   padding: 8px 15px;
   border: none;
@@ -338,7 +338,7 @@
   transition: background-color 0.3s ease;
 }
 
-.all-characters-page .create-new-button:hover {
+.all-heroes-page .create-new-button:hover {
   background-color: var(--state-success-strong);
 }
 

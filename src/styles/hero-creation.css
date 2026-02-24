@@ -1,5 +1,5 @@
-/* character-creation.css
- * Purpose: character creation page-specific layout and controls.
+/* hero-creation.css
+ * Purpose: hero creation page-specific layout and controls.
  * Depends on: theme tokens from src/index.css and shared form primitives from forms.css.
  * Font usage: inherits --body-font globally; form controls continue to use --ui-font.
  */

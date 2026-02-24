@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import CharacterContext from "../contexts/CharacterContext";
+import HeroContext from "../contexts/HeroContext";
 import SettingsContext from "../contexts/SettingsContext";
 import { generateMapData, findStartingTown } from "../utils/mapGenerator";
 import WorldMapDisplay from "../components/WorldMapDisplay";
@@ -50,7 +50,7 @@ const resolveMilestoneCoords = (milestones, mapData) => {
 const GameSettings = () => {
 
   // characters should be saved in Context
-  const { characters } = useContext(CharacterContext);
+  const { heroes } = useContext(HeroContext);
   // Get settings, provider, and model state from context
   const { settings, setSettings, selectedProvider, selectedModel } = useContext(SettingsContext);
   const navigate = useNavigate();
@@ -253,7 +253,7 @@ const GameSettings = () => {
     localStorage.setItem('activeGameSessionId', gameSessionId);
 
     setSettings(settingsData);
-    navigate('/hero-selection', { state: { characters, generatedMap, worldSeed, gameSessionId } });
+    navigate('/hero-selection', { state: { heroes, generatedMap, worldSeed, gameSessionId } });
   };
 
   return (

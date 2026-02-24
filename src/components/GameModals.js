@@ -3,7 +3,7 @@ import { StorySettingsModalContent, HowToPlayModalContent } from './Modals';
 import MapModal from './MapModal';
 import EncounterModal from './EncounterModal';
 import EncounterActionModal from './EncounterActionModal';
-import CharacterModal from './CharacterModal';
+import HeroModal from './HeroModal';
 import AiAssistantPanel from './AiAssistantPanel';
 import PartyInventoryModal from './PartyInventoryModal';
 import DiceRoller from './DiceRoller';
@@ -34,8 +34,8 @@ const GameModals = ({
   isEncounterModalOpen,
   setIsEncounterModalOpen,
   currentEncounter,
-  isCharacterModalOpen,
-  setIsCharacterModalOpen,
+  isHeroModalOpen,
+  setIsHeroModalOpen,
   selectedHeroForModal,
   isActionEncounterOpen,
   setIsActionEncounterOpen,
@@ -109,10 +109,10 @@ const GameModals = ({
         onEnterLocation={() => mapHook.handleEnterLocation(currentEncounter, interactionHook.setConversation, interactionHook.conversation)}
         onViewMap={() => mapHook.setIsMapModalOpen(true)}
       />
-      <CharacterModal
-        isOpen={isCharacterModalOpen}
-        onClose={() => setIsCharacterModalOpen(false)}
-        character={selectedHeroForModal}
+      <HeroModal
+        isOpen={isHeroModalOpen}
+        onClose={() => setIsHeroModalOpen(false)}
+        hero={selectedHeroForModal}
       />
       <EncounterActionModal
         isOpen={isActionEncounterOpen}

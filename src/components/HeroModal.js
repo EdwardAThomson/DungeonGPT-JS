@@ -2,39 +2,39 @@ import React from 'react';
 import { calculateMaxHP, getHPStatus } from '../utils/healthSystem';
 import { getLevelProgress, calculateLevel } from '../utils/progressionSystem';
 
-const CharacterModal = ({ isOpen, onClose, character }) => {
-    if (!isOpen || !character) return null;
+const HeroModal = ({ isOpen, onClose, hero }) => {
+    if (!isOpen || !hero) return null;
 
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div
-                className="modal-content character-details-modal"
+                className="modal-content hero-details-modal"
                 onClick={(e) => e.stopPropagation()}
                 style={{ maxWidth: '700px', width: '90%' }}
             >
                 <div className="modal-header-with-image">
-                    {character.profilePicture && (
+                    {hero.profilePicture && (
                         <div className="modal-profile-pic-container">
                             <img
-                                src={character.profilePicture}
-                                alt={`${character.characterName}'s profile`}
+                                src={hero.profilePicture}
+                                alt={`${hero.heroName}'s profile`}
                                 className="modal-profile-pic"
                             />
                         </div>
                     )}
                     <div className="modal-header-text">
-                        <h2>{character.characterName}</h2>
-                        <p className="character-subtitle">
-                            Level {character.characterLevel} {character.characterGender} {character.characterRace} {character.characterClass}
+                        <h2>{hero.heroName}</h2>
+                        <p className="hero-subtitle">
+                            Level {hero.heroLevel} {hero.heroGender} {hero.heroRace} {hero.heroClass}
                         </p>
                     </div>
                 </div>
 
                 <div className="modal-section scrollable-modal-section">
-                    <h4>Character Stats</h4>
-                    {character.stats && (
+                    <h4>Hero Stats</h4>
+                    {hero.stats && (
                         <div className="stats-grid-modal">
-                            {Object.entries(character.stats).map(([stat, value]) => (
+                            {Object.entries(hero.stats).map(([stat, value]) => (
                                 <div key={stat} className="stat-item-modal">
                                     <span className="stat-label">{stat.substring(0, 3).toUpperCase()}</span>
                                     <span className="stat-value">{value}</span>
@@ -44,29 +44,29 @@ const CharacterModal = ({ isOpen, onClose, character }) => {
                     )}
                 </div>
 
-                {character.characterBackground && (
+                {hero.heroBackground && (
                     <div className="modal-section scrollable-modal-section">
                         <h4>Background</h4>
-                        <div className="character-background-text">
-                            {character.characterBackground}
+                        <div className="hero-background-text">
+                            {hero.heroBackground}
                         </div>
                     </div>
                 )}
 
-                {character.stats && (() => {
-                    const maxHP = character.maxHP || calculateMaxHP(character);
-                    const currentHP = character.currentHP ?? maxHP;
+                {hero.stats && (() => {
+                    const maxHP = hero.maxHP || calculateMaxHP(hero);
+                    const currentHP = hero.currentHP ?? maxHP;
                     const status = getHPStatus(currentHP, maxHP);
                     return (
                         <div className="modal-section">
                             <h4>Health</h4>
-                            <div className="character-hp-display">
-                                <div className="character-hp-label">
+                            <div className="hero-hp-display">
+                                <div className="hero-hp-label">
                                     <span>HP</span>
                                     <span style={{ color: status.color, fontWeight: 'bold' }}>{currentHP}/{maxHP}</span>
                                 </div>
-                                <div className="character-hp-bar">
-                                    <div className="character-hp-fill" style={{ 
+                                <div className="hero-hp-bar">
+                                    <div className="hero-hp-fill" style={{ 
                                         width: `${(currentHP / maxHP) * 100}%`,
                                         background: status.color
                                     }} />
@@ -80,20 +80,20 @@ const CharacterModal = ({ isOpen, onClose, character }) => {
                 })()}
 
                 {(() => {
-                    const xp = character.xp || 0;
-                    const level = character.level || calculateLevel(xp);
+                    const xp = hero.xp || 0;
+                    const level = hero.level || calculateLevel(xp);
                     const progress = getLevelProgress(xp);
                     return (
                         <div className="modal-section">
                             <h4>Experience</h4>
-                            <div className="character-xp-display">
+                            <div className="hero-xp-display">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                                     <span><strong>Level {level}</strong></span>
                                     <span style={{ color: 'var(--state-highlight)', fontWeight: 'bold' }}>{xp} XP</span>
                                 </div>
                                 {!progress.isMaxLevel ? (
                                     <>
-                                        <div className="character-hp-bar" style={{ background: 'var(--ink-strong)' }}>
+                                        <div className="hero-hp-bar" style={{ background: 'var(--ink-strong)' }}>
                                             <div style={{ 
                                                 width: `${progress.percentage}%`,
                                                 height: '100%',
@@ -116,9 +116,9 @@ const CharacterModal = ({ isOpen, onClose, character }) => {
                     );
                 })()}
 
-                {character.characterAlignment && (
+                {hero.heroAlignment && (
                     <div className="modal-section">
-                        <p><strong>Alignment:</strong> {character.characterAlignment}</p>
+                        <p><strong>Alignment:</strong> {hero.heroAlignment}</p>
                     </div>
                 )}
 
@@ -130,4 +130,4 @@ const CharacterModal = ({ isOpen, onClose, character }) => {
     );
 };
 
-export default CharacterModal;
+export default HeroModal;

@@ -1,78 +1,78 @@
-// CharacterSummary.js
+// HeroSummary.js
 
 import React, { useContext, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { downloadJSONFile } from "../utils/fileHelper";
-import CharacterContext from "../contexts/CharacterContext";
+import HeroContext from "../contexts/HeroContext";
 import { calculateMaxHP } from "../utils/healthSystem";
-import { charactersApi } from "../services/charactersApi";
+import { heroesApi } from "../services/heroesApi";
 import { createLogger } from "../utils/logger";
 
-const logger = createLogger('character-summary');
+const logger = createLogger('hero-summary');
 
-const CharacterSummary = () => {
-  const { characters, setCharacters } = useContext(CharacterContext);
+const HeroSummary = () => {
+  const { heroes, setHeroes } = useContext(HeroContext);
   const { state } = useLocation();
-  const newCharacter = state?.newCharacter;
+  const newHero = state?.newCharacter;
   const [feedbackModal, setFeedbackModal] = useState(null);
 
   const navigate = useNavigate();
 
-  // Check if the character exists in the context (means we are editing)
-  const isEditing = characters.some(char => char.characterId === newCharacter?.characterId);
+  // Check if the hero exists in the context (means we are editing)
+  const isEditing = heroes.some(hero => hero.heroId === newHero?.heroId);
 
   const handleSaveOrUpdate = async () => {
-    if (!newCharacter) return; // Safety check
+    if (!newHero) return; // Safety check
 
     // Determine endpoint and method based on whether it's an edit or add
     const isUpdate = isEditing;
     // Update local context/state first for immediate UI feedback
-    let updatedCharacters;
+    let updatedHeroes;
     if (isUpdate) {
-      updatedCharacters = characters.map(char =>
-        char.characterId === newCharacter.characterId ? newCharacter : char
+      updatedHeroes = heroes.map(hero =>
+        hero.heroId === newHero.heroId ? newHero : hero
       );
     } else {
-      updatedCharacters = [...characters, newCharacter];
+      updatedHeroes = [...heroes, newHero];
     }
-    setCharacters(updatedCharacters); // Update context
+    setHeroes(updatedHeroes); // Update context
 
-    logger.debug(isUpdate ? "Updating character..." : "Adding character....", newCharacter);
+    logger.debug(isUpdate ? "Updating hero..." : "Adding hero....", newHero);
 
     // Attempt to save/update on the server
     try {
       const result = isUpdate
-        ? await charactersApi.update(newCharacter.characterId, newCharacter)
-        : await charactersApi.create(newCharacter);
+        ? await heroesApi.update(newHero.heroId, newHero)
+        : await heroesApi.create(newHero);
 
-      logger.debug(`Character ${isUpdate ? 'updated' : 'added'} in database. Response:`, result);
+      logger.debug(`Hero ${isUpdate ? 'updated' : 'added'} in database. Response:`, result);
       setFeedbackModal({
         title: isUpdate ? "Hero Updated" : "Hero Added",
-        message: `Character ${isUpdate ? 'updated' : 'added'} successfully.`,
-        onConfirm: () => handleProgress(updatedCharacters)
+        message: `Hero ${isUpdate ? 'updated' : 'added'} successfully.`,
+        onConfirm: () => handleProgress(updatedHeroes)
       });
     } catch (error) {
-      logger.error(`Error ${isUpdate ? 'updating' : 'adding'} character in DB:`, error);
+      logger.error(`Error ${isUpdate ? 'updating' : 'adding'} hero in DB:`, error);
       setFeedbackModal({
         title: "Save Warning",
-        message: `Failed to ${isUpdate ? 'update' : 'add'} character in database: ${error.message}. Changes were applied locally.`,
-        onConfirm: () => handleProgress(updatedCharacters)
+        message: `Failed to ${isUpdate ? 'update' : 'add'} hero in database: ${error.message}. Changes were applied locally.`,
+        onConfirm: () => handleProgress(updatedHeroes)
       });
     }
   };
 
-  const handleProgress = async (currentChars) => { // Accept characters array
+  const handleProgress = async (currentHeroes) => { // Accept heroes array
     // This function only handles navigation now
-    const finalCharacters = currentChars || characters; // Use passed array or context
+    const finalHeroes = currentHeroes || heroes; // Use passed array or context
     if (state?.returnToHeroSelection) {
-      navigate('/hero-selection', { state: { characters: finalCharacters, settingsData: state.settingsData } });
+      navigate('/hero-selection', { state: { heroes: finalHeroes, settingsData: state.settingsData } });
     } else {
       navigate("/all-heroes");
     }
   };
 
-  if (!newCharacter) {
-    return <p className="page-container">No character data found. Please create a character first.</p>;
+  if (!newHero) {
+    return <p className="page-container">No hero data found. Please create a hero first.</p>;
   }
 
   const closeFeedbackModal = () => {
@@ -88,35 +88,35 @@ const CharacterSummary = () => {
       <div className="summary-content">
         {/* Image Column */}
         <div className="summary-image">
-          <img src={newCharacter.profilePicture} alt={`${newCharacter.characterName}'s profile`} />
+          <img src={newHero.profilePicture} alt={`${newHero.heroName}'s profile`} />
         </div>
 
         {/* Details Column */}
         <div className="summary-details">
-          <h2>{newCharacter.characterName}</h2>
+          <h2>{newHero.heroName}</h2>
           <div className="summary-info-grid">
             <p className="kv-row">
-              <span className="detail-label">Level:</span> {newCharacter.characterLevel}
+              <span className="detail-label">Level:</span> {newHero.heroLevel}
             </p>
             <p className="kv-row">
-              <span className="detail-label">Class:</span> {newCharacter.characterClass}
+              <span className="detail-label">Class:</span> {newHero.heroClass}
             </p>
             <p className="kv-row">
-              <span className="detail-label">Race:</span> {newCharacter.characterRace}
+              <span className="detail-label">Race:</span> {newHero.heroRace}
             </p>
             <p className="kv-row">
-              <span className="detail-label">Alignment:</span> {newCharacter.characterAlignment}
+              <span className="detail-label">Alignment:</span> {newHero.heroAlignment}
             </p>
           </div>
           <p className="kv-row summary-background">
-            <span className="detail-label">Background:</span> {newCharacter.characterBackground}
+            <span className="detail-label">Background:</span> {newHero.heroBackground}
           </p>
           {/* Stats List */}
-          {newCharacter.stats && (
+          {newHero.stats && (
             <div className="summary-stats-list">
               <h4>Stats:</h4>
               <ul>
-                {Object.entries(newCharacter.stats).map(([stat, value]) => (
+                {Object.entries(newHero.stats).map(([stat, value]) => (
                   <li key={stat}>
                     {stat}: {value}
                   </li>
@@ -124,9 +124,9 @@ const CharacterSummary = () => {
               </ul>
             </div>
           )}
-          {newCharacter.stats && (
+          {newHero.stats && (
             <p className="kv-row summary-max-hp">
-              <span className="detail-label">Max HP:</span> {newCharacter.maxHP || calculateMaxHP(newCharacter)}
+              <span className="detail-label">Max HP:</span> {newHero.maxHP || calculateMaxHP(newHero)}
             </p>
           )}
         </div>
@@ -136,7 +136,7 @@ const CharacterSummary = () => {
       <div className="summary-actions">
         {/* Back Button - always takes you back to edit */}
         <button
-          onClick={() => { navigate("/hero-creation", { state: { newCharacter, editing: true } }); }}
+          onClick={() => { navigate("/hero-creation", { state: { newCharacter: newHero, editing: true } }); }}
           className="summary-action-btn summary-back-btn"
         >
           Back (Edit)
@@ -147,10 +147,10 @@ const CharacterSummary = () => {
         </button>
         {/* Download Button */}
         <button
-          onClick={() => downloadJSONFile(`${newCharacter.characterName}-character.json`, newCharacter)}
+          onClick={() => downloadJSONFile(`${newHero.heroName}-hero.json`, newHero)}
           className="summary-action-btn summary-download-btn"
         >
-          Download Character JSON
+          Download Hero JSON
         </button>
       </div>
 
@@ -171,4 +171,4 @@ const CharacterSummary = () => {
   );
 };
 
-export default CharacterSummary;
+export default HeroSummary;

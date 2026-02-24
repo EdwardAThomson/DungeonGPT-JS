@@ -82,7 +82,7 @@ const Game = () => {
   const [isEncounterModalOpen, setIsEncounterModalOpen] = useState(false);
   const [isDiceModalOpen, setIsDiceModalOpen] = useState(false);
   const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
-  const [isCharacterModalOpen, setIsCharacterModalOpen] = useState(false);
+  const [isHeroModalOpen, setIsHeroModalOpen] = useState(false);
   const [selectedHeroForModal, setSelectedHeroForModal] = useState(null);
   const [currentEncounter, setCurrentEncounter] = useState(null);
   const [actionEncounter, setActionEncounter] = useState(null);
@@ -445,7 +445,7 @@ const Game = () => {
           selectedHeroes={selectedHeroes}
           onOpenCharacter={(hero) => {
             setSelectedHeroForModal(hero);
-            setIsCharacterModalOpen(true);
+            setIsHeroModalOpen(true);
           }}
         />
       </div>
@@ -476,8 +476,8 @@ const Game = () => {
         isEncounterModalOpen={isEncounterModalOpen}
         setIsEncounterModalOpen={setIsEncounterModalOpen}
         currentEncounter={currentEncounter}
-        isCharacterModalOpen={isCharacterModalOpen}
-        setIsCharacterModalOpen={setIsCharacterModalOpen}
+        isHeroModalOpen={isHeroModalOpen}
+        setIsHeroModalOpen={setIsHeroModalOpen}
         selectedHeroForModal={selectedHeroForModal}
         isActionEncounterOpen={isActionEncounterOpen}
         setIsActionEncounterOpen={setIsActionEncounterOpen}

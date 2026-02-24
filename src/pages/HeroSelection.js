@@ -2,17 +2,17 @@
 
 import React, { useState, useContext, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import CharacterContext from '../contexts/CharacterContext';
+import HeroContext from '../contexts/HeroContext';
 import SettingsContext from '../contexts/SettingsContext';
 import { initializeHP } from '../utils/healthSystem';
-import { charactersApi } from '../services/charactersApi';
+import { heroesApi } from '../services/heroesApi';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('hero-selection');
 
 const HeroSelection = () => {
   const { state } = useLocation();
-  const { characters, setCharacters } = useContext(CharacterContext);
+  const { heroes, setHeroes } = useContext(HeroContext);
   const { settings } = useContext(SettingsContext);
   const navigate = useNavigate();
 
@@ -26,31 +26,31 @@ const HeroSelection = () => {
 
   // Fetch characters from database on component mount
   useEffect(() => {
-    const fetchCharacters = async () => {
+    const fetchHeroes = async () => {
       try {
-        const data = await charactersApi.list();
-        setCharacters(data);
+        const data = await heroesApi.list();
+        setHeroes(data);
       } catch (error) {
-        logger.error('Error fetching characters:', error);
-        setSelectionError('Failed to load characters. Please ensure the server is running.');
+        logger.error('Error fetching heroes:', error);
+        setSelectionError('Failed to load heroes. Please ensure the server is running.');
       }
     };
 
-    // Only fetch if characters array is empty
-    if (characters.length === 0) {
-      fetchCharacters();
+    // Only fetch if heroes array is empty
+    if (heroes.length === 0) {
+      fetchHeroes();
     }
-  }, [characters.length, setCharacters]);
+  }, [setHeroes]);
 
-  const toggleHeroSelection = (character) => {
+  const toggleHeroSelection = (hero) => {
     setSelectionError('');
     setSelectedHeroes((prevSelected) => {
-      const isSelected = prevSelected.some(hero => hero.characterId === character.characterId);
+      const isSelected = prevSelected.some(h => h.heroId === hero.heroId);
       if (isSelected) {
-        return prevSelected.filter((hero) => hero.characterId !== character.characterId);
+        return prevSelected.filter((h) => h.heroId !== hero.heroId);
       } else {
         if (prevSelected.length < 4) {
-          return [...prevSelected, character];
+          return [...prevSelected, hero];
         } else {
           setSelectionError('You can select a maximum of 4 heroes.');
           return prevSelected;
@@ -59,7 +59,7 @@ const HeroSelection = () => {
     });
   };
 
-  const handleCreateCharacter = () => {
+  const handleCreateHero = () => {
     navigate('/hero-creation', { state: { returnToHeroSelection: true, settingsData: settings } });
   };
 
@@ -85,49 +85,49 @@ const HeroSelection = () => {
     <div className="page-container hero-selection-page">
       <div className="page-header">
         <h2>Select Your Party (1-4 Heroes)</h2>
-        <button onClick={handleCreateCharacter} className="create-new-button">
+        <button onClick={handleCreateHero} className="create-new-button">
           + Create New Hero
         </button>
       </div>
 
-      {characters.length === 0 ? (
-        <h3>No heroes available. Please create a hero.</h3>
+      {heroes.length === 0 ? (
+        <p>No heroes available. Please create heroes first.</p>
       ) : (
-        <ul className="all-characters-list hero-selection-list">
-          {characters.map((char) => {
-            const isSelected = selectedHeroes.some(hero => hero.characterId === char.characterId);
+        <ul className="all-heroes-list hero-selection-list">
+          {heroes.map((hero) => {
+            const isSelected = selectedHeroes.some(h => h.heroId === hero.heroId);
             return (
               <li
-                key={char.characterId}
-                className={`character-item hero-item ${isSelected ? 'selected' : ''}`}
-                onClick={() => toggleHeroSelection(char)}
+                key={hero.heroId}
+                className={`hero-item ${isSelected ? 'selected' : ''}`}
+                onClick={() => toggleHeroSelection(hero)}
               >
-                <div className="character-item-image">
-                  <img src={char.profilePicture} alt={`${char.characterName}'s profile`} />
+                <div className="hero-item-image">
+                  <img src={hero.profilePicture} alt={`${hero.heroName}'s profile`} />
                 </div>
 
-                <div className="character-item-info">
-                  <h3>{char.characterName}</h3>
+                <div className="hero-item-info">
+                  <h3>{hero.heroName}</h3>
                   <p>
-                    <span className="detail-label">Level:</span> {char.characterLevel} {char.characterClass}
+                    <span className="detail-label">Level:</span> {hero.heroLevel} {hero.heroClass}
                   </p>
                   <p>
-                    <span className="detail-label">Race:</span> {char.characterRace}
+                    <span className="detail-label">Race:</span> {hero.heroRace}
                   </p>
                   <p>
-                    <span className="detail-label">Gender:</span> {char.characterGender || 'N/A'}
+                    <span className="detail-label">Gender:</span> {hero.heroGender || 'N/A'}
                   </p>
                   <p>
-                    <span className="detail-label">Alignment:</span> {char.characterAlignment || 'N/A'}
+                    <span className="detail-label">Alignment:</span> {hero.heroAlignment || 'N/A'}
                   </p>
                   <p>
-                    <span className="detail-label">BG:</span> {char.characterBackground ? `${char.characterBackground.substring(0, 60)}...` : 'N/A'}
+                    <span className="detail-label">BG:</span> {hero.heroBackground ? `${hero.heroBackground.substring(0, 60)}...` : 'N/A'}
                   </p>
                 </div>
 
-                {char.stats && (
-                  <ul className="character-item-stats">
-                    {Object.entries(char.stats).map(([stat, value]) => (
+                {hero.stats && (
+                  <ul className="hero-item-stats">
+                    {Object.entries(hero.stats).map(([stat, value]) => (
                       <li key={stat}>{stat.substring(0, 3)}: {value}</li>
                     ))}
                   </ul>
