@@ -61,7 +61,7 @@ export const processRewards = (rewards, outcome) => {
     criticalFailure: 0
   };
   
-  const multiplier = outcomeMultipliers[outcome] || 1.0;
+  const multiplier = outcomeMultipliers[outcome] ?? 1.0;
   
   // XP
   const xp = Math.floor((rewards.xp || 0) * multiplier);

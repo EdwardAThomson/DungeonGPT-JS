@@ -11,6 +11,7 @@ const logger = createLogger('server');
 
 const app = express();
 const port = Number(process.env.PORT || 5000);
+const dbPath = process.env.SQLITE_DB_PATH || './src/game.db';
 const isProduction = process.env.NODE_ENV === 'production';
 
 const sendError = (res, status, message, details = null) => {
@@ -318,7 +319,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
  *
  */
 
-const db = new sqlite3.Database('./src/game.db', (err) => {
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     logger.error('Error opening database', err);
   } else {
@@ -927,9 +928,21 @@ app.get('/api/llm/tasks/:id/stream', (req, res) => {
 //   .then(() => console.log('MongoDB Connected'))
 //   .catch(err => console.error('MongoDB Connection Error:', err));
 
-app.listen(port, () => {
+const startServer = () => app.listen(port, () => {
   logger.info(`Server running on http://localhost:${port}`);
 });
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = {
+  app,
+  db,
+  startServer,
+  extractAuthToken,
+  requireApiAuthMiddleware
+};
 
 
 /**
