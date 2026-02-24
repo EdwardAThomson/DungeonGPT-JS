@@ -333,6 +333,9 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                       <img
                         src={hero.profilePicture}
                         alt={hero.characterName}
+                        loading="lazy"
+                        width="60"
+                        height="60"
                         style={{
                           width: '60px',
                           height: '60px',

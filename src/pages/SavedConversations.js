@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { conversationsApi } from '../services/conversationsApi';
 import { createLogger } from '../utils/logger';
-import SavedGameDetailsModal from '../components/SavedGameDetailsModal';
+
+// Lazy load the details modal for better performance
+const SavedGameDetailsModal = lazy(() => import('../components/SavedGameDetailsModal'));
 
 const logger = createLogger('saved-conversations');
 
@@ -270,17 +272,19 @@ const SavedConversations = () => {
         </div>
       )}
 
-      <SavedGameDetailsModal
-        isOpen={isDetailsModalOpen}
-        onClose={() => {
-          setIsDetailsModalOpen(false);
-          setSelectedConversation(null);
-        }}
-        conversation={selectedConversation}
-        formatDate={formatDate}
-        formatProvider={formatProvider}
-        formatModel={formatModel}
-      />
+      <Suspense fallback={<div style={{ textAlign: 'center', padding: '20px' }}>Loading details...</div>}>
+        <SavedGameDetailsModal
+          isOpen={isDetailsModalOpen}
+          onClose={() => {
+            setIsDetailsModalOpen(false);
+            setSelectedConversation(null);
+          }}
+          conversation={selectedConversation}
+          formatDate={formatDate}
+          formatProvider={formatProvider}
+          formatModel={formatModel}
+        />
+      </Suspense>
 
       <div className="navigation-buttons">
         <button onClick={() => navigate('/')} className="back-button">

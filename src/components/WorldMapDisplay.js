@@ -260,7 +260,13 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero }) =>
                     ][tile.beachDirection] : 'none'
                   }}
                 >
-                  <img src={firstHero.profilePicture} alt={firstHero.characterName} />
+                  <img 
+                    src={firstHero.profilePicture} 
+                    alt={firstHero.characterName}
+                    loading="lazy"
+                    width="40"
+                    height="40"
+                  />
                   <div className="player-marker-pointer"></div>
                 </div>
               )}

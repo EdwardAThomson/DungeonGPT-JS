@@ -103,7 +103,13 @@ const HeroSelection = () => {
                 onClick={() => toggleHeroSelection(hero)}
               >
                 <div className="hero-item-image">
-                  <img src={hero.profilePicture} alt={`${hero.heroName}'s profile`} />
+                  <img 
+                    src={hero.profilePicture} 
+                    alt={`${hero.heroName}'s profile`}
+                    loading="lazy"
+                    width="150"
+                    height="150"
+                  />
                 </div>
 
                 <div className="hero-item-info">

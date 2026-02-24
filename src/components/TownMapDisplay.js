@@ -280,7 +280,13 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
               {/* Player portrait marker */}
               {isPlayer && firstHero && (
                 <div className="player-marker-portrait" style={{ zIndex: 3 }}>
-                  <img src={firstHero.profilePicture} alt={firstHero.characterName} />
+                  <img 
+                    src={firstHero.profilePicture} 
+                    alt={firstHero.characterName}
+                    loading="lazy"
+                    width="40"
+                    height="40"
+                  />
                   <div className="player-marker-pointer"></div>
                 </div>
               )}

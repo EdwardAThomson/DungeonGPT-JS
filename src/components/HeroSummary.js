@@ -88,7 +88,13 @@ const HeroSummary = () => {
       <div className="summary-content">
         {/* Image Column */}
         <div className="summary-image">
-          <img src={newHero.profilePicture} alt={`${newHero.heroName}'s profile`} />
+          <img 
+            src={newHero.profilePicture} 
+            alt={`${newHero.heroName}'s profile`}
+            loading="lazy"
+            width="300"
+            height="300"
+          />
         </div>
 
         {/* Details Column */}
