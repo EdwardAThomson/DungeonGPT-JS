@@ -1,6 +1,6 @@
 // App.js
 
-import React, { useContext, Suspense, lazy } from "react";
+import React, { useContext, Suspense, lazy, useState } from "react";
 import { BrowserRouter as Router, Route, Link, Routes, Navigate, useLocation } from "react-router-dom";
 import HeroCreation from "./pages/HeroCreation";
 import HeroSummary from "./components/HeroSummary";
@@ -25,6 +25,7 @@ const AppContent = () => {
   const location = useLocation();
   const isDebugEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEBUG_ROUTES === 'true';
   const isGamePage = location.pathname === '/game';
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   const {
     selectedProvider,
@@ -43,8 +44,21 @@ const AppContent = () => {
   return (
     <div className="App" data-theme={theme}>
       <a href="#main-content" className="skip-link">Skip to main content</a>
+      
+      {/* Hamburger button - outside nav so it's visible when nav is hidden */}
+      {isGamePage && (
+        <button
+          className="hamburger-btn"
+          onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+          aria-label="Toggle navigation menu"
+          aria-expanded={isMobileNavOpen}
+        >
+          {isMobileNavOpen ? '✕' : '☰'}
+        </button>
+      )}
+      
       {/* Add className="main-nav" here for the nav styles */}
-      <nav className="main-nav">
+      <nav className={`main-nav ${isGamePage ? 'game-page-nav' : ''} ${isMobileNavOpen ? 'mobile-nav-open' : ''}`}>
         <ul>
           <li><Link to="/">Home</Link></li>
           <NavDropdown 
@@ -86,6 +100,13 @@ const AppContent = () => {
             </li>
           )}
         </ul>
+        {/* Mobile nav overlay */}
+        {isGamePage && isMobileNavOpen && (
+          <div
+            className="mobile-nav-overlay"
+            onClick={() => setIsMobileNavOpen(false)}
+          />
+        )}
       </nav>
 
       <AISettingsModalContent

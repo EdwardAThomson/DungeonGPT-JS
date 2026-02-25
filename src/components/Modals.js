@@ -466,6 +466,29 @@ export const StorySettingsModalContent = ({
                     Cloud API keys are configured in the <code style={{ background: 'var(--surface-soft)', padding: '2px 6px', borderRadius: '3px' }}>.env</code> file on the server. Use <strong>gemini-cli</strong>, <strong>claude-cli</strong>, or <strong>codex</strong> providers for CLI-based access without API keys.
                   </p>
                 </div>
+
+                {/* Active Model Status */}
+                <div style={{ marginTop: '20px', background: 'var(--surface)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active Model:</span>
+                    <span style={{ marginLeft: '8px', fontSize: '0.9rem', color: 'var(--text)', fontWeight: 'bold' }}>{selectedModel}</span>
+                    <span style={{ marginLeft: '4px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>({selectedProvider.toUpperCase()})</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        background: ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider) ? '#9b59b6' : '#2ecc71'
+                      }}
+                      title={['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider) ? 'CLI Mode' : 'Cloud API'}
+                    />
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      {['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider) ? 'CLI Mode' : 'Cloud API'}
+                    </span>
+                  </div>
+                </div>
               </div>
             </>
           )}

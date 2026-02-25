@@ -9,6 +9,13 @@
   --touch-target-min: 44px; /* iOS/Android minimum touch target */
 }
 
+/* Hide mobile-only elements by default (desktop) */
+.mobile-party-toggle,
+.mobile-party-overlay,
+.hamburger-btn {
+  display: none;
+}
+
 /* ============================================
    MOBILE STYLES (max-width: 768px)
    ============================================ */
@@ -66,23 +73,122 @@
     box-sizing: border-box;
   }
 
-  /* Game page layout - stack vertically */
+  /* Game page layout - hide party bar on mobile */
   .game-container {
     flex-direction: column !important;
-    gap: 12px;
+    position: relative;
   }
 
-  .party-sidebar {
-    width: 100% !important;
-    max-width: 100% !important;
-    max-height: 200px;
-    overflow-y: auto;
-    order: -1; /* Show party at top on mobile */
+  .party-bar {
+    position: fixed !important;
+    top: 0 !important;
+    right: -100% !important;
+    width: 280px !important;
+    max-width: 280px !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow-y: auto !important;
+    z-index: 1500 !important;
+    transition: right 0.3s ease !important;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.3) !important;
+    background-color: var(--surface) !important;
+  }
+
+  .party-bar.mobile-open {
+    right: 0 !important;
   }
 
   .game-main {
     width: 100% !important;
     max-width: 100% !important;
+    margin-left: 0 !important;
+  }
+
+  /* Hide Adventure Log title on mobile */
+  .game-top h2 {
+    display: none !important;
+  }
+
+  /* Hamburger menu button for game page mobile */
+  .hamburger-btn {
+    display: flex !important;
+    position: fixed !important;
+    top: 8px !important;
+    left: 8px !important;
+    width: 44px !important;
+    height: 44px !important;
+    background: var(--surface) !important;
+    border: 1px solid var(--primary) !important;
+    border-radius: 6px !important;
+    color: var(--primary) !important;
+    font-size: 1.5rem !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    z-index: 1001 !important;
+  }
+
+  /* Hide nav bar on game page mobile by default, show hamburger instead */
+  .game-page-nav {
+    display: none !important;
+  }
+
+  /* Show nav bar normally when hamburger is clicked */
+  .game-page-nav.mobile-nav-open {
+    display: flex !important;
+    position: relative !important;
+  }
+
+  /* Add left padding to nav links when menu is open to avoid hamburger overlap */
+  .game-page-nav.mobile-nav-open ul {
+    padding-left: 60px !important;
+  }
+
+  /* Mobile party toggle button */
+  .mobile-party-toggle {
+    position: fixed !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    width: 56px !important;
+    height: 56px !important;
+    border-radius: 50% !important;
+    background-color: var(--surface) !important;
+    color: var(--primary) !important;
+    border: 2px solid var(--primary) !important;
+    font-size: 1.5rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    z-index: 1600 !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+    transition: all 0.3s ease !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .mobile-party-toggle:hover {
+    transform: scale(1.1) !important;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.4) !important;
+  }
+
+  .mobile-party-toggle-portrait {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: 50% !important;
+  }
+
+  /* Mobile overlay */
+  .mobile-party-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background-color: rgba(0,0,0,0.5) !important;
+    z-index: 1400 !important;
+    backdrop-filter: blur(2px) !important;
   }
 
   /* Header adjustments */
@@ -99,7 +205,7 @@
   }
 
   .game-info-header {
-    flex-direction: column;
+    flex-direction: column-reverse;
     gap: 12px;
     align-items: flex-start;
   }
@@ -628,12 +734,25 @@
     max-width: 90%;
   }
 
-  .game-container {
-    gap: 16px;
+  /* Solid background on game page to prevent white gaps */
+  .game-page-wrapper {
+    background-color: var(--bg) !important;
   }
 
-  .party-sidebar {
-    width: 280px;
+  .game-container {
+    gap: 16px;
+    width: 100% !important;
+    background-color: var(--bg) !important;
+  }
+
+  .game-main {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+
+  .party-bar {
+    width: 240px !important;
+    flex-shrink: 0 !important;
   }
 
   .all-heroes-list {

@@ -5,6 +5,18 @@ import { getLevelProgress, calculateLevel } from '../utils/progressionSystem';
 const HeroModal = ({ isOpen, onClose, hero }) => {
     if (!isOpen || !hero) return null;
 
+    // Gender emoji - Male or Female only
+    const getGenderEmoji = (gender) => {
+        const g = (gender || '').toLowerCase();
+        if (g === 'female' || g.includes('female')) return '♀️';
+        return '♂️'; // Default to male
+    };
+
+    const heroRace = hero.characterRace || hero.race || hero.heroRace || '';
+    const heroClass = hero.characterClass || hero.heroClass || '';
+    const heroLevel = hero.level || hero.heroLevel || hero.characterLevel || 1;
+    const heroGender = hero.gender || hero.heroGender || 'Male';
+
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div
@@ -23,9 +35,9 @@ const HeroModal = ({ isOpen, onClose, hero }) => {
                         </div>
                     )}
                     <div className="modal-header-text">
-                        <h2>{hero.heroName}</h2>
+                        <h2>{hero.characterName || hero.heroName}</h2>
                         <p className="hero-subtitle">
-                            Level {hero.heroLevel} {hero.heroGender} {hero.heroRace} {hero.heroClass}
+                            {getGenderEmoji(heroGender)} Level {heroLevel} {heroRace} {heroClass}
                         </p>
                     </div>
                 </div>
@@ -62,7 +74,7 @@ const HeroModal = ({ isOpen, onClose, hero }) => {
                             <h4>Health</h4>
                             <div className="hero-hp-display">
                                 <div className="hero-hp-label">
-                                    <span>HP</span>
+                                    <span>HP </span>
                                     <span style={{ color: status.color, fontWeight: 'bold' }}>{currentHP}/{maxHP}</span>
                                 </div>
                                 <div className="hero-hp-bar">

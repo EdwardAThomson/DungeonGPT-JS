@@ -38,9 +38,6 @@ const GameMainPanel = ({
         <h2>Adventure Log</h2>
         <div className="game-info-header">
           <div>
-            {campaignGoal && (
-              <p><strong>Quest:</strong> <span style={{ color: 'var(--text-secondary)', fontWeight: 'bold' }}>{campaignGoal}</span></p>
-            )}
             <p><strong>Location:</strong> {townName
               ? `${townName} (${townPosition?.x}, ${townPosition?.y})`
               : `(${worldPosition.x}, ${worldPosition.y}) - ${currentBiome}`
@@ -72,6 +69,13 @@ const GameMainPanel = ({
             <button onClick={onStartAdventure} className="start-adventure-button" aria-label="Start the adventure">
               Start the Adventure!
             </button>
+          </div>
+        )}
+
+        {/* Quest reminder as virtual first message - not stored in DB */}
+        {campaignGoal && (
+          <div className="message system quest-message">
+            <SafeMarkdownMessage content={`**Quest:** ${campaignGoal}`} />
           </div>
         )}
 
@@ -108,30 +112,6 @@ const GameMainPanel = ({
           </button>
         </form>
         <p className="info">AI responses may not always be accurate or coherent.</p>
-        <div className="model-info-text">
-          <span className="model-label">Active Model:</span>
-          <span className="model-value">{selectedModel} ({selectedProvider.toUpperCase()})</span>
-        </div>
-        <div className="status-bar">
-          <div className="api-key-status">
-            <span
-              className={`status-light ${['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
-                ? 'status-cli'
-                : 'status-active'
-                }`}
-              title={
-                ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
-                  ? `${selectedProvider} uses local CLI (OAuth login)`
-                  : `${selectedProvider} uses server-side API key (.env file)`
-              }
-            ></span>
-            <span className="status-text">
-              {['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider)
-                ? 'CLI Mode'
-                : 'Cloud API'}
-            </span>
-          </div>
-        </div>
 
         {showDebugInfo && (
           <div className="debug-info-box">

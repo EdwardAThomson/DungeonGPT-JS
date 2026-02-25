@@ -89,6 +89,17 @@
   max-width: 90%;
 }
 
+.message.quest-message {
+  background-color: var(--surface);
+  border: 1px solid var(--primary);
+  border-left: 4px solid var(--primary);
+  color: var(--text);
+  font-style: normal;
+  text-align: left;
+  align-self: stretch;
+  max-width: 100%;
+}
+
 .message.error {
   background-color: var(--state-danger-bright-10);
   color: var(--state-danger-bright);

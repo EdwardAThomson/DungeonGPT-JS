@@ -93,6 +93,7 @@ const Game = () => {
   const [pendingNarrativeTile, setPendingNarrativeTile] = useState(null);
   const [aiNarrativeEnabled, setAiNarrativeEnabled] = useState(true);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
+  const [isMobilePartySidebarOpen, setIsMobilePartySidebarOpen] = useState(false);
 
   // --- HOOKS ---
   const {
@@ -446,8 +447,37 @@ const Game = () => {
           onOpenCharacter={(hero) => {
             setSelectedHeroForModal(hero);
             setIsHeroModalOpen(true);
+            setIsMobilePartySidebarOpen(false); // Close sidebar when opening modal
           }}
+          className={isMobilePartySidebarOpen ? 'mobile-open' : ''}
         />
+
+        {/* Mobile party toggle button - uses first hero portrait */}
+        <button
+          className="mobile-party-toggle"
+          onClick={() => setIsMobilePartySidebarOpen(!isMobilePartySidebarOpen)}
+          aria-label="Toggle party sidebar"
+        >
+          {isMobilePartySidebarOpen ? (
+            '✕'
+          ) : selectedHeroes[0]?.profilePicture ? (
+            <img 
+              src={selectedHeroes[0].profilePicture} 
+              alt="Party" 
+              className="mobile-party-toggle-portrait"
+            />
+          ) : (
+            '⚔️'
+          )}
+        </button>
+
+        {/* Mobile overlay */}
+        {isMobilePartySidebarOpen && (
+          <div
+            className="mobile-party-overlay"
+            onClick={() => setIsMobilePartySidebarOpen(false)}
+          />
+        )}
       </div>
 
       <GameModals

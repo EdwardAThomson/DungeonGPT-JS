@@ -12,9 +12,9 @@ const getXpProgress = (hero) => {
   return Math.min(100, ((xp - currentThreshold) / (nextThreshold - currentThreshold)) * 100);
 };
 
-const PartySidebar = ({ selectedHeroes = [], onOpenCharacter }) => {
+const PartySidebar = ({ selectedHeroes = [], onOpenCharacter, className = '' }) => {
   return (
-    <div className="party-bar">
+    <div className={`party-bar ${className}`.trim()}>
       <h2>Party Members</h2>
       {selectedHeroes.length > 0 ? (
         selectedHeroes.map((hero) => (

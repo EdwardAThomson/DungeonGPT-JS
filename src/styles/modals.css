@@ -256,6 +256,14 @@
 .modal-header-text h2 {
   margin: 0;
   color: var(--ink-strong);
+  font-family: var(--header-font);
+}
+
+.modal-header-text .hero-subtitle {
+  margin: 8px 0 0 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
 
 .character-subtitle {
