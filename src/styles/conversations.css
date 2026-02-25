@@ -166,6 +166,15 @@
   color: var(--on-dark);
 }
 
+/* Button text/icon toggle - show text by default, hide icon */
+.danger-button .button-text {
+  display: inline;
+}
+
+.danger-button .button-icon {
+  display: none;
+}
+
 .navigation-buttons {
   margin-top: 30px;
   display: flex;

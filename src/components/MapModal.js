@@ -1,8 +1,28 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import FocusTrap from 'focus-trap-react';
 import WorldMapDisplay from './WorldMapDisplay';
 import TownMapDisplay from './TownMapDisplay';
 
 const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered }) => {
+    const previousFocusRef = useRef(null);
+    const modalRef = useRef(null);
+
+    useEffect(() => {
+        if (isOpen) {
+            // Save current focus
+            previousFocusRef.current = document.activeElement;
+        } else if (previousFocusRef.current) {
+            // Restore focus when closing
+            previousFocusRef.current.focus();
+        }
+    }, [isOpen]);
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+            onClose();
+        }
+    };
+
     if (!isOpen) return null;
 
     // Check if player is on a town tile
@@ -10,9 +30,17 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            {/* Add specific class for map styling if needed */}
-            <div className="modal-content map-modal-content" onClick={(e) => e.stopPropagation()}>
-                <h2>{mapLevel === 'town' ? (townMapData?.townName || 'Town Map') : 'World Map'}</h2>
+            <FocusTrap>
+                <div 
+                    ref={modalRef}
+                    className="modal-content map-modal-content" 
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={handleKeyDown}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="map-modal-title"
+                >
+                    <h2 id="map-modal-title">{mapLevel === 'town' ? (townMapData?.townName || 'Town Map') : 'World Map'}</h2>
                 {mapLevel === 'world' ? (
                     <>
                         <WorldMapDisplay
@@ -36,6 +64,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                                     }}
                                     style={{ marginRight: '10px' }}
                                     disabled={!hasAdventureStarted}
+                                    aria-label={isInsideTown ? `View ${currentTile.townName || currentTile.poi} map` : `Enter ${currentTile.townName || currentTile.poi}`}
                                     title={!hasAdventureStarted ? 'Start the adventure first' : ''}
                                 >
                                     {isInsideTown ? `View ${currentTile.townName || currentTile.poi} Map` : `Enter ${currentTile.townName || currentTile.poi}`}
@@ -59,10 +88,11 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                         markBuildingDiscovered={markBuildingDiscovered}
                     />
                 )}
-                <button className="modal-close-button" onClick={onClose}>
-                    Close Map
-                </button>
-            </div>
+                    <button className="modal-close-button" onClick={onClose} aria-label="Close map modal">
+                        Close Map
+                    </button>
+                </div>
+            </FocusTrap>
         </div>
     );
 };

@@ -42,6 +42,7 @@ const AppContent = () => {
 
   return (
     <div className="App" data-theme={theme}>
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       {/* Add className="main-nav" here for the nav styles */}
       <nav className="main-nav">
         <ul>
@@ -65,7 +66,7 @@ const AppContent = () => {
               onClick={() => setIsSettingsModalOpen(true)}
               className="nav-settings-btn"
             >
-              ⚙️ Settings
+              ⚙️ <span className="settings-text">Settings</span>
             </button>
           </li>
           {isGamePage && (
@@ -80,7 +81,7 @@ const AppContent = () => {
             </li>
           )}
           {isDebugEnabled && (
-            <li className="nav-settings-item">
+            <li className="nav-settings-item nav-debug-item">
               <DebugMenu inNav />
             </li>
           )}
@@ -101,7 +102,7 @@ const AppContent = () => {
       />
 
       {/* === Add this wrapper div === */}
-      <div className={`main-content ${isGamePage ? 'game-page-content' : ''}`}>
+      <div id="main-content" className={`main-content ${isGamePage ? 'game-page-content' : ''}`}>
         <ErrorBoundary>
           <Suspense fallback={<div className="page-container">Loading...</div>}>
             <Routes>

@@ -1,0 +1,779 @@
+/* responsive.css
+ * Purpose: Mobile-first responsive design breakpoints and overrides
+ * Ensures app works well on mobile, tablet, and desktop viewports
+ */
+
+:root {
+  --mobile-breakpoint: 768px;
+  --tablet-breakpoint: 1024px;
+  --touch-target-min: 44px; /* iOS/Android minimum touch target */
+}
+
+/* ============================================
+   MOBILE STYLES (max-width: 768px)
+   ============================================ */
+
+@media (max-width: 768px) {
+  /* Force full width on mobile */
+  body, html, #root, .App {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Hide skip link on mobile - it's intrusive */
+  .skip-link {
+    display: none !important;
+  }
+
+  /* Hide debug menu on mobile - target the DebugMenu component wrapper */
+  .nav-debug-item {
+    display: none !important;
+  }
+
+  /* Settings button - show only emoji on mobile */
+  .nav-settings-btn .settings-text {
+    display: none !important;
+  }
+
+  .nav-settings-btn {
+    min-width: auto !important;
+    padding: 8px 12px !important;
+  }
+
+  /* Container adjustments */
+  .container {
+    padding: 0 12px;
+    margin: 12px auto;
+    max-width: 100%;
+  }
+
+  /* Main content - remove max-width constraint */
+  .main-content {
+    max-width: 100% !important;
+    padding: 20px 12px !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Page containers */
+  .page-container,
+  .Home-page,
+  .character-creation-form {
+    padding: 20px 16px !important;
+    margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  /* Game page layout - stack vertically */
+  .game-container {
+    flex-direction: column !important;
+    gap: 12px;
+  }
+
+  .party-sidebar {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 200px;
+    overflow-y: auto;
+    order: -1; /* Show party at top on mobile */
+  }
+
+  .game-main {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Header adjustments */
+  .header-button-group {
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+  }
+
+  .header-button-group button {
+    font-size: 0.8rem;
+    padding: 6px 10px;
+    min-height: var(--touch-target-min);
+  }
+
+  .game-info-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  /* Modal sizing */
+  .modal-content {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 90vh;
+    overflow-y: auto;
+    margin: 5vh auto;
+  }
+
+  .modal-overlay {
+    padding: 0;
+  }
+
+  /* Map modals */
+  .world-map-container,
+  .town-map-container {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .world-map-grid,
+  .town-map-grid {
+    min-width: 300px; /* Prevent map from being too small */
+  }
+
+  /* Navigation adjustments */
+  .main-nav {
+    padding: 0 8px;
+  }
+
+  .main-nav > ul {
+    height: auto;
+    min-height: 60px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 0;
+  }
+
+  .main-nav > ul > li > a,
+  .nav-dropdown-toggle,
+  .nav-settings-btn {
+    min-width: auto !important;
+    min-height: 40px !important;
+    padding: 8px 12px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Dropdown menus - full width, below nav */
+  .nav-dropdown {
+    position: static !important;
+  }
+
+  .nav-dropdown-menu {
+    position: fixed !important;
+    top: 80px !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: auto !important;
+    width: calc(100% - 16px) !important;
+    max-width: calc(100% - 16px) !important;
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important;
+    z-index: 2000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background-color: var(--surface) !important;
+    border: 1px solid var(--primary) !important;
+  }
+
+  .nav-dropdown-menu li {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-bottom: 1px solid var(--border) !important;
+    background-color: var(--surface) !important;
+  }
+
+  .nav-dropdown-menu li:last-child {
+    border-bottom: none !important;
+  }
+
+  .nav-dropdown-menu a {
+    flex: 1 !important;
+    min-height: 56px !important;
+    height: auto !important;
+    padding: 16px 20px !important;
+    font-size: 0.9rem !important;
+    justify-content: center !important;
+    text-align: center !important;
+    display: flex !important;
+    align-items: center !important;
+    line-height: 1.4 !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    background-color: var(--surface) !important;
+    color: var(--text) !important;
+  }
+
+  /* Form elements - larger touch targets */
+  input,
+  textarea,
+  select,
+  button {
+    min-height: var(--touch-target-min);
+    font-size: 16px; /* Prevents iOS zoom on focus */
+  }
+
+  /* Hero cards - fix overflow */
+  .all-heroes-list {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+    padding: 0 !important;
+  }
+
+  .hero-item {
+    flex-direction: column;
+    text-align: center;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 12px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .hero-item-info {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .hero-item-info h3 {
+    font-size: 1rem !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .hero-item-info p {
+    font-size: 0.8rem !important;
+  }
+
+  .hero-item-image {
+    margin: 0 auto 10px;
+    width: 80px !important;
+    height: 80px !important;
+  }
+
+  .hero-item-stats {
+    gap: 6px !important;
+  }
+
+  .hero-item-stats li {
+    font-size: 0.75rem !important;
+    padding: 2px 6px !important;
+  }
+
+  .hero-item-actions {
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    width: 100%;
+    gap: 6px !important;
+    justify-content: center !important;
+  }
+
+  .hero-item-actions button {
+    flex: 1 1 auto !important;
+    min-width: 60px !important;
+    min-height: 32px !important;
+    font-size: 0.7rem !important;
+    padding: 6px 8px !important;
+  }
+
+  /* Page titles - smaller on mobile */
+  .page-container h1,
+  .page-container h2,
+  .Home-page h1,
+  .Home-page h2,
+  .hero-creation-form h1,
+  .character-creation-form h1 {
+    font-size: 1.3rem !important;
+    margin-bottom: 10px !important;
+  }
+
+  /* Page header - title on top, buttons below */
+  .page-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  /* Hero page header buttons - both on same line below title */
+  .page-header-actions {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+  }
+
+  .page-header-actions .primary-button,
+  .page-header-actions .secondary-button {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    min-height: 32px !important;
+    font-size: 0.7rem !important;
+    padding: 6px 10px !important;
+    white-space: nowrap !important;
+  }
+
+  /* Conversation messages */
+  .conversation {
+    padding: 12px;
+  }
+
+  .user-message,
+  .ai-message {
+    max-width: 100%;
+    padding: 12px;
+  }
+
+  /* Settings page */
+  .settings-container {
+    padding: 12px;
+  }
+
+  .settings-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Encounter modal */
+  .encounter-modal-content {
+    padding: 16px;
+  }
+
+  .encounter-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .encounter-actions button {
+    width: 100%;
+  }
+
+  /* Party inventory */
+  .inventory-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Navigation */
+  .nav-container {
+    padding: 0 12px;
+  }
+
+  .nav-links {
+    gap: 8px;
+  }
+
+  /* Hide text on small buttons, show icons only */
+  .icon-button-text {
+    display: none;
+  }
+
+  /* Home page - fix card layout and text overflow */
+  .home-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .home-nav-card {
+    padding: 16px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Hide grey description text on mobile for cleaner look */
+  .home-nav-card p,
+  .card-content p {
+    display: none !important;
+  }
+
+  .primary-card {
+    flex-direction: column !important;
+    padding: 20px 16px !important;
+    gap: 12px !important;
+  }
+
+  .primary-card .card-icon {
+    font-size: 2rem !important;
+  }
+
+  .primary-card .card-content h3 {
+    font-size: 1.2rem !important;
+  }
+
+  .hero-section h1 {
+    font-size: 2rem !important;
+  }
+
+  .subtitle {
+    font-size: 0.9rem !important;
+    letter-spacing: 0.1em !important;
+  }
+
+  /* Fix all text overflow issues */
+  h1, h2, h3, h4, p, span, button, a {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  /* Ensure buttons don't overflow */
+  .primary-button,
+  .secondary-button {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ============================================
+     SAVED GAMES PAGE - MOBILE
+     ============================================ */
+
+  /* Hide instruction text on mobile */
+  .page-instructions {
+    display: none !important;
+  }
+
+  /* Conversation cards - fix overflow, stack vertically */
+  .conversations-list {
+    width: 100% !important;
+  }
+
+  .conversation-item {
+    padding: 12px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  /* Stack the inner flex container vertically */
+  .conversation-item > div:first-child {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+  }
+
+  /* Party portraits row - center them */
+  .conversation-item > div:first-child > div:first-child {
+    justify-content: center !important;
+    width: 100% !important;
+    margin-bottom: 10px !important;
+  }
+
+  /* Content section - full width */
+  .conversation-item > div:first-child > div:last-child {
+    width: 100% !important;
+  }
+
+  .conversation-item h3 {
+    font-size: 0.95rem !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .conversation-item p {
+    font-size: 0.75rem !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  /* Smaller hero portraits in saved games */
+  .conversation-item img {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  /* Conversation action buttons - smaller */
+  .conversation-actions {
+    gap: 6px !important;
+  }
+
+  .conversation-actions button {
+    padding: 6px 10px !important;
+    font-size: 0.7rem !important;
+    min-height: 32px !important;
+  }
+
+  /* Show icon, hide text for delete button on mobile */
+  .danger-button .button-text {
+    display: none !important;
+  }
+
+  .danger-button .button-icon {
+    display: inline !important;
+  }
+
+  /* ============================================
+     CHARACTER CREATION PAGE - MOBILE
+     ============================================ */
+
+  /* Convert two-column layout to single column */
+  .middle-container {
+    flex-direction: column !important;
+    gap: 20px !important;
+  }
+
+  .middle-left,
+  .middle-right {
+    flex: none !important;
+    width: 100% !important;
+  }
+
+  /* Template dropdown - full width with button underneath */
+  .template-controls {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  .template-controls select {
+    width: 100% !important;
+    min-height: var(--touch-target-min) !important;
+    font-size: 1rem !important;
+  }
+
+  .template-controls .apply-template-btn {
+    width: 100% !important;
+    min-height: var(--touch-target-min) !important;
+  }
+
+  /* Stats section - fix overflow */
+  .stats-section {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .stats-section .stat-input {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .stats-section .stat-input label {
+    width: 90px !important;
+    font-size: 0.85rem !important;
+    flex-shrink: 0;
+  }
+
+  .stats-section .stat-input input {
+    width: 60px !important;
+    flex-shrink: 0;
+  }
+
+  .stats-section .stat-input input[type="range"] {
+    flex: 1 !important;
+    min-width: 80px !important;
+    width: auto !important;
+  }
+
+  /* Profile pictures - smaller on mobile */
+  .profile-pictures .picture-options {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  .profile-pictures img {
+    width: 80px !important;
+    height: 80px !important;
+  }
+
+  /* Form sections - ensure full width */
+  .form-section,
+  .form-row {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .form-row {
+    flex-direction: column !important;
+  }
+
+  .form-row .form-item {
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+
+  /* Name input group */
+  .name-input-group {
+    flex-direction: column !important;
+    gap: 10px !important;
+  }
+
+  .name-input-group input {
+    width: 100% !important;
+  }
+
+  .generate-name-btn {
+    width: 100% !important;
+    min-height: var(--touch-target-min) !important;
+  }
+}
+
+/* ============================================
+   TABLET STYLES (769px - 1100px)
+   ============================================ */
+
+@media (min-width: 769px) and (max-width: 1100px) {
+  .container {
+    max-width: 90%;
+  }
+
+  .game-container {
+    gap: 16px;
+  }
+
+  .party-sidebar {
+    width: 280px;
+  }
+
+  .all-heroes-list {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .modal-content {
+    width: 85vw;
+    max-width: 800px;
+  }
+
+  /* Dropdown menu fixes for tablet - same approach as mobile */
+  .nav-dropdown {
+    position: static !important;
+  }
+
+  .nav-dropdown-menu {
+    position: fixed !important;
+    top: 90px !important;
+    left: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: translateX(-50%) !important;
+    width: auto !important;
+    min-width: 300px !important;
+    max-width: 400px !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important;
+    z-index: 2000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background-color: var(--surface) !important;
+    border: 1px solid var(--primary) !important;
+  }
+
+  .nav-dropdown-menu li {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: var(--surface) !important;
+  }
+
+  .nav-dropdown-menu a {
+    flex: 1 !important;
+    min-height: 56px !important;
+    height: auto !important;
+    padding: 14px 20px !important;
+    font-size: 0.9rem !important;
+    display: flex !important;
+    align-items: center !important;
+    background-color: var(--surface) !important;
+    color: var(--text) !important;
+  }
+}
+
+/* ============================================
+   LANDSCAPE MOBILE (max-height: 500px)
+   ============================================ */
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .modal-content {
+    max-height: 95vh;
+    overflow-y: auto;
+  }
+
+  .party-sidebar {
+    max-height: 150px;
+  }
+
+  .header-button-group {
+    gap: 4px;
+  }
+
+  .header-button-group button {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY HELPERS
+   ============================================ */
+
+/* Skip to main content link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--primary);
+  color: var(--bg);
+  padding: 8px 16px;
+  z-index: 10000;
+  text-decoration: none;
+  border-radius: 0 0 4px 0;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Ensure touch targets are large enough */
+@media (pointer: coarse) {
+  button,
+  a,
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: var(--touch-target-min);
+    min-width: var(--touch-target-min);
+  }
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

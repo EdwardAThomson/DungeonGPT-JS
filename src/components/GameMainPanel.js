@@ -47,12 +47,20 @@ const GameMainPanel = ({
             }</p>
           </div>
           <div className="header-button-group">
-            <button onClick={onOpenMap} className="view-map-button">{townName ? `${townName} Map` : 'Map'}</button>
-            <button onClick={onOpenInventory} className="view-settings-button">📦 Inventory</button>
-            <button onClick={onOpenHowToPlay} className="how-to-play-button">How to Play</button>
-            <button onClick={onOpenSettings} className="view-settings-button">Full Settings</button>
-            <button onClick={onManualSave} className="manual-save-button" disabled={!canManualSave}>
-              💾 Save
+            <button onClick={onOpenMap} className="view-map-button" aria-label={townName ? `View ${townName} map` : 'View world map'}>
+              {townName ? `${townName} Map` : 'Map'}
+            </button>
+            <button onClick={onOpenInventory} className="view-settings-button" aria-label="Open party inventory">
+              <span aria-hidden="true">📦</span> Inventory
+            </button>
+            <button onClick={onOpenHowToPlay} className="how-to-play-button" aria-label="Open how to play guide">
+              How to Play
+            </button>
+            <button onClick={onOpenSettings} className="view-settings-button" aria-label="Open full settings">
+              Full Settings
+            </button>
+            <button onClick={onManualSave} className="manual-save-button" disabled={!canManualSave} aria-label="Save game manually">
+              <span aria-hidden="true">💾</span> Save
             </button>
           </div>
         </div>
@@ -61,7 +69,7 @@ const GameMainPanel = ({
       <div className="conversation">
         {!hasAdventureStarted && !isLoading && (
           <div className="start-adventure-overlay">
-            <button onClick={onStartAdventure} className="start-adventure-button">
+            <button onClick={onStartAdventure} className="start-adventure-button" aria-label="Start the adventure">
               Start the Adventure!
             </button>
           </div>
@@ -84,13 +92,16 @@ const GameMainPanel = ({
 
       <div className="game-lower-section">
         <form onSubmit={onSubmit}>
+          <label htmlFor="user-action-input" className="sr-only">Your action</label>
           <textarea
+            id="user-action-input"
             value={userInput}
             onChange={onInputChange}
             placeholder={hasAdventureStarted ? "Type your action..." : "Click 'Start Adventure' above..."}
             rows="4"
             className="user-input"
             disabled={!hasAdventureStarted || isLoading}
+            aria-label="Type your action or command"
           />
           <button type="submit" className="game-send-button" disabled={!hasAdventureStarted || !userInput.trim() || isLoading}>
             {isLoading ? '...' : '↑ Send'}

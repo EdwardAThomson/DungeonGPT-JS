@@ -144,7 +144,7 @@ const SavedConversations = () => {
   return (
     <div className="page-container">
       <h1>Saved Conversations</h1>
-      <p>Manage your saved game sessions. Click "Load" to continue a previous adventure.</p>
+      <p className="page-instructions">Manage your saved game sessions. Click "Load" to continue a previous adventure.</p>
 
       {conversations.length === 0 ? (
         <p>No saved conversations found. Start a new game to create your first adventure!</p>
@@ -262,8 +262,10 @@ const SavedConversations = () => {
                     onClick={() => deleteConversation(conversation.sessionId)}
                     className="danger-button"
                     style={{ padding: '10px 20px', fontSize: '0.9rem' }}
+                    title="Delete"
                   >
-                    Delete
+                    <span className="button-text">Delete</span>
+                    <span className="button-icon">🗑️</span>
                   </button>
                 </div>
               </div>

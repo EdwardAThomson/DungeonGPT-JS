@@ -149,18 +149,25 @@
 }
 
 .game-settings-page .settings-submit-button {
-  padding: 12px 25px;
+  padding: 14px 30px;
   font-size: 1.1rem;
-  background-color: var(--state-info);
-  color: white;
-  border: none;
-  border-radius: 4px;
+  font-family: var(--header-font);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  background-color: var(--primary);
+  color: var(--bg);
+  border: 2px solid var(--primary);
+  border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px var(--shadow);
 }
 
 .game-settings-page .settings-submit-button:hover {
-  background-color: var(--state-info-strong);
+  background-color: transparent;
+  color: var(--primary);
+  box-shadow: 0 6px 16px var(--shadow);
 }
 
 .story-settings-section {

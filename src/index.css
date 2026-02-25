@@ -258,6 +258,18 @@ a:hover {
   border-bottom-color: var(--primary);
 }
 
+/* Accessibility: Focus styles for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* Helper class for errors */
 .error-message {
   color: var(--state-danger-bright);

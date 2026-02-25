@@ -4,6 +4,14 @@
  * Font usage: --header-font for headings/actions, --body-font for body copy, --ui-font inherited in controls.
  */
 
+.page-header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
 .all-heroes-list {
   list-style: none;
   padding: 0;

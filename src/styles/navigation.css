@@ -129,7 +129,7 @@
   border: 1px solid var(--primary);
   border-radius: 4px;
   list-style: none;
-  padding: 6px 0;
+  padding: 0;
   margin: 0;
   min-width: 260px;
   box-shadow: 0 12px 24px var(--shadow-black-30);
@@ -143,11 +143,12 @@
 }
 
 .nav-dropdown-menu li {
-  height: auto;
+  flex: 0 0 auto;
   display: flex;
   width: 100%;
   margin: 0;
-  overflow: hidden;
+  padding: 0;
+  background-color: var(--surface);
 }
 
 .nav-dropdown-menu a {
@@ -158,6 +159,7 @@
   box-sizing: border-box;
   padding: 14px 24px;
   color: var(--text);
+  background-color: var(--surface);
   text-decoration: none;
   font-family: var(--header-font);
   font-size: 0.92rem;

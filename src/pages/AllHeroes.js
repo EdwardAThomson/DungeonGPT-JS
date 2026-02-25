@@ -71,10 +71,10 @@ const AllHeroes = () => {
         {/* Wrapper for header buttons */}
         <div className="page-header-actions">
           <button onClick={() => navigate("/game-settings")} className="primary-button">
-            + Start New Game
+            New Game
           </button>
           <button onClick={() => navigate("/hero-creation")} className="secondary-button">
-            + Create New Hero
+            New Hero
           </button>
         </div>
       </div>
