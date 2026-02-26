@@ -10,6 +10,7 @@ import GameSettings from "./pages/GameSettings";
 import HeroSelection from './pages/HeroSelection';
 import Game from './pages/Game';
 import SavedConversations from './pages/SavedConversations';
+import CFWorkerDebug from './pages/CFWorkerDebug';
 
 import "./styles/index.css";
 
@@ -135,6 +136,7 @@ const AppContent = () => {
               <Route path="/hero-selection" element={<HeroSelection />} />
               <Route path="/game" element={<Game />} />
               <Route path="/saved-conversations" element={<SavedConversations />} />
+              <Route path="/cf-worker-debug" element={<CFWorkerDebug />} />
               {isDebugEnabled && <Route path="/debug/*" element={<DebugRoutes />} />}
               {!isDebugEnabled && <Route path="/debug/*" element={<Navigate to="/" replace />} />}
             </Routes>

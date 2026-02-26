@@ -17,17 +17,25 @@ const PartySidebar = ({ selectedHeroes = [], onOpenCharacter, className = '' }) 
     <div className={`party-bar ${className}`.trim()}>
       <h2>Party Members</h2>
       {selectedHeroes.length > 0 ? (
-        selectedHeroes.map((hero) => (
-          <div key={hero.characterId || hero.characterName} className="party-member">
+        selectedHeroes.map((hero) => {
+          // Support both legacy (character*) and new (hero*) field names
+          const name = hero.heroName || hero.characterName || 'Unknown';
+          const level = hero.heroLevel || hero.characterLevel || 1;
+          const race = hero.heroRace || hero.characterRace || '';
+          const charClass = hero.heroClass || hero.characterClass || '';
+          const id = hero.heroId || hero.characterId || name;
+
+          return (
+          <div key={id} className="party-member">
             {hero.profilePicture && (
               <img
                 src={hero.profilePicture}
-                alt={`${hero.characterName}'s profile`}
+                alt={`${name}'s profile`}
                 onClick={() => onOpenCharacter(hero)}
               />
             )}
-            <h3>{hero.characterName}</h3>
-            <p>Level {hero.characterLevel} {hero.characterRace} {hero.characterClass}</p>
+            <h3>{name}</h3>
+            <p>Level {level} {race} {charClass}</p>
 
             {hero.maxHP && (
               <div style={{ margin: '10px 0', padding: '8px', background: 'var(--surface-light)', borderRadius: '6px' }}>
@@ -94,7 +102,7 @@ const PartySidebar = ({ selectedHeroes = [], onOpenCharacter, className = '' }) 
               </button>
             </div>
           </div>
-        ))
+        );})
       ) : (
         <p>No heroes selected.</p>
       )}

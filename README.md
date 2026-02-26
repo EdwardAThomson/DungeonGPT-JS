@@ -20,17 +20,18 @@ YouTube Video 🎥:
 *   **World Map:** Explore a procedurally generated world map with biomes, towns, and points of interest.
 *   **Encounter System:** Dynamic encounters with skill checks, rewards, and AI-narrated outcomes.
 *   **Inventory & Progression:** Track party inventory, gold, HP, and XP progression.
-*   **Multi-Provider AI:** Support for OpenAI, Google Gemini, and Anthropic Claude (cloud APIs and CLI modes).
+*   **Multi-Provider AI:** Support for OpenAI, Google Gemini, Anthropic Claude (cloud APIs and CLI modes), and Cloudflare Workers AI.
 *   **Persistent Sessions:** Characters and game sessions saved via backend server and SQLite database.
+*   **Save/Load System:** Manual and auto-save functionality with save confirmation modals.
 
 ## Technology Stack
 
 *   **Frontend:** React (Hooks, Context API)
 *   **Routing:** React Router DOM
 *   **Styling:** Modular CSS (feature-based organization in `src/styles/`)
-*   **Backend:** Node.js / Express (`src/server.js`)
+*   **Backend:** Node.js / Express (`src/server.js`) + Cloudflare Workers (optional)
 *   **Database:** SQLite (`src/game.db`)
-*   **AI Providers:** OpenAI, Google Gemini, Anthropic Claude (cloud APIs and CLI modes)
+*   **AI Providers:** OpenAI, Google Gemini, Anthropic Claude (cloud APIs and CLI modes), Cloudflare Workers AI
 
 ## Project Structure
 
@@ -47,6 +48,13 @@ src/
 ├── styles/          # Feature-based CSS files
 ├── utils/           # Utility functions (map generation, health system, etc.)
 └── server.js        # Express backend server
+
+cf-worker/           # Cloudflare Workers AI backend (optional)
+├── src/
+│   ├── index.ts     # Hono app entry point
+│   ├── routes/      # API routes (/api/ai/*)
+│   └── services/    # Workers AI service layer
+└── wrangler.toml    # Cloudflare Workers config
 ```
 
 The following images shows the chat interface of DungeonGPT:
@@ -92,6 +100,19 @@ The following images shows the chat interface of DungeonGPT:
     
     *   Keep this terminal window open while using the application.
 
+4b. **Optional: Run Cloudflare Workers AI (Alternative AI Provider):**
+    *   If you want to use Cloudflare Workers AI instead of cloud API providers:
+    *   Navigate to the `cf-worker` directory and run:
+
+    ```bash
+    cd cf-worker
+    npm install
+    npm run dev
+    ```
+    
+    *   The worker will start on `http://localhost:8787`
+    *   Select `cf-workers` as your AI provider in the game settings
+
 5.  **Run the React development server:**
     *   In **another** terminal window (while the backend server is running), navigate to the project root directory and run:
 
@@ -109,22 +130,28 @@ The following images shows the chat interface of DungeonGPT:
 4.  **Start a new game** by going to "New Game", filling in the settings, and then selecting your heroes on the subsequent "Hero Selection" page.
 5.  **Play the game:** Interact with the AI game master by typing actions in the input box on the "Game" screen.
 
-## Recent Improvements (Phase 0-2 Refactor)
+## Recent Improvements
 
-*   ✅ API calls handled securely by the backend (API keys in `.env`, not exposed to frontend)
-*   ✅ Modular game architecture (controllers for movement, encounters, saves)
-*   ✅ Multi-provider AI support (OpenAI, Gemini, Claude — cloud and CLI modes)
-*   ✅ Environment-aware logging system (production-safe)
-*   ✅ CSS split into feature-based modules for maintainability
-*   ✅ World map with procedural generation and exploration
-*   ✅ Encounter system with skill checks and AI narration
+*   ✅ **Cloudflare Workers AI Integration** — No API keys required for public deployment
+*   ✅ **Save/Load System** — Manual save with confirmation, auto-save, and legacy save compatibility
+*   ✅ **API Security** — API keys handled securely by backend (not exposed to frontend)
+*   ✅ **Modular Architecture** — Controllers for movement, encounters, saves
+*   ✅ **Multi-Provider AI** — OpenAI, Gemini, Claude, Cloudflare Workers (cloud and CLI modes)
+*   ✅ **Environment-Aware Logging** — Production-safe logging system
+*   ✅ **Feature-Based CSS** — Modular styling for maintainability
+*   ✅ **Procedural World Map** — Biomes, towns, mountains with exploration
+*   ✅ **Dynamic Encounters** — Skill checks, rewards, AI narration
+*   ✅ **Town Discovery System** — Buildings discovered and remembered across sessions
+*   ✅ **Debug Tools** — CF Worker debug page for testing AI integration
 
 ## Potential Future Improvements
 
-*   User authentication and multi-user support (Phase 4)
-*   Migration to Cloudflare D1 for edge deployment
+*   User authentication and multi-user support
+*   Migration to Cloudflare D1 for full edge deployment
+*   Streaming AI responses for better UX
 *   Unit and integration tests for core game loops
 *   Additional encounter types and world events
+*   Dungeon/cave sub-maps with procedural generation
 
 ## License & Attribution
 

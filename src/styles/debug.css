@@ -1,0 +1,113 @@
+.debug-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.debug-section {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.debug-section h3 {
+  color: var(--primary);
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-family: var(--header-font);
+}
+
+.debug-section .form-group {
+  margin-bottom: 15px;
+}
+
+.debug-section .form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+  color: var(--text);
+}
+
+.debug-section .form-group input,
+.debug-section .form-group select,
+.debug-section .form-group textarea {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.debug-section .form-group textarea {
+  resize: vertical;
+  font-family: monospace;
+}
+
+.debug-section .form-group input:focus,
+.debug-section .form-group select:focus,
+.debug-section .form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.debug-section pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.debug-section code {
+  background: var(--surface);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+  color: var(--primary);
+}
+
+.error-section {
+  border-color: var(--state-danger);
+}
+
+.success-section {
+  border-color: var(--state-success);
+}
+
+.debug-section ol {
+  margin: 10px 0;
+  padding-left: 25px;
+}
+
+.debug-section ol li {
+  margin-bottom: 8px;
+}
+
+.debug-page .primary-button {
+  background-color: var(--primary);
+  color: var(--bg);
+  border: 1px solid var(--primary);
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--header-font);
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.debug-page .primary-button:hover:not(:disabled) {
+  background-color: transparent;
+  color: var(--primary);
+}
+
+.debug-page .primary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

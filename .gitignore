@@ -58,9 +58,15 @@ new_temp/
 *.gemini-sandbox
 temp/server1.js
 
+# Cloudflare Workers
+cf-worker/.wrangler/
+cf-worker/.dev.vars
+.dev.vars
+
 # Special docs
 docs/deployment_*.md
 docs/refactor_assessment.md
 docs/ui_flow_improvements.md
 docs/character_to_hero_migration.md
 docs/accessibility_responsive_improvements.md
+docs/cloudflare_workers_ai_integration_plan.md

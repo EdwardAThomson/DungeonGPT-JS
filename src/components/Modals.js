@@ -49,6 +49,9 @@ export const AISettingsModalContent = ({
                       <option value="gemini">Gemini</option>
                       <option value="claude">Claude</option>
                     </optgroup>
+                    <optgroup label="CloudFlare Workers">
+                      <option value="cf-workers">CF Workers AI</option>
+                    </optgroup>
                     <optgroup label="CLI Tools">
                       <option value="codex">Codex CLI</option>
                       <option value="claude-cli">Claude CLI</option>
@@ -77,6 +80,9 @@ export const AISettingsModalContent = ({
                       <option value="openai">OpenAI</option>
                       <option value="gemini">Gemini</option>
                       <option value="claude">Claude</option>
+                    </optgroup>
+                    <optgroup label="CloudFlare Workers">
+                      <option value="cf-workers">CF Workers AI</option>
                     </optgroup>
                     <optgroup label="CLI Tools">
                       <option value="codex">Codex CLI</option>
@@ -191,14 +197,7 @@ export const StorySettingsModalContent = ({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content settings-modal-refined" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '20px 20px 10px 20px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ margin: 0, color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>⚙️ System Scroll</h2>
-            {worldSeed && (
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>
-                Session ID: {worldSeed}
-              </span>
-            )}
-          </div>
+          <h2 style={{ margin: 0, color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>⚙️ System Scroll</h2>
         </div>
 
         {/* Tab Navigation */}
@@ -413,6 +412,9 @@ export const StorySettingsModalContent = ({
                           <option value="gemini">Gemini</option>
                           <option value="claude">Claude</option>
                         </optgroup>
+                        <optgroup label="CloudFlare Workers">
+                          <option value="cf-workers">CF Workers AI</option>
+                        </optgroup>
                         <optgroup label="CLI Tools">
                           <option value="codex">Codex CLI</option>
                           <option value="claude-cli">Claude CLI</option>
@@ -441,6 +443,9 @@ export const StorySettingsModalContent = ({
                           <option value="openai">OpenAI</option>
                           <option value="gemini">Gemini</option>
                           <option value="claude">Claude</option>
+                        </optgroup>
+                        <optgroup label="CloudFlare Workers">
+                          <option value="cf-workers">CF Workers AI</option>
                         </optgroup>
                         <optgroup label="CLI Tools">
                           <option value="codex">Codex CLI</option>

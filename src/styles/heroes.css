@@ -445,17 +445,20 @@
 }
 
 .hero-selection-page .create-new-button {
-  background-color: var(--state-success);
+  background-color: var(--primary);
   padding: 8px 15px;
-  border: none;
+  border: 1px solid var(--primary);
   border-radius: 4px;
-  color: white;
+  color: var(--bg);
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.2s ease;
+  font-family: var(--header-font);
+  letter-spacing: 0.05em;
 }
 
 .hero-selection-page .create-new-button:hover {
-  background-color: var(--state-success-strong);
+  background-color: transparent;
+  color: var(--primary);
 }
 
 .hero-item {
@@ -512,35 +515,43 @@
 }
 
 .hero-selection-actions .back-button {
-  background-color: var(--state-muted);
+  background-color: transparent;
   padding: 10px 20px;
-  border: none;
+  border: 1px solid var(--primary);
   border-radius: 4px;
-  color: white;
+  color: var(--primary);
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.2s ease;
+  font-family: var(--header-font);
+  letter-spacing: 0.05em;
 }
 
 .hero-selection-actions .back-button:hover {
-  background-color: var(--state-muted-strong);
+  background-color: var(--primary);
+  color: var(--bg);
 }
 
 .hero-selection-actions .next-button {
-  background-color: var(--state-success);
+  background-color: var(--primary);
   padding: 10px 20px;
-  border: none;
+  border: 1px solid var(--primary);
   border-radius: 4px;
-  color: white;
+  color: var(--bg);
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.2s ease;
   font-size: 1rem;
+  font-family: var(--header-font);
+  letter-spacing: 0.05em;
 }
 
 .hero-selection-actions .next-button:hover {
-  background-color: var(--state-success-strong);
+  background-color: transparent;
+  color: var(--primary);
 }
 
 .hero-selection-actions .next-button:disabled {
-  background-color: var(--state-muted-faint);
+  background-color: var(--border);
+  border-color: var(--border);
+  color: var(--text-secondary);
   cursor: not-allowed;
 }

@@ -1,0 +1,16 @@
+name = "dungeongpt-api"
+main = "src/index.ts"
+compatibility_date = "2025-02-14"
+compatibility_flags = ["nodejs_compat"]
+
+[ai]
+binding = "AI"
+
+[vars]
+ENVIRONMENT = "development"
+
+# Uncomment for D1 database binding (Phase 2)
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "dungeongpt-db"
+# database_id = "your-database-id-here"

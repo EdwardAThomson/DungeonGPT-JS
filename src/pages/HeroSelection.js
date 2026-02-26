@@ -86,7 +86,7 @@ const HeroSelection = () => {
       <div className="page-header">
         <h2>Select Your Party (1-4 Heroes)</h2>
         <button onClick={handleCreateHero} className="create-new-button">
-          + Create New Hero
+          New Hero
         </button>
       </div>
 

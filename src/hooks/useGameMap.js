@@ -6,9 +6,8 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-map');
 
-const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed) => {
+const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null) => {
     // --- State Initialization --- //
-    const [generatedMap] = useState(() => loadedConversation?.generatedMap || null); // Capture generatedMap if passed via state
 
     const [mapAndPosition] = useState(() => {
         if (loadedConversation?.world_map && loadedConversation?.player_position) {
@@ -36,7 +35,8 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             };
         }
 
-        // Generate new map
+        // Use provided map or generate new one
+        // generatedMap should already have town names assigned from GameSettings
         const newMap = generatedMap || generateMapData(10, 10, worldSeed);
         const startingPos = findStartingTown(newMap);
         logger.debug('Starting town found', startingPos);

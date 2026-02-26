@@ -2,6 +2,7 @@ import { apiFetch, buildApiUrl } from './apiClient';
 import { createLogger } from '../utils/logger';
 
 const API_PATH = '/api/llm';
+const CF_WORKER_URL = process.env.REACT_APP_CF_WORKER_URL || 'http://localhost:8787';
 const logger = createLogger('llm-service');
 
 const sanitizeResponse = (text) => {
@@ -33,6 +34,25 @@ export const llmService = {
      * Standard text generation (non-streaming)
      */
     async generateText({ provider, model, prompt, maxTokens, temperature }) {
+        // Route CF Workers requests to the CF Worker endpoint
+        if (provider === 'cf-workers') {
+            const response = await fetch(`${CF_WORKER_URL}/api/ai/generate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider, model, prompt, maxTokens, temperature }),
+            });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => null);
+                const errorMessage = error?.error || `Failed to generate text: ${response.statusText}`;
+                throw new Error(errorMessage);
+            }
+
+            const data = await response.json();
+            return data.text;
+        }
+
+        // Route other providers to Express backend
         const response = await apiFetch(`${API_PATH}/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

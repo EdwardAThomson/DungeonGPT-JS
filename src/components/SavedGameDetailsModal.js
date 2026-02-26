@@ -73,7 +73,7 @@ const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate, form
                   {hero.profilePicture && (
                     <img 
                       src={hero.profilePicture} 
-                      alt={hero.characterName}
+                      alt={hero.heroName || hero.characterName || 'Hero'}
                       style={{
                         width: '50px',
                         height: '50px',
@@ -84,9 +84,9 @@ const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate, form
                     />
                   )}
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontWeight: 'bold', marginBottom: '4px' }}>{hero.characterName}</p>
+                    <p style={{ fontWeight: 'bold', marginBottom: '4px' }}>{hero.heroName || hero.characterName || 'Unknown'}</p>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                      Level {hero.level || hero.characterLevel || 1} {hero.characterRace} {hero.characterClass}
+                      Level {hero.level || hero.heroLevel || hero.characterLevel || 1} {hero.heroRace || hero.characterRace || ''} {hero.heroClass || hero.characterClass || ''}
                     </p>
                     {hero.currentHP !== undefined && hero.maxHP && (
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>

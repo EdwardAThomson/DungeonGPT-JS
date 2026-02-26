@@ -36,7 +36,7 @@ const logger = createLogger('game');
 
 const Game = () => {
   const { state } = useLocation();
-  const { selectedHeroes: stateHeroes, loadedConversation, worldSeed: stateSeed, gameSessionId: stateGameSessionId } = state || { selectedHeroes: [], loadedConversation: null, worldSeed: null, gameSessionId: null };
+  const { selectedHeroes: stateHeroes, loadedConversation, worldSeed: stateSeed, gameSessionId: stateGameSessionId, generatedMap: stateGeneratedMap } = state || { selectedHeroes: [], loadedConversation: null, worldSeed: null, gameSessionId: null, generatedMap: null };
   const [selectedHeroes, setSelectedHeroes] = useState(() => {
     // Initialize heroes with progression fields if missing
     const heroes = loadedConversation?.selected_heroes || stateHeroes || [];
@@ -94,6 +94,8 @@ const Game = () => {
   const [aiNarrativeEnabled, setAiNarrativeEnabled] = useState(true);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [isMobilePartySidebarOpen, setIsMobilePartySidebarOpen] = useState(false);
+  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
+  const [savedGameTitle, setSavedGameTitle] = useState('');
 
   // --- HOOKS ---
   const {
@@ -104,7 +106,7 @@ const Game = () => {
   } = useGameSession(loadedConversation, setSettings, setSelectedProvider, setSelectedModel, stateGameSessionId);
 
   // Pass dummy/empty functions for now where we handle logic in Game.js wrapper
-  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed);
+  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap);
 
   const interactionHook = useGameInteraction(
     loadedConversation,
@@ -420,7 +422,13 @@ const Game = () => {
           onOpenInventory={() => setIsInventoryModalOpen(true)}
           onOpenHowToPlay={() => setIsHowToPlayModalOpen(true)}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
-          onManualSave={() => performSave()}
+          onManualSave={() => {
+            performSave();
+            const timestamp = new Date();
+            const title = `Adventure - ${timestamp.toLocaleDateString()} ${timestamp.toLocaleTimeString()}`;
+            setSavedGameTitle(title);
+            setShowSaveConfirmation(true);
+          }}
           canManualSave={!!sessionId}
           hasAdventureStarted={hasAdventureStarted}
           isLoading={interactionHook.isLoading}
@@ -522,6 +530,28 @@ const Game = () => {
         diceSkill={diceSkill}
         diceMode={diceMode}
       />
+
+      {/* Save Confirmation Modal */}
+      {showSaveConfirmation && (
+        <div className="modal-overlay" onClick={() => setShowSaveConfirmation(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center' }}>
+            <h3 style={{ marginBottom: '15px', color: 'var(--state-success)' }}>✓ Game Saved!</h3>
+            <p style={{ marginBottom: '10px', color: 'var(--text)' }}>
+              Your progress has been saved as:
+            </p>
+            <p style={{ marginBottom: '20px', fontWeight: 'bold', color: 'var(--primary)' }}>
+              {savedGameTitle}
+            </p>
+            <button
+              onClick={() => setShowSaveConfirmation(false)}
+              className="primary-button"
+              style={{ padding: '10px 30px' }}
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

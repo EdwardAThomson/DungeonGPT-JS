@@ -16,6 +16,7 @@ const SavedConversations = () => {
   const [newName, setNewName] = useState('');
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -61,14 +62,11 @@ const SavedConversations = () => {
   };
 
   const deleteConversation = async (sessionId) => {
-    if (!window.confirm('Delete this saved game permanently? This cannot be undone.')) {
-      return;
-    }
-
     try {
       await conversationsApi.remove(sessionId);
       // Remove from local state
       setConversations(conversations.filter(conv => conv.sessionId !== sessionId));
+      setDeleteConfirmId(null);
     } catch (err) {
       setError(err.message);
     }
@@ -162,13 +160,14 @@ const SavedConversations = () => {
                   {/* Hero Portraits */}
                   {heroes.length > 0 && (
                     <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                      {heroes.slice(0, 4).map((hero, idx) => (
-                        hero.profilePicture ? (
+                      {heroes.slice(0, 4).map((hero, idx) => {
+                        const heroName = hero.heroName || hero.characterName || 'Unknown';
+                        return hero.profilePicture ? (
                           <img
                             key={idx}
                             src={hero.profilePicture}
-                            alt={hero.characterName}
-                            title={hero.characterName}
+                            alt={heroName}
+                            title={heroName}
                             style={{
                               width: '60px',
                               height: '60px',
@@ -178,8 +177,8 @@ const SavedConversations = () => {
                               boxShadow: '0 2px 8px var(--shadow)'
                             }}
                           />
-                        ) : null
-                      ))}
+                        ) : null;
+                      })}
                     </div>
                   )}
                   
@@ -234,7 +233,7 @@ const SavedConversations = () => {
                     )}
                     {heroes.length > 0 && (
                       <p style={{ margin: '10px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                        <strong>Party:</strong> {heroes.map(h => h.characterName).join(', ')}
+                        <strong>Party:</strong> {heroes.map(h => h.heroName || h.characterName || 'Unknown').join(', ')}
                       </p>
                     )}
                   </div>
@@ -259,7 +258,7 @@ const SavedConversations = () => {
                     Details
                   </button>
                   <button
-                    onClick={() => deleteConversation(conversation.sessionId)}
+                    onClick={() => setDeleteConfirmId(conversation.sessionId)}
                     className="danger-button"
                     style={{ padding: '10px 20px', fontSize: '0.9rem' }}
                     title="Delete"
@@ -296,6 +295,34 @@ const SavedConversations = () => {
           Start New Game
         </button>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="modal-overlay" onClick={() => setDeleteConfirmId(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <h3 style={{ marginBottom: '15px' }}>Delete Saved Game?</h3>
+            <p style={{ marginBottom: '20px', color: 'var(--text-secondary)' }}>
+              This will permanently delete this saved game. This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="secondary-button"
+                style={{ padding: '10px 20px' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteConversation(deleteConfirmId)}
+                className="danger-button"
+                style={{ padding: '10px 20px' }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

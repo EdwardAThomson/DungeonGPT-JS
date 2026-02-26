@@ -15,7 +15,7 @@ const HeroModal = ({ isOpen, onClose, hero }) => {
     const heroRace = hero.characterRace || hero.race || hero.heroRace || '';
     const heroClass = hero.characterClass || hero.heroClass || '';
     const heroLevel = hero.level || hero.heroLevel || hero.characterLevel || 1;
-    const heroGender = hero.gender || hero.heroGender || 'Male';
+    const heroGender = hero.heroGender || hero.characterGender || hero.gender || 'Male';
 
     return (
         <div className="modal-overlay" onClick={onClose}>
