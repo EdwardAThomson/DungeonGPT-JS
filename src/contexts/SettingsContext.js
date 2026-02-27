@@ -1,16 +1,20 @@
 import { createContext, useState } from "react";
-import { DEFAULT_MODELS } from "../llm/llm_constants";
+import { DEFAULT_MODELS, getDefaultProvider } from "../llm/llm_constants";
+
+// Get environment-appropriate default provider
+const defaultProvider = getDefaultProvider();
+const defaultModel = DEFAULT_MODELS[defaultProvider];
 
 const SettingsContext = createContext({
   settings: {},
   setSettings: () => { },
-  selectedProvider: 'gemini-cli',
+  selectedProvider: defaultProvider,
   setSelectedProvider: () => { },
-  selectedModel: DEFAULT_MODELS['gemini-cli'],
+  selectedModel: defaultModel,
   setSelectedModel: () => { },
-  assistantProvider: 'gemini-cli',
+  assistantProvider: defaultProvider,
   setAssistantProvider: () => { },
-  assistantModel: DEFAULT_MODELS['gemini-cli'],
+  assistantModel: defaultModel,
   setAssistantModel: () => { },
   isSettingsModalOpen: false,
   setIsSettingsModalOpen: () => { },
@@ -20,10 +24,10 @@ const SettingsContext = createContext({
 
 export const SettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState({});
-  const [selectedProvider, setSelectedProvider] = useState('gemini-cli');
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODELS['gemini-cli']);
-  const [assistantProvider, setAssistantProvider] = useState('gemini-cli');
-  const [assistantModel, setAssistantModel] = useState(DEFAULT_MODELS['gemini-cli']);
+  const [selectedProvider, setSelectedProvider] = useState(defaultProvider);
+  const [selectedModel, setSelectedModel] = useState(defaultModel);
+  const [assistantProvider, setAssistantProvider] = useState(defaultProvider);
+  const [assistantModel, setAssistantModel] = useState(defaultModel);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark-fantasy');
 

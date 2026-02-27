@@ -133,6 +133,9 @@ const DebugMenu = ({ inNav = false }) => {
                     <Link to="/debug/encounter-debug" style={linkStyle} onClick={() => setIsOpen(false)}>
                         ⚔️ Encounter Debug
                     </Link>
+                    <Link to="/debug/cf-worker" style={{ ...linkStyle, color: '#ff9800', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
+                        ☁️ CF Worker AI Test
+                    </Link>
                 </div>
             )}
             <button style={buttonStyle} onClick={toggleMenu} title="Debug Menu">

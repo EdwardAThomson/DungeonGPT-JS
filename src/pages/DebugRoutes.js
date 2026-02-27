@@ -13,6 +13,7 @@ import ProgressionTest from './ProgressionTest';
 import LLMDebug from './LLMDebug';
 import ConversationManager from './ConversationManager';
 import EncounterDebug from './EncounterDebug';
+import CFWorkerDebug from './CFWorkerDebug';
 
 const debugLinks = [
   { to: 'terrain-studio-v2', label: 'Terrain Studio V2' },
@@ -28,6 +29,7 @@ const debugLinks = [
   { to: 'progression-test', label: 'Progression Test' },
   { to: 'llm-debug', label: 'LLM Pipeline Debug' },
   { to: 'conversation-manager', label: 'Conversation Manager' },
+  { to: 'cf-worker', label: 'CF Worker AI Test' },
 ];
 
 const DebugRoutes = () => {
@@ -73,6 +75,7 @@ const DebugRoutes = () => {
           <Route path="progression-test" element={<ProgressionTest />} />
           <Route path="llm-debug" element={<LLMDebug />} />
           <Route path="conversation-manager" element={<ConversationManager />} />
+          <Route path="cf-worker" element={<CFWorkerDebug />} />
           <Route path="*" element={<Navigate to="llm-debug" replace />} />
         </Routes>
       </section>
