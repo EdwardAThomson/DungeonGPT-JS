@@ -20,7 +20,7 @@ app.use(
       // Allow requests with no origin (e.g., curl, Postman)
       return null;
     },
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     maxAge: 86400,
   })

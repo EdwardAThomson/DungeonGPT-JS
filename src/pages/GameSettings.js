@@ -2,6 +2,7 @@ import React, { useState, useContext, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import HeroContext from "../contexts/HeroContext";
 import SettingsContext from "../contexts/SettingsContext";
+import { useAuth } from "../contexts/AuthContext";
 import { generateMapData, findStartingTown } from "../utils/mapGenerator";
 import WorldMapDisplay from "../components/WorldMapDisplay";
 import { storyTemplates } from "../data/storyTemplates";
@@ -53,6 +54,7 @@ const GameSettings = () => {
   const { heroes } = useContext(HeroContext);
   // Get settings, provider, and model state from context
   const { settings, setSettings, selectedProvider, selectedModel } = useContext(SettingsContext);
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   // Clear any stale session ID when starting a new game
@@ -271,28 +273,43 @@ const GameSettings = () => {
         <div className="template-selector" style={{ marginBottom: '30px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
             <h4 style={{ margin: 0, fontSize: '0.9rem', color: 'var(--state-muted-strong)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Quick Templates</h4>
-            <button
-              onClick={handleAiGenerateStory}
-              disabled={isAiGenerating}
-              className={`ai-generate-button ${isAiGenerating ? 'loading' : ''}`}
-              style={{
-                background: 'linear-gradient(135deg, #6c5ce7, #a29bfe)',
-                color: 'white',
-                border: 'none',
-                padding: '8px 16px',
-                borderRadius: '20px',
-                fontSize: '0.85rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 4px 15px rgba(108, 92, 231, 0.3)',
-                transition: 'all 0.3s ease'
-              }}
-            >
-              {isAiGenerating ? '✨ Spawning World...' : '✨ Generate with AI'}
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={handleAiGenerateStory}
+                disabled={isAiGenerating || !user}
+                className={`ai-generate-button ${isAiGenerating ? 'loading' : ''}`}
+                title={!user ? 'Sign in to use AI generation' : ''}
+                style={{
+                  background: !user ? 'var(--text-secondary)' : 'linear-gradient(135deg, #6c5ce7, #a29bfe)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontSize: '0.85rem',
+                  fontWeight: 'bold',
+                  cursor: !user ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: !user ? 'none' : '0 4px 15px rgba(108, 92, 231, 0.3)',
+                  transition: 'all 0.3s ease',
+                  opacity: !user ? 0.6 : 1
+                }}
+              >
+                {isAiGenerating ? '✨ Spawning World...' : '✨ Generate with AI'}
+              </button>
+              {!user && (
+                <span style={{ 
+                  display: 'block', 
+                  fontSize: '0.7rem', 
+                  color: 'var(--text-secondary)', 
+                  textAlign: 'center',
+                  marginTop: '4px'
+                }}>
+                  Sign in required
+                </span>
+              )}
+            </div>
           </div>
           {aiError && <p className="error-message" style={{ marginBottom: '15px' }}>{aiError}</p>}
 

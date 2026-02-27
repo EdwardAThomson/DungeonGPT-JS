@@ -8,9 +8,3 @@ binding = "AI"
 
 [vars]
 ENVIRONMENT = "development"
-
-# Uncomment for D1 database binding (Phase 2)
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "dungeongpt-db"
-# database_id = "your-database-id-here"

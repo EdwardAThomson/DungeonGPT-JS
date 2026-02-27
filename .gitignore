@@ -26,7 +26,9 @@ node_modules/
 *.sqlite
 *.sqlite3
 src/game.db
+# Allow migration SQL files
 *.sql
+!cf-worker/migrations/*.sql
 
 # Logs
 npm-debug.log*
@@ -63,6 +65,16 @@ cf-worker/.wrangler/
 cf-worker/.dev.vars
 .dev.vars
 
+# CF Worker sensitive files
+.dev.vars
+.wrangler/
+wrangler.toml
+.dev.vars
+
+# D1 database files (not used - using Supabase instead)
+cf-worker/src/routes/db.ts
+cf-worker/migrations/
+
 # Special docs
 docs/deployment_*.md
 docs/refactor_assessment.md
@@ -70,3 +82,5 @@ docs/ui_flow_improvements.md
 docs/character_to_hero_migration.md
 docs/accessibility_responsive_improvements.md
 docs/cloudflare_workers_ai_integration_plan.md
+docs/production_vs_dev_strategy.md
+docs/supabase_migration_plan.md

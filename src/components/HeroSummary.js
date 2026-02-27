@@ -4,6 +4,7 @@ import React, { useContext, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { downloadJSONFile } from "../utils/fileHelper";
 import HeroContext from "../contexts/HeroContext";
+import { useAuth } from "../contexts/AuthContext";
 import { calculateMaxHP } from "../utils/healthSystem";
 import { heroesApi } from "../services/heroesApi";
 import { createLogger } from "../utils/logger";
@@ -12,9 +13,11 @@ const logger = createLogger('hero-summary');
 
 const HeroSummary = () => {
   const { heroes, setHeroes } = useContext(HeroContext);
+  const { user } = useAuth();
   const { state } = useLocation();
   const newHero = state?.newCharacter;
   const [feedbackModal, setFeedbackModal] = useState(null);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
   const navigate = useNavigate();
 
@@ -23,6 +26,14 @@ const HeroSummary = () => {
 
   const handleSaveOrUpdate = async () => {
     if (!newHero) return; // Safety check
+
+    // Check if user is logged in
+    if (!user) {
+      // Store hero data in localStorage for recovery after login
+      localStorage.setItem('pendingHero', JSON.stringify(newHero));
+      setShowLoginPrompt(true);
+      return;
+    }
 
     // Determine endpoint and method based on whether it's an edit or add
     const isUpdate = isEditing;
@@ -168,6 +179,30 @@ const HeroSummary = () => {
             <div className="summary-feedback-actions">
               <button className="modal-close-button" onClick={closeFeedbackModal}>
                 Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showLoginPrompt && (
+        <div className="modal-overlay" onClick={() => setShowLoginPrompt(false)}>
+          <div className="modal-content summary-feedback-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Sign In Required</h3>
+            <p>You need to sign in to save your hero. Your hero data will be preserved.</p>
+            <div className="summary-feedback-actions" style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button 
+                className="modal-close-button" 
+                onClick={() => setShowLoginPrompt(false)}
+                style={{ background: 'transparent', color: 'var(--text)' }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="modal-close-button" 
+                onClick={() => navigate('/login', { state: { from: { pathname: '/hero-summary' } } })}
+              >
+                Sign In
               </button>
             </div>
           </div>

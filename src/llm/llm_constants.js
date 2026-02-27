@@ -26,12 +26,13 @@ export const AVAILABLE_MODELS = {
         { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash CLI (Default)' },
         { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro CLI' },
         { id: 'gemini-cli', name: 'Gemini 2.5 CLI (Legacy)' }
-    ],
-    'cf-workers': [
-        { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast' },
-        { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B' },
-        { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B' }
     ]
+    // Commented out until authentication is implemented
+    // 'cf-workers': [
+    //     { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast' },
+    //     { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B' },
+    //     { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B' }
+    // ]
 };
 
 export const DEFAULT_MODELS = {
@@ -40,8 +41,8 @@ export const DEFAULT_MODELS = {
     claude: 'claude-sonnet-4-5-20250929',
     codex: 'codex-cli',
     'claude-cli': 'claude-cli',
-    'gemini-cli': 'gemini-3-flash-preview',
-    'cf-workers': '@cf/meta/llama-3.1-8b-instruct-fast'
+    'gemini-cli': 'gemini-3-flash-preview'
+    // 'cf-workers': '@cf/meta/llama-3.1-8b-instruct-fast'
 };
 
 export const PROMPT_SNIPPET = `You are a dungeon master acting as the narrator and world simulator for a text-based RPG. Keep responses concise (1-3 paragraphs), focused on the game narrative, describing the results of the user's actions and the current situation. Do not speak OOC or give instructions.`;

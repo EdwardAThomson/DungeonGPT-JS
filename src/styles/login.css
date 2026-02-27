@@ -1,0 +1,179 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg);
+  padding: 20px;
+}
+
+.login-container {
+  background-color: var(--surface);
+  border-radius: 8px;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 32px var(--shadow);
+  border: 1px solid var(--border);
+}
+
+.login-title {
+  font-family: var(--font-header);
+  color: var(--primary);
+  text-align: center;
+  margin: 0 0 8px 0;
+  font-size: 2rem;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  /* No text-transform to preserve "DungeonGPT" capitalization */
+}
+
+.login-subtitle {
+  font-family: var(--font-body);
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0 0 30px 0;
+  font-size: 1.2rem;
+  font-weight: normal;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.login-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.login-form .form-group label {
+  font-family: var(--font-header);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.login-form .form-group input {
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+  margin-bottom: 0;
+}
+
+.login-form .form-group input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--shadow);
+}
+
+.login-form .form-group input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.login-form .form-group input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.login-form .error-message {
+  color: var(--state-danger-bright);
+  background-color: var(--state-danger-bright-10);
+  padding: 12px;
+  border-radius: 4px;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  border: 1px solid var(--state-danger-bright-30);
+}
+
+.login-form .success-message {
+  color: var(--state-success);
+  background-color: var(--success-tint-20);
+  padding: 12px;
+  border-radius: 4px;
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  border: 1px solid var(--state-success);
+}
+
+.login-button {
+  padding: 12px 24px;
+  border-radius: 4px;
+  border: 1px solid var(--primary);
+  background-color: var(--primary);
+  color: var(--bg);
+  font-family: var(--font-header);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 15px;
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.login-button:hover:not(:disabled) {
+  background-color: transparent;
+  color: var(--primary);
+}
+
+.login-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.login-button:disabled {
+  background-color: var(--text-secondary);
+  border-color: var(--text-secondary);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.toggle-mode-button {
+  width: 100%;
+  margin-top: 20px;
+  padding: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background-color: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggle-mode-button:hover:not(:disabled) {
+  background-color: var(--surface);
+  color: var(--text);
+  border-color: var(--primary);
+}
+
+.toggle-mode-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .login-container {
+    padding: 30px 20px;
+  }
+
+  .login-title {
+    font-size: 1.5rem;
+  }
+
+  .login-subtitle {
+    font-size: 1rem;
+  }
+}

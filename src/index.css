@@ -158,6 +158,15 @@ h6 {
   margin-top: 1.5em;
   margin-bottom: 0.8em;
   letter-spacing: 0.05em;
+}
+
+/* h1 does not use text-transform to preserve proper capitalization like "DungeonGPT" */
+
+h2,
+h3,
+h4,
+h5,
+h6 {
   text-transform: uppercase;
 }
 

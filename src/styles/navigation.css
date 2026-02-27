@@ -202,3 +202,18 @@
     padding: 12px 20px;
   }
 }
+
+/* User Profile Navigation Item */
+.nav-profile-item {
+  position: absolute;
+  right: 20px;
+  height: auto;
+  min-width: auto;
+}
+
+.nav-profile-item .profile-avatar-btn {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+}
