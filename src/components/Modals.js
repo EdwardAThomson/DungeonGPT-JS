@@ -1,5 +1,5 @@
 import React, { useContext, useState } from 'react';
-import { AVAILABLE_MODELS, DEFAULT_MODELS } from '../llm/llm_constants';
+import { getAvailableModels, DEFAULT_MODELS } from '../llm/llm_constants';
 import ApiKeysContext from '../contexts/ApiKeysContext';
 import SettingsContext from '../contexts/SettingsContext';
 
@@ -13,6 +13,7 @@ export const AISettingsModalContent = ({
 }) => {
   const { apiKeys, setApiKeys } = useContext(ApiKeysContext);
   const { theme, setTheme } = useContext(SettingsContext);
+  const AVAILABLE_MODELS = getAvailableModels();
 
   if (!isOpen) return null;
 
@@ -44,19 +45,25 @@ export const AISettingsModalContent = ({
                 <div>
                   <label style={labelStyle}>PROVIDER</label>
                   <select value={selectedProvider} onChange={(e) => handleProviderChange(e.target.value, 'game')} style={selectStyle}>
-                    <optgroup label="Cloud APIs">
-                      <option value="openai">OpenAI</option>
-                      <option value="gemini">Gemini</option>
-                      <option value="claude">Claude</option>
-                    </optgroup>
-                    <optgroup label="CloudFlare Workers">
-                      <option value="cf-workers">CF Workers AI</option>
-                    </optgroup>
-                    <optgroup label="CLI Tools">
-                      <option value="codex">Codex CLI</option>
-                      <option value="claude-cli">Claude CLI</option>
-                      <option value="gemini-cli">Gemini CLI</option>
-                    </optgroup>
+                    {Object.keys(AVAILABLE_MODELS).includes('openai') && (
+                      <optgroup label="Cloud APIs">
+                        {AVAILABLE_MODELS['openai'] && <option value="openai">OpenAI</option>}
+                        {AVAILABLE_MODELS['gemini'] && <option value="gemini">Gemini</option>}
+                        {AVAILABLE_MODELS['claude'] && <option value="claude">Claude</option>}
+                      </optgroup>
+                    )}
+                    {AVAILABLE_MODELS['cf-workers'] && (
+                      <optgroup label="CloudFlare Workers">
+                        <option value="cf-workers">CF Workers AI</option>
+                      </optgroup>
+                    )}
+                    {(AVAILABLE_MODELS['codex'] || AVAILABLE_MODELS['claude-cli'] || AVAILABLE_MODELS['gemini-cli']) && (
+                      <optgroup label="CLI Tools">
+                        {AVAILABLE_MODELS['codex'] && <option value="codex">Codex CLI</option>}
+                        {AVAILABLE_MODELS['claude-cli'] && <option value="claude-cli">Claude CLI</option>}
+                        {AVAILABLE_MODELS['gemini-cli'] && <option value="gemini-cli">Gemini CLI</option>}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
                 <div>
@@ -76,19 +83,25 @@ export const AISettingsModalContent = ({
                 <div>
                   <label style={labelStyle}>PROVIDER</label>
                   <select value={assistantProvider || selectedProvider} onChange={(e) => handleProviderChange(e.target.value, 'assistant')} style={selectStyle}>
-                    <optgroup label="Cloud APIs">
-                      <option value="openai">OpenAI</option>
-                      <option value="gemini">Gemini</option>
-                      <option value="claude">Claude</option>
-                    </optgroup>
-                    <optgroup label="CloudFlare Workers">
-                      <option value="cf-workers">CF Workers AI</option>
-                    </optgroup>
-                    <optgroup label="CLI Tools">
-                      <option value="codex">Codex CLI</option>
-                      <option value="claude-cli">Claude CLI</option>
-                      <option value="gemini-cli">Gemini CLI</option>
-                    </optgroup>
+                    {Object.keys(AVAILABLE_MODELS).includes('openai') && (
+                      <optgroup label="Cloud APIs">
+                        {AVAILABLE_MODELS['openai'] && <option value="openai">OpenAI</option>}
+                        {AVAILABLE_MODELS['gemini'] && <option value="gemini">Gemini</option>}
+                        {AVAILABLE_MODELS['claude'] && <option value="claude">Claude</option>}
+                      </optgroup>
+                    )}
+                    {AVAILABLE_MODELS['cf-workers'] && (
+                      <optgroup label="CloudFlare Workers">
+                        <option value="cf-workers">CF Workers AI</option>
+                      </optgroup>
+                    )}
+                    {(AVAILABLE_MODELS['codex'] || AVAILABLE_MODELS['claude-cli'] || AVAILABLE_MODELS['gemini-cli']) && (
+                      <optgroup label="CLI Tools">
+                        {AVAILABLE_MODELS['codex'] && <option value="codex">Codex CLI</option>}
+                        {AVAILABLE_MODELS['claude-cli'] && <option value="claude-cli">Claude CLI</option>}
+                        {AVAILABLE_MODELS['gemini-cli'] && <option value="gemini-cli">Gemini CLI</option>}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
                 <div>
@@ -174,6 +187,7 @@ export const StorySettingsModalContent = ({
   const [activeTab, setActiveTab] = useState('story'); // 'story' or 'ai'
   const { apiKeys, setApiKeys } = useContext(ApiKeysContext);
   const { theme, setTheme } = useContext(SettingsContext);
+  const AVAILABLE_MODELS = getAvailableModels();
 
   if (!isOpen) return null;
 
@@ -407,19 +421,25 @@ export const StorySettingsModalContent = ({
                     <div>
                       <label style={labelStyle}>PROVIDER</label>
                       <select value={selectedProvider} onChange={(e) => handleProviderChange(e.target.value, 'game')} style={selectStyle}>
-                        <optgroup label="Cloud APIs">
-                          <option value="openai">OpenAI</option>
-                          <option value="gemini">Gemini</option>
-                          <option value="claude">Claude</option>
-                        </optgroup>
-                        <optgroup label="CloudFlare Workers">
-                          <option value="cf-workers">CF Workers AI</option>
-                        </optgroup>
-                        <optgroup label="CLI Tools">
-                          <option value="codex">Codex CLI</option>
-                          <option value="claude-cli">Claude CLI</option>
-                          <option value="gemini-cli">Gemini CLI</option>
-                        </optgroup>
+                        {Object.keys(AVAILABLE_MODELS).includes('openai') && (
+                          <optgroup label="Cloud APIs">
+                            {AVAILABLE_MODELS['openai'] && <option value="openai">OpenAI</option>}
+                            {AVAILABLE_MODELS['gemini'] && <option value="gemini">Gemini</option>}
+                            {AVAILABLE_MODELS['claude'] && <option value="claude">Claude</option>}
+                          </optgroup>
+                        )}
+                        {AVAILABLE_MODELS['cf-workers'] && (
+                          <optgroup label="CloudFlare Workers">
+                            <option value="cf-workers">CF Workers AI</option>
+                          </optgroup>
+                        )}
+                        {(AVAILABLE_MODELS['codex'] || AVAILABLE_MODELS['claude-cli'] || AVAILABLE_MODELS['gemini-cli']) && (
+                          <optgroup label="CLI Tools">
+                            {AVAILABLE_MODELS['codex'] && <option value="codex">Codex CLI</option>}
+                            {AVAILABLE_MODELS['claude-cli'] && <option value="claude-cli">Claude CLI</option>}
+                            {AVAILABLE_MODELS['gemini-cli'] && <option value="gemini-cli">Gemini CLI</option>}
+                          </optgroup>
+                        )}
                       </select>
                     </div>
                     <div>
@@ -439,19 +459,25 @@ export const StorySettingsModalContent = ({
                     <div>
                       <label style={labelStyle}>PROVIDER</label>
                       <select value={assistantProvider || selectedProvider} onChange={(e) => handleProviderChange(e.target.value, 'assistant')} style={selectStyle}>
-                        <optgroup label="Cloud APIs">
-                          <option value="openai">OpenAI</option>
-                          <option value="gemini">Gemini</option>
-                          <option value="claude">Claude</option>
-                        </optgroup>
-                        <optgroup label="CloudFlare Workers">
-                          <option value="cf-workers">CF Workers AI</option>
-                        </optgroup>
-                        <optgroup label="CLI Tools">
-                          <option value="codex">Codex CLI</option>
-                          <option value="claude-cli">Claude CLI</option>
-                          <option value="gemini-cli">Gemini CLI</option>
-                        </optgroup>
+                        {Object.keys(AVAILABLE_MODELS).includes('openai') && (
+                          <optgroup label="Cloud APIs">
+                            {AVAILABLE_MODELS['openai'] && <option value="openai">OpenAI</option>}
+                            {AVAILABLE_MODELS['gemini'] && <option value="gemini">Gemini</option>}
+                            {AVAILABLE_MODELS['claude'] && <option value="claude">Claude</option>}
+                          </optgroup>
+                        )}
+                        {AVAILABLE_MODELS['cf-workers'] && (
+                          <optgroup label="CloudFlare Workers">
+                            <option value="cf-workers">CF Workers AI</option>
+                          </optgroup>
+                        )}
+                        {(AVAILABLE_MODELS['codex'] || AVAILABLE_MODELS['claude-cli'] || AVAILABLE_MODELS['gemini-cli']) && (
+                          <optgroup label="CLI Tools">
+                            {AVAILABLE_MODELS['codex'] && <option value="codex">Codex CLI</option>}
+                            {AVAILABLE_MODELS['claude-cli'] && <option value="claude-cli">Claude CLI</option>}
+                            {AVAILABLE_MODELS['gemini-cli'] && <option value="gemini-cli">Gemini CLI</option>}
+                          </optgroup>
+                        )}
                       </select>
                     </div>
                     <div>
