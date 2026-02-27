@@ -48,7 +48,18 @@ export const DEFAULT_MODELS = {
 // Production: Only CF Workers
 // Development: All providers
 export const getAvailableModels = () => {
-    const isProduction = process.env.NODE_ENV === 'production';
+    // Check if we're in CloudFlare Pages production
+    // CF_PAGES is set by CloudFlare Pages during build
+    // REACT_APP_CF_PAGES can be manually set in CF Pages env vars
+    const isProduction = process.env.REACT_APP_CF_PAGES === 'true' || 
+                        process.env.CF_PAGES === '1';
+    
+    console.log('Environment check:', {
+        REACT_APP_CF_PAGES: process.env.REACT_APP_CF_PAGES,
+        CF_PAGES: process.env.CF_PAGES,
+        NODE_ENV: process.env.NODE_ENV,
+        isProduction
+    });
     
     if (isProduction) {
         // Production: Only CF Workers
@@ -62,7 +73,8 @@ export const getAvailableModels = () => {
 };
 
 export const getDefaultProvider = () => {
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isProduction = process.env.REACT_APP_CF_PAGES === 'true' || 
+                        process.env.CF_PAGES === '1';
     return isProduction ? 'cf-workers' : 'gemini';
 };
 
