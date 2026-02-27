@@ -33,25 +33,26 @@ const supabaseHeroesApi = {
       throw new Error('Supabase not configured');
     }
     
+    // Build insert object with only fields that exist in the table
+    // This matches the Express API pattern: heroName, heroRace, heroClass, etc.
+    const insertData = {
+      hero_id: hero.heroId,
+      hero_name: hero.name,
+      hero_race: hero.race,
+      hero_class: hero.class,
+      hero_level: hero.level || 1,
+      hero_background: hero.background,
+      stats: hero.stats
+    };
+    
+    // Add optional fields if they exist
+    if (hero.gender) insertData.hero_gender = hero.gender;
+    if (hero.profilePicture) insertData.profile_picture = hero.profilePicture;
+    if (hero.alignment) insertData.hero_alignment = hero.alignment;
+    
     const { data, error } = await supabase
       .from('heroes')
-      .insert([{
-        hero_id: hero.heroId,
-        name: hero.name,
-        race: hero.race,
-        class: hero.class,
-        alignment: hero.alignment,
-        background: hero.background,
-        stats: hero.stats,
-        skills: hero.skills,
-        equipment: hero.equipment,
-        backstory: hero.backstory,
-        personality: hero.personality,
-        current_hp: hero.currentHP,
-        max_hp: hero.maxHP,
-        level: hero.level || 1,
-        experience: hero.experience || 0
-      }])
+      .insert([insertData])
       .select()
       .single();
     
@@ -64,24 +65,24 @@ const supabaseHeroesApi = {
       throw new Error('Supabase not configured');
     }
     
+    // Build update object matching SQLite schema
+    const updateData = {
+      hero_name: hero.name,
+      hero_race: hero.race,
+      hero_class: hero.class,
+      hero_level: hero.level,
+      hero_background: hero.background,
+      stats: hero.stats
+    };
+    
+    // Add optional fields if they exist
+    if (hero.gender) updateData.hero_gender = hero.gender;
+    if (hero.profilePicture) updateData.profile_picture = hero.profilePicture;
+    if (hero.alignment) updateData.hero_alignment = hero.alignment;
+    
     const { data, error } = await supabase
       .from('heroes')
-      .update({
-        name: hero.name,
-        race: hero.race,
-        class: hero.class,
-        alignment: hero.alignment,
-        background: hero.background,
-        stats: hero.stats,
-        skills: hero.skills,
-        equipment: hero.equipment,
-        backstory: hero.backstory,
-        personality: hero.personality,
-        current_hp: hero.currentHP,
-        max_hp: hero.maxHP,
-        level: hero.level,
-        experience: hero.experience
-      })
+      .update(updateData)
       .eq('hero_id', heroId)
       .select()
       .single();
