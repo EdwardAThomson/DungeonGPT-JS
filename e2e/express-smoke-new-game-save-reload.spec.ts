@@ -1,9 +1,19 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, Page, Route } from '@playwright/test';
+
+/**
+ * E2E Test: Express Backend - Full Game Flow
+ * 
+ * Tests complete game workflow using Express/SQLite backend (local dev).
+ * Validates: hero creation, map generation, movement, save, and reload.
+ * 
+ * Run with: npx playwright test express-smoke-new-game-save-reload
+ * Requires: Express server running on localhost:5000
+ */
 
 const createHeroPayload = (name: string, id: string) => ({
   heroId: id,
   heroName: name,
-  heroGender: 'Non-binary',
+  heroGender: 'Male',
   profilePicture: 'https://picsum.photos/seed/dungeongpt-e2e/200/200',
   heroRace: 'Human',
   heroClass: 'Fighter',
@@ -20,10 +30,10 @@ const createHeroPayload = (name: string, id: string) => ({
   }
 });
 
-const mockLlmEndpoints = async (page) => {
+const mockLlmEndpoints = async (page: Page) => {
   let taskCounter = 0;
 
-  await page.route('**/api/llm/generate', async (route) => {
+  await page.route('**/api/llm/generate', async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -31,7 +41,7 @@ const mockLlmEndpoints = async (page) => {
     });
   });
 
-  await page.route('**/api/llm/tasks', async (route) => {
+  await page.route('**/api/llm/tasks', async (route: Route) => {
     taskCounter += 1;
     await route.fulfill({
       status: 200,
@@ -40,7 +50,7 @@ const mockLlmEndpoints = async (page) => {
     });
   });
 
-  await page.route('**/api/llm/tasks/*/stream', async (route) => {
+  await page.route('**/api/llm/tasks/*/stream', async (route: Route) => {
     await route.fulfill({
       status: 200,
       headers: {
@@ -54,7 +64,7 @@ const mockLlmEndpoints = async (page) => {
   });
 };
 
-const moveOneTile = async (page) => {
+const moveOneTile = async (page: Page) => {
   await page.locator('button:has-text("Map")').first().click();
   await expect(page.getByRole('heading', { name: 'World Map' })).toBeVisible();
 

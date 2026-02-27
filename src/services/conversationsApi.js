@@ -48,9 +48,16 @@ const supabaseConversationsApi = {
       throw new Error('Supabase not configured');
     }
     
+    // Get authenticated user ID for RLS
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+    
     const { data, error } = await supabase
       .from('conversations')
       .insert([{
+        user_id: user.id,
         session_id: payload.sessionId,
         conversation_name: payload.conversationName,
         conversation_data: payload.conversationData,

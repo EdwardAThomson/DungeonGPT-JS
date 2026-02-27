@@ -9,7 +9,7 @@ import { storyTemplates } from "../data/storyTemplates";
 import { llmService } from "../services/llmService";
 import { createLogger } from "../utils/logger";
 
-const logger = createLogger('game-settings');
+const logger = createLogger('new-game');
 
 // Resolve milestone location names to map coordinates by matching town and mountain names
 const resolveMilestoneCoords = (milestones, mapData) => {
@@ -48,7 +48,7 @@ const resolveMilestoneCoords = (milestones, mapData) => {
     });
 };
 
-const GameSettings = () => {
+const NewGame = () => {
 
   // characters should be saved in Context
   const { heroes } = useContext(HeroContext);
@@ -259,7 +259,7 @@ const GameSettings = () => {
   };
 
   return (
-    <div className="page-container game-settings-page">
+    <div className="page-container new-game-page">
       <h1>New Game Setup</h1>
       <p>Configure your adventure's world and narrative style below.</p>
 
@@ -577,7 +577,7 @@ const GameSettings = () => {
   );
 };
 
-export default GameSettings;
+export default NewGame;
 
 
 // const { state } = useLocation();

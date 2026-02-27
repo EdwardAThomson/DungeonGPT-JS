@@ -1,40 +1,40 @@
 /* settings.css
- * Purpose: game settings page and settings modal/story template presentation styles.
+ * Purpose: new game page and settings modal/story template presentation styles.
  * Depends on: theme tokens from src/index.css and shared form primitives from forms.css.
  * Font usage: --header-font for headings/cards, --ui-font for controls.
  */
 
-.game-settings-page .form-section {
+.new-game-page .form-section {
   margin-bottom: 30px;
   padding-bottom: 20px;
   border-bottom: 1px solid var(--border-soft);
 }
 
-.game-settings-page .form-section:last-of-type {
+.new-game-page .form-section:last-of-type {
   border-bottom: none;
   margin-bottom: 0;
 }
 
-.game-settings-page h2 {
+.new-game-page h2 {
   margin-top: 0;
   margin-bottom: 15px;
   color: var(--primary);
 }
 
-.game-settings-page h3 {
+.new-game-page h3 {
   margin-bottom: 8px;
   color: var(--text);
   display: inline-block;
   position: relative;
 }
 
-.game-settings-page p {
+.new-game-page p {
   margin: 0 0 10px 0;
   line-height: 1.5;
   color: var(--text-secondary);
 }
 
-.game-settings-page .settings-textarea {
+.new-game-page .settings-textarea {
   width: 100%;
   max-width: 600px;
   padding: 10px;
@@ -45,22 +45,22 @@
   resize: vertical;
 }
 
-.game-settings-page .mood-selectors,
-.game-settings-page .world-settings-selectors,
-.game-settings-page .ai-settings-selectors {
+.new-game-page .mood-selectors,
+.new-game-page .world-settings-selectors,
+.new-game-page .ai-settings-selectors {
   display: flex;
   gap: 40px;
   flex-wrap: wrap;
 }
 
-.game-settings-page .mood-selector-item,
-.game-settings-page .world-setting-item,
-.game-settings-page .ai-setting-item {
+.new-game-page .mood-selector-item,
+.new-game-page .world-setting-item,
+.new-game-page .ai-setting-item {
   flex: 1;
   min-width: 200px;
 }
 
-.game-settings-page .settings-select {
+.new-game-page .settings-select {
   width: 100%;
   padding: 10px;
   border: 1px solid var(--border);
@@ -77,8 +77,8 @@
   padding-right: 2.5em;
 }
 
-.game-settings-page .provider-select,
-.game-settings-page .verbosity-select {
+.new-game-page .provider-select,
+.new-game-page .verbosity-select {
   max-width: 300px;
 }
 
@@ -135,20 +135,20 @@
   opacity: 1;
 }
 
-.game-settings-page .form-actions {
+.new-game-page .form-actions {
   margin-top: 30px;
   position: relative;
   text-align: center;
 }
 
-.game-settings-page .error-message {
+.new-game-page .error-message {
   color: var(--state-danger);
   font-weight: bold;
   margin-bottom: 15px;
   font-size: 0.95rem;
 }
 
-.game-settings-page .settings-submit-button {
+.new-game-page .settings-submit-button {
   padding: 14px 30px;
   font-size: 1.1rem;
   font-family: var(--header-font);
@@ -164,7 +164,7 @@
   box-shadow: 0 4px 12px var(--shadow);
 }
 
-.game-settings-page .settings-submit-button:hover {
+.new-game-page .settings-submit-button:hover {
   background-color: transparent;
   color: var(--primary);
   box-shadow: 0 6px 16px var(--shadow);

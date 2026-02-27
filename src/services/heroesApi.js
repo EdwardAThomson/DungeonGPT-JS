@@ -25,7 +25,20 @@ const supabaseHeroesApi = {
       .order('created_at', { ascending: false });
     
     if (error) throw new Error(`Failed to fetch heroes: ${error.message}`);
-    return data || [];
+    
+    // Transform database schema to frontend schema
+    return (data || []).map(hero => ({
+      heroId: hero.hero_id,
+      heroName: hero.hero_name,
+      heroGender: hero.hero_gender,
+      heroRace: hero.hero_race,
+      heroClass: hero.hero_class,
+      heroLevel: hero.hero_level,
+      heroBackground: hero.hero_background,
+      heroAlignment: hero.hero_alignment,
+      profilePicture: hero.profile_picture,
+      stats: hero.stats
+    }));
   },
 
   async create(hero) {
@@ -33,22 +46,29 @@ const supabaseHeroesApi = {
       throw new Error('Supabase not configured');
     }
     
+    // Get authenticated user ID for RLS
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+    
     // Build insert object with only fields that exist in the table
-    // This matches the Express API pattern: heroName, heroRace, heroClass, etc.
+    // Hero object uses heroName, heroRace, heroClass naming convention
     const insertData = {
+      user_id: user.id,
       hero_id: hero.heroId,
-      hero_name: hero.name,
-      hero_race: hero.race,
-      hero_class: hero.class,
-      hero_level: hero.level || 1,
-      hero_background: hero.background,
+      hero_name: hero.heroName,
+      hero_race: hero.heroRace,
+      hero_class: hero.heroClass,
+      hero_level: hero.heroLevel || 1,
+      hero_background: hero.heroBackground,
       stats: hero.stats
     };
     
     // Add optional fields if they exist
-    if (hero.gender) insertData.hero_gender = hero.gender;
+    if (hero.heroGender) insertData.hero_gender = hero.heroGender;
     if (hero.profilePicture) insertData.profile_picture = hero.profilePicture;
-    if (hero.alignment) insertData.hero_alignment = hero.alignment;
+    if (hero.heroAlignment) insertData.hero_alignment = hero.heroAlignment;
     
     const { data, error } = await supabase
       .from('heroes')
@@ -57,7 +77,20 @@ const supabaseHeroesApi = {
       .single();
     
     if (error) throw new Error(`Failed to add hero: ${error.message}`);
-    return data;
+    
+    // Transform database schema to frontend schema
+    return {
+      heroId: data.hero_id,
+      heroName: data.hero_name,
+      heroGender: data.hero_gender,
+      heroRace: data.hero_race,
+      heroClass: data.hero_class,
+      heroLevel: data.hero_level,
+      heroBackground: data.hero_background,
+      heroAlignment: data.hero_alignment,
+      profilePicture: data.profile_picture,
+      stats: data.stats
+    };
   },
 
   async update(heroId, hero) {
@@ -67,18 +100,18 @@ const supabaseHeroesApi = {
     
     // Build update object matching SQLite schema
     const updateData = {
-      hero_name: hero.name,
-      hero_race: hero.race,
-      hero_class: hero.class,
-      hero_level: hero.level,
-      hero_background: hero.background,
+      hero_name: hero.heroName,
+      hero_race: hero.heroRace,
+      hero_class: hero.heroClass,
+      hero_level: hero.heroLevel,
+      hero_background: hero.heroBackground,
       stats: hero.stats
     };
     
     // Add optional fields if they exist
-    if (hero.gender) updateData.hero_gender = hero.gender;
+    if (hero.heroGender) updateData.hero_gender = hero.heroGender;
     if (hero.profilePicture) updateData.profile_picture = hero.profilePicture;
-    if (hero.alignment) updateData.hero_alignment = hero.alignment;
+    if (hero.heroAlignment) updateData.hero_alignment = hero.heroAlignment;
     
     const { data, error } = await supabase
       .from('heroes')
@@ -88,7 +121,20 @@ const supabaseHeroesApi = {
       .single();
     
     if (error) throw new Error(`Failed to update hero: ${error.message}`);
-    return data;
+    
+    // Transform database schema to frontend schema
+    return {
+      heroId: data.hero_id,
+      heroName: data.hero_name,
+      heroGender: data.hero_gender,
+      heroRace: data.hero_race,
+      heroClass: data.hero_class,
+      heroLevel: data.hero_level,
+      heroBackground: data.hero_background,
+      heroAlignment: data.hero_alignment,
+      profilePicture: data.profile_picture,
+      stats: data.stats
+    };
   },
 
   async delete(heroId) {

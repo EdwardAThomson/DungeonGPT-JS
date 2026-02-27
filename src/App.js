@@ -6,7 +6,7 @@ import HeroCreation from "./pages/HeroCreation";
 import HeroSummary from "./components/HeroSummary";
 import AllHeroes from "./pages/AllHeroes";
 import HomePage from "./pages/HomePage";
-import GameSettings from "./pages/GameSettings";
+import NewGame from "./pages/NewGame";
 import HeroSelection from './pages/HeroSelection';
 import Game from './pages/Game';
 import SavedConversations from './pages/SavedConversations';
@@ -95,7 +95,7 @@ const AppContent = () => {
           <NavDropdown 
             label="Games" 
             items={[
-              { label: "New Game", path: "/game-settings" },
+              { label: "New Game", path: "/new-game" },
               { label: "Saved Games", path: "/saved-conversations" }
             ]}
           />
@@ -159,7 +159,7 @@ const AppContent = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/hero-creation" element={<HeroCreation />} />
               <Route path="/hero-summary" element={<HeroSummary />} />
-              <Route path="/game-settings" element={<GameSettings />} />
+              <Route path="/new-game" element={<NewGame />} />
               
               {/* Protected routes */}
               <Route path="/all-heroes" element={<ProtectedRoute><AllHeroes /></ProtectedRoute>} />

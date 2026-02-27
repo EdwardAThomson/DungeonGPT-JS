@@ -12,7 +12,7 @@ const HomePage = () => {
       </div>
 
       <div className="home-navigation">
-        <Link to="/game-settings" className="home-nav-card primary-card">
+        <Link to="/new-game" className="home-nav-card primary-card">
           <div className="card-icon">⚔️</div>
           <div className="card-content">
             <h3>Start Adventure</h3>

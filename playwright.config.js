@@ -13,7 +13,7 @@ module.exports = defineConfig({
     baseURL: 'http://127.0.0.1:3000',
     trace: 'retain-on-failure'
   },
-  webServer: [
+  webServer: process.env.SKIP_WEBSERVER ? undefined : [
     {
       command: 'PORT=5000 REQUIRE_API_AUTH=false node src/server.js',
       port: 5000,

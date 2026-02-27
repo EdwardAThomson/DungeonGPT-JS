@@ -36,6 +36,9 @@
     "test": "react-scripts test",
     "test:e2e": "npx playwright test",
     "test:e2e:headed": "npx playwright test --headed",
+    "test:e2e:express": "npx playwright test express-smoke-new-game-save-reload",
+    "test:e2e:supabase": "npx playwright test supabase-hero-save",
+    "test:supabase": "./scripts/test-supabase-local.sh",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

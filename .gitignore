@@ -20,6 +20,7 @@ node_modules/
 .env.development
 .env.production
 !.env.example
+.env.local.supabase*
 
 # Database files
 *.db

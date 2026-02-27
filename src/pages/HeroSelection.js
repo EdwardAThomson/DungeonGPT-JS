@@ -78,7 +78,7 @@ const HeroSelection = () => {
   };
 
   const handleBack = () => {
-    navigate('/game-settings');
+    navigate('/new-game');
   };
 
   return (
