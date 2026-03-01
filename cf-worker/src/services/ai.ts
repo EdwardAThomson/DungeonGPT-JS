@@ -1,8 +1,6 @@
 import { getFallbackModelId, getModelById } from "./models";
 import type { Env } from "../types";
 
-const SYSTEM_PROMPT = `You are a dungeon master acting as the narrator and world simulator for a text-based RPG. Keep responses concise (1-3 paragraphs), focused on the game narrative, describing the results of the user's actions and the current situation. Do not speak OOC or give instructions.`;
-
 const DEFAULT_MAX_TOKENS = 500;
 const DEFAULT_TEMPERATURE = 0.7;
 
@@ -21,6 +19,7 @@ interface GenerateOptions {
   modelId: string;
   maxTokens?: number;
   temperature?: number;
+  systemPrompt?: string;
 }
 
 function sanitizeResponse(text: string): string {
@@ -57,30 +56,56 @@ async function callWorkersAi(
   modelId: string,
   prompt: string,
   maxTokens: number,
-  temperature: number
+  temperature: number,
+  systemPrompt?: string
 ): Promise<{ text: string }> {
-  const response = await env.AI.run(
-    modelId as Parameters<typeof env.AI.run>[0],
-    {
-      messages: [
-        { role: "system" as const, content: SYSTEM_PROMPT },
-        { role: "user" as const, content: prompt },
-      ],
-      max_tokens: maxTokens,
-      temperature,
-    }
-  );
-
-  if (
-    typeof response === "object" &&
-    response !== null &&
-    "response" in response &&
-    typeof response.response === "string"
-  ) {
-    return { text: response.response };
+  const messages: Array<{ role: "system" | "user"; content: string }> = [];
+  if (systemPrompt) {
+    messages.push({ role: "system", content: systemPrompt });
   }
+  messages.push({ role: "user", content: prompt });
 
-  throw new AiServiceError("Unexpected Workers AI response format", 502);
+  try {
+    const response = await env.AI.run(
+      modelId as Parameters<typeof env.AI.run>[0],
+      {
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+      }
+    );
+
+    // Handle both response formats:
+    // 1. Legacy CF format: { response: "text" }
+    // 2. OpenAI-compatible format: { choices: [{ message: { content: "text" } }] }
+    
+    if (typeof response === "object" && response !== null) {
+      // Legacy format
+      if ("response" in response && typeof response.response === "string") {
+        return { text: response.response };
+      }
+      
+      // OpenAI-compatible format (cast to any to handle dynamic response types)
+      const anyResponse = response as any;
+      if (
+        "choices" in anyResponse &&
+        Array.isArray(anyResponse.choices) &&
+        anyResponse.choices.length > 0 &&
+        anyResponse.choices[0]?.message?.content
+      ) {
+        return { text: anyResponse.choices[0].message.content };
+      }
+    }
+
+    console.error("Unexpected CF AI response format:", JSON.stringify(response));
+    throw new AiServiceError("Unexpected Workers AI response format", 502);
+  } catch (error: unknown) {
+    console.error(`CF AI error for model ${modelId}:`, error);
+    if (error instanceof Error) {
+      throw new AiServiceError(`CF AI error: ${error.message}`, 502);
+    }
+    throw new AiServiceError(`CF AI error: ${String(error)}`, 502);
+  }
 }
 
 export async function generateText(
@@ -104,10 +129,20 @@ export async function generateText(
       model.id,
       options.prompt,
       maxTokens,
-      temperature
+      temperature,
+      options.systemPrompt
     );
     return { text: sanitizeResponse(primary.text) };
   } catch (primaryError: unknown) {
+    const status =
+      primaryError instanceof AiServiceError ? primaryError.status : 500;
+    const errMsg =
+      primaryError instanceof Error ? primaryError.message : String(primaryError);
+    const message =
+      status >= 500
+        ? `AI generation failed: ${errMsg}`
+        : errMsg;
+
     console.error(
       `Primary model ${model.id} failed:`,
       primaryError instanceof Error ? primaryError.message : primaryError
@@ -115,7 +150,7 @@ export async function generateText(
 
     const fallbackId = getFallbackModelId(model.id);
     if (!fallbackId) {
-      throw primaryError;
+      throw new AiServiceError(message, status);
     }
 
     const fallbackModel = getModelById(fallbackId);
@@ -130,7 +165,8 @@ export async function generateText(
       fallbackModel.id,
       options.prompt,
       Math.min(maxTokens, fallbackModel.maxTokens),
-      temperature
+      temperature,
+      options.systemPrompt
     );
     return { text: sanitizeResponse(fallback.text) };
   }

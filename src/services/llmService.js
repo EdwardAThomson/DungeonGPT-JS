@@ -33,13 +33,15 @@ export const llmService = {
     /**
      * Standard text generation (non-streaming)
      */
-    async generateText({ provider, model, prompt, maxTokens, temperature }) {
+    async generateText({ provider, model, prompt, maxTokens, temperature, systemPrompt }) {
         // Route CF Workers requests to the CF Worker endpoint
         if (provider === 'cf-workers') {
+            const body = { provider, model, prompt, maxTokens, temperature };
+            if (systemPrompt) body.systemPrompt = systemPrompt;
             const response = await fetch(`${CF_WORKER_URL}/api/ai/generate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ provider, model, prompt, maxTokens, temperature }),
+                body: JSON.stringify(body),
             });
 
             if (!response.ok) {
@@ -53,10 +55,12 @@ export const llmService = {
         }
 
         // Route other providers to Express backend
+        const body = { provider, model, prompt, maxTokens, temperature };
+        if (systemPrompt) body.systemPrompt = systemPrompt;
         const response = await apiFetch(`${API_PATH}/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ provider, model, prompt, maxTokens, temperature }),
+            body: JSON.stringify(body),
         });
 
         if (!response.ok) {

@@ -10,6 +10,7 @@ const generateAiRequestSchema = z.object({
   provider: z.string().min(1),
   model: z.string().min(1),
   prompt: z.string().min(1).max(50000),
+  systemPrompt: z.string().max(10000).optional(),
   maxTokens: z.number().int().positive().max(4096).optional(),
   temperature: z.number().min(0).max(2).optional(),
 });
@@ -49,6 +50,7 @@ aiRoutes.post("/generate", async (c) => {
       modelId: parsed.data.model,
       maxTokens: parsed.data.maxTokens,
       temperature: parsed.data.temperature,
+      systemPrompt: parsed.data.systemPrompt,
     });
 
     const output = generateAiResponseSchema.parse(result);

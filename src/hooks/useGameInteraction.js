@@ -147,7 +147,7 @@ const useGameInteraction = (
 
         let locationInfo = `Player starts at coordinates (${playerPosition.x}, ${playerPosition.y}) in a ${currentTile?.biome || 'Unknown Area'} biome.`;
         if (currentTile?.poi === 'town' && currentTile?.townName) {
-            locationInfo += ` The party is standing at the edge of ${currentTile.townName}, a ${currentTile.townSize || 'settlement'}.`;
+            locationInfo += ` The party is standing OUTSIDE at the edge of ${currentTile.townName}, a ${currentTile.townSize || 'settlement'}. They have not yet entered the town.`;
         } else if (currentTile?.poi) {
             locationInfo += ` POI: ${currentTile.poi}.`;
         }

@@ -10,10 +10,8 @@ const logger = createLogger('llm-backend');
  * Handles direct SDK calls using environment variables.
  */
 
-async function generateText({ provider, model, prompt, maxTokens, temperature }) {
+async function generateText({ provider, model, prompt, maxTokens, temperature, systemPrompt }) {
     logger.debug(`Generating text with provider=${provider}, model=${model}`);
-
-    const systemPromptContent = `You are a dungeon master acting as the narrator and world simulator for a text-based RPG. Keep responses concise (1-3 paragraphs), focused on the game narrative, describing the results of the user's actions and the current situation. Do not speak OOC or give instructions.`;
 
     try {
         if (provider === 'openai') {
@@ -21,12 +19,13 @@ async function generateText({ provider, model, prompt, maxTokens, temperature })
             if (!apiKey) throw new Error('OpenAI API key missing on server.');
 
             const openai = new OpenAI({ apiKey: apiKey });
+            const messages = [];
+            if (systemPrompt) messages.push({ role: "system", content: systemPrompt });
+            messages.push({ role: "user", content: prompt });
+
             const response = await openai.chat.completions.create({
                 model: model,
-                messages: [
-                    { role: "system", content: systemPromptContent },
-                    { role: "user", content: prompt },
-                ],
+                messages,
                 max_tokens: maxTokens || 500,
                 temperature: temperature || 0.7,
             });
@@ -37,10 +36,9 @@ async function generateText({ provider, model, prompt, maxTokens, temperature })
             if (!apiKey) throw new Error('Gemini API key missing on server.');
 
             const genAI = new GoogleGenerativeAI(apiKey);
-            const geminiModel = genAI.getGenerativeModel({
-                model: model || 'gemini-pro',
-                systemInstruction: systemPromptContent,
-            });
+            const modelConfig = { model: model || 'gemini-pro' };
+            if (systemPrompt) modelConfig.systemInstruction = systemPrompt;
+            const geminiModel = genAI.getGenerativeModel(modelConfig);
 
             const result = await geminiModel.generateContent(prompt, {
                 temperature: temperature || 0.7,
@@ -54,13 +52,14 @@ async function generateText({ provider, model, prompt, maxTokens, temperature })
             if (!apiKey) throw new Error('Anthropic API key missing on server.');
 
             const anthropic = new Anthropic({ apiKey: apiKey });
-            const response = await anthropic.messages.create({
+            const claudeOptions = {
                 model: model || 'claude-3-opuses-20240229',
                 max_tokens: maxTokens || 500,
                 temperature: temperature || 0.7,
-                system: systemPromptContent,
                 messages: [{ role: "user", content: prompt }]
-            });
+            };
+            if (systemPrompt) claudeOptions.system = systemPrompt;
+            const response = await anthropic.messages.create(claudeOptions);
             return response.content[0].text.trim();
 
         } else if (['codex', 'claude-cli', 'gemini-cli'].includes(provider)) {
