@@ -56,13 +56,22 @@ const supabaseConversationsApi = {
     
     const { data, error } = await supabase
       .from('conversations')
-      .insert([{
+      .upsert([{
         user_id: user.id,
         session_id: payload.sessionId,
         conversation_name: payload.conversationName,
-        conversation_data: payload.conversationData,
-        settings_snapshot: payload.settingsSnapshot
-      }])
+        conversation_data: payload.conversation || payload.conversationData,
+        game_settings: payload.gameSettings || payload.settingsSnapshot || null,
+        selected_heroes: payload.selectedHeroes || null,
+        summary: payload.currentSummary || null,
+        world_map: payload.worldMap || null,
+        player_position: payload.playerPosition || null,
+        sub_maps: payload.sub_maps || null,
+        provider: payload.provider || null,
+        model: payload.model || null,
+        timestamp: payload.timestamp || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }], { onConflict: 'session_id' })
       .select()
       .single();
     
