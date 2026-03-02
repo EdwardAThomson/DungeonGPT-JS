@@ -39,9 +39,12 @@ const supabaseConversationsApi = {
       .from('conversations')
       .select('*')
       .eq('session_id', sessionId)
-      .single();
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
     
     if (error) throw new Error(`Failed to load conversation: ${error.message}`);
+    if (!data) throw new Error('Conversation not found');
     return data;
   },
 
