@@ -14,6 +14,9 @@ if (useSupabase) {
   console.log('[conversationsApi] Using Express/SQLite backend (dev)', forceSQLite ? '(forced via REACT_APP_USE_SQLITE)' : '');
 }
 
+// Normalize Supabase response to match Express/SQLite field names expected by the UI
+const normalizeConversation = (row) => row ? ({ ...row, sessionId: row.session_id }) : null;
+
 // Supabase implementation
 const supabaseConversationsApi = {
   async list() {
@@ -27,7 +30,7 @@ const supabaseConversationsApi = {
       .order('updated_at', { ascending: false });
     
     if (error) throw new Error(`Failed to fetch conversations: ${error.message}`);
-    return data || [];
+    return (data || []).map(normalizeConversation);
   },
 
   async getById(sessionId) {
@@ -45,7 +48,7 @@ const supabaseConversationsApi = {
     
     if (error) throw new Error(`Failed to load conversation: ${error.message}`);
     if (!data) throw new Error('Conversation not found');
-    return data;
+    return normalizeConversation(data);
   },
 
   async save(payload) {
