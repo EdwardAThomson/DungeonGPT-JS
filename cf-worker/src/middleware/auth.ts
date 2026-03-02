@@ -56,6 +56,77 @@ function decodeJwtPart<T>(b64url: string): T {
   return JSON.parse(new TextDecoder().decode(bytes)) as T;
 }
 
+function encodeAsn1Length(length: number): Uint8Array {
+  if (length < 0x80) {
+    return Uint8Array.of(length);
+  }
+
+  const bytes: number[] = [];
+  let value = length;
+  while (value > 0) {
+    bytes.unshift(value & 0xff);
+    value >>= 8;
+  }
+
+  return Uint8Array.of(0x80 | bytes.length, ...bytes);
+}
+
+function normalizeAsn1Integer(bytes: Uint8Array): Uint8Array {
+  let start = 0;
+  while (start < bytes.length - 1 && bytes[start] === 0) {
+    start += 1;
+  }
+
+  const trimmed = bytes.slice(start);
+  if (trimmed[0] && (trimmed[0] & 0x80) !== 0) {
+    const prefixed = new Uint8Array(trimmed.length + 1);
+    prefixed[0] = 0;
+    prefixed.set(trimmed, 1);
+    return prefixed;
+  }
+
+  return trimmed;
+}
+
+function joseToDerEcdsaSignature(signature: Uint8Array): Uint8Array {
+  if (signature.length % 2 !== 0) {
+    throw new Error("Invalid ES256 signature length");
+  }
+
+  const half = signature.length / 2;
+  const r = normalizeAsn1Integer(signature.slice(0, half));
+  const s = normalizeAsn1Integer(signature.slice(half));
+
+  const rLength = encodeAsn1Length(r.length);
+  const sLength = encodeAsn1Length(s.length);
+  const sequenceLength =
+    2 + rLength.length + r.length +
+    2 + sLength.length + s.length;
+  const sequenceLengthBytes = encodeAsn1Length(sequenceLength);
+
+  const der = new Uint8Array(
+    1 + sequenceLengthBytes.length + sequenceLength
+  );
+
+  let offset = 0;
+  der[offset++] = 0x30;
+  der.set(sequenceLengthBytes, offset);
+  offset += sequenceLengthBytes.length;
+
+  der[offset++] = 0x02;
+  der.set(rLength, offset);
+  offset += rLength.length;
+  der.set(r, offset);
+  offset += r.length;
+
+  der[offset++] = 0x02;
+  der.set(sLength, offset);
+  offset += sLength.length;
+  der.set(s, offset);
+
+  return der;
+}
+
 async function importJwk(
   jwk: JwkKey
 ): Promise<{ key: CryptoKey; alg: string } | null> {
@@ -93,6 +164,9 @@ async function fetchAndCacheJwks(jwksUrl: string): Promise<void> {
   }
   const jwks = (await response.json()) as { keys: JwkKey[] };
   const now = Date.now();
+
+  // Clear cache and rebuild to handle key revocation
+  keyCache.clear();
 
   for (const jwk of jwks.keys ?? []) {
     if (!jwk.kid) continue;
@@ -141,23 +215,26 @@ async function verifySupabaseJwt(
 
   const jwksUrl = `${supabaseUrl}/auth/v1/.well-known/jwks.json`;
   const { key, alg } = await getSigningKey(header.kid, jwksUrl);
+  if (header.alg && header.alg !== alg) {
+    throw new Error("JWT algorithm mismatch");
+  }
 
   const signingInput = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
-  const signature = base64urlToBytes(signatureB64);
+  const rawSignature = base64urlToBytes(signatureB64);
 
   let valid: boolean;
   if (alg === "RS256") {
     valid = await crypto.subtle.verify(
       { name: "RSASSA-PKCS1-v1_5" },
       key,
-      signature,
+      rawSignature,
       signingInput
     );
   } else if (alg === "ES256") {
     valid = await crypto.subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },
       key,
-      signature,
+      joseToDerEcdsaSignature(rawSignature),
       signingInput
     );
   } else {
@@ -180,6 +257,11 @@ async function verifySupabaseJwt(
   if (payload.iss && payload.iss !== expectedIss) {
     throw new Error("Invalid token issuer");
   }
+
+  // Ensure this is an authenticated user session, not a service role or anon key
+  if (payload.role !== "authenticated") {
+    throw new Error("Invalid token role");
+  }
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
@@ -188,9 +270,12 @@ export async function requireAuth(
   c: Context<{ Bindings: Env }>,
   next: Next
 ): Promise<Response | void> {
-  // If SUPABASE_URL is not configured, skip auth (allows local dev without Supabase)
+  // Fail closed by default. Local dev can opt into bypass explicitly.
   if (!c.env.SUPABASE_URL) {
-    return next();
+    if (c.env.ALLOW_UNAUTHENTICATED_DEV === "true") {
+      return next();
+    }
+    return c.json({ error: "Authentication not configured" }, 500);
   }
 
   const authHeader = c.req.header("Authorization");

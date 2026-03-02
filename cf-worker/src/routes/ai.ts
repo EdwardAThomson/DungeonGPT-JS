@@ -20,7 +20,7 @@ const generateAiResponseSchema = z.object({
   text: z.string(),
 });
 
-aiRoutes.get("/models", (c) => {
+aiRoutes.get("/models", requireAuth, (c) => {
   const models = getAllModels();
   return c.json({
     models,

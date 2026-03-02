@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { supabase } from '../services/supabaseClient';
 import '../styles/debug.css';
 
 const CFWorkerDebug = () => {
@@ -53,11 +54,17 @@ const CFWorkerDebug = () => {
 
       console.log('Sending request:', requestBody);
 
+      const headers = { 'Content-Type': 'application/json' };
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      }
+
       const res = await fetch(`${workerUrl}/api/ai/generate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(requestBody)
       });
 
@@ -85,7 +92,15 @@ const CFWorkerDebug = () => {
     setResponse(null);
 
     try {
-      const res = await fetch(`${workerUrl}/api/ai/models`);
+      const headers = {};
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      }
+
+      const res = await fetch(`${workerUrl}/api/ai/models`, { headers });
       const data = await res.json();
       
       if (!res.ok) {

@@ -6,12 +6,17 @@
 # Supabase project URL (e.g. https://abcdefghij.supabase.co)
 # Found in: Supabase dashboard > Project Settings > API > Project URL
 #
-# When set, the worker verifies Supabase JWTs on POST /api/ai/generate.
+# When set, the worker verifies Supabase JWTs on protected /api/ai/* routes.
 # Verification uses the JWKS endpoint: ${SUPABASE_URL}/auth/v1/.well-known/jwks.json
 # Supports both RS256 and ES256 (Supabase new JWT Signing Keys).
 #
-# When absent, auth is skipped (convenient for local dev without Supabase configured).
+# When absent, the worker fails closed unless you explicitly enable local bypass
+# with ALLOW_UNAUTHENTICATED_DEV=true below.
 SUPABASE_URL=https://your-project-ref.supabase.co
+
+# Optional local-only bypass for `wrangler dev` without Supabase configured.
+# Do not enable this in deployed environments.
+# ALLOW_UNAUTHENTICATED_DEV=true
 
 # Custom domain (optional)
 # If you purchase a custom domain, set it here to allow CORS from that origin.
