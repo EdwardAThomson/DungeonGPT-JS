@@ -29,8 +29,12 @@ export default function AiAssistantPanel({ gameState, backend, model, showFloati
     const [prompt, setPrompt] = useState('');
     const [status, setStatus] = useState('idle');
     const [logs, setLogs] = useState([]);
+    const [panelSize, setPanelSize] = useState({ width: 450, height: 400 });
+    const [isResizing, setIsResizing] = useState(false);
 
     const logsEndRef = useRef(null);
+    const panelRef = useRef(null);
+    const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
     // Auto-scroll
     useEffect(() => {
@@ -43,11 +47,51 @@ export default function AiAssistantPanel({ gameState, backend, model, showFloati
         return () => window.removeEventListener('open-ai-assistant', handleOpenFromNav);
     }, []);
 
+    // Resize handlers
+    const handleResizeStart = (e) => {
+        e.preventDefault();
+        setIsResizing(true);
+        resizeStartRef.current = {
+            x: e.clientX,
+            y: e.clientY,
+            width: panelSize.width,
+            height: panelSize.height
+        };
+    };
+
+    useEffect(() => {
+        if (!isResizing) return;
+
+        const handleMouseMove = (e) => {
+            const deltaX = resizeStartRef.current.x - e.clientX;
+            const deltaY = resizeStartRef.current.y - e.clientY;
+            
+            setPanelSize({
+                width: Math.max(300, resizeStartRef.current.width + deltaX),
+                height: Math.max(250, resizeStartRef.current.height + deltaY)
+            });
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isResizing]);
+
     const handleRun = async () => {
         if (!prompt.trim()) return;
 
+        const userPrompt = prompt;
+        setPrompt('');
         setStatus('queued');
-        setLogs([]);
+        setLogs([{ line: 'AI is thinking...', stream: 'system', ts: new Date().toISOString() }]);
 
         // --- CLI BACKENDS (Served by Node Backend) ---
         const isCli = ['codex', 'claude-cli', 'gemini-cli'].includes(backend);
@@ -55,7 +99,7 @@ export default function AiAssistantPanel({ gameState, backend, model, showFloati
         if (isCli) {
             try {
                 const contextBlock = serializeGameState(gameState);
-                const fullPrompt = `${PROMPT_SNIPPET}\n\n${contextBlock}\n\n[USER COMMAND]\n${prompt}`;
+                const fullPrompt = `${PROMPT_SNIPPET}\n\n${contextBlock}\n\n[USER COMMAND]\n${userPrompt}`;
 
                 let cliBackend = 'codex';
                 if (backend === 'claude-cli') cliBackend = 'claude';
@@ -88,7 +132,7 @@ export default function AiAssistantPanel({ gameState, backend, model, showFloati
         setStatus('running');
         try {
             const contextBlock = serializeGameState(gameState);
-            const fullPrompt = `${PROMPT_SNIPPET}\n\n${contextBlock}\n\n[USER COMMAND]\n${prompt}`;
+            const fullPrompt = `${PROMPT_SNIPPET}\n\n${contextBlock}\n\n[USER COMMAND]\n${userPrompt}`;
 
             const response = await llmService.generateText({
                 provider: backend,
@@ -134,12 +178,12 @@ export default function AiAssistantPanel({ gameState, backend, model, showFloati
     }
 
     return (
-        <div style={{
+        <div ref={panelRef} style={{
             position: 'fixed',
             bottom: '20px',
             right: '20px',
-            width: '450px',
-            height: '400px',
+            width: `${panelSize.width}px`,
+            height: `${panelSize.height}px`,
             backgroundColor: 'var(--surface)',
             color: 'var(--text)',
             border: '1px solid var(--primary)',
@@ -150,8 +194,40 @@ export default function AiAssistantPanel({ gameState, backend, model, showFloati
             flexDirection: 'column',
             overflow: 'hidden',
             fontFamily: 'monospace',
-            fontSize: '12px'
+            fontSize: '12px',
+            userSelect: isResizing ? 'none' : 'auto'
         }}>
+            {/* Resize Handle */}
+            <div
+                onMouseDown={handleResizeStart}
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '24px',
+                    height: '24px',
+                    cursor: 'nwse-resize',
+                    zIndex: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: isResizing ? 'var(--primary)' : 'transparent',
+                    borderBottomRightRadius: '4px',
+                    transition: 'background-color 0.2s'
+                }}
+                title="Drag to resize"
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--primary-tint-10)'}
+                onMouseLeave={(e) => {
+                    if (!isResizing) e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+            >
+                <svg width="16" height="16" viewBox="0 0 16 16" style={{ opacity: 0.6, transform: 'rotate(-90deg)' }}>
+                    <path d="M0 0 L16 16 M4 0 L16 12 M8 0 L16 8 M12 0 L16 4" 
+                          stroke="var(--primary)" 
+                          strokeWidth="1.5" 
+                          strokeLinecap="round"/>
+                </svg>
+            </div>
             {/* Header */}
             <div style={{
                 display: 'flex',
@@ -187,7 +263,12 @@ export default function AiAssistantPanel({ gameState, backend, model, showFloati
                     <div style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>How can I help you, adventurer?</div>
                 )}
                 {logs.map((log, i) => (
-                    <div key={i} style={{ color: log.stream === 'stderr' ? 'var(--state-danger)' : 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                    <div key={i} style={{ 
+                        color: log.stream === 'stderr' ? 'var(--state-danger)' : log.stream === 'system' ? 'var(--text-secondary)' : 'var(--text)', 
+                        whiteSpace: 'pre-wrap', 
+                        wordBreak: 'break-all',
+                        fontStyle: log.stream === 'system' ? 'italic' : 'normal'
+                    }}>
                         <span style={{ color: 'var(--text-secondary)', marginRight: '8px' }}>[{new Date(log.ts).toLocaleTimeString()}]</span>
                         {log.line}
                     </div>

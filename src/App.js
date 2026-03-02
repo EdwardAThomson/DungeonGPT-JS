@@ -24,6 +24,7 @@ import SettingsContext from "./contexts/SettingsContext";
 import { AISettingsModalContent } from "./components/Modals";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NavDropdown from "./components/NavDropdown";
+import DatabaseIndicator from "./components/DatabaseIndicator";
 
 const DebugRoutes = lazy(() => import('./pages/DebugRoutes'));
 
@@ -174,6 +175,8 @@ const AppContent = () => {
           </Suspense>
         </ErrorBoundary>
       </div>
+
+      <DatabaseIndicator />
 
     </div>
   );

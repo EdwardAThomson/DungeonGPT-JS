@@ -3,13 +3,15 @@ import { supabase } from './supabaseClient';
 
 // Use Supabase only in production (CloudFlare Pages)
 // In dev, always use Express/SQLite even if Supabase is configured
+// Override: Set REACT_APP_USE_SQLITE=true to force SQLite locally
+const forceSQLite = process.env.REACT_APP_USE_SQLITE === 'true';
 const isProduction = process.env.REACT_APP_CF_PAGES === 'true';
-const useSupabase = isProduction && !!supabase;
+const useSupabase = !forceSQLite && isProduction && !!supabase;
 
 if (useSupabase) {
   console.log('[conversationsApi] Using Supabase backend (production)');
 } else {
-  console.log('[conversationsApi] Using Express/SQLite backend (dev)');
+  console.log('[conversationsApi] Using Express/SQLite backend (dev)', forceSQLite ? '(forced via REACT_APP_USE_SQLITE)' : '');
 }
 
 // Supabase implementation
