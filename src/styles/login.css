@@ -164,6 +164,48 @@
   cursor: not-allowed;
 }
 
+.login-links {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.how-to-play-link,
+.back-home-link {
+  text-align: center;
+  padding: 10px;
+  border-radius: 4px;
+  text-decoration: none;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.how-to-play-link {
+  color: var(--primary);
+  background-color: var(--primary-tint-10);
+  border: 1px solid var(--primary);
+}
+
+.how-to-play-link:hover {
+  background-color: var(--primary);
+  color: var(--bg);
+}
+
+.back-home-link {
+  color: var(--text-secondary);
+  background-color: transparent;
+  border: 1px solid var(--border);
+}
+
+.back-home-link:hover {
+  color: var(--text);
+  border-color: var(--text-secondary);
+}
+
 @media (max-width: 768px) {
   .login-container {
     padding: 30px 20px;

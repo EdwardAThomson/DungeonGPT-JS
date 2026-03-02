@@ -21,6 +21,14 @@ const HomePage = () => {
         </Link>
 
         <div className="home-grid">
+          <Link to="/how-to-play" className="home-nav-card">
+            <div className="card-icon">📚</div>
+            <div className="card-content">
+              <h3>How to Play</h3>
+              <p>Learn the basics</p>
+            </div>
+          </Link>
+
           <Link to="/hero-creation" className="home-nav-card">
             <div className="card-icon">🧙‍♂️</div>
             <div className="card-content">

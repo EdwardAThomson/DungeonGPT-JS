@@ -1,7 +1,7 @@
 import { useState, useContext } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsContext from '../contexts/SettingsContext';
-import { useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
 import '../styles/login.css';
 
 const Login = () => {
@@ -106,6 +106,15 @@ const Login = () => {
         >
           {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
         </button>
+
+        <div className="login-links">
+          <Link to="/how-to-play" className="how-to-play-link">
+            📚 How to Play
+          </Link>
+          <Link to="/" className="back-home-link">
+            ← Back to Home
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ import SavedConversations from './pages/SavedConversations';
 import CFWorkerDebug from './pages/CFWorkerDebug';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
+import HowToPlay from './pages/HowToPlay';
 import { useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import UserProfileIndicator from './components/UserProfileIndicator';
@@ -86,6 +87,7 @@ const AppContent = () => {
       <nav className={`main-nav ${isGamePage ? 'game-page-nav' : ''} ${isMobileNavOpen ? 'mobile-nav-open' : ''}`}>
         <ul>
           <li><Link to="/">Home</Link></li>
+          <li><Link to="/how-to-play">How to Play</Link></li>
           <NavDropdown 
             label="Heroes" 
             items={[
@@ -158,6 +160,7 @@ const AppContent = () => {
               {/* Public routes */}
               <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/how-to-play" element={<HowToPlay />} />
               <Route path="/hero-creation" element={<HeroCreation />} />
               <Route path="/hero-summary" element={<HeroSummary />} />
               <Route path="/new-game" element={<NewGame />} />

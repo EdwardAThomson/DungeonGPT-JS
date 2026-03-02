@@ -35,6 +35,11 @@
   gap: 20px;
 }
 
+/* Center the 4th card (Chronicles) when it's alone on the second row */
+.home-grid > :nth-child(4):last-child {
+  grid-column: 2 / 3;
+}
+
 .home-nav-card {
   background-color: var(--bg);
   border: 1px solid var(--border);
