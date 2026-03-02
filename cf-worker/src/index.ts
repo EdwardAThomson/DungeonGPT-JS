@@ -26,8 +26,11 @@ app.use(
         return origin;
       }
 
-      // Production Cloudflare Pages URL (exact match)
-      if (origin === "https://dungeongpt-js.pages.dev") {
+      // Production Cloudflare Pages URL (exact match or any preview/branch subdomain)
+      if (
+        origin === "https://dungeongpt-js.pages.dev" ||
+        /^https:\/\/[a-z0-9-]+\.dungeongpt-js\.pages\.dev$/.test(origin)
+      ) {
         return origin;
       }
 

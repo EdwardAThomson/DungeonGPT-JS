@@ -288,6 +288,10 @@ export async function requireAuth(
     await verifySupabaseJwt(token, c.env.SUPABASE_URL);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unauthorized";
+    console.error(`[auth] JWT verification failed: ${message}`, {
+      supabaseUrl: c.env.SUPABASE_URL,
+      tokenPrefix: token.slice(0, 20) + "...",
+    });
     return c.json({ error: message }, 401);
   }
 
