@@ -68,30 +68,42 @@ export const getAvailableModels = () => {
     // Check if we're in CloudFlare Pages production
     // CF_PAGES is set by CloudFlare Pages during build
     // REACT_APP_CF_PAGES can be manually set in CF Pages env vars
-    const isProduction = process.env.REACT_APP_CF_PAGES === 'true' || 
-                        process.env.CF_PAGES === '1';
+    // REACT_APP_USE_SQLITE=true forces dev mode (all providers)
+    const forceDev = process.env.REACT_APP_USE_SQLITE === 'true';
+    const isProduction = !forceDev && (
+        process.env.REACT_APP_CF_PAGES === 'true' || 
+        process.env.CF_PAGES === '1'
+    );
     
-    console.log('Environment check:', {
+    console.log('[llm_constants] Environment check:', {
         REACT_APP_CF_PAGES: process.env.REACT_APP_CF_PAGES,
+        REACT_APP_USE_SQLITE: process.env.REACT_APP_USE_SQLITE,
         CF_PAGES: process.env.CF_PAGES,
         NODE_ENV: process.env.NODE_ENV,
-        isProduction
+        forceDev,
+        isProduction,
+        availableProviders: isProduction ? ['cf-workers'] : Object.keys(AVAILABLE_MODELS)
     });
     
     if (isProduction) {
         // Production: Only CF Workers
+        console.log('[llm_constants] Production mode - only CF Workers available');
         return {
             'cf-workers': AVAILABLE_MODELS['cf-workers']
         };
     }
     
     // Development: All providers
+    console.log('[llm_constants] Development mode - all providers available');
     return AVAILABLE_MODELS;
 };
 
 export const getDefaultProvider = () => {
-    const isProduction = process.env.REACT_APP_CF_PAGES === 'true' || 
-                        process.env.CF_PAGES === '1';
+    const forceDev = process.env.REACT_APP_USE_SQLITE === 'true';
+    const isProduction = !forceDev && (
+        process.env.REACT_APP_CF_PAGES === 'true' || 
+        process.env.CF_PAGES === '1'
+    );
     return isProduction ? 'cf-workers' : 'gemini';
 };
 
