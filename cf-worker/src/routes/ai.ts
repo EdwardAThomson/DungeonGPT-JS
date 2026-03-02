@@ -20,6 +20,9 @@ const generateAiResponseSchema = z.object({
   text: z.string(),
 });
 
+// Respond explicitly to CORS preflight for authenticated requests.
+aiRoutes.options("*", (c) => c.body(null, 204));
+
 aiRoutes.get("/models", requireAuth, (c) => {
   const models = getAllModels();
   return c.json({

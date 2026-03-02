@@ -88,9 +88,8 @@ docs/production_vs_dev_strategy.md
 docs/supabase_migration_plan.md
 docs/supabase_auth_review.md
 
-# CF Worker Auth
-docs/cf_worker_auth_review.md
-docs/cf_worker_auth_flow.md
+docs/cloudflare_worker_deployment.md
+
 
 # AI Prompt Analysis
 docs/AI_PROMPT_ANALYSIS.md

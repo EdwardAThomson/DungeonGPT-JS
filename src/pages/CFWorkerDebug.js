@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import '../styles/debug.css';
 
+const rawWorkerUrl = process.env.REACT_APP_CF_WORKER_URL || 'http://localhost:8787';
+const DEFAULT_WORKER_URL = rawWorkerUrl.replace('https://localhost', 'http://localhost');
+
 const CFWorkerDebug = () => {
-  const [workerUrl, setWorkerUrl] = useState('http://localhost:8787');
+  const [workerUrl, setWorkerUrl] = useState(DEFAULT_WORKER_URL);
   const [testPrompt, setTestPrompt] = useState('Tell me a short story about a brave knight.');
   const [selectedModel, setSelectedModel] = useState('@cf/meta/llama-3.1-8b-instruct-fast');
   const [maxTokens, setMaxTokens] = useState(100);
@@ -18,6 +21,22 @@ const CFWorkerDebug = () => {
     { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B' },
     { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B' }
   ];
+
+  const getAuthHeaders = async (includeJson = false) => {
+    const headers = {};
+
+    if (includeJson) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      throw new Error('No active Supabase session. Please sign in again and retry.');
+    }
+
+    headers['Authorization'] = `Bearer ${session.access_token}`;
+    return headers;
+  };
 
   const checkHealth = async () => {
     setLoading(true);
@@ -54,13 +73,7 @@ const CFWorkerDebug = () => {
 
       console.log('Sending request:', requestBody);
 
-      const headers = { 'Content-Type': 'application/json' };
-      if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
-      }
+      const headers = await getAuthHeaders(true);
 
       const res = await fetch(`${workerUrl}/api/ai/generate`, {
         method: 'POST',
@@ -92,13 +105,7 @@ const CFWorkerDebug = () => {
     setResponse(null);
 
     try {
-      const headers = {};
-      if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
-      }
+      const headers = await getAuthHeaders();
 
       const res = await fetch(`${workerUrl}/api/ai/models`, { headers });
       const data = await res.json();
@@ -135,7 +142,7 @@ const CFWorkerDebug = () => {
             type="text"
             value={workerUrl}
             onChange={(e) => setWorkerUrl(e.target.value)}
-            placeholder="http://localhost:8787"
+            placeholder={DEFAULT_WORKER_URL}
           />
         </div>
       </div>
