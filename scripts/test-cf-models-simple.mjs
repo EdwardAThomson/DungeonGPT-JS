@@ -16,6 +16,12 @@
  *   --resume=tests-ai/run-2026-03-01-...   (resume a previous run, skip completed)
  *   --no-halt                               (don't stop on model failure)
  *   --timeout=60                             (seconds per request, default 60)
+ *
+ * Auth (required when worker has SUPABASE_JWT_SECRET configured):
+ *   SUPABASE_ACCESS_TOKEN=<token> node scripts/test-cf-models-simple.mjs
+ *   Get a token from your browser's dev tools (Application > Local Storage > supabase access_token)
+ *   or via: curl -X POST https://<project>.supabase.co/auth/v1/token?grant_type=password \
+ *     -d '{"email":"...","password":"..."}' | jq .access_token
  */
 
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs';
@@ -159,6 +165,121 @@ Describe what the party sees and experiences as they arrive. Keep it brief (2-3 
   },
 };
 
+// ─── Advanced Test Scenarios (Protocol Compliance) ──────────────────────────
+// Run with --advanced flag to test protocol features like milestones, combat, etc.
+
+const ADVANCED_SCENARIOS = {
+  milestone_completion: {
+    name: 'Milestone Completion (Protocol Tag)',
+    description: 'Tests if model correctly uses [COMPLETE_MILESTONE: text] tag when milestone is achieved.',
+    prompt: DM_PROTOCOL + `[CONTEXT]
+Setting: A war-torn kingdom where undead armies march from the fallen capital. Mood: Grim Intensity. Magic: High Magic. Tech: Medieval.
+Goal of the Campaign: Destroy the Lich King's phylactery hidden in the Obsidian Citadel
+Current Milestone: Slay the Dragon of Frostpeak Mountains
+Remaining Milestones: Retrieve the Oracle's prophecy, Infiltrate the Obsidian Citadel
+
+Player is at coordinates (12, 2) in a mountain biome. Point Of Interest: Dragon's Lair.
+Party: Kael (Fighter, HP: 45/60), Lyra (Wizard, HP: 28/35), Bram (Cleric, HP: 50/50).
+
+[SUMMARY]
+The party climbed the treacherous Frostpeak Mountains and found the ancient dragon Frostclaw guarding the path to the Oracle. After a fierce battle, Kael delivered the final blow with his enchanted sword, and the dragon fell. The party stands victorious but wounded.
+
+[PLAYER ACTION]
+We search the dragon's hoard and prepare to continue to the Oracle's sanctuary.
+
+[NARRATE]
+Remember: When a milestone is achieved, mark it complete using [COMPLETE_MILESTONE: exact milestone text]`,
+  },
+
+  combat_narration: {
+    name: 'Combat Narration (Dice Rolls)',
+    description: 'Tests combat description with dice roll results. Should describe hit/miss, damage, and enemy status.',
+    prompt: DM_PROTOCOL + `[CONTEXT]
+Setting: A war-torn kingdom where undead armies march from the fallen capital. Mood: Grim.
+Goal: Destroy the Lich King's phylactery
+Current Milestone: Seek the Oracle in the Frostpeak Mountains
+Player is at coordinates (9, 5) in a plains biome. Party: Kael (Fighter, HP: 60/60), Lyra (Wizard, HP: 35/35), Bram (Cleric, HP: 50/50).
+
+[SUMMARY]
+The party encountered a patrol of 3 undead soldiers on the road. Combat has begun. The undead are slow but relentless.
+
+[COMBAT ROUND]
+Kael attacks Undead Soldier #1 with longsword:
+- Attack roll: 18 (HIT)
+- Damage: 9 slashing damage
+
+Lyra casts Magic Missile at Undead Soldier #2:
+- Automatic hit
+- Damage: 11 force damage
+
+Bram casts Sacred Flame on Undead Soldier #1:
+- Enemy DEX save: 8 (FAILED)
+- Damage: 7 radiant damage
+
+[NARRATE]
+Describe the results of these attacks. What happens to the undead soldiers? What do the players see? End by asking what they do next.`,
+  },
+
+  town_entry: {
+    name: 'Town Entry (World Building)',
+    description: 'Tests entering a town. Should describe atmosphere, NPCs, buildings, and offer options.',
+    prompt: DM_PROTOCOL + `[CONTEXT]
+Setting: A war-torn kingdom where undead armies march from the fallen capital. Mood: Grim.
+Goal: Destroy the Lich King's phylactery
+Current Milestone: Seek the Oracle in the Frostpeak Mountains
+Player is at coordinates (7, 4) in a plains biome. Point Of Interest: town (Millhaven, village).
+Party: Kael (Fighter), Lyra (Wizard), Bram (Cleric).
+
+[SUMMARY]
+The party has been traveling for two days across war-torn plains. They are low on supplies and need information about the mountain paths. They can see the village of Millhaven ahead.
+
+[PLAYER ACTION]
+We enter the village of Millhaven.
+
+[NARRATE]
+Describe what the party sees as they enter the village. What is the atmosphere? Who do they see? What buildings or locations are notable? Present options for what they might do.`,
+  },
+
+  skill_check_request: {
+    name: 'Skill Check Request (Dangerous Action)',
+    description: 'Tests if model requests skill checks for risky actions. Should ask for appropriate skill check.',
+    prompt: DM_PROTOCOL + `[CONTEXT]
+Setting: A war-torn kingdom where undead armies march from the fallen capital. Mood: Grim.
+Goal: Destroy the Lich King's phylactery
+Current Milestone: Seek the Oracle in the Frostpeak Mountains
+Player is at coordinates (11, 3) in a mountain biome. Party: Kael (Fighter), Lyra (Wizard), Bram (Cleric).
+
+[SUMMARY]
+The party is climbing the Frostpeak Mountains. They've reached a treacherous cliff face with a narrow ledge. The path ahead requires crossing a 20-foot gap over a deadly drop. There's a rope bridge, but it looks ancient and unstable.
+
+[PLAYER ACTION]
+Kael will carefully cross the rope bridge first to test if it's safe.
+
+[NARRATE]
+This is a dangerous action. You may request a skill check using the format: [CHECK: skill_name] or [CHECK_DC15: skill_name]. Describe the situation and request the appropriate check, or narrate the outcome if you determine no check is needed.`,
+  },
+
+  invalid_action: {
+    name: 'Invalid Action Handling (Edge Case)',
+    description: 'Tests how model handles impossible or nonsensical player actions. Should stay in character and redirect.',
+    prompt: DM_PROTOCOL + `[CONTEXT]
+Setting: A war-torn kingdom where undead armies march from the fallen capital. Mood: Grim.
+Goal: Destroy the Lich King's phylactery
+Current Milestone: Seek the Oracle in the Frostpeak Mountains
+Player is at coordinates (7, 4) in a plains biome. Point Of Interest: town (Millhaven).
+Party: Kael (Fighter), Lyra (Wizard), Bram (Cleric).
+
+[SUMMARY]
+The party is in Millhaven village, speaking with the village elder about the mountain paths.
+
+[PLAYER ACTION]
+I cast fireball at the moon and then teleport to the Lich King's castle.
+
+[NARRATE]
+Handle this invalid/impossible action gracefully. Stay in character as DM. Explain what's not possible and redirect the player to reasonable options.`,
+  },
+};
+
 // ─── Quality Checks ──────────────────────────────────────────────────────────
 
 function runQualityChecks(response, scenarioKey) {
@@ -191,6 +312,45 @@ function runQualityChecks(response, scenarioKey) {
     checks.push({ name: `Brief for movement (${sentenceCount} sentences)`, pass: isBrief });
   }
 
+  // Advanced scenario-specific checks
+  if (scenarioKey === 'milestone_completion') {
+    const hasMilestoneTag = /\[COMPLETE_MILESTONE:\s*[^\]]+\]/i.test(response);
+    checks.push({ name: 'Uses [COMPLETE_MILESTONE: text] tag', pass: hasMilestoneTag });
+    if (hasMilestoneTag) {
+      const correctMilestone = /\[COMPLETE_MILESTONE:\s*Slay the Dragon/i.test(response);
+      checks.push({ name: 'Correct milestone text', pass: correctMilestone });
+    }
+  }
+
+  if (scenarioKey === 'combat_narration') {
+    const describesDamage = /\d+\s*(damage|hit points|hp)/i.test(response);
+    checks.push({ name: 'Describes damage/hits', pass: describesDamage });
+    const describesEnemies = /(undead|soldier)/i.test(response);
+    checks.push({ name: 'Mentions enemies', pass: describesEnemies });
+  }
+
+  if (scenarioKey === 'town_entry') {
+    const describesAtmosphere = response.length > 100;
+    checks.push({ name: 'Describes town atmosphere', pass: describesAtmosphere });
+    const mentionsNPCsOrBuildings = /(villager|people|inn|tavern|shop|building|house|elder|guard)/i.test(response);
+    checks.push({ name: 'Mentions NPCs or buildings', pass: mentionsNPCsOrBuildings });
+  }
+
+  if (scenarioKey === 'skill_check_request') {
+    const requestsCheck = /\[CHECK[_DC\d]*:\s*\w+\]/i.test(response);
+    checks.push({ name: 'Requests skill check [CHECK: skill]', pass: requestsCheck });
+    if (requestsCheck) {
+      const appropriateSkill = /\[CHECK[_DC\d]*:\s*(athletics|acrobatics|dexterity|strength)\]/i.test(response);
+      checks.push({ name: 'Appropriate skill (athletics/acrobatics)', pass: appropriateSkill });
+    }
+  }
+
+  if (scenarioKey === 'invalid_action') {
+    const staysInCharacter = !/(cannot|can't|unable|impossible|not possible)/i.test(response.slice(0, 100));
+    const redirectsGracefully = /(instead|however|perhaps|you could|you might|available|possible)/i.test(response);
+    checks.push({ name: 'Handles gracefully (no harsh rejection)', pass: redirectsGracefully });
+  }
+
   const echoesProtocol = response.includes('STRICT DUNGEON MASTER PROTOCOL') ||
     response.includes('Failure to follow this protocol');
   checks.push({ name: 'Does not echo protocol', pass: !echoesProtocol });
@@ -202,11 +362,20 @@ function runQualityChecks(response, scenarioKey) {
   return { checks, passed, total, score };
 }
 
+// ─── Auth Token ───────────────────────────────────────────────────────────────
+
+const SUPABASE_ACCESS_TOKEN = process.env.SUPABASE_ACCESS_TOKEN || null;
+
 // ─── CF Worker API Caller ────────────────────────────────────────────────────
 
 async function callWorker(workerUrl, modelId, prompt, maxTokens = 1600, temperature = 0.7, timeoutMs = 60000) {
   const url = `${workerUrl}/api/ai/generate`;
   const startTime = Date.now();
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (SUPABASE_ACCESS_TOKEN) {
+    headers['Authorization'] = `Bearer ${SUPABASE_ACCESS_TOKEN}`;
+  }
 
   try {
     const controller = new AbortController();
@@ -214,7 +383,7 @@ async function callWorker(workerUrl, modelId, prompt, maxTokens = 1600, temperat
 
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         provider: 'cf-workers',
         model: modelId,
@@ -429,15 +598,20 @@ async function main() {
   }
 
   // ── Scenario filtering ──
-  let scenariosToTest = SCENARIOS;
+  // Use --advanced flag to run advanced scenarios, otherwise run basic scenarios
+  const useAdvanced = opts.advanced;
+  let scenariosToTest = useAdvanced ? ADVANCED_SCENARIOS : SCENARIOS;
+  
   if (opts.scenarios) {
     const requested = opts.scenarios.split(',').map(s => s.trim());
     scenariosToTest = {};
+    const sourceScenarios = useAdvanced ? ADVANCED_SCENARIOS : SCENARIOS;
     for (const key of requested) {
-      if (SCENARIOS[key]) scenariosToTest[key] = SCENARIOS[key];
+      if (sourceScenarios[key]) scenariosToTest[key] = sourceScenarios[key];
     }
     if (Object.keys(scenariosToTest).length === 0) {
-      console.error('No matching scenarios. Available:', Object.keys(SCENARIOS).join(', '));
+      const available = useAdvanced ? Object.keys(ADVANCED_SCENARIOS) : Object.keys(SCENARIOS);
+      console.error('No matching scenarios. Available:', available.join(', '));
       process.exit(1);
     }
   }
@@ -469,6 +643,7 @@ async function main() {
   console.log('╚══════════════════════════════════════════════════════════════╝');
   console.log(`  Worker URL:    ${workerUrl}`);
   console.log(`  Run directory: ${runDir}`);
+  console.log(`  Test Mode:     ${useAdvanced ? 'ADVANCED (Protocol Compliance)' : 'BASIC (Narrative Quality)'}`);
   console.log(`  Models:        ${modelsToTest.length} selected`);
   console.log(`  Scenarios:     ${Object.keys(scenariosToTest).join(', ')}`);
   console.log(`  Halt on fail:  ${haltOnFail ? 'YES (use --no-halt to disable)' : 'NO'}`);

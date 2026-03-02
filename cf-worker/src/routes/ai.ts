@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { generateText, AiServiceError } from "../services/ai";
 import { getAllModels, DEFAULT_MODEL_ID } from "../services/models";
+import { requireAuth } from "../middleware/auth";
 import type { Env } from "../types";
 
 const aiRoutes = new Hono<{ Bindings: Env }>();
@@ -27,7 +28,7 @@ aiRoutes.get("/models", (c) => {
   });
 });
 
-aiRoutes.post("/generate", async (c) => {
+aiRoutes.post("/generate", requireAuth, async (c) => {
   const body: unknown = await c.req.json();
   const parsed = generateAiRequestSchema.safeParse(body);
 

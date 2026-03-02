@@ -8,16 +8,36 @@ const app = new Hono<{ Bindings: Env }>();
 app.use(
   "*",
   cors({
-    origin: (origin) => {
-      // Allow requests from localhost in development
-      if (origin?.includes("localhost") || origin?.includes("127.0.0.1")) {
+    origin: (origin, c) => {
+      if (!origin) {
+        // Reject requests with no origin header (was previously allowed)
+        // Auth is now required, so curl/Postman must send Authorization header anyway
+        return null;
+      }
+
+      // Exact localhost origins for development
+      const localhostOrigins = [
+        "http://localhost:3000",
+        "http://localhost:8787",
+        "http://localhost:8788",
+        "http://127.0.0.1:3000",
+      ];
+      if (localhostOrigins.includes(origin)) {
         return origin;
       }
-      // Allow requests from your production domain
-      if (origin?.includes("dungeongpt") || origin?.includes(".pages.dev")) {
+
+      // Production Cloudflare Pages URL (exact match)
+      if (origin === "https://dungeongpt-js.pages.dev") {
         return origin;
       }
-      // Allow requests with no origin (e.g., curl, Postman)
+
+      // Custom domain (if configured via env var)
+      const customDomain = c.env.CUSTOM_DOMAIN;
+      if (customDomain && origin === customDomain) {
+        return origin;
+      }
+
+      // Reject all other origins
       return null;
     },
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

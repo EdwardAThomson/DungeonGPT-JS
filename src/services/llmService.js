@@ -1,5 +1,6 @@
 import { apiFetch, buildApiUrl } from './apiClient';
 import { createLogger } from '../utils/logger';
+import { supabase } from './supabaseClient';
 
 const API_PATH = '/api/llm';
 const CF_WORKER_URL = process.env.REACT_APP_CF_WORKER_URL || 'http://localhost:8787';
@@ -38,9 +39,16 @@ export const llmService = {
         if (provider === 'cf-workers') {
             const body = { provider, model, prompt, maxTokens, temperature };
             if (systemPrompt) body.systemPrompt = systemPrompt;
+            const cfHeaders = { 'Content-Type': 'application/json' };
+            if (supabase) {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.access_token) {
+                    cfHeaders['Authorization'] = `Bearer ${session.access_token}`;
+                }
+            }
             const response = await fetch(`${CF_WORKER_URL}/api/ai/generate`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: cfHeaders,
                 body: JSON.stringify(body),
             });
 
