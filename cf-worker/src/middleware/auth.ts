@@ -234,7 +234,7 @@ async function verifySupabaseJwt(
     valid = await crypto.subtle.verify(
       { name: "ECDSA", hash: "SHA-256" },
       key,
-      joseToDerEcdsaSignature(rawSignature),
+      rawSignature,
       signingInput
     );
   } else {
