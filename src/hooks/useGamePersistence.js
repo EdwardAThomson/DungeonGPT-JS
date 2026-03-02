@@ -78,7 +78,7 @@ const useGamePersistence = ({
     movesSinceEncounter
   ]);
 
-  const performSave = useCallback((isUnmount = false) => {
+  const performSave = useCallback(async (isUnmount = false) => {
     if (!sessionIdRef.current) return;
 
     if (!hasAdventureStartedRef.current) {
@@ -126,7 +126,7 @@ const useGamePersistence = ({
       movesSinceEncounter: movesSinceEncounterRef.current
     });
 
-    saveConversationToBackend(sessionIdRef.current, {
+    return saveConversationToBackend(sessionIdRef.current, {
       conversation: conversationRef.current,
       provider: selectedProviderRef.current,
       model: selectedModelRef.current,

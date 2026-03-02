@@ -10,11 +10,11 @@ const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate, form
     : null;
 
   const heroes = conversation.selected_heroes 
-    ? JSON.parse(conversation.selected_heroes) 
+    ? (typeof conversation.selected_heroes === 'string' ? JSON.parse(conversation.selected_heroes) : conversation.selected_heroes)
     : [];
 
   const position = conversation.player_position 
-    ? JSON.parse(conversation.player_position) 
+    ? (typeof conversation.player_position === 'string' ? JSON.parse(conversation.player_position) : conversation.player_position)
     : null;
 
   const subMaps = conversation.sub_maps 

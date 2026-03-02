@@ -75,9 +75,11 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
                 ...gameState // spread the rest of the game state
             });
             logger.debug('Conversation saved successfully', result);
+            return true;
 
         } catch (error) {
             logger.error('Error saving conversation', error);
+            return false;
         }
     };
 

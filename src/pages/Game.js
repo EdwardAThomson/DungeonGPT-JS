@@ -422,12 +422,14 @@ const Game = () => {
           onOpenInventory={() => setIsInventoryModalOpen(true)}
           onOpenHowToPlay={() => setIsHowToPlayModalOpen(true)}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
-          onManualSave={() => {
-            performSave();
+          onManualSave={async () => {
             const timestamp = new Date();
             const title = `Adventure - ${timestamp.toLocaleDateString()} ${timestamp.toLocaleTimeString()}`;
-            setSavedGameTitle(title);
-            setShowSaveConfirmation(true);
+            const success = await performSave();
+            if (success !== false) {
+              setSavedGameTitle(title);
+              setShowSaveConfirmation(true);
+            }
           }}
           canManualSave={!!sessionId}
           hasAdventureStarted={hasAdventureStarted}

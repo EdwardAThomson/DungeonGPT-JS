@@ -149,7 +149,7 @@ const SavedConversations = () => {
       ) : (
         <div className="conversations-list">
           {conversations.map((conversation) => {
-            const heroes = conversation.selected_heroes ? JSON.parse(conversation.selected_heroes) : [];
+            const heroes = conversation.selected_heroes ? (typeof conversation.selected_heroes === 'string' ? JSON.parse(conversation.selected_heroes) : conversation.selected_heroes) : [];
             const settings = conversation.game_settings 
               ? (typeof conversation.game_settings === 'string' ? JSON.parse(conversation.game_settings) : conversation.game_settings)
               : null;
