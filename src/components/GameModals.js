@@ -156,6 +156,9 @@ const GameModals = ({
         party={selectedHeroes}
         onResolve={handleEncounterResolve}
         onCharacterUpdate={handleHeroUpdate}
+        settings={settings}
+        selectedProvider={selectedProvider}
+        selectedModel={selectedModel}
         />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>

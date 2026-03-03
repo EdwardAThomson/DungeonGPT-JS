@@ -20,6 +20,7 @@ const debugLinks = [
   { to: 'terrain-studio', label: 'Terrain Studio (Old)' },
   { to: 'encounter-test', label: 'Encounter Test' },
   { to: 'encounter-debug', label: 'Encounter Debug' },
+  { to: '/encounter-debug', label: '🎭 Encounter Modal Test', external: true },
   { to: 'dice-test', label: 'Dice Test' },
   { to: 'town-map-test', label: 'Town Map Test' },
   { to: 'world-map-test', label: 'World Map Test' },
@@ -41,7 +42,7 @@ const DebugRoutes = () => {
         <h3 style={{ marginTop: 0 }}>Debug Tools</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {debugLinks.map((item) => {
-            const target = `/debug/${item.to}`;
+            const target = item.external ? item.to : `/debug/${item.to}`;
             const isActive = location.pathname === target;
             return (
               <Link

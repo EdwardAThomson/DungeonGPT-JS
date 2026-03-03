@@ -1,12 +1,7 @@
-import { llmService } from '../services/llmService';
 import { rollCheck } from './dice';
 import { calculateModifier, SKILLS } from './rules';
 import { DIFFICULTY_DC } from '../data/encounters';
 import { calculateDamage, shouldDealDamage, getDamageDescription } from './healthSystem';
-import { resolveProviderAndModel } from '../llm/modelResolver';
-import { createLogger } from './logger';
-
-const logger = createLogger('encounter-resolver');
 
 /**
  * Resolves an encounter based on player action and dice roll
@@ -54,32 +49,9 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
   // 4. Get base consequence
   const baseConsequence = encounter.consequences[outcomeTier];
   
-  // 5. Generate AI narration
-  const prompt = buildEncounterPrompt(
-    encounter, 
-    playerAction, 
-    rollResult, 
-    outcomeTier, 
-    baseConsequence, 
-    settings,
-    character
-  );
-  
-  let aiNarration;
-  try {
-    const resolved = resolveProviderAndModel(llmConfig.provider, llmConfig.model);
-    aiNarration = await llmService.generateUnified({
-      provider: resolved.provider,
-      model: resolved.model,
-      prompt,
-      temperature: 0.8,
-      maxTokens: 200
-    });
-  } catch (error) {
-    logger.error('[ENCOUNTER] AI narration failed, using base consequence:', error);
-    // Fallback to base consequence if AI fails
-    aiNarration = baseConsequence;
-  }
+  // 5. Use base consequence for narration (fully local, no AI calls)
+  // This makes combat instant and eliminates API costs/latency
+  const aiNarration = baseConsequence;
   
   // 6. Calculate HP damage if hostile encounter
   let hpDamage = 0;
@@ -103,27 +75,6 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
     hpDamage,
     damageDescription
   };
-};
-
-/**
- * Builds the AI prompt for encounter narration
- */
-const buildEncounterPrompt = (encounter, action, rollResult, tier, baseConsequence, settings, character) => {
-  return `
-You are the Dungeon Master for a ${settings.grimnessLevel} ${settings.darknessLevel} fantasy adventure.
-
-ENCOUNTER: ${encounter.description}
-PLAYER ACTION: ${action}
-CHARACTER: ${character.characterName} (${character.characterClass})
-DICE ROLL: ${rollResult.total} (d20: ${rollResult.naturalRoll} + modifier: ${rollResult.modifier})
-OUTCOME: ${tier.toUpperCase()}
-${rollResult.isCriticalSuccess ? '⚡ CRITICAL SUCCESS!' : ''}
-${rollResult.isCriticalFailure ? '💀 CRITICAL FAILURE!' : ''}
-
-Base Consequence: ${baseConsequence}
-
-Narrate this outcome in 2-3 vivid sentences. Make it dramatic and fitting for the ${settings.responseVerbosity} verbosity level. Include sensory details and emotional impact.
-  `.trim();
 };
 
 /**

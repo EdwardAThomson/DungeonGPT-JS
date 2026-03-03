@@ -153,6 +153,8 @@ const Game = () => {
     const townEncounter = checkForEncounter(syntheticTownTile, false, settings, movesSinceEncounter);
 
     if (townEncounter) {
+      // Close map modal so its FocusTrap doesn't block the encounter modal
+      mapHook.setIsMapModalOpen(false);
       setActionEncounter(townEncounter);
       setIsActionEncounterOpen(true);
       setMovesSinceEncounter(0);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { conversationsApi } from '../services/conversationsApi';
 import { createLogger } from '../utils/logger';
 
@@ -64,7 +64,7 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
         }
     }, []);
 
-    const saveConversationToBackend = async (currentSessionId, gameState) => {
+    const saveConversationToBackend = useCallback(async (currentSessionId, gameState) => {
         try {
             logger.debug('Starting save operation');
             // Adjust URL to your backend endpoint
@@ -81,7 +81,7 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
             logger.error('Error saving conversation', error);
             return false;
         }
-    };
+    }, []);
 
     return {
         sessionId,

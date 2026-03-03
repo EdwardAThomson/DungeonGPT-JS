@@ -1,4 +1,5 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { resolveEncounter } from '../utils/encounterResolver';
 import { createMultiRoundEncounter, resolveRound, getRoundActions, generateEncounterSummary } from '../utils/multiRoundEncounter';
 import { applyDamage, getHPStatus } from '../utils/healthSystem';
@@ -78,6 +79,12 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
   }, [isOpen, encounter]);
 
   if (!isOpen || !encounter) return null;
+  
+  // Early return if no character - prevents crashes during initialization
+  if (!currentCharacter && !showHeroSelection) {
+    console.warn('[ENCOUNTER] No character available and not in hero selection mode');
+    return null;
+  }
 
   const handleHeroConfirm = () => {
     // Roll initiative check (15% chance of failure)
@@ -92,7 +99,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
       const availableIndices = party.map((_, idx) => idx).filter(idx => idx !== selectedHeroIndex);
       actualHeroIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
       const forcedHero = party[actualHeroIndex];
-      message = `⚡ Initiative failed! ${forcedHero.characterName} is forced to act instead!`;
+      message = `⚡ Initiative failed! ${forcedHero.heroName || forcedHero.characterName} is forced to act instead!`;
     }
     
     setInitiativeResult({
@@ -122,6 +129,11 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
   };
 
   const handleAction = async (action) => {
+    if (!currentCharacter) {
+      console.error('[ENCOUNTER] Cannot perform action - no current character');
+      return;
+    }
+    
     setSelectedAction(action);
     setIsResolving(true);
 
@@ -203,13 +215,18 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
   };
   
   const handleFleeEncounter = () => {
+    if (!currentCharacter) {
+      console.error('[ENCOUNTER] Cannot flee - no current character');
+      return;
+    }
+    
     // Fleeing from combat has consequences
     const fleeRoll = Math.random();
     const fleeSuccess = fleeRoll > 0.3; // 70% chance to flee successfully
     
     if (fleeSuccess) {
       setResult({
-        narration: `${currentCharacter.characterName} successfully breaks away from combat and flees to safety.`,
+        narration: `${currentCharacter.heroName || currentCharacter.characterName} successfully breaks away from combat and flees to safety.`,
         rollResult: null,
         outcomeTier: 'success',
         rewards: null,
@@ -231,7 +248,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
       }
       
       setResult({
-        narration: `${currentCharacter.characterName} attempts to flee but is caught! They take ${fleeDamage} damage escaping.`,
+        narration: `${currentCharacter.heroName || currentCharacter.characterName} attempts to flee but is caught! They take ${fleeDamage} damage escaping.`,
         rollResult: null,
         outcomeTier: 'failure',
         rewards: null,
@@ -268,7 +285,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
   };
   
   // Check if character is defeated
-  const isDefeated = currentCharacter.currentHP <= 0;
+  const isDefeated = currentCharacter ? currentCharacter.currentHP <= 0 : false;
 
   const getOutcomeBadgeClass = (tier) => {
     const classes = {
@@ -295,9 +312,9 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
     ? getRoundActions(roundState)
     : encounter.suggestedActions;
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content encounter-action-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px', width: '95%' }}>
+  return createPortal(
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-content encounter-action-modal" style={{ maxWidth: '800px', width: '95%' }}>
         {showHeroSelection && !heroConfirmed && party && party.length > 1 ? (
           // Hero selection phase
           <>
@@ -319,10 +336,10 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                     onClick={() => setSelectedHeroIndex(idx)}
                     style={{
                       padding: '15px',
-                      border: selectedHeroIndex === idx ? '2px solid var(--primary)' : '2px solid #444',
+                      border: selectedHeroIndex === idx ? '2px solid var(--primary)' : '2px solid var(--border)',
                       borderRadius: '8px',
                       cursor: 'pointer',
-                      background: selectedHeroIndex === idx ? 'rgba(76, 175, 80, 0.1)' : '#2a2a2a',
+                      background: selectedHeroIndex === idx ? 'var(--primary-tint-10)' : 'var(--surface)',
                       transition: 'all 0.2s',
                       display: 'flex',
                       alignItems: 'center',
@@ -332,7 +349,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                     {hero.profilePicture && (
                       <img
                         src={hero.profilePicture}
-                        alt={hero.characterName}
+                        alt={hero.heroName || hero.characterName}
                         loading="lazy"
                         width="60"
                         height="60"
@@ -347,13 +364,13 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                     )}
                     <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <strong>{hero.characterName}</strong>
+                        <strong>{hero.heroName || hero.characterName || 'Unknown'}</strong>
                         <span style={{ marginLeft: '10px', color: 'var(--text-secondary)' }}>
-                          {hero.characterClass}
+                          {hero.heroClass || hero.characterClass || ''}
                         </span>
                       </div>
                       <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                        HP: {hero.currentHP}/{hero.maxHP} | Level {hero.level}
+                        HP: {hero.currentHP}/{hero.maxHP} | Level {hero.level || hero.heroLevel || hero.characterLevel || 1}
                       </div>
                     </div>
                   </div>
@@ -361,7 +378,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
               </div>
               
               <button
-                onClick={handleHeroConfirm}
+                onClick={() => handleHeroConfirm()}
                 style={{
                   marginTop: '20px',
                   padding: '12px 24px',
@@ -374,7 +391,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
               </button>
             </div>
             
-            <button className="modal-close-button" onClick={onClose}>
+            <button className="modal-close-button" onClick={() => onClose()}>
               Flee Encounter
             </button>
           </>
@@ -433,12 +450,19 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
               )}
               
               {/* Player HP Bar */}
-              {currentCharacter.maxHP && (
+              {currentCharacter && currentCharacter.maxHP && (
                 <div className="encounter-hp-bar">
                   <div className="hp-label">
-                    <span>{currentCharacter.characterName}</span>
+                    <span>
+                      {currentCharacter.heroName || currentCharacter.characterName}
+                      {(currentCharacter.heroClass || currentCharacter.characterClass) && (
+                        <span style={{ marginLeft: '8px', color: 'var(--text-secondary)', fontSize: '0.9em' }}>
+                          Level {currentCharacter.level || currentCharacter.heroLevel || currentCharacter.characterLevel || 1} {currentCharacter.heroClass || currentCharacter.characterClass}
+                        </span>
+                      )}
+                    </span>
                     <span style={{ color: getHPStatus(currentCharacter.currentHP, currentCharacter.maxHP).color }}>
-                      {currentCharacter.currentHP} / {currentCharacter.maxHP} HP
+                      HP: {currentCharacter.currentHP}/{currentCharacter.maxHP}
                     </span>
                   </div>
                   <div className="hp-bar-container">
@@ -738,7 +762,8 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

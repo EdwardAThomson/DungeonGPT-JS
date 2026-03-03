@@ -1,6 +1,6 @@
 // App.js
 
-import React, { useContext, Suspense, lazy, useState } from "react";
+import React, { useContext, useEffect, Suspense, lazy, useState } from "react";
 import { BrowserRouter as Router, Route, Link, Routes, Navigate, useLocation } from "react-router-dom";
 import HeroCreation from "./pages/HeroCreation";
 import HeroSummary from "./components/HeroSummary";
@@ -11,6 +11,7 @@ import HeroSelection from './pages/HeroSelection';
 import Game from './pages/Game';
 import SavedConversations from './pages/SavedConversations';
 import CFWorkerDebug from './pages/CFWorkerDebug';
+import EncounterModalDebug from './pages/EncounterModalDebug';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
 import HowToPlay from './pages/HowToPlay';
@@ -49,6 +50,11 @@ const AppContent = () => {
     setIsSettingsModalOpen,
     theme
   } = useContext(SettingsContext);
+
+  // Sync theme to document.body so Portal content inherits CSS variables
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme);
+  }, [theme]);
 
   // Show loading screen while checking authentication
   if (loading) {
@@ -172,6 +178,7 @@ const AppContent = () => {
               <Route path="/saved-conversations" element={<ProtectedRoute><SavedConversations /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/cf-worker-debug" element={<ProtectedRoute><CFWorkerDebug /></ProtectedRoute>} />
+              {isDebugEnabled && <Route path="/encounter-debug" element={<EncounterModalDebug />} />}
               {isDebugEnabled && <Route path="/debug/*" element={<ProtectedRoute><DebugRoutes /></ProtectedRoute>} />}
               {!isDebugEnabled && <Route path="/debug/*" element={<Navigate to="/" replace />} />}
             </Routes>

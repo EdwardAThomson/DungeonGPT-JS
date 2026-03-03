@@ -240,7 +240,7 @@
   align-items: center;
   gap: 20px;
   margin-bottom: 20px;
-  border-bottom: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--primary);
   padding-bottom: 15px;
 }
 
@@ -255,7 +255,7 @@
 
 .modal-header-text h2 {
   margin: 0;
-  color: var(--ink-strong);
+  color: var(--primary);
   font-family: var(--header-font);
 }
 
@@ -280,26 +280,26 @@
 }
 
 .stat-item-modal {
-  background: var(--surface-soft);
+  background: var(--surface);
   padding: 10px;
   border-radius: 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  border: 1px solid var(--surface-soft);
+  border: 1px solid var(--primary);
 }
 
 .stat-label {
   font-size: 0.75rem;
   font-weight: bold;
-  color: var(--text-secondary-soft);
+  color: var(--text-secondary);
   margin-bottom: 2px;
 }
 
 .stat-value {
   font-size: 1.25rem;
   font-weight: bold;
-  color: var(--ink-strong);
+  color: var(--text);
 }
 
 .character-background-text {

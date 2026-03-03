@@ -167,10 +167,15 @@ export const generateEncounterSummary = async (roundState) => {
     };
   }, { xp: 0, gold: 0, items: [] });
   
+  // Aggregate penalties (penalties is an object with messages, goldLoss, itemsLost)
   const totalPenalties = rounds.reduce((acc, r) => {
     if (!r.result.penalties) return acc;
-    return [...acc, ...r.result.penalties];
-  }, []);
+    return {
+      messages: [...acc.messages, ...(r.result.penalties.messages || [])],
+      goldLoss: acc.goldLoss + (r.result.penalties.goldLoss || 0),
+      itemsLost: [...acc.itemsLost, ...(r.result.penalties.itemsLost || [])]
+    };
+  }, { messages: [], goldLoss: 0, itemsLost: [] });
   
   // Add outcome-based modifiers
   if (outcome === 'victory') {
@@ -178,7 +183,7 @@ export const generateEncounterSummary = async (roundState) => {
   } else if (outcome === 'defeat') {
     totalRewards.xp = Math.floor(totalRewards.xp * 0.5); // Half XP for defeat
     totalRewards.gold = Math.floor(totalRewards.gold * 0.3); // Lose most gold
-    totalPenalties.push('Defeated - serious injuries sustained');
+    totalPenalties.messages.push('Defeated - serious injuries sustained');
   } else if (outcome === 'escaped') {
     totalRewards.xp = Math.floor(totalRewards.xp * 0.7); // Reduced XP for fleeing
     totalRewards.items = []; // No loot when fleeing

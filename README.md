@@ -1,5 +1,7 @@
 # DungeonGPT (JS): Character Creator & AI Game Master
 
+**🎮 Live App:** https://dungeongpt-js.pages.dev/
+
 This is a web application built with React that allows users to create detailed characters for role-playing games, manage them, and use them in an interactive game session powered by an AI (default: OpenAI's GPT models).
 
 This project is based upon the [Python version of the same name](https://github.com/EdwardAThomson/DungeonGPT).
@@ -20,55 +22,65 @@ YouTube Video 🎥:
 *   **World Map:** Explore a procedurally generated world map with biomes, towns, and points of interest.
 *   **Encounter System:** Dynamic encounters with skill checks, rewards, and AI-narrated outcomes.
 *   **Inventory & Progression:** Track party inventory, gold, HP, and XP progression.
-*   **Multi-Provider AI:** Support for OpenAI, Google Gemini, Anthropic Claude (cloud APIs and CLI modes), and Cloudflare Workers AI.
-*   **Persistent Sessions:** Characters and game sessions saved via backend server and SQLite database.
+*   **Multi-Provider AI:** Support for OpenAI, Cloudflare Workers AI, and other providers.
+*   **User Authentication:** Secure sign-in with Supabase Magic Link authentication.
+*   **Persistent Sessions:** Characters and game sessions saved to Supabase PostgreSQL database with Row Level Security.
 *   **Save/Load System:** Manual and auto-save functionality with save confirmation modals.
 
 ## Technology Stack
 
-*   **Frontend:** React (Hooks, Context API)
+*   **Frontend:** React (Hooks, Context API) - Deployed on Cloudflare Pages
 *   **Routing:** React Router DOM
 *   **Styling:** Modular CSS (feature-based organization in `src/styles/`)
-*   **Backend:** Node.js / Express (`src/server.js`) + Cloudflare Workers (optional)
-*   **Database:** SQLite (`src/game.db`)
-*   **AI Providers:** OpenAI, Google Gemini, Anthropic Claude (cloud APIs and CLI modes), Cloudflare Workers AI
+*   **Backend:** Cloudflare Workers (TypeScript with Hono framework)
+*   **Database:** Supabase PostgreSQL with Row Level Security (RLS)
+*   **Authentication:** Supabase Auth (Magic Link)
+*   **AI Providers:** Cloudflare Workers AI, OpenAI (server-side only, no exposed keys)
 
 ## Project Structure
 
 ```
 src/
 ├── components/      # Reusable UI components (modals, panels, maps)
-├── contexts/        # React Context providers (Settings, API keys)
+├── contexts/        # React Context providers (Auth, Settings)
 ├── data/            # Static game data (encounters, races, classes)
 ├── game/            # Game logic controllers (movement, encounters, saves)
 ├── hooks/           # Custom React hooks (useGameMap, useGameSession, etc.)
 ├── llm/             # LLM integration (model resolver, constants)
-├── pages/           # Page components (Game, CharacterCreation, etc.)
-├── services/        # API client services (characters, conversations, LLM)
+├── pages/           # Page components (Game, CharacterCreation, Login, etc.)
+├── services/        # API client services (Supabase, heroes, conversations, LLM)
 ├── styles/          # Feature-based CSS files
-├── utils/           # Utility functions (map generation, health system, etc.)
-└── server.js        # Express backend server
+└── utils/           # Utility functions (map generation, health system, etc.)
 
-cf-worker/           # Cloudflare Workers AI backend (optional)
+cf-worker/           # Cloudflare Workers backend (production)
 ├── src/
 │   ├── index.ts     # Hono app entry point
-│   ├── routes/      # API routes (/api/ai/*)
+│   ├── routes/      # API routes (heroes, conversations, AI)
+│   ├── middleware/  # Auth middleware (Supabase JWT validation)
 │   └── services/    # Workers AI service layer
 └── wrangler.toml    # Cloudflare Workers config
 ```
 
-The following images shows the chat interface of DungeonGPT:
+The following image shows the character creator interface of DungeonGPT:
 
-![Character Creation](./screenshots/character_creator.png)
-![Chat Interface](./screenshots/chat_interface_update.png)
+![Character Creation](./screenshots/character_creator_updated.png)
+
+The following image shows the chat interface of DungeonGPT:
+
+![Chat Interface](./screenshots/chat_interface.png)
 
 
 ## Setup and Installation
 
+### Local Development
+
+This is a guide for deploying the app locally.
+
 1.  **Clone the repository:**
+
     ```bash
-    git clone <your-repository-url>
-    cd character-creation
+    git clone https://github.com/EdwardAThomson/DungeonGPT-JS.git
+    cd DungeonGPT-JS
     ```
 
 2.  **Install dependencies:**
@@ -77,19 +89,26 @@ The following images shows the chat interface of DungeonGPT:
     ```
 
 3.  **Set up Environment Variables:**
-    *   Copy `.env.example` to `.env` and configure your API keys:
+
+    *   Copy `.env.example` to `.env` and configure:
+
     ```bash
     cp .env.example .env
     ```
-    *   Add your LLM API keys to `.env`:
+
+    *   Edit `.env` and add your LLM API keys:
+
     ```
     OPENAI_API_KEY=your-openai-key
     GEMINI_API_KEY=your-gemini-key
     ANTHROPIC_API_KEY=your-claude-key
     ```
+
+    *   The default settings in `.env.example` should work for local development (port 5000 for backend, port 3000 for frontend).
     *   API keys are handled securely by the backend server — they are never exposed to the frontend.
 
 4.  **Run the backend server (Required for Database Persistence):**
+
     *   The backend server (`src/server.js`) handles saving and loading characters to/from the SQLite database (`src/game.db`).
     *   **This server must be running** in a separate terminal for character saving/loading features to work.
     *   Open a terminal, navigate to the project root directory, and run:
@@ -100,58 +119,66 @@ The following images shows the chat interface of DungeonGPT:
     
     *   Keep this terminal window open while using the application.
 
-4b. **Optional: Run Cloudflare Workers AI (Alternative AI Provider):**
-    *   If you want to use Cloudflare Workers AI instead of cloud API providers:
-    *   Navigate to the `cf-worker` directory and run:
-
-    ```bash
-    cd cf-worker
-    npm install
-    npm run dev
-    ```
-    
-    *   The worker will start on `http://localhost:8787`
-    *   Select `cf-workers` as your AI provider in the game settings
-
 5.  **Run the React development server:**
-    *   In **another** terminal window (while the backend server is running), navigate to the project root directory and run:
+
+    *   In a new terminal, from the project root:
 
     ```bash
     npm start
     ```
 
-    *   This will open the application in your default browser, usually at `http://localhost:3000`.
+    *   This will open the application at `http://localhost:3000`
+
+### Production Deployment
+
+The app is deployed on:
+
+- **Frontend:** Cloudflare Pages (https://dungeongpt-js.pages.dev/)
+- **Backend:** Cloudflare Workers
+- **Database:** Supabase PostgreSQL
+
+For deployment instructions, see the deployment guides in `/docs`.
 
 ## Usage
 
-1.  **Navigate** through the sections using the top navigation bar (Home, Character Creator, All Characters, New Game).
-2.  **Create a character** using the "Character Creator" form.
-3.  **View and manage** your characters under "All Characters".
-4.  **Start a new game** by going to "New Game", filling in the settings, and then selecting your heroes on the subsequent "Hero Selection" page.
-5.  **Play the game:** Interact with the AI game master by typing actions in the input box on the "Game" screen.
+1.  **Create a hero** using the "Hero Creator" form with detailed stats, class, race, and background
+2.  **View and manage** your heroes under "All Heroes"
+3.  **Start a new game** by going to "New Game", configuring settings, and selecting your party
+4.  **Explore the world** with a procedurally generated map featuring biomes, towns, and encounters
+5.  **Play the game** by interacting with the AI Dungeon Master through text commands
+6.  **Save your progress** - characters and game sessions are saved to the local SQLite database
+
+**Note:** The live production app at https://dungeongpt-js.pages.dev/ includes additional features like Magic Link authentication (soon) and cloud persistence via Supabase.
 
 ## Recent Improvements
 
-*   ✅ **Cloudflare Workers AI Integration** — No API keys required for public deployment
-*   ✅ **Save/Load System** — Manual save with confirmation, auto-save, and legacy save compatibility
-*   ✅ **API Security** — API keys handled securely by backend (not exposed to frontend)
+*   ✅ **Production Deployment** — Live on Cloudflare Pages with Workers backend
+*   ✅ **Supabase Integration** — PostgreSQL database with Row Level Security
+*   ✅ **Magic Link Authentication** — Secure, passwordless sign-in
+*   ✅ **Cloudflare Workers AI** — Server-side AI with no exposed API keys
+*   ✅ **Multi-User Support** — Each user's data isolated with RLS policies
+*   ✅ **Save/Load System** — Manual save with confirmation, auto-save, cloud persistence
 *   ✅ **Modular Architecture** — Controllers for movement, encounters, saves
-*   ✅ **Multi-Provider AI** — OpenAI, Gemini, Claude, Cloudflare Workers (cloud and CLI modes)
+*   ✅ **Multi-Provider AI** — OpenAI, Gemini, Claude, Cloudflare Workers (cloud and CLI modes) [Local Dev Mode]
 *   ✅ **Environment-Aware Logging** — Production-safe logging system
 *   ✅ **Feature-Based CSS** — Modular styling for maintainability
 *   ✅ **Procedural World Map** — Biomes, towns, mountains with exploration
 *   ✅ **Dynamic Encounters** — Skill checks, rewards, AI narration
 *   ✅ **Town Discovery System** — Buildings discovered and remembered across sessions
-*   ✅ **Debug Tools** — CF Worker debug page for testing AI integration
+*   ✅ **How to Play Page** — Comprehensive guide for new players
+*   ✅ **E2E Testing** — Playwright tests for critical user flows
 
 ## Potential Future Improvements
 
-*   User authentication and multi-user support
-*   Migration to Cloudflare D1 for full edge deployment
-*   Streaming AI responses for better UX
-*   Unit and integration tests for core game loops
-*   Additional encounter types and world events
-*   Dungeon/cave sub-maps with procedural generation
+*   💳 **Billing Integration** — Credit-based system with Lemon Squeezy
+*   📊 **Usage Tracking** — AI usage analytics and cost monitoring
+*   🚀 **Rate Limiting** — Request throttling and abuse prevention
+*   📈 **Monitoring** — Error tracking and performance metrics
+*   🎬 **Streaming AI Responses** — Real-time text generation for better UX
+*   🧪 **Expanded Testing** — Unit and integration tests for core game loops
+*   🗺️ **Dungeon Sub-Maps** — Procedurally generated caves and dungeons
+*   ⚔️ **Combat System** — Turn-based tactical combat encounters
+*   🎭 **NPC Interactions** — Persistent NPCs with memory and relationships
 
 ## License & Attribution
 

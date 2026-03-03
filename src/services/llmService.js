@@ -3,7 +3,8 @@ import { createLogger } from '../utils/logger';
 import { supabase } from './supabaseClient';
 
 const API_PATH = '/api/llm';
-const CF_WORKER_URL = process.env.REACT_APP_CF_WORKER_URL || 'http://localhost:8787';
+const rawCfWorkerUrl = process.env.REACT_APP_CF_WORKER_URL || 'http://localhost:8787';
+const CF_WORKER_URL = rawCfWorkerUrl.replace('https://localhost', 'http://localhost');
 const logger = createLogger('llm-service');
 
 const sanitizeResponse = (text) => {
@@ -40,21 +41,39 @@ export const llmService = {
             const body = { provider, model, prompt, maxTokens, temperature };
             if (systemPrompt) body.systemPrompt = systemPrompt;
             const cfHeaders = { 'Content-Type': 'application/json' };
+
+            // Always attach Supabase auth to CF Worker requests.
+            // The worker verifies JWTs to protect Cloudflare AI credits.
             if (supabase) {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session?.access_token) {
-                    cfHeaders['Authorization'] = `Bearer ${session.access_token}`;
+                try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session?.access_token) {
+                        cfHeaders['Authorization'] = `Bearer ${session.access_token}`;
+                    } else {
+                        logger.warn('No active Supabase session - CF Worker will reject unauthenticated requests');
+                    }
+                } catch (authErr) {
+                    logger.warn('Failed to get Supabase session for CF auth:', authErr);
                 }
+            } else {
+                logger.warn('Supabase client not initialized - CF Worker requests will be unauthenticated');
             }
-            const response = await fetch(`${CF_WORKER_URL}/api/ai/generate`, {
-                method: 'POST',
-                headers: cfHeaders,
-                body: JSON.stringify(body),
-            });
+
+            let response;
+            try {
+                response = await fetch(`${CF_WORKER_URL}/api/ai/generate`, {
+                    method: 'POST',
+                    headers: cfHeaders,
+                    body: JSON.stringify(body),
+                });
+            } catch (fetchErr) {
+                logger.error('CF Worker fetch failed:', fetchErr, '- URL:', CF_WORKER_URL);
+                throw new Error(`Cannot reach CF Worker at ${CF_WORKER_URL}. Is the worker running? (${fetchErr.message})`);
+            }
 
             if (!response.ok) {
                 const error = await response.json().catch(() => null);
-                const errorMessage = error?.error || `Failed to generate text: ${response.statusText}`;
+                const errorMessage = error?.error || `CF Worker error ${response.status}: ${response.statusText}`;
                 throw new Error(errorMessage);
             }
 

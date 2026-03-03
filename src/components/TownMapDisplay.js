@@ -58,9 +58,12 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
     }
   };
 
+  // Always use playerPosition - CSS transition handles smooth movement
+
   return (
     <div>
       <div style={{
+        position: 'relative',
         display: 'grid',
         gridTemplateColumns: `repeat(${townMapData.width}, 30px)`,
         gap: '1px',
@@ -272,31 +275,45 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
                 </>
               )}
               {/* Emoji/POI */}
-              {!isPlayer && (
-                <span style={{ position: 'relative', zIndex: 2 }}>
-                  {getTownTileEmoji(tile)}
-                </span>
-              )}
-              {/* Player portrait marker */}
-              {isPlayer && firstHero && (
-                <div className="player-marker-portrait" style={{ zIndex: 3 }}>
-                  <img 
-                    src={firstHero.profilePicture} 
-                    alt={firstHero.characterName}
-                    loading="lazy"
-                    width="40"
-                    height="40"
-                  />
-                  <div className="player-marker-pointer"></div>
-                </div>
-              )}
-              {/* Fallback star if no hero */}
-              {isPlayer && !firstHero && (
-                <span style={{ position: 'relative', zIndex: 2 }}>⭐</span>
-              )}
+              <span style={{ position: 'relative', zIndex: 2 }}>
+                {getTownTileEmoji(tile)}
+              </span>
             </div>
           );
         })}
+        {/* Animated player marker overlay */}
+        {playerPosition && (
+          <div
+            style={{
+              position: 'absolute',
+              left: `${playerPosition.x * 31}px`,
+              top: `${playerPosition.y * 31}px`,
+              width: '30px',
+              height: '30px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              pointerEvents: 'none',
+              zIndex: 10,
+              transition: 'left 0.6s ease-in-out, top 0.6s ease-in-out'
+            }}
+          >
+            {firstHero ? (
+              <div className="player-marker-portrait">
+                <img 
+                  src={firstHero.profilePicture} 
+                  alt={firstHero.characterName}
+                  loading="lazy"
+                  width="40"
+                  height="40"
+                />
+                <div className="player-marker-pointer"></div>
+              </div>
+            ) : (
+              <span style={{ fontSize: '16px' }}>⭐</span>
+            )}
+          </div>
+        )}
       </div>
       {townError && (
         <div className="message system error" style={{ margin: '10px auto', display: 'block', maxWidth: '400px' }}>

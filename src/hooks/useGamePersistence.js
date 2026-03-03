@@ -126,7 +126,7 @@ const useGamePersistence = ({
       movesSinceEncounter: movesSinceEncounterRef.current
     });
 
-    return saveConversationToBackend(sessionIdRef.current, {
+    const result = await saveConversationToBackend(sessionIdRef.current, {
       conversation: conversationRef.current,
       provider: selectedProviderRef.current,
       model: selectedModelRef.current,
@@ -140,6 +140,7 @@ const useGamePersistence = ({
     });
 
     lastSaveFingerprintRef.current = fingerprint;
+    return result;
   }, [loadedConversation?.game_settings, logger, saveConversationToBackend]);
 
   useEffect(() => {

@@ -26,7 +26,7 @@ const parseCsv = (value) => (value || '')
   .filter(Boolean);
 
 const corsAllowedOrigins = parseCsv(process.env.CORS_ALLOWED_ORIGINS);
-const defaultDevOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000'];
+const defaultDevOrigins = ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001', 'http://127.0.0.1:3001'];
 const effectiveAllowedOrigins = corsAllowedOrigins.length > 0
   ? corsAllowedOrigins
   : (isProduction ? [] : defaultDevOrigins);

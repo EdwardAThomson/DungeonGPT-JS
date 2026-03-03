@@ -216,7 +216,7 @@ const HowToPlay = () => {
           <div className="faq-item">
             <h3>What AI models are available?</h3>
             <p>
-              We support multiple AI providers including OpenAIGPT-OSS, Llama 3 & 4. 
+              We support multiple AI providers including OpenAI's GPT-OSS and Llama 3 & 4. 
               Further models are being tested and may be added in the future.
             </p>
           </div>
