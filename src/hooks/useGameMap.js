@@ -68,13 +68,13 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         if (currentTownMap && currentTownMap.townName && townMapsCache[currentTownMap.townName]) {
             const cachedDiscovered = townMapsCache[currentTownMap.townName].discoveredBuildings || [];
             const currentDiscovered = currentTownMap.discoveredBuildings || [];
-            
+
             logger.debug('Initial discoveredBuildings sync check', {
                 townName: currentTownMap.townName,
                 cachedDiscovered,
                 currentDiscovered
             });
-            
+
             if (cachedDiscovered.length > 0 && cachedDiscovered.length !== currentDiscovered.length) {
                 logger.debug('Syncing discoveredBuildings from cache on mount');
                 setCurrentTownMap(prev => ({
@@ -83,7 +83,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 }));
             }
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Run only on mount
 
     // Visited tracking
@@ -112,9 +112,9 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
 
     const markBuildingDiscovered = (townName, x, y) => {
         if (!townName) return;
-        
+
         const coord = `${x},${y}`;
-        
+
         setTownMapsCache(prev => {
             const townData = prev[townName];
             if (!townData) return prev;
@@ -138,14 +138,14 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             const cachedData = townMapsCache[currentTownMap.townName];
             const currentDiscovered = currentTownMap.discoveredBuildings || [];
             const cachedDiscovered = cachedData?.discoveredBuildings || [];
-            
+
             logger.debug('Checking discoveredBuildings sync', {
                 townName: currentTownMap.townName,
                 currentDiscovered,
                 cachedDiscovered,
                 needsSync: cachedDiscovered.length !== currentDiscovered.length
             });
-            
+
             if (cachedDiscovered.length > currentDiscovered.length) {
                 logger.debug('Syncing discoveredBuildings from cache');
                 setCurrentTownMap(prev => ({
@@ -259,7 +259,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         const townName = currentTile.townName || currentTile.poi;
 
         let townMapData = townMapsCache[townName];
-        
+
         logger.debug('Town cache lookup', {
             townName,
             hasCachedData: !!townMapData,
@@ -404,6 +404,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         setIsMapModalOpen,
         townError,
 
+        handleEnterLocation,
         handleEnterCurrentTown,
         handleLeaveTown,
         handleTownTileClick,

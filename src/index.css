@@ -10,6 +10,7 @@
   --light-text-secondary: #5d4037cc;
   --light-border: #d4c4a8;
   --light-shadow: rgba(93, 64, 55, 0.15);
+  --light-inventory-shelf-bg: #5d4037;
 
   /* Dark Fantasy Theme (Stone/Void) */
   --dark-bg: #121212;
@@ -20,6 +21,7 @@
   --dark-text-secondary: #b0b0b0;
   --dark-border: #333333;
   --dark-shadow: rgba(0, 0, 0, 0.5);
+  --dark-inventory-shelf-bg: #0a0a0a;
 
   /* Font Families */
   --font-header: 'Cinzel', serif;
@@ -109,6 +111,7 @@
   --text-secondary: var(--light-text-secondary);
   --border: var(--light-border);
   --shadow: var(--light-shadow);
+  --inventory-shelf-bg: var(--light-inventory-shelf-bg);
   --header-font: var(--font-header);
   --body-font: var(--font-body);
 }
@@ -122,6 +125,7 @@
   --text-secondary: var(--dark-text-secondary);
   --border: var(--dark-border);
   --shadow: var(--dark-shadow);
+  --inventory-shelf-bg: var(--dark-inventory-shelf-bg);
   --header-font: var(--font-header);
   --body-font: var(--font-body);
 }

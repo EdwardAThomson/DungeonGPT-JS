@@ -11,23 +11,23 @@ import { calculateMaxHP } from "../utils/healthSystem";
 
 const profilePictures = [
   // Male portraits
-  { imageId: 1, src: "barbarian.png", gender: "Male" },
-  { imageId: 2, src: "wizard.png", gender: "Male" },
-  { imageId: 3, src: "ranger.png", gender: "Male" },
-  { imageId: 4, src: "paladin.png", gender: "Male" },
-  { imageId: 5, src: "cleric.png", gender: "Male" },
-  { imageId: 6, src: "bard.png", gender: "Male" },
-  { imageId: 7, src: "fighter.png", gender: "Male" },
-  { imageId: 8, src: "druid.png", gender: "Male" },
+  { imageId: 1, src: "assets/characters/barbarian.webp", gender: "Male" },
+  { imageId: 2, src: "assets/characters/wizard.webp", gender: "Male" },
+  { imageId: 3, src: "assets/characters/ranger.webp", gender: "Male" },
+  { imageId: 4, src: "assets/characters/paladin.webp", gender: "Male" },
+  { imageId: 5, src: "assets/characters/cleric.webp", gender: "Male" },
+  { imageId: 6, src: "assets/characters/bard.webp", gender: "Male" },
+  { imageId: 7, src: "assets/characters/fighter.webp", gender: "Male" },
+  { imageId: 8, src: "assets/characters/druid.webp", gender: "Male" },
   // Female portraits
-  { imageId: 9, src: "female_barbarian.png", gender: "Female" },
-  { imageId: 10, src: "female_wizard.png", gender: "Female" },
-  { imageId: 11, src: "female_ranger.png", gender: "Female" },
-  { imageId: 12, src: "female_paladin.png", gender: "Female" },
-  { imageId: 13, src: "female_cleric.png", gender: "Female" },
-  { imageId: 14, src: "female_bard.png", gender: "Female" },
-  { imageId: 15, src: "female_fighter.png", gender: "Female" },
-  { imageId: 16, src: "female_druid.png", gender: "Female" },
+  { imageId: 9, src: "assets/characters/female_barbarian.webp", gender: "Female" },
+  { imageId: 10, src: "assets/characters/female_wizard.webp", gender: "Female" },
+  { imageId: 11, src: "assets/characters/female_ranger.webp", gender: "Female" },
+  { imageId: 12, src: "assets/characters/female_paladin.webp", gender: "Female" },
+  { imageId: 13, src: "assets/characters/female_cleric.webp", gender: "Female" },
+  { imageId: 14, src: "assets/characters/female_bard.webp", gender: "Female" },
+  { imageId: 15, src: "assets/characters/female_fighter.webp", gender: "Female" },
+  { imageId: 16, src: "assets/characters/female_druid.webp", gender: "Female" },
 ];
 
 const heroGenders = ["Male", "Female"];

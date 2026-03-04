@@ -13,7 +13,7 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
   for (const item of allItems) {
     const key = typeof item === 'string' ? item : (item.key || 'unknown');
     const catalogEntry = ITEM_CATALOG[key];
-    const name = catalogEntry?.name || item.name || key.replace(/_/g, ' ');
+    const name = catalogEntry?.name || item.name || key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     const quantity = item.quantity || 1;
     const rarity = catalogEntry?.rarity || item.rarity || 'common';
     const icon = catalogEntry?.icon || item.icon || null;
@@ -35,65 +35,141 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '90%' }}>
-        <h2 style={{ marginBottom: '20px' }}>Party Inventory</h2>
+      <div
+        className="modal-content"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          maxWidth: '600px',
+          width: '90%',
+          background: 'var(--surface)',
+          border: '2px solid var(--border)',
+          boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+          color: 'var(--text)',
+          borderRadius: '12px',
+          padding: '24px'
+        }}
+      >
+        <h2 style={{
+          marginBottom: '24px',
+          marginTop: 0,
+          textAlign: 'center',
+          fontSize: '2rem',
+          color: 'var(--primary)',
+          borderBottom: '1px solid var(--border)',
+          paddingBottom: '16px'
+        }}>
+          Party Inventory
+        </h2>
 
+        {/* Themed Gold Section */}
         <div
           style={{
-            padding: '15px',
-            background: 'linear-gradient(135deg, #f39c12 0%, #e67e22 100%)',
+            padding: '20px',
+            background: 'var(--primary)',
+            color: 'var(--bg)', /* High contrast text against primary */
             borderRadius: '8px',
-            marginBottom: '20px',
+            marginBottom: '24px',
             display: 'flex',
             alignItems: 'center',
-            gap: '15px',
+            gap: '20px',
             cursor: 'pointer',
-            transition: 'transform 0.1s'
+            transition: 'all 0.2s ease',
+            boxShadow: '0 4px 12px var(--shadow)'
           }}
-          onClick={() => setSelectedImage({ src: '/assets/icons/items/gold_coins.png', name: 'Gold Coins' })}
+          onClick={() => setSelectedImage({ src: '/assets/icons/items/gold_coins.webp', name: 'Gold Coins' })}
           title="Click to enlarge"
           onMouseDown={(e) => e.currentTarget.style.transform = 'scale(0.98)'}
           onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
         >
           <img
-            src="/assets/icons/items/gold_coins.png"
+            src="/assets/icons/items/gold_coins.webp"
             alt="Gold"
             loading="lazy"
-            style={{ width: '48px', height: '48px', objectFit: 'contain' }}
+            style={{
+              width: '56px',
+              height: '56px',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))'
+            }}
           />
-          <div>
-            <div style={{ fontSize: '12px', opacity: 0.9 }}>Gold Pieces</div>
-            <div style={{ fontSize: '24px', fontWeight: 'bold' }}>{totalGold} GP</div>
+          <div style={{ flex: 1 }}>
+            <div style={{
+              fontSize: '14px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              opacity: 0.9,
+              fontWeight: 'bold',
+              fontFamily: 'var(--header-font)'
+            }}>
+              Treasury
+            </div>
+            <div style={{
+              fontSize: '28px',
+              fontWeight: 'bold',
+              fontFamily: 'var(--header-font)',
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '8px'
+            }}>
+              {totalGold} <span style={{ fontSize: '18px', opacity: 0.8 }}>GP</span>
+            </div>
           </div>
+          <div style={{ fontSize: '24px', opacity: 0.7 }}>🔍</div>
         </div>
 
-        <h3 style={{ marginBottom: '10px' }}>Items</h3>
+        <h3 style={{
+          marginBottom: '12px',
+          fontSize: '1.2rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          color: 'var(--text-secondary)'
+        }}>
+          <span>⚔️</span> Collected Items
+        </h3>
+
+        {/* High Contrast Item Container (Themed Vault Background) */}
         <div style={{
-          background: 'var(--surface)',
+          background: 'var(--inventory-shelf-bg)',
           borderRadius: '8px',
-          padding: '15px',
-          minHeight: '100px',
-          maxHeight: '40vh',
-          overflowY: 'auto'
+          padding: '20px',
+          minHeight: '120px',
+          maxHeight: '35vh',
+          overflowY: 'auto',
+          border: '1px solid var(--border)',
+          boxShadow: 'inset 0 4px 15px rgba(0,0,0,0.8)'
         }}>
           {allItems.length === 0 ? (
-            <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-              No items yet. Complete encounters to find loot!
-            </p>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '80px',
+              color: 'var(--bg)',
+              opacity: 0.6,
+              fontStyle: 'italic'
+            }}>
+              <p>Empty satchels and hollow boxes.</p>
+              <p style={{ fontSize: '0.9rem' }}>Loot enemies and chests to fill your inventory.</p>
+            </div>
           ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
               {Object.entries(itemMap).map(([key, item]) => (
                 <div
                   key={key}
                   style={{
-                    padding: '8px 12px',
-                    background: 'var(--surface-light)',
-                    borderRadius: '4px',
+                    padding: '10px 14px',
+                    background: 'rgba(0,0,0,0.2)',
+                    borderRadius: '6px',
                     border: `1px solid ${rarityColors[item.rarity] || rarityColors.common}`,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
-                    cursor: item.icon ? 'pointer' : 'default'
+                    gap: '10px',
+                    cursor: item.icon ? 'pointer' : 'default',
+                    transition: 'all 0.2s ease',
+                    position: 'relative',
+                    boxShadow: `0 0 5px ${item.rarity !== 'common' ? (rarityColors[item.rarity] + '33') : 'rgba(0,0,0,0.5)'}`
                   }}
                   onClick={item.icon ? () => setSelectedImage({ src: `/${item.icon}`, name: item.name }) : undefined}
                 >
@@ -103,27 +179,35 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
                       alt={item.name}
                       loading="lazy"
                       style={{
-                        width: '32px',
-                        height: '32px',
+                        width: '36px',
+                        height: '36px',
                         objectFit: 'contain',
                         borderRadius: '4px',
-                        background: 'rgba(0,0,0,0.2)'
+                        background: 'rgba(255,255,255,0.05)'
                       }}
                     />
                   )}
-                  <span style={{ color: rarityColors[item.rarity] || rarityColors.common }}>{item.name}</span>
+                  <span style={{
+                    color: rarityColors[item.rarity] || rarityColors.common,
+                    fontWeight: '500',
+                    fontSize: '0.95rem'
+                  }}>
+                    {item.name}
+                  </span>
                   {item.quantity > 1 && (
                     <span
                       style={{
                         background: 'var(--primary)',
-                        color: 'white',
-                        borderRadius: '50%',
-                        width: '20px',
-                        height: '20px',
+                        color: 'var(--bg)',
+                        borderRadius: '12px',
+                        padding: '0 6px',
+                        height: '18px',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: '12px'
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        minWidth: '22px'
                       }}
                     >
                       x{item.quantity}
@@ -138,18 +222,22 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
         <button
           onClick={onClose}
           style={{
-            marginTop: '20px',
-            padding: '12px 20px',
+            marginTop: '24px',
+            padding: '14px 20px',
             background: 'var(--primary)',
-            color: 'white',
+            color: 'var(--bg)',
             border: 'none',
-            borderRadius: '4px',
+            borderRadius: '6px',
             cursor: 'pointer',
             width: '100%',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            fontSize: '1.1rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.2em',
+            boxShadow: '0 4px 8px var(--shadow)'
           }}
         >
-          Close
+          Return to Adventure
         </button>
       </div>
 
@@ -158,7 +246,7 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
           style={{
             position: 'fixed',
             top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.9)',
+            background: 'rgba(0,0,0,0.92)',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -178,15 +266,21 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
               maxWidth: '85vw',
               maxHeight: '75vh',
               objectFit: 'contain',
-              background: '#1a1a1a',
-              padding: '24px',
+              background: '#0a0a0a',
+              padding: '32px',
               borderRadius: '12px',
-              border: '1px solid #444',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.8)'
+              border: '2px solid #333',
+              boxShadow: '0 30px 60px rgba(0,0,0,0.9)'
             }}
           />
-          <h2 style={{ color: 'white', marginTop: '24px', fontSize: '2rem' }}>{selectedImage.name}</h2>
-          <p style={{ color: '#888', marginTop: '8px' }}>Click anywhere to close</p>
+          <h2 style={{
+            color: '#d4af37',
+            marginTop: '24px',
+            fontSize: '2.5rem',
+            fontFamily: 'var(--header-font)',
+            textShadow: '0 2px 10px rgba(0,0,0,0.5)'
+          }}>{selectedImage.name}</h2>
+          <p style={{ color: '#888', marginTop: '12px', fontSize: '1.1rem' }}>Click anywhere to return</p>
         </div>
       )}
     </div>

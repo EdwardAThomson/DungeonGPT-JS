@@ -89,28 +89,28 @@ export const processRewards = (rewards, outcome) => {
 // Item definitions with rarity and value
 export const ITEM_CATALOG = {
   // Common items
-  'healing_potion': { name: 'Healing Potion', rarity: 'common', value: 50, effect: 'heal', amount: '2d4+2', icon: 'assets/icons/items/healing_potion.png' },
-  'antidote': { name: 'Antidote', rarity: 'common', value: 25, effect: 'cure_poison', icon: 'assets/icons/items/antidote.png' },
-  'rations': { name: 'Trail Rations', rarity: 'common', value: 5, stackable: true, icon: 'assets/icons/items/rations.png' },
-  'torch': { name: 'Torch', rarity: 'common', value: 1, stackable: true, icon: 'assets/icons/items/torch.png' },
-  'rope': { name: 'Rope (50ft)', rarity: 'common', value: 10, icon: 'assets/icons/items/rope.png' },
+  'healing_potion': { name: 'Healing Potion', rarity: 'common', value: 50, effect: 'heal', amount: '2d4+2', icon: 'assets/icons/items/healing_potion.webp' },
+  'antidote': { name: 'Antidote', rarity: 'common', value: 25, effect: 'cure_poison', icon: 'assets/icons/items/antidote.webp' },
+  'rations': { name: 'Trail Rations', rarity: 'common', value: 5, stackable: true, icon: 'assets/icons/items/rations.webp' },
+  'torch': { name: 'Torch', rarity: 'common', value: 1, stackable: true, icon: 'assets/icons/items/torch.webp' },
+  'rope': { name: 'Rope (50ft)', rarity: 'common', value: 10, icon: 'assets/icons/items/rope.webp' },
 
   // Uncommon items
-  'greater_healing_potion': { name: 'Greater Healing Potion', rarity: 'uncommon', value: 150, effect: 'heal', amount: '4d4+4', icon: 'assets/icons/items/greater_healing_potion.png' },
-  'scroll_fireball': { name: 'Fire Scroll', rarity: 'uncommon', value: 200, effect: 'spell', spell: 'fireball', icon: 'assets/icons/items/scroll_fireball.png' },
-  'silver_dagger': { name: 'Silver Dagger', rarity: 'uncommon', value: 100, type: 'weapon', icon: 'assets/icons/items/silver_dagger.png' },
+  'greater_healing_potion': { name: 'Greater Healing Potion', rarity: 'uncommon', value: 150, effect: 'heal', amount: '4d4+4', icon: 'assets/icons/items/greater_healing_potion.webp' },
+  'scroll_fireball': { name: 'Fire Scroll', rarity: 'uncommon', value: 200, effect: 'spell', spell: 'fireball', icon: 'assets/icons/items/scroll_fireball.webp' },
+  'silver_dagger': { name: 'Silver Dagger', rarity: 'uncommon', value: 100, type: 'weapon', icon: 'assets/icons/items/silver_dagger.webp' },
 
   // Rare items
-  'magic_weapon': { name: 'Enchanted Blade', rarity: 'rare', value: 500, type: 'weapon', bonus: '+1', icon: 'assets/icons/items/magic_weapon.png' },
-  'ring_protection': { name: 'Protective Ring', rarity: 'rare', value: 750, type: 'ring', bonus: '+1 defense', icon: 'assets/icons/items/ring_protection.png' },
+  'magic_weapon': { name: 'Enchanted Blade', rarity: 'rare', value: 500, type: 'weapon', bonus: '+1', icon: 'assets/icons/items/magic_weapon.webp' },
+  'ring_protection': { name: 'Protective Ring', rarity: 'rare', value: 750, type: 'ring', bonus: '+1 defense', icon: 'assets/icons/items/ring_protection.webp' },
 
   // Very Rare
-  'legendary_weapon': { name: 'Legendary Weapon', rarity: 'very_rare', value: 2500, type: 'weapon', bonus: '+2', icon: 'assets/icons/items/legendary_weapon.png' },
-  'legendary_artifact': { name: 'Ancient Artifact', rarity: 'very_rare', value: 5000, type: 'artifact', icon: 'assets/icons/items/legendary_artifact.png' },
+  'legendary_weapon': { name: 'Legendary Weapon', rarity: 'very_rare', value: 2500, type: 'weapon', bonus: '+2', icon: 'assets/icons/items/legendary_weapon.webp' },
+  'legendary_artifact': { name: 'Ancient Artifact', rarity: 'very_rare', value: 5000, type: 'artifact', icon: 'assets/icons/items/legendary_artifact.webp' },
 
   // POI-specific items
-  'cave_mushrooms': { name: 'Glowing Cave Mushrooms', rarity: 'common', value: 15, stackable: true, icon: 'assets/icons/items/cave_mushrooms.png' },
-  'raw_gems': { name: 'Raw Gemstones', rarity: 'uncommon', value: 75, icon: 'assets/icons/items/raw_gems.png' },
+  'cave_mushrooms': { name: 'Glowing Cave Mushrooms', rarity: 'common', value: 15, stackable: true, icon: 'assets/icons/items/cave_mushrooms.webp' },
+  'raw_gems': { name: 'Raw Gemstones', rarity: 'uncommon', value: 75, icon: 'assets/icons/items/raw_gems.webp' },
   'spider_silk': { name: 'Giant Spider Silk', rarity: 'uncommon', value: 50 },
   'bat_guano': { name: 'Alchemical Reagent', rarity: 'common', value: 10, stackable: true },
   'ancient_scroll': { name: 'Ancient Scroll', rarity: 'uncommon', value: 100 },
@@ -121,33 +121,35 @@ export const ITEM_CATALOG = {
   'spell_scroll': { name: 'Magic Scroll', rarity: 'uncommon', value: 150 },
   'healing_herbs': { name: 'Healing Herbs', rarity: 'common', value: 20, stackable: true },
   'rare_flower': { name: 'Rare Flower', rarity: 'uncommon', value: 45 },
-  'dryad_blessing': { name: 'Dryad\'s Blessing', rarity: 'rare', value: 0, type: 'blessing' },
+  'dryad_blessing': { name: 'Dryad\'s Blessing', rarity: 'rare', value: 0, type: 'blessing', icon: 'assets/icons/items/dryad_blessing.webp' },
   'fairy_dust': { name: 'Fairy Dust', rarity: 'uncommon', value: 100 },
   'fey_charm': { name: 'Fey Charm', rarity: 'rare', value: 250, type: 'charm' },
   'giant_feather': { name: 'Giant Eagle Feather', rarity: 'uncommon', value: 60 },
   'dragon_scale': { name: 'Dragon Scale', rarity: 'very_rare', value: 1000 },
   'mountain_crystal': { name: 'Mountain Crystal', rarity: 'uncommon', value: 80 },
   'storm_crystal': { name: 'Storm Crystal', rarity: 'rare', value: 200 },
+  'magical_item': { name: 'Magical Artifact', rarity: 'rare', value: 150 },
+  'artifact_trinket': { name: 'Ancient Trinket', rarity: 'uncommon', value: 45 },
 
   // Generic loot
-  'gold_coins': { name: 'Gold Coins', rarity: 'common', value: 0, isGold: true, icon: 'assets/icons/items/gold_coins.png' },
+  'gold_coins': { name: 'Gold Coins', rarity: 'common', value: 0, isGold: true, icon: 'assets/icons/items/gold_coins.webp' },
   'gemstone': { name: 'Gemstone', rarity: 'uncommon', value: 100 },
   'pearl': { name: 'Pearl', rarity: 'uncommon', value: 100 },
   'old_coins': { name: 'Ancient Coins', rarity: 'common', value: 25 },
-  'treasure_map': { name: 'Treasure Map', rarity: 'rare', value: 0, type: 'quest_item', icon: 'assets/icons/items/treasure_map.png' },
+  'treasure_map': { name: 'Treasure Map', rarity: 'rare', value: 0, type: 'quest_item', icon: 'assets/icons/items/treasure_map.webp' },
 
   // Quest items
-  'quest_clue': { name: 'Mysterious Clue', rarity: 'uncommon', value: 0, type: 'quest_item' },
+  'quest_clue': { name: 'Mysterious Clue', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/quest_clue.webp' },
   'quest_key': { name: 'Ornate Key', rarity: 'rare', value: 0, type: 'quest_item' },
   'quest_letter': { name: 'Sealed Letter', rarity: 'uncommon', value: 0, type: 'quest_item' },
-  'mysterious_letter': { name: 'Mysterious Letter', rarity: 'uncommon', value: 0, type: 'quest_item' },
+  'mysterious_letter': { name: 'Mysterious Letter', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/mysterious_letter.webp' },
 
   // Monster drops
-  'wolf_pelt': { name: 'Wolf Pelt', rarity: 'common', value: 15, stackable: true, icon: 'assets/icons/items/wolf_pelt.png' },
-  'wolf_fang': { name: 'Wolf Fang', rarity: 'common', value: 10, stackable: true, icon: 'assets/icons/items/wolf_fang.png' },
-  'goblin_ear': { name: 'Goblin Ear', rarity: 'common', value: 5, stackable: true, icon: 'assets/icons/items/goblin_ear.png' },
-  'spider_venom': { name: 'Spider Venom', rarity: 'uncommon', value: 35, icon: 'assets/icons/items/spider_venom.png' },
-  'bandit_badge': { name: 'Bandit Badge', rarity: 'common', value: 20, icon: 'assets/icons/items/bandit_badge.png' },
+  'wolf_pelt': { name: 'Wolf Pelt', rarity: 'common', value: 15, stackable: true, icon: 'assets/icons/items/wolf_pelt.webp' },
+  'wolf_fang': { name: 'Wolf Fang', rarity: 'common', value: 10, stackable: true, icon: 'assets/icons/items/wolf_fang.webp' },
+  'goblin_ear': { name: 'Goblin Ear', rarity: 'common', value: 5, stackable: true, icon: 'assets/icons/items/goblin_ear.webp' },
+  'spider_venom': { name: 'Spider Venom', rarity: 'uncommon', value: 35, icon: 'assets/icons/items/spider_venom.webp' },
+  'bandit_badge': { name: 'Bandit Badge', rarity: 'common', value: 20, icon: 'assets/icons/items/bandit_badge.webp' },
   'bear_claw': { name: 'Bear Claw', rarity: 'uncommon', value: 25 },
   'bear_pelt': { name: 'Bear Pelt', rarity: 'uncommon', value: 40 },
   'venom_sac': { name: 'Venom Sac', rarity: 'uncommon', value: 45 },
@@ -156,7 +158,7 @@ export const ITEM_CATALOG = {
   'rusty_dagger': { name: 'Rusty Dagger', rarity: 'common', value: 5, type: 'weapon' },
   'shortsword': { name: 'Shortsword', rarity: 'common', value: 25, type: 'weapon' },
   'leather_armor': { name: 'Leather Armor', rarity: 'common', value: 30, type: 'armor' },
-  'map_fragment': { name: 'Map Fragment', rarity: 'uncommon', value: 0, type: 'quest_item' },
+  'map_fragment': { name: 'Map Fragment', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/map_fragment.webp' },
   'inspiration': { name: 'Minstrel\'s Blessing', rarity: 'uncommon', value: 0, type: 'buff' },
   'divine_blessing': { name: 'Divine Blessing', rarity: 'rare', value: 0, type: 'blessing' },
   'ancient_knowledge': { name: 'Ancient Knowledge', rarity: 'rare', value: 0, type: 'lore' },
@@ -165,7 +167,7 @@ export const ITEM_CATALOG = {
   'family_heirloom': { name: 'Family Heirloom', rarity: 'uncommon', value: 50 },
   'ale_mug': { name: 'Tavern Mug', rarity: 'common', value: 1 },
   'bar_stool_leg': { name: 'Bar Stool Leg', rarity: 'common', value: 1, type: 'weapon' },
-  'herbal_remedy': { name: 'Herbal Remedy', rarity: 'common', value: 15, effect: 'heal', amount: '1d4' },
+  'herbal_remedy': { name: 'Herbal Remedy', rarity: 'common', value: 15, effect: 'heal', amount: '1d4', icon: 'assets/icons/items/herbal_remedy.webp' },
   'stolen_goods': { name: 'Stolen Goods', rarity: 'uncommon', value: 35 },
   'poisoned_dagger': { name: 'Poisoned Dagger', rarity: 'uncommon', value: 75, type: 'weapon' },
   'rare_ingredient': { name: 'Rare Ingredient', rarity: 'uncommon', value: 40 }
