@@ -1,6 +1,7 @@
 import React from 'react';
 import { calculateMaxHP, getHPStatus } from '../utils/healthSystem';
 import { getLevelProgress, calculateLevel } from '../utils/progressionSystem';
+import { resolveProfilePicture } from '../utils/assetHelper';
 
 const HeroModal = ({ isOpen, onClose, hero }) => {
     if (!isOpen || !hero) return null;
@@ -28,7 +29,7 @@ const HeroModal = ({ isOpen, onClose, hero }) => {
                     {hero.profilePicture && (
                         <div className="modal-profile-pic-container">
                             <img
-                                src={hero.profilePicture}
+                                src={resolveProfilePicture(hero.profilePicture)}
                                 alt={`${hero.heroName}'s profile`}
                                 className="modal-profile-pic"
                             />
@@ -78,7 +79,7 @@ const HeroModal = ({ isOpen, onClose, hero }) => {
                                     <span style={{ color: status.color, fontWeight: 'bold' }}>{currentHP}/{maxHP}</span>
                                 </div>
                                 <div className="hero-hp-bar">
-                                    <div className="hero-hp-fill" style={{ 
+                                    <div className="hero-hp-fill" style={{
                                         width: `${(currentHP / maxHP) * 100}%`,
                                         background: status.color
                                     }} />
@@ -106,7 +107,7 @@ const HeroModal = ({ isOpen, onClose, hero }) => {
                                 {!progress.isMaxLevel ? (
                                     <>
                                         <div className="hero-hp-bar" style={{ background: 'var(--ink-strong)' }}>
-                                            <div style={{ 
+                                            <div style={{
                                                 width: `${progress.percentage}%`,
                                                 height: '100%',
                                                 background: 'linear-gradient(90deg, var(--state-warning), var(--state-highlight))',

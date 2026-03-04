@@ -8,6 +8,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { calculateMaxHP } from "../utils/healthSystem";
 import { heroesApi } from "../services/heroesApi";
 import { createLogger } from "../utils/logger";
+import { resolveProfilePicture } from "../utils/assetHelper";
 
 const logger = createLogger('hero-summary');
 
@@ -99,8 +100,8 @@ const HeroSummary = () => {
       <div className="summary-content">
         {/* Image Column */}
         <div className="summary-image">
-          <img 
-            src={newHero.profilePicture} 
+          <img
+            src={resolveProfilePicture(newHero.profilePicture)}
             alt={`${newHero.heroName}'s profile`}
             loading="lazy"
             width="300"
@@ -191,15 +192,15 @@ const HeroSummary = () => {
             <h3>Sign In Required</h3>
             <p>You need to sign in to save your hero. Your hero data will be preserved.</p>
             <div className="summary-feedback-actions" style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button 
-                className="modal-close-button" 
+              <button
+                className="modal-close-button"
                 onClick={() => setShowLoginPrompt(false)}
                 style={{ background: 'transparent', color: 'var(--text)' }}
               >
                 Cancel
               </button>
-              <button 
-                className="modal-close-button" 
+              <button
+                className="modal-close-button"
                 onClick={() => navigate('/login', { state: { from: { pathname: '/hero-summary' } } })}
               >
                 Sign In

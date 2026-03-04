@@ -10,7 +10,7 @@ import { calculateDamage, shouldDealDamage, getDamageDescription } from './healt
 export const resolveEncounter = async (encounter, playerAction, character, settings, llmConfig = {}) => {
   // 1. Determine relevant skill and modifier
   const action = encounter.suggestedActions.find(a => a.label === playerAction);
-  
+
   if (!action) {
     throw new Error(`Invalid action: ${playerAction}`);
   }
@@ -30,10 +30,10 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
   const statName = SKILLS[skill];
   const statValue = character.stats[statName] || 10;
   const modifier = calculateModifier(statValue);
-  
+
   // 2. Roll the check
   const rollResult = rollCheck(modifier);
-  
+
   // 3. Determine outcome tier
   let outcomeTier;
   if (rollResult.isCriticalSuccess) {
@@ -45,26 +45,26 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
   } else {
     outcomeTier = 'failure';
   }
-  
+
   // 4. Get base consequence
   const baseConsequence = encounter.consequences[outcomeTier];
-  
+
   // 5. Use base consequence for narration (fully local, no AI calls)
   // This makes combat instant and eliminates API costs/latency
   const aiNarration = baseConsequence;
-  
+
   // 6. Calculate HP damage if hostile encounter
   let hpDamage = 0;
   let damageDescription = null;
-  
+
   if (shouldDealDamage(encounter) && character.maxHP) {
     hpDamage = calculateDamage(outcomeTier, character.maxHP, encounter.difficulty);
     damageDescription = getDamageDescription(hpDamage, character.maxHP);
   }
-  
+
   // 7. Apply rewards/penalties
   const outcome = applyConsequences(outcomeTier, encounter.rewards, rollResult, encounter);
-  
+
   return {
     narration: aiNarration,
     rollResult,
@@ -91,7 +91,7 @@ const applyConsequences = (outcomeTier, rewards, rollResult, encounter) => {
   if (outcomeTier === 'success' || outcomeTier === 'criticalSuccess') {
     result.rewards = generateLoot(rewards, rollResult, outcomeTier, encounter);
   }
-  
+
   // Failure tiers may still get healing from healer encounters
   if ((outcomeTier === 'failure' || outcomeTier === 'criticalFailure') && encounter?.healingByTier) {
     result.rewards = generateLoot(rewards, rollResult, outcomeTier, encounter);
@@ -111,23 +111,23 @@ const applyConsequences = (outcomeTier, rewards, rollResult, encounter) => {
  */
 const determinePenalties = (outcomeTier, encounter) => {
   const isCritical = outcomeTier === 'criticalFailure';
-  
+
   // Categorize encounters
   const hostileEncounters = ['goblin', 'wolf', 'bandit', 'spider', 'bear'];
   const socialEncounters = ['merchant', 'minstrel', 'child'];
   const environmentalEncounters = ['rockslide', 'shrine'];
-  
+
   const encounterName = encounter.name.toLowerCase();
   const isHostile = hostileEncounters.some(keyword => encounterName.includes(keyword));
   const isSocial = socialEncounters.some(keyword => encounterName.includes(keyword));
   const isEnvironmental = environmentalEncounters.some(keyword => encounterName.includes(keyword));
-  
+
   const penalties = {
     messages: [],
     goldLoss: 0,
     itemsLost: []
   };
-  
+
   // Hostile encounters: physical consequences + gold loss
   if (isHostile) {
     if (isCritical) {
@@ -140,7 +140,7 @@ const determinePenalties = (outcomeTier, encounter) => {
       penalties.messages.push(`Lost ${penalties.goldLoss} gold escaping`);
     }
   }
-  
+
   // Social encounters: reputation/resource consequences
   else if (isSocial) {
     if (isCritical) {
@@ -152,7 +152,7 @@ const determinePenalties = (outcomeTier, encounter) => {
       // No gold loss for minor social failures
     }
   }
-  
+
   // Environmental encounters: situational consequences
   else if (isEnvironmental) {
     if (isCritical) {
@@ -166,7 +166,7 @@ const determinePenalties = (outcomeTier, encounter) => {
       // No gold loss for minor environmental setbacks
     }
   }
-  
+
   // Default fallback
   else {
     if (isCritical) {
@@ -177,7 +177,7 @@ const determinePenalties = (outcomeTier, encounter) => {
       penalties.messages.push('Minor setback');
     }
   }
-  
+
   return penalties;
 };
 
@@ -205,14 +205,14 @@ const generateLoot = (rewards, rollResult, outcomeTier, encounter) => {
     for (const itemEntry of rewards.items) {
       const [itemName, chanceStr] = itemEntry.split(':');
       const chance = parseInt(chanceStr) / 100;
-      
+
       // Critical success increases loot chance by 50%
-      const adjustedChance = outcomeTier === 'criticalSuccess' 
-        ? Math.min(chance * 1.5, 1.0) 
+      const adjustedChance = outcomeTier === 'criticalSuccess'
+        ? Math.min(chance * 1.5, 1.0)
         : chance;
-      
+
       if (Math.random() < adjustedChance) {
-        loot.items.push(itemName.replace(/_/g, ' '));
+        loot.items.push(itemName);
       }
     }
   }

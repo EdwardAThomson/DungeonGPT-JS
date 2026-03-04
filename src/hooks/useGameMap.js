@@ -53,7 +53,8 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
     const [worldMap, setWorldMap] = useState(mapAndPosition.map);
     const [playerPosition, setPlayerPosition] = useState(mapAndPosition.position);
 
-    const subMapsData = loadedConversation?.sub_maps || loadedConversation?.subMaps;
+    const rawSubMaps = loadedConversation?.sub_maps || loadedConversation?.subMaps;
+    const subMapsData = typeof rawSubMaps === 'string' ? JSON.parse(rawSubMaps) : rawSubMaps;
 
     // Multi-level map system
     const [currentMapLevel, setCurrentMapLevel] = useState(subMapsData?.currentMapLevel || 'world');

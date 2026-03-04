@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolveProfilePicture } from '../utils/assetHelper';
 
 // Biome background colors
 const biomeColors = {
@@ -260,8 +261,8 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero }) =>
                     ][tile.beachDirection] : 'none'
                   }}
                 >
-                  <img 
-                    src={firstHero.profilePicture} 
+                  <img
+                    src={resolveProfilePicture(firstHero.profilePicture)}
                     alt={firstHero.characterName}
                     loading="lazy"
                     width="40"

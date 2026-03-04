@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getTownTileEmoji } from '../utils/townMapGenerator';
 import BuildingModal from './BuildingModal';
 import { createLogger } from '../utils/logger';
+import { resolveProfilePicture } from '../utils/assetHelper';
 
 const logger = createLogger('town-map-display');
 
@@ -26,12 +27,12 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
 
   const handleBuildingClick = (tile) => {
     if (!playerPosition) return;
-    
+
     // Calculate distance
     const distance = Math.abs(tile.x - playerPosition.x) + Math.abs(tile.y - playerPosition.y);
     const coordString = `${tile.x},${tile.y}`;
     const isDiscovered = discoveredBuildings.includes(coordString);
-    
+
     logger.debug('Building click debug:', {
       tileCoords: coordString,
       discoveredBuildings,
@@ -300,8 +301,8 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           >
             {firstHero ? (
               <div className="player-marker-portrait">
-                <img 
-                  src={firstHero.profilePicture} 
+                <img
+                  src={resolveProfilePicture(firstHero.profilePicture)}
                   alt={firstHero.characterName}
                   loading="lazy"
                   width="40"

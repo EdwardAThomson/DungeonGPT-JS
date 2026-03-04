@@ -31,6 +31,7 @@ import {
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
 import { createLogger } from '../utils/logger';
+import { resolveProfilePicture } from '../utils/assetHelper';
 
 const logger = createLogger('game');
 
@@ -64,6 +65,10 @@ const Game = () => {
     : loadedConversation?.game_settings;
   const worldSeed = settingsObj?.worldSeed || stateSeed;
 
+  const subMapsObj = typeof loadedConversation?.sub_maps === 'string'
+    ? JSON.parse(loadedConversation.sub_maps)
+    : (loadedConversation?.sub_maps || loadedConversation?.subMaps);
+
   const {
     settings,
     setSettings,
@@ -88,7 +93,7 @@ const Game = () => {
   const [actionEncounter, setActionEncounter] = useState(null);
   const [isActionEncounterOpen, setIsActionEncounterOpen] = useState(false);
   const [movesSinceEncounter, setMovesSinceEncounter] = useState(
-    loadedConversation?.sub_maps?.movesSinceEncounter || 0
+    subMapsObj?.movesSinceEncounter || 0
   );
   const [pendingNarrativeTile, setPendingNarrativeTile] = useState(null);
   const [aiNarrativeEnabled, setAiNarrativeEnabled] = useState(true);
@@ -227,7 +232,7 @@ const Game = () => {
     });
     const randomEncounter = checkForEncounter(targetTile, isFirstVisitToTile, settings, movesSinceEncounter);
     logger.debug('checkForEncounter returned', randomEncounter ? randomEncounter.name : null);
-    
+
     const plannedEncounterFlow = planWorldTileEncounterFlow({
       randomEncounter,
       targetTile,
@@ -408,6 +413,31 @@ const Game = () => {
   const currentBiome = currentTile?.biome || 'Unknown Area';
   const townName = mapHook.isInsideTown ? (mapHook.currentTownTile?.townName || 'Town') : null;
 
+  let subLocationName = null;
+  if (mapHook.isInsideTown && mapHook.currentTownMap && mapHook.townPlayerPosition) {
+    const tileX = mapHook.townPlayerPosition.x;
+    const tileY = mapHook.townPlayerPosition.y;
+    const townMapData = mapHook.currentTownMap.mapData;
+    if (townMapData && townMapData[tileY] && townMapData[tileY][tileX]) {
+      const townTile = townMapData[tileY][tileX];
+      if (townTile.type === 'building') {
+        if (townTile.buildingName) {
+          subLocationName = townTile.buildingName;
+        } else if (townTile.buildingType) {
+          subLocationName = townTile.buildingType.charAt(0).toUpperCase() + townTile.buildingType.slice(1);
+        } else {
+          subLocationName = 'Building';
+        }
+      } else if (townTile.type === 'town_square') {
+        subLocationName = 'Town Square';
+      } else if (townTile.type?.includes('path') || townTile.type === 'grass') {
+        subLocationName = 'Street';
+      } else {
+        subLocationName = townTile.type ? townTile.type.charAt(0).toUpperCase() + townTile.type.slice(1).replace('_', ' ') : 'Town';
+      }
+    }
+  }
+
   const diceSkill = interactionHook.checkRequest?.type === 'skill' ? interactionHook.checkRequest.skill : null;
   const diceMode = interactionHook.checkRequest?.type === 'skill' ? 'skill' : 'dice';
 
@@ -417,6 +447,7 @@ const Game = () => {
         <GameMainPanel
           campaignGoal={settings.campaignGoal}
           townName={townName}
+          subLocationName={subLocationName}
           townPosition={mapHook.townPlayerPosition}
           worldPosition={mapHook.playerPosition}
           currentBiome={currentBiome}
@@ -473,9 +504,9 @@ const Game = () => {
           {isMobilePartySidebarOpen ? (
             '✕'
           ) : selectedHeroes[0]?.profilePicture ? (
-            <img 
-              src={selectedHeroes[0].profilePicture} 
-              alt="Party" 
+            <img
+              src={resolveProfilePicture(selectedHeroes[0].profilePicture)}
+              alt="Party"
               className="mobile-party-toggle-portrait"
             />
           ) : (

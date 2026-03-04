@@ -4,6 +4,7 @@ import SafeMarkdownMessage from './SafeMarkdownMessage';
 const GameMainPanel = ({
   campaignGoal,
   townName,
+  subLocationName,
   townPosition,
   worldPosition,
   currentBiome,
@@ -39,7 +40,7 @@ const GameMainPanel = ({
         <div className="game-info-header">
           <div>
             <p><strong>Location:</strong> {townName
-              ? `${townName} (${townPosition?.x}, ${townPosition?.y})`
+              ? `(${worldPosition.x}, ${worldPosition.y}) - ${currentBiome} | ${townName} - ${subLocationName}`
               : `(${worldPosition.x}, ${worldPosition.y}) - ${currentBiome}`
             }</p>
           </div>

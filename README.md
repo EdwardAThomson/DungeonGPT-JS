@@ -63,11 +63,11 @@ cf-worker/           # Cloudflare Workers backend (production)
 
 The following image shows the character creator interface of DungeonGPT:
 
-![Character Creation](./screenshots/character_creator_updated.png)
+![Character Creation](./public/assets/screenshots/character_creator_updated.png)
 
 The following image shows the chat interface of DungeonGPT:
 
-![Chat Interface](./screenshots/chat_interface.png)
+![Chat Interface](./public/assets/screenshots/chat_interface.png)
 
 
 ## Setup and Installation

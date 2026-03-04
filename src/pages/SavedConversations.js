@@ -2,6 +2,7 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { conversationsApi } from '../services/conversationsApi';
 import { createLogger } from '../utils/logger';
+import { resolveProfilePicture } from '../utils/assetHelper';
 
 // Lazy load the details modal for better performance
 const SavedGameDetailsModal = lazy(() => import('../components/SavedGameDetailsModal'));
@@ -150,10 +151,10 @@ const SavedConversations = () => {
         <div className="conversations-list">
           {conversations.map((conversation) => {
             const heroes = conversation.selected_heroes ? (typeof conversation.selected_heroes === 'string' ? JSON.parse(conversation.selected_heroes) : conversation.selected_heroes) : [];
-            const settings = conversation.game_settings 
+            const settings = conversation.game_settings
               ? (typeof conversation.game_settings === 'string' ? JSON.parse(conversation.game_settings) : conversation.game_settings)
               : null;
-            
+
             return (
               <div key={conversation.sessionId} className="conversation-item" style={{ padding: '25px', minHeight: '180px', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', gap: '20px', marginBottom: '15px', flex: 1 }}>
@@ -165,7 +166,7 @@ const SavedConversations = () => {
                         return hero.profilePicture ? (
                           <img
                             key={idx}
-                            src={hero.profilePicture}
+                            src={resolveProfilePicture(hero.profilePicture)}
                             alt={heroName}
                             title={heroName}
                             style={{
@@ -181,7 +182,7 @@ const SavedConversations = () => {
                       })}
                     </div>
                   )}
-                  
+
                   {/* Content */}
                   <div style={{ flex: 1 }}>
                     {editingName === conversation.sessionId ? (
@@ -201,7 +202,7 @@ const SavedConversations = () => {
                         >
                           Save
                         </button>
-                        <button 
+                        <button
                           onClick={() => {
                             setEditingName(null);
                             setNewName('');
@@ -226,8 +227,8 @@ const SavedConversations = () => {
                     )}
                     {settings?.shortDescription && (
                       <p style={{ margin: '8px 0', fontSize: '0.9rem', lineHeight: '1.5', color: 'var(--text)' }}>
-                        {settings.shortDescription.length > 120 
-                          ? settings.shortDescription.substring(0, 120) + '...' 
+                        {settings.shortDescription.length > 120
+                          ? settings.shortDescription.substring(0, 120) + '...'
                           : settings.shortDescription}
                       </p>
                     )}

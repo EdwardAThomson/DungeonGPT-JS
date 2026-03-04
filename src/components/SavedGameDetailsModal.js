@@ -1,26 +1,27 @@
 import React from 'react';
+import { resolveProfilePicture } from '../utils/assetHelper';
 
 const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate, formatProvider, formatModel }) => {
   if (!isOpen || !conversation) return null;
 
-  const settings = conversation.game_settings 
-    ? (typeof conversation.game_settings === 'string' 
-        ? JSON.parse(conversation.game_settings) 
-        : conversation.game_settings)
+  const settings = conversation.game_settings
+    ? (typeof conversation.game_settings === 'string'
+      ? JSON.parse(conversation.game_settings)
+      : conversation.game_settings)
     : null;
 
-  const heroes = conversation.selected_heroes 
+  const heroes = conversation.selected_heroes
     ? (typeof conversation.selected_heroes === 'string' ? JSON.parse(conversation.selected_heroes) : conversation.selected_heroes)
     : [];
 
-  const position = conversation.player_position 
+  const position = conversation.player_position
     ? (typeof conversation.player_position === 'string' ? JSON.parse(conversation.player_position) : conversation.player_position)
     : null;
 
-  const subMaps = conversation.sub_maps 
-    ? (typeof conversation.sub_maps === 'string' 
-        ? JSON.parse(conversation.sub_maps) 
-        : conversation.sub_maps) 
+  const subMaps = conversation.sub_maps
+    ? (typeof conversation.sub_maps === 'string'
+      ? JSON.parse(conversation.sub_maps)
+      : conversation.sub_maps)
     : null;
 
   const getLocationString = () => {
@@ -33,8 +34,8 @@ const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate, form
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div 
-        className="modal-content" 
+      <div
+        className="modal-content"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '800px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}
       >
@@ -58,12 +59,12 @@ const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate, form
             <h3 style={{ color: 'var(--primary)', fontSize: '1.1rem', marginBottom: '10px' }}>Party Members</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
               {heroes.map((hero, idx) => (
-                <div 
-                  key={idx} 
-                  style={{ 
-                    background: 'var(--surface)', 
-                    padding: '15px', 
-                    borderRadius: '8px', 
+                <div
+                  key={idx}
+                  style={{
+                    background: 'var(--surface)',
+                    padding: '15px',
+                    borderRadius: '8px',
                     border: '1px solid var(--border)',
                     display: 'flex',
                     alignItems: 'center',
@@ -71,8 +72,8 @@ const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate, form
                   }}
                 >
                   {hero.profilePicture && (
-                    <img 
-                      src={hero.profilePicture} 
+                    <img
+                      src={resolveProfilePicture(hero.profilePicture)}
                       alt={hero.heroName || hero.characterName || 'Hero'}
                       style={{
                         width: '50px',
@@ -131,8 +132,8 @@ const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate, form
           </div>
         )}
 
-        <button 
-          className="modal-close-button" 
+        <button
+          className="modal-close-button"
           onClick={onClose}
           style={{ marginTop: '20px', width: '100%' }}
         >

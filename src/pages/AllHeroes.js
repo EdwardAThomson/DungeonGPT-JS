@@ -7,6 +7,7 @@ import HeroContext from "../contexts/HeroContext";
 import { calculateMaxHP } from "../utils/healthSystem";
 import { heroesApi } from "../services/heroesApi";
 import { createLogger } from "../utils/logger";
+import { resolveProfilePicture } from "../utils/assetHelper";
 
 const logger = createLogger('all-heroes');
 
@@ -47,7 +48,7 @@ const AllHeroes = () => {
 
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
-    
+
     try {
       await heroesApi.delete(deleteConfirm.heroId);
       setHeroes(heroes.filter(h => h.heroId !== deleteConfirm.heroId));
@@ -86,8 +87,8 @@ const AllHeroes = () => {
           {heroes.map((hero) => (
             <li key={hero.heroId} className="hero-item">
               <div className="hero-item-image">
-                <img 
-                  src={hero.profilePicture} 
+                <img
+                  src={resolveProfilePicture(hero.profilePicture)}
                   alt={`${hero.heroName}'s profile`}
                   loading="lazy"
                   width="150"
