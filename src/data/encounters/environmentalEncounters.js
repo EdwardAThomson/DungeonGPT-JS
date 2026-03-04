@@ -38,7 +38,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
       { label: 'Listen', skill: 'Perception', description: 'Identify sounds in the fog' },
       { label: 'Dispel', skill: 'Arcana', description: 'Clear the fog magically' }
     ],
-    rewards: { xp: 25, gold: '0', items: ['fog_essence:40%', 'hidden_path:30%'] },
+    rewards: { xp: 25, gold: '0', items: ['fog_essence:40%', 'traveler_map:30%'] },
     consequences: {
       criticalSuccess: 'You navigate perfectly and find something hidden by the fog.',
       success: 'You make it through without incident.',
@@ -84,7 +84,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
       { label: 'Create Shade', skill: 'Survival', description: 'Improvise sun protection' },
       { label: 'Push Through', skill: 'Constitution', description: 'Endure the heat' }
     ],
-    rewards: { xp: 30, gold: '0', items: ['survival_experience:60%', 'desert_flower:30%'] },
+    rewards: { xp: 30, gold: '0', items: ['herbal_remedy:60%', 'desert_flower:30%'] },
     consequences: {
       criticalSuccess: 'You find an oasis with cool water and shade.',
       success: 'You manage the heat effectively.',
@@ -108,7 +108,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
       { label: 'Signal Back', skill: 'Survival', description: 'Try to communicate' },
       { label: 'Ignore', skill: null, description: 'Continue on your way' }
     ],
-    rewards: { xp: 35, gold: '1d20', items: ['wisp_essence:40%', 'magical_discovery:50%', 'traveler_contact:30%'] },
+    rewards: { xp: 35, gold: '1d20', items: ['wisp_essence:40%', 'ancient_knowledge:50%', 'quest_clue:30%'] },
     consequences: {
       criticalSuccess: 'The lights lead you to treasure or helpful allies.',
       success: 'You discover the lights are a natural phenomenon and gain knowledge.',

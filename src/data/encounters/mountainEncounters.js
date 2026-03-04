@@ -16,7 +16,7 @@ export const MOUNTAIN_ENCOUNTERS = {
       { label: 'Scout Ahead', skill: 'Perception', description: 'Identify the safest path' },
       { label: 'Turn Back', skill: null, description: 'Find another way' }
     ],
-    rewards: { xp: 45, gold: '0', items: ['mountain_crystal:50%', 'eagle_feather:30%', 'rare_ore:25%'] },
+    rewards: { xp: 45, gold: '0', items: ['mountain_crystal:50%', 'giant_feather:30%', 'rare_ore:25%'] },
     consequences: {
       criticalSuccess: 'You find a hidden shortcut and rare mountain treasures.',
       success: 'You cross safely and continue your journey.',
@@ -88,7 +88,7 @@ export const MOUNTAIN_ENCOUNTERS = {
       { label: 'Climb to Nest', skill: 'Athletics', description: 'Investigate the nest' },
       { label: 'Observe', skill: 'Perception', description: 'Watch from a safe distance' }
     ],
-    rewards: { xp: 55, gold: '0', items: ['giant_feather:80%', 'eagle_blessing:30%', 'mountain_view:50%', 'eagle_ally:20%'] },
+    rewards: { xp: 55, gold: '0', items: ['giant_feather:80%', 'eagle_blessing:30%', 'mountain_view:50%', 'eagle_blessing:20%'] },
     consequences: {
       criticalSuccess: 'You befriend the eagles - they offer to carry you where you need to go.',
       success: 'The eagles accept you and you gather valuable feathers.',

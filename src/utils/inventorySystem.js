@@ -174,6 +174,15 @@ export const ITEM_CATALOG = {
   'enchanted_staff': { name: 'Enchanted Staff', rarity: 'uncommon', value: 250, type: 'weapon' },
   'mountain_view': { name: 'Memory of a View', rarity: 'common', value: 0 },
 
+  // Environmental / natural loot (used by environmental & POI encounters)
+  'rainwater': { name: 'Collected Rainwater', rarity: 'common', value: 5, stackable: true },
+  'fog_essence': { name: 'Fog Essence', rarity: 'uncommon', value: 60 },
+  'desert_flower': { name: 'Desert Flower', rarity: 'uncommon', value: 35 },
+  'wisp_essence': { name: 'Wisp Essence', rarity: 'rare', value: 120 },
+  'cave_fish': { name: 'Cave Fish', rarity: 'common', value: 8, stackable: true },
+  'beast_hide': { name: 'Beast Hide', rarity: 'common', value: 20 },
+  'enchanted_tusk': { name: 'Enchanted Tusk', rarity: 'uncommon', value: 85 },
+
   // Generic loot
   'gold_coins': { name: 'Gold Coins', rarity: 'common', value: 0, isGold: true, icon: 'assets/icons/items/gold_coins.webp' },
   'gemstone': { name: 'Gemstone', rarity: 'uncommon', value: 100 },
