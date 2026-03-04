@@ -15,6 +15,8 @@ import ConversationManager from './ConversationManager';
 import EncounterDebug from './EncounterDebug';
 import CFWorkerDebug from './CFWorkerDebug';
 import ItemIconsTest from './ItemIconsTest';
+import EncounterVisualDebug from './EncounterVisualDebug';
+import EncounterModalStates from './EncounterModalStates';
 
 const debugLinks = [
   { to: 'terrain-studio-v2', label: 'Terrain Studio V2' },
@@ -33,6 +35,8 @@ const debugLinks = [
   { to: 'conversation-manager', label: 'Conversation Manager' },
   { to: 'cf-worker', label: 'CF Worker AI Test' },
   { to: 'item-icons', label: 'Item Icons Test' },
+  { to: 'encounter-visual', label: '🎨 Encounter Visual Debug' },
+  { to: 'encounter-states', label: '🎭 Modal States Test' },
 ];
 
 const DebugRoutes = () => {
@@ -80,6 +84,8 @@ const DebugRoutes = () => {
           <Route path="conversation-manager" element={<ConversationManager />} />
           <Route path="cf-worker" element={<CFWorkerDebug />} />
           <Route path="item-icons" element={<ItemIconsTest />} />
+          <Route path="encounter-visual" element={<EncounterVisualDebug />} />
+          <Route path="encounter-states" element={<EncounterModalStates />} />
           <Route path="*" element={<Navigate to="llm-debug" replace />} />
         </Routes>
       </section>

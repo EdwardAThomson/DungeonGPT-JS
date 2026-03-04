@@ -15,6 +15,7 @@ export const BASE_ENCOUNTERS = {
       { label: 'Flee', skill: 'Acrobatics', description: 'Sprint away before they surround you' },
       { label: 'Negotiate', skill: 'Persuasion', description: 'Offer gold or safe passage' }
     ],
+    image: '/assets/encounters/goblin_ambush.webp',
     rewards: { xp: 50, gold: '2d10', items: ['rusty_dagger:30%', 'healing_potion:20%'] },
     consequences: {
       criticalSuccess: 'The goblins flee in terror, dropping valuable loot in their panic.',

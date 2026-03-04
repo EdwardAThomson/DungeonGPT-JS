@@ -142,6 +142,9 @@ const DebugMenu = ({ inNav = false }) => {
                     <Link to="/debug/item-icons" style={{ ...linkStyle, color: '#e84393', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
                         🎒 Item Icons Test
                     </Link>
+                    <Link to="/debug/encounter-visual" style={{ ...linkStyle, color: '#00cec9', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
+                        🎨 Encounter Visual Debug
+                    </Link>
                 </div>
             )}
             <button style={buttonStyle} onClick={toggleMenu} title="Debug Menu">

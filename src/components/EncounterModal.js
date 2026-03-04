@@ -1,7 +1,15 @@
 import React, { useEffect, useRef } from 'react';
 import FocusTrap from 'focus-trap-react';
 
-const EncounterModal = ({ isOpen, onClose, encounter, onEnterLocation, onViewMap }) => {
+const EncounterModal = ({
+    isOpen,
+    onClose,
+    encounter,
+    onAction,
+    onEnterLocation,
+    onViewMap,
+    fullSizeImage = false
+}) => {
     const previousFocusRef = useRef(null);
 
     useEffect(() => {
@@ -38,51 +46,80 @@ const EncounterModal = ({ isOpen, onClose, encounter, onEnterLocation, onViewMap
     return (
         <div className="modal-overlay" onClick={onClose}>
             <FocusTrap>
-                <div 
-                    className="modal-content encounter-modal-content" 
+                <div
+                    className="modal-content encounter-modal-content"
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={handleKeyDown}
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="encounter-modal-title"
+                    style={{ padding: '20px 24px' }}
                 >
-                <div style={{ textAlign: 'center', fontSize: '64px', marginBottom: '20px' }}>
-                    {getLocationIcon(encounter.poiType)}
-                </div>
-                <h2 id="encounter-modal-title">{encounter.name}</h2>
-                <p style={{ fontSize: '16px', lineHeight: '1.6', marginBottom: '20px' }}>
-                    {encounter.description}
-                </p>
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                    {encounter.canEnter && (
-                        <button
-                            className="primary-button"
-                            onClick={() => {
-                                onEnterLocation();
-                                onClose();
-                            }}
-                            aria-label={`Enter ${encounter.name}`}
-                        >
-                            Enter {encounter.name}
-                        </button>
+                    <h2 id="encounter-modal-title" style={{ marginTop: '0', marginBottom: '2px', paddingBottom: '6px' }}>{encounter.name}</h2>
+                    <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--state-muted-strong)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '10px' }}>
+                        Random Encounter
+                    </div>
+                    {encounter.image && (
+                        <div style={{
+                            width: '100%',
+                            height: fullSizeImage ? 'auto' : '240px',
+                            maxHeight: fullSizeImage ? '500px' : '240px',
+                            marginBottom: '12px',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            border: '2px solid var(--border)'
+                        }}>
+                            <img
+                                src={encounter.image}
+                                alt={encounter.name}
+                                style={{
+                                    width: '100%',
+                                    height: fullSizeImage ? 'auto' : '100%',
+                                    objectFit: fullSizeImage ? 'contain' : 'cover',
+                                    objectPosition: fullSizeImage ? 'center' : 'center 30%',
+                                    display: 'block'
+                                }}
+                            />
+                        </div>
                     )}
-                    <button className="secondary-button" onClick={onClose} aria-label="Continue journey">
-                        Continue Journey
-                    </button>
-                    <button
-                        className="secondary-button"
-                        onClick={() => {
-                            onClose();
-                            if (onViewMap) onViewMap();
-                        }}
-                        aria-label="View world map"
-                    >
-                        View Map
-                    </button>
-                </div>
-                <p style={{ fontSize: '12px', color: 'var(--state-muted-strong)', marginTop: '20px', fontStyle: 'italic' }}>
-                    💡 Tip: Use the Map button in the top-right to navigate the world
-                </p>
+                    {!encounter.image && (
+                        <div style={{ textAlign: 'center', fontSize: '64px', marginBottom: '12px' }}>
+                            {getLocationIcon(encounter.poiType)}
+                        </div>
+                    )}
+                    <p style={{ fontSize: '14px', lineHeight: '1.5', marginBottom: '12px' }}>
+                        {encounter.description}
+                    </p>
+                    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        {encounter.canEnter && (
+                            <button
+                                className="primary-button"
+                                onClick={() => {
+                                    onEnterLocation();
+                                    onClose();
+                                }}
+                                aria-label={`Enter ${encounter.name} `}
+                            >
+                                Enter {encounter.name}
+                            </button>
+                        )}
+                        <button className="secondary-button" onClick={onClose} aria-label="Continue journey">
+                            Continue Journey
+                        </button>
+                        <button
+                            className="secondary-button"
+                            onClick={() => {
+                                onClose();
+                                if (onViewMap) onViewMap();
+                            }}
+                            aria-label="View world map"
+                        >
+                            View Map
+                        </button>
+                    </div>
+                    <p style={{ fontSize: '11px', color: 'var(--state-muted-strong)', marginTop: '10px', marginBottom: '0', fontStyle: 'italic' }}>
+                        💡 Use the Map button in the top-right to navigate
+                    </p>
                 </div>
             </FocusTrap>
         </div>

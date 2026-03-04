@@ -89,7 +89,7 @@ const EncounterModalDebug = () => {
       },
       gold: 50,
       inventory: [],
-      profilePicture: '/fighter.png'
+      profilePicture: '/assets/characters/fighter.webp'
     },
     {
       characterId: 'hero-2',
@@ -111,22 +111,22 @@ const EncounterModalDebug = () => {
       },
       gold: 75,
       inventory: [],
-      profilePicture: '/ranger.png'
+      profilePicture: '/assets/characters/ranger.webp'
     }
   ];
 
   const startTest = (encounterType, partySize) => {
     addLog(`Starting ${encounterType} encounter with ${partySize} hero(es)`, 'info');
-    
+
     const encounter = sampleEncounters[encounterType];
     const party = partySize === 1 ? [sampleHeroes[0]] : sampleHeroes;
-    
+
     setTestEncounter(encounter);
     setTestHero(party[0]);
     setTestParty(party);
     setEncounterResult(null);
     setIsModalOpen(true);
-    
+
     addLog('Modal opened', 'info');
   };
 
@@ -134,19 +134,19 @@ const EncounterModalDebug = () => {
     addLog('Encounter resolved', 'info');
     addLog(`Outcome: ${result.outcomeTier}`, 'info');
     addLog(`Narration: ${result.narration}`, 'info');
-    
+
     if (result.rewards) {
       addLog(`Rewards: XP=${result.rewards.xp}, Gold=${result.rewards.gold}, Items=${result.rewards.items?.join(', ') || 'none'}`, 'info');
     }
-    
+
     if (result.penalties) {
       addLog(`Penalties: ${result.penalties.messages?.join(', ') || 'none'}`, 'warn');
     }
-    
+
     if (result.hpDamage) {
       addLog(`HP Damage: ${result.hpDamage}`, 'warn');
     }
-    
+
     setEncounterResult(result);
     setIsModalOpen(false);
   };
@@ -154,9 +154,9 @@ const EncounterModalDebug = () => {
   const handleHeroUpdate = (updatedHero) => {
     addLog(`Hero updated: ${updatedHero.characterName} HP=${updatedHero.currentHP}/${updatedHero.maxHP}`, 'info');
     setTestHero(updatedHero);
-    
+
     // Update in party too
-    setTestParty(prev => prev.map(h => 
+    setTestParty(prev => prev.map(h =>
       h.characterId === updatedHero.characterId ? updatedHero : h
     ));
   };
@@ -167,9 +167,9 @@ const EncounterModalDebug = () => {
   };
 
   return (
-    <div style={{ 
-      padding: '20px', 
-      maxWidth: '1200px', 
+    <div style={{
+      padding: '20px',
+      maxWidth: '1200px',
       margin: '0 auto',
       fontFamily: 'var(--body-font)',
       color: 'var(--text)',
@@ -177,56 +177,56 @@ const EncounterModalDebug = () => {
       minHeight: '100vh'
     }}>
       <h1 style={{ color: 'var(--primary)' }}>⚔️ Encounter Modal Debug</h1>
-      
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: '1fr 1fr', 
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
         gap: '20px',
         marginBottom: '20px'
       }}>
         {/* Test Controls */}
-        <div style={{ 
-          background: 'var(--surface)', 
-          padding: '20px', 
+        <div style={{
+          background: 'var(--surface)',
+          padding: '20px',
           borderRadius: '8px',
           border: '1px solid var(--border)'
         }}>
           <h2>Test Controls</h2>
-          
+
           <div style={{ marginBottom: '20px' }}>
             <h3>Simple Encounter (Single Round)</h3>
-            <button 
+            <button
               onClick={() => startTest('simple', 1)}
               style={{ marginRight: '10px' }}
               className="primary-button"
             >
               1 Hero
             </button>
-            <button 
+            <button
               onClick={() => startTest('simple', 2)}
               className="primary-button"
             >
               2 Heroes (Selection)
             </button>
           </div>
-          
+
           <div style={{ marginBottom: '20px' }}>
             <h3>Multi-Round Encounter</h3>
-            <button 
+            <button
               onClick={() => startTest('multiRound', 1)}
               style={{ marginRight: '10px' }}
               className="primary-button"
             >
               1 Hero
             </button>
-            <button 
+            <button
               onClick={() => startTest('multiRound', 2)}
               className="primary-button"
             >
               2 Heroes (Selection)
             </button>
           </div>
-          
+
           <div>
             <h3>Current Test State</h3>
             <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
@@ -239,18 +239,18 @@ const EncounterModalDebug = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Last Result */}
-        <div style={{ 
-          background: 'var(--surface)', 
-          padding: '20px', 
+        <div style={{
+          background: 'var(--surface)',
+          padding: '20px',
           borderRadius: '8px',
           border: '1px solid var(--border)'
         }}>
           <h2>Last Result</h2>
           {encounterResult ? (
             <div style={{ fontSize: '14px' }}>
-              <p><strong>Outcome:</strong> <span style={{ 
+              <p><strong>Outcome:</strong> <span style={{
                 color: encounterResult.outcomeTier?.includes('Success') ? 'var(--state-success)' : 'var(--state-danger)'
               }}>{encounterResult.outcomeTier}</span></p>
               <p><strong>Narration:</strong> {encounterResult.narration}</p>
@@ -282,11 +282,11 @@ const EncounterModalDebug = () => {
           )}
         </div>
       </div>
-      
+
       {/* Logs */}
-      <div style={{ 
-        background: 'var(--surface)', 
-        padding: '20px', 
+      <div style={{
+        background: 'var(--surface)',
+        padding: '20px',
         borderRadius: '8px',
         border: '1px solid var(--border)'
       }}>
@@ -294,9 +294,9 @@ const EncounterModalDebug = () => {
           <h2>Event Logs</h2>
           <button onClick={clearLogs} className="primary-button">Clear Logs</button>
         </div>
-        <div style={{ 
-          background: 'var(--bg)', 
-          padding: '15px', 
+        <div style={{
+          background: 'var(--bg)',
+          padding: '15px',
           borderRadius: '4px',
           maxHeight: '400px',
           overflowY: 'auto',
@@ -307,11 +307,11 @@ const EncounterModalDebug = () => {
             <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>No logs yet</p>
           ) : (
             logs.map((log, idx) => (
-              <div key={idx} style={{ 
+              <div key={idx} style={{
                 marginBottom: '5px',
-                color: log.type === 'error' ? 'var(--state-danger)' : 
-                       log.type === 'warn' ? 'var(--state-warning)' : 
-                       'var(--text)'
+                color: log.type === 'error' ? 'var(--state-danger)' :
+                  log.type === 'warn' ? 'var(--state-warning)' :
+                    'var(--text)'
               }}>
                 <span style={{ color: 'var(--text-secondary)' }}>[{log.timestamp}]</span> {log.message}
               </div>
@@ -319,7 +319,7 @@ const EncounterModalDebug = () => {
           )}
         </div>
       </div>
-      
+
       {/* Modal */}
       <EncounterActionModal
         isOpen={isModalOpen}
