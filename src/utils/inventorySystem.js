@@ -9,17 +9,17 @@
 export const rollDice = (notation) => {
   if (typeof notation === 'number') return notation;
   if (!notation || notation === '0') return 0;
-  
+
   const match = notation.match(/^(\d+)d(\d+)(?:\+(\d+))?$/);
   if (!match) return parseInt(notation) || 0;
-  
+
   const [, count, sides, bonus] = match;
   let total = parseInt(bonus) || 0;
-  
+
   for (let i = 0; i < parseInt(count); i++) {
     total += Math.floor(Math.random() * parseInt(sides)) + 1;
   }
-  
+
   return total;
 };
 
@@ -33,10 +33,10 @@ export const rollItemDrop = (itemString) => {
   if (!match) {
     return { name: itemString, dropped: true };
   }
-  
+
   const [, name, chance] = match;
   const roll = Math.random() * 100;
-  
+
   return {
     name,
     chance: parseInt(chance),
@@ -52,7 +52,7 @@ export const rollItemDrop = (itemString) => {
  */
 export const processRewards = (rewards, outcome) => {
   if (!rewards) return { xp: 0, gold: 0, items: [] };
-  
+
   // Outcome affects rewards
   const outcomeMultipliers = {
     criticalSuccess: 1.5,
@@ -60,18 +60,18 @@ export const processRewards = (rewards, outcome) => {
     failure: 0.3,
     criticalFailure: 0
   };
-  
+
   const multiplier = outcomeMultipliers[outcome] ?? 1.0;
-  
+
   // XP
   const xp = Math.floor((rewards.xp || 0) * multiplier);
-  
+
   // Gold
   let gold = 0;
   if (rewards.gold && multiplier > 0) {
     gold = Math.floor(rollDice(rewards.gold) * multiplier);
   }
-  
+
   // Items (only on success or better)
   const items = [];
   if (rewards.items && multiplier >= 1.0) {
@@ -82,35 +82,35 @@ export const processRewards = (rewards, outcome) => {
       }
     }
   }
-  
+
   return { xp, gold, items };
 };
 
 // Item definitions with rarity and value
 export const ITEM_CATALOG = {
   // Common items
-  'healing_potion': { name: 'Healing Potion', rarity: 'common', value: 50, effect: 'heal', amount: '2d4+2' },
-  'antidote': { name: 'Antidote', rarity: 'common', value: 25, effect: 'cure_poison' },
-  'rations': { name: 'Trail Rations', rarity: 'common', value: 5, stackable: true },
-  'torch': { name: 'Torch', rarity: 'common', value: 1, stackable: true },
-  'rope': { name: 'Rope (50ft)', rarity: 'common', value: 10 },
-  
+  'healing_potion': { name: 'Healing Potion', rarity: 'common', value: 50, effect: 'heal', amount: '2d4+2', icon: 'assets/icons/items/healing_potion.png' },
+  'antidote': { name: 'Antidote', rarity: 'common', value: 25, effect: 'cure_poison', icon: 'assets/icons/items/antidote.png' },
+  'rations': { name: 'Trail Rations', rarity: 'common', value: 5, stackable: true, icon: 'assets/icons/items/rations.png' },
+  'torch': { name: 'Torch', rarity: 'common', value: 1, stackable: true, icon: 'assets/icons/items/torch.png' },
+  'rope': { name: 'Rope (50ft)', rarity: 'common', value: 10, icon: 'assets/icons/items/rope.png' },
+
   // Uncommon items
-  'greater_healing_potion': { name: 'Greater Healing Potion', rarity: 'uncommon', value: 150, effect: 'heal', amount: '4d4+4' },
-  'scroll_fireball': { name: 'Fire Scroll', rarity: 'uncommon', value: 200, effect: 'spell', spell: 'fireball' },
-  'silver_dagger': { name: 'Silver Dagger', rarity: 'uncommon', value: 100, type: 'weapon' },
-  
+  'greater_healing_potion': { name: 'Greater Healing Potion', rarity: 'uncommon', value: 150, effect: 'heal', amount: '4d4+4', icon: 'assets/icons/items/greater_healing_potion.png' },
+  'scroll_fireball': { name: 'Fire Scroll', rarity: 'uncommon', value: 200, effect: 'spell', spell: 'fireball', icon: 'assets/icons/items/scroll_fireball.png' },
+  'silver_dagger': { name: 'Silver Dagger', rarity: 'uncommon', value: 100, type: 'weapon', icon: 'assets/icons/items/silver_dagger.png' },
+
   // Rare items
-  'magic_weapon': { name: 'Enchanted Blade', rarity: 'rare', value: 500, type: 'weapon', bonus: '+1' },
-  'ring_protection': { name: 'Protective Ring', rarity: 'rare', value: 750, type: 'ring', bonus: '+1 defense' },
-  
+  'magic_weapon': { name: 'Enchanted Blade', rarity: 'rare', value: 500, type: 'weapon', bonus: '+1', icon: 'assets/icons/items/magic_weapon.png' },
+  'ring_protection': { name: 'Protective Ring', rarity: 'rare', value: 750, type: 'ring', bonus: '+1 defense', icon: 'assets/icons/items/ring_protection.png' },
+
   // Very Rare
-  'legendary_weapon': { name: 'Legendary Weapon', rarity: 'very_rare', value: 2500, type: 'weapon', bonus: '+2' },
-  'legendary_artifact': { name: 'Ancient Artifact', rarity: 'very_rare', value: 5000, type: 'artifact' },
-  
+  'legendary_weapon': { name: 'Legendary Weapon', rarity: 'very_rare', value: 2500, type: 'weapon', bonus: '+2', icon: 'assets/icons/items/legendary_weapon.png' },
+  'legendary_artifact': { name: 'Ancient Artifact', rarity: 'very_rare', value: 5000, type: 'artifact', icon: 'assets/icons/items/legendary_artifact.png' },
+
   // POI-specific items
-  'cave_mushrooms': { name: 'Glowing Cave Mushrooms', rarity: 'common', value: 15, stackable: true },
-  'raw_gems': { name: 'Raw Gemstones', rarity: 'uncommon', value: 75 },
+  'cave_mushrooms': { name: 'Glowing Cave Mushrooms', rarity: 'common', value: 15, stackable: true, icon: 'assets/icons/items/cave_mushrooms.png' },
+  'raw_gems': { name: 'Raw Gemstones', rarity: 'uncommon', value: 75, icon: 'assets/icons/items/raw_gems.png' },
   'spider_silk': { name: 'Giant Spider Silk', rarity: 'uncommon', value: 50 },
   'bat_guano': { name: 'Alchemical Reagent', rarity: 'common', value: 10, stackable: true },
   'ancient_scroll': { name: 'Ancient Scroll', rarity: 'uncommon', value: 100 },
@@ -128,30 +128,30 @@ export const ITEM_CATALOG = {
   'dragon_scale': { name: 'Dragon Scale', rarity: 'very_rare', value: 1000 },
   'mountain_crystal': { name: 'Mountain Crystal', rarity: 'uncommon', value: 80 },
   'storm_crystal': { name: 'Storm Crystal', rarity: 'rare', value: 200 },
-  
+
   // Generic loot
-  'gold_coins': { name: 'Gold Coins', rarity: 'common', value: 0, isGold: true },
+  'gold_coins': { name: 'Gold Coins', rarity: 'common', value: 0, isGold: true, icon: 'assets/icons/items/gold_coins.png' },
   'gemstone': { name: 'Gemstone', rarity: 'uncommon', value: 100 },
   'pearl': { name: 'Pearl', rarity: 'uncommon', value: 100 },
   'old_coins': { name: 'Ancient Coins', rarity: 'common', value: 25 },
-  'treasure_map': { name: 'Treasure Map', rarity: 'rare', value: 0, type: 'quest_item' },
-  
+  'treasure_map': { name: 'Treasure Map', rarity: 'rare', value: 0, type: 'quest_item', icon: 'assets/icons/items/treasure_map.png' },
+
   // Quest items
   'quest_clue': { name: 'Mysterious Clue', rarity: 'uncommon', value: 0, type: 'quest_item' },
   'quest_key': { name: 'Ornate Key', rarity: 'rare', value: 0, type: 'quest_item' },
   'quest_letter': { name: 'Sealed Letter', rarity: 'uncommon', value: 0, type: 'quest_item' },
   'mysterious_letter': { name: 'Mysterious Letter', rarity: 'uncommon', value: 0, type: 'quest_item' },
-  
+
   // Monster drops
-  'wolf_pelt': { name: 'Wolf Pelt', rarity: 'common', value: 15, stackable: true },
-  'wolf_fang': { name: 'Wolf Fang', rarity: 'common', value: 10, stackable: true },
-  'goblin_ear': { name: 'Goblin Ear', rarity: 'common', value: 5, stackable: true },
-  'spider_venom': { name: 'Spider Venom', rarity: 'uncommon', value: 35 },
-  'bandit_badge': { name: 'Bandit Badge', rarity: 'common', value: 20 },
+  'wolf_pelt': { name: 'Wolf Pelt', rarity: 'common', value: 15, stackable: true, icon: 'assets/icons/items/wolf_pelt.png' },
+  'wolf_fang': { name: 'Wolf Fang', rarity: 'common', value: 10, stackable: true, icon: 'assets/icons/items/wolf_fang.png' },
+  'goblin_ear': { name: 'Goblin Ear', rarity: 'common', value: 5, stackable: true, icon: 'assets/icons/items/goblin_ear.png' },
+  'spider_venom': { name: 'Spider Venom', rarity: 'uncommon', value: 35, icon: 'assets/icons/items/spider_venom.png' },
+  'bandit_badge': { name: 'Bandit Badge', rarity: 'common', value: 20, icon: 'assets/icons/items/bandit_badge.png' },
   'bear_claw': { name: 'Bear Claw', rarity: 'uncommon', value: 25 },
   'bear_pelt': { name: 'Bear Pelt', rarity: 'uncommon', value: 40 },
   'venom_sac': { name: 'Venom Sac', rarity: 'uncommon', value: 45 },
-  
+
   // Encounter loot
   'rusty_dagger': { name: 'Rusty Dagger', rarity: 'common', value: 5, type: 'weapon' },
   'shortsword': { name: 'Shortsword', rarity: 'common', value: 25, type: 'weapon' },
@@ -181,7 +181,7 @@ export const ITEM_CATALOG = {
 export const addItem = (inventory, itemKey, quantity = 1) => {
   const itemDef = ITEM_CATALOG[itemKey];
   const newInventory = [...inventory];
-  
+
   // Check if stackable item already exists
   if (itemDef?.stackable) {
     const existing = newInventory.find(i => i.key === itemKey);
@@ -190,7 +190,7 @@ export const addItem = (inventory, itemKey, quantity = 1) => {
       return newInventory;
     }
   }
-  
+
   // Add new item
   newInventory.push({
     key: itemKey,
@@ -200,7 +200,7 @@ export const addItem = (inventory, itemKey, quantity = 1) => {
     quantity,
     ...(itemDef || {})
   });
-  
+
   return newInventory;
 };
 
@@ -214,15 +214,15 @@ export const addItem = (inventory, itemKey, quantity = 1) => {
 export const removeItem = (inventory, itemKey, quantity = 1) => {
   const newInventory = [...inventory];
   const index = newInventory.findIndex(i => i.key === itemKey);
-  
+
   if (index === -1) return newInventory;
-  
+
   if (newInventory[index].quantity > quantity) {
     newInventory[index].quantity -= quantity;
   } else {
     newInventory.splice(index, 1);
   }
-  
+
   return newInventory;
 };
 
@@ -247,7 +247,7 @@ export const addGold = (character, amount) => {
  */
 export const removeGold = (character, amount) => {
   if ((character.gold || 0) < amount) return null;
-  
+
   return {
     ...character,
     gold: character.gold - amount

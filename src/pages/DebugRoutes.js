@@ -14,6 +14,7 @@ import LLMDebug from './LLMDebug';
 import ConversationManager from './ConversationManager';
 import EncounterDebug from './EncounterDebug';
 import CFWorkerDebug from './CFWorkerDebug';
+import ItemIconsTest from './ItemIconsTest';
 
 const debugLinks = [
   { to: 'terrain-studio-v2', label: 'Terrain Studio V2' },
@@ -31,6 +32,7 @@ const debugLinks = [
   { to: 'llm-debug', label: 'LLM Pipeline Debug' },
   { to: 'conversation-manager', label: 'Conversation Manager' },
   { to: 'cf-worker', label: 'CF Worker AI Test' },
+  { to: 'item-icons', label: 'Item Icons Test' },
 ];
 
 const DebugRoutes = () => {
@@ -77,6 +79,7 @@ const DebugRoutes = () => {
           <Route path="llm-debug" element={<LLMDebug />} />
           <Route path="conversation-manager" element={<ConversationManager />} />
           <Route path="cf-worker" element={<CFWorkerDebug />} />
+          <Route path="item-icons" element={<ItemIconsTest />} />
           <Route path="*" element={<Navigate to="llm-debug" replace />} />
         </Routes>
       </section>

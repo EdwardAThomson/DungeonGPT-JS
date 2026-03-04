@@ -139,6 +139,9 @@ const DebugMenu = ({ inNav = false }) => {
                     <Link to="/debug/cf-worker" style={{ ...linkStyle, color: '#ff9800', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
                         ☁️ CF Worker AI Test
                     </Link>
+                    <Link to="/debug/item-icons" style={{ ...linkStyle, color: '#e84393', fontWeight: 'bold' }} onClick={() => setIsOpen(false)}>
+                        🎒 Item Icons Test
+                    </Link>
                 </div>
             )}
             <button style={buttonStyle} onClick={toggleMenu} title="Debug Menu">
