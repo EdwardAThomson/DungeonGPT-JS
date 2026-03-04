@@ -133,6 +133,15 @@ const HowToPlay = () => {
               </ul>
             </div>
             <div className="feature-image-placeholder gallery-placeholder" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div className="how-to-play-hero-container">
+                <img
+                  src="/assets/buildings/town_interior_hero.webp"
+                  alt="Town Interior"
+                  className="feature-screenshot hero-screenshot clickable-screenshot"
+                  onClick={() => openImage('/assets/buildings/town_interior_hero.webp', 'Grand Inn')}
+                  title="Click to enlarge"
+                />
+              </div>
               <div className="how-to-play-mini-gallery">
                 <div className="mini-gallery-item">
                   <img src="/assets/buildings/tavern.webp" alt="Tavern" className="clickable-screenshot" onClick={() => openImage('/assets/buildings/tavern.webp', 'Tavern')} />
