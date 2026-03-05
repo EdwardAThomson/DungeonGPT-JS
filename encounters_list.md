@@ -4,15 +4,15 @@ This document lists all available encounters in the game, categorized by their t
 
 ## Wilderness Encounters (Base)
 - **Goblin Ambush** (Immediate) - 👺 [HAS IMAGE]
-- **Wolf Pack** (Immediate) - 🐺
-- **Bandit Roadblock** (Immediate) - 🗡️
-- **Traveling Merchant** (Narrative) - 🛒
+- **Wolf Pack** (Immediate) - 🐺 [HAS IMAGE]
+- **Bandit Roadblock** (Immediate) - 🗡️ [HAS IMAGE]
+- **Traveling Merchant** (Narrative) - 🛒 [HAS IMAGE]
 - **Wandering Minstrel** (Narrative) - 🎵
-- **Giant Spider Nest** (Immediate) - 🕷️
-- **Angry Bear** (Immediate) - 🐻
-- **Mysterious Shrine** (Narrative) - ⛩️
+- **Giant Spider Nest** (Immediate) - 🕷️ [HAS IMAGE]
+- **Angry Bear** (Immediate) - 🐻 [HAS IMAGE]
+- **Mysterious Shrine** (Narrative) - ⛩️ [HAS IMAGE]
 - **Rockslide** (Immediate) - 🪨
-- **Lost Child** (Narrative) - 👧
+- **Lost Child** (Narrative) - 👧 [HAS IMAGE]
 
 ## Additional Wilderness & Road
 - **Medicinal Herbs** (Narrative) - 🌿
@@ -59,8 +59,8 @@ This document lists all available encounters in the game, categorized by their t
 - **Mountain Eagle Nest** (Narrative) - 🦅
 
 ## Environmental Hazards
-- **Sudden Storm** (Immediate) - ⛈️
-- **Earthquake** (Immediate) - 🫨
+- **Sudden Storm** (Immediate) - ⛈️ [HAS IMAGE]
+- **Earthquake** (Immediate) - 🫨 [HAS IMAGE]
 - **Thick Fog** (Narrative) - 🌫️
 - **Heat Wave** (Narrative) - ☀️
 - **Strange Lights** (Narrative) - 🌟

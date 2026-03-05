@@ -7,6 +7,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     encounterTier: 'immediate',
     environmental: true,
     description: 'Dark clouds gather with unnatural speed and a violent storm breaks overhead!',
+    image: '/assets/encounters/sudden_storm.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Find Shelter', skill: 'Survival', description: 'Locate cover quickly' },
@@ -53,6 +54,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     encounterTier: 'immediate',
     environmental: true,
     description: 'The ground shakes violently as an earthquake strikes!',
+    image: '/assets/encounters/earthquake.webp',
     difficulty: 'hard',
     suggestedActions: [
       { label: 'Drop and Cover', skill: 'Acrobatics', description: 'Protect yourself from debris' },
