@@ -32,6 +32,7 @@ export const CAVE_ENCOUNTERS = {
     encounterTier: 'immediate',
     poiType: 'cave',
     description: 'A massive swarm of bats erupts from the cave, filling the air with leathery wings and piercing screeches!',
+    image: '/assets/encounters/cave_bats.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Duck and Cover', skill: 'Acrobatics', description: 'Protect yourself from the swarm' },

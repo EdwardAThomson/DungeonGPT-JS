@@ -9,6 +9,7 @@ export const MOUNTAIN_ENCOUNTERS = {
     narrativeHook: 'a narrow path winding along a sheer cliff face',
     aiContext: 'The mountain pass is narrow and dangerous, with sheer drops and loose rocks. One wrong step could be fatal, but it\'s the only way through the peaks.',
     description: 'A narrow trail clings to the mountainside, with deadly drops on one side and unstable rocks above.',
+    image: '/assets/encounters/mountain_pass.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Proceed Carefully', skill: 'Acrobatics', description: 'Navigate with extreme care' },
@@ -82,6 +83,7 @@ export const MOUNTAIN_ENCOUNTERS = {
     narrativeHook: 'massive feathers scattered on a high ledge',
     aiContext: 'A giant eagle\'s nest sits on a high ledge, containing eggs or fledglings. The eagles are intelligent and might be befriended or could attack intruders.',
     description: 'A massive nest of woven branches perches on a ledge, the screech of giant eagles echoing off the peaks.',
+    image: '/assets/encounters/mountain_eagle_nest.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Approach Slowly', skill: 'Animal Handling', description: 'Try to befriend the eagles' },

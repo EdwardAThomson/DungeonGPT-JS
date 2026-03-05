@@ -32,6 +32,7 @@ export const RUINS_ENCOUNTERS = {
     encounterTier: 'immediate',
     poiType: 'ruins',
     description: 'A spectral figure materializes among the ruins, its hollow eyes fixing upon you!',
+    image: '/assets/encounters/ruin_ghost.webp',
     difficulty: 'hard',
     multiRound: true,
     enemyHP: 40,

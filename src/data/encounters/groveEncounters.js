@@ -9,6 +9,7 @@ export const GROVE_ENCOUNTERS = {
     narrativeHook: 'an ancient circle of trees radiating peaceful energy',
     aiContext: 'A ring of ancient trees marks a sacred grove. The air feels charged with natural magic. Druids or forest spirits might dwell here, and the grove could offer healing or blessings.',
     description: 'A circle of towering ancient trees surrounds a peaceful clearing, humming with natural magic.',
+    image: '/assets/encounters/sacred_grove.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Meditate', skill: 'Religion', description: 'Commune with nature spirits' },
@@ -33,6 +34,7 @@ export const GROVE_ENCOUNTERS = {
     narrativeHook: 'a beautiful figure seeming to emerge from an ancient tree',
     aiContext: 'A dryad, guardian of the grove, reveals herself. She might offer aid to those who respect the forest, or punish those who harm it. Her favor could open paths through the deepest woods.',
     description: 'A beautiful spirit steps from an ancient oak, her form shifting between woman and tree.',
+    image: '/assets/encounters/dryad_encounter.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Greet Respectfully', skill: 'Persuasion', description: 'Show proper respect' },
@@ -55,6 +57,7 @@ export const GROVE_ENCOUNTERS = {
     encounterTier: 'immediate',
     poiType: 'grove',
     description: 'A massive boar, its eyes glowing with unnatural intelligence, charges from the undergrowth!',
+    image: '/assets/encounters/forest_beast.webp',
     difficulty: 'hard',
     multiRound: true,
     enemyHP: 55,
@@ -81,6 +84,7 @@ export const GROVE_ENCOUNTERS = {
     narrativeHook: 'a perfect circle of mushrooms glowing softly in the twilight',
     aiContext: 'A ring of luminescent mushrooms marks a fairy crossing. Stepping inside could transport you elsewhere, attract fey attention, or grant strange gifts - but fairy bargains are tricky.',
     description: 'Glowing mushrooms form a perfect circle, the air within shimmering with otherworldly light.',
+    image: '/assets/encounters/fairy_ring.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Step Inside', skill: 'Arcana', description: 'Enter the fairy ring' },

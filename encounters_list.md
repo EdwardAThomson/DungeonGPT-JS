@@ -35,29 +35,29 @@ This document lists all available encounters in the game, categorized by their t
 ## Location-Specific (POIs)
 
 ### Caves
-- **Cave Bats** (Immediate) - 🦇
+- **Cave Bats** (Immediate) - 🦇 [HAS IMAGE]
 - **Cave Spider Nest** (Immediate) - 🕷️
 - **Cave Treasure Guardian** (Immediate) - 🐉
 - **Cave Entrance** (Narrative) - 🕳️ [HAS IMAGE]
 - **Underground Lake** (Narrative) - 💧 [HAS IMAGE]
 
 ### Ruins
-- **Ruin Ghost** (Immediate) - 👻
+- **Ruin Ghost** (Immediate) - 👻 [HAS IMAGE]
 - **Ruin Cultists** (Immediate) - 🕯️
 - **Ruin Entrance** (Narrative) - 🏛️ [HAS IMAGE]
 - **Treasure Vault** (Narrative) - 💰
 - **Ancient Library** (Narrative) - 📚 [HAS IMAGE]
 
 ### Groves
-- **Forest Beast** (Immediate) - 🐗
-- **Sacred Grove** (Narrative) - 🧚
-- **Dryad Encounter** (Narrative) - 🌳
-- **Fairy Ring** (Narrative) - 🍄
+- **Forest Beast** (Immediate) - 🐗 [HAS IMAGE]
+- **Sacred Grove** (Narrative) - 🧚 [HAS IMAGE]
+- **Dryad Encounter** (Narrative) - 🌳 [HAS IMAGE]
+- **Fairy Ring** (Narrative) - 🍄 [HAS IMAGE]
 
 ### Mountains
 - **Mountain Dragon** (Immediate) - 🐉 [HAS IMAGE]
-- **Mountain Pass** (Narrative) - ⛰️
-- **Mountain Eagle Nest** (Narrative) - 🦅
+- **Mountain Pass** (Narrative) - ⛰️ [HAS IMAGE]
+- **Mountain Eagle Nest** (Narrative) - 🦅 [HAS IMAGE]
 
 ## Environmental Hazards
 - **Sudden Storm** (Immediate) - ⛈️ [HAS IMAGE]
