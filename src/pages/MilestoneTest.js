@@ -12,7 +12,7 @@ const MilestoneTest = () => {
     const [testPrompt, setTestPrompt] = useState('');
     const [aiResponse, setAiResponse] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [detectedToolCall, setDetectedToolCall] = useState(null);
+    const [detectedMarker, setDetectedMarker] = useState(null);
     const [provider, setProvider] = useState('gemini-cli');
     const [model, setModel] = useState('gemini-3-flash-preview');
 
@@ -57,7 +57,7 @@ const MilestoneTest = () => {
         if (!testPrompt.trim()) return;
 
         setIsLoading(true);
-        setDetectedToolCall(null);
+        setDetectedMarker(null);
 
         const context = generatePromptContext();
         const fullPrompt = DM_PROTOCOL + `[CONTEXT]\n${context}\n\n[PLAYER ACTION]\n${testPrompt}\n\n[NARRATE]`;
@@ -77,7 +77,7 @@ const MilestoneTest = () => {
             const match = response.match(MILESTONE_COMPLETE_REGEX);
             if (match) {
                 const milestoneText = match[1].trim();
-                setDetectedToolCall({ type: 'COMPLETE_MILESTONE', text: milestoneText });
+                setDetectedMarker({ type: 'COMPLETE_MILESTONE', text: milestoneText });
 
                 // Find and mark milestone as complete
                 const milestoneIndex = milestones.findIndex(m =>
@@ -95,7 +95,7 @@ const MilestoneTest = () => {
             // Check for campaign completion
             const campaignMatch = response.match(CAMPAIGN_COMPLETE_REGEX);
             if (campaignMatch) {
-                setDetectedToolCall({ type: 'COMPLETE_CAMPAIGN', text: 'Campaign Complete!' });
+                setDetectedMarker({ type: 'COMPLETE_CAMPAIGN', text: 'Campaign Complete!' });
                 setCampaignComplete(true);
             }
         } catch (error) {
@@ -113,7 +113,7 @@ const MilestoneTest = () => {
         ]);
         setCampaignComplete(false);
         setAiResponse('');
-        setDetectedToolCall(null);
+        setDetectedMarker(null);
     };
 
     const milestoneStatus = getMilestoneStatus(milestones);
@@ -122,7 +122,7 @@ const MilestoneTest = () => {
         <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'var(--body-font)', color: 'var(--text)' }}>
             <h1 style={{ color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>🎯 Milestone System Test</h1>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '30px' }}>
-                Test the milestone tracking system and tool call detection. Enter player actions that might trigger milestone completion.
+                Test the milestone tracking system and response marker detection. Enter player actions that might trigger milestone completion.
             </p>
 
             {/* AI Configuration */}
@@ -241,13 +241,13 @@ const MilestoneTest = () => {
                 </div>
             )}
 
-            {/* Tool Call Detection */}
-            {detectedToolCall && (
+            {/* Response Marker Detection */}
+            {detectedMarker && (
                 <div style={{ padding: '15px', background: 'rgba(76, 175, 80, 0.15)', border: '2px solid #4caf50', borderRadius: '8px', marginBottom: '30px' }}>
-                    <h3 style={{ marginTop: 0, color: '#4caf50', fontFamily: 'var(--header-font)' }}>✅ Tool Call Detected!</h3>
+                    <h3 style={{ marginTop: 0, color: '#4caf50', fontFamily: 'var(--header-font)' }}>✅ Response Marker Detected!</h3>
                     <div style={{ fontSize: '14px', color: 'var(--text)' }}>
-                        <strong>Type:</strong> {detectedToolCall.type}<br />
-                        <strong>Milestone Text:</strong> {detectedToolCall.text}
+                        <strong>Marker Type:</strong> {detectedMarker.type}<br />
+                        <strong>Parsed Milestone Text:</strong> {detectedMarker.text}
                     </div>
                 </div>
             )}

@@ -2,7 +2,7 @@
 title: "Building an AI-Powered Quest System: Milestone Tracking with Structured Text Markers"
 date: "2026-01-30"
 category: "artificial-intelligence"
-tags: AI, JavaScript, React, OpenAI, Gemini, Game Development, Tool Calls, Quest System
+tags: AI, JavaScript, React, OpenAI, Gemini, Game Development, Text Markers, Quest System
 description: "How we built an intelligent quest tracking system that uses structured text markers to automatically detect and celebrate player achievements in DungeonGPT."
 
 ---
@@ -211,8 +211,7 @@ The markers feel native to the AI's response. They don't require specialized API
 ### 2. **Transparent and Debuggable**
 The markers are human-readable in the AI response. If something goes wrong, we can immediately see what the AI tried to do.
 
-### 3. **Provider Agnostic**
-Because we're using simple text markers rather than proprietary tool calling APIs, this works identically across OpenAI, Gemini, and Claude.
+Because we're using simple text markers rather than proprietary function calling APIs, this works identically across OpenAI, Gemini, and Claude.
 
 ### 4. **Forgiving by Design**
 The fuzzy matching ensures that minor variations in AI phrasing don't break the system. The AI doesn't need to remember _exact_ milestone text.
@@ -293,7 +292,7 @@ Building an AI-powered quest system taught us that **LLMs excel at understanding
 - ✅ Maintains narrative immersion
 - ✅ Provides satisfying visual feedback
 
-The key insight was treating the AI as a **collaborative partner in quest tracking**, not just a text generator. By providing clear context and simple tools, the AI became genuinely helpful in managing campaign progression.
+The key insight was treating the AI as a **collaborative partner in quest tracking**, not just a text generator. By providing clear context and simple markers, the AI became genuinely helpful in managing campaign progression.
 
 This approach proves that modern LLMs can do more than generate creative content—they can actively participate in game state management when given the right framework.
 
