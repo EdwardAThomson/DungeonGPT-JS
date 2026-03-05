@@ -113,8 +113,8 @@ export const ITEM_CATALOG = {
   // POI-specific items
   'cave_mushrooms': { name: 'Glowing Cave Mushrooms', rarity: 'common', value: 15, stackable: true, icon: 'assets/icons/items/cave_mushrooms.webp' },
   'raw_gems': { name: 'Raw Gemstones', rarity: 'uncommon', value: 75, icon: 'assets/icons/items/raw_gems.webp' },
-  'spider_silk': { name: 'Giant Spider Silk', rarity: 'uncommon', value: 50 },
-  'bat_guano': { name: 'Alchemical Reagent', rarity: 'common', value: 10, stackable: true },
+  'spider_silk': { name: 'Giant Spider Silk', rarity: 'uncommon', value: 50, icon: 'assets/icons/items/spider_silk.webp' },
+  'bat_guano': { name: 'Alchemical Reagent', rarity: 'common', value: 10, stackable: true, icon: 'assets/icons/items/bat_guano.webp' },
   'ancient_scroll': { name: 'Ancient Scroll', rarity: 'uncommon', value: 100 },
   'artifact_fragment': { name: 'Artifact Fragment', rarity: 'rare', value: 200 },
   'ectoplasm': { name: 'Ectoplasm', rarity: 'uncommon', value: 75 },
@@ -142,8 +142,8 @@ export const ITEM_CATALOG = {
   'survivor_reward': { name: 'Survivor\'s Gift', rarity: 'common', value: 20 },
   'salvaged_goods': { name: 'Salvaged Goods', rarity: 'common', value: 30 },
   'wrapped_corpse_loot': { name: 'Traveler\'s Belongings', rarity: 'common', value: 25 },
-  'exposed_minerals': { name: 'Exposed Minerals', rarity: 'common', value: 20 },
-  'hard_leather': { name: 'Hardened Leather', rarity: 'common', value: 15 },
+  'exposed_minerals': { name: 'Exposed Minerals', rarity: 'common', value: 20, icon: 'assets/icons/items/exposed_minerals.webp' },
+  'hard_leather': { name: 'Hardened Leather', rarity: 'common', value: 15, icon: 'assets/icons/items/hard_leather.webp' },
   'poison_vial': { name: 'Poison Vial', rarity: 'uncommon', value: 45 },
   'glowing_fungi': { name: 'Glowing Cave Fungi', rarity: 'common', value: 10, stackable: true },
   'rare_herb': { name: 'Rare Herb', rarity: 'uncommon', value: 40 },
@@ -180,7 +180,7 @@ export const ITEM_CATALOG = {
   'desert_flower': { name: 'Desert Flower', rarity: 'uncommon', value: 35 },
   'wisp_essence': { name: 'Wisp Essence', rarity: 'rare', value: 120 },
   'cave_fish': { name: 'Cave Fish', rarity: 'common', value: 8, stackable: true },
-  'beast_hide': { name: 'Beast Hide', rarity: 'common', value: 20 },
+  'beast_hide': { name: 'Beast Hide', rarity: 'common', value: 20, icon: 'assets/icons/items/beast_hide.webp' },
   'enchanted_tusk': { name: 'Enchanted Tusk', rarity: 'uncommon', value: 85 },
 
   // Generic loot
@@ -202,9 +202,9 @@ export const ITEM_CATALOG = {
   'goblin_ear': { name: 'Goblin Ear', rarity: 'common', value: 5, stackable: true, icon: 'assets/icons/items/goblin_ear.webp' },
   'spider_venom': { name: 'Spider Venom', rarity: 'uncommon', value: 35, icon: 'assets/icons/items/spider_venom.webp' },
   'bandit_badge': { name: 'Bandit Badge', rarity: 'common', value: 20, icon: 'assets/icons/items/bandit_badge.webp' },
-  'bear_claw': { name: 'Bear Claw', rarity: 'uncommon', value: 25 },
-  'bear_pelt': { name: 'Bear Pelt', rarity: 'uncommon', value: 40 },
-  'venom_sac': { name: 'Venom Sac', rarity: 'uncommon', value: 45 },
+  'bear_claw': { name: 'Bear Claw', rarity: 'uncommon', value: 25, icon: 'assets/icons/items/bear_claw.webp' },
+  'bear_pelt': { name: 'Bear Pelt', rarity: 'uncommon', value: 40, icon: 'assets/icons/items/bear_pelt.webp' },
+  'venom_sac': { name: 'Venom Sac', rarity: 'uncommon', value: 45, icon: 'assets/icons/items/venom_sac.webp' },
 
   // Encounter loot
   'rusty_dagger': { name: 'Rusty Dagger', rarity: 'common', value: 5, type: 'weapon' },

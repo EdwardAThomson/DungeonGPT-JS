@@ -8,10 +8,11 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isMagicLink, setIsMagicLink] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const { user, signIn, signUp } = useAuth();
+  const { user, signIn, signUp, signInWithMagicLink, signInWithOAuth } = useAuth();
   const { theme } = useContext(SettingsContext);
   const navigate = useNavigate();
   const location = useLocation();
@@ -31,7 +32,14 @@ const Login = () => {
     setLoading(true);
 
     try {
-      if (isSignUp) {
+      if (isMagicLink) {
+        const { error } = await signInWithMagicLink(email);
+        if (error) {
+          setError(error.message);
+        } else {
+          setMessage('Check your email for a magic link to sign in!');
+        }
+      } else if (isSignUp) {
         const { error } = await signUp(email, password);
         if (error) {
           setError(error.message);
@@ -57,7 +65,7 @@ const Login = () => {
     <div className="login-page" data-theme={theme}>
       <div className="login-container">
         <h1 className="login-title">DungeonGPT</h1>
-        <h2 className="login-subtitle">{isSignUp ? 'Create Account' : 'Sign In'}</h2>
+        <h2 className="login-subtitle">{isMagicLink ? 'Magic Link' : isSignUp ? 'Create Account' : 'Sign In'}</h2>
         
         <form onSubmit={handleSubmit} className="login-form">
           <div className="form-group">
@@ -73,39 +81,83 @@ const Login = () => {
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              disabled={loading}
-            />
-          </div>
+          {!isMagicLink && (
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                disabled={loading}
+              />
+            </div>
+          )}
 
           {error && <p className="error-message">{error}</p>}
           {message && <p className="success-message">{message}</p>}
 
           <button type="submit" className="login-button" disabled={loading}>
-            {loading ? 'Loading...' : (isSignUp ? 'Sign Up' : 'Sign In')}
+            {loading ? 'Loading...' : isMagicLink ? 'Send Magic Link' : isSignUp ? 'Sign Up' : 'Sign In'}
           </button>
         </form>
 
-        <button 
+        <button
           onClick={() => {
-            setIsSignUp(!isSignUp);
+            setIsMagicLink(!isMagicLink);
+            setIsSignUp(false);
             setError('');
             setMessage('');
           }}
           className="toggle-mode-button"
           disabled={loading}
         >
-          {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
+          {isMagicLink ? 'Sign in with password instead' : 'Sign in with Magic Link'}
         </button>
+
+        {!isMagicLink && (
+          <button
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              setError('');
+              setMessage('');
+            }}
+            className="toggle-mode-button"
+            disabled={loading}
+          >
+            {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
+          </button>
+        )}
+
+        {/* SSO buttons - uncomment when providers are configured in Supabase
+        <div className="sso-divider">or continue with</div>
+        <div className="sso-buttons">
+          <button
+            className="sso-button sso-google"
+            onClick={() => signInWithOAuth('google')}
+            disabled={loading}
+          >
+            Google
+          </button>
+          <button
+            className="sso-button sso-github"
+            onClick={() => signInWithOAuth('github')}
+            disabled={loading}
+          >
+            GitHub
+          </button>
+          <button
+            className="sso-button sso-discord"
+            onClick={() => signInWithOAuth('discord')}
+            disabled={loading}
+          >
+            Discord
+          </button>
+        </div>
+        */}
 
         <div className="login-links">
           <Link to="/how-to-play" className="how-to-play-link">

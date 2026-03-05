@@ -61,6 +61,32 @@ export const AuthProvider = ({ children }) => {
     return { data, error };
   };
 
+  const signInWithMagicLink = async (email) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Authentication not configured' } };
+    }
+    const { data, error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: window.location.origin
+      }
+    });
+    return { data, error };
+  };
+
+  const signInWithOAuth = async (provider) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Authentication not configured' } };
+    }
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+    return { data, error };
+  };
+
   const signOut = async () => {
     if (!supabase) {
       return { error: null };
@@ -74,6 +100,8 @@ export const AuthProvider = ({ children }) => {
     loading,
     signUp,
     signIn,
+    signInWithMagicLink,
+    signInWithOAuth,
     signOut
   };
 
