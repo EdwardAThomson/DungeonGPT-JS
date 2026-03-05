@@ -9,6 +9,7 @@ export const CAVE_ENCOUNTERS = {
     narrativeHook: 'a dark cave mouth yawning open in the hillside',
     aiContext: 'A cave entrance beckons from the rocky terrain. Cold air drifts from within, carrying unfamiliar scents. The darkness inside could hide treasure, danger, or both.',
     description: 'A cave entrance looms before you, dark and mysterious. Strange sounds echo from within.',
+    image: '/assets/encounters/cave_entrance.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Enter Cautiously', skill: 'Stealth', description: 'Slip inside quietly' },
@@ -79,6 +80,7 @@ export const CAVE_ENCOUNTERS = {
     narrativeHook: 'the sound of dripping water echoing from deep within',
     aiContext: 'The cave opens into a vast underground chamber containing a still, dark lake. Phosphorescent fungi provide dim light. Something might lurk in the depths.',
     description: 'A subterranean lake stretches before you, its dark waters reflecting strange glowing fungi.',
+    image: '/assets/encounters/underground_lake.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Drink', skill: 'Nature', description: 'Test if the water is safe' },

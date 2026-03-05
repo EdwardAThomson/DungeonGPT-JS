@@ -80,17 +80,7 @@ cf-worker/migrations/
 # Special docs
 docs/deployment_*.md
 docs/refactor_assessment.md
-docs/ui_flow_improvements.md
-docs/character_to_hero_migration.md
-docs/accessibility_responsive_improvements.md
-docs/cloudflare_workers_ai_integration_plan.md
 docs/production_vs_dev_strategy.md
-docs/supabase_migration_plan.md
-docs/supabase_auth_review.md
-
-docs/cloudflare_worker_deployment.md
-
 
 # AI Prompt Analysis
 docs/AI_PROMPT_ANALYSIS.md
-docs/CF_AI_MODEL_RECOMMENDATIONS.md

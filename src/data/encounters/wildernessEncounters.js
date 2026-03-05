@@ -154,6 +154,7 @@ export const WILDERNESS_ENCOUNTERS = {
     narrativeHook: 'a metallic glint catching the light among the bushes',
     aiContext: 'Sharp eyes notice something unusual - a metallic gleam partially hidden in the vegetation. It could be treasure, a trap, or something left behind by previous travelers.',
     description: 'Something glints in the undergrowth - metal or perhaps gemstones catching the sunlight.',
+    image: '/assets/encounters/hidden_cache.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Investigate', skill: 'Investigation', description: 'Carefully examine the object' },
@@ -177,6 +178,7 @@ export const WILDERNESS_ENCOUNTERS = {
     narrativeHook: 'a column of smoke rising in the distance',
     aiContext: 'A thin column of smoke rises from beyond the next hill. It could be a campfire, a settlement, or something burning. The source is unclear but investigating might reveal something important.',
     description: 'You notice smoke rising in the distance. Is it a campfire, a village, or something more sinister?',
+    image: '/assets/encounters/distant_smoke.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Investigate', skill: 'Survival', description: 'Track the smoke to its source' },

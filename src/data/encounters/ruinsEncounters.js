@@ -9,6 +9,7 @@ export const RUINS_ENCOUNTERS = {
     narrativeHook: 'crumbling stone pillars emerging from the overgrowth',
     aiContext: 'Ancient ruins rise from the landscape, their original purpose lost to time. Weathered carvings hint at a forgotten civilization. The ruins might hold secrets, treasure, or lingering dangers.',
     description: 'Moss-covered ruins stand before you, remnants of a civilization long forgotten.',
+    image: '/assets/encounters/ruin_entrance.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Explore', skill: 'Investigation', description: 'Search the ruins thoroughly' },
@@ -105,6 +106,7 @@ export const RUINS_ENCOUNTERS = {
     narrativeHook: 'rows of dusty shelves visible through a collapsed wall',
     aiContext: 'A partially intact library contains scrolls and tomes that have survived the ages. The knowledge here could be invaluable - magical formulae, historical secrets, or maps to hidden places.',
     description: 'Ancient books and scrolls line crumbling shelves, their knowledge preserved through centuries.',
+    image: '/assets/encounters/ancient_library.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Study', skill: 'History', description: 'Read the ancient texts' },

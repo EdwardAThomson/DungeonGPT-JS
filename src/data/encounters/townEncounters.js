@@ -108,6 +108,7 @@ export const TOWN_ENCOUNTERS = {
     narrativeHook: 'a professional-looking clinic in the heart of town',
     aiContext: 'A clean, well-lit building serves as the town\'s primary medical facility. Inside, a dignified physician oversees several assistants. The atmosphere is professional and organized, suggesting reliable but potentially expensive care.',
     description: 'You visit the local physician, whose clinic is filled with neatly labeled jars and clean bandages.',
+    image: '/assets/encounters/town_healer.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Consult Healer', skill: 'Persuasion', description: 'Ask for professional medical help' },
