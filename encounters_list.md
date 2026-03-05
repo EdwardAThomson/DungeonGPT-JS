@@ -36,8 +36,8 @@ This document lists all available encounters in the game, categorized by their t
 
 ### Caves
 - **Cave Bats** (Immediate) - 🦇 [HAS IMAGE]
-- **Cave Spider Nest** (Immediate) - 🕷️
-- **Cave Treasure Guardian** (Immediate) - 🐉
+- **Cave Spider Nest** (Immediate) - 🕷️ [HAS IMAGE]
+- **Cave Treasure Guardian** (Immediate) - 🐉 [HAS IMAGE]
 - **Cave Entrance** (Narrative) - 🕳️ [HAS IMAGE]
 - **Underground Lake** (Narrative) - 💧 [HAS IMAGE]
 
