@@ -7,11 +7,11 @@ This document lists all available encounters in the game, categorized by their t
 - **Wolf Pack** (Immediate) - 🐺 [HAS IMAGE]
 - **Bandit Roadblock** (Immediate) - 🗡️ [HAS IMAGE]
 - **Traveling Merchant** (Narrative) - 🛒 [HAS IMAGE]
-- **Wandering Minstrel** (Narrative) - 🎵
+- **Wandering Minstrel** (Narrative) - 🎵 [HAS IMAGE]
 - **Giant Spider Nest** (Immediate) - 🕷️ [HAS IMAGE]
 - **Angry Bear** (Immediate) - 🐻 [HAS IMAGE]
 - **Mysterious Shrine** (Narrative) - ⛩️ [HAS IMAGE]
-- **Rockslide** (Immediate) - 🪨
+- **Rockslide** (Immediate) - 🪨 [HAS IMAGE]
 - **Lost Child** (Narrative) - 👧 [HAS IMAGE]
 
 ## Additional Wilderness & Road
@@ -25,7 +25,7 @@ This document lists all available encounters in the game, categorized by their t
 - **Distant Smoke** (Narrative) - 💨
 
 ## Town Encounters
-- **Tavern Brawl** (Immediate) - 🍺
+- **Tavern Brawl** (Immediate) - 🍺 [HAS IMAGE]
 - **Bustling Market** (Narrative) - 🏪
 - **Quest Board** (Narrative) - 📜
 - **Traveling Healer** (Narrative) - ⚕️
@@ -54,13 +54,13 @@ This document lists all available encounters in the game, categorized by their t
 - **Fairy Ring** (Narrative) - 🍄
 
 ### Mountains
-- **Mountain Dragon** (Immediate) - 🐉
+- **Mountain Dragon** (Immediate) - 🐉 [HAS IMAGE]
 - **Mountain Pass** (Narrative) - ⛰️
 - **Mountain Eagle Nest** (Narrative) - 🦅
 
 ## Environmental Hazards
 - **Sudden Storm** (Immediate) - ⛈️ [HAS IMAGE]
 - **Earthquake** (Immediate) - 🫨 [HAS IMAGE]
-- **Thick Fog** (Narrative) - 🌫️
-- **Heat Wave** (Narrative) - ☀️
-- **Strange Lights** (Narrative) - 🌟
+- **Thick Fog** (Narrative) - 🌫️ [HAS IMAGE]
+- **Heat Wave** (Narrative) - ☀️ [HAS IMAGE]
+- **Strange Lights** (Narrative) - 🌟 [HAS IMAGE]

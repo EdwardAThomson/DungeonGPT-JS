@@ -31,6 +31,7 @@ export const MOUNTAIN_ENCOUNTERS = {
     encounterTier: 'immediate',
     poiType: 'mountain',
     description: 'A dragon emerges from its mountain lair, ancient and terrible, demanding tribute or combat!',
+    image: '/assets/encounters/mountain_dragon.webp',
     difficulty: 'deadly',
     multiRound: true,
     enemyHP: 120,

@@ -114,6 +114,7 @@ export const BASE_ENCOUNTERS = {
     narrativeHook: 'a bard playing music by the roadside',
     aiContext: 'A traveling minstrel sits beneath a tree, playing a haunting melody on their lute. They seem lost in the music but might welcome company or have tales to share.',
     description: 'A bard sits by the roadside, playing a melancholy tune on a well-worn lute.',
+    image: '/assets/encounters/wandering_minstrel.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Listen to Song', skill: 'Perception', description: 'The song may contain hidden lore' },
@@ -207,6 +208,7 @@ export const BASE_ENCOUNTERS = {
     icon: '🪨',
     encounterTier: 'immediate',
     description: 'The ground trembles and rocks begin tumbling down the mountainside toward you!',
+    image: '/assets/encounters/rockslide.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Run', skill: 'Acrobatics', description: 'Sprint to safety' },

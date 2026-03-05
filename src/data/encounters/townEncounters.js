@@ -6,6 +6,7 @@ export const TOWN_ENCOUNTERS = {
     icon: '🍺',
     encounterTier: 'immediate',
     description: 'A drunken argument erupts into a full-blown brawl at the local tavern. Chairs fly and fists swing!',
+    image: '/assets/encounters/tavern_brawl.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Join the Fight', skill: 'Athletics', description: 'Wade in and start throwing punches' },

@@ -32,6 +32,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     narrativeHook: 'a wall of thick fog rolling across the land',
     aiContext: 'Dense fog blankets the area, reducing visibility to nearly nothing. Strange sounds echo through the mist. The fog might be natural, magical, or hiding something.',
     description: 'Impenetrable fog rolls in, reducing visibility to mere feet. Strange sounds echo in the whiteness.',
+    image: '/assets/encounters/thick_fog.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Navigate', skill: 'Survival', description: 'Try to maintain direction' },
@@ -79,6 +80,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     narrativeHook: 'the air shimmering with intense heat',
     aiContext: 'An oppressive heat wave makes travel dangerous. Dehydration and heat exhaustion threaten the party. Finding water and shade becomes critical.',
     description: 'The sun beats down mercilessly, the air so hot it shimmers. Every step is exhausting.',
+    image: '/assets/encounters/heat_wave.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Find Water', skill: 'Survival', description: 'Search for a water source' },
@@ -103,6 +105,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     narrativeHook: 'mysterious lights dancing on the horizon',
     aiContext: 'Unexplained lights appear in the sky or floating above the ground. They could be will-o-wisps, magical phenomena, or signals from other travelers.',
     description: 'Eerie lights dance in the distance, their colors shifting and their movement almost purposeful.',
+    image: '/assets/encounters/strange_lights.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Follow', skill: 'Survival', description: 'Track the lights to their source' },

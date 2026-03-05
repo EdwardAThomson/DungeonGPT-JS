@@ -1,13 +1,13 @@
 ---
-title: "Building an AI-Powered Quest System: Milestone Tracking with LLM Tool Calls"
+title: "Building an AI-Powered Quest System: Milestone Tracking with Structured Text Markers"
 date: "2026-01-30"
 category: "artificial-intelligence"
 tags: AI, JavaScript, React, OpenAI, Gemini, Game Development, Tool Calls, Quest System
-description: "How we built an intelligent quest tracking system that uses LLM tool calls to automatically detect and celebrate player achievements in DungeonGPT."
+description: "How we built an intelligent quest tracking system that uses structured text markers to automatically detect and celebrate player achievements in DungeonGPT."
 
 ---
 
-# Building an AI-Powered Quest System: Milestone Tracking with LLM Tool Calls
+# Building an AI-Powered Quest System: Milestone Tracking with Structured Text Markers
 
 ## What is DungeonGPT?
 
@@ -49,15 +49,13 @@ The AI needs to understand _intent and outcome_, not just pattern match specific
 3. **Communicate back**: Signal to the application that a milestone was reached
 4. **Stay in character**: Do all this without breaking immersion with technical jargon
 
-## Enter: LLM Tool Calls
+## Enter: Structured Text Markers
 
-The solution came from a powerful feature built into modern LLMs: **tool calling** (also called function calling). This allows the AI to invoke predefined functions as part of its response.
-
-However, we took a simpler approach that doesn't require the full tool calling API infrastructure. Instead, we use **structured text markers** that the AI includes in its narrative responses. Our system then parses these markers to trigger game events.
+We could have used explicit **tool calling** (also called function calling) APIs, which require passing JSON schemas back and forth. However, we took a simpler approach that doesn't require the full tool calling API infrastructure. Instead, we use **structured text markers** that the AI includes in its narrative responses. Our system then parses these markers to trigger game events.
 
 ### The Protocol
 
-We implemented two special tool calls that the AI can use:
+We implemented two special marker formats that the AI can use:
 
 #### 1. Milestone Completion
 ```
@@ -83,7 +81,7 @@ This signals that the overarching campaign goal has been achieved:
 
 ### Instructing the AI
 
-The magic happens in our dungeon master protocol. Here's how we instruct the AI about these tool calls:
+The magic happens in our dungeon master protocol. Here's how we instruct the AI about these markers:
 
 ```javascript
 export const DM_PROTOCOL = `[STRICT DUNGEON MASTER PROTOCOL]
@@ -142,7 +140,7 @@ This gives the AI full awareness of:
 
 ### Detection and Parsing
 
-When the AI responds, we use regex patterns to detect tool call markers:
+When the AI responds, we use regex patterns to detect the text markers:
 
 ```javascript
 const MILESTONE_COMPLETE_REGEX = /\[COMPLETE_MILESTONE:\s*(.+?)\]/i;
@@ -174,7 +172,7 @@ Notice the **fuzzy matching** approach. The AI might not include the _exact_ mil
 
 When a milestone is completed, players see immediate visual confirmation (at least on the demo page for now!):
 
-- ✅ **Tool Call Detected** banner with the milestone name
+- ✅ **Marker Detected** banner with the milestone name
 - 🎯 **Progress updates** (e.g., "2/3 Milestones Complete")
 - ✓ **Completed milestones** move to a "Completed" section with strikethrough styling
 - 🏆 **Campaign Complete** victory badge when the main objective is finished
@@ -187,9 +185,9 @@ We built a dedicated test page (`/milestone-test`) accessible via our debug menu
 2. **View current milestone status** with visual indicators
 3. **Test player actions** to see if they trigger milestone completion
 4. **Preview the exact context** sent to the AI
-5. **Inspect AI responses** including raw tool call markers
+5. **Inspect AI responses** including raw marker text
 
-This made development and iteration much faster. We could rapidly test different phrasing, verify fuzzy matching, and ensure the AI was using tool calls appropriately.
+This made development and iteration much faster. We could rapidly test different phrasing, verify fuzzy matching, and ensure the AI was using the markers appropriately.
 
 Example test scenarios from our [testing documentation](file:///home/edward/Projects/DungeonGPT-JS/docs/QUEST_MILESTONE_TESTING.md):
 
@@ -197,18 +195,18 @@ Example test scenarios from our [testing documentation](file:///home/edward/Proj
 
 - **Input:** "We finally located the Sunfire Vault!"
 - **Expected:** Matches "Locate the Sunfire Vault deep within the Cinder Mountains"
-- **Result:** ✅ Tool call detected, milestone marked complete
+- **Result:** ✅ Marker detected, milestone marked complete
 
 **Test: No False Positives**
 
 - **Input:** "We're still searching for clues about the map's location."
-- **Expected:** No tool call (milestone not actually completed)
+- **Expected:** No marker (milestone not actually completed)
 - **Result:** ✅ AI responds narratively, no milestone change
 
 ## Why This Approach Works
 
 ### 1. **Natural Integration**
-The tool calls feel native to the AI's response. They don't require specialized API features that might vary between providers (OpenAI, Gemini, Claude).
+The markers feel native to the AI's response. They don't require specialized API features that might vary between providers (OpenAI, Gemini, Claude).
 
 ### 2. **Transparent and Debuggable**
 The markers are human-readable in the AI response. If something goes wrong, we can immediately see what the AI tried to do.
@@ -234,7 +232,7 @@ Our early attempts had vague instructions like "mark milestones when complete." 
 The breakthrough came when we:
 
 - Used **clear, structured markers** with examples
-- Emphasized that tool calls should be **rare and meaningful**
+- Emphasized that markers should be **rare and meaningful**
 - Provided the **exact text format** to use
 
 ### Context is Everything
@@ -277,10 +275,10 @@ This would allow tracking partial progress (e.g., recruiting allies, collecting 
 
 Meta-game achievements that track interesting player behaviors across multiple campaigns.
 
-### Tool Call Analytics
+### Marker Analytics
 We're considering adding an analytics dashboard to track:
 
-- How often tool calls are used correctly vs incorrectly
+- How often markers are used correctly vs incorrectly
 - Which milestones are completed most/least often
 - Average campaign completion rates
 
@@ -299,10 +297,10 @@ The key insight was treating the AI as a **collaborative partner in quest tracki
 
 This approach proves that modern LLMs can do more than generate creative content—they can actively participate in game state management when given the right framework.
 
-If you're building AI-powered games or interactive experiences, consider how tool calls might help your AI "understand" not just _what players say_, but _what they accomplish_.
+If you're building AI-powered games or interactive experiences, consider how structured text markers might help your AI "understand" not just _what players say_, but _what they accomplish_.
 
 ---
 
 **Want to try DungeonGPT?** Check out the [GitHub repository](https://github.com/EdwardAThomson/DungeonGPT-JS) and watch the [overview video](https://youtu.be/CGskdUTQnMo).
 
-**Questions or ideas?** I'd love to hear how you're using LLMs in game development. What quest mechanics would you build with AI tool calls?
+**Questions or ideas?** I'd love to hear how you're using LLMs in game development. What quest mechanics would you build with AI text markers?
