@@ -43,9 +43,9 @@ This document lists all available encounters in the game, categorized by their t
 
 ### Ruins
 - **Ruin Ghost** (Immediate) - 👻 [HAS IMAGE]
-- **Ruin Cultists** (Immediate) - 🕯️
+- **Ruin Cultists** (Immediate) - 🕯️ [HAS IMAGE]
 - **Ruin Entrance** (Narrative) - 🏛️ [HAS IMAGE]
-- **Treasure Vault** (Narrative) - 💰
+- **Treasure Vault** (Narrative) - 💰 [HAS IMAGE]
 - **Ancient Library** (Narrative) - 📚 [HAS IMAGE]
 
 ### Groves

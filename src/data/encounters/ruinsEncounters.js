@@ -59,6 +59,7 @@ export const RUINS_ENCOUNTERS = {
     narrativeHook: 'an ornate door half-buried in rubble',
     aiContext: 'Behind fallen stones, an ornate door with ancient locks hints at a sealed vault. Whatever the ancients locked away might still be inside - treasure, knowledge, or something dangerous.',
     description: 'A sealed vault door bears arcane symbols and complex locks, promising secrets within.',
+    image: '/assets/encounters/ruin_treasure_vault.webp',
     difficulty: 'hard',
     suggestedActions: [
       { label: 'Pick Lock', skill: 'Sleight of Hand', description: 'Try to open the locks' },
@@ -81,6 +82,7 @@ export const RUINS_ENCOUNTERS = {
     encounterTier: 'immediate',
     poiType: 'ruins',
     description: 'Hooded figures chant around a glowing altar in the ruins - you\'ve stumbled upon a dark ritual!',
+    image: '/assets/encounters/ruin_cultists.webp',
     difficulty: 'hard',
     multiRound: true,
     enemyHP: 60,
