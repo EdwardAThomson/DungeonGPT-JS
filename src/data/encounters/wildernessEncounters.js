@@ -8,6 +8,7 @@ export const WILDERNESS_ENCOUNTERS = {
     narrativeHook: 'rare medicinal herbs growing among wildflowers',
     aiContext: 'A patch of unusual plants catches your eye - rare medicinal herbs with distinctive leaves and flowers. They could be valuable for healing or trade.',
     description: 'You spot a patch of rare medicinal herbs growing among the wildflowers.',
+    image: '/assets/encounters/medicinal_herbs.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Gather Herbs', skill: 'Nature', description: 'Carefully harvest the plants' },
@@ -31,6 +32,7 @@ export const WILDERNESS_ENCOUNTERS = {
     narrativeHook: 'an abandoned campsite with cold ashes',
     aiContext: 'An abandoned campsite lies ahead. The fire pit is cold, supplies are scattered, and there are signs of a hasty departure. What happened here?',
     description: 'You come across an abandoned campsite. The fire is cold, but supplies remain scattered about.',
+    image: '/assets/encounters/abandoned_campsite.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Search Camp', skill: 'Investigation', description: 'Look through what was left behind' },
@@ -54,6 +56,7 @@ export const WILDERNESS_ENCOUNTERS = {
     narrativeHook: 'a hermit meditating outside a mountain cave',
     aiContext: 'A weathered hermit sits cross-legged outside a cave entrance, eyes closed in meditation. Their presence radiates wisdom and peace. They seem aware of your approach despite their closed eyes.',
     description: 'A weathered hermit sits outside a cave, eyes twinkling with ancient knowledge.',
+    image: '/assets/encounters/mountain_hermit.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Seek Wisdom', skill: 'Persuasion', description: 'Ask the hermit for guidance' },
@@ -77,6 +80,7 @@ export const WILDERNESS_ENCOUNTERS = {
     narrativeHook: 'elven rangers watching from the forest',
     aiContext: 'Silent figures emerge from the treeline - elven rangers in forest green cloaks. Their bows are drawn but not aimed. They watch with cautious curiosity, clearly guardians of this woodland realm.',
     description: 'Silent elven rangers emerge from the treeline, bows drawn but not hostile — they wish to know your business.',
+    image: '/assets/encounters/elven_patrol.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Explain Yourself', skill: 'Persuasion', description: 'State your purpose honestly' },
@@ -102,6 +106,7 @@ export const WILDERNESS_ENCOUNTERS = {
     narrativeHook: 'a cloaked stranger observing you from a distance',
     aiContext: 'A mysterious hooded figure stands near the path, watching the party with interest. They don\'t appear hostile, but something about them seems significant. The stranger might have information, a quest, or hidden motives.',
     description: 'A hooded figure watches from the shadows, their face obscured but their attention clearly fixed on you.',
+    image: '/assets/encounters/mysterious_stranger.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Approach', skill: 'Persuasion', description: 'Greet the stranger openly' },
@@ -125,6 +130,7 @@ export const WILDERNESS_ENCOUNTERS = {
     narrativeHook: 'someone lying injured beside the path',
     aiContext: 'A wounded traveler is slumped against a tree, clutching their side. They appear to have been attacked recently. Blood stains their clothing. They might need help, or this could be a trap.',
     description: 'An injured traveler lies by the roadside, groaning in pain and calling weakly for help.',
+    image: '/assets/encounters/wounded_traveler.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Help', skill: 'Medicine', description: 'Tend to their wounds' },

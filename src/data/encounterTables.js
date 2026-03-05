@@ -62,7 +62,8 @@ export const encounterTables = {
     // Narrative encounters (common in towns)
     { template: 'town_market', weight: 20, hostile: false },
     { template: 'town_quest_board', weight: 18, hostile: false },
-    { template: 'town_healer', weight: 15, hostile: false },
+    { template: 'traveling_healer', weight: 10, hostile: false },
+    { template: 'town_healer', weight: 12, hostile: false },
     { template: 'suspicious_stranger', weight: 12, hostile: false },
     { template: 'wandering_minstrel', weight: 8, hostile: false },
     { template: 'mysterious_stranger', weight: 10, hostile: false },

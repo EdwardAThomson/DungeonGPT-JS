@@ -28,8 +28,9 @@ export const TOWN_ENCOUNTERS = {
     icon: '🏪',
     encounterTier: 'narrative',
     narrativeHook: 'a bustling market square filled with vendors',
-    aiContext: 'The town market is alive with activity. Vendors hawk their wares, fresh produce is piled high, and mysterious trinkets catch the eye. The air is filled with the sounds of haggling and the smell of fresh bread.',
-    description: 'The town market is alive with vendors hawking exotic wares, fresh produce, and mysterious trinkets.',
+    aiContext: 'The town square is alive with color and noise. Merchants hawking their wares, guards patrolling, and people from all walks of life going about their business.',
+    description: 'The town square is packed with stalls and people. The air is filled with the scent of spices and the sound of trade.',
+    image: '/assets/encounters/town_market.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Browse Wares', skill: 'Persuasion', description: 'Haggle with merchants for supplies' },
@@ -51,8 +52,9 @@ export const TOWN_ENCOUNTERS = {
     icon: '📜',
     encounterTier: 'narrative',
     narrativeHook: 'a notice board covered in postings and warnings',
-    aiContext: 'A weathered notice board stands prominently in the town square, its surface covered with parchments - bounties, requests for help, warnings about dangers, and notices of missing persons.',
-    description: 'A weathered notice board stands in the town square, covered with requests for help and warnings.',
+    aiContext: 'A large wooden board stands in the center of town, covered in small scrolls and posters. Some offer work, others warn of dangers in the surrounding lands.',
+    description: 'Bounties, requests for help, and warnings for travelers are pinned to this central notice board.',
+    image: '/assets/encounters/town_quest_board.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Read Notices', skill: 'Perception', description: 'Study the postings carefully' },
@@ -69,13 +71,14 @@ export const TOWN_ENCOUNTERS = {
     }
   },
 
-  'town_healer': {
+  'traveling_healer': {
     name: 'Traveling Healer',
     icon: '⚕️',
     encounterTier: 'narrative',
     narrativeHook: 'a healer\'s tent with the scent of medicinal herbs',
     aiContext: 'A colorful tent stands near the town well, its entrance marked by bundles of drying herbs. A kindly healer tends to the sick and injured, offering remedies and blessings to those in need.',
     description: 'A kindly healer has set up a tent near the town well, offering remedies and blessings to weary travelers.',
+    image: '/assets/encounters/traveling_healer.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Seek Healing', skill: 'Persuasion', description: 'Ask for treatment of injuries' },
@@ -98,13 +101,43 @@ export const TOWN_ENCOUNTERS = {
     }
   },
 
+  'town_healer': {
+    name: 'Town Healer',
+    icon: '🏥',
+    encounterTier: 'narrative',
+    narrativeHook: 'a professional-looking clinic in the heart of town',
+    aiContext: 'A clean, well-lit building serves as the town\'s primary medical facility. Inside, a dignified physician oversees several assistants. The atmosphere is professional and organized, suggesting reliable but potentially expensive care.',
+    description: 'You visit the local physician, whose clinic is filled with neatly labeled jars and clean bandages.',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Consult Healer', skill: 'Persuasion', description: 'Ask for professional medical help' },
+      { label: 'Stock Up', skill: 'Persuasion', description: 'Buy official medical supplies' },
+      { label: 'Volunteer', skill: 'Medicine', description: 'Offer to help for experience' },
+      { label: 'Leave', skill: null, description: 'Step back out into the street' }
+    ],
+    rewards: { xp: 20, gold: '0', items: ['healing_potion:80%', 'medicine_kit:50%', 'medical_journal:20%'], healing: '3d8+6' },
+    consequences: {
+      criticalSuccess: 'The physician is impressed by your constitution and treats you as a priority, providing exceptional care.',
+      success: 'The treatment is efficient and highly effective.',
+      failure: 'The clinic is busy; you wait a long time for basic treatment.',
+      criticalFailure: 'The treatment is exorbitant and only moderately effective.'
+    },
+    healingByTier: {
+      criticalSuccess: 'full',
+      success: '3d8+6',
+      failure: '1d8',
+      criticalFailure: '1d4'
+    }
+  },
+
   'suspicious_stranger': {
     name: 'Suspicious Stranger',
     icon: '🕵️',
     encounterTier: 'narrative',
     narrativeHook: 'a hooded figure lurking in the shadows',
-    aiContext: 'A mysterious hooded figure watches from a quiet alley, their face obscured. They seem to be waiting for someone - or watching for an opportunity. Something about them suggests they have secrets to share.',
-    description: 'A hooded figure approaches you in a quiet alley, claiming to have information... for a price.',
+    aiContext: 'A figure cloaked in shadows leans against a wall in a narrow alley, watching the crowd with keen eyes. They seem to be waiting for someone.',
+    description: 'A hooded figure signals you to follow them into a dark alleyway.',
+    image: '/assets/encounters/suspicious_stranger.webp',
     difficulty: 'medium',
     suggestedActions: [
       { label: 'Listen', skill: 'Perception', description: 'Hear them out while staying alert' },

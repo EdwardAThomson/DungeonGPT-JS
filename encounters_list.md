@@ -15,21 +15,22 @@ This document lists all available encounters in the game, categorized by their t
 - **Lost Child** (Narrative) - 👧 [HAS IMAGE]
 
 ## Additional Wilderness & Road
-- **Medicinal Herbs** (Narrative) - 🌿
-- **Abandoned Campsite** (Narrative) - 🏕️
-- **Mountain Hermit** (Narrative) - 🧙
-- **Elven Patrol** (Narrative) - 🧝
-- **Mysterious Stranger** (Narrative) - 🎭
-- **Wounded Traveler** (Narrative) - 🩹
+- **Medicinal Herbs** (Narrative) - 🌿 [HAS IMAGE]
+- **Abandoned Campsite** (Narrative) - 🏕️ [HAS IMAGE]
+- **Mountain Hermit** (Narrative) - 🧙 [HAS IMAGE]
+- **Elven Patrol** (Narrative) - 🧝 [HAS IMAGE]
+- **Mysterious Stranger** (Narrative) - 🎭 [HAS IMAGE]
+- **Wounded Traveler** (Narrative) - 🩹 [HAS IMAGE]
 - **Hidden Cache** (Narrative) - 💎
 - **Distant Smoke** (Narrative) - 💨
 
 ## Town Encounters
 - **Tavern Brawl** (Immediate) - 🍺 [HAS IMAGE]
-- **Bustling Market** (Narrative) - 🏪
-- **Quest Board** (Narrative) - 📜
-- **Traveling Healer** (Narrative) - ⚕️
-- **Suspicious Stranger** (Narrative) - 🕵️
+- **Bustling Market** (Narrative) - 🏪 [HAS IMAGE]
+- **Quest Board** (Narrative) - 📜 [HAS IMAGE]
+- **Traveling Healer** (Narrative) - ⚕️ [HAS IMAGE]
+- **Town Healer** (Narrative) - 🏥
+- **Suspicious Stranger** (Narrative) - 👤 [HAS IMAGE]
 
 ## Location-Specific (POIs)
 
