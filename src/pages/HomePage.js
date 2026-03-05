@@ -2,8 +2,11 @@
 
 import React from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 const HomePage = () => {
+  const { user } = useAuth();
+
   return (
     <div className="Home-page main-card">
       <div className="hero-section">
@@ -53,6 +56,16 @@ const HomePage = () => {
             </div>
           </Link>
         </div>
+
+        {!user && (
+          <Link to="/login" className="home-nav-card mobile-sign-in-card">
+            <div className="card-icon">🔑</div>
+            <div className="card-content">
+              <h3>Sign In</h3>
+              <p>Save your progress across devices</p>
+            </div>
+          </Link>
+        )}
       </div>
     </div>
   );

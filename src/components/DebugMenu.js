@@ -9,20 +9,7 @@ const DebugMenu = ({ inNav = false }) => {
     };
 
     const buttonStyle = inNav
-        ? {
-            background: 'transparent',
-            border: '1px solid var(--primary)',
-            color: 'var(--primary)',
-            minWidth: '180px',
-            minHeight: '54px',
-            padding: '12px 22px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontFamily: 'var(--header-font)',
-            fontSize: '0.85rem',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase'
-        }
+        ? {}
         : {
             position: 'fixed',
             bottom: '20px',
@@ -147,7 +134,7 @@ const DebugMenu = ({ inNav = false }) => {
                     </Link>
                 </div>
             )}
-            <button style={buttonStyle} onClick={toggleMenu} title="Debug Menu">
+            <button style={buttonStyle} className={inNav ? 'nav-settings-btn' : ''} onClick={toggleMenu} title="Debug Menu">
                 {inNav ? '🐞 Debug' : '🐞'}
             </button>
         </div>

@@ -31,14 +31,11 @@
 
 .home-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 1fr;
   gap: 20px;
 }
 
-/* Center the 4th card (Chronicles) when it's alone on the second row */
-.home-grid > :nth-child(4):last-child {
-  grid-column: 2 / 3;
-}
+/* Remove the 4th-item centering hack (not needed in single-column layout) */
 
 .home-nav-card {
   background-color: var(--bg);
@@ -111,4 +108,15 @@
   margin: 10px 0 0 0;
   font-size: 0.9rem;
   color: var(--text-secondary);
+}
+
+/* Mobile-only sign in card - hidden on desktop */
+.mobile-sign-in-card {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-sign-in-card {
+    display: flex;
+  }
 }

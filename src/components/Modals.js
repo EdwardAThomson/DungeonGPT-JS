@@ -115,12 +115,6 @@ export const AISettingsModalContent = ({
               </div>
             </div>
 
-            <div style={{ background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-              <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>API Keys</h4>
-              <p style={{ margin: '0', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6', textAlign: 'left' }}>
-                Cloud API keys are configured in the <code style={{ background: 'var(--surface-soft)', padding: '2px 6px', borderRadius: '3px' }}>.env</code> file on the server. Use <strong>gemini-cli</strong>, <strong>claude-cli</strong>, or <strong>codex</strong> providers for CLI-based access without API keys.
-              </p>
-            </div>
           </div>
 
           {/* Theme Selection */}
@@ -491,12 +485,6 @@ export const StorySettingsModalContent = ({
                   </div>
                 </div>
 
-                <div style={{ background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>API Keys</h4>
-                  <p style={{ margin: '0', fontSize: '0.9rem', color: 'var(--text-secondary)', lineHeight: '1.6', textAlign: 'left' }}>
-                    Cloud API keys are configured in the <code style={{ background: 'var(--surface-soft)', padding: '2px 6px', borderRadius: '3px' }}>.env</code> file on the server. Use <strong>gemini-cli</strong>, <strong>claude-cli</strong>, or <strong>codex</strong> providers for CLI-based access without API keys.
-                  </p>
-                </div>
 
                 {/* Active Model Status */}
                 <div style={{ marginTop: '20px', background: 'var(--surface)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

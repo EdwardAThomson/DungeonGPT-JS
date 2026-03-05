@@ -6,7 +6,8 @@
 :root {
   --mobile-breakpoint: 768px;
   --tablet-breakpoint: 1024px;
-  --touch-target-min: 44px; /* iOS/Android minimum touch target */
+  --touch-target-min: 44px;
+  /* iOS/Android minimum touch target */
 }
 
 /* Hide mobile-only elements by default (desktop) */
@@ -21,8 +22,12 @@
    ============================================ */
 
 @media (max-width: 768px) {
+
   /* Force full width on mobile */
-  body, html, #root, .App {
+  body,
+  html,
+  #root,
+  .App {
     width: 100%;
     max-width: 100%;
     overflow-x: hidden;
@@ -38,8 +43,8 @@
     display: none !important;
   }
 
-  /* Settings button - show only emoji on mobile */
-  .nav-settings-btn .settings-text {
+  /* Settings button - only hide text when nav is collapsed (not in open burger menu) */
+  .main-nav:not(.mobile-nav-open) .nav-settings-btn .settings-text {
     display: none !important;
   }
 
@@ -90,7 +95,7 @@
     overflow-y: auto !important;
     z-index: 1500 !important;
     transition: right 0.3s ease !important;
-    box-shadow: -4px 0 20px rgba(0,0,0,0.3) !important;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3) !important;
     background-color: var(--surface) !important;
   }
 
@@ -109,7 +114,7 @@
     display: none !important;
   }
 
-  /* Hamburger menu button for game page mobile */
+  /* Hamburger menu button - visible on all pages on mobile */
   .hamburger-btn {
     display: flex !important;
     position: fixed !important;
@@ -125,23 +130,132 @@
     align-items: center !important;
     justify-content: center !important;
     cursor: pointer !important;
-    z-index: 1001 !important;
+    z-index: 2001 !important;
   }
 
-  /* Hide nav bar on game page mobile by default, show hamburger instead */
-  .game-page-nav {
+  /* Hide nav bar on mobile by default */
+  .main-nav {
     display: none !important;
+    padding: 0 8px;
   }
 
-  /* Show nav bar normally when hamburger is clicked */
-  .game-page-nav.mobile-nav-open {
+  /* Show nav as full-screen overlay when hamburger is clicked */
+  .main-nav.mobile-nav-open {
     display: flex !important;
-    position: relative !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 2000 !important;
+    background: var(--surface) !important;
+    padding-top: 60px !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: none !important;
   }
 
-  /* Add left padding to nav links when menu is open to avoid hamburger overlap */
-  .game-page-nav.mobile-nav-open ul {
-    padding-left: 60px !important;
+  .main-nav.mobile-nav-open>ul {
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: auto !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    padding: 12px 16px !important;
+    align-items: stretch !important;
+  }
+
+  .main-nav.mobile-nav-open>ul>li {
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  .main-nav.mobile-nav-open>ul>li>a,
+  .main-nav.mobile-nav-open .nav-dropdown-toggle,
+  .main-nav.mobile-nav-open .nav-settings-btn {
+    width: 100% !important;
+    min-height: 48px !important;
+    padding: 12px 16px !important;
+    font-size: 0.95rem !important;
+    justify-content: flex-start !important;
+    border: none !important;
+    margin-left: 0 !important;
+  }
+
+  /* Profile/sign-in item - reset absolute position, flow inline */
+  .nav-profile-item {
+    position: static !important;
+    right: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-width: 0 !important;
+  }
+
+  /* user-profile-indicator container - full width, no margin-left:auto */
+  .main-nav.mobile-nav-open .nav-profile-item .user-profile-indicator {
+    width: 100% !important;
+    margin-left: 0 !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  /* Mobile flat profile links (Profile & Sign Out) */
+  .mobile-profile-links {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+
+  .mobile-profile-link {
+    display: block !important;
+    width: 100% !important;
+    min-height: 48px !important;
+    padding: 12px 16px !important;
+    font-family: var(--font-header) !important;
+    font-size: 0.95rem !important;
+    letter-spacing: 0.1em !important;
+    text-align: left !important;
+    text-decoration: none !important;
+    color: var(--text) !important;
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    cursor: pointer !important;
+    box-sizing: border-box !important;
+  }
+
+  .mobile-signout {
+    color: var(--state-danger) !important;
+  }
+
+  /* Sign-in link in mobile nav - full width, left-aligned */
+  .main-nav.mobile-nav-open .login-link {
+    display: block !important;
+    width: 100% !important;
+    min-height: 48px !important;
+    padding: 12px 16px !important;
+    font-size: 0.95rem !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-sizing: border-box !important;
+    text-align: left !important;
+    line-height: 2.5 !important;
+  }
+
+  /* Mobile overlay - behind the nav */
+  .mobile-nav-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background-color: rgba(0, 0, 0, 0.7) !important;
+    z-index: 1999 !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: none !important;
   }
 
   /* Mobile party toggle button */
@@ -161,7 +275,7 @@
     justify-content: center !important;
     cursor: pointer !important;
     z-index: 1600 !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
     transition: all 0.3s ease !important;
     padding: 0 !important;
     overflow: hidden !important;
@@ -169,7 +283,7 @@
 
   .mobile-party-toggle:hover {
     transform: scale(1.1) !important;
-    box-shadow: 0 6px 16px rgba(0,0,0,0.4) !important;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4) !important;
   }
 
   .mobile-party-toggle-portrait {
@@ -186,9 +300,9 @@
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
-    background-color: rgba(0,0,0,0.5) !important;
+    background-color: rgba(0, 0, 0, 0.5) !important;
     z-index: 1400 !important;
-    backdrop-filter: blur(2px) !important;
+    backdrop-filter: none !important;
   }
 
   /* Header adjustments */
@@ -232,58 +346,43 @@
 
   .world-map-grid,
   .town-map-grid {
-    min-width: 300px; /* Prevent map from being too small */
+    min-width: 300px;
+    /* Prevent map from being too small */
   }
 
-  /* Navigation adjustments */
-  .main-nav {
-    padding: 0 8px;
-  }
 
-  .main-nav > ul {
-    height: auto;
-    min-height: 60px;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 8px 0;
-  }
-
-  .main-nav > ul > li > a,
-  .nav-dropdown-toggle,
-  .nav-settings-btn {
-    min-width: auto !important;
-    min-height: 40px !important;
-    padding: 8px 12px !important;
-    font-size: 0.75rem !important;
-  }
-
-  /* Dropdown menus - full width, below nav */
+  /* Dropdown: stack button + sub-menu vertically */
   .nav-dropdown {
     position: static !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
   }
 
   .nav-dropdown-menu {
-    position: fixed !important;
-    top: 80px !important;
-    left: 8px !important;
-    right: 8px !important;
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
     bottom: auto !important;
-    width: calc(100% - 16px) !important;
-    max-width: calc(100% - 16px) !important;
+    width: 100% !important;
+    max-width: 100% !important;
     height: auto !important;
     max-height: none !important;
     min-height: 0 !important;
     overflow: hidden !important;
-    border-radius: 8px !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important;
-    z-index: 2000 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    z-index: auto !important;
     padding: 0 !important;
     margin: 0 !important;
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
-    background-color: var(--surface) !important;
-    border: 1px solid var(--primary) !important;
+    background-color: var(--bg) !important;
+    border: none !important;
+    border-top: 1px solid var(--border) !important;
+    border-bottom: 1px solid var(--border) !important;
   }
 
   .nav-dropdown-menu li {
@@ -293,7 +392,7 @@
     margin: 0 !important;
     padding: 0 !important;
     border-bottom: 1px solid var(--border) !important;
-    background-color: var(--surface) !important;
+    background-color: var(--bg) !important;
   }
 
   .nav-dropdown-menu li:last-child {
@@ -302,20 +401,20 @@
 
   .nav-dropdown-menu a {
     flex: 1 !important;
-    min-height: 56px !important;
+    min-height: 48px !important;
     height: auto !important;
-    padding: 16px 20px !important;
+    padding: 12px 16px 12px 32px !important;
     font-size: 0.9rem !important;
-    justify-content: center !important;
-    text-align: center !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
     display: flex !important;
     align-items: center !important;
     line-height: 1.4 !important;
     white-space: normal !important;
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
-    background-color: var(--surface) !important;
-    color: var(--text) !important;
+    background-color: var(--bg) !important;
+    color: var(--text-secondary) !important;
   }
 
   /* Form elements - larger touch targets */
@@ -324,7 +423,8 @@
   select,
   button {
     min-height: var(--touch-target-min);
-    font-size: 16px; /* Prevents iOS zoom on focus */
+    font-size: 16px;
+    /* Prevents iOS zoom on focus */
   }
 
   /* Hero cards - fix overflow */
@@ -527,7 +627,14 @@
   }
 
   /* Fix all text overflow issues */
-  h1, h2, h3, h4, p, span, button, a {
+  h1,
+  h2,
+  h3,
+  h4,
+  p,
+  span,
+  button,
+  a {
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
   }
@@ -564,20 +671,20 @@
   }
 
   /* Stack the inner flex container vertically */
-  .conversation-item > div:first-child {
+  .conversation-item>div:first-child {
     flex-direction: column !important;
     align-items: flex-start !important;
   }
 
   /* Party portraits row - center them */
-  .conversation-item > div:first-child > div:first-child {
+  .conversation-item>div:first-child>div:first-child {
     justify-content: center !important;
     width: 100% !important;
     margin-bottom: 10px !important;
   }
 
   /* Content section - full width */
-  .conversation-item > div:first-child > div:last-child {
+  .conversation-item>div:first-child>div:last-child {
     width: 100% !important;
   }
 
@@ -745,6 +852,17 @@
     background-color: var(--bg) !important;
   }
 
+  /* Home page - single column on tablet too as requested */
+  .home-grid {
+    grid-template-columns: 1fr !important;
+    gap: 15px !important;
+  }
+
+  .primary-card {
+    flex-direction: column !important;
+    text-align: center !important;
+  }
+
   .game-main {
     flex: 1 !important;
     min-width: 0 !important;
@@ -783,7 +901,7 @@
     max-height: none !important;
     overflow: hidden !important;
     border-radius: 8px !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.4) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
     z-index: 2000 !important;
     padding: 0 !important;
     margin: 0 !important;
@@ -876,6 +994,7 @@
 
 /* Ensure touch targets are large enough */
 @media (pointer: coarse) {
+
   button,
   a,
   input[type="checkbox"],
@@ -887,6 +1006,7 @@
 
 /* Reduce motion for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
+
   *,
   *::before,
   *::after {

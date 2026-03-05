@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import '../styles/user-profile.css';
 
-const UserProfileIndicator = () => {
+const UserProfileIndicator = ({ isMobileNavOpen, onNavClose }) => {
   const { user, signOut } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -34,14 +34,24 @@ const UserProfileIndicator = () => {
   if (!user) {
     return (
       <div className="user-profile-indicator">
-        <Link to="/login" className="login-link">Sign In</Link>
+        <Link to="/login" className="login-link" onClick={onNavClose}>Sign In</Link>
+      </div>
+    );
+  }
+
+  // In the open mobile burger menu: show flat text links instead of avatar
+  if (isMobileNavOpen) {
+    return (
+      <div className="user-profile-indicator mobile-profile-links">
+        <Link to="/profile" className="mobile-profile-link" onClick={onNavClose}>👤 Profile</Link>
+        <button className="mobile-profile-link mobile-signout" onClick={handleSignOut}>🚪 Sign Out</button>
       </div>
     );
   }
 
   return (
     <div className="user-profile-indicator" ref={dropdownRef}>
-      <button 
+      <button
         className="profile-avatar-btn"
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
@@ -57,14 +67,14 @@ const UserProfileIndicator = () => {
             <span className="profile-email">{user.email}</span>
           </div>
           <div className="profile-dropdown-divider" />
-          <Link 
-            to="/profile" 
+          <Link
+            to="/profile"
             className="profile-dropdown-item"
             onClick={() => setIsOpen(false)}
           >
             👤 Profile
           </Link>
-          <button 
+          <button
             className="profile-dropdown-item profile-signout"
             onClick={handleSignOut}
           >

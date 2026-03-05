@@ -41,7 +41,7 @@
   padding: 2rem;
   background: var(--background);
   border-radius: 8px;
-  border-left: 4px solid var(--primary);
+  border-top: 4px solid var(--primary);
 }
 
 .feature-section h2 {
@@ -489,6 +489,7 @@
 
   .cta-button {
     width: 100%;
+    box-sizing: border-box;
   }
 
   .steps-list {

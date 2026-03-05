@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import '../styles/navigation.css';
 
-const NavDropdown = ({ label, items }) => {
+const NavDropdown = ({ label, items, onNavClose }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
@@ -71,7 +71,7 @@ const NavDropdown = ({ label, items }) => {
       <button
         ref={buttonRef}
         className="nav-dropdown-toggle"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
         onKeyDown={handleButtonKeyDown}
         aria-expanded={isOpen}
         aria-haspopup="true"
@@ -80,7 +80,7 @@ const NavDropdown = ({ label, items }) => {
         {label} <span className="dropdown-arrow" aria-hidden="true">{isOpen ? '▲' : '▼'}</span>
       </button>
       {isOpen && (
-        <ul 
+        <ul
           ref={menuRef}
           className="nav-dropdown-menu"
           role="menu"
@@ -88,9 +88,9 @@ const NavDropdown = ({ label, items }) => {
         >
           {items.map((item, index) => (
             <li key={index} role="none">
-              <Link 
-                to={item.path} 
-                onClick={() => setIsOpen(false)}
+              <Link
+                to={item.path}
+                onClick={() => { setIsOpen(false); onNavClose && onNavClose(); }}
                 role="menuitem"
               >
                 {item.label}

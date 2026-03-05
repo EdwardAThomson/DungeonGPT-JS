@@ -180,16 +180,16 @@
 @media (max-width: 1100px) {
   .main-nav ul {
     height: 76px;
-    gap: 10px;
+    gap: 8px;
   }
 
   .main-nav > ul > li > a,
   .nav-dropdown-toggle,
   .nav-settings-btn {
-    min-width: 140px;
+    min-width: 110px;
     min-height: 48px;
-    font-size: 0.85rem;
-    padding: 10px 16px;
+    font-size: 0.8rem;
+    padding: 10px 12px;
   }
 
   .nav-dropdown-menu {

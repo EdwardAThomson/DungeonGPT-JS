@@ -60,10 +60,10 @@ const AppContent = () => {
   if (loading) {
     return (
       <div className="App" data-theme={theme}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
           height: '100vh',
           color: 'var(--text)'
         }}>
@@ -76,41 +76,41 @@ const AppContent = () => {
   return (
     <div className="App" data-theme={theme}>
       <a href="#main-content" className="skip-link">Skip to main content</a>
-      
-      {/* Hamburger button - outside nav so it's visible when nav is hidden */}
-      {isGamePage && (
-        <button
-          className="hamburger-btn"
-          onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
-          aria-label="Toggle navigation menu"
-          aria-expanded={isMobileNavOpen}
-        >
-          {isMobileNavOpen ? '✕' : '☰'}
-        </button>
-      )}
-      
+
+      {/* Hamburger button - visible on mobile for all pages */}
+      <button
+        className="hamburger-btn"
+        onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
+        aria-label="Toggle navigation menu"
+        aria-expanded={isMobileNavOpen}
+      >
+        {isMobileNavOpen ? '✕' : '☰'}
+      </button>
+
       {/* Add className="main-nav" here for the nav styles */}
       <nav className={`main-nav ${isGamePage ? 'game-page-nav' : ''} ${isMobileNavOpen ? 'mobile-nav-open' : ''}`}>
         <ul>
-          <li><Link to="/">Home</Link></li>
-          <li><Link to="/how-to-play">How to Play</Link></li>
-          <NavDropdown 
-            label="Heroes" 
+          <li><Link to="/" onClick={() => setIsMobileNavOpen(false)}>Home</Link></li>
+          <li><Link to="/how-to-play" onClick={() => setIsMobileNavOpen(false)}>How to Play</Link></li>
+          <NavDropdown
+            label="Heroes"
             items={[
               { label: "Create New Hero", path: "/hero-creation" },
               { label: "All Heroes", path: "/all-heroes" }
             ]}
+            onNavClose={() => setIsMobileNavOpen(false)}
           />
-          <NavDropdown 
-            label="Games" 
+          <NavDropdown
+            label="Games"
             items={[
               { label: "New Game", path: "/new-game" },
               { label: "Saved Games", path: "/saved-conversations" }
             ]}
+            onNavClose={() => setIsMobileNavOpen(false)}
           />
           <li className="nav-settings-item">
             <button
-              onClick={() => setIsSettingsModalOpen(true)}
+              onClick={() => { setIsMobileNavOpen(false); setIsSettingsModalOpen(true); }}
               className="nav-settings-btn"
             >
               ⚙️ <span className="settings-text">Settings</span>
@@ -133,17 +133,18 @@ const AppContent = () => {
             </li>
           )}
           <li className="nav-profile-item">
-            <UserProfileIndicator />
+            <UserProfileIndicator isMobileNavOpen={isMobileNavOpen} onNavClose={() => setIsMobileNavOpen(false)} />
           </li>
         </ul>
-        {/* Mobile nav overlay */}
-        {isGamePage && isMobileNavOpen && (
-          <div
-            className="mobile-nav-overlay"
-            onClick={() => setIsMobileNavOpen(false)}
-          />
-        )}
       </nav>
+
+      {/* Mobile nav overlay - moved outside nav to prevent filter nesting issues */}
+      {isMobileNavOpen && (
+        <div
+          className="mobile-nav-overlay"
+          onClick={() => setIsMobileNavOpen(false)}
+        />
+      )}
 
       <AISettingsModalContent
         isOpen={isSettingsModalOpen}
@@ -170,7 +171,7 @@ const AppContent = () => {
               <Route path="/hero-creation" element={<HeroCreation />} />
               <Route path="/hero-summary" element={<HeroSummary />} />
               <Route path="/new-game" element={<NewGame />} />
-              
+
               {/* Protected routes */}
               <Route path="/all-heroes" element={<ProtectedRoute><AllHeroes /></ProtectedRoute>} />
               <Route path="/hero-selection" element={<ProtectedRoute><HeroSelection /></ProtectedRoute>} />
