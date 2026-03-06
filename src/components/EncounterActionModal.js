@@ -4,6 +4,7 @@ import { resolveEncounter } from '../utils/encounterResolver';
 import { createMultiRoundEncounter, resolveRound, getRoundActions, generateEncounterSummary } from '../utils/multiRoundEncounter';
 import { applyDamage, getHPStatus } from '../utils/healthSystem';
 import SettingsContext from '../contexts/SettingsContext';
+import ClickableImage from './ClickableImage';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('encounter-action-modal');
@@ -333,27 +334,13 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
               Random Encounter
             </div>
             {encounter.image && (
-              <div style={{
-                width: '100%',
-                height: fullSizeImage ? 'auto' : '240px',
-                maxHeight: fullSizeImage ? '500px' : '240px',
-                marginBottom: '10px',
-                borderRadius: '8px',
-                overflow: 'hidden',
-                border: '2px solid var(--border)'
-              }}>
-                <img
-                  src={encounter.image}
-                  alt={encounter.name}
-                  style={{
-                    width: '100%',
-                    height: fullSizeImage ? 'auto' : '100%',
-                    objectFit: fullSizeImage ? 'contain' : 'cover',
-                    objectPosition: fullSizeImage ? 'center' : 'center 30%',
-                    display: 'block'
-                  }}
-                />
-              </div>
+              <ClickableImage
+                src={encounter.image}
+                alt={encounter.name}
+                height={fullSizeImage ? 'auto' : '240px'}
+                maxHeight={fullSizeImage ? '500px' : '240px'}
+                objectPosition={fullSizeImage ? 'center' : 'center 30%'}
+              />
             )}
             <div className="encounter-description" style={{ marginBottom: '10px', fontSize: '14px' }}>
               <p style={{ marginBottom: '0' }}>{encounter.description}</p>
@@ -467,27 +454,13 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                 Random Encounter
               </div>
               {encounter.image && !result && (
-                <div style={{
-                  width: '100%',
-                  height: fullSizeImage ? 'auto' : '200px',
-                  maxHeight: fullSizeImage ? '400px' : '200px',
-                  marginBottom: '10px',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  border: '2px solid var(--border)'
-                }}>
-                  <img
-                    src={encounter.image}
-                    alt={encounter.name}
-                    style={{
-                      width: '100%',
-                      height: fullSizeImage ? 'auto' : '100%',
-                      objectFit: fullSizeImage ? 'contain' : 'cover',
-                      objectPosition: fullSizeImage ? 'center' : 'center 30%',
-                      display: 'block'
-                    }}
-                  />
-                </div>
+                <ClickableImage
+                  src={encounter.image}
+                  alt={encounter.name}
+                  height={fullSizeImage ? 'auto' : '200px'}
+                  maxHeight={fullSizeImage ? '400px' : '200px'}
+                  objectPosition={fullSizeImage ? 'center' : 'center 30%'}
+                />
               )}
               {!encounter.image && <span className="encounter-icon">{encounter.icon}</span>}
               {isMultiRound && roundState && (

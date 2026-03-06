@@ -1,8 +1,8 @@
 # Items List
 
 **Total Items:** 135
-**Items with images:** 64
-**Items missing images:** 71
+**Items with images:** 81
+**Items missing images:** 54
 
 Image format: `assets/icons/items/{item_key}.webp`
 
@@ -77,6 +77,23 @@ Image format: `assets/icons/items/{item_key}.webp`
 | 63 | ancient_artifact | Ancient Artifact | rare | HAS IMAGE |
 | 64 | cursed_item | Cursed Item | rare | HAS IMAGE |
 | 65 | natures_blessing | Nature's Blessing | uncommon | HAS IMAGE |
+| 66 | elven_blessing | Elven Blessing | rare | HAS IMAGE |
+| 67 | eagle_blessing | Eagle's Blessing | rare | HAS IMAGE |
+| 68 | divine_blessing | Divine Blessing | rare | HAS IMAGE |
+| 69 | druid_token | Druid Token | uncommon | HAS IMAGE |
+| 70 | nature_charm | Nature Charm | uncommon | HAS IMAGE |
+| 71 | inspiration | Inspiration | uncommon | HAS IMAGE |
+| 72 | rusty_dagger | Rusty Dagger | common | HAS IMAGE |
+| 73 | ancient_scroll | Ancient Scroll | uncommon | HAS IMAGE |
+| 74 | dark_tome | Dark Tome | rare | HAS IMAGE |
+| 75 | history_tome | History Tome | uncommon | HAS IMAGE |
+| 76 | forbidden_knowledge | Forbidden Knowledge | rare | HAS IMAGE |
+| 77 | ancient_knowledge | Ancient Knowledge | rare | HAS IMAGE |
+| 78 | journal_page | Journal Page | common | HAS IMAGE |
+| 79 | hermit_wisdom | Hermit's Wisdom | uncommon | HAS IMAGE |
+| 80 | quest_key | Quest Key | rare | HAS IMAGE |
+| 81 | quest_letter | Quest Letter | uncommon | HAS IMAGE |
+| 82 | cave_map | Cave Map | uncommon | HAS IMAGE |
 
 ## Items WITHOUT Images
 
@@ -107,18 +124,11 @@ Image format: `assets/icons/items/{item_key}.webp`
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 2 | elven_blessing | Elven Blessing | uncommon |
-| 3 | eagle_blessing | Eagle's Blessing | uncommon |
-| 4 | divine_blessing | Divine Blessing | rare |
-| 5 | druid_token | Druid Token | uncommon |
-| 6 | nature_charm | Nature Charm | uncommon |
-| 7 | inspiration | Inspiration | uncommon |
 
 ### Weapons & Armor
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 1 | rusty_dagger | Rusty Dagger | common |
 | 2 | shortsword | Shortsword | common |
 | 3 | poisoned_dagger | Poisoned Dagger | uncommon |
 | 4 | ritual_dagger | Ritual Dagger | uncommon |
@@ -147,21 +157,11 @@ Image format: `assets/icons/items/{item_key}.webp`
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 1 | ancient_scroll | Ancient Scroll | uncommon |
-| 2 | dark_tome | Dark Tome | rare |
-| 3 | history_tome | History Tome | uncommon |
-| 4 | forbidden_knowledge | Forbidden Knowledge | rare |
-| 5 | ancient_knowledge | Ancient Knowledge | rare |
-| 6 | journal_page | Journal Page | common |
-| 7 | hermit_wisdom | Hermit's Wisdom | uncommon |
 
 ### Quest Items & Maps
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 1 | quest_key | Quest Key | uncommon |
-| 2 | quest_letter | Quest Letter | uncommon |
-| 3 | cave_map | Cave Map | uncommon |
 | 4 | forest_map | Forest Map | uncommon |
 | 5 | traveler_map | Traveler's Map | uncommon |
 | 6 | old_map | Old Map | common |

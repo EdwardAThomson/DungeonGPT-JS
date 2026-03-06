@@ -81,9 +81,16 @@ cf-worker/migrations/
 docs/deployment_*.md
 docs/refactor_assessment.md
 docs/production_vs_dev_strategy.md
-
 docs/authentication_plan.md
+
+docs/gaming-hub-*.md
+
 
 # AI Prompt Analysis
 docs/AI_PROMPT_ANALYSIS.md
 
+# Image Prompts
+docs/future_item_prompts.md
+
+# Ambient Soundscapes prompts
+docs/ambient_soundscapes.md

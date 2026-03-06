@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import FocusTrap from 'focus-trap-react';
+import ClickableImage from './ClickableImage';
 
 const EncounterModal = ({
     isOpen,
@@ -60,27 +61,13 @@ const EncounterModal = ({
                         Random Encounter
                     </div>
                     {encounter.image && (
-                        <div style={{
-                            width: '100%',
-                            height: fullSizeImage ? 'auto' : '240px',
-                            maxHeight: fullSizeImage ? '500px' : '240px',
-                            marginBottom: '12px',
-                            borderRadius: '8px',
-                            overflow: 'hidden',
-                            border: '2px solid var(--border)'
-                        }}>
-                            <img
-                                src={encounter.image}
-                                alt={encounter.name}
-                                style={{
-                                    width: '100%',
-                                    height: fullSizeImage ? 'auto' : '100%',
-                                    objectFit: fullSizeImage ? 'contain' : 'cover',
-                                    objectPosition: fullSizeImage ? 'center' : 'center 30%',
-                                    display: 'block'
-                                }}
-                            />
-                        </div>
+                        <ClickableImage
+                            src={encounter.image}
+                            alt={encounter.name}
+                            height={fullSizeImage ? 'auto' : '240px'}
+                            maxHeight={fullSizeImage ? '500px' : '240px'}
+                            objectPosition={fullSizeImage ? 'center' : 'center 30%'}
+                        />
                     )}
                     {!encounter.image && (
                         <div style={{ textAlign: 'center', fontSize: '64px', marginBottom: '12px' }}>

@@ -1,6 +1,6 @@
 # DungeonGPT (JS): Character Creator & AI Game Master
 
-**🎮 Live App:** https://dungeongpt-js.pages.dev/
+**🎮 Live App:** https://dungeongpt.xyz/
 
 This is a web application built with React that allows users to create detailed characters for role-playing games, manage them, and use them in an interactive game session powered by an AI (default: OpenAI's GPT models).
 
@@ -133,7 +133,7 @@ This is a guide for deploying the app locally.
 
 The app is deployed on:
 
-- **Frontend:** Cloudflare Pages (https://dungeongpt-js.pages.dev/)
+- **Frontend:** Cloudflare Pages (https://dungeongpt.xyz)
 - **Backend:** Cloudflare Workers
 - **Database:** Supabase PostgreSQL
 
