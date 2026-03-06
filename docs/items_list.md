@@ -1,8 +1,8 @@
 # Items List
 
 **Total Items:** 135
-**Items with images:** 36
-**Items missing images:** 99
+**Items with images:** 47
+**Items missing images:** 88
 
 Image format: `assets/icons/items/{item_key}.webp`
 
@@ -46,9 +46,20 @@ Image format: `assets/icons/items/{item_key}.webp`
 | 32 | bear_claw | Bear Claw | common | HAS IMAGE |
 | 33 | bear_pelt | Bear Pelt | common | HAS IMAGE |
 | 34 | beast_hide | Beast Hide | common | HAS IMAGE |
-| 35 | venom_sac | Venom Sac | uncommon | HAS IMAGE | REDO
-| 36 | hard_leather | Hard Leather | common | HAS IMAGE | REDO
-| 37 | exposed_minerals | Exposed Minerals | common | HAS IMAGE | REDO
+| 35 | venom_sac | Venom Sac | uncommon | HAS IMAGE |
+| 36 | hard_leather | Hard Leather | common | HAS IMAGE |
+| 37 | exposed_minerals | Exposed Minerals | common | HAS IMAGE |
+| 38 | glowing_fungi | Glowing Fungi | common | HAS IMAGE |
+| 39 | cave_fish | Cave Fish | common | HAS IMAGE |
+| 40 | rare_ore | Rare Ore | uncommon | HAS IMAGE |
+| 41 | giant_feather | Giant Feather | uncommon | HAS IMAGE |
+| 42 | dragon_scale | Dragon Scale | rare | HAS IMAGE |
+| 43 | dragon_egg | Dragon Egg | very_rare | HAS IMAGE |
+| 44 | ectoplasm | Ectoplasm | uncommon | HAS IMAGE |
+| 45 | healing_herbs | Healing Herbs | common | HAS IMAGE |
+| 46 | rare_herb | Rare Herb | uncommon | HAS IMAGE |
+| 47 | mountain_herbs | Mountain Herbs | common | HAS IMAGE |
+| 48 | rare_flower | Rare Flower | uncommon | HAS IMAGE |
 
 ## Items WITHOUT Images
 
@@ -56,22 +67,12 @@ Image format: `assets/icons/items/{item_key}.webp`
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 1 | glowing_fungi | Glowing Fungi | common |
-| 2 | cave_fish | Cave Fish | common |
-| 11 | rare_ore | Rare Ore | uncommon |
-| 12 | giant_feather | Giant Feather | uncommon |
-| 13 | dragon_scale | Dragon Scale | rare |
-| 14 | dragon_egg | Dragon Egg | very_rare |
-| 15 | ectoplasm | Ectoplasm | uncommon |
+
 
 ### Herbs & Consumables
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 1 | healing_herbs | Healing Herbs | common |
-| 2 | rare_herb | Rare Herb | uncommon |
-| 3 | mountain_herbs | Mountain Herbs | common |
-| 4 | rare_flower | Rare Flower | uncommon |
 | 5 | desert_flower | Desert Flower | uncommon |
 | 6 | rare_ingredient | Rare Ingredient | uncommon |
 | 7 | elven_rations | Elven Rations | uncommon |
