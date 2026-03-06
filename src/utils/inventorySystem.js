@@ -177,7 +177,7 @@ export const ITEM_CATALOG = {
   // Environmental / natural loot (used by environmental & POI encounters)
   'rainwater': { name: 'Collected Rainwater', rarity: 'common', value: 5, stackable: true },
   'fog_essence': { name: 'Fog Essence', rarity: 'uncommon', value: 60 },
-  'desert_flower': { name: 'Desert Flower', rarity: 'uncommon', value: 35 },
+  'desert_flower': { name: 'Desert Flower', rarity: 'uncommon', value: 35, icon: 'assets/icons/items/desert_flower.webp' },
   'wisp_essence': { name: 'Wisp Essence', rarity: 'rare', value: 120 },
   'cave_fish': { name: 'Cave Fish', rarity: 'common', value: 8, stackable: true, icon: 'assets/icons/items/cave_fish.webp' },
   'beast_hide': { name: 'Beast Hide', rarity: 'common', value: 20, icon: 'assets/icons/items/beast_hide.webp' },
@@ -221,7 +221,7 @@ export const ITEM_CATALOG = {
   'bar_stool_leg': { name: 'Bar Stool Leg', rarity: 'common', value: 1, type: 'weapon' },
   'stolen_goods': { name: 'Stolen Goods', rarity: 'uncommon', value: 35 },
   'poisoned_dagger': { name: 'Poisoned Dagger', rarity: 'uncommon', value: 75, type: 'weapon' },
-  'rare_ingredient': { name: 'Rare Ingredient', rarity: 'uncommon', value: 40 }
+  'rare_ingredient': { name: 'Rare Ingredient', rarity: 'uncommon', value: 40, icon: 'assets/icons/items/rare_ingredient.webp' }
 };
 
 /**

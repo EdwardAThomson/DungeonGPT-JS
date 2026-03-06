@@ -1,8 +1,8 @@
 # Items List
 
 **Total Items:** 135
-**Items with images:** 47
-**Items missing images:** 88
+**Items with images:** 49
+**Items missing images:** 86
 
 Image format: `assets/icons/items/{item_key}.webp`
 
@@ -60,6 +60,8 @@ Image format: `assets/icons/items/{item_key}.webp`
 | 46 | rare_herb | Rare Herb | uncommon | HAS IMAGE |
 | 47 | mountain_herbs | Mountain Herbs | common | HAS IMAGE |
 | 48 | rare_flower | Rare Flower | uncommon | HAS IMAGE |
+| 49 | desert_flower | Desert Flower | uncommon | HAS IMAGE |
+| 50 | rare_ingredient | Rare Ingredient | uncommon | HAS IMAGE |
 
 ## Items WITHOUT Images
 
@@ -73,10 +75,8 @@ Image format: `assets/icons/items/{item_key}.webp`
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 5 | desert_flower | Desert Flower | uncommon |
-| 6 | rare_ingredient | Rare Ingredient | uncommon |
-| 7 | elven_rations | Elven Rations | uncommon |
-| 8 | poison_vial | Poison Vial | uncommon |
+| 3 | elven_rations | Elven Rations | uncommon |
+| 4 | poison_vial | Poison Vial | uncommon |
 | 9 | rainwater | Rainwater | common |
 | 10 | ale_mug | Ale Mug | common |
 
