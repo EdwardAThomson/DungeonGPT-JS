@@ -1,8 +1,8 @@
 # Items List
 
 **Total Items:** 135
-**Items with images:** 49
-**Items missing images:** 86
+**Items with images:** 64
+**Items missing images:** 71
 
 Image format: `assets/icons/items/{item_key}.webp`
 
@@ -62,6 +62,21 @@ Image format: `assets/icons/items/{item_key}.webp`
 | 48 | rare_flower | Rare Flower | uncommon | HAS IMAGE |
 | 49 | desert_flower | Desert Flower | uncommon | HAS IMAGE |
 | 50 | rare_ingredient | Rare Ingredient | uncommon | HAS IMAGE |
+| 51 | elven_rations | Elven Rations | uncommon | HAS IMAGE |
+| 52 | poison_vial | Poison Vial | uncommon | HAS IMAGE |
+| 53 | rainwater | Rainwater | common | HAS IMAGE |
+| 54 | ale_mug | Ale Mug | common | HAS IMAGE |
+| 55 | spell_scroll | Spell Scroll | uncommon | HAS IMAGE |
+| 56 | enchanted_seed | Enchanted Seed | uncommon | HAS IMAGE |
+| 57 | enchanted_mushroom | Enchanted Mushroom | uncommon | HAS IMAGE |
+| 58 | enchanted_staff | Enchanted Staff | rare | HAS IMAGE |
+| 59 | enchanted_tusk | Enchanted Tusk | rare | HAS IMAGE |
+| 60 | enchanted_trinket | Enchanted Trinket | uncommon | HAS IMAGE |
+| 61 | magical_item | Magical Item | uncommon | HAS IMAGE |
+| 62 | artifact_trinket | Artifact Trinket | uncommon | HAS IMAGE |
+| 63 | ancient_artifact | Ancient Artifact | rare | HAS IMAGE |
+| 64 | cursed_item | Cursed Item | rare | HAS IMAGE |
+| 65 | natures_blessing | Nature's Blessing | uncommon | HAS IMAGE |
 
 ## Items WITHOUT Images
 
@@ -75,25 +90,11 @@ Image format: `assets/icons/items/{item_key}.webp`
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 3 | elven_rations | Elven Rations | uncommon |
-| 4 | poison_vial | Poison Vial | uncommon |
-| 9 | rainwater | Rainwater | common |
-| 10 | ale_mug | Ale Mug | common |
 
 ### Magical Items & Enchantments
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 1 | spell_scroll | Spell Scroll | uncommon |
-| 2 | enchanted_seed | Enchanted Seed | uncommon |
-| 3 | enchanted_mushroom | Enchanted Mushroom | uncommon |
-| 4 | enchanted_staff | Enchanted Staff | rare |
-| 5 | enchanted_tusk | Enchanted Tusk | rare |
-| 6 | enchanted_trinket | Enchanted Trinket | uncommon |
-| 7 | magical_item | Magical Item | uncommon |
-| 8 | artifact_trinket | Artifact Trinket | uncommon |
-| 9 | ancient_artifact | Ancient Artifact | rare |
-| 10 | cursed_item | Cursed Item | rare |
 | 11 | fairy_dust | Fairy Dust | uncommon |
 | 12 | fey_charm | Fey Charm | uncommon |
 | 13 | storm_crystal | Storm Crystal | rare |
@@ -102,11 +103,10 @@ Image format: `assets/icons/items/{item_key}.webp`
 | 16 | spirit_essence | Spirit Essence | uncommon |
 | 17 | primal_essence | Primal Essence | uncommon |
 
-### Blessings & Buffs
+### Blessings & Lore
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 1 | nature_blessing | Nature's Blessing | uncommon |
 | 2 | elven_blessing | Elven Blessing | uncommon |
 | 3 | eagle_blessing | Eagle's Blessing | uncommon |
 | 4 | divine_blessing | Divine Blessing | rare |
