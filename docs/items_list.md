@@ -1,8 +1,8 @@
 # Items List
 
 **Total Items:** 135
-**Items with images:** 81
-**Items missing images:** 54
+**Items with images:** 87
+**Items missing images:** 48
 
 Image format: `assets/icons/items/{item_key}.webp`
 
@@ -94,6 +94,12 @@ Image format: `assets/icons/items/{item_key}.webp`
 | 80 | quest_key | Quest Key | rare | HAS IMAGE |
 | 81 | quest_letter | Quest Letter | uncommon | HAS IMAGE |
 | 82 | cave_map | Cave Map | uncommon | HAS IMAGE |
+| 83 | forest_map | Forest Map | uncommon | HAS IMAGE |
+| 84 | traveler_map | Traveler's Map | uncommon | HAS IMAGE |
+| 85 | shortsword | Shortsword | common | HAS IMAGE |
+| 86 | poisoned_dagger | Poisoned Dagger | uncommon | HAS IMAGE |
+| 87 | ritual_dagger | Ritual Dagger | uncommon | HAS IMAGE |
+| 88 | leather_armor | Leather Armor | common | HAS IMAGE |
 
 ## Items WITHOUT Images
 
@@ -129,10 +135,6 @@ Image format: `assets/icons/items/{item_key}.webp`
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 2 | shortsword | Shortsword | common |
-| 3 | poisoned_dagger | Poisoned Dagger | uncommon |
-| 4 | ritual_dagger | Ritual Dagger | uncommon |
-| 5 | leather_armor | Leather Armor | common |
 | 6 | bar_stool_leg | Bar Stool Leg | common |
 
 ### Treasure & Valuables
@@ -162,8 +164,6 @@ Image format: `assets/icons/items/{item_key}.webp`
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 4 | forest_map | Forest Map | uncommon |
-| 5 | traveler_map | Traveler's Map | uncommon |
 | 6 | old_map | Old Map | common |
 | 7 | artifact_fragment | Artifact Fragment | uncommon |
 

@@ -118,7 +118,7 @@ export const ITEM_CATALOG = {
   'ancient_scroll': { name: 'Ancient Scroll', rarity: 'uncommon', value: 100, icon: 'assets/icons/items/ancient_scroll.webp' },
   'artifact_fragment': { name: 'Artifact Fragment', rarity: 'rare', value: 200 },
   'ectoplasm': { name: 'Ectoplasm', rarity: 'uncommon', value: 75, icon: 'assets/icons/items/ectoplasm.webp' },
-  'ritual_dagger': { name: 'Ritual Dagger', rarity: 'uncommon', value: 125, type: 'weapon' },
+  'ritual_dagger': { name: 'Ritual Dagger', rarity: 'uncommon', value: 125, type: 'weapon', icon: 'assets/icons/items/ritual_dagger.webp' },
   'dark_tome': { name: 'Dark Tome', rarity: 'rare', value: 300, icon: 'assets/icons/items/dark_tome.webp' },
   'spell_scroll': { name: 'Spell Scroll', rarity: 'uncommon', value: 50, icon: 'assets/icons/items/spell_scroll.webp' },
   'healing_herbs': { name: 'Healing Herbs', rarity: 'common', value: 20, stackable: true, icon: 'assets/icons/items/healing_herbs.webp' },
@@ -164,8 +164,8 @@ export const ITEM_CATALOG = {
   'dragon_gold': { name: 'Dragon Hoard Gold', rarity: 'rare', value: 500 },
   'dragon_egg': { name: 'Dragon Egg', rarity: 'legendary', value: 5000, icon: 'assets/icons/items/dragon_egg.webp' },
   'cave_map': { name: 'Rough Cave Map', rarity: 'uncommon', value: 30, icon: 'assets/icons/items/cave_map.webp' },
-  'forest_map': { name: 'Forest Map', rarity: 'uncommon', value: 40 },
-  'traveler_map': { name: 'Traveler\'s Map', rarity: 'uncommon', value: 35 },
+  'forest_map': { name: 'Forest Map', rarity: 'uncommon', value: 40, icon: 'assets/icons/items/forest_map.webp' },
+  'traveler_map': { name: 'Traveler\'s Map', rarity: 'uncommon', value: 35, icon: 'assets/icons/items/traveler_map.webp' },
   'old_map': { name: 'Old Map', rarity: 'uncommon', value: 35 },
   'hermit_wisdom': { name: 'Hermit\'s Wisdom', rarity: 'uncommon', value: 100, icon: 'assets/icons/items/hermit_wisdom.webp' },
   'ancient_artifact': { name: 'Ancient Artifact', rarity: 'rare', value: 400, icon: 'assets/icons/items/ancient_artifact.webp' },
@@ -208,8 +208,8 @@ export const ITEM_CATALOG = {
 
   // Encounter loot
   'rusty_dagger': { name: 'Rusty Dagger', rarity: 'common', value: 5, type: 'weapon', icon: 'assets/icons/items/rusty_dagger.webp' },
-  'shortsword': { name: 'Shortsword', rarity: 'common', value: 25, type: 'weapon' },
-  'leather_armor': { name: 'Leather Armor', rarity: 'common', value: 30, type: 'armor' },
+  'shortsword': { name: 'Shortsword', rarity: 'common', value: 25, type: 'weapon', icon: 'assets/icons/items/shortsword.webp' },
+  'leather_armor': { name: 'Leather Armor', rarity: 'common', value: 30, type: 'armor', icon: 'assets/icons/items/leather_armor.webp' },
   'map_fragment': { name: 'Map Fragment', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/map_fragment.webp' },
   'inspiration': { name: 'Minstrel\'s Blessing', rarity: 'uncommon', value: 0, type: 'buff', icon: 'assets/icons/items/inspiration.webp' },
   'divine_blessing': { name: 'Divine Blessing', rarity: 'rare', value: 0, type: 'blessing', icon: 'assets/icons/items/divine_blessing.webp' },
@@ -220,7 +220,7 @@ export const ITEM_CATALOG = {
   'ale_mug': { name: 'Ale Mug', rarity: 'common', value: 2, icon: 'assets/icons/items/ale_mug.webp' },
   'bar_stool_leg': { name: 'Bar Stool Leg', rarity: 'common', value: 1, type: 'weapon' },
   'stolen_goods': { name: 'Stolen Goods', rarity: 'uncommon', value: 35 },
-  'poisoned_dagger': { name: 'Poisoned Dagger', rarity: 'uncommon', value: 75, type: 'weapon' },
+  'poisoned_dagger': { name: 'Poisoned Dagger', rarity: 'uncommon', value: 75, type: 'weapon', icon: 'assets/icons/items/poisoned_dagger.webp' },
   'rare_ingredient': { name: 'Rare Ingredient', rarity: 'uncommon', value: 40, icon: 'assets/icons/items/rare_ingredient.webp' }
 };
 
