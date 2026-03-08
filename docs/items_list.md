@@ -1,8 +1,8 @@
 # Items List
 
 **Total Items:** 135
-**Items with images:** 91
-**Items missing images:** 44
+- **Items WITH Images**: 100
+- **Items MISSING Images**: 35
 
 Image format: `assets/icons/items/{item_key}.webp`
 
@@ -104,6 +104,14 @@ Image format: `assets/icons/items/{item_key}.webp`
 | 90 | pearl | Pearl | uncommon | HAS IMAGE |
 | 91 | rare_gem | Rare Gem | uncommon | HAS IMAGE |
 | 92 | bar_stool_leg | Bar Stool Leg | common | HAS IMAGE |
+| 93 | fairy_dust | Fairy Dust | uncommon | HAS IMAGE |
+| 94 | fey_charm | Fey Charm | rare | HAS IMAGE |
+| 95 | storm_crystal | Storm Crystal | rare | HAS IMAGE |
+| 96 | fog_essence | Fog Essence | uncommon | HAS IMAGE |
+| 97 | wisp_essence | Wisp Essence | uncommon | HAS IMAGE |
+| 98 | spirit_essence | Spirit Essence | rare | HAS IMAGE |
+| 99 | primal_essence | Primal Essence | rare | HAS IMAGE |
+| 100 | ghostly_trinket | Ghostly Trinket | uncommon | HAS IMAGE |
 
 ## Items WITHOUT Images
 
@@ -122,13 +130,6 @@ Image format: `assets/icons/items/{item_key}.webp`
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 11 | fairy_dust | Fairy Dust | uncommon |
-| 12 | fey_charm | Fey Charm | uncommon |
-| 13 | storm_crystal | Storm Crystal | rare |
-| 14 | fog_essence | Fog Essence | uncommon |
-| 15 | wisp_essence | Wisp Essence | uncommon |
-| 16 | spirit_essence | Spirit Essence | uncommon |
-| 17 | primal_essence | Primal Essence | uncommon |
 
 ### Blessings & Lore
 
@@ -171,7 +172,6 @@ Image format: `assets/icons/items/{item_key}.webp`
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 1 | ghostly_trinket | Ghostly Trinket | uncommon |
 | 2 | wrapped_corpse_loot | Wrapped Corpse Loot | common |
 | 3 | survivor_reward | Survivor's Reward | uncommon |
 | 4 | mountain_view | Mountain View | common |
