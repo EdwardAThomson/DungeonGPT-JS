@@ -117,6 +117,9 @@ export const ITEM_CATALOG = {
   'bat_guano': { name: 'Alchemical Reagent', rarity: 'common', value: 10, stackable: true, icon: 'assets/icons/items/bat_guano.webp' },
   'ancient_scroll': { name: 'Ancient Scroll', rarity: 'uncommon', value: 100, icon: 'assets/icons/items/ancient_scroll.webp' },
   'artifact_fragment': { name: 'Artifact Fragment', rarity: 'rare', value: 200 },
+  'gemstone': { name: 'Gemstone', rarity: 'uncommon', value: 100, icon: 'assets/icons/items/gemstone.webp' },
+  'pearl': { name: 'Pearl', rarity: 'uncommon', value: 100, icon: 'assets/icons/items/pearl.webp' },
+  'rare_gem': { name: 'Rare Gemstone', rarity: 'rare', value: 200, icon: 'assets/icons/items/rare_gem.webp' },
   'ectoplasm': { name: 'Ectoplasm', rarity: 'uncommon', value: 75, icon: 'assets/icons/items/ectoplasm.webp' },
   'ritual_dagger': { name: 'Ritual Dagger', rarity: 'uncommon', value: 125, type: 'weapon', icon: 'assets/icons/items/ritual_dagger.webp' },
   'dark_tome': { name: 'Dark Tome', rarity: 'rare', value: 300, icon: 'assets/icons/items/dark_tome.webp' },
@@ -185,10 +188,11 @@ export const ITEM_CATALOG = {
 
   // Generic loot
   'gold_coins': { name: 'Gold Coins', rarity: 'common', value: 0, isGold: true, icon: 'assets/icons/items/gold_coins.webp' },
-  'gemstone': { name: 'Gemstone', rarity: 'uncommon', value: 100 },
-  'pearl': { name: 'Pearl', rarity: 'uncommon', value: 100 },
+  'gemstone': { name: 'Gemstone', rarity: 'uncommon', value: 100, icon: 'assets/icons/items/gemstone.webp' },
+  'pearl': { name: 'Pearl', rarity: 'uncommon', value: 100, icon: 'assets/icons/items/pearl.webp' },
   'old_coins': { name: 'Ancient Coins', rarity: 'common', value: 25 },
   'treasure_map': { name: 'Treasure Map', rarity: 'rare', value: 0, type: 'quest_item', icon: 'assets/icons/items/treasure_map.webp' },
+  'rare_gem': { name: 'Rare Gemstone', rarity: 'rare', value: 200, icon: 'assets/icons/items/rare_gem.webp' },
 
   // Quest items
   'quest_clue': { name: 'Mysterious Clue', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/quest_clue.webp' },
@@ -218,7 +222,7 @@ export const ITEM_CATALOG = {
   'rare_ore': { name: 'Rare Ore', rarity: 'uncommon', value: 60, icon: 'assets/icons/items/rare_ore.webp' },
   'family_heirloom': { name: 'Family Heirloom', rarity: 'uncommon', value: 50 },
   'ale_mug': { name: 'Ale Mug', rarity: 'common', value: 2, icon: 'assets/icons/items/ale_mug.webp' },
-  'bar_stool_leg': { name: 'Bar Stool Leg', rarity: 'common', value: 1, type: 'weapon' },
+  'bar_stool_leg': { name: 'Bar Stool Leg', rarity: 'common', value: 1, type: 'weapon', icon: 'assets/icons/items/bar_stool_leg.webp' },
   'stolen_goods': { name: 'Stolen Goods', rarity: 'uncommon', value: 35 },
   'poisoned_dagger': { name: 'Poisoned Dagger', rarity: 'uncommon', value: 75, type: 'weapon', icon: 'assets/icons/items/poisoned_dagger.webp' },
   'rare_ingredient': { name: 'Rare Ingredient', rarity: 'uncommon', value: 40, icon: 'assets/icons/items/rare_ingredient.webp' }

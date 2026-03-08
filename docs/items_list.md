@@ -1,8 +1,8 @@
 # Items List
 
 **Total Items:** 135
-**Items with images:** 87
-**Items missing images:** 48
+**Items with images:** 91
+**Items missing images:** 44
 
 Image format: `assets/icons/items/{item_key}.webp`
 
@@ -100,6 +100,10 @@ Image format: `assets/icons/items/{item_key}.webp`
 | 86 | poisoned_dagger | Poisoned Dagger | uncommon | HAS IMAGE |
 | 87 | ritual_dagger | Ritual Dagger | uncommon | HAS IMAGE |
 | 88 | leather_armor | Leather Armor | common | HAS IMAGE |
+| 89 | gemstone | Gemstone | uncommon | HAS IMAGE |
+| 90 | pearl | Pearl | uncommon | HAS IMAGE |
+| 91 | rare_gem | Rare Gem | uncommon | HAS IMAGE |
+| 92 | bar_stool_leg | Bar Stool Leg | common | HAS IMAGE |
 
 ## Items WITHOUT Images
 
@@ -135,15 +139,11 @@ Image format: `assets/icons/items/{item_key}.webp`
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 6 | bar_stool_leg | Bar Stool Leg | common |
 
 ### Treasure & Valuables
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 1 | gemstone | Gemstone | uncommon |
-| 2 | pearl | Pearl | uncommon |
-| 3 | rare_gem | Rare Gem | uncommon |
 | 4 | old_coins | Old Coins | common |
 | 5 | ancient_gold | Ancient Gold | uncommon |
 | 6 | pixie_gold | Pixie Gold | uncommon |
