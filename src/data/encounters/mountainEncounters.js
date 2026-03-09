@@ -59,6 +59,7 @@ export const MOUNTAIN_ENCOUNTERS = {
     narrativeHook: 'smoke rising from a cave dwelling high on the mountainside',
     aiContext: 'A hermit dwells in a mountain cave, having left civilization behind to seek wisdom or hide from their past. They might share knowledge, trade, or prefer to be left alone.',
     description: 'An elderly hermit tends a fire outside their mountain cave, eyeing your approach with suspicion.',
+    image: '/assets/encounters/mountain_hermit.webp',
     difficulty: 'easy',
     suggestedActions: [
       { label: 'Greet Friendly', skill: 'Persuasion', description: 'Approach with respect' },

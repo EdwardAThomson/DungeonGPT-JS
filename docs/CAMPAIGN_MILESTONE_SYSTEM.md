@@ -523,7 +523,7 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [x] Add `tier`, `levelRange`, `theme`, `subtitle` fields to template data structure
 - [x] Group template picker by theme with tier badges
 - [x] Add Tier 3 template stubs (coming soon placeholders) for all 4 themes
-- [ ] Add level-based warnings at hero selection (party too low for chosen template)
+- [x] Add level-based warnings at hero selection (party too low for chosen template) — also on template cards and detail modal in NewGame.js
 - [ ] Generate template card images for all adventures
 - [ ] Flesh out Tier 3 templates with full milestone data
 - [ ] AI-assisted campaign creation that outputs structured milestone data

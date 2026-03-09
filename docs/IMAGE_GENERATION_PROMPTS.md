@@ -94,7 +94,7 @@ Output directory: `public/assets/encounters/bosses/`
 |-----|--------|
 | `great_dreamer` | The Great Dreamer — a colossal tentacled entity slumbering beneath a dark ocean, visible through fractured reality. Mountainous body, countless tendrils, one enormous eye half-open. Tiny ships on the surface for scale. Dark fantasy digital painting, cosmic horror, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
 | `void_leviathan` | A void leviathan — an impossibly large serpentine creature swimming through a starfield of warped space. Body covered in eyes that see into other dimensions, reality bending around it. Dark fantasy digital painting, cosmic horror, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
-| `mind_flayer_savant` | A mind flayer savant — an elegant tentacle-faced humanoid in ornate purple robes, hovering in a chamber of psychic crystals. Tentacles writhing, psionic energy radiating from its oversized cranium. Dark fantasy digital painting, Lovecraftian atmosphere, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
+| `psionic_devourer` | A psionic devourer — an elegant tentacle-faced humanoid in ornate purple robes, hovering in a chamber of psychic crystals. Tentacles writhing, psionic energy radiating from its oversized cranium. Dark fantasy digital painting, Lovecraftian atmosphere, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
 
 ---
 

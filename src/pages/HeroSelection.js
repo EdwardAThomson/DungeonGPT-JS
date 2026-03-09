@@ -174,6 +174,21 @@ const HeroSelection = () => {
       )}
 
       <div className="form-actions hero-selection-actions">
+        {isBelowRecommended && (
+          <div style={{
+            background: 'rgba(255, 152, 0, 0.15)',
+            border: '1px solid #ff9800',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            marginBottom: '12px',
+            color: 'var(--text)',
+            fontSize: '0.9rem',
+            width: '100%',
+            boxSizing: 'border-box',
+          }}>
+            <strong style={{ color: '#ff9800' }}>Level Warning:</strong> This adventure is designed for levels {levelRange[0]}-{levelRange[1]}, but your highest-level hero is level {partyMaxLevel}. Your party may struggle with encounters.
+          </div>
+        )}
         {selectionError && <p className="error-message">{selectionError}</p>}
         <button onClick={handleBack} className="back-button">
           Back to Settings

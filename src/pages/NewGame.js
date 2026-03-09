@@ -358,6 +358,11 @@ const NewGame = () => {
   // Template detail modal
   const [previewTemplate, setPreviewTemplate] = useState(null);
 
+  // Party max level for level warnings on templates
+  const partyMaxLevel = heroes.length > 0
+    ? Math.max(...heroes.map(h => h.heroLevel || 1))
+    : 0;
+
   const milestoneTypeIcon = {
     item: '📦',
     combat: '⚔️',
@@ -455,11 +460,33 @@ const NewGame = () => {
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
                       {m.type}{m.location ? ` \u2022 ${m.location}` : ''}
                       {m.requires?.length > 0 ? ` \u2022 needs #${m.requires.join(', #')}` : ''}
+                      {m.rewards ? ` \u2022 ${m.rewards.xp} XP, ${m.rewards.gold} gold` : ''}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
+
+            {/* Total rewards summary */}
+            {ms.length > 0 && (() => {
+              let totalXp = 0;
+              for (const m of ms) {
+                if (m.rewards?.xp) totalXp += m.rewards.xp;
+                if (m.encounter?.rewards?.xp) totalXp += m.encounter.rewards.xp;
+              }
+              return totalXp > 0 ? (
+                <div style={{
+                  fontSize: '0.75rem', color: 'var(--text-secondary)',
+                  marginBottom: '16px', padding: '6px 10px',
+                  background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)',
+                  display: 'flex', gap: '12px',
+                }}>
+                  <span><strong>Total XP:</strong> {totalXp}</span>
+                  <span><strong>Milestones:</strong> {ms.length}</span>
+                  <span><strong>Boss fights:</strong> {ms.filter(m => m.type === 'combat').length}</span>
+                </div>
+              ) : null;
+            })()}
 
             {/* Tone Tags */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
@@ -479,6 +506,17 @@ const NewGame = () => {
               ))}
             </div>
           </div>
+
+          {/* Level warning */}
+          {partyMaxLevel > 0 && t.levelRange && partyMaxLevel < t.levelRange[0] && (
+            <div style={{
+              margin: '0 20px 0', padding: '10px 14px',
+              background: 'rgba(255, 152, 0, 0.15)', border: '1px solid #ff9800',
+              borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text)',
+            }}>
+              <strong style={{ color: '#ff9800' }}>Level Warning:</strong> Your highest hero is level {partyMaxLevel}, but this adventure requires level {t.levelRange[0]}+.
+            </div>
+          )}
 
           {/* Footer */}
           <div style={{
@@ -607,6 +645,11 @@ const NewGame = () => {
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>
             {template.description}
           </div>
+          {!isLocked && partyMaxLevel > 0 && template.levelRange && partyMaxLevel < template.levelRange[0] && (
+            <div style={{ fontSize: '0.7rem', color: '#ff9800', marginTop: '6px', fontWeight: 600 }}>
+              ⚠ Requires Lv {template.levelRange[0]}+ (your highest: Lv {partyMaxLevel})
+            </div>
+          )}
         </div>
       </div>
     );

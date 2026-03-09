@@ -19,6 +19,7 @@ import ItemIconsTest from './ItemIconsTest';
 import EncounterVisualDebug from './EncounterVisualDebug';
 import EncounterModalStates from './EncounterModalStates';
 import BuildingSearchTest from './BuildingSearchTest';
+import ImageGenDebug from './ImageGenDebug';
 
 const sectionIcons = {
   'Terrain & Maps': '🗺️',
@@ -66,6 +67,7 @@ const debugSections = [
       { to: 'llm-debug', label: 'LLM Pipeline Debug' },
       { to: 'conversation-manager', label: 'Conversation Manager' },
       { to: 'cf-worker', label: 'CF Worker AI Test' },
+      { to: 'image-gen', label: 'Image Generation' },
     ],
   },
 ];
@@ -190,6 +192,7 @@ const DebugRoutes = () => {
           <Route path="encounter-visual" element={<EncounterVisualDebug />} />
           <Route path="encounter-states" element={<EncounterModalStates />} />
           <Route path="building-search" element={<BuildingSearchTest />} />
+          <Route path="image-gen" element={<ImageGenDebug />} />
           <Route path="*" element={<Navigate to="/debug" replace />} />
         </Routes>
       </section>

@@ -9,7 +9,7 @@
 //   Tier 2 (Lv 3-4) — regional threats, boss HP 100-200, rewards 100-200 XP
 //   Tier 3 (Lv 5+)  — epic threats, boss HP 250-400, rewards 300-500 XP
 //
-// Item IDs marked with [PLACEHOLDER] don't exist in the item registry yet.
+// All item IDs in rewards reference entries in ITEM_CATALOG (inventorySystem.js).
 // Existing item IDs (treasure_map, dark_tome, quest_key, etc.) are real.
 // See docs/CAMPAIGN_MILESTONE_SYSTEM.md for the full design.
 
@@ -79,6 +79,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'Goblin Chieftain',
                         icon: '👺',
+                        image: '/assets/encounters/bosses/goblin_chieftain.webp',
                         encounterTier: 'boss',
                         difficulty: 'medium',
                         multiRound: true,
@@ -169,6 +170,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'Shadow Overlord',
                         icon: '👑',
+                        image: '/assets/icons/items/ritual_dagger.webp',
                         encounterTier: 'boss',
                         difficulty: 'deadly',
                         multiRound: true,
@@ -184,7 +186,7 @@ export const storyTemplates = [
                             failure: 'The Overlord strikes back with devastating force, wounding your party badly.',
                             criticalFailure: 'The Overlord nearly destroys you. You must retreat and regroup.'
                         },
-                        rewards: { xp: 500, gold: '5d20', items: ['legendary_artifact'] } // [PLACEHOLDER] crown_of_sunfire
+                        rewards: { xp: 500, gold: '5d20', items: ['crown_of_sunfire'] }
                     },
                     rewards: { xp: 300, gold: '3d20', items: [] },
                     minLevel: 5
@@ -263,6 +265,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'Blightspawn',
                         icon: '🦠',
+                        image: '/assets/icons/items/ritual_dagger.webp',
                         encounterTier: 'boss',
                         difficulty: 'medium',
                         multiRound: true,
@@ -353,6 +356,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'The Rot-Heart',
                         icon: '🫀',
+                        image: '/assets/icons/items/ritual_dagger.webp',
                         encounterTier: 'boss',
                         difficulty: 'hard',
                         multiRound: true,
@@ -368,7 +372,7 @@ export const storyTemplates = [
                             failure: 'The heart lashes out with putrid tendrils, infecting your wounds.',
                             criticalFailure: 'Rot spores engulf you. You barely escape, badly poisoned and weakened.'
                         },
-                        rewards: { xp: 350, gold: '3d20', items: ['mountain_crystal'] } // purified heart shard
+                        rewards: { xp: 350, gold: '3d20', items: ['purified_heart_shard'] }
                     },
                     rewards: { xp: 200, gold: '2d20', items: [] },
                     minLevel: 4
@@ -447,6 +451,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'Rogue Automaton',
                         icon: '🤖',
+                        image: '/assets/icons/items/ritual_dagger.webp',
                         encounterTier: 'boss',
                         difficulty: 'medium',
                         multiRound: true,
@@ -537,6 +542,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'Herald of the Old Gods',
                         icon: '⚙️',
+                        image: '/assets/icons/items/ritual_dagger.webp',
                         encounterTier: 'boss',
                         difficulty: 'deadly',
                         multiRound: true,
@@ -631,6 +637,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'The Hooded Priest',
                         icon: '🕯️',
+                        image: '/assets/icons/items/ritual_dagger.webp',
                         encounterTier: 'boss',
                         difficulty: 'medium',
                         multiRound: true,
@@ -721,6 +728,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'The Great Dreamer',
                         icon: '🐙',
+                        image: '/assets/icons/items/ritual_dagger.webp',
                         encounterTier: 'boss',
                         difficulty: 'deadly',
                         multiRound: true,
@@ -736,7 +744,7 @@ export const storyTemplates = [
                             failure: 'The Dreamer lashes out with psychic force. Your mind fractures under the weight of alien thoughts.',
                             criticalFailure: 'The Breach widens. You barely escape as reality warps around the Dreamer\'s awakening form.'
                         },
-                        rewards: { xp: 500, gold: '4d20', items: ['ancient_artifact'] } // seal of binding
+                        rewards: { xp: 500, gold: '4d20', items: ['seal_of_binding'] }
                     },
                     rewards: { xp: 300, gold: '3d20', items: [] },
                     minLevel: 5
