@@ -17,7 +17,7 @@ export const GROVE_ENCOUNTERS = {
       { label: 'Rest', skill: null, description: 'Take shelter in the grove' },
       { label: 'Harvest', skill: 'Survival', description: 'Gather rare herbs' }
     ],
-    rewards: { xp: 35, gold: '0', items: ['healing_herbs:70%', 'nature_blessing:40%', 'druid_token:25%', 'rare_flower:35%'] },
+    rewards: { xp: 35, gold: '0', items: ['healing_herbs:70%', 'natures_blessing:40%', 'druid_token:25%', 'rare_flower:35%'] },
     consequences: {
       criticalSuccess: 'The grove\'s guardian appears and grants you a powerful blessing.',
       success: 'You feel refreshed and find useful herbs.',

@@ -11,19 +11,17 @@ async function generateImage(prompt, outputPath) {
         throw new Error('GEMINI_API_KEY not found in .env');
     }
     console.log(`Generating image for: "${prompt}"...`);
-    
+
     const genAI = new GoogleGenerativeAI(API_KEY);
     const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
     try {
         const result = await model.generateContent({
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            // Optional: imageConfig for 1:1 ratio
-            // config: { imageConfig: { aspectRatio: "1:1" } }
         });
 
         const response = await result.response;
-        
+
         for (const part of response.candidates[0].content.parts) {
             if (part.inlineData) {
                 const buffer = Buffer.from(part.inlineData.data, 'base64');
@@ -38,13 +36,11 @@ async function generateImage(prompt, outputPath) {
     }
 }
 
-// Batch 19 & Alternative Leather Armor
+// Batch 26 (Medical & Mystic) - High-Depth Style
 const items = [
-    { key: 'leather_armor', prompt: 'A set of heavy, dark brown boiled leather armor with visible stitching, thick straps, and iron buckles, showing a rugged and organic texture without any metallic sheen, stylized digital game art icon, clean bold lines, vibrant leather textures, premium aesthetics. Perfectly centered on a solid dark charcoal background (#2c2c2c). High quality, 2D game asset style.' },
-    { key: 'gemstone', prompt: 'A large, uncut sparkling sapphire with many facets that catch and refract brilliant blue light, stylized digital game art icon, clean bold lines, vibrant crystal lighting, premium aesthetics. Perfectly centered on a solid dark charcoal background (#2c2c2c). High quality, 2D game asset style.' },
-    { key: 'pearl', prompt: 'A perfect, oversized white pearl with a shimmering iridescent luster, glowing with a soft, ethereal moonlight glow, stylized digital game art icon, clean bold lines, vibrant smooth textures, premium aesthetics. Perfectly centered on a solid dark charcoal background (#2c2c2c). High quality, 2D game asset style.' },
-    { key: 'rare_gem', prompt: 'A brilliant, teardrop-shaped ruby of exceptional purity, pulsing with an inner fire and emitting a warm red radiance, stylized digital game art icon, clean bold lines, vibrant gem lighting, premium aesthetics. Perfectly centered on a solid dark charcoal background (#2c2c2c). High quality, 2D game asset style.' },
-    { key: 'bar_stool_leg', prompt: 'A heavy, splintered wooden leg from a tavern stool, with a few bent nails sticking out and showing signs of use in a brawl, stylized digital game art icon, clean bold lines, detailed wood textures, premium aesthetics. Perfectly centered on a solid dark charcoal background (#2c2c2c). High quality, 2D game asset style.' }
+    { key: 'medical_journal', prompt: 'A thick, leather-bound volume with anatomical drawings and silver-edged pages. Painterly digital fantasy art with rich weathered leather and parchment textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset.' },
+    { key: 'uncovered_ruins', prompt: 'A jagged, ancient stone tablet fragment showing a glowing map of underground ruins. Painterly digital fantasy art with rich weathered stone textures, dramatic cinematic lighting, and glowing blue energy lines. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset.' },
+
 ];
 
 async function runBatch() {

@@ -1,8 +1,8 @@
 # Items List
 
 **Total Items:** 135
-- **Items WITH Images**: 100
-- **Items MISSING Images**: 35
+- **Items WITH Images**: 115
+- **Items MISSING Images**: 20
 
 Image format: `assets/icons/items/{item_key}.webp`
 
@@ -112,6 +112,28 @@ Image format: `assets/icons/items/{item_key}.webp`
 | 98 | spirit_essence | Spirit Essence | rare | HAS IMAGE |
 | 99 | primal_essence | Primal Essence | rare | HAS IMAGE |
 | 100 | ghostly_trinket | Ghostly Trinket | uncommon | HAS IMAGE |
+| 101 | old_coins | Old Coins | common | HAS IMAGE |
+| 102 | ancient_gold | Ancient Gold | uncommon | HAS IMAGE |
+| 103 | pixie_gold | Pixie Gold | uncommon | HAS IMAGE |
+| 104 | dragon_gold | Dragon Gold | rare | HAS IMAGE |
+| 105 | drowned_treasure | Drowned Treasure | uncommon | HAS IMAGE |
+| 106 | cult_treasure | Cult Treasure | uncommon | HAS IMAGE |
+| 107 | fallen_treasure | Fallen Treasure | uncommon | HAS IMAGE |
+| 108 | salvaged_goods | Salvaged Goods | common | HAS IMAGE |
+| 109 | stolen_goods | Stolen Goods | uncommon | HAS IMAGE |
+| 110 | family_heirloom | Family Heirloom | rare | HAS IMAGE |
+| 111 | old_map | Old Map | common | HAS IMAGE |
+| 112 | artifact_fragment | Artifact Fragment | uncommon | HAS IMAGE |
+| 113 | wrapped_corpse_loot | Wrapped Corpse Loot | common | HAS IMAGE |
+| 114 | survivor_reward | Survivor's Reward | uncommon | HAS IMAGE |
+| 115 | mountain_view | Mountain View | common | HAS IMAGE |
+| 116 | medical_journal | Medical Journal | uncommon | HAS IMAGE |
+| 117 | medicine_kit | Medicine Kit | uncommon | HAS IMAGE |
+| 118 | uncovered_ruins | Ruins Map Fragment | uncommon | HAS IMAGE |
+| 119 | nature_blessing | Nature's Blessing | rare | HAS IMAGE |
+
+
+
 
 ## Items WITHOUT Images
 
@@ -145,16 +167,6 @@ Image format: `assets/icons/items/{item_key}.webp`
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 4 | old_coins | Old Coins | common |
-| 5 | ancient_gold | Ancient Gold | uncommon |
-| 6 | pixie_gold | Pixie Gold | uncommon |
-| 7 | drowned_treasure | Drowned Treasure | uncommon |
-| 8 | cult_treasure | Cult Treasure | uncommon |
-| 9 | fallen_treasure | Fallen Treasure | uncommon |
-| 10 | dragon_gold | Dragon Gold | rare |
-| 11 | salvaged_goods | Salvaged Goods | common |
-| 12 | stolen_goods | Stolen Goods | uncommon |
-| 13 | family_heirloom | Family Heirloom | rare |
 
 ### Lore, Scrolls & Knowledge
 
@@ -165,13 +177,8 @@ Image format: `assets/icons/items/{item_key}.webp`
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 6 | old_map | Old Map | common |
-| 7 | artifact_fragment | Artifact Fragment | uncommon |
 
 ### Trophies & Miscellaneous
 
 | # | Key | Name | Rarity |
 |---|-----|------|--------|
-| 2 | wrapped_corpse_loot | Wrapped Corpse Loot | common |
-| 3 | survivor_reward | Survivor's Reward | uncommon |
-| 4 | mountain_view | Mountain View | common |
