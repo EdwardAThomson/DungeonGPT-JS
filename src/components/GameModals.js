@@ -74,13 +74,17 @@ const GameModals = ({
   const visibleMilestonePois = useMemo(() => {
     const milestones = settings?.milestones;
     if (!milestones || milestones.length === 0) return null;
+    // Check if any milestones spawn POIs at all
+    const hasPois = milestones.some(m => m.spawn?.type === 'poi');
+    if (!hasPois) return null; // no POI milestones — don't filter anything
     const visible = new Set();
     for (const m of milestones) {
       if (m.spawn?.type === 'poi' && (m.completed || areRequirementsMet(m, milestones))) {
         visible.add(m.spawn.id);
       }
     }
-    return visible.size > 0 ? visible : null;
+    // Return the set even if empty — an empty set means "hide all milestone POIs"
+    return visible;
   }, [settings?.milestones]);
 
   return (

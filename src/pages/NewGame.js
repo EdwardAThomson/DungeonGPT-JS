@@ -4,9 +4,11 @@ import HeroContext from "../contexts/HeroContext";
 import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from "../contexts/AuthContext";
 import { generateMapData, findStartingTown } from "../utils/mapGenerator";
+import { generateTownMap } from "../utils/townMapGenerator";
+import { populateTown } from "../utils/npcGenerator";
 import WorldMapDisplay from "../components/WorldMapDisplay";
 import { storyTemplates } from "../data/storyTemplates";
-import { spawnWorldMapEntities } from "../game/milestoneSpawner";
+import { spawnWorldMapEntities, injectQuestBuildings } from "../game/milestoneSpawner";
 import { getMilestoneLocationNames } from "../game/milestoneEngine";
 import { llmService } from "../services/llmService";
 import { createLogger } from "../utils/logger";
@@ -292,6 +294,38 @@ const NewGame = () => {
     // Spawn milestone entities onto the world map before resolving coords
     const spawnResult = spawnWorldMapEntities(generatedMap, milestones);
 
+    // Pre-generate all town maps so saves are never affected by generator changes
+    const townMapsCache = {};
+    for (let y = 0; y < generatedMap.length; y++) {
+      for (let x = 0; x < generatedMap[y].length; x++) {
+        const tile = generatedMap[y][x];
+        if (tile.poi === 'town' && tile.townName) {
+          const townSize = tile.townSize || tile.poiType || 'village';
+          const seed = parseInt(worldSeed) + (x * 1000) + (y * 10000);
+          const townMapData = generateTownMap(townSize, tile.townName, 'south', seed, tile.hasRiver, tile.riverDirection);
+
+          // Inject quest buildings if needed
+          if (spawnResult.requiredBuildings?.[tile.townName]) {
+            injectQuestBuildings(townMapData, spawnResult.requiredBuildings[tile.townName]);
+          }
+
+          // Populate town with NPCs
+          const npcs = populateTown(townMapData, seed);
+          townMapData.npcs = npcs;
+
+          townMapsCache[tile.townName] = townMapData;
+          logger.debug(`Pre-generated town map: ${tile.townName} (${townSize})`);
+        }
+      }
+    }
+
+    // Resolve tier and level range from template or custom settings
+    const templateData = selectedTemplate && selectedTemplate !== 'custom' && selectedTemplate !== 'ai'
+      ? storyTemplates.find(t => t.id === selectedTemplate)
+      : null;
+    const campaignTier = templateData?.tier || customTier || 1;
+    const campaignLevelRange = templateData?.levelRange || (campaignTier === 1 ? [1, 2] : [3, 5]);
+
     const settingsData = {
       shortDescription: finalDescription,
       grimnessLevel,
@@ -303,6 +337,8 @@ const NewGame = () => {
       milestones: resolveMilestoneCoords(milestones, generatedMap),
       worldSeed,
       templateName,
+      tier: campaignTier,
+      levelRange: campaignLevelRange,
       requiredBuildings: spawnResult.requiredBuildings,
       enemySpawns: spawnResult.enemySpawns,
       itemSpawns: spawnResult.itemSpawns
@@ -313,7 +349,7 @@ const NewGame = () => {
     localStorage.setItem('activeGameSessionId', gameSessionId);
 
     setSettings(settingsData);
-    navigate('/hero-selection', { state: { heroes, generatedMap, worldSeed, gameSessionId } });
+    navigate('/hero-selection', { state: { heroes, generatedMap, worldSeed, gameSessionId, townMapsCache } });
   };
 
   // Tab state

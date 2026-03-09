@@ -38,7 +38,7 @@ const logger = createLogger('game');
 
 const Game = () => {
   const { state } = useLocation();
-  const { selectedHeroes: stateHeroes, loadedConversation, worldSeed: stateSeed, gameSessionId: stateGameSessionId, generatedMap: stateGeneratedMap } = state || { selectedHeroes: [], loadedConversation: null, worldSeed: null, gameSessionId: null, generatedMap: null };
+  const { selectedHeroes: stateHeroes, loadedConversation, worldSeed: stateSeed, gameSessionId: stateGameSessionId, generatedMap: stateGeneratedMap, townMapsCache: stateTownMapsCache } = state || { selectedHeroes: [], loadedConversation: null, worldSeed: null, gameSessionId: null, generatedMap: null, townMapsCache: null };
   const [selectedHeroes, setSelectedHeroes] = useState(() => {
     // Initialize heroes with progression fields if missing
     const heroes = loadedConversation?.selected_heroes || stateHeroes || [];
@@ -112,7 +112,7 @@ const Game = () => {
   } = useGameSession(loadedConversation, setSettings, setSelectedProvider, setSelectedModel, stateGameSessionId);
 
   // Pass dummy/empty functions for now where we handle logic in Game.js wrapper
-  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings);
+  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache);
 
   const interactionHook = useGameInteraction(
     loadedConversation,

@@ -7,7 +7,7 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-map');
 
-const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null, requiredBuildings = null) => {
+const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null, requiredBuildings = null, initialTownMapsCache = null) => {
     // --- State Initialization --- //
 
     const [mapAndPosition] = useState(() => {
@@ -63,7 +63,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
     const [townPlayerPosition, setTownPlayerPosition] = useState(subMapsData?.townPlayerPosition || null);
     const [currentTownTile, setCurrentTownTile] = useState(subMapsData?.currentTownTile || null);
     const [isInsideTown, setIsInsideTown] = useState(subMapsData?.isInsideTown || false);
-    const [townMapsCache, setTownMapsCache] = useState(subMapsData?.townMapsCache || {});
+    const [townMapsCache, setTownMapsCache] = useState(subMapsData?.townMapsCache || initialTownMapsCache || {});
 
     // On mount: sync currentTownMap with cache to ensure discoveredBuildings is up to date
     useEffect(() => {

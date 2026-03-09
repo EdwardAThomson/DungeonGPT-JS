@@ -6,6 +6,7 @@ import HeroContext from '../contexts/HeroContext';
 import SettingsContext from '../contexts/SettingsContext';
 import { initializeHP } from '../utils/healthSystem';
 import { heroesApi } from '../services/heroesApi';
+import { resolveProfilePicture } from '../utils/assetHelper';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('hero-selection');
@@ -20,6 +21,7 @@ const HeroSelection = () => {
   const generatedMap = state?.generatedMap;
   const worldSeed = state?.worldSeed;
   const gameSessionId = state?.gameSessionId;
+  const townMapsCache = state?.townMapsCache;
 
   const [selectedHeroes, setSelectedHeroes] = useState([]);
   const [selectionError, setSelectionError] = useState('');
@@ -63,6 +65,13 @@ const HeroSelection = () => {
     navigate('/hero-creation', { state: { returnToHeroSelection: true, settingsData: settings } });
   };
 
+  // Level warning: check if selected party is below the campaign's recommended level
+  const levelRange = settings?.levelRange;
+  const partyMaxLevel = selectedHeroes.length > 0
+    ? Math.max(...selectedHeroes.map(h => h.heroLevel || 1))
+    : 0;
+  const isBelowRecommended = levelRange && partyMaxLevel > 0 && partyMaxLevel < levelRange[0];
+
   const handleNext = () => {
     if (selectedHeroes.length === 0 || selectedHeroes.length > 4) {
       setSelectionError('Please select between 1 and 4 heroes to start.');
@@ -73,7 +82,7 @@ const HeroSelection = () => {
     // Initialize HP for all selected heroes
     const heroesWithHP = selectedHeroes.map(hero => initializeHP(hero));
 
-    navigate('/game', { state: { selectedHeroes: heroesWithHP, generatedMap, worldSeed, gameSessionId } });
+    navigate('/game', { state: { selectedHeroes: heroesWithHP, generatedMap, worldSeed, gameSessionId, townMapsCache } });
 
   };
 
@@ -85,10 +94,29 @@ const HeroSelection = () => {
     <div className="page-container hero-selection-page">
       <div className="page-header">
         <h2>Select Your Party (1-4 Heroes)</h2>
-        <button onClick={handleCreateHero} className="create-new-button">
-          New Hero
-        </button>
+        <div className="page-header-actions">
+          <button onClick={handleCreateHero} className="create-new-button">
+            New Hero
+          </button>
+          <button onClick={handleNext} className="next-button" disabled={selectedHeroes.length === 0 || selectedHeroes.length > 4}>
+            Start Game ({selectedHeroes.length})
+          </button>
+        </div>
       </div>
+
+      {isBelowRecommended && (
+        <div style={{
+          background: 'rgba(255, 152, 0, 0.15)',
+          border: '1px solid #ff9800',
+          borderRadius: '8px',
+          padding: '12px 16px',
+          marginBottom: '16px',
+          color: 'var(--text)',
+          fontSize: '0.9rem',
+        }}>
+          <strong style={{ color: '#ff9800' }}>Level Warning:</strong> This adventure is designed for levels {levelRange[0]}-{levelRange[1]}, but your highest-level hero is level {partyMaxLevel}. Your party may struggle with encounters.
+        </div>
+      )}
 
       {heroes.length === 0 ? (
         <p>No heroes available. Please create heroes first.</p>
@@ -104,7 +132,7 @@ const HeroSelection = () => {
               >
                 <div className="hero-item-image">
                   <img 
-                    src={hero.profilePicture} 
+                    src={resolveProfilePicture(hero.profilePicture)}
                     alt={`${hero.heroName}'s profile`}
                     loading="lazy"
                     width="150"
