@@ -1,11 +1,115 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { generateNPC, populateTown } from '../utils/npcGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
 import TownMapDisplay from "../components/TownMapDisplay";
 
+const BUILDING_EMOJIS = {
+    house: '🏠', inn: '🏨', shop: '🏪', temple: '⛪', tavern: '🍺',
+    guild: '🏛️', market: '🏬', bank: '🏦', manor: '🏰', barn: '🏚️',
+    blacksmith: '⚒️', keep: '🏰', archives: '📚', alchemist: '⚗️',
+    foundry: '🔥', warehouse: '📦', library: '📖'
+};
+
+const TownMetrics = ({ townMap, townNpcs }) => {
+    const buildingCounts = useMemo(() => {
+        const counts = {};
+        townMap.mapData.flat().forEach(tile => {
+            if (tile.type === 'building' && tile.buildingType) {
+                counts[tile.buildingType] = (counts[tile.buildingType] || 0) + 1;
+            }
+        });
+        return counts;
+    }, [townMap]);
+
+    const npcCounts = useMemo(() => {
+        const counts = {};
+        townNpcs.forEach(npc => {
+            counts[npc.role] = (counts[npc.role] || 0) + 1;
+        });
+        return counts;
+    }, [townNpcs]);
+
+    const totalBuildings = Object.values(buildingCounts).reduce((a, b) => a + b, 0);
+
+    const tableStyle = { width: '100%', fontSize: '13px', borderCollapse: 'collapse' };
+    const thStyle = { textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid var(--border, #333)' };
+    const tdStyle = { padding: '4px 8px', borderBottom: '1px solid var(--border, #222)' };
+
+    return (
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <div style={{
+                flex: '1 1 300px',
+                backgroundColor: 'var(--surface, #1a1a2e)',
+                border: '1px solid var(--border, #333)',
+                borderRadius: '8px',
+                padding: '16px'
+            }}>
+                <h4 style={{ margin: '0 0 12px 0', color: 'var(--primary, #c4a35a)' }}>
+                    Buildings ({totalBuildings})
+                </h4>
+                <table style={tableStyle}>
+                    <thead>
+                        <tr>
+                            <th style={thStyle}>Type</th>
+                            <th style={{ ...thStyle, textAlign: 'right' }}>Count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {Object.entries(buildingCounts)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([type, count]) => (
+                                <tr key={type}>
+                                    <td style={tdStyle}>
+                                        {BUILDING_EMOJIS[type] || '🏠'} {type.charAt(0).toUpperCase() + type.slice(1)}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 'bold' }}>
+                                        {count}
+                                    </td>
+                                </tr>
+                            ))}
+                    </tbody>
+                </table>
+            </div>
+
+            <div style={{
+                flex: '1 1 300px',
+                backgroundColor: 'var(--surface, #1a1a2e)',
+                border: '1px solid var(--border, #333)',
+                borderRadius: '8px',
+                padding: '16px'
+            }}>
+                <h4 style={{ margin: '0 0 12px 0', color: 'var(--primary, #c4a35a)' }}>
+                    Residents ({townNpcs.length})
+                </h4>
+                <table style={tableStyle}>
+                    <thead>
+                        <tr>
+                            <th style={thStyle}>Role</th>
+                            <th style={{ ...thStyle, textAlign: 'right' }}>Count</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {Object.entries(npcCounts)
+                            .sort(([, a], [, b]) => b - a)
+                            .map(([role, count]) => (
+                                <tr key={role}>
+                                    <td style={tdStyle}>{role}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 'bold' }}>
+                                        {count}
+                                    </td>
+                                </tr>
+                            ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
 const NPCTest = () => {
     const [npcs, setNpcs] = useState([]);
     const [seedInput, setSeedInput] = useState('');
+    const [townNpcs, setTownNpcs] = useState([]);
 
     const generateBatch = () => {
         const batch = [];
@@ -63,6 +167,7 @@ const NPCTest = () => {
 
         setGroupedNpcs(groups);
         setTownMap(townMap); // Store for visualization
+        setTownNpcs(population);
         setNpcs([]); // Clear main list to show grouped view
         setStatsReport(null);
     };
@@ -111,10 +216,10 @@ const NPCTest = () => {
                 </div>
 
                 {statsReport && (
-                    <div className="stats-report" style={{ padding: '10px', background: '#f0f0f0', borderRadius: '5px', marginBottom: '15px' }}>
+                    <div className="stats-report" style={{ padding: '10px', background: 'var(--surface, #1a1a2e)', border: '1px solid var(--border, #333)', borderRadius: '5px', marginBottom: '15px' }}>
                         <strong>Distribution Report (n={statsReport.total}):</strong>
-                        <span style={{ marginLeft: '15px', color: '#2980b9' }}>Male: {statsReport.male}%</span>
-                        <span style={{ marginLeft: '15px', color: '#c0392b' }}>Female: {statsReport.female}%</span>
+                        <span style={{ marginLeft: '15px', color: '#5dade2' }}>Male: {statsReport.male}%</span>
+                        <span style={{ marginLeft: '15px', color: '#e74c3c' }}>Female: {statsReport.female}%</span>
                         <span style={{ marginLeft: '15px', fontWeight: 'bold' }}>
                             {Math.abs(statsReport.male - 50) < 10 ? "✅ Balanced" : "⚠️ Skewed"}
                         </span>
@@ -124,16 +229,19 @@ const NPCTest = () => {
 
             {/* Town Visualization */}
             {townMap && (
-                <div style={{ marginBottom: '30px', border: '1px solid #ddd', padding: '15px', borderRadius: '8px', background: '#fff' }}>
+                <div style={{ marginBottom: '30px', border: '1px solid var(--border, #333)', padding: '15px', borderRadius: '8px', background: 'var(--surface, #1a1a2e)' }}>
                     <h2 style={{ marginTop: 0 }}>🗺️ Town Map Visualization</h2>
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
                         <TownMapDisplay townMapData={townMap} showLeaveButton={false} />
                     </div>
-                    <p style={{ textAlign: 'center', fontSize: '0.9em', color: '#666', fontStyle: 'italic' }}>
+                    <p style={{ textAlign: 'center', fontSize: '0.9em', color: 'var(--text-secondary, #aaa)', fontStyle: 'italic' }}>
                         Scroll down to see the inhabitants of these buildings!
                     </p>
                 </div>
             )}
+
+            {/* Town Metrics */}
+            {townMap && townNpcs.length > 0 && <TownMetrics townMap={townMap} townNpcs={townNpcs} />}
 
             {groupedNpcs && (
                 <div className="town-population-view">
@@ -144,15 +252,15 @@ const NPCTest = () => {
                         const type = location.buildingType ? location.buildingType.charAt(0).toUpperCase() + location.buildingType.slice(1) : 'Building';
 
                         return (
-                            <div key={building} className="building-group" style={{ marginBottom: '20px', padding: '10px', background: '#f9f9f9', borderRadius: '5px' }}>
-                                <h3 style={{ borderBottom: '2px solid #3498db', paddingBottom: '5px', marginTop: 0 }}>
-                                    {building} <span style={{ fontSize: '0.7em', color: '#7f8c8d', fontWeight: 'normal' }}>| {type} at {coords}</span>
+                            <div key={building} className="building-group" style={{ marginBottom: '20px', padding: '10px', background: 'var(--surface, #1a1a2e)', border: '1px solid var(--border, #333)', borderRadius: '5px' }}>
+                                <h3 style={{ borderBottom: '2px solid var(--primary, #c4a35a)', paddingBottom: '5px', marginTop: 0 }}>
+                                    {building} <span style={{ fontSize: '0.7em', color: 'var(--text-secondary, #aaa)', fontWeight: 'normal' }}>| {type} at {coords}</span>
                                 </h3>
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '10px' }}>
                                     {staff.map(npc => (
-                                        <div key={npc.id} className="npc-card" style={{ border: '1px solid #ddd', padding: '10px', borderRadius: '5px', background: 'white' }}>
+                                        <div key={npc.id} className="npc-card" style={{ border: '1px solid var(--border, #333)', padding: '10px', borderRadius: '5px', background: 'var(--bg, #0f0f23)' }}>
                                             <strong>{npc.name}</strong> ({npc.gender} {npc.race}, {npc.age})<br />
-                                            <em style={{ color: '#666' }}>{npc.job}</em><br />
+                                            <em style={{ color: 'var(--text-secondary, #aaa)' }}>{npc.job}</em><br />
                                             Class: {npc.class} Lvl {npc.level} | {npc.alignment}
                                         </div>
                                     ))}
@@ -166,14 +274,14 @@ const NPCTest = () => {
             <div className="npc-list" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
                 {npcs.map((npc) => (
                     <div key={npc.id} style={{
-                        border: '1px solid #ccc',
+                        border: '1px solid var(--border, #333)',
                         borderRadius: '8px',
                         padding: '15px',
-                        backgroundColor: '#fff',
-                        boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+                        backgroundColor: 'var(--surface, #1a1a2e)',
+                        boxShadow: '0 2px 5px var(--shadow, rgba(0,0,0,0.3))'
                     }}>
-                        <h3 style={{ marginTop: 0, color: '#2c3e50' }}>{npc.title} {npc.name}</h3>
-                        <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '10px' }}>
+                        <h3 style={{ marginTop: 0, color: 'var(--primary, #c4a35a)' }}>{npc.title} {npc.name}</h3>
+                        <div style={{ fontSize: '0.9em', color: 'var(--text-secondary, #aaa)', marginBottom: '10px' }}>
                             <span style={{ fontWeight: 'bold', marginRight: '5px' }}>
                                 {npc.gender === 'Male' ? '♂️' : '♀️'}
                             </span>
@@ -185,7 +293,7 @@ const NPCTest = () => {
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '5px', marginBottom: '10px', fontSize: '0.9em', textAlign: 'center' }}>
                             {Object.entries(npc.stats).map(([stat, val]) => (
-                                <div key={stat} style={{ background: '#f5f5f5', padding: '3px', borderRadius: '3px' }}>
+                                <div key={stat} style={{ background: 'var(--bg, #0f0f23)', padding: '3px', borderRadius: '3px' }}>
                                     <div style={{ fontWeight: 'bold' }}>{stat.slice(0, 3)}</div>
                                     <div>{val}</div>
                                 </div>
@@ -200,13 +308,13 @@ const NPCTest = () => {
                                 ))}
                             </ul>
                         </div>
-                        <div style={{ fontSize: '0.7em', color: '#aaa', marginTop: '10px' }}>
+                        <div style={{ fontSize: '0.7em', color: 'var(--text-secondary, #888)', marginTop: '10px' }}>
                             Seed: {npc.seed} | ID: {npc.id.slice(0, 8)}...
                         </div>
                     </div>
                 ))}
             </div>
-            {npcs.length === 0 && !groupedNpcs && <p style={{ textAlign: 'center', color: '#999' }}>Click a button to generate NPCs</p>}
+            {npcs.length === 0 && !groupedNpcs && <p style={{ textAlign: 'center', color: 'var(--text-secondary, #aaa)' }}>Click a button to generate NPCs</p>}
         </div>
     );
 };

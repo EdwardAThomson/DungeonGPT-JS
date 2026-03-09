@@ -76,6 +76,27 @@ const ROLES = {
         inventory: ["Fine Clothes", "Toy Sword", "Doll"],
         hpRange: [4, 6]
     },
+    // Lesser nobility / landed gentry
+    "Gentry": {
+        possibleTitles: {
+            Male: ["Sir", "Master", "Squire", "Gentleman", "Steward"],
+            Female: ["Dame", "Mistress", "Lady", "Gentlewoman", "Stewardess"]
+        },
+        defaultClass: "Aristocrat",
+        baseStats: { Strength: 10, Dexterity: 11, Constitution: 10, Intelligence: 12, Wisdom: 12, Charisma: 13 },
+        inventory: ["Fine Clothes", "Riding Boots", ["Signet Ring", "Silver Brooch", "Gold Chain"]],
+        hpRange: [6, 12]
+    },
+    "Gentry Child": {
+        possibleTitles: {
+            Male: ["Young Master", "Master"],
+            Female: ["Young Mistress", "Miss"]
+        },
+        defaultClass: "Aristocrat",
+        baseStats: { Strength: 7, Dexterity: 10, Constitution: 8, Intelligence: 11, Wisdom: 9, Charisma: 12 },
+        inventory: ["Fine Clothes", ["Book of Heraldry", "Wooden Practice Sword", "Embroidery Kit"]],
+        hpRange: [4, 6]
+    },
     "Criminal": {
         possibleTitles: ["Thief", "Bandit", "Cutpurse", "Thug", "Smuggler"],
         defaultClass: "Rogue",
@@ -156,6 +177,67 @@ const ROLES = {
         baseStats: { Strength: 13, Dexterity: 11, Constitution: 12, Intelligence: 10, Wisdom: 11, Charisma: 10 },
         inventory: ["Rough Clothes", ["Pitchfork", "Scythe", "Sickle"], "Straw Hat"],
         hpRange: [6, 10]
+    },
+    // Knowledge & Scholarly
+    "Archivist": {
+        possibleTitles: {
+            Male: ["Lorekeeper", "Archivist", "Curator", "Head Scholar", "Sage"],
+            Female: ["Lorekeeper", "Archivist", "Curator", "Head Scholar", "Sage"]
+        },
+        defaultClass: "Expert",
+        baseStats: { Strength: 8, Dexterity: 10, Constitution: 10, Intelligence: 16, Wisdom: 14, Charisma: 11 },
+        inventory: ["Reading Glasses", "Quill & Ink", "Leather-Bound Journal", "Ring of Keys"],
+        hpRange: [6, 10]
+    },
+    "Librarian": {
+        possibleTitles: {
+            Male: ["Scribe", "Bookkeeper", "Assistant", "Cataloger", "Page"],
+            Female: ["Scribe", "Bookkeeper", "Assistant", "Cataloger", "Page"]
+        },
+        defaultClass: "Expert",
+        baseStats: { Strength: 8, Dexterity: 11, Constitution: 9, Intelligence: 14, Wisdom: 12, Charisma: 10 },
+        inventory: ["Simple Robes", "Stack of Scrolls", "Candle", "Bookmark"],
+        hpRange: [4, 8]
+    },
+    // Alchemy & Potions
+    "Alchemist": {
+        possibleTitles: {
+            Male: ["Apothecary", "Alchemist", "Herbalist", "Potioneer", "Brewer"],
+            Female: ["Apothecary", "Alchemist", "Herbalist", "Potioneer", "Brewer"]
+        },
+        defaultClass: "Expert",
+        baseStats: { Strength: 9, Dexterity: 13, Constitution: 11, Intelligence: 15, Wisdom: 13, Charisma: 10 },
+        inventory: ["Stained Apron", "Mortar & Pestle", "Herb Pouch", ["Healing Potion", "Antidote", "Flask of Acid"]],
+        hpRange: [6, 12]
+    },
+    // Industrial
+    "Foundry Master": {
+        possibleTitles: {
+            Male: ["Smelter", "Foreman", "Furnace Master", "Ironworker", "Caster"],
+            Female: ["Smelter", "Foreman", "Furnace Master", "Ironworker", "Caster"]
+        },
+        defaultClass: "Expert",
+        baseStats: { Strength: 14, Dexterity: 10, Constitution: 15, Intelligence: 11, Wisdom: 10, Charisma: 9 },
+        inventory: ["Heavy Apron", "Long Tongs", "Fire-Resistant Gloves", "Iron Ingot"],
+        hpRange: [12, 20]
+    },
+    "Foundry Worker": {
+        possibleTitles: ["Stoker", "Slagman", "Ore Handler", "Bellows Operator", "Apprentice"],
+        defaultClass: "Commoner",
+        baseStats: { Strength: 13, Dexterity: 10, Constitution: 14, Intelligence: 9, Wisdom: 10, Charisma: 9 },
+        inventory: ["Soot-Stained Clothes", "Shovel", "Waterskin"],
+        hpRange: [8, 14]
+    },
+    // Logistics & Trade
+    "Warehouse Master": {
+        possibleTitles: {
+            Male: ["Quartermaster", "Stockmaster", "Depot Chief", "Supply Master", "Warden"],
+            Female: ["Quartermaster", "Stockmaster", "Depot Chief", "Supply Master", "Warden"]
+        },
+        defaultClass: "Expert",
+        baseStats: { Strength: 12, Dexterity: 11, Constitution: 11, Intelligence: 13, Wisdom: 12, Charisma: 12 },
+        inventory: ["Work Clothes", "Manifest Ledger", "Ring of Keys", "Measuring Rod"],
+        hpRange: [8, 14]
     }
 };
 
@@ -296,10 +378,12 @@ export const generateNPC = (options = {}) => {
 
     // Add Wealth based on Role/Class (Simple approximation)
     let coins = 0;
-    if (roleKey === "Noble Child") {
+    if (roleKey === "Noble Child" || roleKey === "Gentry Child") {
         coins = rng.range(2, 10) + " Silver Pieces (Allowance)";
     } else if (roleKey === "Noble" || roleKey === "Merchant") {
-        coins = rng.range(20, 100) + " Gold Places";
+        coins = rng.range(20, 100) + " Gold Pieces";
+    } else if (roleKey === "Gentry") {
+        coins = rng.range(10, 50) + " Gold Pieces";
     } else if (roleKey === "Guard" || roleKey === "Tavern Keeper") {
         coins = rng.range(5, 20) + " Silver Pieces";
     } else {
@@ -487,6 +571,24 @@ export const populateTown = (townMapData, seed) => {
         } else if (b.type === 'guild') {
             const master = addNPC("Guild Master", b, b);
             master.job = `Master of ${b.name}`;
+        } else if (b.type === 'archives' || b.type === 'library') {
+            const archivist = addNPC("Archivist", b, b);
+            archivist.job = `Head of ${b.name}`;
+            const assistant = addNPC("Librarian", b, b, {
+                gender: archivist.gender === "Male" ? "Female" : "Male"
+            });
+            assistant.job = `${assistant.title} at ${b.name}`;
+        } else if (b.type === 'alchemist') {
+            const alchemist = addNPC("Alchemist", b, b);
+            alchemist.job = `Proprietor of ${b.name}`;
+        } else if (b.type === 'foundry') {
+            const master = addNPC("Foundry Master", b, b);
+            master.job = `Master of ${b.name}`;
+            const worker = addNPC("Foundry Worker", b, b);
+            worker.job = `Worker at ${b.name}`;
+        } else if (b.type === 'warehouse') {
+            const master = addNPC("Warehouse Master", b, b);
+            master.job = `${master.title} of ${b.name}`;
         }
     });
 
@@ -495,6 +597,42 @@ export const populateTown = (townMapData, seed) => {
 
     residentialSites.forEach(home => {
         if (occupiedHomes.has(`${home.x},${home.y}`)) return; // Skip if already populated (e.g. leader)
+
+        // Manor residents: lesser nobility / gentry families
+        if (home.type === 'manor') {
+            const familyName = rng.pick(NOBLE_LAST_NAMES);
+
+            // Head of household — mix of landed knights and wealthy merchants
+            const isKnight = rng.random() < 0.6;
+            const head = addNPC(isKnight ? "Gentry" : "Merchant", home, home, { lastName: familyName });
+            const gentryOccupations = [
+                "Retired Knight", "Landowner", "Magistrate", "Tax Collector",
+                "Master of Coin", "Horse Breeder", "Patron of the Arts"
+            ];
+            const merchantOccupations = [
+                "Wealthy Trader", "Trade Baron", "Import Merchant",
+                "Spice Merchant", "Silk Trader", "Wine Merchant"
+            ];
+            head.job = `${head.title} ${head.name.split(' ')[1]} — ${rng.pick(isKnight ? gentryOccupations : merchantOccupations)}`;
+
+            // Spouse
+            const spouseGender = head.gender === "Male" ? "Female" : "Male";
+            const spouse = addNPC("Gentry", home, home, {
+                lastName: familyName,
+                gender: spouseGender,
+                titleIndex: head.selectedTitleIndex
+            });
+            spouse.job = `${spouse.title} of the House ${familyName}`;
+
+            // Children (1-3)
+            const childCount = rng.range(1, 3);
+            for (let i = 0; i < childCount; i++) {
+                const child = addNPC("Gentry Child", home, home, { lastName: familyName });
+                child.job = `${child.title} of the House ${familyName}`;
+            }
+
+            return;
+        }
 
         const familyName = rng.pick(HUMAN_LAST_NAMES);
         const familySize = rng.range(3, 6); // More authentic medieval family sizes (1-4 children)

@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
 
-const BuildingModal = ({ building, npcs, onClose }) => {
+const getAbilityModifier = (score) => Math.floor(((score || 10) - 10) / 2);
+
+const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound }) => {
     const [imageError, setImageError] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+    const [searchAttempts, setSearchAttempts] = useState(0);
+    const [searchResult, setSearchResult] = useState(null); // { success, roll, modifier, dc, total }
+    const [itemFound, setItemFound] = useState(false);
 
     if (!building) return null;
 
@@ -170,6 +175,109 @@ const BuildingModal = ({ building, npcs, onClose }) => {
                                 </p>
                             )}
                         </div>
+
+                        {/* Quest Item Search Section */}
+                        {building.questItemId && !itemFound && (
+                            <div className="modal-section" style={{
+                                backgroundColor: 'rgba(0,0,0,0.03)',
+                                padding: '20px',
+                                borderRadius: '10px',
+                                border: '2px solid var(--accent, var(--primary))',
+                                marginTop: '15px'
+                            }}>
+                                <h4 style={{
+                                    borderBottom: '2px solid var(--accent, var(--primary))',
+                                    paddingBottom: '10px',
+                                    margin: '0 0 15px 0',
+                                    color: 'var(--accent, var(--primary))',
+                                    fontFamily: 'var(--header-font)'
+                                }}>
+                                    Search for {building.questItemName || 'Quest Item'}
+                                </h4>
+                                <p style={{ margin: '0 0 15px 0', color: 'var(--text-secondary)', fontFamily: 'var(--body-font)' }}>
+                                    {searchAttempts === 0
+                                        ? 'You sense something important may be hidden here. Search the building to find it.'
+                                        : `You've searched ${searchAttempts} time${searchAttempts > 1 ? 's' : ''}. Keep looking...`}
+                                </p>
+                                {searchResult && !searchResult.success && (
+                                    <div style={{
+                                        padding: '12px',
+                                        marginBottom: '15px',
+                                        borderRadius: '8px',
+                                        backgroundColor: 'rgba(200, 100, 50, 0.1)',
+                                        border: '1px solid rgba(200, 100, 50, 0.3)',
+                                        fontFamily: 'var(--body-font)',
+                                        fontSize: '0.9rem'
+                                    }}>
+                                        <strong>Roll: {searchResult.roll} + {searchResult.modifier} = {searchResult.total}</strong> (needed {searchResult.dc})
+                                        <br />
+                                        <span style={{ fontStyle: 'italic', color: 'var(--text-secondary)' }}>
+                                            {searchResult.total <= searchResult.dc - 5
+                                                ? 'You rummage through shelves and drawers but find nothing of note. Perhaps try a different area.'
+                                                : 'You notice something promising but can\'t quite locate it. You\'re getting closer...'}
+                                        </span>
+                                    </div>
+                                )}
+                                <button
+                                    className="primary-button"
+                                    onClick={() => {
+                                        const baseDC = 12;
+                                        const dcReduction = searchAttempts * 3;
+                                        const dc = Math.max(2, baseDC - dcReduction);
+                                        const stats = firstHero?.stats || {};
+                                        const intMod = getAbilityModifier(stats.Intelligence || stats.intelligence);
+                                        const wisMod = getAbilityModifier(stats.Wisdom || stats.wisdom);
+                                        const modifier = Math.max(intMod, wisMod);
+                                        const roll = Math.floor(Math.random() * 20) + 1;
+                                        const total = roll + modifier;
+                                        const success = total >= dc;
+                                        const newAttempts = searchAttempts + 1;
+                                        setSearchAttempts(newAttempts);
+                                        setSearchResult({ success, roll, modifier, dc, total });
+                                        if (success) {
+                                            setItemFound(true);
+                                            if (onQuestItemFound) {
+                                                onQuestItemFound(building.questItemId, building.questItemName);
+                                            }
+                                        }
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px',
+                                        fontWeight: 'bold',
+                                        letterSpacing: '1px'
+                                    }}
+                                >
+                                    Search the {building.buildingType || 'Building'}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Quest Item Found */}
+                        {itemFound && searchResult && (
+                            <div className="modal-section" style={{
+                                backgroundColor: 'rgba(50, 180, 80, 0.1)',
+                                padding: '20px',
+                                borderRadius: '10px',
+                                border: '2px solid rgba(50, 180, 80, 0.6)',
+                                marginTop: '15px',
+                                textAlign: 'center'
+                            }}>
+                                <h4 style={{
+                                    margin: '0 0 10px 0',
+                                    color: 'rgba(50, 180, 80, 1)',
+                                    fontFamily: 'var(--header-font)'
+                                }}>
+                                    Item Found!
+                                </h4>
+                                <p style={{ margin: '0 0 8px 0', fontFamily: 'var(--body-font)' }}>
+                                    <strong>Roll: {searchResult.roll} + {searchResult.modifier} = {searchResult.total}</strong> (needed {searchResult.dc})
+                                </p>
+                                <p style={{ margin: 0, fontFamily: 'var(--body-font)', fontSize: '1.1rem' }}>
+                                    You discovered <strong style={{ color: 'var(--primary)' }}>{building.questItemName || 'a quest item'}</strong>!
+                                </p>
+                            </div>
+                        )}
 
                         <button
                             className="secondary-button"

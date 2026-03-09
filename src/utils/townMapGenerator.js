@@ -320,16 +320,20 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
     },
     village: {
       important: ['inn', 'shop', 'blacksmith'],
+      secondary: ['alchemist'],
       houses: 8
     },
     town: {
       important: ['inn', 'shop', 'temple', 'blacksmith', 'tavern', 'tavern'],
-      houses: 20
+      secondary: ['alchemist', 'archives', 'warehouse'],
+      houses: 25
     },
     city: {
-      important: ['temple', 'market', 'manor', 'blacksmith', 'tavern', 'tavern', 'tavern', 'guild', 'guild', 'guild', 'bank', 'bank', 'bank'],
-      houses: 40,
-      hasKeep: true
+      important: ['temple', 'market', 'blacksmith', 'tavern', 'tavern', 'tavern', 'bank', 'bank', 'bank'],
+      secondary: ['guild', 'guild', 'guild', 'alchemist', 'alchemist', 'archives', 'library', 'foundry', 'warehouse', 'warehouse'],
+      houses: 55,
+      hasKeep: true,
+      nobleEstate: ['manor', 'manor', 'manor', 'manor', 'manor']
     }
   };
 
@@ -419,6 +423,131 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
     }
   }
 
+  // STEP 0.5: Place noble estate manors between keep and town square (cities only)
+  if (config.nobleEstate) {
+    const keepY = 3;
+    const estateManors = config.nobleEstate;
+    let manorsPlaced = 0;
+
+    // Pick a random side of the keep path (left or right) and a random starting row
+    const estateSide = rng() < 0.5 ? -1 : 1; // -1 = left of path, 1 = right
+    const estateMinY = keepY + 2;
+    const estateMaxY = centerY - 2;
+    const estateStartY = estateMinY + Math.floor(rng() * Math.max(1, estateMaxY - estateMinY - 1));
+    const estateStartX = centerX + (estateSide * (2 + Math.floor(rng() * 2))); // 2-3 tiles from path
+
+    // Build cluster: place first manor at anchor, then grow outward from placed manors
+    const placedManorPositions = [];
+
+    for (const manorType of estateManors) {
+      let placed = false;
+
+      if (placedManorPositions.length === 0) {
+        // First manor: place at anchor point, or find nearest valid spot
+        for (let r = 0; r <= 3 && !placed; r++) {
+          for (let dy = -r; dy <= r && !placed; dy++) {
+            for (let dx = -r; dx <= r && !placed; dx++) {
+              if (r > 0 && Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+              const x = estateStartX + dx;
+              const y = estateStartY + dy;
+              if (!isOccupied(x, y)) {
+                mapData[y][x].type = 'building';
+                mapData[y][x].buildingType = manorType;
+                mapData[y][x].buildingName = generateManorName(rng);
+                mapData[y][x].walkable = false;
+                mapData[y][x].poi = null;
+                markOccupied(x, y);
+                placedManorPositions.push({ x, y });
+                manorsPlaced++;
+                placed = true;
+              }
+            }
+          }
+        }
+      } else {
+        // Subsequent manors: find spots adjacent to already-placed manors
+        const adjacentCandidates = [];
+        for (const mp of placedManorPositions) {
+          for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+            adjacentCandidates.push({ x: mp.x + dx, y: mp.y + dy });
+          }
+        }
+        // Shuffle adjacent candidates
+        for (let i = adjacentCandidates.length - 1; i > 0; i--) {
+          const j = Math.floor(rng() * (i + 1));
+          [adjacentCandidates[i], adjacentCandidates[j]] = [adjacentCandidates[j], adjacentCandidates[i]];
+        }
+        for (const pos of adjacentCandidates) {
+          if (!isOccupied(pos.x, pos.y)) {
+            mapData[pos.y][pos.x].type = 'building';
+            mapData[pos.y][pos.x].buildingType = manorType;
+            mapData[pos.y][pos.x].buildingName = generateManorName(rng);
+            mapData[pos.y][pos.x].walkable = false;
+            mapData[pos.y][pos.x].poi = null;
+            markOccupied(pos.x, pos.y);
+            placedManorPositions.push(pos);
+            manorsPlaced++;
+            placed = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // Record noble estate exclusion zone (bounding box of placed manors + 1 tile padding)
+    if (placedManorPositions.length > 0) {
+      const minX = Math.min(...placedManorPositions.map(p => p.x)) - 1;
+      const maxX = Math.max(...placedManorPositions.map(p => p.x)) + 1;
+      const minY = Math.min(...placedManorPositions.map(p => p.y)) - 1;
+      const maxY = Math.max(...placedManorPositions.map(p => p.y)) + 1;
+      config._estateZone = { minX, maxX, minY, maxY };
+    }
+
+    logger.debug(`[TOWN_MAP] Placed ${manorsPlaced} noble estate manors clustered near (${estateStartX}, ${estateStartY})`);
+  }
+
+  // Helper: assign a generated name to a building tile based on its type
+  const assignBuildingName = (tile, buildingType) => {
+    if (buildingType === 'tavern' || buildingType === 'inn') {
+      tile.buildingName = generateTavernName(rng);
+    } else if (buildingType === 'guild') {
+      tile.buildingName = generateGuildName(rng);
+    } else if (buildingType === 'bank') {
+      tile.buildingName = generateBankName(rng);
+    } else if (buildingType === 'shop' || buildingType === 'market') {
+      tile.buildingName = generateShopName(rng);
+    } else if (buildingType === 'blacksmith') {
+      const blacksmithNames = ["Iron Anvil", "Heavy Hammer", "Strong Forge", "Dragon Sunder", "Steel Strike", "The Hearth Forge"];
+      tile.buildingName = blacksmithNames[Math.floor(rng() * blacksmithNames.length)];
+    } else if (buildingType === 'manor' || buildingType === 'keep') {
+      tile.buildingName = generateManorName(rng);
+    } else if (buildingType === 'temple') {
+      tile.buildingName = generateTempleName(rng);
+    } else if (buildingType === 'archives' || buildingType === 'library') {
+      const archiveNames = ["Hall of Records", "The Dusty Stacks", "Lorekeeper's Archive", "The Old Library", "Scholar's Rest", "The Athenaeum"];
+      tile.buildingName = archiveNames[Math.floor(rng() * archiveNames.length)];
+    } else if (buildingType === 'alchemist') {
+      const alchemistNames = ["The Bubbling Flask", "Elixir & Tonic", "The Green Vial", "Apothecary's Den", "The Alembic", "Mystic Brews"];
+      tile.buildingName = alchemistNames[Math.floor(rng() * alchemistNames.length)];
+    } else if (buildingType === 'foundry') {
+      const foundryNames = ["The Great Furnace", "Ironworks", "The Smeltery", "Crucible Foundry", "The Fire Pit", "Molten Works"];
+      tile.buildingName = foundryNames[Math.floor(rng() * foundryNames.length)];
+    } else if (buildingType === 'warehouse') {
+      const warehouseNames = ["The Storehouse", "Trade Depot", "The Granary", "Merchant's Cache", "The Vault", "Supply Hold"];
+      tile.buildingName = warehouseNames[Math.floor(rng() * warehouseNames.length)];
+    }
+  };
+
+  // Helper: place a building on a tile
+  const placeBuilding = (x, y, buildingType) => {
+    mapData[y][x].type = 'building';
+    mapData[y][x].buildingType = buildingType;
+    mapData[y][x].walkable = false;
+    mapData[y][x].poi = null;
+    assignBuildingName(mapData[y][x], buildingType);
+    markOccupied(x, y);
+  };
+
   // STEP 1: Place important buildings around town square clockwise
   logger.debug(`[TOWN_MAP] Placing ${important.length} important buildings around square...`);
 
@@ -460,31 +589,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
       if (!pos) continue;
 
       if (!isOccupied(pos.x, pos.y)) {
-        mapData[pos.y][pos.x].type = 'building';
-        mapData[pos.y][pos.x].buildingType = buildingType;
-        mapData[pos.y][pos.x].walkable = false;
-        mapData[pos.y][pos.x].poi = null; // Clear any trees/decorations
-
-        // Generate names for special buildings
-        // Generate names for special buildings
-        if (buildingType === 'tavern' || buildingType === 'inn') {
-          mapData[pos.y][pos.x].buildingName = generateTavernName(rng);
-        } else if (buildingType === 'guild') {
-          mapData[pos.y][pos.x].buildingName = generateGuildName(rng);
-        } else if (buildingType === 'bank') {
-          mapData[pos.y][pos.x].buildingName = generateBankName(rng);
-        } else if (buildingType === 'shop' || buildingType === 'market') {
-          mapData[pos.y][pos.x].buildingName = generateShopName(rng);
-        } else if (buildingType === 'blacksmith') {
-          const blacksmithNames = ["Iron Anvil", "Heavy Hammer", "Strong Forge", "Dragon Sunder", "Steel Strike", "The Hearth Forge"];
-          mapData[pos.y][pos.x].buildingName = `${blacksmithNames[Math.floor(rng() * blacksmithNames.length)]}`;
-        } else if (buildingType === 'manor' || buildingType === 'keep') {
-          mapData[pos.y][pos.x].buildingName = generateManorName(rng);
-        } else if (buildingType === 'temple') {
-          mapData[pos.y][pos.x].buildingName = generateTempleName(rng);
-        }
-
-        markOccupied(pos.x, pos.y);
+        placeBuilding(pos.x, pos.y, buildingType);
         importantPlaced++;
         placed = true;
         posIndex = (posIndex + 2) % squarePositions.length; // Skip one space
@@ -493,7 +598,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
 
     // If couldn't place around square, try one ring out
     if (!placed) {
-      for (let radius = 2; radius <= 4 && !placed; radius++) {
+      for (let radius = 2; radius <= 6 && !placed; radius++) {
         for (let dy = -radius; dy <= radius && !placed; dy++) {
           for (let dx = -radius; dx <= radius && !placed; dx++) {
             if (Math.abs(dx) === radius || Math.abs(dy) === radius) {
@@ -501,29 +606,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
               const y = centerY + dy;
 
               if (!isOccupied(x, y)) {
-                mapData[y][x].type = 'building';
-                mapData[y][x].buildingType = buildingType;
-                mapData[y][x].walkable = false;
-                mapData[y][x].poi = null; // Clear any trees/decorations
-
-                if (buildingType === 'tavern' || buildingType === 'inn') {
-                  mapData[y][x].buildingName = generateTavernName(rng);
-                } else if (buildingType === 'guild') {
-                  mapData[y][x].buildingName = generateGuildName(rng);
-                } else if (buildingType === 'bank') {
-                  mapData[y][x].buildingName = generateBankName(rng);
-                } else if (buildingType === 'shop' || buildingType === 'market') {
-                  mapData[y][x].buildingName = generateShopName(rng);
-                } else if (buildingType === 'blacksmith') {
-                  const blacksmithNames = ["Iron Anvil", "Heavy Hammer", "Strong Forge", "Dragon Sunder", "Steel Strike", "The Hearth Forge"];
-                  mapData[y][x].buildingName = `${blacksmithNames[Math.floor(rng() * blacksmithNames.length)]}`;
-                } else if (buildingType === 'manor' || buildingType === 'keep') {
-                  mapData[y][x].buildingName = generateManorName(rng);
-                } else if (buildingType === 'temple') {
-                  mapData[y][x].buildingName = generateTempleName(rng);
-                }
-
-                markOccupied(x, y);
+                placeBuilding(x, y, buildingType);
                 importantPlaced++;
                 placed = true;
               }
@@ -534,7 +617,66 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
     }
   }
 
+  if (importantPlaced < important.length) {
+    logger.warn(`[TOWN_MAP] Only placed ${importantPlaced}/${important.length} important buildings!`);
+  }
   logger.debug(`[TOWN_MAP] Placed ${importantPlaced} important buildings`);
+
+  // STEP 1.5: Place secondary buildings in a second ring around the square (shuffled for variety)
+  const secondary = config.secondary || [];
+  if (secondary.length > 0) {
+    logger.debug(`[TOWN_MAP] Placing ${secondary.length} secondary buildings in outer ring...`);
+
+    // Collect positions in rings 2-5 out from the square
+    const secondRingPositions = [];
+    for (let radius = halfSize + 2; radius <= halfSize + 5; radius++) {
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          if (Math.abs(dx) === radius || Math.abs(dy) === radius) {
+            const x = centerX + dx;
+            const y = centerY + dy;
+            if (x >= 1 && x < mapData[0].length - 1 && y >= 1 && y < mapData.length - 1) {
+              secondRingPositions.push({ x, y });
+            }
+          }
+        }
+      }
+    }
+
+    // Shuffle positions so buildings don't always land in the same spots
+    for (let i = secondRingPositions.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [secondRingPositions[i], secondRingPositions[j]] = [secondRingPositions[j], secondRingPositions[i]];
+    }
+
+    // Building types that should not be placed in the noble estate zone
+    const estateExcluded = new Set(['warehouse', 'foundry']);
+    const estateZone = config._estateZone || null;
+
+    const isInEstateZone = (x, y) => {
+      if (!estateZone) return false;
+      return x >= estateZone.minX && x <= estateZone.maxX &&
+             y >= estateZone.minY && y <= estateZone.maxY;
+    };
+
+    let secondaryPlaced = 0;
+    for (const buildingType of secondary) {
+      for (const pos of secondRingPositions) {
+        if (!isOccupied(pos.x, pos.y)) {
+          // Skip estate zone for industrial/warehouse buildings
+          if (estateExcluded.has(buildingType) && isInEstateZone(pos.x, pos.y)) continue;
+          placeBuilding(pos.x, pos.y, buildingType);
+          secondaryPlaced++;
+          break;
+        }
+      }
+    }
+
+    if (secondaryPlaced < secondary.length) {
+      logger.warn(`[TOWN_MAP] Only placed ${secondaryPlaced}/${secondary.length} secondary buildings!`);
+    }
+    logger.debug(`[TOWN_MAP] Placed ${secondaryPlaced} secondary buildings`);
+  }
 
   // STEP 2: Place houses away from center (exclude rings based on town size)
   logger.debug(`[TOWN_MAP] Placing ${houses} houses...`);
@@ -710,6 +852,24 @@ function generateBuildingPaths(mapData, centerPos, rng) {
     }
   };
 
+  // STEP 0: Connect all important/secondary buildings to nearest road
+  for (const building of importantBuildings) {
+    let nearestRoad = null;
+    let minDist = Infinity;
+
+    pathTiles.forEach(road => {
+      const dist = Math.abs(building.x - road.x) + Math.abs(building.y - road.y);
+      if (dist < minDist) {
+        minDist = dist;
+        nearestRoad = road;
+      }
+    });
+
+    if (nearestRoad && minDist > 1) {
+      createPath(building, nearestRoad);
+    }
+  }
+
   // Track which houses are connected to the main network
   const connectedHouses = new Set();
 
@@ -838,7 +998,12 @@ export const getTownTileEmoji = (tile) => {
       manor: '🏰',
       barn: '🏚️',
       blacksmith: '⚒️',
-      keep: '🏰'  // Castle/keep for cities
+      keep: '🏰',  // Castle/keep for cities
+      archives: '📚',
+      alchemist: '⚗️',
+      foundry: '🔥',
+      warehouse: '📦',
+      library: '📖'
     };
     return buildingEmojis[tile.buildingType] || '🏠';
   }

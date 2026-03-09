@@ -18,6 +18,7 @@ import CFWorkerDebug from './CFWorkerDebug';
 import ItemIconsTest from './ItemIconsTest';
 import EncounterVisualDebug from './EncounterVisualDebug';
 import EncounterModalStates from './EncounterModalStates';
+import BuildingSearchTest from './BuildingSearchTest';
 
 const sectionIcons = {
   'Terrain & Maps': '🗺️',
@@ -56,6 +57,7 @@ const debugSections = [
       { to: 'campaign-milestone-test', label: 'Campaign Milestone Test' },
       { to: 'progression-test', label: 'Progression Test' },
       { to: 'item-icons', label: 'Item Icons Test' },
+      { to: 'building-search', label: 'Building Search Test' },
     ],
   },
   {
@@ -187,6 +189,7 @@ const DebugRoutes = () => {
           <Route path="item-icons" element={<ItemIconsTest />} />
           <Route path="encounter-visual" element={<EncounterVisualDebug />} />
           <Route path="encounter-states" element={<EncounterModalStates />} />
+          <Route path="building-search" element={<BuildingSearchTest />} />
           <Route path="*" element={<Navigate to="/debug" replace />} />
         </Routes>
       </section>
