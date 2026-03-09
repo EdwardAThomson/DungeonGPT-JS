@@ -3,12 +3,13 @@ import { getTile } from '../utils/mapGenerator';
 import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
 import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver';
+import { areRequirementsMet } from '../game/milestoneEngine';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-interaction');
 
 const TRIGGER_REGEX = /\[(CHECK|ROLL):\s*([a-zA-Z0-9\s]+)\]/i;
-const MILESTONE_COMPLETE_REGEX = /\[COMPLETE_MILESTONE:\s*(.+?)\]/i;
+const MILESTONE_COMPLETE_REGEX = /\[COMPLETE_MILESTONE:\s*([\s\S]+?)\]/i;
 const CAMPAIGN_COMPLETE_REGEX = /\[COMPLETE_CAMPAIGN\]/i;
 
 // Helper function to normalize milestones (backward compatibility)
@@ -34,9 +35,33 @@ const getMilestoneStatus = (milestones) => {
     const normalized = normalizeMilestones(milestones);
     const completed = normalized.filter(m => m.completed);
     const remaining = normalized.filter(m => !m.completed);
-    const current = remaining.length > 0 ? remaining[0] : null;
+    const active = remaining.filter(m => areRequirementsMet(m, normalized));
+    const locked = remaining.filter(m => !areRequirementsMet(m, normalized));
+    const current = active[0] || null;
 
-    return { current, completed, remaining, all: normalized };
+    return { current, completed, remaining, active, locked, all: normalized };
+};
+
+// Format milestone status as prompt text with type and state info
+const formatMilestonePromptText = (milestoneStatus) => {
+    const { completed, active, locked } = milestoneStatus;
+    if (completed.length === 0 && active.length === 0 && locked.length === 0) return '';
+
+    let text = '';
+    if (active.length > 0) {
+        text += '\nActive Milestones: ' + active.map(m => {
+            const typeTag = m.type ? ` [${m.type}]` : '';
+            const levelTag = m.minLevel ? ` (Lv.${m.minLevel}+)` : '';
+            return `${m.text}${typeTag}${levelTag}`;
+        }).join('; ');
+    }
+    if (completed.length > 0) {
+        text += '\nCompleted: ' + completed.map(m => m.text).join('; ');
+    }
+    if (locked.length > 0) {
+        text += '\nLocked (prerequisites not met): ' + locked.map(m => m.text).join('; ');
+    }
+    return text;
 };
 
 // Helper function to clean AI responses
@@ -157,16 +182,7 @@ const useGameInteraction = (
 
         // Get milestone status
         const milestoneStatus = getMilestoneStatus(settings.milestones);
-        let milestonesInfo = '';
-        if (milestoneStatus.current) {
-            milestonesInfo += `\nCurrent Milestone: ${milestoneStatus.current.text}`;
-            if (milestoneStatus.completed.length > 0) {
-                milestonesInfo += `\nCompleted Milestones: ${milestoneStatus.completed.map(m => m.text).join(', ')}`;
-            }
-            if (milestoneStatus.remaining.length > 1) {
-                milestonesInfo += `\nRemaining Milestones: ${milestoneStatus.remaining.slice(1).map(m => m.text).join(', ')}`;
-            }
-        }
+        const milestonesInfo = formatMilestonePromptText(milestoneStatus);
 
         const gameContext = `Setting: ${settings.shortDescription || 'A mystery fantasy world'}. Mood: ${settings.grimnessLevel || 'Normal'} Intensity. Magic: ${settings.magicLevel || 'Standard'}. Tech: ${settings.technologyLevel || 'Medieval'}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
 
@@ -238,16 +254,7 @@ const useGameInteraction = (
 
         // Get milestone status
         const milestoneStatusRegular = getMilestoneStatus(settings.milestones);
-        let milestonesInfoRegular = '';
-        if (milestoneStatusRegular.current) {
-            milestonesInfoRegular += `\nCurrent Milestone: ${milestoneStatusRegular.current.text}`;
-            if (milestoneStatusRegular.completed.length > 0) {
-                milestonesInfoRegular += `\nCompleted: ${milestoneStatusRegular.completed.map(m => m.text).join(', ')}`;
-            }
-            if (milestoneStatusRegular.remaining.length > 1) {
-                milestonesInfoRegular += `\nRemaining: ${milestoneStatusRegular.remaining.slice(1).map(m => m.text).join(', ')}`;
-            }
-        }
+        const milestonesInfoRegular = formatMilestonePromptText(milestoneStatusRegular);
 
         const gameContext = `Setting: ${settings.shortDescription || 'Fantasy Realm'}. Mood: ${settings.grimnessLevel || 'Normal'}.${goalInfo}${milestonesInfoRegular}\n${locationInfo}. Party: ${partyInfo}.`;
         const prompt = `[CONTEXT]\n${gameContext}\n\n[SUMMARY]\n${currentSummary || 'The tale unfolds.'}\n\n[PLAYER ACTION]\n${userMessage.content}\n\n[NARRATE]`;
@@ -261,7 +268,7 @@ const useGameInteraction = (
             // Check for milestone completion
             const milestoneMatch = aiResponse.match(MILESTONE_COMPLETE_REGEX);
             if (milestoneMatch) {
-                const milestoneText = milestoneMatch[1].trim();
+                const milestoneText = milestoneMatch[1].replace(/\s+/g, ' ').trim();
                 logger.info(`Milestone complete signaled: ${milestoneText}`);
 
                 // Find and mark milestone as complete

@@ -3,7 +3,7 @@ import FocusTrap from 'focus-trap-react';
 import WorldMapDisplay from './WorldMapDisplay';
 import TownMapDisplay from './TownMapDisplay';
 
-const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered }) => {
+const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered, visibleMilestonePois, onQuestItemFound }) => {
     const previousFocusRef = useRef(null);
     const modalRef = useRef(null);
 
@@ -48,6 +48,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                             playerPosition={playerPosition}
                             onTileClick={onTileClick}
                             firstHero={firstHero}
+                            visibleMilestonePois={visibleMilestonePois}
                         />
                         {townError && (
                             <div className="message system error" style={{ margin: '10px auto', display: 'block' }}>
@@ -86,6 +87,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                         firstHero={firstHero}
                         townError={townError}
                         markBuildingDiscovered={markBuildingDiscovered}
+                        onQuestItemFound={onQuestItemFound}
                     />
                 )}
                     <button className="modal-close-button" onClick={onClose} aria-label="Close map modal">

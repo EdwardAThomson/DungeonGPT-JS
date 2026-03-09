@@ -30,6 +30,7 @@ import {
   formatEncounterRewardLog
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
+import { checkMilestoneCompletion, getMilestoneRewards } from '../game/milestoneEngine';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
 
@@ -111,7 +112,7 @@ const Game = () => {
   } = useGameSession(loadedConversation, setSettings, setSelectedProvider, setSelectedModel, stateGameSessionId);
 
   // Pass dummy/empty functions for now where we handle logic in Game.js wrapper
-  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap);
+  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings);
 
   const interactionHook = useGameInteraction(
     loadedConversation,
@@ -145,6 +146,54 @@ const Game = () => {
     setSelectedHeroes(prev => prev.map(h =>
       h.characterId === updatedHero.characterId ? updatedHero : h
     ));
+  };
+
+  // --- Milestone Engine: deterministic completion check ---
+  const checkMilestoneEvent = (event, currentParty) => {
+    const milestones = settings?.milestones;
+    if (!milestones || milestones.length === 0) return;
+
+    const heroLevel = currentParty?.[0]?.level || 1;
+    const result = checkMilestoneCompletion(milestones, event, heroLevel);
+    if (!result) return;
+
+    if (result.type === 'completed') {
+      logger.info(`[MILESTONE] Completed: #${result.milestoneId} — ${result.milestone.text}`);
+      setSettings(prev => ({ ...prev, milestones: result.updatedMilestones }));
+
+      // Apply milestone rewards to lead hero
+      const rewards = getMilestoneRewards(result.milestone);
+      if (rewards.xp > 0 || rewards.gold > 0 || rewards.items.length > 0) {
+        const rewardResult = applyEncounterOutcomeToParty({
+          party: currentParty,
+          result: { rewards, heroIndex: 0 }
+        });
+        setSelectedHeroes(rewardResult.updatedParty);
+        const heroName = rewardResult.updatedParty[0]?.characterName || 'Hero';
+        const rewardLog = formatEncounterRewardLog(heroName, rewardResult.rewardMessages);
+        if (rewardLog) logger.info(rewardLog);
+      }
+
+      // Chat celebration message (also serves as context for the AI's next narration)
+      const rewardSummary = rewards.xp > 0 || rewards.gold > 0
+        ? `\nRewards: ${rewards.xp > 0 ? `+${rewards.xp} XP` : ''}${rewards.gold > 0 ? ` +${rewards.gold} gold` : ''}${rewards.items.length > 0 ? ` + ${rewards.items.join(', ')}` : ''}`
+        : '';
+      const celebrationMsg = {
+        role: 'system',
+        content: result.campaignComplete
+          ? `🏆 CAMPAIGN COMPLETE! 🏆\n${settings.campaignGoal || 'Victory Achieved!'}\n\nThe tale of your heroic deeds will be sung for generations to come!`
+          : `🎉 Milestone Achieved! 🎉\n${result.milestone.text}${rewardSummary}`
+      };
+      interactionHook.setConversation(prev => [...prev, celebrationMsg]);
+
+      if (result.campaignComplete) {
+        setSettings(prev => ({ ...prev, campaignComplete: true }));
+      }
+    } else if (result.type === 'blocked') {
+      logger.debug(`[MILESTONE] Blocked: #${result.milestoneId} — needs: ${result.unmetRequirements.map(r => r.text).join(', ')}`);
+    } else if (result.type === 'level_blocked') {
+      logger.debug(`[MILESTONE] Level blocked: #${result.milestoneId} — needs Lv.${result.requiredLevel}, have Lv.${result.currentLevel}`);
+    }
   };
 
   // --- Town Tile Click Wrapper (adds encounter checks) ---
@@ -220,6 +269,14 @@ const Game = () => {
     if (encounter) {
       setCurrentEncounter(encounter);
       setIsEncounterModalOpen(true);
+    }
+
+    // Milestone check: location_visited
+    if (targetTile.poi || targetTile.townName) {
+      const locationId = targetTile.poi || targetTile.townName?.toLowerCase().replace(/\s+/g, '_');
+      if (locationId) {
+        checkMilestoneEvent({ type: 'location_visited', locationId }, selectedHeroes);
+      }
     }
 
     // --- Random Encounter Check (Phase 2.4: Two-Tier System) ---
@@ -351,7 +408,23 @@ const Game = () => {
     if (rewardLog) logger.info(rewardLog);
     if (penaltyLog) logger.info(penaltyLog);
 
+    // Milestone checks after encounter resolution
     const encounterName = actionEncounter?.name || 'Encounter';
+    if (result?.outcome === 'victory' || result?.outcome === 'success') {
+      // Check enemy_defeated milestone
+      const enemyId = actionEncounter?.enemyId || actionEncounter?.name?.toLowerCase().replace(/\s+/g, '_');
+      if (enemyId) {
+        checkMilestoneEvent({ type: 'enemy_defeated', enemyId }, updatedParty);
+      }
+    }
+    // Check item_acquired for any reward items
+    if (result?.rewards?.items?.length > 0) {
+      for (const itemName of result.rewards.items) {
+        const itemId = itemName.replace(/ /g, '_').toLowerCase();
+        checkMilestoneEvent({ type: 'item_acquired', itemId }, updatedParty);
+      }
+    }
+
     if (result?.narration) {
       const encounterMsg = { role: 'ai', content: `⚔️ **${encounterName}**: ${result.narration}` };
       interactionHook.setConversation((prev) => [...prev, encounterMsg]);
@@ -564,6 +637,9 @@ const Game = () => {
         setIsDiceModalOpen={setIsDiceModalOpen}
         diceSkill={diceSkill}
         diceMode={diceMode}
+        onQuestItemFound={(itemId, itemName) => {
+          checkMilestoneEvent({ type: 'item_acquired', itemId }, selectedHeroes);
+        }}
       />
 
       {/* Save Confirmation Modal */}

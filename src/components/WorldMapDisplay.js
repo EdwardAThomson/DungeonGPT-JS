@@ -120,7 +120,7 @@ const renderPathOverlay = (tile) => {
   );
 };
 
-const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero }) => {
+const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visibleMilestonePois }) => {
   if (!mapData || mapData.length === 0) {
     return <div>Loading map...</div>;
   }
@@ -171,11 +171,14 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero }) =>
           }
           let poiContent = null;
 
+          // Hide milestone POIs that aren't unlocked yet
+          const isMilestoneHidden = tile.milestonePoi && visibleMilestonePois && !visibleMilestonePois.has(tile.poi);
+
           // Check if it's a town with size information
           if (tile.poi === 'town') {
             poiContent = getTownEmoji(tile);
-          } else if (tile.poi) {
-            poiContent = poiEmojis[tile.poi] || tile.poi;
+          } else if (tile.poi && !isMilestoneHidden) {
+            poiContent = poiEmojis[tile.poi] || (tile.milestonePoi ? '🏴' : tile.poi);
           }
 
           // If biome is 'forest' or 'mountains' (old system), convert to POI emoji
@@ -227,8 +230,8 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero }) =>
                 {poiContent}
               </span>
 
-              {/* Display name label for towns and named mountains */}
-              {(tile.townName || (tile.mountainName && tile.isFirstMountainInRange)) && (
+              {/* Display name label for towns, named mountains, and milestone POIs */}
+              {(tile.townName || (tile.mountainName && tile.isFirstMountainInRange) || (tile.milestonePoi && tile.poiName && !isMilestoneHidden)) && (
                 <span style={{
                   position: 'absolute',
                   bottom: '-6px',
@@ -236,14 +239,14 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero }) =>
                   transform: 'translateX(-50%)',
                   fontSize: '7px',
                   fontWeight: 'bold',
-                  color: tile.townName ? '#2c1810' : '#4a3728',
+                  color: tile.milestonePoi ? '#8b0000' : tile.townName ? '#2c1810' : '#4a3728',
                   whiteSpace: 'nowrap',
                   zIndex: 4,
                   pointerEvents: 'none',
                   textShadow: '0 0 2px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.7)',
                   lineHeight: 1,
                 }}>
-                  {tile.townName || tile.mountainName}
+                  {tile.townName || tile.mountainName || tile.poiName}
                 </span>
               )}
 

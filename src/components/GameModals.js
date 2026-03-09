@@ -1,4 +1,5 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useMemo } from 'react';
+import { areRequirementsMet } from '../game/milestoneEngine';
 
 // Lazy load modal components for better performance
 const StorySettingsModalContent = lazy(() => import('./Modals').then(module => ({ default: module.StorySettingsModalContent })));
@@ -66,8 +67,22 @@ const GameModals = ({
   isDiceModalOpen,
   setIsDiceModalOpen,
   diceSkill,
-  diceMode
+  diceMode,
+  onQuestItemFound
 }) => {
+  // Compute which milestone POIs are visible (active or completed, not locked)
+  const visibleMilestonePois = useMemo(() => {
+    const milestones = settings?.milestones;
+    if (!milestones || milestones.length === 0) return null;
+    const visible = new Set();
+    for (const m of milestones) {
+      if (m.spawn?.type === 'poi' && (m.completed || areRequirementsMet(m, milestones))) {
+        visible.add(m.spawn.id);
+      }
+    }
+    return visible.size > 0 ? visible : null;
+  }, [settings?.milestones]);
+
   return (
     <>
       <Suspense fallback={<ModalLoadingFallback />}>
@@ -126,6 +141,8 @@ const GameModals = ({
         hasAdventureStarted={hasAdventureStarted}
         townError={mapHook.townError}
         markBuildingDiscovered={mapHook.markBuildingDiscovered}
+        visibleMilestonePois={visibleMilestonePois}
+        onQuestItemFound={onQuestItemFound}
         />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>

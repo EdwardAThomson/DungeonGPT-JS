@@ -428,20 +428,48 @@ const checkMilestones = (milestones, event) => {
 5. **NEW: `spawnMilestoneEntities()`** ensures required buildings exist in towns, places items/NPCs in buildings, and marks POI/enemy locations on the map
 6. Game starts with all milestone-related entities in the world (locked ones are non-interactive)
 
-### Campaign Creator UI Additions
+### Campaign Creator UI: Tabbed Design
 
-For Custom Tale mode, the milestone editor needs:
-- A **type dropdown** per milestone (item / combat / location / narrative)
-- A **prerequisite selector** (which other milestones must be completed first)
-- Conditional fields based on type:
-  - Item: item name, building/context where it's found
-  - Combat: enemy name, difficulty, stats, suggested actions
-  - Location: POI name
-  - Narrative: NPC name, role, personality notes
-- Location assignment (which town/area to spawn in)
-- Rewards per milestone (XP, gold, items)
+The New Game page should be split into **tabs** rather than trying to squeeze everything into one view. Each tab is a fundamentally different experience.
 
-For template-based campaigns, these are all pre-defined and locked.
+#### Tab 1: Template Adventures
+
+Pre-built campaigns with fixed milestones, encounters, and rewards. The player picks one and goes.
+
+- **Read-only presentation** — adventure info is displayed as text, not in editable input fields. There's nothing to change.
+- Show: campaign name, description, goal, milestone summary (count, types), tone settings
+- The milestone dependency graph could be shown visually
+- "Start Adventure" button at the bottom
+
+#### Tab 2: Custom Adventures
+
+Player-authored campaigns using the milestone system. This is the complex tab and needs significant design work.
+
+- A **milestone editor** where the player builds their quest chain:
+  - Type dropdown per milestone (item / combat / location / narrative)
+  - Prerequisite selector (which other milestones must be completed first)
+  - Conditional fields based on type:
+    - Item: pick from item registry, building/context where it's found
+    - Combat: pick from enemy registry, difficulty, suggested actions
+    - Location: POI name
+    - Narrative: NPC name, role, personality notes
+  - Location assignment (which town/area to spawn in)
+  - Rewards per milestone (XP, gold, items)
+- **Level-gated content** — items, enemies, and encounters filtered by player level
+- **Entity validation** — all references checked against registries before saving
+- Tone/setting controls (grimness, darkness, magic, tech level)
+
+This tab needs deep thinking and is likely a Phase 3+ effort. The current Custom Tale mode is a text-input form that doesn't understand the milestone system at all.
+
+#### Tab 3: Freeform Adventures (Future / Low Priority)
+
+Campaigns that bypass the structured milestone system entirely. Pure AI-narrated storytelling with no deterministic quest tracking — closer to the current system where the AI is both narrator and judge.
+
+- Useful for players who just want open-ended roleplay
+- No milestone tracking, no dependency graph, no spawned entities
+- The AI drives everything — including deciding when "quests" are complete
+- Could use the existing text marker system (`[COMPLETE_MILESTONE]`) as a lightweight fallback
+- Low priority — the structured system is the main focus
 
 ---
 
@@ -453,21 +481,33 @@ For template-based campaigns, these are all pre-defined and locked.
 - [x] Define milestone data structure with `type`, `trigger`, `requires`, and `spawn`
 - [x] Build milestone checker logic with dependency enforcement
 - [x] Test in debug page with simulated game events
-- [ ] Add `encounter` and `rewards` fields to milestone data in test page
-- [ ] Update `storyTemplates.js` with typed milestones for all 4 templates
+- [x] Add `encounter` and `rewards` fields to milestone data in test page
+- [x] Update `storyTemplates.js` with typed milestones for all 4 templates
 
-### Phase 2: Spawning & Integration
-- [ ] Build `spawnMilestoneEntities()` to place items/NPCs/POIs at map generation
-- [ ] Ensure quest-critical buildings exist in target towns
-- [ ] Wire milestone checker into the game loop (listen for inventory changes, combat results, movement)
-- [ ] Connect combat milestones to the encounter system (`resolveEncounter()`)
-- [ ] Update the AI prompt to narrate completions instead of judging them
-- [ ] Update `NewGame.js` form with milestone type editor for Custom Tale mode
+### Phase 2: Spawning & Integration ✅
+- [x] Build `spawnMilestoneEntities()` to place items/NPCs/POIs at map generation
+- [x] Ensure quest-critical buildings exist in target towns
+- [x] Wire milestone checker into the game loop (listen for inventory changes, combat results, movement)
+- [x] Connect combat milestones to the encounter system (`resolveEncounter()`)
+- [x] Update the AI prompt to narrate completions instead of judging them
+- [x] Redesign `NewGame.js` with tabbed layout (Templates / Custom Tale)
+- [x] Template tab: read-only adventure cards grouped by theme, detail modal, tier badges
+- [x] Add quest item search mechanic in BuildingModal (progressive DC dice roll)
+- [x] Fix SSE text normalization and milestone marker regex for cross-chunk detection
+- [x] Add LLM milestone prompt tests (Tests 6-7) to debug page
+- [ ] ~~Custom tab: milestone editor with registry-backed entity pickers~~ (deferred to Phase 3+)
 
-### Phase 3: Encounter Enhancements
-- [ ] Add `minLevel` enforcement for boss encounters (soft or hard gate)
+### Phase 3: Custom Campaign Builder & Registries
+- [x] Extract quest enemies into shared data file (`questEnemies.js`) — 31 bosses, 4 themes × 2 tiers, `getEnemiesByTierAndTheme()` helper
+- [x] Extract quest items into shared registry — `QUEST_ITEMS` + `SEARCHABLE_ITEMS` in `questPickerData.js`
+- [x] Extract quest POIs into shared registry — `POI_TYPES` in `questPickerData.js` (10 types with terrain tags)
+- [x] Build menu-driven Custom tab with registry-backed pickers (not free text) — theme, tier, enemy, item, building, NPC, POI, town/mountain name pickers
+- [x] Milestone slot system: fixed dependency graph, player picks what fills each slot — 4-slot diamond `[1,2] → 3 → 4`
+- [x] Add `QUEST_BUILDINGS` (14 types), `NPC_ROLES` (9 roles), `THEME_NAMES`, `THEME_DEFAULTS` registries
+- [x] Per-slot town/mountain name selection feeding into `customNames` for map generation
+- [x] Template modal contextual progression buttons (Generate Map → Hero Selection)
+- [x] Entity validation at campaign creation time — pickers prevent invalid picks; `validateCustomSlots()` catches partial slots and requires ≥1 complete milestone; `shortDescription` auto-generated from selections
 - [ ] Design team/party encounter system (separate design effort)
-- [ ] Extract quest enemies into shared data file if warranted
 - [ ] Add encounter images for quest bosses
 
 ### Phase 4: Narrative Milestones
@@ -477,8 +517,15 @@ For template-based campaigns, these are all pre-defined and locked.
 - [ ] Explore function calls as a more robust alternative to text markers
 - [ ] Consider skill check gates within NPC conversations
 
-### Phase 5: Campaign Variety
-- [ ] Add more pre-built templates with diverse milestone types
+### Phase 5: Campaign Variety & Tiers
+- [x] Define tier system (Tier 1-3 with level ranges, HP/reward scaling)
+- [x] Add Tier 1 templates for all 4 themes (level 1-2 content)
+- [x] Add `tier`, `levelRange`, `theme`, `subtitle` fields to template data structure
+- [x] Group template picker by theme with tier badges
+- [x] Add Tier 3 template stubs (coming soon placeholders) for all 4 themes
+- [ ] Add level-based warnings at hero selection (party too low for chosen template)
+- [ ] Generate template card images for all adventures
+- [ ] Flesh out Tier 3 templates with full milestone data
 - [ ] AI-assisted campaign creation that outputs structured milestone data
 - [ ] Player customization options (difficulty, milestone count, theme)
 
@@ -492,7 +539,7 @@ For template-based campaigns, these are all pre-defined and locked.
 | `NewGame.js` | Campaign creation UI | Add milestone type editor for Custom Tale |
 | `MilestoneTest.js` | Tests AI marker detection | Keep as-is for narrative milestone testing |
 | `CampaignMilestoneTest.js` | Tests deterministic milestone system | Prototype for encounter + reward integration |
-| `promptComposer.js` | Builds AI prompts with milestone context | Update to distinguish mechanical vs narrative |
+| `promptComposer.js` | Builds AI prompts with milestone context | **Done:** Shows Active/Completed/Locked with type tags |
 | `saveController.js` | Saves game state | Should already preserve new fields via settings |
 | `useGameSession.js` | Manages game session state | Wire in milestone checker events |
 | `inventorySystem.js` | Tracks items and rewards | Emit events when quest items are acquired |
@@ -502,6 +549,86 @@ For template-based campaigns, these are all pre-defined and locked.
 | `npcGenerator.js` | Generates NPCs with roles/stats | Generate quest NPCs from milestone spawn data |
 | `mapGenerator.js` | Generates the world map | Ensure quest POIs are placed correctly |
 | Town map system | Town layout with buildings | Ensure quest buildings exist in target towns |
+
+---
+
+## Campaign Creation Constraints
+
+### Campaign Tiers
+
+Themes (Heroic Fantasy, Grimdark, etc.) and difficulty tiers are **separate axes**. A theme provides narrative flavor; a tier scales enemies, HP, rewards, and level gates. This means each theme can have multiple campaigns at different power levels.
+
+#### Tier definitions
+
+| Tier | Level Range | Boss HP | Reward Scale | Narrative Stakes |
+|------|------------|---------|--------------|-----------------|
+| **Tier 1** | 1-2 | 20-40 HP | 25-75 XP, 1d10 gold | Local threats — bandits, beasts, petty villains |
+| **Tier 2** | 3-4 | 100-200 HP | 100-200 XP, 2d20 gold | Regional threats — warlords, plagues, conspiracies |
+| **Tier 3** | 5+ | 250-400 HP | 300-500 XP, 4d20 gold | Epic threats — demon lords, elder gods, world-enders |
+
+#### Theme x Tier matrix
+
+| Theme | Tier 1 (Lv 1-2) | Tier 2 (Lv 3-4) | Tier 3 (Lv 5+) |
+|-------|-----------------|-----------------|----------------|
+| **Heroic Fantasy** | The Goblin Threat | Crown of Sunfire | The Shattered Throne *(coming soon)* |
+| **Grimdark Survival** | The Blighted Village | The Rot-Heart | The Last Winter *(coming soon)* |
+| **Arcane Renaissance** | The Rogue Automaton | Herald of the Old Gods | The Clockwork God *(coming soon)* |
+| **Eldritch Horror** | The Blackwood Cult | The Great Dreamer | The Drowned City *(coming soon)* |
+
+All themes have Tier 1 and Tier 2 templates with full milestone data. Tier 3 templates exist as stubs (coming soon).
+
+#### Why separate stories instead of scaling
+
+A level 1 party fighting the "Shadow Overlord" with 30 HP feels wrong narratively. The story should match the stakes:
+- **Tier 1:** Goblin raiders threaten the farmlands. Appropriate for new adventurers.
+- **Tier 2:** A dark lord threatens the kingdom. Appropriate for experienced parties.
+- **Tier 3:** A cosmic entity threatens reality. Appropriate for legendary heroes.
+
+Scaling numbers within a single template would make the narrative incoherent. Separate templates let each story stand on its own.
+
+#### Data structure
+
+Each template gains a `tier` and `levelRange` field:
+
+```javascript
+{
+    id: 'heroic-fantasy-t1',
+    name: 'Heroic Fantasy',
+    tier: 1,
+    levelRange: [1, 2],
+    subtitle: 'The Goblin Threat',
+    theme: 'heroic-fantasy',
+    // ...rest of template
+}
+```
+
+The template picker groups by theme, shows tier badges, and filters by player level. Higher-tier templates are visible but locked until the player reaches the minimum level.
+
+### Level-Gated Campaign Availability
+
+Players should only be able to create campaigns appropriate for their level.
+
+**Approach:**
+- Each template has an explicit `tier` and `levelRange`
+- The campaign picker filters available templates by the player's current level
+- Higher-tier templates are visible but locked with a level indicator
+- For Custom Tale mode, the milestone editor restricts available enemies, items, and reward tiers based on player level
+
+### Item & Entity Validation (Registry Requirement)
+
+Milestones must only reference items, enemies, NPCs, and buildings that **exist in the game's data files**. You can't spawn a "crown_of_sunfire" if there's no item definition for it. You can't spawn a "blue_dragon" if only "red_dragon" exists.
+
+**Current state:** The test page uses placeholder IDs (e.g., `hidden_map`, `shadow_overlord`) that don't correspond to real game entities. This is fine for prototyping but will break at integration time.
+
+**What needs to happen before the campaign builder ships:**
+1. **Item registry** — All quest items must be defined in the item system (id, name, icon, description, rarity, tier)
+2. **Enemy registry** — All quest enemies must be defined with stats, icons, and encounter data
+3. **Building registry** — All quest-critical building types must be supported by the town map generator
+4. **NPC role support** — Quest NPCs must use roles that `npcGenerator.js` can handle
+5. **Validation at campaign creation** — The campaign builder validates all entity references against registries before saving. If a milestone references `crown_of_sunfire`, that item must exist.
+6. **AI-generated campaigns** — When AI generates milestone data, it must pick from the existing registries, not invent new entity IDs
+
+**Implication:** We may need to significantly expand the item, enemy, and building registries before the campaign builder can offer meaningful variety. The current item set is small; campaigns will need quest-specific items, boss-specific loot, and building types beyond what's currently available.
 
 ---
 

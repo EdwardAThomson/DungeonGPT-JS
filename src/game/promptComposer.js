@@ -1,15 +1,27 @@
 import { DM_PROTOCOL } from '../data/prompts';
 import { buildMovementPrompt } from '../utils/promptBuilder';
+import { areRequirementsMet } from '../game/milestoneEngine';
 
 const formatCampaignMilestones = (milestones) => {
   if (!Array.isArray(milestones) || milestones.length === 0) {
     return '';
   }
-  const items = milestones
-    .map((milestone) => (typeof milestone === 'object' ? milestone.text : milestone))
-    .filter(Boolean);
-  if (items.length === 0) return '';
-  return `\nKey Milestones to achieve: ${items.join(', ')}`;
+  // Handle both old (string) and new (object) milestone formats
+  const normalized = milestones.map(m => typeof m === 'object' ? m : { text: String(m), completed: false });
+  const completed = normalized.filter(m => m.completed);
+  const active = normalized.filter(m => !m.completed && areRequirementsMet(m, normalized));
+
+  let text = '';
+  if (active.length > 0) {
+    text += '\nActive Milestones: ' + active.map(m => {
+      const typeTag = m.type ? ` [${m.type}]` : '';
+      return `${m.text}${typeTag}`;
+    }).join('; ');
+  }
+  if (completed.length > 0) {
+    text += '\nCompleted: ' + completed.map(m => m.text).join('; ');
+  }
+  return text;
 };
 
 export const formatPartyInfo = (selectedHeroes = []) => {

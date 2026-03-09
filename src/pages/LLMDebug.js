@@ -20,6 +20,15 @@ const sanitizeResponse = (text) => {
   return s.trim();
 };
 
+// SSE streams chunk text at arbitrary byte boundaries, causing mid-word line breaks.
+// This normalizer collapses spurious single newlines while preserving paragraph breaks.
+const normalizeSSEText = (text) => {
+  if (!text) return '';
+  // Collapse lines that were split mid-word or mid-sentence (single \n between non-empty lines)
+  // Preserve double newlines (paragraph breaks)
+  return text.replace(/\r\n/g, '\n').replace(/([^\n])\n([^\n])/g, '$1 $2').replace(/ +/g, ' ');
+};
+
 // ── Test Card wrapper ──
 const TestCard = ({ number, title, description, children }) => (
   <div style={card}>
@@ -391,7 +400,118 @@ const LLMDebug = () => {
     });
   };
 
-  const anyRunning = t1Running || t2Running || t3Running || t4Running || t5Running;
+  // ── Test 6: Mechanical milestone narration (should NOT emit [COMPLETE_MILESTONE]) ──
+  const [t6Status, setT6Status] = useState(null);
+  const [t6Running, setT6Running] = useState(false);
+  const [t6Response, setT6Response] = useState('');
+  const [t6Elapsed, setT6Elapsed] = useState(0);
+  const runTest6 = async () => {
+    setT6Running(true); setT6Status(null); setT6Response(''); setT6Elapsed(0);
+    const startTime = Date.now();
+    const elapsedInterval = setInterval(() => setT6Elapsed(Math.floor((Date.now() - startTime) / 1000)), 1000);
+    const prompt = DM_PROTOCOL + `[CONTEXT]
+Setting: A dark fantasy kingdom plagued by shadow. Mood: Grim. Magic: High. Tech: Medieval.
+Goal: Defeat the Shadow Lord and restore light to the realm.
+Active Milestones: Find the Tome of Shadows in the Grand Archives of Oakhaven [item]; Defeat the Shadow Lord at the Shadow Fortress [combat]
+Completed: Visit the Cinder Mountains [location] (JUST COMPLETED - the party has arrived!)
+Player is at coordinates (5, 3) in a mountain biome. Point Of Interest: mountain.
+Party: Aelindra (Wizard, Lv.3), Gruk (Barbarian, Lv.3).
+
+[SUMMARY]
+The party traveled north through dense forests and has just arrived at the Cinder Mountains, completing a key milestone.
+
+[PLAYER ACTION]
+We look around the mountain pass.
+
+[NARRATE]`;
+
+    try {
+      let raw = await runInlineCliTask(prompt);
+      clearInterval(elapsedInterval);
+      const normalized = normalizeSSEText(raw);
+      const sanitized = sanitizeResponse(normalized);
+      setT6Response(sanitized);
+
+      const checks = [];
+      if (!sanitized.trim()) checks.push('Response is empty');
+      if (/\[COMPLETE_MILESTONE/i.test(normalized)) checks.push('AI emitted [COMPLETE_MILESTONE] for a LOCATION milestone (should be engine-handled)');
+
+      setT6Status({
+        ok: sanitized.trim().length > 0 && checks.length === 0,
+        msg: checks.length === 0
+          ? `PASS: AI narrated the scene without trying to complete a mechanical milestone. ${sanitized.length} chars.`
+          : `Issues:\n${checks.map(c => '  - ' + c).join('\n')}`
+      });
+    } catch (e) {
+      clearInterval(elapsedInterval);
+      setT6Status({ ok: false, msg: `Failed: ${e.message}` });
+    }
+    setT6Running(false);
+  };
+
+  // ── Test 7: Narrative milestone completion (SHOULD emit [COMPLETE_MILESTONE]) ──
+  const [t7Status, setT7Status] = useState(null);
+  const [t7Running, setT7Running] = useState(false);
+  const [t7Response, setT7Response] = useState('');
+  const [t7Marker, setT7Marker] = useState('');
+  const [t7Elapsed, setT7Elapsed] = useState(0);
+  const runTest7 = async () => {
+    setT7Running(true); setT7Status(null); setT7Response(''); setT7Marker(''); setT7Elapsed(0);
+    const startTime = Date.now();
+    const elapsedInterval = setInterval(() => setT7Elapsed(Math.floor((Date.now() - startTime) / 1000)), 1000);
+    const prompt = DM_PROTOCOL + `[CONTEXT]
+Setting: A dark fantasy kingdom plagued by shadow. Mood: Grim. Magic: High. Tech: Medieval.
+Goal: Defeat the Shadow Lord and restore light to the realm.
+Active Milestones: Convince the Elder Council to support the quest [narrative]; Find the Tome of Shadows in the Grand Archives of Oakhaven [item]
+Completed: Visit the Cinder Mountains [location]
+Player is at coordinates (3, 5) in a grassland biome. Point Of Interest: town.
+Party: Aelindra (Wizard, Lv.3), Gruk (Barbarian, Lv.3).
+
+[SUMMARY]
+The party entered Oakhaven and met with the Elder Council. After presenting evidence of the Shadow Lord's growing threat and Aelindra's passionate plea, the council has just unanimously voted to support the quest, providing soldiers and supplies.
+
+[PLAYER ACTION]
+I thank the council for their support and ask when the soldiers will be ready.
+
+[NARRATE]`;
+
+    try {
+      let raw = await runInlineCliTask(prompt);
+      clearInterval(elapsedInterval);
+      // Normalize SSE chunking artifacts before parsing markers
+      const normalized = normalizeSSEText(raw);
+      const sanitized = sanitizeResponse(normalized);
+      setT7Response(sanitized);
+
+      // Match [COMPLETE_MILESTONE: ...] — use [\s\S]+? to handle any residual newlines
+      const milestoneMatch = normalized.match(/\[COMPLETE_MILESTONE:\s*([\s\S]+?)\]/i);
+      const markerDisplay = milestoneMatch ? milestoneMatch[0].replace(/\s+/g, ' ') : '(none found)';
+      setT7Marker(markerDisplay);
+
+      const checks = [];
+      if (!sanitized.trim()) checks.push('Response is empty');
+      if (!milestoneMatch) checks.push('AI did NOT emit [COMPLETE_MILESTONE] for a narrative milestone that was clearly accomplished');
+      if (milestoneMatch && !milestoneMatch[1].toLowerCase().includes('elder council')) {
+        checks.push(`Milestone text doesn't match expected: "${milestoneMatch[1].replace(/\s+/g, ' ')}" (expected something about Elder Council)`);
+      }
+      // Check it didn't also try to complete mechanical milestones
+      const allMatches = normalized.match(/\[COMPLETE_MILESTONE:[\s\S]+?\]/gi) || [];
+      if (allMatches.length > 1) checks.push(`AI emitted ${allMatches.length} COMPLETE_MILESTONE markers (expected exactly 1)`);
+
+      setT7Status({
+        ok: sanitized.trim().length > 0 && checks.length === 0,
+        msg: checks.length === 0
+          ? `PASS: AI correctly emitted ${markerDisplay} for the narrative milestone.`
+          : `Issues:\n${checks.map(c => '  - ' + c).join('\n')}`
+      });
+    } catch (e) {
+      clearInterval(elapsedInterval);
+      setT7Status({ ok: false, msg: `Failed: ${e.message}` });
+    }
+    setT7Running(false);
+  };
+
+  const anyRunning = t1Running || t2Running || t3Running || t4Running || t5Running || t6Running || t7Running;
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: 20, color: '#e0e0e0' }}>
@@ -502,6 +622,40 @@ const LLMDebug = () => {
           <div style={{ marginTop: 8, padding: 12, background: '#0d1117', borderRadius: 4, border: `1px solid ${t5Status.ok ? '#4caf50' : '#f44336'}`, whiteSpace: 'pre-wrap' }}>
             <span style={t5Status.ok ? pass : fail}>{t5Status.ok ? 'ALL PASS' : 'FAILED'}</span>
             <span style={{ marginLeft: 12, color: '#ccc' }}>{t5Status.msg}</span>
+          </div>
+        )}
+      </TestCard>
+
+      {/* ── TEST 6 ── */}
+      <TestCard number="6" title="Mechanical Milestone (No [COMPLETE_MILESTONE])" description="Sends a prompt where a LOCATION milestone was just completed by the engine. The AI should narrate it with flair but must NOT emit [COMPLETE_MILESTONE] — mechanical milestones are engine-handled.">
+        <button onClick={runTest6} disabled={anyRunning} style={btn('#ff9800', anyRunning)}>
+          {t6Running ? `Testing... ${t6Elapsed}s` : 'Test Mechanical Milestone'}
+        </button>
+        {t6Response && <ResultBox label="AI Response (should narrate arrival, no [COMPLETE_MILESTONE])" value={t6Response} />}
+        {t6Status && (
+          <div style={{ marginTop: 8, padding: 12, background: '#0d1117', borderRadius: 4, border: `1px solid ${t6Status.ok ? '#4caf50' : '#f44336'}`, whiteSpace: 'pre-wrap' }}>
+            <span style={t6Status.ok ? pass : fail}>{t6Status.ok ? 'PASS' : 'FAIL'}</span>
+            <span style={{ marginLeft: 12, color: '#ccc' }}>{t6Status.msg}</span>
+          </div>
+        )}
+      </TestCard>
+
+      {/* ── TEST 7 ── */}
+      <TestCard number="7" title="Narrative Milestone ([COMPLETE_MILESTONE] expected)" description="Sends a prompt where a NARRATIVE milestone (convince the Elder Council) has clearly been accomplished. The AI should emit [COMPLETE_MILESTONE: ...] for this one.">
+        <button onClick={runTest7} disabled={anyRunning} style={btn('#ff9800', anyRunning)}>
+          {t7Running ? `Testing... ${t7Elapsed}s` : 'Test Narrative Milestone'}
+        </button>
+        {t7Response && <ResultBox label="AI Response" value={t7Response} />}
+        {t7Marker && (
+          <div style={{ marginTop: 8 }}>
+            <div style={label}>Detected Milestone Marker</div>
+            <div style={{ ...mono, color: t7Marker === '(none found)' ? '#f44336' : '#4caf50', fontWeight: 700 }}>{t7Marker}</div>
+          </div>
+        )}
+        {t7Status && (
+          <div style={{ marginTop: 8, padding: 12, background: '#0d1117', borderRadius: 4, border: `1px solid ${t7Status.ok ? '#4caf50' : '#f44336'}`, whiteSpace: 'pre-wrap' }}>
+            <span style={t7Status.ok ? pass : fail}>{t7Status.ok ? 'PASS' : 'FAIL'}</span>
+            <span style={{ marginLeft: 12, color: '#ccc' }}>{t7Status.msg}</span>
           </div>
         )}
       </TestCard>

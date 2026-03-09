@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { generateMapData, getTile, findStartingTown } from '../utils/mapGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
 import { populateTown } from '../utils/npcGenerator';
+import { injectQuestBuildings } from '../game/milestoneSpawner';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-map');
 
-const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null) => {
+const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null, requiredBuildings = null) => {
     // --- State Initialization --- //
 
     const [mapAndPosition] = useState(() => {
@@ -190,6 +191,11 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                     currentTownTile.riverDirection
                 );
 
+                // Inject quest buildings if needed
+                if (requiredBuildings?.[townName]) {
+                    injectQuestBuildings(newTownMap, requiredBuildings[townName]);
+                }
+
                 // POPULATE TOWN
                 const npcs = populateTown(newTownMap, seed);
                 newTownMap.npcs = npcs;
@@ -218,6 +224,11 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 logger.info('Generating new town map', townName);
                 const seed = worldSeed ? (parseInt(worldSeed) + (townTile.x * 1000) + (townTile.y * 10000)) : (loadedConversation?.sessionId || Math.floor(Math.random() * 1000000));
                 townMapData = generateTownMap(townSize, townName, 'south', seed, townTile.hasRiver, townTile.riverDirection);
+
+                // Inject quest buildings if needed
+                if (requiredBuildings?.[townName]) {
+                    injectQuestBuildings(townMapData, requiredBuildings[townName]);
+                }
 
                 // POPULATE TOWN WITH NPCs
                 logger.debug('Populating town with NPCs');
@@ -304,6 +315,11 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
 
             logger.debug('Using town seed', seed);
             townMapData = generateTownMap(townSize, townName, 'south', seed, currentTile.hasRiver, currentTile.riverDirection);
+
+            // Inject quest buildings if needed
+            if (requiredBuildings?.[townName]) {
+                injectQuestBuildings(townMapData, requiredBuildings[townName]);
+            }
 
             // POPULATE TOWN WITH NPCs
             logger.debug('Populating town with NPCs');

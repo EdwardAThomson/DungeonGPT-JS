@@ -325,8 +325,8 @@ export const generateNPC = (options = {}) => {
 
     // 5. Determine Age
     let age;
-    if (roleKey === "Noble Child") {
-        age = rng.range(6, 15);
+    if (roleKey === "Noble Child" || roleKey === "Gentry Child" || title === "Child") {
+        age = rng.range(4, 15);
     } else if (title.includes("Elder")) {
         age = rng.range(60, 90);
     } else {
@@ -635,58 +635,113 @@ export const populateTown = (townMapData, seed) => {
         }
 
         const familyName = rng.pick(HUMAN_LAST_NAMES);
-        const familySize = rng.range(3, 6); // More authentic medieval family sizes (1-4 children)
+        const childCount = rng.range(1, 4);
 
-        for (let i = 0; i < familySize; i++) {
-            const isChild = i >= 2;
-            const canBeFarmer = workSites.length > 0 && (townSize === 'hamlet' || townSize === 'village' || townSize === 'town');
-            const role = isChild ? "Villager" : (canBeFarmer ? "Farmer" : "Villager");
-            const npc = addNPC(role, home, home, {
-                lastName: familyName,
-                title: isChild ? "Child" : (role === "Farmer" ? "Farmer" : "Citizen")
-            });
+        // Generate house name based on family and town size
+        const houseStyles = {
+            hamlet: ["Cottage", "Homestead", "Hut"],
+            village: ["Cottage", "Homestead", "House"],
+            town: ["House", "Residence", "Dwelling"],
+            city: ["Residence", "Townhouse", "House"]
+        };
+        const style = rng.pick(houseStyles[townSize] || houseStyles.village);
+        mapData[home.y][home.x].buildingName = `The ${familyName} ${style}`;
 
-            // Assign jobs to adults
-            if (!isChild) {
-                if (role === "Farmer" && workSites.length > 0) {
-                    const site = workSites[rng.range(0, workSites.length - 1)];
-                    npc.location.x = site.x;
-                    npc.location.y = site.y;
-                    npc.location.buildingType = site.type;
-                    npc.job = site.type === 'field' ? "Tilling the fields" : "Tending to the barn";
-                } else {
-                    // Balanced Vocation System
-                    if (!vocationSlots) {
-                        const slotsBySize = {
-                            hamlet: { "Cloth Weaver": 1, "Tool Mender": 1 },
-                            village: { "Cloth Weaver": 1, "Tool Mender": 1, "Tanner": 1, "Tailor": 1, "Carpenter": 1 },
-                            town: { "Cloth Weaver": 2, "Tool Mender": 2, "Tanner": 2, "Tailor": 2, "Carpenter": 2, "Ale Brewer": 2, "Baker": 2 },
-                            city: { "Cloth Weaver": 5, "Tool Mender": 4, "Tanner": 4, "Tailor": 5, "Carpenter": 4, "Ale Brewer": 3, "Baker": 4 }
-                        };
-                        vocationSlots = { ...(slotsBySize[townSize] || slotsBySize.village) };
-                    }
+        const canBeFarmer = workSites.length > 0 && (townSize === 'hamlet' || townSize === 'village' || townSize === 'town');
 
-                    // Try to pick an available specialized vocation
-                    const availableVocations = Object.keys(vocationSlots).filter(v => vocationSlots[v] > 0);
-                    if (availableVocations.length > 0) {
-                        const vocation = rng.pick(availableVocations);
-                        npc.job = vocation;
-                        vocationSlots[vocation]--;
-                    } else {
-                        // Fallback to more common/domestic activities
-                        const domesticActivities = [
-                            "Tending the hearth", "Cleaning the house", "Resting in the square",
-                            "Trading at the market", "Mending nets", "Preparing a meal",
-                            "Helping neighbors", "Running errands", "Fetching water"
-                        ];
-                        npc.job = rng.pick(domesticActivities);
-                    }
-                }
+        // --- Generate head of household ---
+        const headRole = canBeFarmer ? "Farmer" : "Villager";
+        const head = addNPC(headRole, home, home, {
+            lastName: familyName,
+            title: headRole === "Farmer" ? "Farmer" : "Citizen"
+        });
+        head.familyRole = 'head';
+        // Ensure head is old enough to have children (medieval: married young, but at least 25)
+        if (head.age < 25) head.age = rng.range(25, 40);
+
+        // --- Generate spouse ---
+        const spouseGender = head.gender === "Male" ? "Female" : "Male";
+        const spouseRole = canBeFarmer ? "Farmer" : "Villager";
+        const spouse = addNPC(spouseRole, home, home, {
+            lastName: familyName,
+            gender: spouseGender,
+            title: spouseRole === "Farmer" ? "Farmer" : "Citizen"
+        });
+        spouse.familyRole = 'spouse';
+        // Spouse within a few years of head (medieval norm: wives often a bit younger)
+        spouse.age = head.age + rng.range(-4, 2);
+        if (spouse.age < 20) spouse.age = 20;
+
+        // --- Assign parent jobs ---
+        const assignParentJob = (npc) => {
+            if (npc.role === "Farmer" && workSites.length > 0) {
+                const site = workSites[rng.range(0, workSites.length - 1)];
+                npc.location.x = site.x;
+                npc.location.y = site.y;
+                npc.location.buildingType = site.type;
+                npc.job = site.type === 'field' ? "Tilling the fields" : "Tending to the barn";
             } else {
-                const childActivities = ["Playing in the street", "Helping parents", "Exploring nearby", "Playing tag"];
-                npc.job = rng.pick(childActivities);
+                // Balanced Vocation System
+                if (!vocationSlots) {
+                    const slotsBySize = {
+                        hamlet: { "Cloth Weaver": 1, "Tool Mender": 1 },
+                        village: { "Cloth Weaver": 1, "Tool Mender": 1, "Tanner": 1, "Tailor": 1, "Carpenter": 1 },
+                        town: { "Cloth Weaver": 2, "Tool Mender": 2, "Tanner": 2, "Tailor": 2, "Carpenter": 2, "Ale Brewer": 2, "Baker": 2 },
+                        city: { "Cloth Weaver": 5, "Tool Mender": 4, "Tanner": 4, "Tailor": 5, "Carpenter": 4, "Ale Brewer": 3, "Baker": 4 }
+                    };
+                    vocationSlots = { ...(slotsBySize[townSize] || slotsBySize.village) };
+                }
+                const availableVocations = Object.keys(vocationSlots).filter(v => vocationSlots[v] > 0);
+                if (availableVocations.length > 0) {
+                    const vocation = rng.pick(availableVocations);
+                    npc.job = vocation;
+                    vocationSlots[vocation]--;
+                } else {
+                    const domesticActivities = [
+                        "Tending the hearth", "Cleaning the house", "Resting in the square",
+                        "Trading at the market", "Mending nets", "Preparing a meal",
+                        "Helping neighbors", "Running errands", "Fetching water"
+                    ];
+                    npc.job = rng.pick(domesticActivities);
+                }
             }
+        };
+        assignParentJob(head);
+        assignParentJob(spouse);
+
+        // --- Generate children with coherent ages ---
+        const youngestParent = Math.min(head.age, spouse.age);
+        // Oldest child can be at most youngestParent - 16 (medieval: childbearing from ~16)
+        const oldestChildMaxAge = Math.max(1, youngestParent - 16);
+        // Cap at 15 (still a "child" in the household)
+        const oldestChildAge = Math.min(15, oldestChildMaxAge);
+
+        const childNpcs = [];
+        for (let i = 0; i < childCount; i++) {
+            const child = addNPC("Villager", home, home, {
+                lastName: familyName,
+                title: "Child"
+            });
+            child.familyRole = 'child';
+            childNpcs.push(child);
         }
+
+        // Assign staggered ages: oldest first, each subsequent 1-3 years younger
+        let currentAge = oldestChildAge;
+        // Sort children by their generated seed to maintain determinism, then overwrite ages
+        childNpcs.forEach((child, i) => {
+            if (i === 0) {
+                child.age = currentAge;
+            } else {
+                currentAge = Math.max(1, currentAge - rng.range(1, 3));
+                child.age = currentAge;
+            }
+            // Age-appropriate activities
+            const childActivities = child.age >= 10
+                ? ["Helping parents", "Running errands", "Exploring nearby", "Playing with friends", "Doing chores", "Learning a trade"]
+                : ["Playing in the yard", "Helping parents", "Playing tag", "Chasing the cat", "Playing with a stick sword", "Picking wildflowers"];
+            child.job = rng.pick(childActivities);
+        });
     });
 
     return npcs;

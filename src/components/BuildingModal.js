@@ -2,6 +2,21 @@ import React, { useState } from 'react';
 
 const getAbilityModifier = (score) => Math.floor(((score || 10) - 10) / 2);
 
+const RESIDENTIAL_TYPES = ['house', 'manor', 'keep'];
+
+const familyRoleLabel = (npc) => {
+    if (npc.familyRole === 'head') return 'Head of Household';
+    if (npc.familyRole === 'spouse') return 'Spouse';
+    if (npc.familyRole === 'child') return 'Child';
+    return null;
+};
+
+const genderIcon = (gender) => {
+    if (gender === 'Male') return '\u2642';
+    if (gender === 'Female') return '\u2640';
+    return '';
+};
+
 const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound }) => {
     const [imageError, setImageError] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
@@ -11,6 +26,8 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound })
     const [itemFound, setItemFound] = useState(false);
 
     if (!building) return null;
+
+    const isResidential = RESIDENTIAL_TYPES.includes(building.buildingType);
 
     // Map building types to image names
     const getImageSrc = (type) => {
@@ -25,6 +42,24 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound })
         setIsLightboxOpen(!isLightboxOpen);
     };
 
+    // Sort residential NPCs: head first, then spouse, then children
+    const sortedNpcs = isResidential
+        ? [...npcs].sort((a, b) => {
+            const order = { head: 0, spouse: 1, child: 2 };
+            return (order[a.familyRole] ?? 3) - (order[b.familyRole] ?? 3);
+        })
+        : npcs;
+
+    // Deduplicate NPCs who both work and live here (same NPC matched by both location and homeCoords)
+    const uniqueNpcs = [];
+    const seenIds = new Set();
+    for (const npc of sortedNpcs) {
+        if (!seenIds.has(npc.id)) {
+            seenIds.add(npc.id);
+            uniqueNpcs.push(npc);
+        }
+    }
+
     return (
         <>
             <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1000, backgroundColor: 'rgba(0,0,0,0.7)' }}>
@@ -32,7 +67,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound })
                     className="modal-content building-modal"
                     onClick={(e) => e.stopPropagation()}
                     style={{
-                        maxWidth: '780px', // 30% increase from 600px
+                        maxWidth: '780px',
                         width: '95%',
                         border: '3px solid var(--primary)',
                         padding: '0',
@@ -67,12 +102,12 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound })
                         </div>
                     </div>
 
-                    {/* Image Section */}
-                    {!imageError && (
+                    {/* Image Section - real image or placeholder for houses */}
+                    {!imageError ? (
                         <div
                             style={{
                                 width: 'calc(100% - 50px)',
-                                height: '365px', // 30% increase from 280px
+                                height: '365px',
                                 margin: '0 25px 20px 25px',
                                 backgroundColor: '#000',
                                 position: 'relative',
@@ -117,13 +152,43 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound })
                                     border: '1px solid var(--bg)',
                                     boxShadow: '0 4px 10px rgba(0,0,0,0.3)'
                                 }}>
-                                    🔎 View Full Size
+                                    View Full Size
                                 </div>
                             )}
+                        </div>
+                    ) : (
+                        /* Placeholder when no image exists */
+                        <div style={{
+                            width: 'calc(100% - 50px)',
+                            height: '160px',
+                            margin: '0 25px 20px 25px',
+                            background: 'linear-gradient(135deg, rgba(139,90,43,0.15) 0%, rgba(101,67,33,0.25) 100%)',
+                            borderRadius: '10px',
+                            border: '3px solid var(--border)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px'
+                        }}>
+                            <span style={{ fontSize: '3.5rem' }}>
+                                {building.buildingType === 'house' ? '\uD83C\uDFE0' :
+                                 building.buildingType === 'manor' ? '\uD83C\uDFF0' :
+                                 building.buildingType === 'keep' ? '\uD83C\uDFF0' : '\uD83C\uDFE2'}
+                            </span>
+                            <span style={{
+                                fontSize: '0.85rem',
+                                color: 'var(--text-secondary)',
+                                fontStyle: 'italic',
+                                fontFamily: 'var(--body-font)'
+                            }}>
+                                {isResidential ? 'A humble dwelling in town' : building.buildingType}
+                            </span>
                         </div>
                     )}
 
                     <div style={{ padding: '0 25px 25px 25px' }}>
+                        {/* Inhabitants Section - enhanced for residential buildings */}
                         <div className="modal-section" style={{
                             backgroundColor: 'rgba(0,0,0,0.03)',
                             padding: '20px',
@@ -137,31 +202,63 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound })
                                 color: 'var(--primary)',
                                 fontFamily: 'var(--header-font)'
                             }}>
-                                Inhabitants & Workers
+                                {isResidential ? 'Household' : 'Inhabitants & Workers'}
                             </h4>
-                            {npcs.length > 0 ? (
+                            {uniqueNpcs.length > 0 ? (
                                 <ul style={{ listStyle: 'none', padding: 0, margin: '0' }}>
-                                    {npcs.map(npc => (
-                                        <li key={npc.id} style={{
-                                            padding: '12px 0',
-                                            borderBottom: '1px dashed var(--border)',
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center'
-                                        }}>
-                                            <span style={{ fontWeight: 'bold', color: 'var(--text)' }}>{npc.name}</span>
-                                            <span style={{
-                                                fontSize: '12px',
-                                                color: 'var(--text-secondary)',
-                                                backgroundColor: 'var(--border)',
-                                                padding: '4px 12px',
-                                                borderRadius: '6px',
-                                                fontWeight: '500'
+                                    {uniqueNpcs.map(npc => {
+                                        const roleLabel = isResidential ? familyRoleLabel(npc) : null;
+                                        const isWorksElsewhere = isResidential &&
+                                            npc.location && npc.location.homeCoords &&
+                                            (npc.location.x !== npc.location.homeCoords.x || npc.location.y !== npc.location.homeCoords.y);
+
+                                        return (
+                                            <li key={npc.id} style={{
+                                                padding: '10px 0',
+                                                borderBottom: '1px dashed var(--border)',
                                             }}>
-                                                {npc.job || npc.title || 'Resident'}
-                                            </span>
-                                        </li>
-                                    ))}
+                                                <div style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center'
+                                                }}>
+                                                    <span style={{ fontWeight: 'bold', color: 'var(--text)' }}>
+                                                        {genderIcon(npc.gender)} {npc.name}
+                                                    </span>
+                                                    <span style={{
+                                                        fontSize: '12px',
+                                                        color: 'var(--text-secondary)',
+                                                        backgroundColor: 'var(--border)',
+                                                        padding: '4px 12px',
+                                                        borderRadius: '6px',
+                                                        fontWeight: '500'
+                                                    }}>
+                                                        {npc.job || npc.title || 'Resident'}
+                                                    </span>
+                                                </div>
+                                                {/* Extra details for residential buildings */}
+                                                {isResidential && (
+                                                    <div style={{
+                                                        display: 'flex',
+                                                        gap: '12px',
+                                                        marginTop: '4px',
+                                                        fontSize: '0.8rem',
+                                                        color: 'var(--text-secondary)',
+                                                        fontFamily: 'var(--body-font)'
+                                                    }}>
+                                                        {roleLabel && <span>{roleLabel}</span>}
+                                                        {npc.age && <span>Age {npc.age}</span>}
+                                                        {npc.race && <span>{npc.race}</span>}
+                                                        {isWorksElsewhere && (
+                                                            <span style={{ fontStyle: 'italic' }}>
+                                                                (works elsewhere)
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
                             ) : (
                                 <p style={{
@@ -298,7 +395,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound })
             </div>
 
             {/* Image Lightbox Modal */}
-            {isLightboxOpen && (
+            {isLightboxOpen && !imageError && (
                 <div
                     className="modal-overlay lightbox-overlay"
                     onClick={toggleLightbox}

@@ -17,7 +17,7 @@ const logger = createLogger('town-map-display');
  * @param {string} townError - Error message to display in town map
  * @param {Function} markBuildingDiscovered - Callback to mark a building as seen
  */
-const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError, markBuildingDiscovered }) => {
+const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError, markBuildingDiscovered, onQuestItemFound }) => {
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [distanceWarning, setDistanceWarning] = useState(false);
 
@@ -42,10 +42,14 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
 
     // Allow seeing info if close enough (within 2 tiles) OR if already discovered
     if (distance <= 2 || isDiscovered) {
-      // Find NPCs in this building
-      const buildingNpcs = (townMapData.npcs || []).filter(npc =>
-        npc.location && npc.location.x === tile.x && npc.location.y === tile.y
-      );
+      // Find NPCs in this building (workers here OR residents whose home is here)
+      const buildingNpcs = (townMapData.npcs || []).filter(npc => {
+        if (!npc.location) return false;
+        const isWorkingHere = npc.location.x === tile.x && npc.location.y === tile.y;
+        const livesHere = npc.location.homeCoords &&
+          npc.location.homeCoords.x === tile.x && npc.location.homeCoords.y === tile.y;
+        return isWorkingHere || livesHere;
+      });
 
       setSelectedBuilding({ ...tile, npcs: buildingNpcs });
 
@@ -334,6 +338,8 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           building={selectedBuilding}
           npcs={selectedBuilding.npcs}
           onClose={() => setSelectedBuilding(null)}
+          firstHero={firstHero}
+          onQuestItemFound={onQuestItemFound}
         />
       )}
 
