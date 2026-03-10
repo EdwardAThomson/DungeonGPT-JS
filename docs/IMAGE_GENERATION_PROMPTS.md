@@ -26,7 +26,7 @@ node scripts/generate_batch_api.js
 
 Output directory: `public/assets/encounters/bosses/`
 
-### Heroic Fantasy — Tier 1
+### Heroic Fantasy — Tier 1 - COMPLETE
 
 | Key | Prompt |
 |-----|--------|
@@ -94,7 +94,11 @@ Output directory: `public/assets/encounters/bosses/`
 |-----|--------|
 | `great_dreamer` | The Great Dreamer — a colossal tentacled entity slumbering beneath a dark ocean, visible through fractured reality. Mountainous body, countless tendrils, one enormous eye half-open. Tiny ships on the surface for scale. Dark fantasy digital painting, cosmic horror, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
 | `void_leviathan` | A void leviathan — an impossibly large serpentine creature swimming through a starfield of warped space. Body covered in eyes that see into other dimensions, reality bending around it. Dark fantasy digital painting, cosmic horror, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
-| `psionic_devourer` | A psionic devourer — an elegant tentacle-faced humanoid in ornate purple robes, hovering in a chamber of psychic crystals. Tentacles writhing, psionic energy radiating from its oversized cranium. Dark fantasy digital painting, Lovecraftian atmosphere, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
+| `psionic_devourer` | A psionic devourer — a gaunt floating figure with translucent crystalline skin revealing a pulsing brain-like mass within its elongated skull. No mouth or nose, just three asymmetric glowing eyes. Thin clawed hands outstretched, violet psychic energy arcing between its fingers and nearby shattered crystals. Ornate chitinous armor fused to its body. Hovering in a vast underground chamber lined with glowing psionic geodes. Dark fantasy digital painting, Lovecraftian atmosphere, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
+
+
+
+
 
 ---
 
@@ -104,7 +108,7 @@ Output directory: `public/assets/templates/`
 
 These are wide banner images shown on the adventure selection cards.
 
-### Tier 1 Templates
+### Tier 1 Templates - COMPLETE
 
 | Key | Prompt |
 |-----|--------|
@@ -113,7 +117,7 @@ These are wide banner images shown on the adventure selection cards.
 | `arcane-renaissance-t1` | A Renaissance-style city with brass spires and clockwork towers, a malfunctioning automaton sparking in the town square. Citizens fleeing, gears scattered. Warm amber and copper tones. Epic fantasy illustration with steampunk elements, sweeping cityscape. Wide cinematic composition 16:9. Rich color palette, painterly style. No text, no UI, no borders. |
 | `eldritch-horror-t1` | A fog-shrouded coastal village at night with hooded figures gathering around a bonfire on the beach. Strange symbols drawn in the sand, an unnatural green glow from the waves. Epic dark fantasy illustration, Lovecraftian atmosphere. Wide cinematic composition 16:9. Dark moody palette, painterly style. No text, no UI, no borders. |
 
-### Tier 2 Templates
+### Tier 2 Templates - COMPLETE
 
 | Key | Prompt |
 |-----|--------|
@@ -122,7 +126,7 @@ These are wide banner images shown on the adventure selection cards.
 | `arcane-renaissance-t2` | A towering mechanical angel hovering above a sprawling Renaissance city, arcane energy raining down. Citizens looking up in awe and terror. Grand architecture, magical auroras in the sky. Epic fantasy illustration with arcane elements, sweeping cityscape. Wide cinematic composition 16:9. Rich magical palette, painterly style. No text, no UI, no borders. |
 | `eldritch-horror-t2` | A vast dark ocean under alien stars, the silhouette of an impossibly large tentacled entity rising from the depths. Tiny ships capsizing in the waves. Unnatural purple and green aurora. Epic cosmic horror illustration, sweeping seascape. Wide cinematic composition 16:9. Dark palette with eldritch glows, painterly style. No text, no UI, no borders. |
 
-### Tier 3 Templates (Coming Soon)
+### Tier 3 Templates - COMPLETE
 
 | Key | Prompt |
 |-----|--------|

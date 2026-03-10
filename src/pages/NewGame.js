@@ -400,9 +400,10 @@ const NewGame = () => {
         }}>
           {/* Header image */}
           <div style={{
-            height: '180px',
-            background: `url(/assets/templates/${t.id}.webp) center/cover no-repeat, linear-gradient(135deg, var(--surface), var(--bg))`,
+            height: '260px',
+            background: `url(/assets/templates/${t.id}.webp) center top/cover no-repeat, linear-gradient(135deg, var(--surface), var(--bg))`,
             position: 'relative',
+            flexShrink: 0,
           }}>
             <div style={{
               position: 'absolute', bottom: 0, left: 0, right: 0,

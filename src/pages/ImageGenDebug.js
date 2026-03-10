@@ -8,7 +8,12 @@ const DEFAULT_WORKER_URL = rawWorkerUrl.replace('https://localhost', 'http://loc
 const MODES = { WORKER: 'worker', DIRECT: 'direct' };
 
 const IMAGE_MODELS = [
-  { id: '@cf/black-forest-labs/flux-1-schnell', name: 'FLUX.1 Schnell (fast)', defaultSteps: 4 },
+  { id: '@cf/leonardo/lucid-origin', name: 'Lucid Origin (best quality)', defaultSteps: 25 },
+  { id: '@cf/leonardo/phoenix-1.0', name: 'Phoenix 1.0 (excellent)', defaultSteps: 25 },
+  { id: '@cf/black-forest-labs/flux-2-dev', name: 'FLUX.2 Dev (high quality)', defaultSteps: 25 },
+  { id: '@cf/black-forest-labs/flux-2-klein-9b', name: 'FLUX.2 Klein 9B (good)', defaultSteps: 25 },
+  { id: '@cf/black-forest-labs/flux-2-klein-4b', name: 'FLUX.2 Klein 4B (fast)', defaultSteps: 25 },
+  { id: '@cf/black-forest-labs/flux-1-schnell', name: 'FLUX.1 Schnell (cheapest)', defaultSteps: 4 },
   { id: '@cf/stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL', defaultSteps: 20 },
   { id: '@cf/bytedance/stable-diffusion-xl-lightning', name: 'SDXL Lightning (fast)', defaultSteps: 4 },
 ];
@@ -94,7 +99,7 @@ const PROMPT_SECTIONS = [
     prompts: [
       { key: 'great_dreamer', prompt: 'The Great Dreamer — a colossal tentacled entity slumbering beneath a dark ocean, visible through fractured reality. Mountainous body, countless tendrils, one enormous eye half-open. Tiny ships on the surface for scale. Dark fantasy digital painting, cosmic horror, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements.' },
       { key: 'void_leviathan', prompt: 'A void leviathan — an impossibly large serpentine creature swimming through a starfield of warped space. Body covered in eyes that see into other dimensions, reality bending around it. Dark fantasy digital painting, cosmic horror, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements.' },
-      { key: 'psionic_devourer', prompt: 'A psionic devourer — an elegant tentacle-faced humanoid in ornate purple robes, hovering in a chamber of psychic crystals. Tentacles writhing, psionic energy radiating from its oversized cranium. Dark fantasy digital painting, Lovecraftian atmosphere, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements.' },
+      { key: 'psionic_devourer', prompt: 'A psionic devourer — a gaunt floating figure with translucent crystalline skin revealing a pulsing brain-like mass within its elongated skull. No mouth or nose, just three asymmetric glowing eyes. Thin clawed hands outstretched, violet psychic energy arcing between its fingers and nearby shattered crystals. Ornate chitinous armor fused to its body. Hovering in a vast underground chamber lined with glowing psionic geodes. Dark fantasy digital painting, Lovecraftian atmosphere, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements.' },
     ],
   },
   {
@@ -143,15 +148,24 @@ const getAuthHeaders = async () => {
 };
 
 const ImageGenDebug = () => {
+  const [mode, setMode] = useState(MODES.DIRECT);
   const [workerUrl, setWorkerUrl] = useState(DEFAULT_WORKER_URL);
+  const [cfAccountId, setCfAccountId] = useState(() => localStorage.getItem(LS_CF_ACCOUNT) || '');
+  const [cfApiToken, setCfApiToken] = useState(() => localStorage.getItem(LS_CF_TOKEN) || '');
   const [selectedModel, setSelectedModel] = useState(IMAGE_MODELS[0].id);
   const [selected, setSelected] = useState(() => new Set());
   const [results, setResults] = useState({});  // key -> { image, error, loading }
   const [generating, setGenerating] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
   const [customKey, setCustomKey] = useState('custom_test');
+  const [imageWidth, setImageWidth] = useState(1024);
+  const [imageHeight, setImageHeight] = useState(576);
   const [batchDelay, setBatchDelay] = useState(1000);
   const abortRef = useRef(false);
+
+  // Persist CF credentials to localStorage
+  const updateCfAccountId = (val) => { setCfAccountId(val); localStorage.setItem(LS_CF_ACCOUNT, val); };
+  const updateCfApiToken = (val) => { setCfApiToken(val); localStorage.setItem(LS_CF_TOKEN, val); };
 
   const toggleSelect = (key) => {
     setSelected(prev => {
@@ -181,41 +195,88 @@ const ImageGenDebug = () => {
     });
   };
 
+  const generateViaWorker = useCallback(async (prompt) => {
+    const headers = await getAuthHeaders();
+    const modelInfo = IMAGE_MODELS.find(m => m.id === selectedModel);
+    const res = await fetch(`${workerUrl}/api/image/generate`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        prompt,
+        model: selectedModel,
+        width: imageWidth,
+        height: imageHeight,
+        steps: modelInfo?.defaultSteps,
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+    const fmt = data.format === 'jpeg' ? 'jpeg' : 'png';
+    return { image: `data:image/${fmt};base64,${data.image}`, model: data.modelName };
+  }, [workerUrl, selectedModel, imageWidth, imageHeight]);
+
+  const generateViaDirect = useCallback(async (prompt) => {
+    if (!cfAccountId || !cfApiToken) {
+      throw new Error('CF Account ID and API Token are required for direct mode.');
+    }
+
+    const modelInfo = IMAGE_MODELS.find(m => m.id === selectedModel);
+    const modelPath = selectedModel.replace('@cf/', '');
+
+    // CF REST API requires multipart/form-data for image models
+    const formData = new FormData();
+    formData.append('prompt', prompt);
+    formData.append('width', String(imageWidth));
+    formData.append('height', String(imageHeight));
+    if (modelInfo?.defaultSteps) formData.append('num_steps', String(modelInfo.defaultSteps));
+
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${cfAccountId}/ai/run/@cf/${modelPath}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${cfApiToken}`,
+        },
+        body: formData,
+      }
+    );
+
+    if (!res.ok) {
+      // CF REST API returns JSON errors for non-image responses
+      const errData = await res.json().catch(() => null);
+      const msg = errData?.errors?.[0]?.message || `HTTP ${res.status}: ${res.statusText}`;
+      throw new Error(msg);
+    }
+
+    // The REST API returns raw image bytes directly
+    const blob = await res.blob();
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.readAsDataURL(blob);
+    });
+
+    return { image: dataUrl, model: modelInfo?.name || selectedModel };
+  }, [cfAccountId, cfApiToken, selectedModel, imageWidth, imageHeight]);
+
   const generateSingle = useCallback(async (prompt, key) => {
     setResults(prev => ({ ...prev, [key]: { loading: true } }));
 
     try {
-      const headers = await getAuthHeaders();
-      const modelInfo = IMAGE_MODELS.find(m => m.id === selectedModel);
-      const res = await fetch(`${workerUrl}/api/image/generate`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          prompt,
-          model: selectedModel,
-          width: 1024,
-          height: 576,  // 16:9-ish
-          steps: modelInfo?.defaultSteps,
-        }),
-      });
+      const result = mode === MODES.DIRECT
+        ? await generateViaDirect(prompt)
+        : await generateViaWorker(prompt);
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
-
-      setResults(prev => ({
-        ...prev,
-        [key]: { image: `data:image/png;base64,${data.image}`, model: data.modelName },
-      }));
+      setResults(prev => ({ ...prev, [key]: result }));
     } catch (err) {
       setResults(prev => ({
         ...prev,
         [key]: { error: err.message },
       }));
     }
-  }, [workerUrl, selectedModel]);
+  }, [mode, generateViaDirect, generateViaWorker]);
 
   const generateSelected = useCallback(async () => {
     if (selected.size === 0) return;
@@ -284,7 +345,56 @@ const ImageGenDebug = () => {
       {/* Config */}
       <div className="debug-section">
         <h3>Configuration</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+
+        {/* Mode toggle */}
+        <div className="form-group" style={{ marginBottom: '15px' }}>
+          <label>Mode:</label>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+            {[
+              { value: MODES.DIRECT, label: 'Direct CF API (no worker needed)' },
+              { value: MODES.WORKER, label: 'Via CF Worker' },
+            ].map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setMode(opt.value)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '4px',
+                  border: `1px solid ${mode === opt.value ? 'var(--primary)' : 'var(--border)'}`,
+                  background: mode === opt.value ? 'var(--primary)' : 'transparent',
+                  color: mode === opt.value ? 'var(--bg)' : 'var(--text)',
+                  cursor: 'pointer',
+                  fontSize: '0.9em',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {mode === MODES.DIRECT ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+            <div className="form-group">
+              <label>CF Account ID:</label>
+              <input
+                type="text"
+                value={cfAccountId}
+                onChange={(e) => updateCfAccountId(e.target.value)}
+                placeholder="e.g. a1b2c3d4..."
+              />
+            </div>
+            <div className="form-group">
+              <label>CF API Token:</label>
+              <input
+                type="password"
+                value={cfApiToken}
+                onChange={(e) => updateCfApiToken(e.target.value)}
+                placeholder="Bearer token with Workers AI permission"
+              />
+            </div>
+          </div>
+        ) : (
           <div className="form-group">
             <label>Worker URL:</label>
             <input
@@ -293,6 +403,9 @@ const ImageGenDebug = () => {
               onChange={(e) => setWorkerUrl(e.target.value)}
             />
           </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
           <div className="form-group">
             <label>Model:</label>
             <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
@@ -300,6 +413,53 @@ const ImageGenDebug = () => {
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
+          </div>
+          <div className="form-group">
+            <label>Size (W x H):</label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="number"
+                value={imageWidth}
+                onChange={(e) => setImageWidth(Number(e.target.value))}
+                min="256"
+                max="2500"
+                step="64"
+                style={{ width: '90px' }}
+              />
+              <span style={{ color: 'var(--text-muted)' }}>x</span>
+              <input
+                type="number"
+                value={imageHeight}
+                onChange={(e) => setImageHeight(Number(e.target.value))}
+                min="256"
+                max="2500"
+                step="64"
+                style={{ width: '90px' }}
+              />
+              <div style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
+                {[
+                  { label: '16:9', w: 1024, h: 576 },
+                  { label: '1:1', w: 1024, h: 1024 },
+                  { label: '3:2', w: 1024, h: 683 },
+                ].map(preset => (
+                  <button
+                    key={preset.label}
+                    onClick={() => { setImageWidth(preset.w); setImageHeight(preset.h); }}
+                    style={{
+                      background: imageWidth === preset.w && imageHeight === preset.h ? 'var(--primary)' : 'transparent',
+                      color: imageWidth === preset.w && imageHeight === preset.h ? 'var(--bg)' : 'var(--text-secondary)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '4px',
+                      padding: '2px 8px',
+                      cursor: 'pointer',
+                      fontSize: '0.8em',
+                    }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
         <div className="form-group">
