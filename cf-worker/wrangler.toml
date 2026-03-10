@@ -8,3 +8,5 @@ binding = "AI"
 
 [vars]
 ENVIRONMENT = "development"
+CF_ACCOUNT_ID = "0696395687ae6f35b87de803102ae3ca"
+# CF_API_TOKEN should be set via `wrangler secret put CF_API_TOKEN` or .dev.vars

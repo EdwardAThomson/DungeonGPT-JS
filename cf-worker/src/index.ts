@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { aiRoutes } from "./routes/ai";
+import { imageRoutes } from "./routes/image";
 import type { Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -58,6 +59,7 @@ app.get("/health", (c) =>
 );
 
 app.route("/api/ai", aiRoutes);
+app.route("/api/image", imageRoutes);
 
 app.notFound((c) =>
   c.json(

@@ -15,6 +15,7 @@ import EncounterModalDebug from './pages/EncounterModalDebug';
 import Login from './pages/Login';
 import Profile from './pages/Profile';
 import HowToPlay from './pages/HowToPlay';
+import GettingStarted from './pages/GettingStarted';
 import { useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import UserProfileIndicator from './components/UserProfileIndicator';
@@ -91,7 +92,14 @@ const AppContent = () => {
       <nav className={`main-nav ${isGamePage ? 'game-page-nav' : ''} ${isMobileNavOpen ? 'mobile-nav-open' : ''}`}>
         <ul>
           <li><Link to="/" onClick={() => setIsMobileNavOpen(false)}>Home</Link></li>
-          <li><Link to="/how-to-play" onClick={() => setIsMobileNavOpen(false)}>How to Play</Link></li>
+          <NavDropdown
+            label="How to Play"
+            items={[
+              { label: "Getting Started", path: "/getting-started" },
+              { label: "Features & FAQ", path: "/features" }
+            ]}
+            onNavClose={() => setIsMobileNavOpen(false)}
+          />
           <NavDropdown
             label="Heroes"
             items={[
@@ -167,7 +175,9 @@ const AppContent = () => {
               {/* Public routes */}
               <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<Login />} />
-              <Route path="/how-to-play" element={<HowToPlay />} />
+              <Route path="/getting-started" element={<GettingStarted />} />
+              <Route path="/features" element={<HowToPlay />} />
+              <Route path="/how-to-play" element={<Navigate to="/getting-started" replace />} />
               <Route path="/hero-creation" element={<HeroCreation />} />
               <Route path="/hero-summary" element={<HeroSummary />} />
               <Route path="/new-game" element={<NewGame />} />

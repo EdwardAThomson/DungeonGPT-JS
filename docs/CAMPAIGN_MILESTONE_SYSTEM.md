@@ -507,7 +507,8 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [x] Per-slot town/mountain name selection feeding into `customNames` for map generation
 - [x] Template modal contextual progression buttons (Generate Map → Hero Selection)
 - [x] Entity validation at campaign creation time — pickers prevent invalid picks; `validateCustomSlots()` catches partial slots and requires ≥1 complete milestone; `shortDescription` auto-generated from selections
-- [ ] Design team/party encounter system (separate design effort)
+- [x] Design team/party encounter system — Lead + Support model, see [`TEAM_ENCOUNTER_DESIGN.md`](TEAM_ENCOUNTER_DESIGN.md)
+- [ ] Implement team encounter system (support roles, formation UI, team damage/rewards)
 - [ ] Add encounter images for quest bosses
 
 ### Phase 4: Narrative Milestones
@@ -528,6 +529,8 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [ ] Flesh out Tier 3 templates with full milestone data
 - [ ] AI-assisted campaign creation that outputs structured milestone data
 - [ ] Player customization options (difficulty, milestone count, theme)
+- [ ] Combo attacks: class-pair synergy actions in combat — see [`TEAM_ENCOUNTER_DESIGN.md` Appendix A](TEAM_ENCOUNTER_DESIGN.md#appendix-a-combo-attacks-future--phase-5)
+- [ ] Party synergy hints on Hero Selection page
 
 ---
 

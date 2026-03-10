@@ -18,10 +18,12 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
     const rarity = catalogEntry?.rarity || item.rarity || 'common';
     const icon = catalogEntry?.icon || item.icon || null;
 
+    const description = catalogEntry?.description || item.description || null;
+
     if (itemMap[key]) {
       itemMap[key].quantity += quantity;
     } else {
-      itemMap[key] = { name, quantity, rarity, icon };
+      itemMap[key] = { name, quantity, rarity, icon, description };
     }
   }
 
@@ -171,7 +173,8 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
                     position: 'relative',
                     boxShadow: `0 0 5px ${item.rarity !== 'common' ? (rarityColors[item.rarity] + '33') : 'rgba(0,0,0,0.5)'}`
                   }}
-                  onClick={item.icon ? () => setSelectedImage({ src: `/${item.icon}`, name: item.name }) : undefined}
+                  title={item.description || ''}
+                  onClick={item.icon ? () => setSelectedImage({ src: `/${item.icon}`, name: item.name, description: item.description }) : undefined}
                 >
                   {item.icon && (
                     <img
@@ -187,13 +190,26 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
                       }}
                     />
                   )}
-                  <span style={{
-                    color: rarityColors[item.rarity] || rarityColors.common,
-                    fontWeight: '500',
-                    fontSize: '0.95rem'
-                  }}>
-                    {item.name}
-                  </span>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{
+                      color: rarityColors[item.rarity] || rarityColors.common,
+                      fontWeight: '500',
+                      fontSize: '0.95rem'
+                    }}>
+                      {item.name}
+                    </span>
+                    {item.description && (
+                      <span style={{
+                        color: 'var(--text-secondary, #aaa)',
+                        fontSize: '0.75rem',
+                        fontStyle: 'italic',
+                        marginTop: '2px',
+                        opacity: 0.85
+                      }}>
+                        {item.description}
+                      </span>
+                    )}
+                  </div>
                   {item.quantity > 1 && (
                     <span
                       style={{
@@ -280,6 +296,17 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
             fontFamily: 'var(--header-font)',
             textShadow: '0 2px 10px rgba(0,0,0,0.5)'
           }}>{selectedImage.name}</h2>
+          {selectedImage.description && (
+            <p style={{
+              color: '#ccc',
+              marginTop: '12px',
+              fontSize: '1.1rem',
+              fontStyle: 'italic',
+              maxWidth: '500px',
+              textAlign: 'center',
+              lineHeight: '1.5'
+            }}>{selectedImage.description}</p>
+          )}
           <p style={{ color: '#888', marginTop: '12px', fontSize: '1.1rem' }}>Click anywhere to return</p>
         </div>
       )}

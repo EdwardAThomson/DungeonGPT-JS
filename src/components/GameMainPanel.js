@@ -46,16 +46,16 @@ const GameMainPanel = ({
           </div>
           <div className="header-button-group">
             <button onClick={onOpenMap} className="view-map-button" aria-label={townName ? `View ${townName} map` : 'View world map'}>
-              {townName ? `${townName} Map` : 'Map'}
+              <span aria-hidden="true">🗺️</span> {townName ? `${townName} Map` : 'Map'}
             </button>
             <button onClick={onOpenInventory} className="view-settings-button" aria-label="Open party inventory">
               <span aria-hidden="true">📦</span> Inventory
             </button>
             <button onClick={onOpenHowToPlay} className="how-to-play-button" aria-label="Open how to play guide">
-              How to Play
+              <span aria-hidden="true">📜</span> How to Play
             </button>
             <button onClick={onOpenSettings} className="view-settings-button" aria-label="Open full settings">
-              Full Settings
+              <span aria-hidden="true">⚙️</span> Full Settings
             </button>
             <button onClick={onManualSave} className="manual-save-button" disabled={!canManualSave} aria-label="Save game manually">
               <span aria-hidden="true">💾</span> Save

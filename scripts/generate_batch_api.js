@@ -36,11 +36,11 @@ async function generateImage(prompt, outputPath) {
     }
 }
 
-// Batch 26 (Medical & Mystic) - High-Depth Style
+// Batch 27 (Ancient Wards & Artifacts) - High-Depth Style
 const items = [
-    { key: 'medical_journal', prompt: 'A thick, leather-bound volume with anatomical drawings and silver-edged pages. Painterly digital fantasy art with rich weathered leather and parchment textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset.' },
-    { key: 'uncovered_ruins', prompt: 'A jagged, ancient stone tablet fragment showing a glowing map of underground ruins. Painterly digital fantasy art with rich weathered stone textures, dramatic cinematic lighting, and glowing blue energy lines. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset.' },
-
+    { key: 'crown_of_sunfire', prompt: 'A radiant golden crown that blazes with inner fire. Painterly digital fantasy art with rich polished gold and flame textures, dramatic cinematic lighting, and soft light bloom. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset.' },
+    { key: 'seal_of_binding', prompt: 'An ancient seal inscribed with eldritch wards. Painterly digital fantasy art with rich weathered stone and glowing rune textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset.' },
+    { key: 'purified_heart_shard', prompt: 'A crystallized fragment of the Rot-Heart, cleansed of corruption. Painterly digital fantasy art with rich crystal and internal light textures, dramatic cinematic lighting, and a soft warm radiance. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset.' },
 ];
 
 async function runBatch() {

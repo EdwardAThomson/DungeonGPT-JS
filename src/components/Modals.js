@@ -1,7 +1,47 @@
 import React, { useContext, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { getAvailableModels, DEFAULT_MODELS } from '../llm/llm_constants';
 import ApiKeysContext from '../contexts/ApiKeysContext';
 import SettingsContext from '../contexts/SettingsContext';
+
+// --- Share QR Code (inline expandable) --- //
+const ShareQRCode = () => {
+  const [show, setShow] = useState(false);
+  const url = window.location.origin;
+
+  return (
+    <div style={{ textAlign: 'center', marginTop: '8px' }}>
+      <button
+        onClick={() => setShow(!show)}
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: 'var(--text-secondary)', fontSize: '0.75rem',
+          fontFamily: 'var(--header-font)', letterSpacing: '0.5px',
+          opacity: 0.6, transition: 'opacity 0.2s'
+        }}
+        onMouseEnter={e => e.target.style.opacity = '1'}
+        onMouseLeave={e => e.target.style.opacity = '0.6'}
+      >
+        {show ? '▾ Hide QR Code' : '▸ Share this game'}
+      </button>
+      {show && (
+        <div style={{
+          marginTop: '12px', padding: '16px',
+          background: '#ffffff', borderRadius: '12px',
+          display: 'inline-block', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        }}>
+          <QRCodeSVG value={url} size={160} level="M" />
+          <div style={{
+            marginTop: '8px', fontSize: '0.7rem',
+            color: '#666', wordBreak: 'break-all', maxWidth: '160px'
+          }}>
+            {url}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // --- AI-Only Settings Modal (for Navbar/Homepage) --- //
 export const AISettingsModalContent = ({
@@ -163,6 +203,7 @@ export const AISettingsModalContent = ({
           <button className="modal-close-button" onClick={onClose} style={{ padding: '12px 60px', borderRadius: '30px', fontFamily: 'var(--header-font)', textTransform: 'uppercase', letterSpacing: '2px' }}>
             Accept & Close
           </button>
+          <ShareQRCode />
         </div>
       </div>
     </div>
@@ -517,6 +558,7 @@ export const StorySettingsModalContent = ({
           <button className="modal-close-button" onClick={onClose} style={{ padding: '12px 60px', borderRadius: '30px', fontFamily: 'var(--header-font)', textTransform: 'uppercase', letterSpacing: '2px' }}>
             Accept & Close
           </button>
+          <ShareQRCode />
         </div>
       </div>
     </div>
@@ -551,21 +593,27 @@ export const HowToPlayModalContent = ({ isOpen, onClose }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
         <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', textAlign: 'center' }}>📜 Rules of Engagement</h2>
-        <div style={{ padding: '20px 0', lineHeight: '1.8', color: 'var(--text)' }}>
+        <div style={{ padding: '20px 0', lineHeight: '1.8', color: 'var(--text)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <p>
-            Welcome, traveler! Your journey begins with your characters.
+            Welcome, traveler! Your journey begins with your party of heroes.
           </p>
           <p>
-            ⚔️ <strong>Commanding:</strong> Type your actions in the scroll (text box) and the AI (Dungeon Master) will weave the tapestry of your fate.
+            ⚔️ <strong>Commanding:</strong> Type your actions in the scroll below and the AI Dungeon Master will weave the tapestry of your fate.
           </p>
           <p>
-            🎲 <strong>Probability:</strong> The DM handles the unseen dice of the realm, determining if your steel strikes true or your spells flicker out.
+            🗺️ <strong>Exploration:</strong> Click adjacent tiles on the world map to move your party. Enter towns to visit taverns, shops, temples, and more.
           </p>
           <p>
-            🏰 <strong>World:</strong> Explore the map, visit keeps, and speak to NPCs. Every choice ripples across the fabric of the story.
+            🎲 <strong>Encounters:</strong> Beasts and brigands lurk in the wilds. When danger strikes, choose your actions wisely from the options presented.
+          </p>
+          <p>
+            📜 <strong>Quests:</strong> Follow your campaign milestones to advance the story. Track your progress in the quest log.
+          </p>
+          <p>
+            🎒 <strong>Inventory:</strong> Collect loot, potions, and equipment. Open the party inventory to manage your spoils.
           </p>
           <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '15px' }}>
-            Note: The sidebar tracks your party's vitality and equipment. Keep a keen eye upon it.
+            Note: The sidebar tracks your party's vitality and stats. Keep a keen eye upon it.
           </p>
         </div>
         <div style={{ textAlign: 'center' }}>

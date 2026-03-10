@@ -23,6 +23,8 @@ const EncounterModalDebug = () => {
     simple: {
       name: 'Lone Wolf',
       description: 'A hungry wolf blocks your path, growling menacingly.',
+      icon: '🐺',
+      image: '/assets/encounters/wolf_pack.webp',
       difficulty: 'easy',
       suggestedActions: [
         { label: 'Attack', skill: 'Athletics', description: 'Fight the wolf head-on' },
@@ -45,6 +47,8 @@ const EncounterModalDebug = () => {
     multiRound: {
       name: 'Goblin Ambush',
       description: 'Three goblins leap from the bushes, weapons drawn!',
+      icon: '👺',
+      image: '/assets/encounters/goblin_ambush.webp',
       difficulty: 'hard',
       suggestedActions: [
         { label: 'Attack', skill: 'Athletics', description: 'Fight them directly' },
@@ -64,6 +68,56 @@ const EncounterModalDebug = () => {
       },
       multiRound: true,
       enemyHP: 30
+    },
+    boss: {
+      name: 'Goblin Chieftain',
+      description: 'The goblin chieftain rises from his throne, a crude iron crown on his head. He snarls and draws a jagged blade.',
+      icon: '👹',
+      image: '/assets/encounters/bosses/goblin_chieftain.webp',
+      difficulty: 'deadly',
+      encounterTier: 'boss',
+      suggestedActions: [
+        { label: 'Attack', skill: 'Athletics', description: 'Charge the chieftain head-on' },
+        { label: 'Tactical Strike', skill: 'Dexterity', description: 'Look for an opening in his guard' },
+        { label: 'Rally Party', skill: 'Charisma', description: 'Inspire your allies for a coordinated assault' }
+      ],
+      consequences: {
+        criticalSuccess: 'Your blow sends the chieftain reeling, his crown clattering to the floor!',
+        success: 'You land a solid strike against the chieftain.',
+        failure: 'The chieftain parries and slashes back at you.',
+        criticalFailure: 'The chieftain knocks you to the ground with a brutal swing!'
+      },
+      rewards: {
+        xp: 250,
+        gold: '5d10',
+        items: ['goblin_crown:100']
+      },
+      multiRound: true,
+      enemyHP: 50
+    },
+    bandit: {
+      name: 'Bandit Roadblock',
+      description: 'A gang of bandits has set up a barricade across the road. Their leader steps forward, hand on sword.',
+      icon: '🗡️',
+      image: '/assets/encounters/bandit_roadblock.webp',
+      difficulty: 'medium',
+      suggestedActions: [
+        { label: 'Fight', skill: 'Athletics', description: 'Draw your weapon and attack' },
+        { label: 'Negotiate', skill: 'Persuasion', description: 'Try to talk your way through' },
+        { label: 'Sneak Around', skill: 'Stealth', description: 'Find a way past the barricade' }
+      ],
+      consequences: {
+        criticalSuccess: 'The bandits scatter before your fury.',
+        success: 'You push through after a brief skirmish.',
+        failure: 'The bandits rough you up and take some gold.',
+        criticalFailure: 'The bandits overwhelm you and steal your valuables.'
+      },
+      rewards: {
+        xp: 75,
+        gold: '2d8',
+        items: ['rusty_dagger:40', 'bandit_cloak:20']
+      },
+      multiRound: false
     }
   };
 
@@ -227,6 +281,40 @@ const EncounterModalDebug = () => {
             </button>
           </div>
 
+          <div style={{ marginBottom: '20px' }}>
+            <h3>Boss Encounter</h3>
+            <button
+              onClick={() => startTest('boss', 1)}
+              style={{ marginRight: '10px' }}
+              className="primary-button"
+            >
+              1 Hero
+            </button>
+            <button
+              onClick={() => startTest('boss', 2)}
+              className="primary-button"
+            >
+              2 Heroes (Selection)
+            </button>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <h3>Bandit Roadblock</h3>
+            <button
+              onClick={() => startTest('bandit', 1)}
+              style={{ marginRight: '10px' }}
+              className="primary-button"
+            >
+              1 Hero
+            </button>
+            <button
+              onClick={() => startTest('bandit', 2)}
+              className="primary-button"
+            >
+              2 Heroes (Selection)
+            </button>
+          </div>
+
           <div>
             <h3>Current Test State</h3>
             <div style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
@@ -329,6 +417,7 @@ const EncounterModalDebug = () => {
         }}
         encounter={testEncounter}
         character={testHero}
+        fullSizeImage
         party={testParty}
         onResolve={handleEncounterResolve}
         onCharacterUpdate={handleHeroUpdate}

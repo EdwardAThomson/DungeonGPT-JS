@@ -107,9 +107,9 @@ export const ITEM_CATALOG = {
   // Very Rare
   'legendary_weapon': { name: 'Legendary Weapon', rarity: 'very_rare', value: 2500, type: 'weapon', bonus: '+2', icon: 'assets/icons/items/legendary_weapon.webp' },
   'legendary_artifact': { name: 'Mythic Ancient Artifact', rarity: 'very_rare', value: 5000, type: 'artifact', icon: 'assets/icons/items/legendary_artifact.webp' },
-  'crown_of_sunfire': { name: 'Crown of Sunfire', rarity: 'very_rare', value: 7500, type: 'artifact', description: 'A radiant golden crown that blazes with inner fire. Said to grant its wearer dominion over light and shadow.', icon: 'assets/icons/items/legendary_artifact.webp' },
-  'seal_of_binding': { name: 'Seal of Binding', rarity: 'very_rare', value: 6000, type: 'artifact', description: 'An ancient seal inscribed with eldritch wards. It can imprison entities from beyond the veil.', icon: 'assets/icons/items/ancient_artifact.webp' },
-  'purified_heart_shard': { name: 'Purified Heart Shard', rarity: 'very_rare', value: 5000, type: 'artifact', description: 'A crystallized fragment of the Rot-Heart, cleansed of corruption. It pulses with faint, warm light.', icon: 'assets/icons/items/mountain_crystal.webp' },
+  'crown_of_sunfire': { name: 'Crown of Sunfire', rarity: 'very_rare', value: 7500, type: 'artifact', description: 'A radiant golden crown that blazes with inner fire. Said to grant its wearer dominion over light and shadow.', icon: `assets/icons/items/crown_of_sunfire.webp` },
+  'seal_of_binding': { name: 'Seal of Binding', rarity: 'very_rare', value: 6000, type: 'artifact', description: 'An ancient seal inscribed with eldritch wards. It can imprison entities from beyond the veil.', icon: `assets/icons/items/seal_of_binding.webp` },
+  'purified_heart_shard': { name: 'Purified Heart Shard', rarity: 'very_rare', value: 5000, type: 'artifact', description: 'A crystallized fragment of the Rot-Heart, cleansed of corruption. It pulses with faint, warm light.', icon: `assets/icons/items/purified_heart_shard.webp` },
   'magic_item': { name: 'Magic Item', rarity: 'uncommon', value: 200, icon: 'assets/icons/items/spell_scroll.webp' },
   'magic_scroll': { name: 'Enchanted Scroll', rarity: 'uncommon', value: 150, icon: 'assets/icons/items/spell_scroll.webp' },
 
@@ -224,9 +224,9 @@ export const ITEM_CATALOG = {
   'rare_ingredient': { name: 'Rare Ingredient', rarity: 'uncommon', value: 40, icon: 'assets/icons/items/rare_ingredient.webp' },
 
   // Encounter reward items
-  'medical_journal': { name: 'Medical Journal', rarity: 'uncommon', value: 30 },
-  'medicine_kit': { name: 'Medicine Kit', rarity: 'uncommon', value: 45, effect: 'heal', amount: '2d4' },
-  'uncovered_ruins': { name: 'Ruins Map Fragment', rarity: 'uncommon', value: 50, type: 'quest_item' }
+  'medical_journal': { name: 'Medical Journal', rarity: 'uncommon', value: 30, icon: 'assets/icons/items/medical_journal.webp' },
+  'medicine_kit': { name: 'Medicine Kit', rarity: 'uncommon', value: 45, effect: 'heal', amount: '2d4', icon: 'assets/icons/items/medicine_kit.webp' },
+  'uncovered_ruins': { name: 'Ruins Map Fragment', rarity: 'uncommon', value: 50, type: 'quest_item', icon: 'assets/icons/items/uncovered_ruins.webp' }
 };
 
 /**

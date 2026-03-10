@@ -337,9 +337,9 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
               <ClickableImage
                 src={encounter.image}
                 alt={encounter.name}
-                height={fullSizeImage ? 'auto' : '240px'}
-                maxHeight={fullSizeImage ? '500px' : '240px'}
-                objectPosition={fullSizeImage ? 'center' : 'center 30%'}
+                height={fullSizeImage ? '360px' : '240px'}
+                maxHeight={fullSizeImage ? '360px' : '240px'}
+                objectPosition={fullSizeImage ? 'center 60%' : 'center 30%'}
               />
             )}
             <div className="encounter-description" style={{ marginBottom: '10px', fontSize: '14px' }}>
@@ -457,9 +457,9 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                 <ClickableImage
                   src={encounter.image}
                   alt={encounter.name}
-                  height={fullSizeImage ? 'auto' : '200px'}
-                  maxHeight={fullSizeImage ? '400px' : '200px'}
-                  objectPosition={fullSizeImage ? 'center' : 'center 30%'}
+                  height={fullSizeImage ? '300px' : '200px'}
+                  maxHeight={fullSizeImage ? '300px' : '200px'}
+                  objectPosition={fullSizeImage ? 'center 60%' : 'center 30%'}
                 />
               )}
               {!encounter.image && <span className="encounter-icon">{encounter.icon}</span>}

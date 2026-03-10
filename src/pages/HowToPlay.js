@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import '../styles/HowToPlay.css';
 
-const HowToPlay = () => {
+const Features = () => {
   const [selectedImage, setSelectedImage] = useState(null);
 
   const openImage = (src, alt) => {
@@ -16,15 +16,7 @@ const HowToPlay = () => {
   return (
     <div className="how-to-play-container">
       <div className="how-to-play-content">
-        <h1>How to Play DungeonGPT</h1>
-
-        <section className="intro-section">
-          <p className="intro-text">
-            DungeonGPT is an AI-powered text-based RPG that brings the magic of tabletop
-            role-playing games to your browser. Create heroes, embark on adventures, and
-            let our AI Dungeon Master guide you through epic quests in a dynamic fantasy world.
-          </p>
-        </section>
+        <h1>Features & FAQ</h1>
 
         <section className="feature-section">
           <h2>🎭 Character Creation</h2>
@@ -37,7 +29,7 @@ const HowToPlay = () => {
               </p>
               <ul>
                 <li><strong>12 Classic Classes:</strong> Each with unique abilities and playstyles</li>
-                <li><strong>Multiple Races:</strong> Human, Elf, Dwarf, Halfling, and more</li>
+                <li><strong>9 Playable Races:</strong> Human, Elf, Dwarf, Smallfolk, Dragonkin, Gnome, Half-Elf, Half-Orc, and Demonkin</li>
                 <li><strong>Customizable Stats:</strong> Distribute points across Strength, Dexterity, Constitution, Intelligence, Wisdom, and Charisma</li>
                 <li><strong>Background & Personality:</strong> Define your character's backstory, traits, and motivations</li>
                 <li><strong>Equipment & Skills:</strong> Start with class-appropriate gear and abilities</li>
@@ -49,10 +41,10 @@ const HowToPlay = () => {
             </div>
             <div className="feature-image-placeholder">
               <img
-                src="/assets/screenshots/character_creator_updated.png"
+                src="/assets/screenshots/character_creator_updated.webp"
                 alt="Character Creation Interface"
                 className="feature-screenshot clickable-screenshot"
-                onClick={() => openImage('/assets/screenshots/character_creator_updated.png', 'Character Creation Interface')}
+                onClick={() => openImage('/assets/screenshots/character_creator_updated.webp', 'Character Creation Interface')}
                 title="Click to enlarge"
               />
             </div>
@@ -82,117 +74,19 @@ const HowToPlay = () => {
             </div>
             <div className="feature-image-placeholder">
               <img
-                src="/assets/screenshots/adventure_creator.png"
+                src="/assets/screenshots/adventure_creator.webp"
                 alt="Adventure Setup Interface"
                 className="feature-screenshot clickable-screenshot"
-                onClick={() => openImage('/assets/screenshots/adventure_creator.png', 'Adventure Setup Interface')}
+                onClick={() => openImage('/assets/screenshots/adventure_creator.webp', 'Adventure Setup Interface')}
                 title="Click to enlarge"
               />
-            </div>
-          </div>
-        </section>
-
-        <section className="feature-section">
-          <h2>🎮 Gameplay</h2>
-          <div className="feature-content reverse">
-            <div className="feature-text">
-              <p>
-                Once your adventure begins, you'll interact with the AI Dungeon Master through
-                a chat-based interface. The game combines narrative storytelling with tactical
-                decision-making.
-              </p>
-              <ul>
-                <li><strong>Natural Language:</strong> Type what you want to do in plain English</li>
-                <li><strong>AI Responses:</strong> The Dungeon Master narrates outcomes and presents choices</li>
-                <li><strong>Conversation History:</strong> All your actions and story events are saved</li>
-                <li><strong>Multiple Choice Options:</strong> Get suggested actions or write your own</li>
-              </ul>
-            </div>
-            <div className="feature-image-placeholder">
-              <img
-                src="/assets/screenshots/chat_interface.png"
-                alt="Game Interface"
-                className="feature-screenshot clickable-screenshot"
-                onClick={() => openImage('/assets/screenshots/chat_interface.png', 'Game Interface')}
-                title="Click to enlarge"
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="feature-section">
-          <h2>🗺️ World Map & Exploration</h2>
-          <div className="feature-content">
-            <div className="feature-text">
-              <ul>
-                <li><strong>Procedurally Generated:</strong> Each adventure has a unique overworld map</li>
-                <li><strong>Biomes:</strong> Explore forests, plains, mountains, beaches, and towns</li>
-                <li><strong>Points of Interest:</strong> Discover caves, ruins, shrines, and more</li>
-                <li><strong>Town Maps:</strong> Enter towns to find taverns, shops, temples, and NPCs</li>
-                <li><strong>Click to Move:</strong> Navigate the world by clicking on adjacent tiles</li>
-              </ul>
-            </div>
-            <div className="feature-image-placeholder gallery-placeholder" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div className="how-to-play-hero-container">
-                <img
-                  src="/assets/buildings/town_interior_hero.webp"
-                  alt="Town Interior"
-                  className="feature-screenshot hero-screenshot clickable-screenshot"
-                  onClick={() => openImage('/assets/buildings/town_interior_hero.webp', 'Grand Inn')}
-                  title="Click to enlarge"
-                />
-              </div>
-              <div className="how-to-play-mini-gallery">
-                <div className="mini-gallery-item">
-                  <img src="/assets/buildings/tavern.webp" alt="Tavern" className="clickable-screenshot" onClick={() => openImage('/assets/buildings/tavern.webp', 'Tavern')} />
-                  <span>Tavern</span>
-                </div>
-                <div className="mini-gallery-item">
-                  <img src="/assets/buildings/blacksmith.webp" alt="Blacksmith" className="clickable-screenshot" onClick={() => openImage('/assets/buildings/blacksmith.webp', 'Blacksmith')} />
-                  <span>Blacksmith</span>
-                </div>
-                <div className="mini-gallery-item">
-                  <img src="/assets/buildings/temple.webp" alt="Temple" className="clickable-screenshot" onClick={() => openImage('/assets/buildings/temple.webp', 'Temple')} />
-                  <span>Temple</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="feature-section">
-          <h2>⚔️ Encounters & Combat</h2>
-          <div className="feature-content reverse">
-            <div className="feature-text">
-              <ul>
-                <li><strong>Random Events:</strong> Encounter monsters, NPCs, and situations as you explore</li>
-                <li><strong>Combat:</strong> Engage in turn-based battles with tactical choices</li>
-                <li><strong>Skill Checks:</strong> Use your character's abilities to overcome challenges</li>
-                <li><strong>Consequences:</strong> Your choices affect the story and your character's progression</li>
-              </ul>
-            </div>
-            <div className="feature-image-placeholder gallery-placeholder" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <div className="how-to-play-mini-gallery">
-                <div className="mini-gallery-item">
-                  <img src="/assets/icons/items/goblin_ear.webp" alt="Goblin Ear" className="clickable-screenshot" onClick={() => openImage('/assets/icons/items/goblin_ear.webp', 'Goblin Ear')} />
-                  <span>Goblin Ear</span>
-                </div>
-                <div className="mini-gallery-item">
-                  <img src="/assets/icons/items/wolf_fang.webp" alt="Wolf Fang" className="clickable-screenshot" onClick={() => openImage('/assets/icons/items/wolf_fang.webp', 'Wolf Fang')} />
-                  <span>Wolf Fang</span>
-                </div>
-                <div className="mini-gallery-item">
-                  <img src="/assets/icons/items/spider_venom.webp" alt="Spider Venom" className="clickable-screenshot" onClick={() => openImage('/assets/icons/items/spider_venom.webp', 'Spider Venom')} />
-                  <span>Spider Venom</span>
-                </div>
-              </div>
             </div>
           </div>
         </section>
 
         <section className="feature-section">
           <h2>🎒 Character Management</h2>
-          <div className="feature-content">
+          <div className="feature-content reverse">
             <div className="feature-text">
               <ul>
                 <li><strong>HP Tracking:</strong> Monitor your health during adventures</li>
@@ -200,10 +94,6 @@ const HowToPlay = () => {
                 <li><strong>Party Members:</strong> View stats for all heroes in your party</li>
                 <li><strong>Progression:</strong> Gain experience and level up through your journey</li>
               </ul>
-              <p className="tip">
-                <strong>Tip:</strong> Save your game frequently! You can have multiple saved
-                adventures and return to them anytime.
-              </p>
             </div>
             <div className="feature-image-placeholder gallery-placeholder" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div className="how-to-play-mini-gallery">
@@ -226,7 +116,7 @@ const HowToPlay = () => {
 
         <section className="feature-section">
           <h2>💾 Save & Load System</h2>
-          <div className="feature-content reverse">
+          <div className="feature-content">
             <div className="feature-text">
               <p>
                 Your adventures are automatically saved and can be resumed at any time.
@@ -240,37 +130,13 @@ const HowToPlay = () => {
             </div>
             <div className="feature-image-placeholder">
               <img
-                src="/assets/screenshots/saved_games.png"
+                src="/assets/screenshots/saved_games.webp"
                 alt="Saved Games"
                 className="feature-screenshot clickable-screenshot"
-                onClick={() => openImage('/assets/screenshots/saved_games.png', 'Saved Games')}
+                onClick={() => openImage('/assets/screenshots/saved_games.webp', 'Saved Games')}
                 title="Click to enlarge"
               />
             </div>
-          </div>
-        </section>
-
-        <section className="getting-started-section">
-          <h2>🚀 Ready to Begin?</h2>
-          <p>
-            Start your adventure in three simple steps:
-          </p>
-          <ol className="steps-list">
-            <li><strong>Create a Hero:</strong> Design your character with unique abilities and backstory</li>
-            <li><strong>Start a New Game:</strong> Set up your adventure with custom settings</li>
-            <li><strong>Begin Your Quest:</strong> Let the AI Dungeon Master guide your epic journey</li>
-          </ol>
-
-          <div className="cta-buttons">
-            <Link to="/hero-creation" className="cta-button primary">
-              Create Your First Hero
-            </Link>
-            <Link to="/new-game" className="cta-button secondary">
-              Start an Adventure
-            </Link>
-            <Link to="/login" className="cta-button tertiary">
-              Sign In / Sign Up
-            </Link>
           </div>
         </section>
 
@@ -297,8 +163,9 @@ const HowToPlay = () => {
           <div className="faq-item">
             <h3>What AI models are available?</h3>
             <p>
-              We support multiple AI providers including OpenAI's GPT-OSS and Llama 3 & 4.
-              Further models are being tested and may be added in the future.
+              We support multiple AI providers via CloudFlare Workers
+              (Llama, DeepSeek, Mistral, and more). Exploring how to support models such
+              as OpenAI GPT-5+, Google Gemini, Anthropic Claude.
             </p>
           </div>
 
@@ -321,9 +188,9 @@ const HowToPlay = () => {
 
         <section className="footer-section">
           <p>
-            Have questions or feedback? We'd love to hear from you!
+            Ready to start playing?
           </p>
-          <Link to="/" className="back-link">← Back to Home</Link>
+          <Link to="/getting-started" className="back-link">← Getting Started Guide</Link>
         </section>
       </div>
 
@@ -347,4 +214,4 @@ const HowToPlay = () => {
   );
 };
 
-export default HowToPlay;
+export default Features;

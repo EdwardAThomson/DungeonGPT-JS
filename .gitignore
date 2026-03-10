@@ -98,3 +98,6 @@ docs/ambient_soundscapes.md
 # Images
 adventures/
 bosses/
+
+.dev.vars*
+!.dev.vars.example
