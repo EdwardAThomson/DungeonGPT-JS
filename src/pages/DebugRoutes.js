@@ -20,6 +20,7 @@ import EncounterVisualDebug from './EncounterVisualDebug';
 import EncounterModalStates from './EncounterModalStates';
 import BuildingSearchTest from './BuildingSearchTest';
 import ImageGenDebug from './ImageGenDebug';
+import SummarizationTest from './SummarizationTest';
 
 const sectionIcons = {
   'Terrain & Maps': '🗺️',
@@ -68,6 +69,7 @@ const debugSections = [
       { to: 'conversation-manager', label: 'Conversation Manager' },
       { to: 'cf-worker', label: 'CF Worker AI Test' },
       { to: 'image-gen', label: 'Image Generation' },
+      { to: 'summarization-test', label: 'Summarization A/B Test' },
     ],
   },
 ];
@@ -193,6 +195,7 @@ const DebugRoutes = () => {
           <Route path="encounter-states" element={<EncounterModalStates />} />
           <Route path="building-search" element={<BuildingSearchTest />} />
           <Route path="image-gen" element={<ImageGenDebug />} />
+          <Route path="summarization-test" element={<SummarizationTest />} />
           <Route path="*" element={<Navigate to="/debug" replace />} />
         </Routes>
       </section>

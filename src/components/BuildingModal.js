@@ -30,12 +30,19 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound })
     const isResidential = RESIDENTIAL_TYPES.includes(building.buildingType);
 
     // Map building types to image names
-    const getImageSrc = (type) => {
+    const getImageSrc = (type, bld) => {
+        if (type === 'house') {
+            const variant = ((bld.x || 0) + (bld.y || 0)) % 3 + 1;
+            return `/assets/buildings/house_interior_${variant}.webp`;
+        }
+        if (type === 'manor') {
+            return `/assets/buildings/manor_interior_1.webp`;
+        }
         const normalizedType = type.toLowerCase().replace(/\s+/g, '_');
         return `/assets/buildings/${normalizedType}.webp`;
     };
 
-    const imageSrc = getImageSrc(building.buildingType);
+    const imageSrc = getImageSrc(building.buildingType, building);
 
     const toggleLightbox = (e) => {
         if (e) e.stopPropagation();

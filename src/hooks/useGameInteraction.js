@@ -91,6 +91,129 @@ const cleanAIResponse = (response, contextToRemove) => {
     return cleaned;
 };
 
+// Convert tile distance to a narrative descriptor
+const describeDistance = (dist) => {
+    if (dist <= 2) return 'nearby';
+    if (dist <= 5) return 'not far';
+    if (dist <= 10) return 'some distance away';
+    return 'far away';
+};
+
+// Convert compass direction from dx/dy
+const describeDirection = (dx, dy) => {
+    const ns = dy < 0 ? 'north' : dy > 0 ? 'south' : '';
+    const ew = dx > 0 ? 'east' : dx < 0 ? 'west' : '';
+    return ns + ew || 'nearby';
+};
+
+// Find nearby POIs on the world map (towns, caves, etc.)
+const findNearbyLandmarks = (worldMap, px, py, maxDist = 12) => {
+    if (!worldMap) return [];
+    const landmarks = [];
+    const height = worldMap.length;
+    const width = worldMap[0]?.length || 0;
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            if (x === px && y === py) continue;
+            const tile = worldMap[y]?.[x];
+            if (!tile?.poi) continue;
+
+            const dist = Math.abs(x - px) + Math.abs(y - py); // Manhattan distance
+            if (dist > maxDist) continue;
+
+            const label = tile.poi === 'town' && tile.townName
+                ? `${tile.townName} (${tile.townSize || 'settlement'})`
+                : tile.poi === 'mountain' && tile.mountainName
+                    ? tile.mountainName
+                    : null;
+
+            // Only include named landmarks (towns, named mountains) — skip generic forest/mountain tiles
+            if (!label) continue;
+
+            landmarks.push({
+                label,
+                dist,
+                direction: describeDirection(x - px, y - py),
+                proximity: describeDistance(dist)
+            });
+        }
+    }
+
+    // Sort by distance, take closest few
+    landmarks.sort((a, b) => a.dist - b.dist);
+    return landmarks.slice(0, 4);
+};
+
+// Build rich location context based on whether player is inside a town, at a town edge, or on the world map
+const buildLocationContext = (worldTile, worldPos, locationCtx, worldMap) => {
+    const { isInsideTown, currentTownTile, currentTownMap, townPlayerPosition } = locationCtx;
+    const biome = worldTile?.biome || 'Unknown Area';
+
+    if (isInsideTown && currentTownTile) {
+        const townName = currentTownTile.townName || 'Town';
+        const townSize = currentTownTile.townSize || 'settlement';
+        let info = `The party is INSIDE ${townName}, a ${townSize}.`;
+
+        // Determine what the player is standing on within the town
+        if (currentTownMap?.mapData && townPlayerPosition) {
+            const townTile = currentTownMap.mapData[townPlayerPosition.y]?.[townPlayerPosition.x];
+            if (townTile) {
+                if (townTile.type === 'building') {
+                    const name = townTile.buildingName || townTile.buildingType || 'a building';
+                    info += ` They are at ${name}.`;
+                } else if (townTile.type === 'town_square') {
+                    info += ' They are in the town square.';
+                } else if (townTile.type?.includes('path') || townTile.type === 'grass') {
+                    info += ' They are walking along a street.';
+                }
+            }
+
+            // List nearby buildings for richer context
+            const buildings = [];
+            const mapData = currentTownMap.mapData;
+            const seen = new Set();
+            for (let dy = -3; dy <= 3; dy++) {
+                for (let dx = -3; dx <= 3; dx++) {
+                    const t = mapData[townPlayerPosition.y + dy]?.[townPlayerPosition.x + dx];
+                    if (t?.type === 'building') {
+                        const bName = t.buildingName || t.buildingType;
+                        if (bName && !seen.has(bName)) {
+                            seen.add(bName);
+                            buildings.push(bName);
+                        }
+                    }
+                }
+            }
+            if (buildings.length > 0) {
+                info += ` Nearby: ${buildings.join(', ')}.`;
+            }
+        }
+
+        return info;
+    }
+
+    // On the world map
+    let info = `The party is traveling through ${biome} terrain.`;
+
+    if (worldTile?.poi === 'town' && worldTile?.townName) {
+        info += ` They are standing at the edge of ${worldTile.townName}, a ${worldTile.townSize || 'settlement'}. They have not entered the town.`;
+    } else if (worldTile?.poi === 'cave_entrance') {
+        info += ' There is a cave entrance here.';
+    } else if (worldTile?.poi) {
+        info += ` Point of interest: ${worldTile.poi}.`;
+    }
+
+    // Add nearby landmarks for world map orientation
+    const landmarks = findNearbyLandmarks(worldMap, worldPos.x, worldPos.y);
+    if (landmarks.length > 0) {
+        const parts = landmarks.map(l => `${l.label} (${l.proximity}, to the ${l.direction})`);
+        info += ` Landmarks: ${parts.join('; ')}.`;
+    }
+
+    return info;
+};
+
 const useGameInteraction = (
     loadedConversation,
     settings,
@@ -101,7 +224,8 @@ const useGameInteraction = (
     worldMap,
     playerPosition,
     hasAdventureStarted,
-    setHasAdventureStarted
+    setHasAdventureStarted,
+    locationContext = {}
 ) => {
     const [userInput, setUserInput] = useState('');
     const [conversation, setConversation] = useState(loadedConversation?.conversation_data || []);
@@ -249,7 +373,7 @@ const useGameInteraction = (
 
         const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
         const currentTile = getTile(worldMap, playerPosition.x, playerPosition.y);
-        const locationInfo = `Player is at coordinates (${playerPosition.x}, ${playerPosition.y}) in a ${currentTile?.biome || 'Unknown Area'} biome.${currentTile?.poi ? ` Point Of Interest: ${currentTile.poi}.` : ''}`;
+        const locationInfo = buildLocationContext(currentTile, playerPosition, locationContext, worldMap);
         const goalInfo = settings.campaignGoal ? `\nGoal: ${settings.campaignGoal}` : '';
 
         // Get milestone status

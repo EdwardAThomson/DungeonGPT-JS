@@ -124,7 +124,13 @@ const Game = () => {
     mapHook.worldMap,
     mapHook.playerPosition,
     hasAdventureStarted,
-    setHasAdventureStarted
+    setHasAdventureStarted,
+    {
+      isInsideTown: mapHook.isInsideTown,
+      currentTownTile: mapHook.currentTownTile,
+      currentTownMap: mapHook.currentTownMap,
+      townPlayerPosition: mapHook.townPlayerPosition
+    }
   );
   const { performSave } = useGamePersistence({
     sessionId,
