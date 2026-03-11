@@ -141,6 +141,7 @@ const HeroCreation = () => {
 
   // State for selected template
   const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [alertMessage, setAlertMessage] = useState(null);
 
   /*
    Name
@@ -208,7 +209,7 @@ const HeroCreation = () => {
   // --- New Template Application Function ---
   const handleApplyTemplate = () => {
     if (!selectedTemplate || !heroTemplates[selectedTemplate]) {
-      alert("Please select a class template to apply.");
+      setAlertMessage("Please select a class template to apply.");
       return;
     }
     const template = heroTemplates[selectedTemplate];
@@ -225,13 +226,13 @@ const HeroCreation = () => {
   const handleSubmit = async () => {
     // Specific check for profile picture first
     if (!selectedProfilePicture) {
-      alert("Please select a profile picture.");
+      setAlertMessage("Please select a profile picture.");
       return;
     }
 
     // Check other required fields
     if (!heroName || !selectedRace || !selectedClass || !heroBackground || !alignment || !selectedGender || !level) {
-      alert("Please fill in all remaining hero details (Name, Gender, Race, Class, Level, Alignment, Background).");
+      setAlertMessage("Please fill in all remaining hero details (Name, Gender, Race, Class, Level, Alignment, Background).");
       return;
     }
 
@@ -457,6 +458,19 @@ const HeroCreation = () => {
       <div className="form-actions">
         <button type="button" onClick={handleSubmit}>{state?.editing ? "Update Hero" : "Create Hero"}</button>
       </div>
+
+      {/* Validation Alert Modal */}
+      {alertMessage && (
+        <div className="modal-overlay" onClick={() => setAlertMessage(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', textAlign: 'center' }}>
+            <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', margin: '0 0 16px 0' }}>Hold, Adventurer!</h2>
+            <p style={{ color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0' }}>{alertMessage}</p>
+            <button className="modal-close-button" onClick={() => setAlertMessage(null)} style={{ width: '100%', padding: '12px' }}>
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

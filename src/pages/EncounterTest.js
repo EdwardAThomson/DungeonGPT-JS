@@ -7,6 +7,7 @@ const EncounterTest = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEncounter, setSelectedEncounter] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [alertMessage, setAlertMessage] = useState(null);
 
   // Categorize encounters
   const categorizeEncounter = (key, encounter) => {
@@ -56,7 +57,7 @@ const EncounterTest = () => {
   const handleEncounterSelect = (encounterKey) => {
     // Check if character is defeated
     if (testCharacter.currentHP <= 0) {
-      alert('Your character is defeated and cannot engage in combat! Use the Full Heal button to recover.');
+      setAlertMessage('Your character is defeated and cannot engage in combat! Use the Full Heal button to recover.');
       return;
     }
     
@@ -205,6 +206,19 @@ const EncounterTest = () => {
           ))}
         </div>
       </div>
+
+      {/* Alert Modal */}
+      {alertMessage && (
+        <div className="modal-overlay" onClick={() => setAlertMessage(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', textAlign: 'center' }}>
+            <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', margin: '0 0 16px 0' }}>Fallen Hero!</h2>
+            <p style={{ color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0' }}>{alertMessage}</p>
+            <button className="modal-close-button" onClick={() => setAlertMessage(null)} style={{ width: '100%', padding: '12px' }}>
+              Understood
+            </button>
+          </div>
+        </div>
+      )}
 
       <EncounterActionModal
         isOpen={isModalOpen}

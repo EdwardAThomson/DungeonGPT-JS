@@ -14,6 +14,7 @@ const logger = createLogger('all-heroes');
 const AllHeroes = () => {
   const { heroes, setHeroes, setEditingHeroIndex } = useContext(HeroContext);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [alertMessage, setAlertMessage] = useState(null);
   const navigate = useNavigate();
 
   // insert database retrieval here
@@ -56,7 +57,7 @@ const AllHeroes = () => {
       setDeleteConfirm(null);
     } catch (error) {
       logger.error('Error deleting hero:', error);
-      alert(`Failed to delete hero: ${error.message}`);
+      setAlertMessage(`Failed to delete hero: ${error.message}`);
     }
   };
 
@@ -146,6 +147,19 @@ const AllHeroes = () => {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Alert Modal */}
+      {alertMessage && (
+        <div className="modal-overlay" onClick={() => setAlertMessage(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', textAlign: 'center' }}>
+            <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', margin: '0 0 16px 0' }}>Alas!</h2>
+            <p style={{ color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0' }}>{alertMessage}</p>
+            <button className="modal-close-button" onClick={() => setAlertMessage(null)} style={{ width: '100%', padding: '12px' }}>
+              Understood
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Delete Confirmation Modal */}
