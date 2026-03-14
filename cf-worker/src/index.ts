@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { aiRoutes } from "./routes/ai";
+import { embedRoutes } from "./routes/embed";
 import { imageRoutes } from "./routes/image";
 import type { Env } from "./types";
 
@@ -59,6 +60,7 @@ app.get("/health", (c) =>
   })
 );
 
+app.route("/api/embed", embedRoutes);
 app.route("/api/ai", aiRoutes);
 app.route("/api/image", imageRoutes);
 

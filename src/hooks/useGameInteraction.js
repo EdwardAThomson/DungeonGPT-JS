@@ -4,9 +4,17 @@ import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
 import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver';
 import { areRequirementsMet } from '../game/milestoneEngine';
+import { embedAndStore, query as ragQuery } from '../game/ragEngine';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-interaction');
+
+// Format RAG results into a prompt block (appended at end for cache-friendliness)
+const formatRagContext = (results) => {
+    if (!results || results.length === 0) return '';
+    const items = results.map((r, i) => `- ${r.text.slice(0, 300)}`).join('\n');
+    return `\n\n[RECALLED MEMORIES FROM PAST EVENTS]\n${items}`;
+};
 
 const TRIGGER_REGEX = /\[(CHECK|ROLL):\s*([a-zA-Z0-9\s]+)\]/i;
 const MILESTONE_COMPLETE_REGEX = /\[COMPLETE_MILESTONE:\s*([\s\S]+?)\]/i;
@@ -225,7 +233,8 @@ const useGameInteraction = (
     playerPosition,
     hasAdventureStarted,
     setHasAdventureStarted,
-    locationContext = {}
+    locationContext = {},
+    sessionId = null
 ) => {
     const [userInput, setUserInput] = useState('');
     const [conversation, setConversation] = useState(loadedConversation?.conversation_data || []);
@@ -339,7 +348,15 @@ const useGameInteraction = (
             }
             const aiMessage = { role: 'ai', content: aiResponse };
 
-            setConversation(prev => [...prev, aiMessage]);
+            setConversation(prev => {
+                const updated = [...prev, aiMessage];
+                // Fire-and-forget: embed the AI response for RAG
+                if (sessionId) {
+                    embedAndStore(sessionId, aiResponse, { msgIndex: updated.length - 1 })
+                        .catch(err => logger.warn('RAG embed failed (adventure start):', err));
+                }
+                return updated;
+            });
 
             const updatedSummary = await summarizeConversation(currentSummary, [aiMessage]);
             setCurrentSummary(updatedSummary);
@@ -381,7 +398,19 @@ const useGameInteraction = (
         const milestonesInfoRegular = formatMilestonePromptText(milestoneStatusRegular);
 
         const gameContext = `Setting: ${settings.shortDescription || 'Fantasy Realm'}. Mood: ${settings.grimnessLevel || 'Normal'}.${goalInfo}${milestonesInfoRegular}\n${locationInfo}. Party: ${partyInfo}.`;
-        const prompt = `[CONTEXT]\n${gameContext}\n\n[SUMMARY]\n${currentSummary || 'The tale unfolds.'}\n\n[PLAYER ACTION]\n${userMessage.content}\n\n[NARRATE]`;
+
+        // Query RAG for relevant past events (appended at end for cache-friendliness)
+        let ragContext = '';
+        if (sessionId) {
+            try {
+                const ragResults = await ragQuery(sessionId, userMessage.content);
+                ragContext = formatRagContext(ragResults);
+            } catch (err) {
+                logger.warn('RAG query failed, continuing without:', err);
+            }
+        }
+
+        const prompt = `[CONTEXT]\n${gameContext}\n\n[SUMMARY]\n${currentSummary || 'The tale unfolds.'}\n\n[PLAYER ACTION]\n${userMessage.content}\n\n[NARRATE]${ragContext}`;
 
         try {
             let aiResponse = await generateResponse(model, prompt);
@@ -458,7 +487,14 @@ const useGameInteraction = (
             }
             const aiMessage = { role: 'ai', content: aiResponse };
 
-            setConversation([...tempConversation, aiMessage]);
+            const updatedConv = [...tempConversation, aiMessage];
+            setConversation(updatedConv);
+
+            // Fire-and-forget: embed the AI response for RAG
+            if (sessionId) {
+                embedAndStore(sessionId, aiResponse, { msgIndex: updatedConv.length - 1 })
+                    .catch(err => logger.warn('RAG embed failed (submit):', err));
+            }
 
             const updatedSummary = await summarizeConversation(currentSummary, [userMessage, aiMessage]);
             setCurrentSummary(updatedSummary);

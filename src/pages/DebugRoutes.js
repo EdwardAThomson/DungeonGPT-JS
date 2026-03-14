@@ -21,6 +21,7 @@ import EncounterModalStates from './EncounterModalStates';
 import BuildingSearchTest from './BuildingSearchTest';
 import ImageGenDebug from './ImageGenDebug';
 import SummarizationTest from './SummarizationTest';
+import RagTest from './RagTest';
 
 const sectionIcons = {
   'Terrain & Maps': '🗺️',
@@ -70,6 +71,7 @@ const debugSections = [
       { to: 'cf-worker', label: 'CF Worker AI Test' },
       { to: 'image-gen', label: 'Image Generation' },
       { to: 'summarization-test', label: 'Summarization A/B Test' },
+      { to: 'rag-test', label: 'RAG Test' },
     ],
   },
 ];
@@ -196,6 +198,7 @@ const DebugRoutes = () => {
           <Route path="building-search" element={<BuildingSearchTest />} />
           <Route path="image-gen" element={<ImageGenDebug />} />
           <Route path="summarization-test" element={<SummarizationTest />} />
+          <Route path="rag-test" element={<RagTest />} />
           <Route path="*" element={<Navigate to="/debug" replace />} />
         </Routes>
       </section>

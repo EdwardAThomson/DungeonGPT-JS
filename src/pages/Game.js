@@ -6,6 +6,7 @@ import useGameSession from '../hooks/useGameSession';
 import useGameMap from '../hooks/useGameMap';
 import useGameInteraction from '../hooks/useGameInteraction';
 import useGamePersistence from '../hooks/useGamePersistence';
+import useRagSync from '../hooks/useRagSync';
 import { getTile } from '../utils/mapGenerator';
 import PartySidebar from '../components/PartySidebar';
 import GameMainPanel from '../components/GameMainPanel';
@@ -31,6 +32,7 @@ import {
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
 import { checkMilestoneCompletion, getMilestoneRewards } from '../game/milestoneEngine';
+import { embedAndStore, query as ragQuery } from '../game/ragEngine';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
 
@@ -130,7 +132,8 @@ const Game = () => {
       currentTownTile: mapHook.currentTownTile,
       currentTownMap: mapHook.currentTownMap,
       townPlayerPosition: mapHook.townPlayerPosition
-    }
+    },
+    sessionId
   );
   const { performSave } = useGamePersistence({
     sessionId,
@@ -146,6 +149,13 @@ const Game = () => {
     movesSinceEncounter,
     logger
   });
+
+  // --- RAG Sync (backfill on load) ---
+  const { ragStatus, isBackfilling, backfillProgress } = useRagSync(
+    sessionId,
+    interactionHook.conversation,
+    hasAdventureStarted
+  );
 
   // --- Hero HP Update Handler ---
   const handleHeroUpdate = (updatedHero) => {
@@ -357,6 +367,21 @@ const Game = () => {
     interactionHook.setConversation(prev => [...prev, systemMessage]);
     interactionHook.setIsLoading(true);
 
+    // Query RAG for relevant past events (appended at end for cache-friendliness)
+    let ragContext = '';
+    if (sessionId) {
+      try {
+        const tileDesc = `${targetTile.biome} ${targetTile.poi || ''} ${targetTile.townName || ''}`.trim();
+        const ragResults = await ragQuery(sessionId, tileDesc);
+        if (ragResults.length > 0) {
+          ragContext = '\n\n[RECALLED MEMORIES FROM PAST EVENTS]\n' +
+            ragResults.map(r => `- ${r.text.slice(0, 300)}`).join('\n');
+        }
+      } catch (err) {
+        logger.warn('RAG query failed for movement, continuing without:', err);
+      }
+    }
+
     const { fullPrompt } = composeMovementNarrativePrompt({
       tile: targetTile,
       coords: { x: clickedX, y: clickedY },
@@ -367,7 +392,8 @@ const Game = () => {
       worldMap: mapHook.worldMap,
       isNewArea,
       conversation: interactionHook.conversation,
-      includeRecentContext: true
+      includeRecentContext: true,
+      ragContext
     });
     interactionHook.setLastPrompt(fullPrompt);
 
@@ -384,7 +410,15 @@ const Game = () => {
         return;
       }
       const aiMessage = { role: 'ai', content: aiResponse };
-      interactionHook.setConversation(prev => [...prev, aiMessage]);
+      interactionHook.setConversation(prev => {
+        const updated = [...prev, aiMessage];
+        // Fire-and-forget: embed for RAG
+        if (sessionId) {
+          embedAndStore(sessionId, aiResponse, { msgIndex: updated.length - 1 })
+            .catch(err => logger.warn('RAG embed failed (movement):', err));
+        }
+        return updated;
+      });
     } catch (error) {
       logger.error('Movement AI error', error);
       interactionHook.setError(error.message);
@@ -432,8 +466,16 @@ const Game = () => {
     }
 
     if (result?.narration) {
-      const encounterMsg = { role: 'ai', content: `⚔️ **${encounterName}**: ${result.narration}` };
-      interactionHook.setConversation((prev) => [...prev, encounterMsg]);
+      const encounterContent = `⚔️ **${encounterName}**: ${result.narration}`;
+      const encounterMsg = { role: 'ai', content: encounterContent };
+      interactionHook.setConversation((prev) => {
+        const updated = [...prev, encounterMsg];
+        if (sessionId) {
+          embedAndStore(sessionId, encounterContent, { msgIndex: updated.length - 1 })
+            .catch(err => logger.warn('RAG embed failed (encounter):', err));
+        }
+        return updated;
+      });
     }
 
     setIsActionEncounterOpen(false);
@@ -478,7 +520,14 @@ const Game = () => {
           return;
         }
         const aiMessage = { role: 'ai', content: aiResponse };
-        interactionHook.setConversation((prev) => [...prev, aiMessage]);
+        interactionHook.setConversation((prev) => {
+          const updated = [...prev, aiMessage];
+          if (sessionId) {
+            embedAndStore(sessionId, aiResponse, { msgIndex: updated.length - 1 })
+              .catch(err => logger.warn('RAG embed failed (post-encounter):', err));
+          }
+          return updated;
+        });
       } catch (error) {
         logger.error('Post-encounter AI narrative error', error);
         interactionHook.setProgressStatus(null);
@@ -522,6 +571,40 @@ const Game = () => {
 
   return (
     <div className="game-page-wrapper">
+      {isBackfilling && backfillProgress && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1000,
+          background: 'var(--surface)',
+          borderBottom: '1px solid var(--border)',
+          padding: '4px 16px',
+          fontSize: '0.8rem',
+          color: 'var(--text-secondary)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px'
+        }}>
+          <span>Building DM memory index... {backfillProgress.indexed}/{backfillProgress.total}</span>
+          <div style={{
+            flex: 1,
+            height: '4px',
+            background: 'var(--border)',
+            borderRadius: '2px',
+            overflow: 'hidden',
+            maxWidth: '200px'
+          }}>
+            <div style={{
+              width: `${Math.round((backfillProgress.indexed / backfillProgress.total) * 100)}%`,
+              height: '100%',
+              background: 'var(--primary)',
+              transition: 'width 0.3s ease'
+            }} />
+          </div>
+        </div>
+      )}
       <div className="game-container">
         <GameMainPanel
           campaignGoal={settings.campaignGoal}

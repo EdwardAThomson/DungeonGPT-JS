@@ -66,7 +66,8 @@ export const composeMovementNarrativePrompt = ({
   worldMap,
   isNewArea,
   conversation = [],
-  includeRecentContext = true
+  includeRecentContext = true,
+  ragContext = ''
 }) => {
   const partyInfo = formatPartyInfo(selectedHeroes);
   const movementDescription = buildMovementPrompt(tile, settings, narrativeEncounter, worldMap);
@@ -75,7 +76,7 @@ export const composeMovementNarrativePrompt = ({
   const milestonesInfo = formatCampaignMilestones(settings.milestones);
   const gameContext = `Setting: ${settings.shortDescription}. Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
   const recentContext = includeRecentContext ? buildRecentAiContext(conversation) : '';
-  const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary}${recentContext}\n\n${movementDescription}`;
+  const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary}${recentContext}\n\n${movementDescription}${ragContext}`;
 
   return {
     prompt,
