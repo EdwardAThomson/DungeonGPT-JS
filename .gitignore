@@ -97,8 +97,8 @@ docs/future_item_prompts.md
 docs/ambient_soundscapes.md
 
 # Images
-adventures/
-bosses/
+#adventures/
+#bosses/
 
 .dev.vars*
 !.dev.vars.example
