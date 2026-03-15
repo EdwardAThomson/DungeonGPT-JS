@@ -37,7 +37,7 @@ export const QUEST_ENEMIES = {
     blightspawn: {
         name: 'Blightspawn',
         icon: '🦠',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/blightspawn.webp',
         tier: 1,
         theme: 'grimdark-survival',
         encounterTier: 'boss',
@@ -61,7 +61,7 @@ export const QUEST_ENEMIES = {
     rogue_automaton: {
         name: 'Rogue Automaton',
         icon: '🤖',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/rogue_automaton.webp',
         tier: 1,
         theme: 'arcane-renaissance',
         encounterTier: 'boss',
@@ -133,7 +133,7 @@ export const QUEST_ENEMIES = {
     plague_rat_king: {
         name: 'Plague Rat King',
         icon: '🐀',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/plague_rat_king.webp',
         tier: 1,
         theme: 'grimdark-survival',
         encounterTier: 'boss',
@@ -157,7 +157,7 @@ export const QUEST_ENEMIES = {
     clockwork_spider: {
         name: 'Clockwork Spider',
         icon: '🕷️',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/clockwork_spider.webp',
         tier: 1,
         theme: 'arcane-renaissance',
         encounterTier: 'boss',
@@ -181,7 +181,7 @@ export const QUEST_ENEMIES = {
     rune_golem: {
         name: 'Rune Golem',
         icon: '🗿',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/rune_golem.webp',
         tier: 1,
         theme: 'arcane-renaissance',
         encounterTier: 'boss',
@@ -279,7 +279,7 @@ export const QUEST_ENEMIES = {
     carrion_hag: {
         name: 'Carrion Hag',
         icon: '🧙',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/carrion_hag.webp',
         tier: 1,
         theme: 'grimdark-survival',
         encounterTier: 'boss',
@@ -303,7 +303,7 @@ export const QUEST_ENEMIES = {
     feral_ghoul: {
         name: 'Feral Ghoul',
         icon: '🧟',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/feral_ghoul.webp',
         tier: 1,
         theme: 'grimdark-survival',
         encounterTier: 'boss',
@@ -328,7 +328,7 @@ export const QUEST_ENEMIES = {
     mad_alchemist: {
         name: 'Mad Alchemist',
         icon: '⚗️',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/mad_alchemist.webp',
         tier: 1,
         theme: 'arcane-renaissance',
         encounterTier: 'boss',
@@ -404,7 +404,7 @@ export const QUEST_ENEMIES = {
     shadow_overlord: {
         name: 'Shadow Overlord',
         icon: '👑',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/shadow_overlord.webp',
         tier: 2,
         theme: 'heroic-fantasy',
         encounterTier: 'boss',
@@ -428,7 +428,7 @@ export const QUEST_ENEMIES = {
     rot_heart: {
         name: 'The Rot-Heart',
         icon: '🫀',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/rot_heart.webp',
         tier: 2,
         theme: 'grimdark-survival',
         encounterTier: 'boss',
@@ -452,7 +452,7 @@ export const QUEST_ENEMIES = {
     old_god_herald: {
         name: 'Herald of the Old Gods',
         icon: '⚙️',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/old_god_herald.webp',
         tier: 2,
         theme: 'arcane-renaissance',
         encounterTier: 'boss',
@@ -500,7 +500,7 @@ export const QUEST_ENEMIES = {
     warlord: {
         name: 'The Iron Warlord',
         icon: '⚔️',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/warlord.webp',
         tier: 2,
         theme: 'heroic-fantasy',
         encounterTier: 'boss',
@@ -524,7 +524,7 @@ export const QUEST_ENEMIES = {
     lich: {
         name: 'The Bone Tyrant',
         icon: '💀',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/lich.webp',
         tier: 2,
         theme: 'grimdark-survival',
         encounterTier: 'boss',
@@ -549,7 +549,7 @@ export const QUEST_ENEMIES = {
     dragon_wyrm: {
         name: 'The Red Wyrm',
         icon: '🐉',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/dragon_wyrm.webp',
         tier: 2,
         theme: 'heroic-fantasy',
         encounterTier: 'boss',
@@ -573,7 +573,7 @@ export const QUEST_ENEMIES = {
     fallen_paladin: {
         name: 'The Fallen Paladin',
         icon: '🛡️',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/fallen_paladin.webp',
         tier: 2,
         theme: 'heroic-fantasy',
         encounterTier: 'boss',
@@ -598,7 +598,7 @@ export const QUEST_ENEMIES = {
     plague_lord: {
         name: 'The Plague Lord',
         icon: '☠️',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/plague_lord.webp',
         tier: 2,
         theme: 'grimdark-survival',
         encounterTier: 'boss',
@@ -622,7 +622,7 @@ export const QUEST_ENEMIES = {
     blood_wendigo: {
         name: 'The Blood Wendigo',
         icon: '🦌',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/blood_wendigo.webp',
         tier: 2,
         theme: 'grimdark-survival',
         encounterTier: 'boss',
@@ -647,7 +647,7 @@ export const QUEST_ENEMIES = {
     arcane_colossus: {
         name: 'The Arcane Colossus',
         icon: '🏗️',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/arcane_colossus.webp',
         tier: 2,
         theme: 'arcane-renaissance',
         encounterTier: 'boss',

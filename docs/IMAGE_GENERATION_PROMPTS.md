@@ -35,7 +35,7 @@ Output directory: `public/assets/encounters/bosses/`
 | `troll_bridge_guard` | A hulking moss-covered troll blocking a narrow stone bridge over a misty gorge. Massive club in hand, tiny intelligent eyes glaring. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. |
 | `bandit_king` | A charismatic bandit king in a weathered leather longcoat, seated on a makeshift throne of stolen crates in a forest hideout. Scarred face, confident smirk, dual daggers at his belt. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. |
 
-### Heroic Fantasy — Tier 2
+### Heroic Fantasy — Tier 2 - COMPLETE
 
 | Key | Prompt |
 |-----|--------|
@@ -44,7 +44,7 @@ Output directory: `public/assets/encounters/bosses/`
 | `dragon_wyrm` | A fearsome red wyrm dragon coiled atop a mountain of gold in a vast cavern. Scales gleaming like molten iron, wings spread wide, breathing a torrent of flame. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. |
 | `fallen_paladin` | A fallen paladin in cracked and tarnished silver armor, corrupted holy symbols glowing sickly green. Standing in a desecrated chapel, broken stained glass behind. Eyes burning with unholy light. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. |
 
-### Grimdark Survival — Tier 1
+### Grimdark Survival — Tier 1 - COMPLETE
 
 | Key | Prompt |
 |-----|--------|
@@ -53,7 +53,7 @@ Output directory: `public/assets/encounters/bosses/`
 | `carrion_hag` | A hunched carrion hag with long clawed fingers and tattered robes, stirring a bubbling cauldron in a bone-strewn forest clearing. Pale skin, hollow black eyes, necklace of small skulls. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. |
 | `feral_ghoul` | A feral ghoul crouched on a ruined stone wall at night, emaciated grey body with exposed muscle, jaw unhinged in a silent scream. Moonlit graveyard behind. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. |
 
-### Grimdark Survival — Tier 2
+### Grimdark Survival — Tier 2 - COMPLETE
 
 | Key | Prompt |
 |-----|--------|
@@ -62,7 +62,7 @@ Output directory: `public/assets/encounters/bosses/`
 | `plague_lord` | A plague lord in corroded armor dripping with toxic slime, standing in a field of dead crops. Bloated body, a cloud of buzzing flies, wielding a massive rusted flail. Dark fantasy digital painting, dramatic cinematic lighting, sickly green palette. Landscape composition 16:9. No text or UI elements. |
 | `blood_wendigo` | A blood wendigo — a towering gaunt creature with antlers made of bone, blood-streaked white fur, standing in a blizzard-swept dead forest. Hollow eyes glowing red, elongated claws. Dark fantasy digital painting, dramatic cinematic lighting, cold blue and crimson palette. Landscape composition 16:9. No text or UI elements. |
 
-### Arcane Renaissance — Tier 1
+### Arcane Renaissance — Tier 1 - COMPLETE
 
 | Key | Prompt |
 |-----|--------|
@@ -71,7 +71,7 @@ Output directory: `public/assets/encounters/bosses/`
 | `rune_golem` | A massive rune golem made of carved stone blocks covered in glowing blue arcane runes, standing guard in a ruined magical academy. Cracks leaking magical energy. Dark fantasy digital painting, dramatic cinematic lighting, blue magical glow. Landscape composition 16:9. No text or UI elements. |
 | `mad_alchemist` | A mad alchemist in a stained leather apron surrounded by bubbling apparatus in a chaotic laboratory. Wild eyes behind cracked goggles, holding a volatile glowing flask. Explosions of color. Dark fantasy digital painting with Renaissance elements, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
 
-### Arcane Renaissance — Tier 2
+### Arcane Renaissance — Tier 2 - PARTIAL
 
 | Key | Prompt |
 |-----|--------|
