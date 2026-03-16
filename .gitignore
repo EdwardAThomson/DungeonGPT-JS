@@ -87,6 +87,8 @@ docs/gaming-hub-*.md
 
 docs/LOCAL*
 
+docs/cf-worker-integration-guide.md
+
 # AI Prompt Analysis
 docs/AI_PROMPT_ANALYSIS.md
 
@@ -102,3 +104,5 @@ docs/ambient_soundscapes.md
 
 .dev.vars*
 !.dev.vars.example
+
+

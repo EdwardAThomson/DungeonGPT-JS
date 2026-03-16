@@ -71,7 +71,7 @@ Output directory: `public/assets/encounters/bosses/`
 | `rune_golem` | A massive rune golem made of carved stone blocks covered in glowing blue arcane runes, standing guard in a ruined magical academy. Cracks leaking magical energy. Dark fantasy digital painting, dramatic cinematic lighting, blue magical glow. Landscape composition 16:9. No text or UI elements. |
 | `mad_alchemist` | A mad alchemist in a stained leather apron surrounded by bubbling apparatus in a chaotic laboratory. Wild eyes behind cracked goggles, holding a volatile glowing flask. Explosions of color. Dark fantasy digital painting with Renaissance elements, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
 
-### Arcane Renaissance — Tier 2 - PARTIAL
+### Arcane Renaissance — Tier 2 - COMPLETE
 
 | Key | Prompt |
 |-----|--------|
@@ -79,7 +79,7 @@ Output directory: `public/assets/encounters/bosses/`
 | `arcane_colossus` | An arcane colossus — a building-sized construct of stone and metal animated by swirling magical energy, striding through a city of towers. Rune-covered body, glowing eyes, crushing buildings underfoot. Dark fantasy digital painting, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
 | `leyline_dragon` | A leyline dragon — a serpentine dragon made partially of crystallized magical energy, coiled around an arcane spire. Translucent scales revealing veins of pure mana, eyes like stars. Dark fantasy digital painting, dramatic cinematic lighting, vibrant magical colors. Landscape composition 16:9. No text or UI elements. |
 
-### Eldritch Horror — Tier 1
+### Eldritch Horror — Tier 1 - COMPLETE
 
 | Key | Prompt |
 |-----|--------|
@@ -88,7 +88,7 @@ Output directory: `public/assets/encounters/bosses/`
 | `shadow_stalker` | A shadow stalker — a barely-visible humanoid shape made of living darkness, slipping between the pillars of a fog-shrouded alley. Only glowing white eyes visible, tendrils of shadow reaching outward. Dark fantasy digital painting, Lovecraftian atmosphere, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
 | `worm_that_walks` | The Worm That Walks — a vaguely humanoid shape composed entirely of thousands of writhing worms and maggots, wearing a tattered robe in a decrepit library. Dark fantasy digital painting, Lovecraftian atmosphere, body horror, dramatic cinematic lighting. Landscape composition 16:9. No text or UI elements. |
 
-### Eldritch Horror — Tier 2
+### Eldritch Horror — Tier 2 - COMPLETE
 
 | Key | Prompt |
 |-----|--------|
