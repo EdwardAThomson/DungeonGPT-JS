@@ -199,6 +199,10 @@ const AppContent = () => {
 
       <DatabaseIndicator />
 
+      <footer className="app-footer">
+        © 2026 Edward Thomson (<a href="https://octonion.io" target="_blank" rel="noopener noreferrer">Octonion Software</a>)
+      </footer>
+
     </div>
   );
 };
