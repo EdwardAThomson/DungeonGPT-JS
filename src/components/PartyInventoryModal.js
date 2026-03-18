@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { ITEM_CATALOG } from '../utils/inventorySystem';
+import { useModal } from '../contexts/ModalContext';
+import ModalShell from './ModalShell';
 
-const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
+const PartyInventoryModal = () => {
+  const { isOpen, data, close } = useModal('inventory');
+  const selectedHeroes = data?.selectedHeroes || [];
   const [selectedImage, setSelectedImage] = useState(null);
 
   if (!isOpen) return null;
@@ -36,11 +40,7 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal-content"
-        onClick={(e) => e.stopPropagation()}
-        style={{
+    <ModalShell modalId="inventory" ariaLabel="Party Inventory" style={{
           maxWidth: '600px',
           width: '90%',
           background: 'var(--surface)',
@@ -49,8 +49,7 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
           color: 'var(--text)',
           borderRadius: '12px',
           padding: '24px'
-        }}
-      >
+        }}>
         <h2 style={{
           marginBottom: '24px',
           marginTop: 0,
@@ -236,7 +235,7 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
         </div>
 
         <button
-          onClick={onClose}
+          onClick={close}
           style={{
             marginTop: '24px',
             padding: '14px 20px',
@@ -255,7 +254,6 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
         >
           Return to Adventure
         </button>
-      </div>
 
       {selectedImage && (
         <div
@@ -267,7 +265,7 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 11000,
+            zIndex: 3000,
             cursor: 'pointer'
           }}
           onClick={(e) => {
@@ -310,7 +308,7 @@ const PartyInventoryModal = ({ isOpen, onClose, selectedHeroes = [] }) => {
           <p style={{ color: '#888', marginTop: '12px', fontSize: '1.1rem' }}>Click anywhere to return</p>
         </div>
       )}
-    </div>
+    </ModalShell>
   );
 };
 

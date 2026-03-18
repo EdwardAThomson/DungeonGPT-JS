@@ -17,7 +17,7 @@ const logger = createLogger('town-map-display');
  * @param {string} townError - Error message to display in town map
  * @param {Function} markBuildingDiscovered - Callback to mark a building as seen
  */
-const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError, markBuildingDiscovered, onQuestItemFound }) => {
+const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError, markBuildingDiscovered, onQuestItemFound, onRest, party }) => {
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [distanceWarning, setDistanceWarning] = useState(false);
 
@@ -340,6 +340,8 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           onClose={() => setSelectedBuilding(null)}
           firstHero={firstHero}
           onQuestItemFound={onQuestItemFound}
+          onRest={onRest}
+          party={party}
         />
       )}
 

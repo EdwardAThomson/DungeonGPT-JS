@@ -1,15 +1,19 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { resolveEncounter } from '../utils/encounterResolver';
 import { createMultiRoundEncounter, resolveRound, getRoundActions, generateEncounterSummary } from '../utils/multiRoundEncounter';
 import { applyDamage, getHPStatus } from '../utils/healthSystem';
 import SettingsContext from '../contexts/SettingsContext';
 import ClickableImage from './ClickableImage';
+import { useModal } from '../contexts/ModalContext';
+import ModalShell from './ModalShell';
 import { createLogger } from '../utils/logger';
+import { ITEM_CATALOG } from '../utils/inventorySystem';
 
 const logger = createLogger('encounter-action-modal');
 
-const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, onResolve, onCharacterUpdate, fullSizeImage = false }) => {
+const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, fullSizeImage = false }) => {
+  const { isOpen, data, close } = useModal('encounterAction');
+  const encounter = data?.encounter;
   const { settings, selectedProvider, selectedModel } = useContext(SettingsContext);
   const [selectedAction, setSelectedAction] = useState(null);
   const [isResolving, setIsResolving] = useState(false);
@@ -282,7 +286,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
     setShowHeroSelection(true);
     setHeroConfirmed(false);
     setInitiativeResult(null);
-    onClose();
+    close();
   };
 
   // Check if character is defeated
@@ -323,9 +327,8 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
     return `/assets/characters/${filename}.webp`;
   };
 
-  return createPortal(
-    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-content encounter-action-modal" style={{ maxWidth: '800px', width: '95%', padding: '20px 24px' }}>
+  return (
+    <ModalShell modalId="encounterAction" className="encounter-action-modal" ariaLabel="Encounter" usePortal style={{ maxWidth: '800px', width: '95%', padding: '20px 24px' }}>
         {showHeroSelection && !heroConfirmed && party && party.length > 1 ? (
           // Hero selection phase
           <>
@@ -402,6 +405,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
 
               <button
                 onClick={() => handleHeroConfirm()}
+                disabled={selectedHeroIndex == null}
                 style={{
                   marginTop: '20px',
                   padding: '12px 24px',
@@ -414,7 +418,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
               </button>
             </div>
 
-            <button className="modal-close-button" onClick={() => onClose()}>
+            <button className="modal-close-button" onClick={() => close()}>
               Flee Encounter
             </button>
           </>
@@ -540,7 +544,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                 <div className="defeat-warning">
                   <h3 style={{ color: 'var(--state-danger)', margin: '0 0 10px 0' }}>💀 You are defeated!</h3>
                   <p>You cannot continue fighting in your current condition.</p>
-                  <button className="primary-button" onClick={onClose} style={{ marginTop: '15px' }}>
+                  <button className="primary-button" onClick={close} style={{ marginTop: '15px' }}>
                     Retreat from Combat
                   </button>
                 </div>
@@ -754,7 +758,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
                     {result.rewards.xp > 0 && <li>+{result.rewards.xp} XP</li>}
                     {result.rewards.gold > 0 && <li>+{result.rewards.gold} gold</li>}
                     {result.rewards.items && result.rewards.items.map((item, idx) => (
-                      <li key={idx}>{item}</li>
+                      <li key={idx}>{ITEM_CATALOG[item]?.name || item.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</li>
                     ))}
                   </ul>
                 </div>
@@ -798,9 +802,7 @@ const EncounterActionModal = ({ isOpen, onClose, encounter, character, party, on
             </button>
           </>
         )}
-      </div>
-    </div>,
-    document.body
+    </ModalShell>
   );
 };
 

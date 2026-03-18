@@ -75,7 +75,7 @@ const ClickableImage = ({ src, alt, height = '240px', maxHeight = '240px', objec
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        zIndex: 2000,
+                        zIndex: 3000,
                         backgroundColor: 'rgba(0,0,0,0.9)',
                         display: 'flex',
                         alignItems: 'center',

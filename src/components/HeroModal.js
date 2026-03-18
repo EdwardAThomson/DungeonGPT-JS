@@ -2,9 +2,13 @@ import React from 'react';
 import { calculateMaxHP, getHPStatus } from '../utils/healthSystem';
 import { getLevelProgress, calculateLevel } from '../utils/progressionSystem';
 import { resolveProfilePicture } from '../utils/assetHelper';
+import { useModal } from '../contexts/ModalContext';
+import ModalShell from './ModalShell';
 
-const HeroModal = ({ isOpen, onClose, hero }) => {
-    if (!isOpen || !hero) return null;
+const HeroModal = () => {
+    const { data, close } = useModal('hero');
+    const hero = data?.hero;
+    if (!hero) return null;
 
     // Gender emoji - Male or Female only
     const getGenderEmoji = (gender) => {
@@ -19,12 +23,7 @@ const HeroModal = ({ isOpen, onClose, hero }) => {
     const heroGender = hero.heroGender || hero.characterGender || hero.gender || 'Male';
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div
-                className="modal-content hero-details-modal"
-                onClick={(e) => e.stopPropagation()}
-                style={{ maxWidth: '700px', width: '90%' }}
-            >
+        <ModalShell modalId="hero" className="hero-details-modal" ariaLabel="Hero Details" style={{ maxWidth: '700px', width: '90%' }}>
                 <div className="modal-header-with-image">
                     {hero.profilePicture && (
                         <div className="modal-profile-pic-container">
@@ -135,11 +134,10 @@ const HeroModal = ({ isOpen, onClose, hero }) => {
                     </div>
                 )}
 
-                <button className="modal-close-button" onClick={onClose} style={{ marginTop: '20px' }}>
+                <button className="modal-close-button" onClick={close} style={{ marginTop: '20px' }}>
                     Close
                 </button>
-            </div>
-        </div>
+        </ModalShell>
     );
 };
 

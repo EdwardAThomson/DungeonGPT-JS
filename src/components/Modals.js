@@ -3,6 +3,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { getAvailableModels, DEFAULT_MODELS } from '../llm/llm_constants';
 import ApiKeysContext from '../contexts/ApiKeysContext';
 import SettingsContext from '../contexts/SettingsContext';
+import { useModal } from '../contexts/ModalContext';
+import ModalShell from './ModalShell';
 
 // --- Share QR Code (inline expandable) --- //
 const ShareQRCode = () => {
@@ -586,42 +588,40 @@ const labelStyle = {
 };
 
 // --- How to Play Modal --- //
-export const HowToPlayModalContent = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
+export const HowToPlayModalContent = () => {
+  const { close } = useModal('howToPlay');
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-        <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', textAlign: 'center' }}>📜 Rules of Engagement</h2>
-        <div style={{ padding: '20px 0', lineHeight: '1.8', color: 'var(--text)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <p>
-            Welcome, traveler! Your journey begins with your party of heroes.
-          </p>
-          <p>
-            ⚔️ <strong>Commanding:</strong> Type your actions in the scroll below and the AI Dungeon Master will weave the tapestry of your fate.
-          </p>
-          <p>
-            🗺️ <strong>Exploration:</strong> Click adjacent tiles on the world map to move your party. Enter towns to visit taverns, shops, temples, and more.
-          </p>
-          <p>
-            🎲 <strong>Encounters:</strong> Beasts and brigands lurk in the wilds. When danger strikes, choose your actions wisely from the options presented.
-          </p>
-          <p>
-            📜 <strong>Quests:</strong> Follow your campaign milestones to advance the story. Track your progress in the quest log.
-          </p>
-          <p>
-            🎒 <strong>Inventory:</strong> Collect loot, potions, and equipment. Open the party inventory to manage your spoils.
-          </p>
-          <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '15px' }}>
-            Note: The sidebar tracks your party's vitality and stats. Keep a keen eye upon it.
-          </p>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <button className="modal-close-button" onClick={onClose} style={{ width: '100%', padding: '12px' }}>
-            Begone! I have an adventure to start.
-          </button>
-        </div>
+    <ModalShell modalId="howToPlay" ariaLabel="How to Play" style={{ maxWidth: '500px' }}>
+      <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', textAlign: 'center' }}>📜 Rules of Engagement</h2>
+      <div style={{ padding: '20px 0', lineHeight: '1.8', color: 'var(--text)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <p>
+          Welcome, traveler! Your journey begins with your party of heroes.
+        </p>
+        <p>
+          ⚔️ <strong>Commanding:</strong> Type your actions in the scroll below and the AI Dungeon Master will weave the tapestry of your fate.
+        </p>
+        <p>
+          🗺️ <strong>Exploration:</strong> Click adjacent tiles on the world map to move your party. Enter towns to visit taverns, shops, temples, and more.
+        </p>
+        <p>
+          🎲 <strong>Encounters:</strong> Beasts and brigands lurk in the wilds. When danger strikes, choose your actions wisely from the options presented.
+        </p>
+        <p>
+          📜 <strong>Quests:</strong> Follow your campaign milestones to advance the story. Track your progress in the quest log.
+        </p>
+        <p>
+          🎒 <strong>Inventory:</strong> Collect loot, potions, and equipment. Open the party inventory to manage your spoils.
+        </p>
+        <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '15px' }}>
+          Note: The sidebar tracks your party's vitality and stats. Keep a keen eye upon it.
+        </p>
       </div>
-    </div>
+      <div style={{ textAlign: 'center' }}>
+        <button className="modal-close-button" onClick={close} style={{ width: '100%', padding: '12px' }}>
+          Begone! I have an adventure to start.
+        </button>
+      </div>
+    </ModalShell>
   );
 };

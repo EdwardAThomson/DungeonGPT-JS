@@ -1,33 +1,15 @@
-import React, { useEffect, useRef } from 'react';
-import FocusTrap from 'focus-trap-react';
+import React from 'react';
 import ClickableImage from './ClickableImage';
+import { useModal } from '../contexts/ModalContext';
+import ModalShell from './ModalShell';
 
-const EncounterModal = ({
-    isOpen,
-    onClose,
-    encounter,
-    onAction,
-    onEnterLocation,
-    onViewMap,
-    fullSizeImage = false
-}) => {
-    const previousFocusRef = useRef(null);
+const EncounterModal = () => {
+    const { data, close } = useModal('encounterInfo');
+    const encounter = data?.encounter;
+    const onEnterLocation = data?.onEnterLocation;
+    const onViewMap = data?.onViewMap;
 
-    useEffect(() => {
-        if (isOpen) {
-            previousFocusRef.current = document.activeElement;
-        } else if (previousFocusRef.current) {
-            previousFocusRef.current.focus();
-        }
-    }, [isOpen]);
-
-    const handleKeyDown = (e) => {
-        if (e.key === 'Escape') {
-            onClose();
-        }
-    };
-
-    if (!isOpen || !encounter) return null;
+    if (!encounter) return null;
 
     const getLocationIcon = (poiType) => {
         const icons = {
@@ -45,18 +27,8 @@ const EncounterModal = ({
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <FocusTrap>
-                <div
-                    className="modal-content encounter-modal-content"
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={handleKeyDown}
-                    role="dialog"
-                    aria-modal="true"
-                    aria-labelledby="encounter-modal-title"
-                    style={{ padding: '20px 24px' }}
-                >
-                    <h2 id="encounter-modal-title" style={{ marginTop: '0', marginBottom: '2px', paddingBottom: '6px' }}>{encounter.name}</h2>
+        <ModalShell modalId="encounterInfo" className="encounter-modal-content" ariaLabel="Encounter" style={{ padding: '20px 24px' }}>
+                    <h2 style={{ marginTop: '0', marginBottom: '2px', paddingBottom: '6px' }}>{encounter.name}</h2>
                     <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--state-muted-strong)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '10px' }}>
                         Random Encounter
                     </div>
@@ -64,9 +36,9 @@ const EncounterModal = ({
                         <ClickableImage
                             src={encounter.image}
                             alt={encounter.name}
-                            height={fullSizeImage ? 'auto' : '240px'}
-                            maxHeight={fullSizeImage ? '500px' : '240px'}
-                            objectPosition={fullSizeImage ? 'center' : 'center 30%'}
+                            height='240px'
+                            maxHeight='240px'
+                            objectPosition='center 30%'
                         />
                     )}
                     {!encounter.image && (
@@ -82,21 +54,21 @@ const EncounterModal = ({
                             <button
                                 className="primary-button"
                                 onClick={() => {
-                                    onEnterLocation();
-                                    onClose();
+                                    if (onEnterLocation) onEnterLocation();
+                                    close();
                                 }}
                                 aria-label={`Enter ${encounter.name} `}
                             >
                                 Enter {encounter.name}
                             </button>
                         )}
-                        <button className="secondary-button" onClick={onClose} aria-label="Continue journey">
+                        <button className="secondary-button" onClick={close} aria-label="Continue journey">
                             Continue Journey
                         </button>
                         <button
                             className="secondary-button"
                             onClick={() => {
-                                onClose();
+                                close();
                                 if (onViewMap) onViewMap();
                             }}
                             aria-label="View world map"
@@ -107,9 +79,7 @@ const EncounterModal = ({
                     <p style={{ fontSize: '11px', color: 'var(--state-muted-strong)', marginTop: '10px', marginBottom: '0', fontStyle: 'italic' }}>
                         💡 Use the Map button in the top-right to navigate
                     </p>
-                </div>
-            </FocusTrap>
-        </div>
+        </ModalShell>
     );
 };
 

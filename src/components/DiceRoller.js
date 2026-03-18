@@ -1,8 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { rollDice, rollCheck } from '../utils/dice';
 import { SKILLS, calculateModifier, SUPPORTED_DICE } from '../utils/rules';
+import { useModal } from '../contexts/ModalContext';
+import ModalShell from './ModalShell';
 
-const DiceRoller = ({ isOpen, onClose, initialMode = 'dice', preselectedSkill = null, character = null, onRollComplete }) => {
+const DiceRoller = () => {
+    const { isOpen, data, close } = useModal('dice');
+    const initialMode = data?.mode || 'dice';
+    const preselectedSkill = data?.skill || null;
+    const character = data?.character || null;
+    const onRollComplete = data?.onRollComplete;
+
     const [mode, setMode] = useState(initialMode); // 'dice' or 'skill'
     const [selectedDie, setSelectedDie] = useState(20);
     const [diceCount, setDiceCount] = useState(1);
@@ -12,14 +20,19 @@ const DiceRoller = ({ isOpen, onClose, initialMode = 'dice', preselectedSkill = 
     // Reset state when modal opens
     useEffect(() => {
         if (isOpen) {
-            setMode(initialMode);
+            setMode(data?.mode || 'dice');
             setRollResult(null);
-            if (preselectedSkill) {
-                setSelectedSkill(preselectedSkill);
+            if (data?.skill) {
+                setSelectedSkill(data.skill);
                 setMode('skill');
             }
         }
-    }, [isOpen, initialMode, preselectedSkill]);
+    }, [isOpen, data]);
+
+    const handleClose = () => {
+        if (data?.onCleanup) data.onCleanup();
+        close();
+    };
 
     if (!isOpen) return null;
 
@@ -53,8 +66,7 @@ const DiceRoller = ({ isOpen, onClose, initialMode = 'dice', preselectedSkill = 
     };
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content dice-modal" onClick={e => e.stopPropagation()}>
+        <ModalShell modalId="dice" className="dice-modal" ariaLabel="Dice Roller" onClose={data?.onCleanup}>
                 <h2>🎲 Dice Roller</h2>
 
                 {/* Mode Toggles */}
@@ -152,9 +164,8 @@ const DiceRoller = ({ isOpen, onClose, initialMode = 'dice', preselectedSkill = 
                     </div>
                 )}
 
-                <button className="modal-close-button" onClick={onClose}>Close</button>
-            </div>
-        </div>
+                <button className="modal-close-button" onClick={handleClose}>Close</button>
+        </ModalShell>
     );
 };
 

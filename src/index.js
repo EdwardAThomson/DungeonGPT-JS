@@ -6,6 +6,7 @@ import { SettingsProvider } from "./contexts/SettingsContext";
 import { HeroProvider } from './contexts/HeroContext';
 import { ApiKeysProvider } from "./contexts/ApiKeysContext";
 import { AuthProvider } from './contexts/AuthContext';
+import { ModalProvider } from './contexts/ModalContext';
 
 if (process.env.NODE_ENV === 'production' && process.env.REACT_APP_ENABLE_CONSOLE_LOGS !== 'true') {
   // Keep warn/error visible, suppress noisy debug logs in production.
@@ -25,7 +26,9 @@ root.render(
       <ApiKeysProvider>
         <SettingsProvider>
           <HeroProvider>
-            <App />
+            <ModalProvider>
+              <App />
+            </ModalProvider>
           </HeroProvider>
         </SettingsProvider>
       </ApiKeysProvider>

@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import SettingsContext from "../contexts/SettingsContext";
+import { useModal } from '../contexts/ModalContext';
 import { checkForEncounter } from '../utils/encounterGenerator';
 import useGameSession from '../hooks/useGameSession';
 import useGameMap from '../hooks/useGameMap';
@@ -11,7 +12,8 @@ import { getTile } from '../utils/mapGenerator';
 import PartySidebar from '../components/PartySidebar';
 import GameMainPanel from '../components/GameMainPanel';
 import GameModals from '../components/GameModals';
-import { calculateMaxHP } from '../utils/healthSystem';
+import ModalShell from '../components/ModalShell';
+import { calculateMaxHP, shortRest, longRest } from '../utils/healthSystem';
 import { composeMovementNarrativePrompt } from '../game/promptComposer';
 import { generateMovementNarrative } from '../game/movementController';
 import {
@@ -37,6 +39,24 @@ import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
 
 const logger = createLogger('game');
+
+const SaveConfirmationModal = () => {
+  const { data, close } = useModal('saveConfirmation');
+  return (
+    <ModalShell modalId="saveConfirmation" ariaLabel="Save Confirmation" style={{ maxWidth: '400px', textAlign: 'center' }}>
+      <h3 style={{ marginBottom: '15px', color: 'var(--state-success)' }}>✓ Game Saved!</h3>
+      <p style={{ marginBottom: '10px', color: 'var(--text)' }}>
+        Your progress has been saved as:
+      </p>
+      <p style={{ marginBottom: '20px', fontWeight: 'bold', color: 'var(--primary)' }}>
+        {data?.title}
+      </p>
+      <button onClick={close} className="primary-button" style={{ padding: '10px 30px' }}>
+        Continue
+      </button>
+    </ModalShell>
+  );
+};
 
 const Game = () => {
   const { state } = useLocation();
@@ -85,16 +105,17 @@ const Game = () => {
     setAssistantModel
   } = useContext(SettingsContext);
 
+  // --- Modal Manager hooks ---
+  const { open: openHowToPlay } = useModal('howToPlay');
+  const { open: openHero } = useModal('hero');
+  const { open: openDice } = useModal('dice');
+  const { open: openInventory } = useModal('inventory');
+  const { open: openSaveConfirmation } = useModal('saveConfirmation');
+  const { open: openEncounterInfo, close: closeEncounterInfo } = useModal('encounterInfo');
+  const { open: openEncounterAction, close: closeEncounterAction, data: encounterActionData } = useModal('encounterAction');
+
+  // --- Modal states not yet migrated ---
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isHowToPlayModalOpen, setIsHowToPlayModalOpen] = useState(false);
-  const [isEncounterModalOpen, setIsEncounterModalOpen] = useState(false);
-  const [isDiceModalOpen, setIsDiceModalOpen] = useState(false);
-  const [isInventoryModalOpen, setIsInventoryModalOpen] = useState(false);
-  const [isHeroModalOpen, setIsHeroModalOpen] = useState(false);
-  const [selectedHeroForModal, setSelectedHeroForModal] = useState(null);
-  const [currentEncounter, setCurrentEncounter] = useState(null);
-  const [actionEncounter, setActionEncounter] = useState(null);
-  const [isActionEncounterOpen, setIsActionEncounterOpen] = useState(false);
   const [movesSinceEncounter, setMovesSinceEncounter] = useState(
     subMapsObj?.movesSinceEncounter || 0
   );
@@ -102,8 +123,6 @@ const Game = () => {
   const [aiNarrativeEnabled, setAiNarrativeEnabled] = useState(true);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [isMobilePartySidebarOpen, setIsMobilePartySidebarOpen] = useState(false);
-  const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
-  const [savedGameTitle, setSavedGameTitle] = useState('');
 
   // --- HOOKS ---
   const {
@@ -223,10 +242,9 @@ const Game = () => {
     const townEncounter = checkForEncounter(syntheticTownTile, false, settings, movesSinceEncounter);
 
     if (townEncounter) {
-      // Close map modal so its FocusTrap doesn't block the encounter modal
+      // Close map modal — conflict rule handles this once map is migrated
       mapHook.setIsMapModalOpen(false);
-      setActionEncounter(townEncounter);
-      setIsActionEncounterOpen(true);
+      openEncounterAction({ encounter: townEncounter });
       setMovesSinceEncounter(0);
     } else {
       setMovesSinceEncounter(prev => prev + 1);
@@ -238,10 +256,18 @@ const Game = () => {
   // --- Effect to monitor AI Check Requests ---
   useEffect(() => {
     if (interactionHook.checkRequest) {
-      logger.debug('Opening dice modal for check request', interactionHook.checkRequest);
-      setIsDiceModalOpen(true);
+      const req = interactionHook.checkRequest;
+      logger.debug('Opening dice modal for check request', req);
+      const skill = req.type === 'skill' ? req.skill : null;
+      const mode = req.type === 'skill' ? 'skill' : 'dice';
+      openDice({
+        skill,
+        mode,
+        character: selectedHeroes.length > 0 ? selectedHeroes[0] : null,
+        onCleanup: () => interactionHook.setCheckRequest(null)
+      });
     }
-  }, [interactionHook.checkRequest]);
+  }, [interactionHook.checkRequest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // --- Map Movement Handler with AI ---
   const handleMoveOnWorldMap = async (clickedX, clickedY) => {
@@ -281,10 +307,13 @@ const Game = () => {
     });
 
     // POI Check (for location Modal — towns, etc.)
-    const encounter = buildPoiEncounter(targetTile);
-    if (encounter) {
-      setCurrentEncounter(encounter);
-      setIsEncounterModalOpen(true);
+    const poiEncounter = buildPoiEncounter(targetTile);
+    if (poiEncounter) {
+      openEncounterInfo({
+        encounter: poiEncounter,
+        onEnterLocation: () => mapHook.handleEnterLocation(poiEncounter, interactionHook.setConversation, interactionHook.conversation),
+        onViewMap: () => mapHook.setIsMapModalOpen(true)
+      });
     }
 
     // Milestone check: location_visited
@@ -329,8 +358,8 @@ const Game = () => {
 
     if (plannedEncounterFlow.openActionEncounter) {
       setTimeout(() => {
-        setActionEncounter(randomEncounter);
-        setIsActionEncounterOpen(true);
+        // Conflict rule encounter→closes navigation handles closing encounterInfo automatically
+        openEncounterAction({ encounter: randomEncounter });
       }, plannedEncounterFlow.delayMs || 0);
     }
 
@@ -449,10 +478,11 @@ const Game = () => {
     if (penaltyLog) logger.info(penaltyLog);
 
     // Milestone checks after encounter resolution
-    const encounterName = actionEncounter?.name || 'Encounter';
+    const activeEncounter = encounterActionData?.encounter;
+    const encounterName = activeEncounter?.name || 'Encounter';
     if (result?.outcome === 'victory' || result?.outcome === 'success') {
       // Check enemy_defeated milestone
-      const enemyId = actionEncounter?.enemyId || actionEncounter?.name?.toLowerCase().replace(/\s+/g, '_');
+      const enemyId = activeEncounter?.enemyId || activeEncounter?.name?.toLowerCase().replace(/\s+/g, '_');
       if (enemyId) {
         checkMilestoneEvent({ type: 'enemy_defeated', enemyId }, updatedParty);
       }
@@ -478,8 +508,7 @@ const Game = () => {
       });
     }
 
-    setIsActionEncounterOpen(false);
-    setActionEncounter(null);
+    closeEncounterAction();
 
     // Trigger immediate save after encounter to preserve rewards
     setTimeout(() => performSave(), 500);
@@ -566,9 +595,6 @@ const Game = () => {
     }
   }
 
-  const diceSkill = interactionHook.checkRequest?.type === 'skill' ? interactionHook.checkRequest.skill : null;
-  const diceMode = interactionHook.checkRequest?.type === 'skill' ? 'skill' : 'dice';
-
   return (
     <div className="game-page-wrapper">
       {isBackfilling && backfillProgress && (
@@ -614,16 +640,15 @@ const Game = () => {
           worldPosition={mapHook.playerPosition}
           currentBiome={currentBiome}
           onOpenMap={() => mapHook.setIsMapModalOpen(true)}
-          onOpenInventory={() => setIsInventoryModalOpen(true)}
-          onOpenHowToPlay={() => setIsHowToPlayModalOpen(true)}
+          onOpenInventory={() => openInventory({ selectedHeroes })}
+          onOpenHowToPlay={openHowToPlay}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
           onManualSave={async () => {
             const timestamp = new Date();
             const title = `Adventure - ${timestamp.toLocaleDateString()} ${timestamp.toLocaleTimeString()}`;
             const success = await performSave();
             if (success !== false) {
-              setSavedGameTitle(title);
-              setShowSaveConfirmation(true);
+              openSaveConfirmation({ title });
             }
           }}
           canManualSave={!!sessionId}
@@ -650,8 +675,7 @@ const Game = () => {
         <PartySidebar
           selectedHeroes={selectedHeroes}
           onOpenCharacter={(hero) => {
-            setSelectedHeroForModal(hero);
-            setIsHeroModalOpen(true);
+            openHero({ hero });
             setIsMobilePartySidebarOpen(false); // Close sidebar when opening modal
           }}
           className={isMobilePartySidebarOpen ? 'mobile-open' : ''}
@@ -699,8 +723,6 @@ const Game = () => {
         assistantModel={assistantModel}
         setAssistantModel={setAssistantModel}
         worldSeed={worldSeed}
-        isHowToPlayModalOpen={isHowToPlayModalOpen}
-        setIsHowToPlayModalOpen={setIsHowToPlayModalOpen}
         selectedHeroes={selectedHeroes}
         mapHook={mapHook}
         handleMoveOnWorldMap={handleMoveOnWorldMap}
@@ -708,50 +730,30 @@ const Game = () => {
         currentTile={currentTile}
         hasAdventureStarted={hasAdventureStarted}
         handleTownTileClick={handleTownTileClick}
-        isEncounterModalOpen={isEncounterModalOpen}
-        setIsEncounterModalOpen={setIsEncounterModalOpen}
-        currentEncounter={currentEncounter}
-        isHeroModalOpen={isHeroModalOpen}
-        setIsHeroModalOpen={setIsHeroModalOpen}
-        selectedHeroForModal={selectedHeroForModal}
-        isActionEncounterOpen={isActionEncounterOpen}
-        setIsActionEncounterOpen={setIsActionEncounterOpen}
-        setActionEncounter={setActionEncounter}
-        actionEncounter={actionEncounter}
         handleEncounterResolve={handleEncounterResolve}
         handleHeroUpdate={handleHeroUpdate}
-        isInventoryModalOpen={isInventoryModalOpen}
-        setIsInventoryModalOpen={setIsInventoryModalOpen}
-        isDiceModalOpen={isDiceModalOpen}
-        setIsDiceModalOpen={setIsDiceModalOpen}
-        diceSkill={diceSkill}
-        diceMode={diceMode}
         onQuestItemFound={(itemId, itemName) => {
           checkMilestoneEvent({ type: 'item_acquired', itemId }, selectedHeroes);
+        }}
+        party={selectedHeroes}
+        onRest={(restType) => {
+          const restFn = restType === 'long' ? longRest : shortRest;
+          const healingResults = [];
+          const updatedHeroes = selectedHeroes.map(hero => {
+            if (hero.isDefeated) return hero;
+            const name = hero.heroName || hero.characterName || 'Unknown';
+            const before = hero.currentHP;
+            const healed = restFn(hero);
+            healingResults.push({ name, before, after: healed.currentHP, maxHP: healed.maxHP });
+            return healed;
+          });
+          setSelectedHeroes(updatedHeroes);
+          return { restType, healingResults };
         }}
       />
 
       {/* Save Confirmation Modal */}
-      {showSaveConfirmation && (
-        <div className="modal-overlay" onClick={() => setShowSaveConfirmation(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', textAlign: 'center' }}>
-            <h3 style={{ marginBottom: '15px', color: 'var(--state-success)' }}>✓ Game Saved!</h3>
-            <p style={{ marginBottom: '10px', color: 'var(--text)' }}>
-              Your progress has been saved as:
-            </p>
-            <p style={{ marginBottom: '20px', fontWeight: 'bold', color: 'var(--primary)' }}>
-              {savedGameTitle}
-            </p>
-            <button
-              onClick={() => setShowSaveConfirmation(false)}
-              className="primary-button"
-              style={{ padding: '10px 30px' }}
-            >
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
+      <SaveConfirmationModal />
     </div>
   );
 };

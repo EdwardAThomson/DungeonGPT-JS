@@ -41,8 +41,6 @@ const GameModals = ({
   assistantModel,
   setAssistantModel,
   worldSeed,
-  isHowToPlayModalOpen,
-  setIsHowToPlayModalOpen,
   selectedHeroes,
   mapHook,
   handleMoveOnWorldMap,
@@ -50,25 +48,11 @@ const GameModals = ({
   currentTile,
   hasAdventureStarted,
   handleTownTileClick,
-  isEncounterModalOpen,
-  setIsEncounterModalOpen,
-  currentEncounter,
-  isHeroModalOpen,
-  setIsHeroModalOpen,
-  selectedHeroForModal,
-  isActionEncounterOpen,
-  setIsActionEncounterOpen,
-  setActionEncounter,
-  actionEncounter,
   handleEncounterResolve,
   handleHeroUpdate,
-  isInventoryModalOpen,
-  setIsInventoryModalOpen,
-  isDiceModalOpen,
-  setIsDiceModalOpen,
-  diceSkill,
-  diceMode,
-  onQuestItemFound
+  onQuestItemFound,
+  onRest,
+  party
 }) => {
   // Compute which milestone POIs are visible (active or completed, not locked)
   const visibleMilestonePois = useMemo(() => {
@@ -107,10 +91,7 @@ const GameModals = ({
         />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>
-        <HowToPlayModalContent
-        isOpen={isHowToPlayModalOpen}
-        onClose={() => setIsHowToPlayModalOpen(false)}
-        />
+        <HowToPlayModalContent />
       </Suspense>
 
       <Suspense fallback={<ModalLoadingFallback />}>
@@ -147,61 +128,29 @@ const GameModals = ({
         markBuildingDiscovered={mapHook.markBuildingDiscovered}
         visibleMilestonePois={visibleMilestonePois}
         onQuestItemFound={onQuestItemFound}
+        onRest={onRest}
+        party={party}
         />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>
-        <EncounterModal
-        isOpen={isEncounterModalOpen}
-        onClose={() => setIsEncounterModalOpen(false)}
-        encounter={currentEncounter}
-        onEnterLocation={() => mapHook.handleEnterLocation(currentEncounter, interactionHook.setConversation, interactionHook.conversation)}
-        onViewMap={() => mapHook.setIsMapModalOpen(true)}
-        />
+        <EncounterModal />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>
-        <HeroModal
-        isOpen={isHeroModalOpen}
-        onClose={() => setIsHeroModalOpen(false)}
-        hero={selectedHeroForModal}
-        />
+        <HeroModal />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>
         <EncounterActionModal
-        isOpen={isActionEncounterOpen}
-        onClose={() => {
-          setIsActionEncounterOpen(false);
-          setActionEncounter(null);
-        }}
-        encounter={actionEncounter}
         character={selectedHeroes.length > 0 ? selectedHeroes[0] : null}
         party={selectedHeroes}
         onResolve={handleEncounterResolve}
         onCharacterUpdate={handleHeroUpdate}
-        settings={settings}
-        selectedProvider={selectedProvider}
-        selectedModel={selectedModel}
         />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>
-        <PartyInventoryModal
-        isOpen={isInventoryModalOpen}
-        onClose={() => setIsInventoryModalOpen(false)}
-        selectedHeroes={selectedHeroes}
-        />
+        <PartyInventoryModal />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>
-        <DiceRoller
-        isOpen={isDiceModalOpen}
-        onClose={() => {
-          setIsDiceModalOpen(false);
-          if (interactionHook.checkRequest) {
-            interactionHook.setCheckRequest(null);
-          }
-        }}
-        preselectedSkill={diceSkill}
-        initialMode={diceMode}
-        character={selectedHeroes.length > 0 ? selectedHeroes[0] : null}
-        />
+        <DiceRoller />
       </Suspense>
     </>
   );

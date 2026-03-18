@@ -110,7 +110,7 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
 
 // Seeded random number generator
 function seededRandom(seed) {
-  let state = seed;
+  let state = Number.isFinite(seed) ? seed : 42;
   return function () {
     state = (state * 9301 + 49297) % 233280;
     return state / 233280;

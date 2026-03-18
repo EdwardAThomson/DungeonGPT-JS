@@ -124,7 +124,7 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
 
 // Seeded random number generator for reproducible maps
 function seededRandom(seed) {
-  let state = seed;
+  let state = Number.isFinite(seed) ? seed : 42;
   return function () {
     state = (state * 9301 + 49297) % 233280;
     return state / 233280;

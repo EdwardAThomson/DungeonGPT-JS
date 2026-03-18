@@ -181,7 +181,8 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                     return;
                 }
 
-                const seed = parseInt(worldSeed) + (currentTownTile.x * 1000) + (currentTownTile.y * 10000);
+                const rawSeed = parseInt(worldSeed) + ((currentTownTile.x || 0) * 1000) + ((currentTownTile.y || 0) * 10000);
+                const seed = Number.isFinite(rawSeed) ? rawSeed : Math.floor(Math.random() * 1000000);
                 const newTownMap = generateTownMap(
                     townSize,
                     townName,
@@ -222,7 +223,8 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
 
             if (!townMapData) {
                 logger.info('Generating new town map', townName);
-                const seed = worldSeed ? (parseInt(worldSeed) + (townTile.x * 1000) + (townTile.y * 10000)) : (loadedConversation?.sessionId || Math.floor(Math.random() * 1000000));
+                const rawSeed = worldSeed ? (parseInt(worldSeed) + ((townTile.x || 0) * 1000) + ((townTile.y || 0) * 10000)) : (loadedConversation?.sessionId || Math.floor(Math.random() * 1000000));
+                const seed = Number.isFinite(rawSeed) ? rawSeed : Math.floor(Math.random() * 1000000);
                 townMapData = generateTownMap(townSize, townName, 'south', seed, townTile.hasRiver, townTile.riverDirection);
 
                 // Inject quest buildings if needed
