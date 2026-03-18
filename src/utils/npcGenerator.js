@@ -228,6 +228,24 @@ const ROLES = {
         inventory: ["Soot-Stained Clothes", "Shovel", "Waterskin"],
         hpRange: [8, 14]
     },
+    // Banking & Finance
+    "Banker": {
+        possibleTitles: {
+            Male: ["Banker", "Financier", "Moneylender", "Treasurer", "Vault Keeper"],
+            Female: ["Banker", "Financier", "Moneylender", "Treasurer", "Vault Keeper"]
+        },
+        defaultClass: "Expert",
+        baseStats: { Strength: 9, Dexterity: 11, Constitution: 10, Intelligence: 15, Wisdom: 14, Charisma: 13 },
+        inventory: ["Fine Clothes", "Ledger", "Ink & Quill", "Ring of Keys", "Coin Purse"],
+        hpRange: [6, 12]
+    },
+    "Bank Clerk": {
+        possibleTitles: ["Teller", "Clerk", "Bookkeeper", "Accountant", "Apprentice"],
+        defaultClass: "Expert",
+        baseStats: { Strength: 9, Dexterity: 11, Constitution: 10, Intelligence: 13, Wisdom: 12, Charisma: 11 },
+        inventory: ["Simple Clothes", "Ledger", "Ink & Quill", "Abacus"],
+        hpRange: [4, 8]
+    },
     // Logistics & Trade
     "Warehouse Master": {
         possibleTitles: {
@@ -488,6 +506,7 @@ export const populateTown = (townMapData, seed) => {
 
         // 1. Head of House
         const head = addNPC("Noble", mainResidence, mainResidence, { lastName: familyName });
+        if (head.age < 25) head.age = rng.range(25, 45);
         head.job = `${head.title} of ${townName}`;
 
         // 2. Spouse
@@ -497,12 +516,19 @@ export const populateTown = (townMapData, seed) => {
             gender: spouseGender,
             titleIndex: head.selectedTitleIndex // Match title index for spouse correlation
         });
+        spouse.age = head.age + rng.range(-4, 2);
+        if (spouse.age < 20) spouse.age = 20;
         spouse.job = `${spouse.title} of ${townName}`;
 
-        // 3. Children (1-3)
+        // 3. Children (1-3) with coherent ages
+        const nobleYoungestParent = Math.min(head.age, spouse.age);
+        const nobleOldestChildAge = Math.min(15, Math.max(1, nobleYoungestParent - 16));
         const childCount = rng.range(1, 3);
+        let nobleChildAge = nobleOldestChildAge;
         for (let i = 0; i < childCount; i++) {
             const child = addNPC("Noble Child", mainResidence, mainResidence, { lastName: familyName });
+            child.age = nobleChildAge;
+            nobleChildAge = Math.max(1, nobleChildAge - rng.range(1, 3));
             child.job = `${child.title} of the House ${familyName}`;
         }
 
@@ -589,6 +615,11 @@ export const populateTown = (townMapData, seed) => {
         } else if (b.type === 'warehouse') {
             const master = addNPC("Warehouse Master", b, b);
             master.job = `${master.title} of ${b.name}`;
+        } else if (b.type === 'bank') {
+            const banker = addNPC("Banker", b, b);
+            banker.job = `Director of ${b.name}`;
+            const clerk = addNPC("Bank Clerk", b, b);
+            clerk.job = `Clerk at ${b.name}`;
         }
     });
 
@@ -605,6 +636,7 @@ export const populateTown = (townMapData, seed) => {
             // Head of household — mix of landed knights and wealthy merchants
             const isKnight = rng.random() < 0.6;
             const head = addNPC(isKnight ? "Gentry" : "Merchant", home, home, { lastName: familyName });
+            if (head.age < 25) head.age = rng.range(25, 45);
             const gentryOccupations = [
                 "Retired Knight", "Landowner", "Magistrate", "Tax Collector",
                 "Master of Coin", "Horse Breeder", "Patron of the Arts"
@@ -622,12 +654,19 @@ export const populateTown = (townMapData, seed) => {
                 gender: spouseGender,
                 titleIndex: head.selectedTitleIndex
             });
+            spouse.age = head.age + rng.range(-4, 2);
+            if (spouse.age < 20) spouse.age = 20;
             spouse.job = `${spouse.title} of the House ${familyName}`;
 
-            // Children (1-3)
+            // Children (1-3) with coherent ages
+            const gentryYoungestParent = Math.min(head.age, spouse.age);
+            const gentryOldestChildAge = Math.min(15, Math.max(1, gentryYoungestParent - 16));
             const childCount = rng.range(1, 3);
+            let gentryChildAge = gentryOldestChildAge;
             for (let i = 0; i < childCount; i++) {
                 const child = addNPC("Gentry Child", home, home, { lastName: familyName });
+                child.age = gentryChildAge;
+                gentryChildAge = Math.max(1, gentryChildAge - rng.range(1, 3));
                 child.job = `${child.title} of the House ${familyName}`;
             }
 

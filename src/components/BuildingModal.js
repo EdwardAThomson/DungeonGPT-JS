@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { getHPStatus } from '../utils/healthSystem';
 
 const getAbilityModifier = (score) => Math.floor(((score || 10) - 10) / 2);
 
 const RESIDENTIAL_TYPES = ['house', 'manor', 'keep'];
+const REST_BUILDING_TYPES = ['inn', 'tavern'];
 
 const familyRoleLabel = (npc) => {
     if (npc.familyRole === 'head') return 'Head of Household';
@@ -17,17 +19,22 @@ const genderIcon = (gender) => {
     return '';
 };
 
-const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound }) => {
+const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, onRest, party }) => {
     const [imageError, setImageError] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
     const [searchAttempts, setSearchAttempts] = useState(0);
     const [searchResult, setSearchResult] = useState(null); // { success, roll, modifier, dc, total }
     const [itemFound, setItemFound] = useState(false);
+    const [restResult, setRestResult] = useState(null); // { restType, healingResults: [{ name, before, after, maxHP }] }
+    const [showAllNpcs, setShowAllNpcs] = useState(false);
 
     if (!building) return null;
 
     const isResidential = RESIDENTIAL_TYPES.includes(building.buildingType);
+    const canRest = REST_BUILDING_TYPES.includes(building.buildingType);
+    const restType = building.buildingType === 'inn' ? 'long' : 'short';
+    const partyNeedsHealing = party && party.some(h => h.currentHP < h.maxHP && !h.isDefeated);
 
     // Map building types to image names
     const getImageSrc = (type, bld) => {
@@ -212,8 +219,9 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound })
                                 {isResidential ? 'Household' : 'Inhabitants & Workers'}
                             </h4>
                             {uniqueNpcs.length > 0 ? (
+                                <>
                                 <ul style={{ listStyle: 'none', padding: 0, margin: '0' }}>
-                                    {uniqueNpcs.map(npc => {
+                                    {(showAllNpcs ? uniqueNpcs : uniqueNpcs.slice(0, 4)).map(npc => {
                                         const roleLabel = isResidential ? familyRoleLabel(npc) : null;
                                         const isWorksElsewhere = isResidential &&
                                             npc.location && npc.location.homeCoords &&
@@ -267,6 +275,29 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound })
                                         );
                                     })}
                                 </ul>
+                                {uniqueNpcs.length > 4 && (
+                                    <button
+                                        onClick={() => setShowAllNpcs(!showAllNpcs)}
+                                        style={{
+                                            display: 'block',
+                                            width: '100%',
+                                            marginTop: '8px',
+                                            padding: '6px',
+                                            background: 'none',
+                                            border: '1px dashed var(--border)',
+                                            borderRadius: '6px',
+                                            color: 'var(--primary)',
+                                            cursor: 'pointer',
+                                            fontSize: '0.85rem',
+                                            fontFamily: 'var(--body-font)'
+                                        }}
+                                    >
+                                        {showAllNpcs
+                                            ? 'Show less'
+                                            : `Show all (${uniqueNpcs.length - 4} more)`}
+                                    </button>
+                                )}
+                                </>
                             ) : (
                                 <p style={{
                                     fontStyle: 'italic',
@@ -383,6 +414,151 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound })
                             </div>
                         )}
 
+                        {/* Rest Section - for inns and taverns */}
+                        {canRest && onRest && !restResult && (
+                            <div className="modal-section" style={{
+                                backgroundColor: 'rgba(0,0,0,0.03)',
+                                padding: '20px',
+                                borderRadius: '10px',
+                                border: '1px solid var(--border)',
+                                marginTop: '15px'
+                            }}>
+                                <h4 style={{
+                                    borderBottom: '2px solid var(--primary)',
+                                    paddingBottom: '10px',
+                                    margin: '0 0 15px 0',
+                                    color: 'var(--primary)',
+                                    fontFamily: 'var(--header-font)'
+                                }}>
+                                    {restType === 'long' ? 'Rest at the Inn' : 'Take a Breather'}
+                                </h4>
+                                <p style={{
+                                    margin: '0 0 15px 0',
+                                    color: 'var(--text-secondary)',
+                                    fontFamily: 'var(--body-font)',
+                                    fontSize: '0.9rem'
+                                }}>
+                                    {restType === 'long'
+                                        ? 'A warm bed and a good night\'s sleep will fully restore your party\'s health.'
+                                        : 'A hot meal and a stiff drink will restore some of your party\'s vigor.'}
+                                </p>
+                                {/* Party HP preview */}
+                                {party && party.length > 0 && (
+                                    <div style={{ marginBottom: '15px' }}>
+                                        {party.filter(h => !h.isDefeated).map(hero => {
+                                            const name = hero.heroName || hero.characterName || 'Unknown';
+                                            const id = hero.heroId || hero.characterId || name;
+                                            const hpStatus = getHPStatus(hero.currentHP, hero.maxHP);
+                                            const pct = (hero.currentHP / hero.maxHP) * 100;
+                                            return (
+                                                <div key={id} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '10px',
+                                                    marginBottom: '6px',
+                                                    fontSize: '0.85rem'
+                                                }}>
+                                                    <span style={{ width: '100px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                                                    <div style={{
+                                                        flex: 1,
+                                                        height: '10px',
+                                                        background: 'var(--border)',
+                                                        borderRadius: '5px',
+                                                        overflow: 'hidden'
+                                                    }}>
+                                                        <div style={{
+                                                            width: `${pct}%`,
+                                                            height: '100%',
+                                                            background: hpStatus.color,
+                                                            borderRadius: '5px',
+                                                            transition: 'width 0.3s ease'
+                                                        }} />
+                                                    </div>
+                                                    <span style={{ color: hpStatus.color, fontWeight: 'bold', minWidth: '60px', textAlign: 'right' }}>
+                                                        {hero.currentHP}/{hero.maxHP}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                <button
+                                    className="primary-button"
+                                    disabled={!partyNeedsHealing}
+                                    onClick={() => {
+                                        if (onRest) {
+                                            const result = onRest(restType);
+                                            if (result) setRestResult(result);
+                                        }
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px',
+                                        fontWeight: 'bold',
+                                        letterSpacing: '1px',
+                                        opacity: partyNeedsHealing ? 1 : 0.5
+                                    }}
+                                >
+                                    {partyNeedsHealing
+                                        ? (restType === 'long' ? 'Rest (Full Heal)' : 'Rest (Heal 50%)')
+                                        : 'Party is at full health'}
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Rest Result */}
+                        {restResult && (
+                            <div className="modal-section" style={{
+                                backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                                padding: '20px',
+                                borderRadius: '10px',
+                                border: '2px solid rgba(39, 174, 96, 0.5)',
+                                marginTop: '15px'
+                            }}>
+                                <h4 style={{
+                                    margin: '0 0 15px 0',
+                                    color: '#27ae60',
+                                    fontFamily: 'var(--header-font)',
+                                    textAlign: 'center'
+                                }}>
+                                    {restResult.restType === 'long' ? 'Well Rested!' : 'Feeling Refreshed!'}
+                                </h4>
+                                {restResult.healingResults.map(hr => {
+                                    const healed = hr.after - hr.before;
+                                    return (
+                                        <div key={hr.name} style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            marginBottom: '6px',
+                                            fontSize: '0.85rem'
+                                        }}>
+                                            <span style={{ width: '100px', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hr.name}</span>
+                                            <div style={{
+                                                flex: 1,
+                                                height: '10px',
+                                                background: 'var(--border)',
+                                                borderRadius: '5px',
+                                                overflow: 'hidden'
+                                            }}>
+                                                <div style={{
+                                                    width: `${(hr.after / hr.maxHP) * 100}%`,
+                                                    height: '100%',
+                                                    background: '#27ae60',
+                                                    borderRadius: '5px',
+                                                    transition: 'width 0.5s ease'
+                                                }} />
+                                            </div>
+                                            <span style={{ color: '#27ae60', fontWeight: 'bold', minWidth: '90px', textAlign: 'right' }}>
+                                                {hr.before} → {hr.after}
+                                                {healed > 0 && <span style={{ color: '#27ae60', fontSize: '0.8rem' }}> (+{healed})</span>}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
                         <button
                             className="secondary-button"
                             onClick={onClose}
@@ -407,7 +583,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound })
                     className="modal-overlay lightbox-overlay"
                     onClick={toggleLightbox}
                     style={{
-                        zIndex: 2000,
+                        zIndex: 3000,
                         backgroundColor: 'rgba(0,0,0,0.9)',
                         display: 'flex',
                         alignItems: 'center',

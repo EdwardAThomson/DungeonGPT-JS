@@ -33,8 +33,7 @@ const nameComponents = {
   },
   cityNames: [
     'Stronghold', 'Fortress', 'Citadel', 'Bastion', 'Rampart', 'Bulwark',
-    'Keep', 'Castle', 'Tower', 'Spire', 'Crown', 'Throne', 'Palace',
-    'Capital', 'Metropolis', 'Sanctuary', 'Dominion', 'Empire'
+    'Keep', 'Castle', 'Tower', 'Spire', 'Crown', 'Throne', 'Palace'
   ]
 };
 
