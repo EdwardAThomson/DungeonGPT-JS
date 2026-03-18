@@ -89,8 +89,9 @@ const cleanAIResponse = (response, contextToRemove) => {
     cleaned = cleaned.replace(/Describe the arrival.*?narrative description\./gi, '');
 
     // Normalize line breaks: replace single newlines mid-sentence with spaces
-    // but preserve paragraph breaks (double newlines)
-    cleaned = cleaned.replace(/([a-z,])\n([a-z])/gi, '$1 $2');
+    // but preserve paragraph breaks (double newlines).
+    // Handles AI output that wraps lines with optional leading whitespace.
+    cleaned = cleaned.replace(/([a-z,;:.!?'"\u2014])\n[ \t]*([a-z])/gi, '$1 $2');
 
     // Clean up extra whitespace
     cleaned = cleaned.replace(/\n{3,}/g, '\n\n'); // Max 2 newlines

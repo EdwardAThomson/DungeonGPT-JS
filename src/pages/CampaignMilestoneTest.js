@@ -12,6 +12,11 @@ import { spawnWorldMapEntities } from '../game/milestoneSpawner';
 import { generateMapData } from '../utils/mapGenerator';
 import { getMilestoneLocationNames } from '../game/milestoneEngine';
 import WorldMapDisplay from '../components/WorldMapDisplay';
+import SafeMarkdownMessage from '../components/SafeMarkdownMessage';
+import { llmService } from '../services/llmService';
+import { DM_PROTOCOL } from '../data/prompts';
+import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver';
+import { getDefaultProvider } from '../llm/modelResolver';
 
 // --- Milestone data with the full structure ---
 const SAMPLE_CAMPAIGNS = {
@@ -127,6 +132,9 @@ const sectionBox = (extra = {}) => ({ padding: '14px', background: 'var(--surfac
 const sectionTitle = { marginTop: 0, marginBottom: '10px', color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '15px' };
 const labelStyle = { fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', color: 'var(--text-secondary)', marginBottom: '2px' };
 const codeStyle = { fontSize: '11px', background: 'rgba(0,0,0,0.3)', padding: '1px 4px', borderRadius: '3px', color: '#ddd' };
+
+const MILESTONE_COMPLETE_REGEX = /\[COMPLETE_MILESTONE:\s*([\s\S]+?)\]/i;
+const CAMPAIGN_COMPLETE_REGEX = /\[COMPLETE_CAMPAIGN\]/i;
 
 // --- Milestone card (left column) ---
 const MilestoneCard = ({ m, milestones, selected, onSelect }) => {
@@ -297,6 +305,19 @@ const CampaignMilestoneTest = () => {
   const [spawnSeed, setSpawnSeed] = useState(42);
   const [spawnMapData, setSpawnMapData] = useState(null);
 
+  // AI test state
+  const [aiModelOptions] = useState(() => buildModelOptions());
+  const [aiSelectedOption, setAiSelectedOption] = useState(() => {
+    const opts = buildModelOptions();
+    return opts.length > 0 ? `${opts[0].provider}::${opts[0].model}` : '';
+  });
+  const [aiInput, setAiInput] = useState('');
+  const [aiConversation, setAiConversation] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const [aiDetections, setAiDetections] = useState([]); // log of marker detections
+  const [aiLastPrompt, setAiLastPrompt] = useState('');
+
   const campaign = SAMPLE_CAMPAIGNS[selectedCampaign];
   const allComplete = milestones.every(m => m.completed);
   const selectedMilestone = milestones.find(m => m.id === selectedMilestoneId) || null;
@@ -355,6 +376,124 @@ const CampaignMilestoneTest = () => {
     setEventLog([]);
     setLastResult(null);
   };
+
+  // --- AI Milestone Test ---
+  const buildMilestonePromptContext = useCallback(() => {
+    const completed = milestones.filter(m => m.completed);
+    const remaining = milestones.filter(m => !m.completed);
+    const active = remaining.filter(m => areRequirementsMet(m, milestones));
+    const locked = remaining.filter(m => !areRequirementsMet(m, milestones));
+
+    let text = '';
+    if (active.length > 0) {
+      text += '\nActive Milestones: ' + active.map(m => {
+        const typeTag = m.type ? ` [${m.type}]` : '';
+        const levelTag = m.minLevel ? ` (Lv.${m.minLevel}+)` : '';
+        return `${m.text}${typeTag}${levelTag}`;
+      }).join('; ');
+    }
+    if (completed.length > 0) {
+      text += '\nCompleted: ' + completed.map(m => m.text).join('; ');
+    }
+    if (locked.length > 0) {
+      text += '\nLocked (prerequisites not met): ' + locked.map(m => m.text).join('; ');
+    }
+    return text;
+  }, [milestones]);
+
+  const handleAiSend = useCallback(async () => {
+    if (!aiInput.trim() || aiLoading) return;
+
+    const userMsg = { role: 'user', content: aiInput };
+    setAiConversation(prev => [...prev, userMsg]);
+    setAiInput('');
+    setAiLoading(true);
+    setAiError(null);
+
+    const [provider, model] = aiSelectedOption.split('::');
+    const resolved = resolveProviderAndModel(provider, model);
+
+    const milestonesInfo = buildMilestonePromptContext();
+    const gameContext = `Setting: ${campaign.name} campaign.${campaign.campaignGoal ? `\nGoal: ${campaign.campaignGoal}` : ''}${milestonesInfo}\nThe party is on an adventure.`;
+
+    const recentMessages = aiConversation.slice(-6).map(m =>
+      `${m.role === 'ai' ? 'DM' : 'Player'}: ${m.content}`
+    ).join('\n');
+
+    const prompt = DM_PROTOCOL + `[CONTEXT]\n${gameContext}\n\n[SUMMARY]\n${recentMessages || 'The adventure continues.'}\n\n[PLAYER ACTION]\n${aiInput}\n\n[NARRATE]`;
+    setAiLastPrompt(prompt);
+
+    try {
+      let response = await llmService.generateUnified({
+        provider: resolved.provider,
+        model: resolved.model,
+        prompt,
+        maxTokens: 1200,
+        temperature: 0.7
+      });
+
+      // Normalize mid-sentence newlines (same fix as useGameInteraction)
+      response = response.replace(/([a-z,;:.!?'"\u2014])\n[ \t]*([a-z])/gi, '$1 $2');
+      response = response.replace(/\n{3,}/g, '\n\n').trim();
+
+      // Check for milestone marker
+      const milestoneMatch = response.match(MILESTONE_COMPLETE_REGEX);
+      if (milestoneMatch) {
+        const milestoneText = milestoneMatch[1].replace(/\s+/g, ' ').trim();
+        const matchedMilestone = milestones.find(m =>
+          m.text.toLowerCase().includes(milestoneText.toLowerCase()) ||
+          milestoneText.toLowerCase().includes(m.text.toLowerCase())
+        );
+
+        setAiDetections(prev => [{
+          timestamp: new Date().toLocaleTimeString(),
+          marker: milestoneMatch[0],
+          extractedText: milestoneText,
+          matched: matchedMilestone ? `#${matchedMilestone.id}: ${matchedMilestone.text}` : null,
+          type: 'milestone'
+        }, ...prev]);
+
+        if (matchedMilestone) {
+          setMilestones(prev => prev.map(m =>
+            m.id === matchedMilestone.id ? { ...m, completed: true } : m
+          ));
+        }
+
+        // Strip marker from display
+        response = response.replace(milestoneMatch[0], '').trim();
+      }
+
+      // Check for campaign completion marker
+      const campaignMatch = response.match(CAMPAIGN_COMPLETE_REGEX);
+      if (campaignMatch) {
+        setAiDetections(prev => [{
+          timestamp: new Date().toLocaleTimeString(),
+          marker: campaignMatch[0],
+          extractedText: 'Campaign Complete',
+          matched: 'Campaign goal achieved',
+          type: 'campaign'
+        }, ...prev]);
+        response = response.replace(campaignMatch[0], '').trim();
+      }
+
+      if (!milestoneMatch && !campaignMatch) {
+        setAiDetections(prev => [{
+          timestamp: new Date().toLocaleTimeString(),
+          marker: null,
+          extractedText: 'No markers found',
+          matched: null,
+          type: 'none'
+        }, ...prev]);
+      }
+
+      const aiMsg = { role: 'ai', content: response };
+      setAiConversation(prev => [...prev, aiMsg]);
+    } catch (err) {
+      setAiError(err.message);
+    } finally {
+      setAiLoading(false);
+    }
+  }, [aiInput, aiLoading, aiSelectedOption, aiConversation, milestones, campaign, buildMilestonePromptContext]);
 
   const resultColors = {
     campaign_complete: { bg: 'rgba(212,175,55,0.2)', border: 'var(--primary)', text: 'var(--primary)' },
@@ -476,6 +615,141 @@ const CampaignMilestoneTest = () => {
             <div style={{ fontSize: '10px', marginTop: '2px' }}>Should not match</div>
           </button>
         </div>
+      </div>
+
+      {/* SECTION 2.5: AI Milestone Test */}
+      <div style={sectionBox({ marginBottom: '14px', borderColor: '#ffa726', borderWidth: '2px' })}>
+        <h2 style={sectionTitle}>AI Milestone Test</h2>
+        <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: 0, marginBottom: '10px' }}>
+          Chat with the AI using DM_PROTOCOL + milestone context. Narrative milestones should trigger <code style={codeStyle}>[COMPLETE_MILESTONE]</code> markers. Mechanical milestones (item/combat/location) are engine-detected and the AI should <strong>not</strong> mark them.
+        </p>
+
+        {/* Provider/model selector */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
+          <label style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Provider/Model:</label>
+          <select
+            value={aiSelectedOption}
+            onChange={(e) => setAiSelectedOption(e.target.value)}
+            style={{
+              padding: '4px 8px', borderRadius: '4px', fontSize: '12px', flex: 1, maxWidth: '320px',
+              border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)'
+            }}
+          >
+            {aiModelOptions.map(opt => (
+              <option key={`${opt.provider}::${opt.model}`} value={`${opt.provider}::${opt.model}`}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => { setAiConversation([]); setAiDetections([]); setAiError(null); setAiLastPrompt(''); }}
+            style={{
+              padding: '4px 10px', borderRadius: '4px', fontSize: '11px', cursor: 'pointer',
+              border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-secondary)'
+            }}
+          >Clear Chat</button>
+        </div>
+
+        {/* Chat area */}
+        <div style={{
+          maxHeight: '300px', overflowY: 'auto', marginBottom: '10px', padding: '8px',
+          background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)'
+        }}>
+          {aiConversation.length === 0 && (
+            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center', padding: '20px' }}>
+              Send a message to test AI milestone detection. Try narrative actions like "I convince the Silver Guard captain to join our cause."
+            </div>
+          )}
+          {aiConversation.map((msg, i) => (
+            <div key={i} style={{
+              marginBottom: '8px', padding: '8px 10px', borderRadius: '6px',
+              background: msg.role === 'user' ? 'rgba(79,195,247,0.08)' : 'rgba(255,167,38,0.08)',
+              borderLeft: `3px solid ${msg.role === 'user' ? '#4fc3f7' : '#ffa726'}`
+            }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600 }}>
+                {msg.role === 'user' ? 'Player' : 'DM'}
+              </div>
+              <div style={{ fontSize: '13px' }}>
+                {msg.role === 'ai' ? <SafeMarkdownMessage content={msg.content} /> : msg.content}
+              </div>
+            </div>
+          ))}
+          {aiLoading && (
+            <div style={{ textAlign: 'center', padding: '10px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+              Generating response...
+            </div>
+          )}
+        </div>
+
+        {/* Input */}
+        <form onSubmit={(e) => { e.preventDefault(); handleAiSend(); }} style={{ display: 'flex', gap: '6px' }}>
+          <input
+            type="text"
+            value={aiInput}
+            onChange={(e) => setAiInput(e.target.value)}
+            placeholder="Type a player action..."
+            disabled={aiLoading}
+            style={{
+              flex: 1, padding: '8px 12px', borderRadius: '6px', fontSize: '13px',
+              border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)'
+            }}
+          />
+          <button
+            type="submit"
+            disabled={aiLoading || !aiInput.trim()}
+            style={{
+              padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              border: '1px solid var(--primary)', background: 'rgba(212,175,55,0.15)', color: 'var(--text)',
+              opacity: aiLoading || !aiInput.trim() ? 0.5 : 1
+            }}
+          >Send</button>
+        </form>
+
+        {aiError && (
+          <div style={{ marginTop: '8px', padding: '6px 10px', borderRadius: '4px', fontSize: '12px', background: 'rgba(239,83,80,0.15)', border: '1px solid #ef5350', color: '#ef5350' }}>
+            {aiError}
+          </div>
+        )}
+
+        {/* Detection log */}
+        {aiDetections.length > 0 && (
+          <div style={{ marginTop: '10px' }}>
+            <div style={labelStyle}>Marker Detection Log</div>
+            <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+              {aiDetections.map((d, i) => (
+                <div key={i} style={{
+                  padding: '4px 6px', marginBottom: '2px', borderRadius: '3px', fontSize: '11px',
+                  background: 'var(--bg)', border: '1px solid var(--border)'
+                }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>{d.timestamp}</span>{' '}
+                  {d.type === 'milestone' && d.matched && (
+                    <span style={{ color: '#4caf50' }}>MILESTONE DETECTED: <code style={codeStyle}>{d.marker}</code> → {d.matched}</span>
+                  )}
+                  {d.type === 'milestone' && !d.matched && (
+                    <span style={{ color: '#ef5350' }}>MILESTONE NOT MATCHED: <code style={codeStyle}>{d.marker}</code> — "{d.extractedText}" didn't match any milestone</span>
+                  )}
+                  {d.type === 'campaign' && (
+                    <span style={{ color: 'var(--primary)' }}>CAMPAIGN COMPLETE DETECTED: <code style={codeStyle}>{d.marker}</code></span>
+                  )}
+                  {d.type === 'none' && (
+                    <span style={{ color: 'var(--text-secondary)' }}>No markers in response</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Last prompt (collapsible) */}
+        {aiLastPrompt && (
+          <details style={{ marginTop: '10px' }}>
+            <summary style={{ fontSize: '11px', color: 'var(--text-secondary)', cursor: 'pointer' }}>View last prompt sent to AI</summary>
+            <pre style={{
+              fontSize: '10px', padding: '8px', marginTop: '4px', borderRadius: '4px', maxHeight: '200px', overflowY: 'auto',
+              background: 'rgba(0,0,0,0.3)', color: '#ccc', whiteSpace: 'pre-wrap', wordBreak: 'break-word'
+            }}>{aiLastPrompt}</pre>
+          </details>
+        )}
       </div>
 
       {/* SECTION 3: Last Result */}
