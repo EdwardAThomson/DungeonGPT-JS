@@ -329,7 +329,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
       houses: 25
     },
     city: {
-      important: ['temple', 'market', 'blacksmith', 'tavern', 'tavern', 'tavern', 'bank', 'bank', 'bank'],
+      important: ['inn', 'temple', 'temple', 'market', 'blacksmith', 'tavern', 'tavern', 'tavern', 'bank', 'bank', 'bank'],
       secondary: ['guild', 'guild', 'guild', 'alchemist', 'alchemist', 'archives', 'library', 'foundry', 'warehouse', 'warehouse'],
       houses: 55,
       hasKeep: true,
@@ -506,35 +506,51 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
     logger.debug(`[TOWN_MAP] Placed ${manorsPlaced} noble estate manors clustered near (${estateStartX}, ${estateStartY})`);
   }
 
+  // Track used building names to prevent duplicates within a town
+  const usedNames = new Set();
+
+  // Generate a unique name using the given generator, retrying on collisions
+  const uniqueName = (generator) => {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const name = generator();
+      if (!usedNames.has(name)) {
+        usedNames.add(name);
+        return name;
+      }
+    }
+    // Fallback: accept the last generated name rather than looping forever
+    return generator();
+  };
+
   // Helper: assign a generated name to a building tile based on its type
   const assignBuildingName = (tile, buildingType) => {
     if (buildingType === 'tavern' || buildingType === 'inn') {
-      tile.buildingName = generateTavernName(rng);
+      tile.buildingName = uniqueName(() => generateTavernName(rng));
     } else if (buildingType === 'guild') {
-      tile.buildingName = generateGuildName(rng);
+      tile.buildingName = uniqueName(() => generateGuildName(rng));
     } else if (buildingType === 'bank') {
-      tile.buildingName = generateBankName(rng);
+      tile.buildingName = uniqueName(() => generateBankName(rng));
     } else if (buildingType === 'shop' || buildingType === 'market') {
-      tile.buildingName = generateShopName(rng);
+      tile.buildingName = uniqueName(() => generateShopName(rng));
     } else if (buildingType === 'blacksmith') {
       const blacksmithNames = ["Iron Anvil", "Heavy Hammer", "Strong Forge", "Dragon Sunder", "Steel Strike", "The Hearth Forge"];
-      tile.buildingName = blacksmithNames[Math.floor(rng() * blacksmithNames.length)];
+      tile.buildingName = uniqueName(() => blacksmithNames[Math.floor(rng() * blacksmithNames.length)]);
     } else if (buildingType === 'manor' || buildingType === 'keep') {
-      tile.buildingName = generateManorName(rng);
+      tile.buildingName = uniqueName(() => generateManorName(rng));
     } else if (buildingType === 'temple') {
-      tile.buildingName = generateTempleName(rng);
+      tile.buildingName = uniqueName(() => generateTempleName(rng));
     } else if (buildingType === 'archives' || buildingType === 'library') {
       const archiveNames = ["Hall of Records", "The Dusty Stacks", "Lorekeeper's Archive", "The Old Library", "Scholar's Rest", "The Athenaeum"];
-      tile.buildingName = archiveNames[Math.floor(rng() * archiveNames.length)];
+      tile.buildingName = uniqueName(() => archiveNames[Math.floor(rng() * archiveNames.length)]);
     } else if (buildingType === 'alchemist') {
       const alchemistNames = ["The Bubbling Flask", "Elixir & Tonic", "The Green Vial", "Apothecary's Den", "The Alembic", "Mystic Brews"];
-      tile.buildingName = alchemistNames[Math.floor(rng() * alchemistNames.length)];
+      tile.buildingName = uniqueName(() => alchemistNames[Math.floor(rng() * alchemistNames.length)]);
     } else if (buildingType === 'foundry') {
       const foundryNames = ["The Great Furnace", "Ironworks", "The Smeltery", "Crucible Foundry", "The Fire Pit", "Molten Works"];
-      tile.buildingName = foundryNames[Math.floor(rng() * foundryNames.length)];
+      tile.buildingName = uniqueName(() => foundryNames[Math.floor(rng() * foundryNames.length)]);
     } else if (buildingType === 'warehouse') {
       const warehouseNames = ["The Storehouse", "Trade Depot", "The Granary", "Merchant's Cache", "The Vault", "Supply Hold"];
-      tile.buildingName = warehouseNames[Math.floor(rng() * warehouseNames.length)];
+      tile.buildingName = uniqueName(() => warehouseNames[Math.floor(rng() * warehouseNames.length)]);
     }
   };
 

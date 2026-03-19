@@ -168,7 +168,8 @@ export const generateEncounterSummary = async (roundState) => {
   }, { xp: 0, gold: 0, items: [] });
   
   // Aggregate penalties (penalties is an object with messages, goldLoss, itemsLost)
-  const totalPenalties = rounds.reduce((acc, r) => {
+  // Deduplicate status messages and consolidate gold loss into a single message
+  const rawPenalties = rounds.reduce((acc, r) => {
     if (!r.result.penalties) return acc;
     return {
       messages: [...acc.messages, ...(r.result.penalties.messages || [])],
@@ -176,6 +177,20 @@ export const generateEncounterSummary = async (roundState) => {
       itemsLost: [...acc.itemsLost, ...(r.result.penalties.itemsLost || [])]
     };
   }, { messages: [], goldLoss: 0, itemsLost: [] });
+
+  // Deduplicate: keep unique status messages, replace per-round gold messages with one total
+  const goldPattern = /^Lost \d+ gold/;
+  const uniqueStatusMessages = [...new Set(
+    rawPenalties.messages.filter(m => !goldPattern.test(m))
+  )];
+  if (rawPenalties.goldLoss > 0) {
+    uniqueStatusMessages.push(`Lost ${rawPenalties.goldLoss} gold`);
+  }
+  const totalPenalties = {
+    messages: uniqueStatusMessages,
+    goldLoss: rawPenalties.goldLoss,
+    itemsLost: rawPenalties.itemsLost
+  };
   
   // Add outcome-based modifiers
   if (outcome === 'victory') {
