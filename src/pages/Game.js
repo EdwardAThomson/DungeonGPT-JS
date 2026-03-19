@@ -640,7 +640,14 @@ const Game = () => {
           worldPosition={mapHook.playerPosition}
           currentBiome={currentBiome}
           onOpenMap={() => mapHook.setIsMapModalOpen(true)}
-          onOpenInventory={() => openInventory({ selectedHeroes })}
+          onOpenInventory={() => openInventory({
+            selectedHeroes,
+            onUseItem: (heroId, itemKey, healedHero) => {
+              setSelectedHeroes(prev => prev.map(h =>
+                h.characterId === heroId ? healedHero : h
+              ));
+            }
+          })}
           onOpenHowToPlay={openHowToPlay}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
           onManualSave={async () => {

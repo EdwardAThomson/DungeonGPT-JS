@@ -1,12 +1,31 @@
-import React, { useState } from 'react';
-import { ITEM_CATALOG } from '../utils/inventorySystem';
+import React, { useState, useEffect, useRef } from 'react';
+import { ITEM_CATALOG, rollDice, removeItem } from '../utils/inventorySystem';
+import { applyHealing, getHPStatus } from '../utils/healthSystem';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
 
 const PartyInventoryModal = () => {
   const { isOpen, data, close } = useModal('inventory');
   const selectedHeroes = data?.selectedHeroes || [];
+  const onUseItem = data?.onUseItem;
   const [selectedImage, setSelectedImage] = useState(null);
+  const [useItemState, setUseItemState] = useState(null); // { itemKey } — hero picker
+  const [useResults, setUseResults] = useState([]); // [{ heroName, itemName, rolled, healed, id }]
+  const [usedItems, setUsedItems] = useState({}); // { itemKey: count } — local consumption tracker
+  const [hpAdjustments, setHpAdjustments] = useState({}); // { characterId: healedAmount }
+  const resultTimers = useRef([]);
+
+  // Clear results and state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setUseItemState(null);
+      setUseResults([]);
+      setUsedItems({});
+      setHpAdjustments({});
+      resultTimers.current.forEach(clearTimeout);
+      resultTimers.current = [];
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -21,15 +40,89 @@ const PartyInventoryModal = () => {
     const quantity = item.quantity || 1;
     const rarity = catalogEntry?.rarity || item.rarity || 'common';
     const icon = catalogEntry?.icon || item.icon || null;
-
     const description = catalogEntry?.description || item.description || null;
+    const effect = catalogEntry?.effect || null;
+    const amount = catalogEntry?.amount || null;
 
     if (itemMap[key]) {
       itemMap[key].quantity += quantity;
     } else {
-      itemMap[key] = { name, quantity, rarity, icon, description };
+      itemMap[key] = { name, quantity, rarity, icon, description, effect, amount };
     }
   }
+
+  // Subtract locally consumed items from displayed quantities
+  for (const [key, count] of Object.entries(usedItems)) {
+    if (itemMap[key]) {
+      itemMap[key].quantity -= count;
+      if (itemMap[key].quantity <= 0) delete itemMap[key];
+    }
+  }
+
+  const isHealingItem = (item) => item.effect === 'heal' && item.amount;
+  const injuredHeroes = selectedHeroes
+    .map(h => {
+      const adj = hpAdjustments[h.characterId] || 0;
+      return adj ? { ...h, currentHP: Math.min(h.maxHP, h.currentHP + adj) } : h;
+    })
+    .filter(h => h.currentHP < h.maxHP && !h.isDefeated);
+
+  // Find which hero actually owns an item (first hero with it in inventory)
+  const findItemOwner = (itemKey) => {
+    return selectedHeroes.find(h =>
+      (h.inventory || []).some(i => (typeof i === 'string' ? i : i.key) === itemKey)
+    );
+  };
+
+  const handleUsePotion = (heroIndex) => {
+    const { itemKey } = useItemState;
+    const target = selectedHeroes[heroIndex];
+    const catalogEntry = ITEM_CATALOG[itemKey];
+    const rolled = rollDice(catalogEntry.amount);
+    const before = target.currentHP;
+    const healed = applyHealing(target, rolled);
+    const actualHeal = healed.currentHP - before;
+
+    // Remove item from the hero who owns it
+    const owner = findItemOwner(itemKey);
+    const updatedInventory = removeItem(owner.inventory || [], itemKey, 1);
+    const updatedOwner = { ...owner, inventory: updatedInventory };
+
+    // If owner is the same as target, merge both changes
+    const finalHero = owner.characterId === target.characterId
+      ? { ...healed, inventory: updatedInventory }
+      : healed;
+
+    // Update the target hero (healed)
+    if (onUseItem) {
+      onUseItem(target.characterId, itemKey, finalHero);
+      // If owner is different from target, also update the owner's inventory
+      if (owner.characterId !== target.characterId) {
+        onUseItem(owner.characterId, itemKey, updatedOwner);
+      }
+    }
+
+    // Track locally for instant UI updates
+    setUsedItems(prev => ({ ...prev, [itemKey]: (prev[itemKey] || 0) + 1 }));
+    setHpAdjustments(prev => ({
+      ...prev,
+      [target.characterId]: (prev[target.characterId] || 0) + actualHeal
+    }));
+
+    const resultId = Date.now();
+    setUseResults(prev => [...prev, {
+      heroName: target.characterName || target.name,
+      itemName: catalogEntry.name,
+      rolled,
+      healed: actualHeal,
+      id: resultId
+    }]);
+    const timer = setTimeout(() => {
+      setUseResults(prev => prev.filter(r => r.id !== resultId));
+    }, 4000);
+    resultTimers.current.push(timer);
+    setUseItemState(null);
+  };
 
   const rarityColors = {
     common: '#9d9d9d',
@@ -228,11 +321,116 @@ const PartyInventoryModal = () => {
                       x{item.quantity}
                     </span>
                   )}
+                  {isHealingItem(item) && injuredHeroes.length > 0 && onUseItem && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setUseItemState({ itemKey: key });
+                      }}
+                      style={{
+                        background: '#27ae60',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '4px 10px',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      Use
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        {/* Hero picker for using a healing item */}
+        {useItemState && (
+          <div style={{
+            marginTop: '16px',
+            padding: '16px',
+            background: 'rgba(39, 174, 96, 0.1)',
+            border: '1px solid #27ae60',
+            borderRadius: '8px'
+          }}>
+            <h4 style={{ margin: '0 0 12px 0', color: '#27ae60', fontFamily: 'var(--header-font)' }}>
+              Use {ITEM_CATALOG[useItemState.itemKey]?.name} on...
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {injuredHeroes.map((hero) => {
+                const hpStatus = getHPStatus(hero.currentHP, hero.maxHP);
+                const heroIndex = selectedHeroes.findIndex(h => h.characterId === hero.characterId);
+                return (
+                  <button
+                    key={hero.characterId}
+                    onClick={() => handleUsePotion(heroIndex)}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      padding: '10px 14px',
+                      background: 'rgba(0,0,0,0.2)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '6px',
+                      color: 'var(--text)',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--body-font)',
+                      fontSize: '0.95rem'
+                    }}
+                  >
+                    <span style={{ fontWeight: 'bold' }}>{hero.characterName || hero.name}</span>
+                    <span style={{ color: hpStatus.color, fontSize: '0.85rem' }}>
+                      {hero.currentHP} / {hero.maxHP} HP
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => setUseItemState(null)}
+              style={{
+                marginTop: '10px',
+                padding: '6px 14px',
+                background: 'none',
+                border: '1px solid var(--border)',
+                borderRadius: '4px',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                fontSize: '0.85rem'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* Potion use results */}
+        {useResults.length > 0 && (
+          <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {useResults.map(result => (
+              <div key={result.id} style={{
+                padding: '14px 16px',
+                background: 'rgba(39, 174, 96, 0.1)',
+                border: '1px solid #27ae60',
+                borderRadius: '8px',
+                textAlign: 'center',
+                color: 'var(--text)',
+                fontFamily: 'var(--body-font)'
+              }}>
+                <span style={{ fontSize: '1.1rem' }}>
+                  {result.itemName} restored <strong style={{ color: '#27ae60' }}>{result.healed} HP</strong> to {result.heroName}
+                </span>
+                <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  (rolled {result.rolled})
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <button
           onClick={close}

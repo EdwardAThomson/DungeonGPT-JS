@@ -226,7 +226,8 @@ export const ITEM_CATALOG = {
   // Encounter reward items
   'medical_journal': { name: 'Medical Journal', rarity: 'uncommon', value: 30, icon: 'assets/icons/items/medical_journal.webp' },
   'medicine_kit': { name: 'Medicine Kit', rarity: 'uncommon', value: 45, effect: 'heal', amount: '2d4', icon: 'assets/icons/items/medicine_kit.webp' },
-  'uncovered_ruins': { name: 'Ruins Map Fragment', rarity: 'uncommon', value: 50, type: 'quest_item', icon: 'assets/icons/items/uncovered_ruins.webp' }
+  'uncovered_ruins': { name: 'Ruins Map Fragment', rarity: 'uncommon', value: 50, type: 'quest_item', icon: 'assets/icons/items/uncovered_ruins.webp' },
+  'map_fragment': { name: 'Map Fragment', rarity: 'uncommon', value: 25, icon: 'assets/icons/items/map_fragment.webp' }
 };
 
 /**
