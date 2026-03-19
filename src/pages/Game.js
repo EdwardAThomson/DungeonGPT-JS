@@ -743,6 +743,33 @@ const Game = () => {
           checkMilestoneEvent({ type: 'item_acquired', itemId }, selectedHeroes);
         }}
         party={selectedHeroes}
+        onResurrect={(heroId, goldCost) => {
+          // Deduct gold from party members (spread cost across heroes with gold)
+          let remaining = goldCost;
+          const afterGold = selectedHeroes.map(h => {
+            if (remaining <= 0) return h;
+            const available = h.gold || 0;
+            const deducted = Math.min(available, remaining);
+            remaining -= deducted;
+            return { ...h, gold: available - deducted };
+          });
+
+          // Resurrect the hero at 50% HP
+          const updatedHeroes = afterGold.map(h => {
+            const id = h.characterId || h.heroId;
+            if (id !== heroId) return h;
+            const halfHP = Math.max(1, Math.floor(h.maxHP * 0.5));
+            return { ...h, currentHP: halfHP, isDefeated: false };
+          });
+
+          const hero = updatedHeroes.find(h => (h.characterId || h.heroId) === heroId);
+          setSelectedHeroes(updatedHeroes);
+          return {
+            heroName: hero.heroName || hero.characterName || 'Unknown',
+            hpRestored: hero.currentHP,
+            goldCost
+          };
+        }}
         onRest={(restType) => {
           const restFn = restType === 'long' ? longRest : shortRest;
           const healingResults = [];

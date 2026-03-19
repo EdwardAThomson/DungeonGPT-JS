@@ -26,8 +26,10 @@ const PartySidebar = ({ selectedHeroes = [], onOpenCharacter, className = '' }) 
           const charClass = hero.heroClass || hero.characterClass || '';
           const id = hero.heroId || hero.characterId || name;
 
+          const defeated = hero.currentHP === 0 || hero.isDefeated;
+
           return (
-            <div key={id} className="party-member">
+            <div key={id} className="party-member" style={defeated ? { opacity: 0.45, filter: 'grayscale(70%)' } : undefined}>
               {hero.profilePicture && (
                 <img
                   src={resolveProfilePicture(hero.profilePicture)}

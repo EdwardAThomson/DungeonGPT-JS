@@ -19,7 +19,9 @@ const genderIcon = (gender) => {
     return '';
 };
 
-const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, onRest, party }) => {
+const RESURRECTION_COST_PER_LEVEL = 25;
+
+const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, onRest, onResurrect, party }) => {
     const [imageError, setImageError] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -27,14 +29,18 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
     const [searchResult, setSearchResult] = useState(null); // { success, roll, modifier, dc, total }
     const [itemFound, setItemFound] = useState(false);
     const [restResult, setRestResult] = useState(null); // { restType, healingResults: [{ name, before, after, maxHP }] }
+    const [resurrectionResult, setResurrectionResult] = useState(null); // { heroName, hpRestored, goldCost }
     const [showAllNpcs, setShowAllNpcs] = useState(false);
 
     if (!building) return null;
 
     const isResidential = RESIDENTIAL_TYPES.includes(building.buildingType);
+    const isTemple = building.buildingType === 'temple';
     const canRest = REST_BUILDING_TYPES.includes(building.buildingType);
     const restType = building.buildingType === 'inn' ? 'long' : 'short';
     const partyNeedsHealing = party && party.some(h => h.currentHP < h.maxHP && !h.isDefeated);
+    const defeatedHeroes = party ? party.filter(h => h.isDefeated || h.currentHP <= 0) : [];
+    const totalGold = party ? party.reduce((sum, h) => sum + (h.gold || 0), 0) : 0;
 
     // Map building types to image names
     const getImageSrc = (type, bld) => {
@@ -556,6 +562,104 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                         </div>
                                     );
                                 })}
+                            </div>
+                        )}
+
+                        {/* Resurrection Section - temples only */}
+                        {isTemple && onResurrect && defeatedHeroes.length > 0 && !resurrectionResult && (
+                            <div className="modal-section" style={{
+                                backgroundColor: 'rgba(0,0,0,0.03)',
+                                padding: '20px',
+                                borderRadius: '10px',
+                                border: '2px solid #8e44ad',
+                                marginTop: '15px'
+                            }}>
+                                <h4 style={{
+                                    borderBottom: '2px solid #8e44ad',
+                                    paddingBottom: '10px',
+                                    margin: '0 0 15px 0',
+                                    color: '#8e44ad',
+                                    fontFamily: 'var(--header-font)'
+                                }}>
+                                    Resurrection Rites
+                                </h4>
+                                <p style={{
+                                    margin: '0 0 15px 0',
+                                    color: 'var(--text-secondary)',
+                                    fontFamily: 'var(--body-font)',
+                                    fontSize: '0.9rem'
+                                }}>
+                                    The priests can perform a resurrection ritual to revive a fallen companion. They will be restored to half health.
+                                </p>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {defeatedHeroes.map(hero => {
+                                        const name = hero.heroName || hero.characterName || 'Unknown';
+                                        const id = hero.heroId || hero.characterId || name;
+                                        const level = hero.level || hero.heroLevel || hero.characterLevel || 1;
+                                        const cost = RESURRECTION_COST_PER_LEVEL * level;
+                                        const canAfford = totalGold >= cost;
+                                        return (
+                                            <button
+                                                key={id}
+                                                disabled={!canAfford}
+                                                onClick={() => {
+                                                    const result = onResurrect(hero.characterId || hero.heroId, cost);
+                                                    if (result) setResurrectionResult(result);
+                                                }}
+                                                style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    padding: '12px 14px',
+                                                    background: canAfford ? 'rgba(142, 68, 173, 0.1)' : 'rgba(0,0,0,0.05)',
+                                                    border: canAfford ? '1px solid #8e44ad' : '1px solid var(--border)',
+                                                    borderRadius: '8px',
+                                                    color: canAfford ? 'var(--text)' : 'var(--text-secondary)',
+                                                    cursor: canAfford ? 'pointer' : 'not-allowed',
+                                                    fontFamily: 'var(--body-font)',
+                                                    fontSize: '0.9rem',
+                                                    opacity: canAfford ? 1 : 0.5
+                                                }}
+                                            >
+                                                <span>
+                                                    <span style={{ fontWeight: 'bold' }}>💀 {name}</span>
+                                                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginLeft: '8px' }}>
+                                                        Lvl {level}
+                                                    </span>
+                                                </span>
+                                                <span style={{ fontWeight: 'bold', color: canAfford ? '#d4af37' : 'var(--text-secondary)' }}>
+                                                    {cost} GP
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Resurrection Result */}
+                        {resurrectionResult && (
+                            <div className="modal-section" style={{
+                                backgroundColor: 'rgba(142, 68, 173, 0.1)',
+                                padding: '20px',
+                                borderRadius: '10px',
+                                border: '2px solid rgba(142, 68, 173, 0.5)',
+                                marginTop: '15px',
+                                textAlign: 'center'
+                            }}>
+                                <h4 style={{
+                                    margin: '0 0 10px 0',
+                                    color: '#8e44ad',
+                                    fontFamily: 'var(--header-font)'
+                                }}>
+                                    Resurrection Complete
+                                </h4>
+                                <p style={{ margin: 0, fontFamily: 'var(--body-font)', fontSize: '0.95rem' }}>
+                                    {resurrectionResult.heroName} has been restored to life with <strong style={{ color: '#27ae60' }}>{resurrectionResult.hpRestored} HP</strong>.
+                                </p>
+                                <p style={{ margin: '6px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                    The ritual cost {resurrectionResult.goldCost} gold.
+                                </p>
                             </div>
                         )}
 

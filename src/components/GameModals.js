@@ -52,6 +52,7 @@ const GameModals = ({
   handleHeroUpdate,
   onQuestItemFound,
   onRest,
+  onResurrect,
   party
 }) => {
   // Compute which milestone POIs are visible (active or completed, not locked)
@@ -129,6 +130,7 @@ const GameModals = ({
         visibleMilestonePois={visibleMilestonePois}
         onQuestItemFound={onQuestItemFound}
         onRest={onRest}
+        onResurrect={onResurrect}
         party={party}
         />
       </Suspense>

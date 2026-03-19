@@ -25,7 +25,11 @@ const formatCampaignMilestones = (milestones) => {
 };
 
 export const formatPartyInfo = (selectedHeroes = []) => {
-  return selectedHeroes.map((hero) => `${hero.characterName} (${hero.characterClass})`).join(', ');
+  return selectedHeroes.map((hero) => {
+    const defeated = hero.currentHP <= 0 || hero.isDefeated;
+    if (defeated) return `${hero.characterName} (${hero.characterClass}) [DEFEATED - unconscious/incapacitated, cannot act]`;
+    return `${hero.characterName} (${hero.characterClass})`;
+  }).join(', ');
 };
 
 export const buildLocationInfo = ({ tile, coords, isNewArea }) => {

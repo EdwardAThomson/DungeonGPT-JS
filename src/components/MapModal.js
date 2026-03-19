@@ -3,7 +3,7 @@ import FocusTrap from 'focus-trap-react';
 import WorldMapDisplay from './WorldMapDisplay';
 import TownMapDisplay from './TownMapDisplay';
 
-const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered, visibleMilestonePois, onQuestItemFound, onRest, party }) => {
+const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered, visibleMilestonePois, onQuestItemFound, onRest, onResurrect, party }) => {
     const previousFocusRef = useRef(null);
     const modalRef = useRef(null);
 
@@ -89,6 +89,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                         markBuildingDiscovered={markBuildingDiscovered}
                         onQuestItemFound={onQuestItemFound}
                         onRest={onRest}
+                        onResurrect={onResurrect}
                         party={party}
                     />
                 )}

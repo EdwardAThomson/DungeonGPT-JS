@@ -100,9 +100,16 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
     let message = null;
 
     if (initiativeFailed && party && party.length > 1) {
-      // Random hero is forced to act instead
-      const availableIndices = party.map((_, idx) => idx).filter(idx => idx !== selectedHeroIndex);
-      actualHeroIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+      // Random hero is forced to act instead (exclude defeated heroes)
+      const availableIndices = party.map((_, idx) => idx).filter(idx =>
+        idx !== selectedHeroIndex && !(party[idx].currentHP <= 0 || party[idx].isDefeated)
+      );
+      if (availableIndices.length === 0) {
+        // No other living heroes — initiative failure has no effect
+        actualHeroIndex = selectedHeroIndex;
+      } else {
+        actualHeroIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+      }
       const forcedHero = party[actualHeroIndex];
       message = `⚡ Initiative failed! ${forcedHero.heroName || forcedHero.characterName} is forced to act instead!`;
     }
@@ -153,6 +160,12 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
           setCurrentCharacter(updatedChar);
           if (onCharacterUpdate) {
             onCharacterUpdate(updatedChar);
+          }
+
+          // Hero defeated mid-fight — force encounter defeat
+          if (updatedChar.currentHP <= 0) {
+            updatedState.isResolved = true;
+            updatedState.outcome = 'defeat';
           }
         }
 
@@ -356,20 +369,23 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {party.map((hero, idx) => (
+                {party.map((hero, idx) => {
+                  const defeated = hero.currentHP <= 0 || hero.isDefeated;
+                  return (
                   <div
                     key={idx}
-                    onClick={() => setSelectedHeroIndex(idx)}
+                    onClick={defeated ? undefined : () => setSelectedHeroIndex(idx)}
                     style={{
                       padding: '10px 15px',
                       border: selectedHeroIndex === idx ? '2px solid var(--primary)' : '1px solid var(--border)',
                       borderRadius: '8px',
-                      cursor: 'pointer',
+                      cursor: defeated ? 'not-allowed' : 'pointer',
                       background: selectedHeroIndex === idx ? 'var(--primary-tint-10)' : 'var(--surface)',
                       transition: 'all 0.2s',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '12px'
+                      gap: '12px',
+                      ...(defeated ? { opacity: 0.4, filter: 'grayscale(70%)' } : {})
                     }}
                   >
                     {hero.profilePicture && (
@@ -384,7 +400,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                           height: '44px',
                           borderRadius: '50%',
                           objectFit: 'cover',
-                          border: '2px solid var(--primary)'
+                          border: defeated ? '2px solid var(--border)' : '2px solid var(--primary)'
                         }}
                       />
                     )}
@@ -392,7 +408,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                       <div style={{ textAlign: 'left' }}>
                         <div style={{ fontWeight: 'bold', fontSize: '15px' }}>{hero.heroName || hero.characterName || 'Unknown'}</div>
                         <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                          {hero.heroClass || hero.characterClass || ''}
+                          {defeated ? '💀 Defeated' : (hero.heroClass || hero.characterClass || '')}
                         </div>
                       </div>
                       <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
@@ -400,7 +416,8 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               <button
