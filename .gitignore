@@ -73,8 +73,7 @@ cf-worker/.dev.vars
 wrangler.toml
 .dev.vars
 
-# D1 database files (not used - using Supabase instead)
-cf-worker/src/routes/db.ts
+# D1 database files
 cf-worker/migrations/
 
 # Special docs

@@ -3,6 +3,8 @@ import { cors } from "hono/cors";
 import { aiRoutes } from "./routes/ai";
 import { embedRoutes } from "./routes/embed";
 import { imageRoutes } from "./routes/image";
+import dbRoutes from "./routes/db";
+import { requireAuth } from "./middleware/auth";
 import type { Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -63,6 +65,8 @@ app.get("/health", (c) =>
 app.route("/api/embed", embedRoutes);
 app.route("/api/ai", aiRoutes);
 app.route("/api/image", imageRoutes);
+app.use("/api/db/*", requireAuth);
+app.route("/api/db", dbRoutes);
 
 app.notFound((c) =>
   c.json(

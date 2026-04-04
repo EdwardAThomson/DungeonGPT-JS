@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 
+const HUB_URL = process.env.REACT_APP_HUB_URL || 'https://octonion.io';
+const CALLBACK_URL = `${window.location.origin}/auth/callback`;
+
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
@@ -8,13 +11,11 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // If supabase is not configured, skip auth initialization
     if (!supabase) {
       setLoading(false);
       return;
     }
 
-    // Get initial session
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
         setUser(session?.user ?? null);
@@ -26,7 +27,6 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
       });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user ?? null);
@@ -36,55 +36,8 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email, password) => {
-    if (!supabase) {
-      return { data: null, error: { message: 'Authentication not configured' } };
-    }
-    const { data, error } = await supabase.auth.signUp({ 
-      email, 
-      password,
-      options: {
-        emailRedirectTo: window.location.origin
-      }
-    });
-    return { data, error };
-  };
-
-  const signIn = async (email, password) => {
-    if (!supabase) {
-      return { data: null, error: { message: 'Authentication not configured' } };
-    }
-    const { data, error } = await supabase.auth.signInWithPassword({ 
-      email, 
-      password 
-    });
-    return { data, error };
-  };
-
-  const signInWithMagicLink = async (email) => {
-    if (!supabase) {
-      return { data: null, error: { message: 'Authentication not configured' } };
-    }
-    const { data, error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: window.location.origin
-      }
-    });
-    return { data, error };
-  };
-
-  const signInWithOAuth = async (provider) => {
-    if (!supabase) {
-      return { data: null, error: { message: 'Authentication not configured' } };
-    }
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: window.location.origin
-      }
-    });
-    return { data, error };
+  const redirectToLogin = () => {
+    window.location.href = `${HUB_URL}/auth/login?redirect=${encodeURIComponent(CALLBACK_URL)}`;
   };
 
   const signOut = async () => {
@@ -92,17 +45,16 @@ export const AuthProvider = ({ children }) => {
       return { error: null };
     }
     const { error } = await supabase.auth.signOut();
+    // Optionally redirect to hub logout for global sign-out
+    window.location.href = `${HUB_URL}/auth/logout?redirect=${encodeURIComponent(window.location.origin)}`;
     return { error };
   };
 
   const value = {
     user,
     loading,
-    signUp,
-    signIn,
-    signInWithMagicLink,
-    signInWithOAuth,
-    signOut
+    redirectToLogin,
+    signOut,
   };
 
   return (

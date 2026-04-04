@@ -9,6 +9,7 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.101.1",
     "hono": "^4.7.0",
     "zod": "^3.24.0"
   },

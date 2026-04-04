@@ -7,10 +7,10 @@ const ProtectedRoute = ({ children }) => {
 
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
         height: '50vh',
         color: 'var(--text)'
       }}>
@@ -20,7 +20,6 @@ const ProtectedRoute = ({ children }) => {
   }
 
   if (!user) {
-    // Redirect to login, but save the intended destination
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

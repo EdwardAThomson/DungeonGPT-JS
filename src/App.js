@@ -13,6 +13,7 @@ import SavedConversations from './pages/SavedConversations';
 import CFWorkerDebug from './pages/CFWorkerDebug';
 import EncounterModalDebug from './pages/EncounterModalDebug';
 import Login from './pages/Login';
+import AuthCallback from './pages/AuthCallback';
 import Profile from './pages/Profile';
 import HowToPlay from './pages/HowToPlay';
 import GettingStarted from './pages/GettingStarted';
@@ -175,6 +176,7 @@ const AppContent = () => {
               {/* Public routes */}
               <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/getting-started" element={<GettingStarted />} />
               <Route path="/features" element={<HowToPlay />} />
               <Route path="/how-to-play" element={<Navigate to="/getting-started" replace />} />

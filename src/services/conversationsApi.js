@@ -1,146 +1,75 @@
 import { apiFetch, getErrorMessage } from './apiClient';
 import { supabase } from './supabaseClient';
 
-// Use Supabase only in production (CloudFlare Pages)
-// In dev, always use Express/SQLite even if Supabase is configured
-// Override: Set REACT_APP_USE_SQLITE=true to force SQLite locally
+// Use CF Worker in production, Express/SQLite in dev
 const forceSQLite = process.env.REACT_APP_USE_SQLITE === 'true';
 const isProduction = process.env.REACT_APP_CF_PAGES === 'true';
-const useSupabase = !forceSQLite && isProduction && !!supabase;
+const useCfWorker = !forceSQLite && isProduction;
 
-if (useSupabase) {
-  console.log('[conversationsApi] Using Supabase backend (production)');
+if (useCfWorker) {
+  console.log('[conversationsApi] Using CF Worker backend (production)');
 } else {
   console.log('[conversationsApi] Using Express/SQLite backend (dev)', forceSQLite ? '(forced via REACT_APP_USE_SQLITE)' : '');
 }
 
-// Normalize Supabase response to match Express/SQLite field names expected by the UI
-const normalizeConversation = (row) => row ? ({ ...row, sessionId: row.session_id }) : null;
+const CF_WORKER_URL = process.env.REACT_APP_CF_WORKER_URL || '';
 
-// Supabase implementation
-const supabaseConversationsApi = {
+async function cfFetch(path, options = {}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`;
+  }
+  const response = await fetch(`${CF_WORKER_URL}${path}`, { ...options, headers });
+  if (!response.ok) {
+    const msg = await getErrorMessage(response, `Request failed: ${path}`);
+    throw new Error(msg);
+  }
+  return response.json();
+}
+
+// CF Worker implementation (production)
+const cfWorkerConversationsApi = {
   async list() {
-    if (!supabase) {
-      throw new Error('Supabase not configured');
-    }
-    
-    const { data, error } = await supabase
-      .from('conversations')
-      .select('*')
-      .order('updated_at', { ascending: false });
-    
-    if (error) throw new Error(`Failed to fetch conversations: ${error.message}`);
-    return (data || []).map(normalizeConversation);
+    return cfFetch('/api/db/conversations');
   },
 
   async getById(sessionId) {
-    if (!supabase) {
-      throw new Error('Supabase not configured');
-    }
-    
-    const { data, error } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('session_id', sessionId)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
-    if (error) throw new Error(`Failed to load conversation: ${error.message}`);
-    if (!data) throw new Error('Conversation not found');
-    return normalizeConversation(data);
+    return cfFetch(`/api/db/conversations/${sessionId}`);
   },
 
   async save(payload) {
-    if (!supabase) {
-      throw new Error('Supabase not configured');
-    }
-    
-    // Get authenticated user ID for RLS
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-    
-    const { data, error } = await supabase
-      .from('conversations')
-      .upsert([{
-        user_id: user.id,
-        session_id: payload.sessionId,
-        conversation_name: payload.conversationName,
-        conversation_data: payload.conversation || payload.conversationData,
-        game_settings: payload.gameSettings || payload.settingsSnapshot || null,
-        selected_heroes: payload.selectedHeroes || null,
-        summary: payload.currentSummary || null,
-        world_map: payload.worldMap || null,
-        player_position: payload.playerPosition || null,
-        sub_maps: payload.sub_maps || null,
-        provider: payload.provider || null,
-        model: payload.model || null,
-        timestamp: payload.timestamp || new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }], { onConflict: 'session_id' })
-      .select()
-      .single();
-    
-    if (error) throw new Error(`Failed to save conversation: ${error.message}`);
-    return data;
+    return cfFetch('/api/db/conversations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 
   async updateMessages(sessionId, conversationData) {
-    if (!supabase) {
-      throw new Error('Supabase not configured');
-    }
-    
-    const { data, error } = await supabase
-      .from('conversations')
-      .update({ 
-        conversation_data: conversationData,
-        updated_at: new Date().toISOString()
-      })
-      .eq('session_id', sessionId)
-      .select()
-      .single();
-    
-    if (error) throw new Error(`Failed to update conversation: ${error.message}`);
-    return data;
+    return cfFetch(`/api/db/conversations/${sessionId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ conversation_data: conversationData }),
+    });
   },
 
   async updateName(sessionId, conversationName) {
-    if (!supabase) {
-      throw new Error('Supabase not configured');
-    }
-    
-    const { data, error } = await supabase
-      .from('conversations')
-      .update({ 
-        conversation_name: conversationName,
-        updated_at: new Date().toISOString()
-      })
-      .eq('session_id', sessionId)
-      .select()
-      .single();
-    
-    if (error) throw new Error(`Failed to update conversation name: ${error.message}`);
-    return data;
+    return cfFetch(`/api/db/conversations/${sessionId}/name`, {
+      method: 'PUT',
+      body: JSON.stringify({ conversationName }),
+    });
   },
 
   async remove(sessionId) {
-    if (!supabase) {
-      throw new Error('Supabase not configured');
-    }
-    
-    const { error } = await supabase
-      .from('conversations')
-      .delete()
-      .eq('session_id', sessionId);
-    
-    if (error) throw new Error(`Failed to delete conversation: ${error.message}`);
-    return { success: true };
+    return cfFetch(`/api/db/conversations/${sessionId}`, {
+      method: 'DELETE',
+    });
   }
 };
 
-// Express implementation (original)
+// Express implementation (local dev)
 const expressConversationsApi = {
   async list() {
     const response = await apiFetch('/api/conversations');
@@ -209,30 +138,28 @@ const expressConversationsApi = {
   }
 };
 
-// Hybrid API that uses Supabase if configured, otherwise Express
 export const conversationsApi = {
   async list() {
-    return useSupabase ? supabaseConversationsApi.list() : expressConversationsApi.list();
+    return useCfWorker ? cfWorkerConversationsApi.list() : expressConversationsApi.list();
   },
 
   async getById(sessionId) {
-    return useSupabase ? supabaseConversationsApi.getById(sessionId) : expressConversationsApi.getById(sessionId);
+    return useCfWorker ? cfWorkerConversationsApi.getById(sessionId) : expressConversationsApi.getById(sessionId);
   },
 
   async save(payload) {
-    return useSupabase ? supabaseConversationsApi.save(payload) : expressConversationsApi.save(payload);
+    return useCfWorker ? cfWorkerConversationsApi.save(payload) : expressConversationsApi.save(payload);
   },
 
   async updateMessages(sessionId, conversationData) {
-    return useSupabase ? supabaseConversationsApi.updateMessages(sessionId, conversationData) : expressConversationsApi.updateMessages(sessionId, conversationData);
+    return useCfWorker ? cfWorkerConversationsApi.updateMessages(sessionId, conversationData) : expressConversationsApi.updateMessages(sessionId, conversationData);
   },
 
   async updateName(sessionId, conversationName) {
-    return useSupabase ? supabaseConversationsApi.updateName(sessionId, conversationName) : expressConversationsApi.updateName(sessionId, conversationName);
+    return useCfWorker ? cfWorkerConversationsApi.updateName(sessionId, conversationName) : expressConversationsApi.updateName(sessionId, conversationName);
   },
 
   async remove(sessionId) {
-    return useSupabase ? supabaseConversationsApi.remove(sessionId) : expressConversationsApi.remove(sessionId);
+    return useCfWorker ? cfWorkerConversationsApi.remove(sessionId) : expressConversationsApi.remove(sessionId);
   }
 };
-

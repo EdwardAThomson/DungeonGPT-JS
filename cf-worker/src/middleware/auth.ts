@@ -270,8 +270,11 @@ export async function requireAuth(
   c: Context<{ Bindings: Env }>,
   next: Next
 ): Promise<Response | void> {
+  // Validate JWTs against the Octonion auth hub (falls back to SUPABASE_URL for backwards compat)
+  const authJwksUrl = c.env.OCTONION_SUPABASE_URL || c.env.SUPABASE_URL;
+
   // Fail closed by default. Local dev can opt into bypass explicitly.
-  if (!c.env.SUPABASE_URL) {
+  if (!authJwksUrl) {
     if (c.env.ALLOW_UNAUTHENTICATED_DEV === "true") {
       return next();
     }
@@ -285,11 +288,11 @@ export async function requireAuth(
 
   const token = authHeader.slice(7);
   try {
-    await verifySupabaseJwt(token, c.env.SUPABASE_URL);
+    await verifySupabaseJwt(token, authJwksUrl);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unauthorized";
     console.error(`[auth] JWT verification failed: ${message}`, {
-      supabaseUrl: c.env.SUPABASE_URL,
+      authJwksUrl,
       tokenPrefix: token.slice(0, 20) + "...",
     });
     return c.json({ error: message }, 401);
