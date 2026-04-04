@@ -23,8 +23,8 @@ YouTube Video 🎥:
 *   **Encounter System:** Dynamic encounters with skill checks, rewards, and AI-narrated outcomes.
 *   **Inventory & Progression:** Track party inventory, gold, HP, and XP progression.
 *   **Multi-Provider AI:** Support for OpenAI, Cloudflare Workers AI, and other providers.
-*   **User Authentication:** Secure sign-in with Supabase Magic Link authentication.
-*   **Persistent Sessions:** Characters and game sessions saved to Supabase PostgreSQL database with Row Level Security.
+*   **User Authentication:** Secure sign-in via Octonion hub (centralized auth across games).
+*   **Persistent Sessions:** Characters and game sessions saved to Supabase PostgreSQL, accessed through CF Worker with row-level access enforcement.
 *   **Save/Load System:** Manual and auto-save functionality with save confirmation modals.
 
 ## Technology Stack
@@ -33,8 +33,8 @@ YouTube Video 🎥:
 *   **Routing:** React Router DOM
 *   **Styling:** Modular CSS (feature-based organization in `src/styles/`)
 *   **Backend:** Cloudflare Workers (TypeScript with Hono framework)
-*   **Database:** Supabase PostgreSQL with Row Level Security (RLS)
-*   **Authentication:** Supabase Auth (Magic Link)
+*   **Database:** Supabase PostgreSQL (accessed via CF Worker with row-level access enforcement)
+*   **Authentication:** Octonion hub (centralized auth at octonion.io)
 *   **AI Providers:** Cloudflare Workers AI, OpenAI (server-side only, no exposed keys)
 
 ## Project Structure
@@ -48,15 +48,15 @@ src/
 ├── hooks/           # Custom React hooks (useGameMap, useGameSession, etc.)
 ├── llm/             # LLM integration (model resolver, constants)
 ├── pages/           # Page components (Game, CharacterCreation, Login, etc.)
-├── services/        # API client services (Supabase, heroes, conversations, LLM)
+├── services/        # API client services (auth, heroes, conversations, LLM)
 ├── styles/          # Feature-based CSS files
 └── utils/           # Utility functions (map generation, health system, etc.)
 
 cf-worker/           # Cloudflare Workers backend (production)
 ├── src/
 │   ├── index.ts     # Hono app entry point
-│   ├── routes/      # API routes (heroes, conversations, AI)
-│   ├── middleware/  # Auth middleware (Supabase JWT validation)
+│   ├── routes/      # API routes (DB proxy, AI, images, embeddings)
+│   ├── middleware/  # Auth middleware (Octonion JWT validation)
 │   └── services/    # Workers AI service layer
 └── wrangler.toml    # Cloudflare Workers config
 ```
@@ -148,15 +148,15 @@ For deployment instructions, see the deployment guides in `/docs`.
 5.  **Play the game** by interacting with the AI Dungeon Master through text commands
 6.  **Save your progress** - characters and game sessions are saved to the local SQLite database
 
-**Note:** The live production app at https://dungeongpt-js.pages.dev/ includes additional features like Magic Link authentication (soon) and cloud persistence via Supabase.
+**Note:** The live production app at https://dungeongpt.xyz/ includes additional features like centralized authentication via Octonion hub and cloud persistence via Supabase.
 
 ## Recent Improvements
 
 *   ✅ **Production Deployment** — Live on Cloudflare Pages with Workers backend
-*   ✅ **Supabase Integration** — PostgreSQL database with Row Level Security
-*   ✅ **Magic Link Authentication** — Secure, passwordless sign-in
+*   ✅ **Supabase Integration** — PostgreSQL database accessed via CF Worker
+*   ✅ **Octonion Hub Auth** — Centralized authentication across games
 *   ✅ **Cloudflare Workers AI** — Server-side AI with no exposed API keys
-*   ✅ **Multi-User Support** — Each user's data isolated with RLS policies
+*   ✅ **Multi-User Support** — Each user's data isolated by CF Worker access control
 *   ✅ **Save/Load System** — Manual save with confirmation, auto-save, cloud persistence
 *   ✅ **Modular Architecture** — Controllers for movement, encounters, saves
 *   ✅ **Multi-Provider AI** — OpenAI, Gemini, Claude, Cloudflare Workers (cloud and CLI modes) [Local Dev Mode]
