@@ -19,6 +19,10 @@ const AuthCallback = () => {
       }
 
       if (!supabase) {
+        console.error('[AuthCallback] supabase client is null', {
+          url: process.env.REACT_APP_OCTONION_SUPABASE_URL ? 'set' : 'missing',
+          key: process.env.REACT_APP_OCTONION_SUPABASE_ANON_KEY ? 'set' : 'missing',
+        });
         setError('Authentication not configured');
         return;
       }
