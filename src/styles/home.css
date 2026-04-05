@@ -41,11 +41,13 @@
   background-color: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 24px;
+  padding: 18px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   text-align: center;
+  gap: 16px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-decoration: none;
   color: var(--text);
@@ -65,7 +67,7 @@
   flex-direction: row;
   justify-content: center;
   gap: 20px;
-  padding: 30px;
+  padding: 22px 30px;
 }
 
 .primary-card .card-icon {
@@ -95,7 +97,7 @@
 
 .card-icon {
   font-size: 2rem;
-  margin-bottom: 15px;
+  margin-bottom: 0;
 }
 
 .home-nav-card h3 {
