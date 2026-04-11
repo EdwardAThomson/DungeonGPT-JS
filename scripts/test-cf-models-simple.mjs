@@ -56,23 +56,16 @@ const DEFAULT_WORKER_URL = getCfWorkerUrl();
 const TEST_MODELS = [
   // Ultra Tier
   { id: '@cf/openai/gpt-oss-120b', name: 'GPT-OSS 120B', tier: 'ultra' },
-  { id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b', name: 'DeepSeek R1 32B', tier: 'ultra' },
-  { id: '@cf/qwen/qwq-32b', name: 'QwQ 32B Reasoning', tier: 'ultra' },
   // Premium Tier
   { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B', tier: 'premium' },
-  { id: '@cf/qwen/qwen3-30b-a3b-fp8', name: 'Qwen3 30B MoE', tier: 'premium' },
   // Quality Tier
   { id: '@cf/openai/gpt-oss-20b', name: 'GPT-OSS 20B', tier: 'quality' },
-  { id: '@cf/mistralai/mistral-small-3.1-24b-instruct', name: 'Mistral Small 3.1 24B', tier: 'quality' },
   { id: '@cf/meta/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B', tier: 'quality' },
   { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B', tier: 'quality' },
   // Balanced Tier
   { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast', tier: 'balanced' },
-  { id: '@cf/ibm-granite/granite-4.0-h-micro', name: 'Granite 4.0 Micro', tier: 'balanced' },
-  { id: '@cf/zai-org/glm-4.7-flash', name: 'GLM 4.7 Flash', tier: 'balanced' },
-  // Fast / Budget Tier
+  // Fast Tier
   { id: '@cf/meta/llama-3.2-3b-instruct', name: 'Llama 3.2 3B', tier: 'fast' },
-  { id: '@cf/meta/llama-3.2-1b-instruct', name: 'Llama 3.2 1B', tier: 'budget' },
 ];
 
 // ─── DM Protocol (same as src/data/prompts.js) ──────────────────────────────

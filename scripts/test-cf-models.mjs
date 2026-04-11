@@ -43,14 +43,10 @@ const ALL_MODELS = [
   { id: '@cf/openai/gpt-oss-120b', name: 'GPT-OSS 120B', tier: 'large', params: '120B' },
   { id: '@cf/openai/gpt-oss-20b', name: 'GPT-OSS 20B', tier: 'large', params: '20B' },
   { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B', tier: 'large', params: '70B' },
-  { id: '@cf/qwen/qwen3-30b-a3b-fp8', name: 'Qwen3 30B MoE', tier: 'large', params: '30B (3B active)' },
 
   // Tier 2 — Medium
-  { id: '@cf/mistralai/mistral-small-3.1-24b-instruct', name: 'Mistral Small 3.1', tier: 'medium', params: '24B' },
   { id: '@cf/meta/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout', tier: 'medium', params: '17B MoE' },
   { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B', tier: 'medium', params: '12B' },
-  { id: '@cf/ibm/granite-4.0-h-micro', name: 'Granite 4.0 Micro', tier: 'medium', params: '~7B' },
-  { id: '@cf/zai-org/glm-4.7-flash', name: 'GLM 4.7 Flash', tier: 'medium', params: '~7B' },
 
   // Tier 3 — Small / Fast
   { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast', tier: 'small', params: '8B' },

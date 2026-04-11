@@ -28,26 +28,18 @@ export const AVAILABLE_MODELS = {
         { id: 'gemini-cli', name: 'Gemini 2.5 CLI (Legacy)' }
     ],
     'cf-workers': [
-        // Ultra Tier (100B+ or Reasoning)
+        // Ultra Tier (100B+)
         { id: '@cf/openai/gpt-oss-120b', name: 'GPT-OSS 120B (Ultra)' },
-        { id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b', name: 'DeepSeek R1 32B (Ultra)' },
-        { id: '@cf/qwen/qwq-32b', name: 'QwQ 32B Reasoning (Ultra)' },
-        // Premium Tier (30B-70B)
+        // Premium Tier (70B)
         { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B (Premium)' },
-        { id: '@cf/qwen/qwen3-30b-a3b-fp8', name: 'Qwen3 30B MoE (Premium)' },
-        // Quality Tier (12B-24B) - Best for production
+        // Quality Tier (12B-20B) - Best for production
         { id: '@cf/openai/gpt-oss-20b', name: 'GPT-OSS 20B (Quality) ⭐' },
-        { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B (Quality)' },
         { id: '@cf/meta/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B (Quality)' },
-        { id: '@cf/mistralai/mistral-small-3.1-24b-instruct', name: 'Mistral Small 3.1 24B (Quality)' },
-        // Balanced Tier (7B-8B)
+        { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B (Quality)' },
+        // Balanced Tier (8B)
         { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast (Balanced)' },
-        { id: '@cf/ibm-granite/granite-4.0-h-micro', name: 'Granite 4.0 Micro (Balanced)' },
-        { id: '@cf/zai-org/glm-4.7-flash', name: 'GLM 4.7 Flash (Balanced)' },
         // Fast Tier (3B)
-        { id: '@cf/meta/llama-3.2-3b-instruct', name: 'Llama 3.2 3B (Fast)' },
-        // Budget Tier (1B)
-        { id: '@cf/meta/llama-3.2-1b-instruct', name: 'Llama 3.2 1B (Budget)' }
+        { id: '@cf/meta/llama-3.2-3b-instruct', name: 'Llama 3.2 3B (Fast)' }
     ]
 };
 
