@@ -1,4 +1,4 @@
-import { getFallbackModelId, getModelById } from "./models";
+import { DEFAULT_MODEL_ID, getFallbackModelId, getModelById } from "./models";
 import type { Env } from "../types";
 
 const DEFAULT_MAX_TOKENS = 500;
@@ -84,16 +84,33 @@ async function callWorkersAi(
       if ("response" in response && typeof response.response === "string") {
         return { text: response.response };
       }
-      
+
       // OpenAI-compatible format (cast to any to handle dynamic response types)
       const anyResponse = response as any;
       if (
         "choices" in anyResponse &&
         Array.isArray(anyResponse.choices) &&
-        anyResponse.choices.length > 0 &&
-        anyResponse.choices[0]?.message?.content
+        anyResponse.choices.length > 0
       ) {
-        return { text: anyResponse.choices[0].message.content };
+        const message = anyResponse.choices[0]?.message;
+
+        if (typeof message?.content === "string" && message.content.length > 0) {
+          return { text: message.content };
+        }
+
+        // Reasoning-model fallback: some models (e.g. @cf/google/gemma-4-26b-a4b-it)
+        // emit chain-of-thought into `message.reasoning` and only populate
+        // `message.content` once they finish thinking. If max_tokens runs out
+        // mid-thinking, content is null while reasoning holds partial planning.
+        // Use reasoning as a degraded fallback so callers get something back
+        // instead of a 502, but warn loudly so the situation is visible.
+        if (typeof message?.reasoning === "string" && message.reasoning.length > 0) {
+          console.warn(
+            `Model ${modelId} returned null content with reasoning text; ` +
+              `using reasoning as degraded fallback (likely max_tokens exhausted mid-thinking).`
+          );
+          return { text: message.reasoning };
+        }
       }
     }
 
@@ -112,9 +129,20 @@ export async function generateText(
   env: Env,
   options: GenerateOptions
 ): Promise<{ text: string }> {
-  const model = getModelById(options.modelId);
+  // Unknown model id (e.g. a user has a removed model saved in localStorage):
+  // fall back to the default model rather than 400ing.
+  let model = getModelById(options.modelId);
   if (!model) {
-    throw new AiServiceError(`Unknown model: ${options.modelId}`, 400);
+    console.warn(
+      `Unknown model "${options.modelId}", falling back to default "${DEFAULT_MODEL_ID}"`
+    );
+    model = getModelById(DEFAULT_MODEL_ID);
+    if (!model) {
+      throw new AiServiceError(
+        `Default model "${DEFAULT_MODEL_ID}" not found in registry`,
+        500
+      );
+    }
   }
 
   const maxTokens = Math.min(
