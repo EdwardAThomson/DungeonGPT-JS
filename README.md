@@ -2,7 +2,7 @@
 
 **🎮 Live App:** https://dungeongpt.xyz/
 
-This is a web application built with React that allows users to create detailed characters for role-playing games, manage them, and use them in an interactive game session powered by an AI (default: OpenAI's GPT models).
+This is a web application built with React that allows users to create detailed characters for role-playing games, manage them, and use them in an interactive game session powered by an AI dungeon master. The live app currently runs on Cloudflare Workers AI with a curated set of open-weights models (including GPT-OSS, Llama, and Gemma); premium models via OpenRouter are planned for a future paid tier.
 
 This project is based upon the [Python version of the same name](https://github.com/EdwardAThomson/DungeonGPT).
 
@@ -22,7 +22,7 @@ YouTube Video 🎥:
 *   **World Map:** Explore a procedurally generated world map with biomes, towns, and points of interest.
 *   **Encounter System:** Dynamic encounters with skill checks, rewards, and AI-narrated outcomes.
 *   **Inventory & Progression:** Track party inventory, gold, HP, and XP progression.
-*   **Multi-Provider AI:** Support for OpenAI, Cloudflare Workers AI, and other providers.
+*   **AI Models:** Currently runs on Cloudflare Workers AI (GPT-OSS, Llama, Gemma, and other open-weights models). Local development additionally supports OpenAI, Gemini, and Claude. Premium models via OpenRouter are planned.
 *   **User Authentication:** Secure sign-in via Octonion hub (centralized auth across games).
 *   **Persistent Sessions:** Characters and game sessions saved to Supabase PostgreSQL, accessed through CF Worker with row-level access enforcement.
 *   **Save/Load System:** Manual and auto-save functionality with save confirmation modals.
@@ -35,7 +35,7 @@ YouTube Video 🎥:
 *   **Backend:** Cloudflare Workers (TypeScript with Hono framework)
 *   **Database:** Supabase PostgreSQL (accessed via CF Worker with row-level access enforcement)
 *   **Authentication:** Octonion hub (centralized auth at octonion.io)
-*   **AI Providers:** Cloudflare Workers AI, OpenAI (server-side only, no exposed keys)
+*   **AI Providers:** Cloudflare Workers AI in production. Local development also supports OpenAI, Gemini, and Claude (server-side only, no exposed keys). OpenRouter integration planned for premium tier.
 
 ## Project Structure
 
