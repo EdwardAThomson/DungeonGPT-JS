@@ -6,9 +6,11 @@ This is a web application built with React that allows users to create detailed 
 
 This project is based upon the [Python version of the same name](https://github.com/EdwardAThomson/DungeonGPT).
 
-YouTube Video 🎥:
+YouTube Videos 🎥:
 
 * [How To Play / Overview](https://youtu.be/CGskdUTQnMo)
+* [AI-powered quests: How can we solve non-determinism with LLM outputs?](https://youtu.be/Rzv3Rh3aOkM)
+
 
 ![DungeonGPT - a lone figure roams through the forest](./public/through_the_forest.webp)
 
