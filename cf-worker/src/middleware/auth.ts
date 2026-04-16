@@ -29,8 +29,14 @@ interface JwtHeader {
 interface JwtPayload {
   exp?: number;
   iss?: string;
+  sub?: string;
+  role?: string;
   [key: string]: unknown;
 }
+
+export type AuthVariables = {
+  userId: string;
+};
 
 // ─── JWKS Cache ───────────────────────────────────────────────────────────────
 
@@ -200,7 +206,7 @@ async function getSigningKey(kid: string, jwksUrl: string): Promise<CachedKey> {
 async function verifySupabaseJwt(
   token: string,
   supabaseUrl: string
-): Promise<void> {
+): Promise<JwtPayload> {
   const parts = token.split(".");
   if (parts.length !== 3) {
     throw new Error("Invalid token format");
@@ -262,12 +268,14 @@ async function verifySupabaseJwt(
   if (payload.role !== "authenticated") {
     throw new Error("Invalid token role");
   }
+
+  return payload;
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
 export async function requireAuth(
-  c: Context<{ Bindings: Env }>,
+  c: Context<{ Bindings: Env; Variables: AuthVariables }>,
   next: Next
 ): Promise<Response | void> {
   // Validate JWTs against the Octonion auth hub (falls back to SUPABASE_URL for backwards compat)
@@ -287,8 +295,9 @@ export async function requireAuth(
   }
 
   const token = authHeader.slice(7);
+  let payload: JwtPayload;
   try {
-    await verifySupabaseJwt(token, authJwksUrl);
+    payload = await verifySupabaseJwt(token, authJwksUrl);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unauthorized";
     console.error(`[auth] JWT verification failed: ${message}`, {
@@ -297,6 +306,11 @@ export async function requireAuth(
     });
     return c.json({ error: message }, 401);
   }
+
+  if (!payload.sub) {
+    return c.json({ error: "Token missing subject" }, 401);
+  }
+  c.set("userId", payload.sub);
 
   return next();
 }

@@ -1,8 +1,9 @@
 import { Hono } from 'hono';
 import { createClient } from '@supabase/supabase-js';
 import type { Env } from '../types';
+import type { AuthVariables } from '../middleware/auth';
 
-const dbRoutes = new Hono<{ Bindings: Env }>();
+const dbRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 function getSupabase(env: Env) {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -13,13 +14,6 @@ function getSupabase(env: Env) {
   });
 }
 
-function getUserId(c: { req: { header: (name: string) => string | undefined } }): string {
-  const auth = c.req.header('Authorization');
-  if (!auth?.startsWith('Bearer ')) throw new Error('Missing token');
-  const payload = JSON.parse(atob(auth.slice(7).split('.')[1]));
-  return payload.sub;
-}
-
 // ============================================
 // HEROES ENDPOINTS
 // ============================================
@@ -27,7 +21,7 @@ function getUserId(c: { req: { header: (name: string) => string | undefined } })
 dbRoutes.get('/heroes', async (c) => {
   try {
     const supabase = getSupabase(c.env);
-    const userId = getUserId(c);
+    const userId = c.get('userId');
 
     const { data, error } = await supabase
       .from('heroes')
@@ -49,8 +43,14 @@ dbRoutes.get('/heroes', async (c) => {
       profilePicture: hero.profile_picture,
       stats: hero.stats,
     })));
-  } catch (error) {
-    console.error('Error fetching heroes:', error);
+  } catch (error: any) {
+    console.error('Error fetching heroes:', {
+      message: error?.message,
+      code: error?.code,
+      details: error?.details,
+      hint: error?.hint,
+      stack: error?.stack,
+    });
     return c.json({ error: 'Failed to fetch heroes' }, 500);
   }
 });
@@ -58,7 +58,7 @@ dbRoutes.get('/heroes', async (c) => {
 dbRoutes.post('/heroes', async (c) => {
   try {
     const supabase = getSupabase(c.env);
-    const userId = getUserId(c);
+    const userId = c.get('userId');
     const hero = await c.req.json();
 
     const insertData: Record<string, unknown> = {
@@ -95,8 +95,14 @@ dbRoutes.post('/heroes', async (c) => {
       profilePicture: data.profile_picture,
       stats: data.stats,
     }, 201);
-  } catch (error) {
-    console.error('Error creating hero:', error);
+  } catch (error: any) {
+    console.error('Error creating hero:', {
+      message: error?.message,
+      code: error?.code,
+      details: error?.details,
+      hint: error?.hint,
+      stack: error?.stack,
+    });
     return c.json({ error: 'Failed to create hero' }, 500);
   }
 });
@@ -104,7 +110,7 @@ dbRoutes.post('/heroes', async (c) => {
 dbRoutes.put('/heroes/:heroId', async (c) => {
   try {
     const supabase = getSupabase(c.env);
-    const userId = getUserId(c);
+    const userId = c.get('userId');
     const heroId = c.req.param('heroId');
     const hero = await c.req.json();
 
@@ -145,8 +151,14 @@ dbRoutes.put('/heroes/:heroId', async (c) => {
       profilePicture: data.profile_picture,
       stats: data.stats,
     });
-  } catch (error) {
-    console.error('Error updating hero:', error);
+  } catch (error: any) {
+    console.error('Error updating hero:', {
+      message: error?.message,
+      code: error?.code,
+      details: error?.details,
+      hint: error?.hint,
+      stack: error?.stack,
+    });
     return c.json({ error: 'Failed to update hero' }, 500);
   }
 });
@@ -154,7 +166,7 @@ dbRoutes.put('/heroes/:heroId', async (c) => {
 dbRoutes.delete('/heroes/:heroId', async (c) => {
   try {
     const supabase = getSupabase(c.env);
-    const userId = getUserId(c);
+    const userId = c.get('userId');
     const heroId = c.req.param('heroId');
 
     const { error } = await supabase
@@ -165,8 +177,14 @@ dbRoutes.delete('/heroes/:heroId', async (c) => {
 
     if (error) throw error;
     return c.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting hero:', error);
+  } catch (error: any) {
+    console.error('Error deleting hero:', {
+      message: error?.message,
+      code: error?.code,
+      details: error?.details,
+      hint: error?.hint,
+      stack: error?.stack,
+    });
     return c.json({ error: 'Failed to delete hero' }, 500);
   }
 });
@@ -178,7 +196,7 @@ dbRoutes.delete('/heroes/:heroId', async (c) => {
 dbRoutes.get('/conversations', async (c) => {
   try {
     const supabase = getSupabase(c.env);
-    const userId = getUserId(c);
+    const userId = c.get('userId');
 
     const { data, error } = await supabase
       .from('conversations')
@@ -198,7 +216,7 @@ dbRoutes.get('/conversations', async (c) => {
 dbRoutes.get('/conversations/:sessionId', async (c) => {
   try {
     const supabase = getSupabase(c.env);
-    const userId = getUserId(c);
+    const userId = c.get('userId');
     const sessionId = c.req.param('sessionId');
 
     const { data, error } = await supabase
@@ -222,7 +240,7 @@ dbRoutes.get('/conversations/:sessionId', async (c) => {
 dbRoutes.post('/conversations', async (c) => {
   try {
     const supabase = getSupabase(c.env);
-    const userId = getUserId(c);
+    const userId = c.get('userId');
     const payload = await c.req.json();
 
     const { data, error } = await supabase
@@ -257,7 +275,7 @@ dbRoutes.post('/conversations', async (c) => {
 dbRoutes.put('/conversations/:sessionId', async (c) => {
   try {
     const supabase = getSupabase(c.env);
-    const userId = getUserId(c);
+    const userId = c.get('userId');
     const sessionId = c.req.param('sessionId');
     const { conversation_data } = await c.req.json();
 
@@ -283,7 +301,7 @@ dbRoutes.put('/conversations/:sessionId', async (c) => {
 dbRoutes.put('/conversations/:sessionId/name', async (c) => {
   try {
     const supabase = getSupabase(c.env);
-    const userId = getUserId(c);
+    const userId = c.get('userId');
     const sessionId = c.req.param('sessionId');
     const { conversationName } = await c.req.json();
 
@@ -309,7 +327,7 @@ dbRoutes.put('/conversations/:sessionId/name', async (c) => {
 dbRoutes.delete('/conversations/:sessionId', async (c) => {
   try {
     const supabase = getSupabase(c.env);
-    const userId = getUserId(c);
+    const userId = c.get('userId');
     const sessionId = c.req.param('sessionId');
 
     const { error } = await supabase

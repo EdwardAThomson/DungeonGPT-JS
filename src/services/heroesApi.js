@@ -25,8 +25,8 @@ async function cfFetch(path, options = {}) {
   }
   const response = await fetch(`${CF_WORKER_URL}${path}`, { ...options, headers });
   if (!response.ok) {
-    const msg = await getErrorMessage(response, `Request failed: ${path}`);
-    throw new Error(msg);
+    const msg = await getErrorMessage(response, 'Request failed');
+    throw new Error(`${msg} — ${path}`);
   }
   return response.json();
 }

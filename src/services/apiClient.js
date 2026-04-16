@@ -10,10 +10,16 @@ export const buildApiUrl = (path = '') => {
 export const apiFetch = (path, options) => fetch(buildApiUrl(path), options);
 
 export const getErrorMessage = async (response, fallback = 'Request failed') => {
+  let detail = fallback;
   try {
     const data = await response.json();
-    return data?.error?.message || data?.message || fallback;
+    detail =
+      (typeof data?.error === 'string' && data.error) ||
+      data?.error?.message ||
+      data?.message ||
+      fallback;
   } catch (err) {
-    return fallback;
+    // response body wasn't JSON — keep fallback
   }
+  return `${detail} (HTTP ${response.status})`;
 };
