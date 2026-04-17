@@ -76,8 +76,12 @@ wrangler.toml
 # D1 database files
 cf-worker/migrations/
 
+# Local-only archive of stale docs (preserved on disk, not tracked)
+docs/archive/
+
 # Special docs
 docs/deployment_*.md
+docs/DEPLOYMENT_ARCHITECTURE.md
 docs/refactor_assessment.md
 docs/production_vs_dev_strategy.md
 docs/authentication_plan.md
