@@ -9,7 +9,15 @@ import ModalShell from './ModalShell';
 // --- Share QR Code (inline expandable) --- //
 const ShareQRCode = () => {
   const [show, setShow] = useState(false);
+  const [copied, setCopied] = useState(false);
   const url = window.location.origin;
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
     <div style={{ textAlign: 'center', marginTop: '8px' }}>
@@ -39,6 +47,19 @@ const ShareQRCode = () => {
           }}>
             {url}
           </div>
+          <button
+            onClick={handleCopyLink}
+            style={{
+              marginTop: '10px', padding: '6px 16px',
+              background: copied ? '#4a7c59' : '#555',
+              color: '#fff', border: 'none', borderRadius: '6px',
+              cursor: 'pointer', fontSize: '0.7rem',
+              fontFamily: 'var(--header-font)', letterSpacing: '0.5px',
+              transition: 'background 0.2s'
+            }}
+          >
+            {copied ? '✓ Copied!' : 'Copy Link'}
+          </button>
         </div>
       )}
     </div>
@@ -298,24 +319,27 @@ export const StorySettingsModalContent = ({
             <>
               {/* Story Profile Section */}
               <div className="modal-section" style={{ marginBottom: '25px' }}>
-                <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>📖 Active Story Profile</h3>
-                <div style={{ fontSize: '0.9rem', color: 'var(--text)', background: 'var(--surface)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: 'inset 0 2px 4px var(--shadow)' }}>
+                <h3 style={{ margin: '0 0 18px 0', fontSize: '1.1rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>📖 Active Story Profile</h3>
+                <div style={{ fontSize: '0.9rem', color: 'var(--text)', background: 'var(--surface)', padding: '18px 18px 14px', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: 'inset 0 2px 4px var(--shadow)' }}>
                   {settings.templateName && (
-                    <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'var(--primary)', letterSpacing: '0.5px', textTransform: 'uppercase', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
-                      <strong>Template:</strong> {settings.templateName}
+                    <p style={{ margin: '0 0 14px 0', fontSize: '0.75rem', color: 'var(--text-secondary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+                      Template: {settings.templateName}
                     </p>
                   )}
-                  <p style={{ margin: '0 0 8px 0', fontSize: '1rem' }}><strong>Setting:</strong> {settings.shortDescription || 'Default Fantasy World'}</p>
+                  <p style={{ margin: '0 0 16px 0', fontSize: '0.95rem', lineHeight: '1.5', color: 'var(--text)' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontStyle: 'italic' }}>Setting:</span>{' '}
+                    {settings.shortDescription || 'Default Fantasy World'}
+                  </p>
                   {settings.campaignComplete && (
-                    <div style={{ margin: '12px 0', padding: '12px', background: 'var(--success-tint-20)', borderLeft: '4px solid var(--state-success)', borderRadius: '6px', textAlign: 'center' }}>
+                    <div style={{ margin: '0 0 18px 0', padding: '12px', background: 'var(--success-tint-20)', borderLeft: '4px solid var(--state-success)', borderRadius: '6px', textAlign: 'center' }}>
                       <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--state-success)' }}>🏆 CAMPAIGN COMPLETE 🏆</div>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Victory Achieved!</div>
                     </div>
                   )}
                   {settings.campaignGoal && (
-                    <div style={{ margin: '12px 0', padding: '14px', background: 'var(--primary-tint-10)', borderLeft: '4px solid var(--primary)', borderRadius: '6px', boxShadow: '0 2px 4px var(--shadow)' }}>
-                      <p style={{ margin: '0', fontSize: '1rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.2px', fontWeight: '600' }}>Quest</p>
-                      <p style={{ margin: '8px 0 0 0', color: 'var(--primary)', fontWeight: 'bold', fontSize: '1.35rem', lineHeight: '1.4' }}>{settings.campaignGoal}</p>
+                    <div style={{ margin: '0 0 18px 0', padding: '14px 16px', background: 'var(--primary-tint-10)', border: '1px solid var(--primary)', borderRadius: '8px', textAlign: 'center' }}>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>Quest</p>
+                      <p style={{ margin: '0', color: 'var(--primary)', fontWeight: '600', fontSize: '1rem', lineHeight: '1.45' }}>{settings.campaignGoal}</p>
                     </div>
                   )}
                   {settings.milestones && settings.milestones.length > 0 && (() => {
@@ -329,78 +353,89 @@ export const StorySettingsModalContent = ({
                     };
 
                     const normalized = normalizeMilestones(settings.milestones);
-                    const completed = normalized.filter(m => m.completed);
-                    const remaining = normalized.filter(m => !m.completed);
-                    const current = remaining.length > 0 ? remaining[0] : null;
                     const totalCount = normalized.length;
-                    const completedCount = completed.length;
+                    const completedCount = normalized.filter(m => m.completed).length;
+                    const currentIndex = normalized.findIndex(m => !m.completed);
 
                     return (
-                      <>
-                        {/* Progress Indicator */}
+                      <div style={{ margin: '0 0 14px 0' }}>
+                        {/* Milestones Header with Progress */}
                         {totalCount > 0 && (
-                          <div style={{ margin: '12px 0 8px 0', textAlign: 'center' }}>
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', fontWeight: '600', letterSpacing: '1px' }}>
-                              PROGRESS: {completedCount}/{totalCount} MILESTONES COMPLETE
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '0 0 10px 0', paddingBottom: '6px', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontFamily: 'var(--header-font)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>
+                              Milestones
+                            </span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                              {completedCount}/{totalCount} complete
                             </span>
                           </div>
                         )}
 
-                        {/* Current Milestone */}
-                        {current && (
-                          <div style={{ margin: '12px 0', padding: '12px', background: 'var(--primary-tint-10)', borderLeft: '4px solid var(--primary)', borderRadius: '6px' }}>
-                            <p style={{ margin: '0', fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                              Current Milestone
-                            </p>
-                            <p style={{ margin: '6px 0 0 0', color: 'var(--text)', fontSize: '1.05rem', lineHeight: '1.4' }}>
-                              🎯 {current.text}
-                            </p>
-                          </div>
-                        )}
+                        {/* Milestones list, strict numerical order */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          {normalized.map((m, idx) => {
+                            const isCurrent = idx === currentIndex;
+                            const isCompleted = m.completed;
+                            const isFuture = !isCompleted && !isCurrent;
 
-                        {/* Completed Milestones */}
-                        {completed.length > 0 && (
-                          <div style={{ margin: '12px 0', padding: '10px', background: 'var(--primary-tint-05)', borderLeft: '3px solid var(--state-success)', borderRadius: '6px' }}>
-                            <p style={{ margin: '0 0 6px 0', fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                              Completed
-                            </p>
-                            {completed.map((m, idx) => (
-                              <p key={idx} style={{ margin: '4px 0', color: 'var(--text)', fontSize: '0.9rem', lineHeight: '1.3' }}>
-                                ✓ <span style={{ textDecoration: 'line-through', opacity: 0.7 }}>{m.text}</span>
-                              </p>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Remaining Milestones (excluding current) */}
-                        {remaining.length > 1 && (
-                          <div style={{ margin: '12px 0', padding: '10px', background: 'var(--primary-tint-05)', borderLeft: '2px solid var(--border)', borderRadius: '6px' }}>
-                            <p style={{ margin: '0 0 6px 0', fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                              Remaining ({remaining.length - 1})
-                            </p>
-                            {remaining.slice(1).map((m, idx) => (
-                              <p key={idx} style={{ margin: '4px 0', color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: '1.3' }}>
-                                ○ {m.text}
-                              </p>
-                            ))}
-                          </div>
-                        )}
-                      </>
+                            return (
+                              <div
+                                key={m.id ?? idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'baseline',
+                                  gap: '8px',
+                                  padding: isCurrent ? '8px 12px' : '4px 12px',
+                                  background: isCurrent ? 'var(--primary-tint-10)' : 'transparent',
+                                  borderLeft: isCurrent ? '3px solid var(--primary)' : '3px solid transparent',
+                                  borderRadius: '4px',
+                                  transition: 'background 0.2s'
+                                }}
+                              >
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  color: 'var(--text-secondary)',
+                                  opacity: 0.6,
+                                  minWidth: '18px',
+                                  fontVariantNumeric: 'tabular-nums'
+                                }}>
+                                  {idx + 1}.
+                                </span>
+                                <span style={{
+                                  fontSize: isCurrent ? '0.95rem' : '0.85rem',
+                                  lineHeight: '1.4',
+                                  color: isCompleted ? 'var(--text-secondary)' : 'var(--text)',
+                                  textDecoration: isCompleted ? 'line-through' : 'none',
+                                  opacity: isFuture ? 0.6 : 1,
+                                  fontWeight: isCurrent ? '500' : 'normal',
+                                  flex: 1
+                                }}>
+                                  {isCompleted && (
+                                    <span style={{ color: 'var(--state-success)', marginRight: '6px', textDecoration: 'none', display: 'inline-block' }}>✓</span>
+                                  )}
+                                  {isCurrent && <span style={{ marginRight: '6px' }}>🎯</span>}
+                                  {m.text}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     );
                   })()}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '6px 20px', paddingTop: '12px', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                     <span title="The overall tone and atmosphere of the story - from light-hearted to grim and serious">
-                      <strong>Mood:</strong> {settings.grimnessLevel || 'Neutral'} / {settings.darknessLevel || 'Neutral'}
+                      <span style={{ opacity: 0.7 }}>Mood:</span> {settings.grimnessLevel || 'Neutral'} / {settings.darknessLevel || 'Neutral'}
                     </span>
                     <span title="How prevalent and powerful magic is in this world - from rare and subtle to commonplace and dramatic">
-                      <strong>Magic:</strong> {settings.magicLevel || 'Medium Magic'}
+                      <span style={{ opacity: 0.7 }}>Magic:</span> {settings.magicLevel || 'Medium Magic'}
                     </span>
                     <span title="The level of technological advancement - from primitive to futuristic">
-                      <strong>Tech:</strong> {settings.technologyLevel || 'Medieval'}
+                      <span style={{ opacity: 0.7 }}>Tech:</span> {settings.technologyLevel || 'Medieval'}
                     </span>
                   </div>
                 </div>
-                <p style={{ margin: '10px 0 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center' }}>
+                <p style={{ margin: '10px 0 0 0', fontSize: '0.7rem', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center', opacity: 0.6 }}>
                   * Story settings are woven at the start and cannot be changed here.
                 </p>
               </div>
