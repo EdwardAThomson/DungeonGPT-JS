@@ -16,14 +16,6 @@ export const MODEL_REGISTRY: readonly ModelDefinition[] = [
     maxTokens: 4096,
   },
 
-  // Premium Tier - 70B
-  {
-    id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-    displayName: "Llama 3.3 70B",
-    tier: "premium",
-    maxTokens: 4096,
-  },
-
   // Quality Tier - 12B-20B
   {
     id: "@cf/openai/gpt-oss-20b",
@@ -51,30 +43,35 @@ export const MODEL_REGISTRY: readonly ModelDefinition[] = [
     tier: "balanced",
     maxTokens: 2048,
   },
-
-  // Fast Tier - 3B
-  {
-    id: "@cf/meta/llama-3.2-3b-instruct",
-    displayName: "Llama 3.2 3B",
-    tier: "fast",
-    maxTokens: 2048,
-  },
 ];
 
-export const DEFAULT_MODEL_ID = "@cf/meta/llama-3.1-8b-instruct-fast";
-
-const FALLBACK_MAP: Readonly<Record<string, string>> = {
-  "@cf/meta/llama-3.1-8b-instruct-fast": "@cf/google/gemma-3-12b-it",
-  "@cf/google/gemma-3-12b-it": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-  "@cf/meta/llama-3.3-70b-instruct-fp8-fast": "@cf/meta/llama-3.1-8b-instruct-fast",
-};
+export const DEFAULT_MODEL_ID = "@cf/openai/gpt-oss-120b";
 
 export function getModelById(modelId: string): ModelDefinition | undefined {
   return MODEL_REGISTRY.find((m) => m.id === modelId);
 }
 
-export function getFallbackModelId(modelId: string): string | undefined {
-  return FALLBACK_MAP[modelId];
+/**
+ * Returns fallback candidates for a failed model: default model first,
+ * then remaining models in registry order. Caller should try these
+ * sequentially until one succeeds (or all are exhausted).
+ */
+export function getFallbackCandidates(failedModelId: string): string[] {
+  const candidates: string[] = [];
+
+  // First choice: the default model
+  if (failedModelId !== DEFAULT_MODEL_ID) {
+    candidates.push(DEFAULT_MODEL_ID);
+  }
+
+  // Then: remaining models in registry order
+  for (const model of MODEL_REGISTRY) {
+    if (model.id !== failedModelId && !candidates.includes(model.id)) {
+      candidates.push(model.id);
+    }
+  }
+
+  return candidates;
 }
 
 export function getAllModels(): readonly ModelDefinition[] {

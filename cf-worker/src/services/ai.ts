@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL_ID, getFallbackModelId, getModelById } from "./models";
+import { DEFAULT_MODEL_ID, getFallbackCandidates, getModelById } from "./models";
 import type { Env } from "../types";
 
 const DEFAULT_MAX_TOKENS = 500;
@@ -162,40 +162,42 @@ export async function generateText(
     );
     return { text: sanitizeResponse(primary.text) };
   } catch (primaryError: unknown) {
-    const status =
-      primaryError instanceof AiServiceError ? primaryError.status : 500;
-    const errMsg =
-      primaryError instanceof Error ? primaryError.message : String(primaryError);
-    const message =
-      status >= 500
-        ? `AI generation failed: ${errMsg}`
-        : errMsg;
-
     console.error(
       `Primary model ${model.id} failed:`,
       primaryError instanceof Error ? primaryError.message : primaryError
     );
 
-    const fallbackId = getFallbackModelId(model.id);
-    if (!fallbackId) {
-      throw new AiServiceError(message, status);
+    // Try fallback candidates: default model first, then others in registry order
+    const candidates = getFallbackCandidates(model.id);
+    for (const candidateId of candidates.slice(0, 2)) {
+      const fallbackModel = getModelById(candidateId);
+      if (!fallbackModel) continue;
+
+      console.log(`Falling back to model: ${fallbackModel.id}`);
+      try {
+        const fallback = await callWorkersAi(
+          env,
+          fallbackModel.id,
+          options.prompt,
+          Math.min(maxTokens, fallbackModel.maxTokens),
+          temperature,
+          options.systemPrompt
+        );
+        return { text: sanitizeResponse(fallback.text) };
+      } catch (fallbackError: unknown) {
+        console.error(
+          `Fallback model ${fallbackModel.id} also failed:`,
+          fallbackError instanceof Error ? fallbackError.message : fallbackError
+        );
+      }
     }
 
-    const fallbackModel = getModelById(fallbackId);
-    if (!fallbackModel) {
-      throw primaryError;
-    }
-
-    console.log(`Falling back to model: ${fallbackModel.id}`);
-
-    const fallback = await callWorkersAi(
-      env,
-      fallbackModel.id,
-      options.prompt,
-      Math.min(maxTokens, fallbackModel.maxTokens),
-      temperature,
-      options.systemPrompt
+    // All fallbacks exhausted
+    const errMsg =
+      primaryError instanceof Error ? primaryError.message : String(primaryError);
+    throw new AiServiceError(
+      `AI generation failed (all fallbacks exhausted): ${errMsg}`,
+      502
     );
-    return { text: sanitizeResponse(fallback.text) };
   }
 }
