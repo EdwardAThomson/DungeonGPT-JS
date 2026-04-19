@@ -30,16 +30,12 @@ export const AVAILABLE_MODELS = {
     'cf-workers': [
         // Ultra Tier (100B+)
         { id: '@cf/openai/gpt-oss-120b', name: 'GPT-OSS 120B (Ultra)' },
-        // Premium Tier (70B)
-        { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B (Premium)' },
         // Quality Tier (12B-20B) - Best for production
         { id: '@cf/openai/gpt-oss-20b', name: 'GPT-OSS 20B (Quality) ⭐' },
         { id: '@cf/meta/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B (Quality)' },
         { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B (Quality)' },
         // Balanced Tier (8B)
-        { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast (Balanced)' },
-        // Fast Tier (3B)
-        { id: '@cf/meta/llama-3.2-3b-instruct', name: 'Llama 3.2 3B (Fast)' }
+        { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast (Balanced)' }
     ]
 };
 
@@ -50,7 +46,7 @@ export const DEFAULT_MODELS = {
     codex: 'codex-cli',
     'claude-cli': 'claude-cli',
     'gemini-cli': 'gemini-3-flash-preview',
-    'cf-workers': '@cf/openai/gpt-oss-20b'  // Recommended: 100% quality, 2.7s latency
+    'cf-workers': '@cf/openai/gpt-oss-120b'  // Best quality: 25/25 multi-turn, 3.7s latency
 };
 
 // Filter models based on environment

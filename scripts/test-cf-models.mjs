@@ -42,7 +42,6 @@ const ALL_MODELS = [
   // Tier 1 — Large
   { id: '@cf/openai/gpt-oss-120b', name: 'GPT-OSS 120B', tier: 'large', params: '120B' },
   { id: '@cf/openai/gpt-oss-20b', name: 'GPT-OSS 20B', tier: 'large', params: '20B' },
-  { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B', tier: 'large', params: '70B' },
 
   // Tier 2 — Medium
   { id: '@cf/meta/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout', tier: 'medium', params: '17B MoE' },
@@ -50,7 +49,6 @@ const ALL_MODELS = [
 
   // Tier 3 — Small / Fast
   { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast', tier: 'small', params: '8B' },
-  { id: '@cf/meta/llama-3.2-3b-instruct', name: 'Llama 3.2 3B', tier: 'small', params: '3B' },
 ];
 
 // ─── DM Protocol (same as src/data/prompts.js) ──────────────────────────────

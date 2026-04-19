@@ -56,16 +56,12 @@ const DEFAULT_WORKER_URL = getCfWorkerUrl();
 const TEST_MODELS = [
   // Ultra Tier
   { id: '@cf/openai/gpt-oss-120b', name: 'GPT-OSS 120B', tier: 'ultra' },
-  // Premium Tier
-  { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B', tier: 'premium' },
   // Quality Tier
   { id: '@cf/openai/gpt-oss-20b', name: 'GPT-OSS 20B', tier: 'quality' },
   { id: '@cf/meta/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B', tier: 'quality' },
   { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B', tier: 'quality' },
   // Balanced Tier
   { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast', tier: 'balanced' },
-  // Fast Tier
-  { id: '@cf/meta/llama-3.2-3b-instruct', name: 'Llama 3.2 3B', tier: 'fast' },
 ];
 
 // ─── DM Protocol (same as src/data/prompts.js) ──────────────────────────────
