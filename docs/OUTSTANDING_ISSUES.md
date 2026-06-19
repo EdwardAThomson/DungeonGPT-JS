@@ -58,11 +58,12 @@ Source audits: roadmap survey (2026-04-19), auth verification (2026-04-19), docs
 
 ## Playtest feedback — Henry (2026-06-19)
 
-Raw notes captured during a play session. Two items already fixed: hero cards stretched full-width when only one hero was present (now capped/card-sized), and the Arcane Renaissance setting text named only Cogsworth while the first objective is in Tinker-Row (setting now points to the Tinker-Row workshop).
+Raw notes captured during a play session. Three items already fixed: hero cards stretched full-width when only one hero was present (now capped/card-sized); the Arcane Renaissance setting text named only Cogsworth while the first objective is in Tinker-Row (setting now points to the Tinker-Row workshop); and the missing-workshop bug (#22).
+
+> ~~#22 Quest-blocking: workshop / quest building missing on some maps~~ — **fixed 2026-06-19.** Root cause: world-map town count was a random 2-4 independent of how many named towns the campaign requires, so milestone towns (Tinker-Row/Brasswick/Gear-End) and their quest buildings were silently dropped. `generateMapData` now guarantees at least as many towns as the campaign's named-town count (relaxing spacing on crowded maps), and `spawnWorldMapEntities` warns when a quest building targets a town that isn't on the map. Covered by a new `mapGenerator.test.js` case.
 
 | # | Issue | Source | Size | Decision |
 |---|---|---|---|---|
-| 22 | **Quest-blocking: workshop / quest building missing on some maps.** In Arcane Renaissance the control rod + workshop are injected at `location: 'Tinker-Row'` via `injectQuestBuildings()`; if that town isn't generated or injection is flaky the objective is uncompletable. Needs investigation in `milestoneSpawner.js` / town gen. | Playtest (Henry) | M | |
 | 23 | **Post-creation dead end ("once a character is created, then what?").** No guidance/next-step prompt after hero creation; player is unsure how to proceed. Onboarding gap. | Playtest (Henry) | S | |
 | 24 | **Character selection process not obvious.** Selection affordance on the hero selection page is unclear (how to pick / that you can pick multiple). UX clarity. | Playtest (Henry) | S | |
 | 25 | **Map discoverability.** Accessing the map is not obvious; consider clearer affordance or making it visible at all times. Open design question. | Playtest (Henry) | S | |
