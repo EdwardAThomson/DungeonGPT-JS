@@ -16,7 +16,10 @@
   list-style: none;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  /* Cap track width so cards stay card-sized instead of stretching to fill the
+     row when there are only one or two heroes; center the resulting tracks. */
+  grid-template-columns: repeat(auto-fit, minmax(300px, 360px));
+  justify-content: center;
   gap: 20px;
 }
 

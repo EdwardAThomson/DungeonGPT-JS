@@ -400,7 +400,7 @@ export const storyTemplates = [
         description: 'A malfunctioning automaton is terrorizing the market district. Find out what went wrong and shut it down.',
         customNames: { towns: ['Cogsworth', 'Tinker-Row', 'Brasswick', 'Gear-End'], mountains: ['Copper Ridge'] },
         settings: {
-            shortDescription: 'An automaton has gone haywire in the streets of Cogsworth, smashing market stalls and attacking anyone who gets close. The artificer who built it has gone missing, and the town guard is outmatched.',
+            shortDescription: 'An automaton has gone haywire in the streets of Cogsworth, smashing market stalls and attacking anyone who gets close. The artificer who built it has vanished from their workshop in Tinker-Row, and the town guard is outmatched.',
             campaignGoal: 'Find the automaton\'s control rod and shut it down before it destroys the market district.',
             milestones: [
                 {
