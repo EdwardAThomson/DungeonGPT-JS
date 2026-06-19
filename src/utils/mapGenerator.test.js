@@ -37,4 +37,22 @@ describe('generateMapData', () => {
 
     expect(startingTowns).toHaveLength(1);
   });
+
+  it('places every campaign-required named town, regardless of the random count', () => {
+    const requiredTowns = ['Cogsworth', 'Tinker-Row', 'Brasswick', 'Gear-End'];
+
+    // The base town count is random (2-4); without the guarantee a milestone
+    // town like Tinker-Row would be dropped on some seeds. Check several seeds.
+    for (const seed of [1, 7, 42, 1234, 99999]) {
+      const map = generateMapData(10, 10, seed, { towns: requiredTowns });
+      const placedNames = map
+        .flat()
+        .filter((tile) => tile.poi === 'town')
+        .map((tile) => tile.townName);
+
+      requiredTowns.forEach((name) => {
+        expect(placedNames).toContain(name);
+      });
+    }
+  });
 });

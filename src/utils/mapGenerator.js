@@ -74,15 +74,33 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
     generateRivers(mapData, mountainTiles, rng);
   }
 
-  // 6. Place 2-4 towns
-  const numTowns = 2 + Math.floor(rng() * 3);
-  logger.debug(`[MAP_GENERATION] Placing ${numTowns} towns...`);
+  // 6. Place towns. Normally 2-4, but never fewer than the number of named towns
+  // the campaign requires — each custom name is a milestone/quest location that
+  // must exist on the map, otherwise its quest building/item/POI is silently lost.
+  const requiredTowns = normalizedNames.towns.length;
+  const targetTowns = Math.max(requiredTowns, 2 + Math.floor(rng() * 3));
+  logger.debug(`[MAP_GENERATION] Placing ${targetTowns} towns (campaign requires ${requiredTowns})...`);
 
-  for (let i = 0; i < numTowns; i++) {
-    const townPosition = placeTown(mapData, width, height, rng, townsList);
+  let townSpacing = 3; // relaxed below if the map is too crowded to fit them all
+  let safety = 0;
+  while (townsList.length < targetTowns && safety < targetTowns + 10) {
+    safety++;
+    const townPosition = placeTown(mapData, width, height, rng, townsList, townSpacing);
     if (townPosition) {
       townsList.push(townPosition);
+    } else if (townSpacing > 1) {
+      // Couldn't fit a town at this spacing — relax and retry so required
+      // quest towns still get placed on a crowded map.
+      townSpacing -= 1;
+      logger.debug(`[MAP_GENERATION] Relaxing town spacing to ${townSpacing} to fit required towns`);
+    } else {
+      // Even at minimum spacing there's no room — the map is genuinely full.
+      break;
     }
+  }
+
+  if (townsList.length < requiredTowns) {
+    logger.warn(`[MAP_GENERATION] Placed only ${townsList.length}/${requiredTowns} required towns — some quest locations may be missing.`);
   }
 
   // Improve map distribution by adding features to sparse quadrants
@@ -216,16 +234,16 @@ function placeMountainRange(mapData, width, height, rng) {
   return tiles;
 }
 
-// Place a town at a random empty location with minimum distance from other towns
-function placeTown(mapData, width, height, rng, existingTowns = []) {
+// Place a town at a random empty location with minimum distance from other towns.
+// minDistance can be relaxed by the caller when the map is crowded so required
+// quest towns aren't silently dropped.
+function placeTown(mapData, width, height, rng, existingTowns = [], minDistance = 3) {
   const townNames = [
     "A trading post",
     "A farming hamlet",
     "A riverside settlement",
     "A crossroads inn"
   ];
-
-  const minDistance = 3; // Minimum 3 tiles between towns (2 empty squares)
 
   for (let attempt = 0; attempt < 30; attempt++) {
     const x = 1 + Math.floor(rng() * (width - 2));

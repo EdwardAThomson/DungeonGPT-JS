@@ -136,6 +136,12 @@ export const spawnWorldMapEntities = (mapData, milestones) => {
     for (const building of spawns.buildings) {
         const townName = building.location;
         if (!townName) continue;
+        // Validate the target town exists on the map. If it doesn't, the building
+        // requirement would never be consumed (the town is never entered), so the
+        // quest building silently never appears — warn loudly instead.
+        if (!findLocationOnMap(mapData, townName)) {
+            logger.warn(`[SPAWN] Quest building "${building.name}" targets town "${townName}", which is not on the map — it will not appear.`);
+        }
         if (!requiredBuildings[townName]) requiredBuildings[townName] = [];
 
         // Find associated quest item for this milestone's building
