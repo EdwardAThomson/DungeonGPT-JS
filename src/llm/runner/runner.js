@@ -8,7 +8,30 @@ const logger = createLogger('llm-runner');
 // In-memory task store
 const tasks = new Map();
 
-function createTask({ backend, prompt, cwd, model }) {
+// Kill runaway CLI tasks rather than letting them live forever.
+const TASK_TIMEOUT_MS = Number(process.env.CLI_TASK_TIMEOUT_MS || 5 * 60 * 1000);
+// Cap concurrent CLI processes — these are heavy, agentic tools.
+const MAX_CONCURRENT_TASKS = Number(process.env.CLI_MAX_CONCURRENT_TASKS || 2);
+
+// Env vars the child CLIs legitimately need. We pass an allowlist instead of the
+// full server environment so server-side secrets aren't handed to spawned processes.
+const ENV_ALLOWLIST = [
+    'PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TERM',
+    'TMPDIR', 'TEMP', 'TMP', 'NODE_ENV',
+    // Config/auth the agent CLIs read directly from the environment.
+    'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY',
+    'CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME', 'XDG_DATA_HOME'
+];
+
+function buildChildEnv(extra) {
+    const env = {};
+    for (const key of ENV_ALLOWLIST) {
+        if (process.env[key] !== undefined) env[key] = process.env[key];
+    }
+    return { ...env, ...extra };
+}
+
+function createTask({ backend, prompt, model }) {
     const id = randomUUID();
     const adapter = adapters.getAdapter(backend);
 
@@ -16,16 +39,26 @@ function createTask({ backend, prompt, cwd, model }) {
         throw new Error(`Unknown backend: ${backend}`);
     }
 
+    const active = [...tasks.values()].filter(
+        t => t.status === 'queued' || t.status === 'running'
+    ).length;
+    if (active >= MAX_CONCURRENT_TASKS) {
+        throw new Error(`Too many concurrent CLI tasks (max ${MAX_CONCURRENT_TASKS}). Try again shortly.`);
+    }
+
     const task = {
         id,
         backend,
         prompt,
         model,
-        cwd: cwd || process.cwd(),
+        // cwd is never client-controlled; adapters that need a specific directory
+        // (e.g. the Gemini sandbox) set it themselves in buildCommand().
+        cwd: process.cwd(),
         status: 'queued',
         logs: [],
         clients: [], // SSE clients
-        process: null
+        process: null,
+        timeout: null
     };
 
     tasks.set(id, task);
@@ -51,12 +84,19 @@ function runTask(task, adapter) {
 
         const child = spawn(invocation.command, invocation.args, {
             cwd: invocation.cwd || task.cwd,
-            env: { ...process.env, ...invocation.env },
+            env: buildChildEnv(invocation.env),
             shell: false // Prevent shell escaping issues with complex prompts
         });
 
         task.process = child;
         let lineBuffer = '';
+
+        // Terminate the task if it runs longer than the timeout.
+        task.timeout = setTimeout(() => {
+            logger.warn(`Task ${task.id} exceeded ${TASK_TIMEOUT_MS}ms, terminating`);
+            appendLog(task, `Task timed out after ${Math.round(TASK_TIMEOUT_MS / 1000)}s and was terminated.`, 'stderr');
+            try { child.kill('SIGKILL'); } catch (e) { /* process already gone */ }
+        }, TASK_TIMEOUT_MS);
 
         child.stdout.on('data', (data) => {
             const chunk = data.toString();
@@ -189,6 +229,10 @@ function broadcast(task, message) {
 
 function cleanup(task) {
     // Keep task in memory for history, but maybe remove process ref
+    if (task.timeout) {
+        clearTimeout(task.timeout);
+        task.timeout = null;
+    }
     task.process = null;
     // End all streams
     task.clients.forEach(res => res.end());

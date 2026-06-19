@@ -1,3 +1,9 @@
+// LOCAL DEVELOPMENT SERVER ONLY.
+// This Express server is a convenience harness for local dev (SQLite + direct LLM
+// SDKs + CLI task runner). It is NOT deployed — production runs on the Cloudflare
+// Worker (cf-worker/). It binds to 127.0.0.1 by default and must not be exposed
+// publicly, especially with the CLI task backends (codex/claude/gemini) enabled,
+// since those drive agentic CLI tools on the host machine.
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
@@ -253,6 +259,8 @@ const validateLlmGeneratePayload = (payload) => {
   return errors;
 };
 
+const MAX_CLI_PROMPT_LENGTH = Number(process.env.CLI_MAX_PROMPT_LENGTH || 50000);
+
 const validateLlmTaskPayload = (payload) => {
   const errors = [];
   const allowedBackends = ['codex', 'claude', 'gemini', 'claude-cli', 'gemini-cli'];
@@ -262,9 +270,8 @@ const validateLlmTaskPayload = (payload) => {
   }
   if (!isNonEmptyString(payload.prompt)) {
     errors.push('prompt is required and must be a non-empty string.');
-  }
-  if (payload.cwd !== undefined && !isNonEmptyString(payload.cwd)) {
-    errors.push('cwd must be a non-empty string when provided.');
+  } else if (payload.prompt.length > MAX_CLI_PROMPT_LENGTH) {
+    errors.push(`prompt must be at most ${MAX_CLI_PROMPT_LENGTH} characters.`);
   }
   if (payload.model !== undefined && !isNonEmptyString(payload.model)) {
     errors.push('model must be a non-empty string when provided.');
@@ -893,9 +900,10 @@ app.post('/api/llm/tasks', (req, res) => {
   if (validationErrors.length > 0) {
     return buildValidationError(res, validationErrors);
   }
-  const { backend, prompt, cwd, model } = req.body;
+  // cwd is intentionally not accepted from the client; the runner controls it.
+  const { backend, prompt, model } = req.body;
   try {
-    const taskId = runner.createTask({ backend, prompt, cwd, model });
+    const taskId = runner.createTask({ backend, prompt, model });
     res.json({ id: taskId, status: 'queued' });
   } catch (error) {
     logger.error('Task creation failed', error);
@@ -928,8 +936,11 @@ app.get('/api/llm/tasks/:id/stream', (req, res) => {
 //   .then(() => console.log('MongoDB Connected'))
 //   .catch(err => console.error('MongoDB Connection Error:', err));
 
-const startServer = () => app.listen(port, () => {
-  logger.info(`Server running on http://localhost:${port}`);
+// Bind to localhost by default. This is a local development server only (see the
+// file header); LAN/public exposure must be opted into explicitly via HOST.
+const host = process.env.HOST || '127.0.0.1';
+const startServer = () => app.listen(port, host, () => {
+  logger.info(`Server running on http://${host}:${port}`);
 });
 
 if (require.main === module) {
@@ -941,7 +952,9 @@ module.exports = {
   db,
   startServer,
   extractAuthToken,
-  requireApiAuthMiddleware
+  requireApiAuthMiddleware,
+  validateLlmTaskPayload,
+  MAX_CLI_PROMPT_LENGTH
 };
 
 

@@ -13,7 +13,9 @@ class CodexAdapter extends BaseAdapter {
             args.push('-C', options.cwd);
         }
 
-        args.push(options.prompt);
+        // `--` terminates option parsing so a prompt starting with `-`/`--`
+        // is treated as the positional prompt, not as CLI flags.
+        args.push('--', options.prompt);
 
         return {
             command: this.config.binPath,
