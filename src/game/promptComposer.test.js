@@ -63,7 +63,7 @@ describe('promptComposer', () => {
 
     expect(prompt).toContain('Game Context:');
     expect(prompt).toContain('Campaign Goal: Find the moon shrine');
-    expect(prompt).toContain('Key Milestones to achieve: Reach the shrine, Recover the relic');
+    expect(prompt).toContain('Active Milestones: Reach the shrine; Recover the relic');
     expect(prompt).toContain('Recent descriptions (DO NOT repeat similar phrases):');
     expect(fullPrompt.startsWith(DM_PROTOCOL)).toBe(true);
   });
