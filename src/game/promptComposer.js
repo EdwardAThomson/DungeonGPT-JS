@@ -36,7 +36,9 @@ const WOUNDED_STATUS_TAGS = {
 
 export const formatPartyInfo = (selectedHeroes = []) => {
   return selectedHeroes.map((hero) => {
-    const label = `${hero.characterName} (${hero.characterClass})`;
+    const name = hero.heroName || hero.characterName || 'Unknown';
+    const charClass = hero.heroClass || hero.characterClass || '';
+    const label = charClass ? `${name} (${charClass})` : name;
     const defeated = hero.currentHP <= 0 || hero.isDefeated;
     if (defeated) return `${label} [DEFEATED - unconscious/incapacitated, cannot act]`;
     // Only annotate when HP is known and the hero is below full health.

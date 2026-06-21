@@ -279,11 +279,23 @@
 
 .view-settings-button:hover,
 .how-to-play-button:hover,
-.view-map-button:hover,
 .manual-save-button:hover {
   background-color: var(--surface);
   border-color: var(--primary);
   color: var(--primary);
+  transform: translateY(-1px);
+}
+
+/* Map is the primary navigation action — make it stand out. */
+.view-map-button {
+  background-color: var(--primary);
+  color: var(--bg);
+  border-color: var(--primary);
+  font-weight: 700;
+}
+
+.view-map-button:hover {
+  filter: brightness(1.08);
   transform: translateY(-1px);
 }
 

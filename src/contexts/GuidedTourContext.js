@@ -79,6 +79,20 @@ export const TOUR_STEPS = [
     title: 'Choose your party',
     body: 'Select 1–4 heroes by clicking them, then Start Game — your quest begins!',
   },
+  {
+    id: 'start-adventure',
+    route: '/game',
+    target: '[data-tour="start-adventure"]',
+    title: 'Begin your quest',
+    body: 'Click Start the Adventure to enter the world.',
+  },
+  {
+    id: 'open-map',
+    route: '/game',
+    target: '[data-tour="open-map"]',
+    title: 'Travel with the map',
+    body: 'Open the map and click a tile to move. It stays open as you explore, so you can travel freely.',
+  },
 ];
 
 const GuidedTourContext = createContext(null);
@@ -184,13 +198,15 @@ export const GuidedTourProvider = ({ children }) => {
     }
   }, [tourActive, location.pathname]);
 
-  // Finishing line: reaching the game completes the tour.
+  // Finishing line: the tour completes once the player advances past the last step
+  // (the in-game map coachmark). Driven by Game.js as the player begins and opens
+  // the map; the manual "Got it" advances too.
   useEffect(() => {
-    if (tourActive && location.pathname === '/game') {
+    if (tourActive && stepIndex >= TOUR_STEPS.length) {
       setTourActive(false);
       markDone();
     }
-  }, [tourActive, location.pathname, markDone]);
+  }, [tourActive, stepIndex, markDone]);
 
   const current = TOUR_STEPS[stepIndex];
   const activeStep = tourActive && current && current.route === location.pathname ? current : null;

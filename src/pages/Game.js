@@ -1,7 +1,8 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from '../contexts/AuthContext';
+import { useGuidedTour } from '../contexts/GuidedTourContext';
 import { useModal } from '../contexts/ModalContext';
 import { checkForEncounter } from '../utils/encounterGenerator';
 import useGameSession from '../hooks/useGameSession';
@@ -129,6 +130,11 @@ const Game = () => {
   // (exploration + deterministic combat) and the AI is the sign-in upsell.
   const { user } = useAuth();
   const aiAvailable = !!user;
+  // Reopen the map after an encounter that interrupted exploration.
+  const reopenMapAfterEncounterRef = useRef(false);
+  // Guided tour: advance the in-game coachmarks (Start Adventure -> Map) as the
+  // player acts.
+  const { tourActive, activeStep: tourStep, advanceStep: advanceTour } = useGuidedTour();
 
   // --- HOOKS ---
   const {
@@ -183,6 +189,14 @@ const Game = () => {
     hasAdventureStarted,
     aiAvailable
   );
+
+  // Advance the tour from the "Start Adventure" coachmark to the "Map" coachmark
+  // once the adventure has begun.
+  useEffect(() => {
+    if (tourActive && hasAdventureStarted && tourStep?.id === 'start-adventure') {
+      advanceTour();
+    }
+  }, [tourActive, hasAdventureStarted, tourStep, advanceTour]);
 
   // --- Hero HP Update Handler ---
   const handleHeroUpdate = (updatedHero) => {
@@ -252,6 +266,7 @@ const Game = () => {
     if (townEncounter) {
       // Close map modal — conflict rule handles this once map is migrated
       mapHook.setIsMapModalOpen(false);
+      reopenMapAfterEncounterRef.current = true; // reopen once the encounter resolves
       openEncounterAction({ encounter: townEncounter });
       setMovesSinceEncounter(0);
     } else {
@@ -286,9 +301,6 @@ const Game = () => {
       return;
     }
 
-    // Close the map modal so encounter modals can be seen
-    mapHook.setIsMapModalOpen(false);
-
     const { newMap, targetTile, wasExplored } = applyWorldMapMove(
       mapHook.worldMap,
       clickedX,
@@ -317,6 +329,7 @@ const Game = () => {
     // POI Check (for location Modal — towns, etc.)
     const poiEncounter = buildPoiEncounter(targetTile);
     if (poiEncounter) {
+      mapHook.setIsMapModalOpen(false); // close map so the location modal is visible
       openEncounterInfo({
         encounter: poiEncounter,
         onEnterLocation: () => mapHook.handleEnterLocation(poiEncounter, interactionHook.setConversation, interactionHook.conversation),
@@ -365,6 +378,8 @@ const Game = () => {
     }
 
     if (plannedEncounterFlow.openActionEncounter) {
+      mapHook.setIsMapModalOpen(false); // close map so the encounter is visible
+      reopenMapAfterEncounterRef.current = true; // reopen once the encounter resolves
       setTimeout(() => {
         // Conflict rule encounter→closes navigation handles closing encounterInfo automatically
         openEncounterAction({ encounter: randomEncounter });
@@ -518,6 +533,12 @@ const Game = () => {
 
     closeEncounterAction();
 
+    // Reopen the map so the player can keep exploring after the fight.
+    if (reopenMapAfterEncounterRef.current) {
+      reopenMapAfterEncounterRef.current = false;
+      mapHook.setIsMapModalOpen(true);
+    }
+
     // Trigger immediate save after encounter to preserve rewards
     setTimeout(() => performSave(), 500);
 
@@ -647,7 +668,10 @@ const Game = () => {
           townPosition={mapHook.townPlayerPosition}
           worldPosition={mapHook.playerPosition}
           currentBiome={currentBiome}
-          onOpenMap={() => mapHook.setIsMapModalOpen(true)}
+          onOpenMap={() => {
+            mapHook.setIsMapModalOpen(true);
+            if (tourActive && tourStep?.id === 'open-map') advanceTour();
+          }}
           onOpenInventory={() => openInventory({
             selectedHeroes,
             onUseItem: (heroId, itemKey, healedHero) => {

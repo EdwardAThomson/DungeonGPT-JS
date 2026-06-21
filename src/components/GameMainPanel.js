@@ -47,7 +47,7 @@ const GameMainPanel = ({
             }</p>
           </div>
           <div className="header-button-group">
-            <button onClick={onOpenMap} className="view-map-button" aria-label={townName ? `View ${townName} map` : 'View world map'}>
+            <button onClick={onOpenMap} className="view-map-button" data-tour="open-map" aria-label={townName ? `View ${townName} map` : 'View world map'}>
               <span aria-hidden="true">🗺️</span> {townName ? `${townName} Map` : 'Map'}
             </button>
             <button onClick={onOpenInventory} className="view-settings-button" aria-label="Open party inventory">
@@ -69,7 +69,7 @@ const GameMainPanel = ({
       <div className="conversation">
         {!hasAdventureStarted && !isLoading && (
           <div className="start-adventure-overlay">
-            <button onClick={onStartAdventure} className="start-adventure-button" aria-label="Start the adventure">
+            <button onClick={onStartAdventure} className="start-adventure-button" aria-label="Start the adventure" data-tour="start-adventure">
               Start the Adventure!
             </button>
           </div>
