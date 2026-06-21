@@ -107,7 +107,10 @@ const HeroSelection = () => {
     <div className="page-container hero-selection-page">
       <OnboardingSteps currentStep={2} completedSteps={heroes.length > 0 ? [1] : []} />
       <div className="page-header">
-        <h2>Select Your Party (1-4 Heroes)</h2>
+        <div className="page-header-titles">
+          <h2>Select Your Party</h2>
+          <p className="selection-instructions">Click a hero to add them to your party — choose 1 to 4.</p>
+        </div>
         <div className="page-header-actions">
           <button onClick={handleCreateHero} className="create-new-button">
             New Hero
@@ -132,17 +135,33 @@ const HeroSelection = () => {
         </div>
       )}
 
+      {heroes.length > 0 && (
+        <div className="party-counter">
+          Party: <span className={selectedHeroes.length > 0 ? 'count-active' : ''}>{selectedHeroes.length}</span> of 4 selected
+        </div>
+      )}
+
       {heroes.length === 0 ? (
         <p>No heroes available. Please create heroes first.</p>
       ) : (
         <ul className="all-heroes-list hero-selection-list">
           {heroes.map((hero) => {
             const isSelected = selectedHeroes.some(h => h.heroId === hero.heroId);
+            const atLimit = selectedHeroes.length >= 4 && !isSelected;
             return (
               <li
                 key={hero.heroId}
-                className={`hero-item ${isSelected ? 'selected' : ''}`}
+                className={`hero-item ${isSelected ? 'selected' : ''}${atLimit ? ' at-limit' : ''}`}
                 onClick={() => toggleHeroSelection(hero)}
+                role="button"
+                tabIndex={0}
+                aria-pressed={isSelected}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleHeroSelection(hero);
+                  }
+                }}
               >
                 <div className="hero-item-image">
                   <img 
@@ -181,6 +200,10 @@ const HeroSelection = () => {
                   </ul>
                 )}
                 {isSelected && <div className="selection-indicator">✓</div>}
+
+                <div className={`hero-select-cta ${isSelected ? 'is-selected' : ''}`}>
+                  {isSelected ? '✓ In party — click to remove' : (atLimit ? 'Party full (max 4)' : '➕ Add to party')}
+                </div>
               </li>
             );
           })}

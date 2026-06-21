@@ -494,6 +494,72 @@
   box-shadow: 0 1px 3px var(--shadow-black-20);
 }
 
+/* Keyboard focus affordance for the clickable cards */
+.hero-selection-list .hero-item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Header instruction + live party counter */
+.hero-selection-page .page-header-titles h2 {
+  margin: 0;
+}
+
+.selection-instructions {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.party-counter {
+  margin: 0 0 16px;
+  font-family: var(--header-font);
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.party-counter .count-active {
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+/* Per-card Add / In-party affordance */
+.hero-select-cta {
+  margin-top: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
+  color: var(--text-secondary);
+  font-family: var(--header-font);
+  font-size: 0.82rem;
+  transition: all 0.2s ease;
+}
+
+.hero-item:hover .hero-select-cta {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.hero-select-cta.is-selected {
+  border-style: solid;
+  border-color: var(--state-info);
+  background-color: var(--state-info);
+  color: #fff;
+}
+
+.hero-item.at-limit {
+  opacity: 0.55;
+}
+
+.hero-item.at-limit .hero-select-cta {
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
 .hero-selection-actions {
   display: flex;
   flex-direction: column;

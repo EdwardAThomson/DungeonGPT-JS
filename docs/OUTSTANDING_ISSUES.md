@@ -64,9 +64,10 @@ Raw notes captured during a play session. Three items already fixed: hero cards 
 
 > ~~#23 Post-creation dead end~~ — **fixed 2026-06-20.** Added a guided onboarding flow: a shared `OnboardingSteps` indicator (Create Hero → Start a Game → Begin Quest) across the setup pages (marking a step done only when truly complete, e.g. step 1 only once a hero exists); an honest HeroSummary button label; a "Start a New Game →" next-step banner + real empty state on the roster (spotlighted right after adding a hero); a dismissible "New here?" prompt on the home page (auto-hidden once the player has saved games); and an empty-state CTA on Saved Games. Also fixed a misleading new-game validation message and renamed the "Templates" tab to "Ready-Made".
 
+> ~~#24 Character selection process not obvious~~ — **fixed 2026-06-21.** Hero Selection now has a clear instruction line, a live "Party: N of 4 selected" counter, a per-card Add / "✓ In party" pill (with hover state and a dimmed "Party full" state at the 4-hero limit), and the cards are keyboard-operable buttons (role/tabindex/aria-pressed, Enter/Space, focus ring).
+
 | # | Issue | Source | Size | Decision |
 |---|---|---|---|---|
-| 24 | **Character selection process not obvious.** Selection affordance on the hero selection page is unclear (how to pick / that you can pick multiple). UX clarity. | Playtest (Henry) | S | |
 | 25 | **Map discoverability.** Accessing the map is not obvious; consider clearer affordance or making it visible at all times. Open design question. | Playtest (Henry) | S | |
 | 26 | **Missing `workshop` building interior image** ("the place where I should search" had no picture). Extends #10 (missing building images), which does not currently list `workshop`. | Playtest (Henry) | XS-S (asset gen) | |
 
