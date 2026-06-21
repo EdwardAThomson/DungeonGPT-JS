@@ -1,6 +1,6 @@
 # Guest Mode Plan (Phase B) — local-first, AI-free guest play
 
-Status: **planning, no code yet** (2026-06-21). Phase A (local hero roster + import-on-sign-in) is shipped; this is the next step.
+Status: **B1 shipped** (commit `201ac23`, 2026-06-21) — guests can run the full local mechanical loop. **B2 planned** (detailed below). Phase A (local hero roster + import-on-sign-in) shipped earlier.
 
 ## Goal
 Let a logged-out visitor experience real gameplay before creating an account, with everything saved locally and a one-click sync when they sign up — to reduce signup friction and improve retention.
@@ -55,9 +55,34 @@ Requires **`/api/embed`** (auth) — RAG; cosmetic, already fails silently:
 Is a **mechanics-only** taste (explore + deterministic combat + progression, no conversational DM) compelling enough to drive sign-ups? Combat is the strongest showcase. The **local narration fallback** (#4) makes it feel less bare. If we decide the demo *must* include real AI, that reopens the **open rate-limited AI endpoint** path (out of scope here) — but it's a bigger, riskier build (cost/abuse controls).
 
 ## Suggested phasing within Phase B
-- **B1:** `localGameStore` + `conversationsApi` auth-routing + un-gate routes + guest AI gating (free-text action → sign-in affordance, narration off). → guests can run the mechanical loop and it persists locally.
-- **B2:** `LocalGameSync` (sync games on sign-in) + conversion banner/prompts.
+- **B1 (DONE — `201ac23`):** `localGameStore` + `conversationsApi` auth-routing + un-gate routes + guest AI gating (free-text action → sign-in affordance, narration off, templated intro). Guests run the mechanical loop, persisted locally.
+- **B2 (planned — see detailed section above):** `LocalGameSync` (sync games on sign-in) + conversion banner/prompts.
 - **B3 (optional):** local templated movement/location narration fallback for a richer guest feel.
+
+## Phase B2 — sync guest games on sign-in (detailed plan)
+
+Goal: when a guest who has been playing locally signs in, move their saved games to the cloud so nothing is lost — mirroring the shipped `LocalHeroSync` (heroes) and using the same trigger.
+
+**Component:** `src/components/LocalGameSync.js`, mounted in `App.js` next to `LocalHeroSync` (inside the auth + context providers). Renders a small confirmation toast like the hero one.
+
+**Trigger & order:** on the `user` transition to signed-in (a `useRef` guard so it runs once), after `LocalHeroSync` has imported heroes. Hero IDs are client-generated and preserved by the backend (`db.ts:66`), so a synced game's `selected_heroes` references stay valid regardless of order — but importing heroes first keeps the roster consistent. Simplest: a one-shot effect that runs the hero import then the game import in sequence (or keep two components and let `LocalGameSync` run independently, since references survive either way).
+
+**Upload mapping (important):** `localGameStore` rows are stored in the backend's snake_case shape (`session_id`, `conversation_data`, `game_settings`, `selected_heroes`, `summary`, `world_map`, `player_position`, `sub_maps`, `provider`, `model`, `conversation_name`, `timestamp`). `conversationsApi.save(payload)` expects the camelCase payload. So `LocalGameSync` must map each row back to a save payload:
+`{ sessionId: row.session_id, conversationName: row.conversation_name, conversation: row.conversation_data, gameSettings: row.game_settings, selectedHeroes: row.selected_heroes, currentSummary: row.summary, worldMap: row.world_map, playerPosition: row.player_position, sub_maps: row.sub_maps, provider: row.provider, model: row.model, timestamp: row.timestamp }`.
+(Alternatively add a `localGameStore.exportForUpload()` helper that returns payloads, to keep the mapping in one place.)
+
+**Flow:**
+1. `localGameStore.list()` → for each row, `conversationsApi.save(payload)` (now routes to the cloud because signed in; `session_id` preserved → upsert).
+2. On full success, `localGameStore.clear()`; on partial failure, leave the failed rows and reset the run guard to retry next sign-in.
+3. Toast: "N games saved to your account."
+
+**Active in-progress game:** the currently-open session is just another row, so it uploads too; because `session_id` is preserved, the live game keeps autosaving to the *same* cloud row after sign-in — continuity is automatic.
+
+**RAG:** guest games have no embeddings (B1 skips `/api/embed`). After sync, `useRagSync` (enabled once signed in) backfills embeddings from the synced conversation on next load — no special handling needed.
+
+**Conversion UX (pairs with B2):** a persistent "Playing as guest — sign in to save your progress" banner on the game/saved-games pages, plus a prompt at a high-intent moment (e.g. after the first milestone). Keep copy honest: device-local until sign-in.
+
+**Edge cases:** session-id collision with an existing cloud row is astronomically unlikely (random ids) and upsert-safe; clearing browser data before sign-in loses unsynced guest games (message it); large games are fine in IndexedDB.
 
 ## Risks & edge cases
 - **Device-local**: IndexedDB is per-browser, not a backup — message it ("saved on this device").
