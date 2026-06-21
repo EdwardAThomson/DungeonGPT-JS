@@ -1,5 +1,6 @@
 import { apiFetch, getErrorMessage } from './apiClient';
 import { supabase } from './supabaseClient';
+import { localHeroStore } from './localHeroStore';
 
 // Use CF Worker in production, Express/SQLite in dev
 const forceSQLite = process.env.REACT_APP_USE_SQLITE === 'true';
@@ -106,20 +107,33 @@ const expressHeroesApi = {
   }
 };
 
+const backend = useCfWorker ? cfWorkerHeroesApi : expressHeroesApi;
+
+// Logged-out players get a browser-local roster; signed-in players use the cloud
+// backend. On sign-in, local heroes are imported and cleared (see LocalHeroSync).
+async function isSignedIn() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return !!session?.access_token;
+  } catch (e) {
+    return false;
+  }
+}
+
 export const heroesApi = {
   async list() {
-    return useCfWorker ? cfWorkerHeroesApi.list() : expressHeroesApi.list();
+    return (await isSignedIn()) ? backend.list() : localHeroStore.list();
   },
 
   async create(hero) {
-    return useCfWorker ? cfWorkerHeroesApi.create(hero) : expressHeroesApi.create(hero);
+    return (await isSignedIn()) ? backend.create(hero) : localHeroStore.create(hero);
   },
 
   async update(heroId, hero) {
-    return useCfWorker ? cfWorkerHeroesApi.update(heroId, hero) : expressHeroesApi.update(heroId, hero);
+    return (await isSignedIn()) ? backend.update(heroId, hero) : localHeroStore.update(heroId, hero);
   },
 
   async delete(heroId) {
-    return useCfWorker ? cfWorkerHeroesApi.delete(heroId) : expressHeroesApi.delete(heroId);
+    return (await isSignedIn()) ? backend.delete(heroId) : localHeroStore.delete(heroId);
   }
 };

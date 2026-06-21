@@ -139,6 +139,57 @@
   line-height: 1.5;
 }
 
+/* Guest roster note ("saved on this device") */
+.guest-roster-note {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.guest-roster-note .link-button {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* Local-hero import confirmation toast */
+.local-sync-toast {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: 10px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 16px var(--shadow);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.local-sync-toast-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 2px 4px;
+}
+
+.local-sync-toast-close:hover { color: var(--text); }
+
 @media (max-width: 480px) {
   .onboarding-step-label { font-size: 0.72rem; }
   .onboarding-step-marker { width: 30px; height: 30px; }

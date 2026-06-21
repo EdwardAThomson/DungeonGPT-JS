@@ -31,6 +31,7 @@ import NavDropdown from "./components/NavDropdown";
 import DatabaseIndicator from "./components/DatabaseIndicator";
 import { GuidedTourProvider, useGuidedTour } from "./contexts/GuidedTourContext";
 import TourOverlay from "./components/TourOverlay";
+import LocalHeroSync from "./components/LocalHeroSync";
 
 const DebugRoutes = lazy(() => import('./pages/DebugRoutes'));
 
@@ -188,8 +189,10 @@ const AppContent = () => {
               <Route path="/hero-summary" element={<HeroSummary />} />
               <Route path="/new-game" element={<NewGame />} />
 
+              {/* Roster is available to guests (heroes saved locally until sign-in) */}
+              <Route path="/all-heroes" element={<AllHeroes />} />
+
               {/* Protected routes */}
-              <Route path="/all-heroes" element={<ProtectedRoute><AllHeroes /></ProtectedRoute>} />
               <Route path="/hero-selection" element={<ProtectedRoute><HeroSelection /></ProtectedRoute>} />
               <Route path="/game" element={<ProtectedRoute><Game /></ProtectedRoute>} />
               <Route path="/saved-conversations" element={<ProtectedRoute><SavedConversations /></ProtectedRoute>} />
@@ -205,6 +208,7 @@ const AppContent = () => {
 
       <DatabaseIndicator />
       <TourOverlay />
+      <LocalHeroSync />
 
       <footer className="app-footer">
         © 2026 Edward Thomson (<a href="https://octonion.io" target="_blank" rel="noopener noreferrer">Octonion Software</a>)

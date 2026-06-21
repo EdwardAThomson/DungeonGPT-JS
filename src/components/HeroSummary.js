@@ -20,7 +20,6 @@ const HeroSummary = () => {
   const { state } = useLocation();
   const newHero = state?.newCharacter;
   const [feedbackModal, setFeedbackModal] = useState(null);
-  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
 
   const navigate = useNavigate();
 
@@ -41,15 +40,8 @@ const HeroSummary = () => {
       return;
     }
 
-    // Check if user is logged in
-    if (!user) {
-      // Store hero data in localStorage for recovery after login
-      localStorage.setItem('pendingHero', JSON.stringify(newHero));
-      setShowLoginPrompt(true);
-      return;
-    }
-
-    // Determine endpoint and method based on whether it's an edit or add
+    // Logged-out players save to a browser-local roster (heroesApi routes there
+    // automatically); they're imported to the account on sign-in.
     const isUpdate = isEditing;
     // Update local context/state first for immediate UI feedback
     let updatedHeroes;
@@ -71,9 +63,12 @@ const HeroSummary = () => {
         : await heroesApi.create(newHero);
 
       logger.debug(`Hero ${isUpdate ? 'updated' : 'added'} in database. Response:`, result);
+      const localNote = !user
+        ? ' Saved on this device — sign in to keep your heroes across devices.'
+        : '';
       setFeedbackModal({
         title: isUpdate ? "Hero Updated" : "Hero Added",
-        message: `Hero ${isUpdate ? 'updated' : 'added'} successfully.`,
+        message: `Hero ${isUpdate ? 'updated' : 'added'} successfully.${localNote}`,
         onConfirm: () => handleProgress(updatedHeroes)
       });
     } catch (error) {
@@ -203,29 +198,6 @@ const HeroSummary = () => {
         </div>
       )}
 
-      {showLoginPrompt && (
-        <div className="modal-overlay" onClick={() => setShowLoginPrompt(false)}>
-          <div className="modal-content summary-feedback-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Sign In Required</h3>
-            <p>You need to sign in to save your hero. Your hero data will be preserved.</p>
-            <div className="summary-feedback-actions" style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button
-                className="modal-close-button"
-                onClick={() => setShowLoginPrompt(false)}
-                style={{ background: 'transparent', color: 'var(--text)' }}
-              >
-                Cancel
-              </button>
-              <button
-                className="modal-close-button"
-                onClick={() => navigate('/login', { state: { from: { pathname: '/hero-summary' } } })}
-              >
-                Sign In
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

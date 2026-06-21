@@ -14,6 +14,7 @@ import { useAuth } from './AuthContext';
 import HeroContext from './HeroContext';
 import { heroesApi } from '../services/heroesApi';
 import { conversationsApi } from '../services/conversationsApi';
+import { localHeroStore } from '../services/localHeroStore';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('guided-tour');
@@ -148,8 +149,9 @@ export const GuidedTourProvider = ({ children }) => {
     if (done) { decidedRef.current = true; return; }
 
     if (!user) {
+      // Guest: only auto-arm if they haven't already built a local roster.
       decidedRef.current = true;
-      setTourActive(true);
+      if (!localHeroStore.hasHeroes()) setTourActive(true);
       return;
     }
 

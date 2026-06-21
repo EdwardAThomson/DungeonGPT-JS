@@ -9,6 +9,7 @@ import { heroesApi } from "../services/heroesApi";
 import { createLogger } from "../utils/logger";
 import { resolveProfilePicture } from "../utils/assetHelper";
 import OnboardingSteps from "../components/OnboardingSteps";
+import { useAuth } from "../contexts/AuthContext";
 
 const logger = createLogger('all-heroes');
 
@@ -18,6 +19,7 @@ const AllHeroes = () => {
   const [alertMessage, setAlertMessage] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   // Set when arriving straight from creating a hero — spotlight the next step.
   const justAdded = location.state?.justAdded;
 
@@ -89,6 +91,12 @@ const AllHeroes = () => {
           </button>
         </div>
       </div>
+
+      {!user && heroes.length > 0 && (
+        <div className="guest-roster-note">
+          🔒 These heroes are saved on this device. <button className="link-button" onClick={() => navigate('/login')}>Sign in</button> to keep them across devices.
+        </div>
+      )}
 
       {heroes.length > 0 && (
         <div className={`next-step-banner${justAdded ? ' highlight' : ''}`}>
