@@ -33,7 +33,7 @@ const NavDropdown = ({ label, items, onNavClose }) => {
       setIsOpen(true);
       // Focus first menu item after state updates
       setTimeout(() => {
-        const firstLink = menuRef.current?.querySelector('a');
+        const firstLink = menuRef.current?.querySelector('a, button');
         firstLink?.focus();
       }, 0);
     } else if (e.key === 'ArrowUp') {
@@ -41,7 +41,7 @@ const NavDropdown = ({ label, items, onNavClose }) => {
       setIsOpen(true);
       // Focus last menu item
       setTimeout(() => {
-        const links = menuRef.current?.querySelectorAll('a');
+        const links = menuRef.current?.querySelectorAll('a, button');
         links?.[links.length - 1]?.focus();
       }, 0);
     }
@@ -53,13 +53,13 @@ const NavDropdown = ({ label, items, onNavClose }) => {
       buttonRef.current?.focus();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      const links = Array.from(menuRef.current?.querySelectorAll('a') || []);
+      const links = Array.from(menuRef.current?.querySelectorAll('a, button') || []);
       const currentIndex = links.indexOf(document.activeElement);
       const nextIndex = (currentIndex + 1) % links.length;
       links[nextIndex]?.focus();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      const links = Array.from(menuRef.current?.querySelectorAll('a') || []);
+      const links = Array.from(menuRef.current?.querySelectorAll('a, button') || []);
       const currentIndex = links.indexOf(document.activeElement);
       const prevIndex = currentIndex <= 0 ? links.length - 1 : currentIndex - 1;
       links[prevIndex]?.focus();
@@ -88,13 +88,24 @@ const NavDropdown = ({ label, items, onNavClose }) => {
         >
           {items.map((item, index) => (
             <li key={index} role="none">
-              <Link
-                to={item.path}
-                onClick={() => { setIsOpen(false); onNavClose && onNavClose(); }}
-                role="menuitem"
-              >
-                {item.label}
-              </Link>
+              {item.onClick ? (
+                <button
+                  type="button"
+                  className="nav-dropdown-action"
+                  onClick={() => { item.onClick(); setIsOpen(false); onNavClose && onNavClose(); }}
+                  role="menuitem"
+                >
+                  {item.label}
+                </button>
+              ) : (
+                <Link
+                  to={item.path}
+                  onClick={() => { setIsOpen(false); onNavClose && onNavClose(); }}
+                  role="menuitem"
+                >
+                  {item.label}
+                </Link>
+              )}
             </li>
           ))}
         </ul>

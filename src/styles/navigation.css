@@ -151,7 +151,8 @@
   background-color: var(--surface);
 }
 
-.nav-dropdown-menu a {
+.nav-dropdown-menu a,
+.nav-dropdown-menu .nav-dropdown-action {
   display: flex;
   align-items: center;
   width: 100%;
@@ -172,7 +173,15 @@
   border-bottom: none;
 }
 
-.nav-dropdown-menu a:hover {
+/* The action item is a <button>; strip native chrome so it matches the links. */
+.nav-dropdown-menu .nav-dropdown-action {
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-dropdown-menu a:hover,
+.nav-dropdown-menu .nav-dropdown-action:hover {
   background-color: var(--primary);
   color: var(--bg);
 }

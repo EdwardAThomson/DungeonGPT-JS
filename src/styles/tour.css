@@ -1,0 +1,138 @@
+/* tour.css
+ * Purpose: guided new-player tour — non-blocking coach-marks (outline ring + tooltip)
+ * and a docked info card for form-heavy pages. No full-screen dimming.
+ * Depends on: theme tokens from src/index.css.
+ */
+
+/* Non-blocking highlight: a pulsing outline around the target. The page is NOT
+   dimmed, and the ring itself ignores pointer events so the target stays clickable. */
+.tour-ring {
+  position: fixed;
+  z-index: 10000;
+  border-radius: 8px;
+  border: 3px solid var(--primary);
+  box-shadow: 0 0 0 3px rgba(125, 90, 200, 0.35);
+  pointer-events: none;
+  animation: tour-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes tour-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(125, 90, 200, 0.35); }
+  50% { box-shadow: 0 0 0 9px rgba(125, 90, 200, 0.16); }
+}
+
+.tour-tooltip {
+  position: fixed;
+  z-index: 10001;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.tour-tooltip-min {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.tour-tooltip-min:hover { color: var(--text); background: var(--border); }
+
+/* Collapsed coach-mark — a small re-openable pill, docked bottom-right. */
+.tour-pill {
+  position: fixed;
+  z-index: 10001;
+  bottom: 20px;
+  right: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  font-family: var(--header-font);
+  font-weight: 700;
+  font-size: 0.85rem;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px var(--shadow);
+  animation: tour-pulse 1.6s ease-in-out infinite;
+}
+
+.tour-pill:hover { filter: brightness(1.05); }
+
+/* Docked info card (form-heavy pages / fallback) — bottom-centre, non-blocking. */
+.tour-tooltip-floating {
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+}
+
+.tour-tooltip-title {
+  font-family: var(--header-font);
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+  padding-right: 18px; /* room for the close ✕ */
+}
+
+.tour-tooltip-body {
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+.tour-tooltip-count {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.tour-tooltip-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tour-skip-link {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 2px 4px;
+}
+
+.tour-skip-link:hover { color: var(--text); }
+
+.tour-next-btn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-family: var(--header-font);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.tour-next-btn:hover { filter: brightness(1.08); }

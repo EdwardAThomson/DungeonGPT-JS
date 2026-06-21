@@ -146,7 +146,14 @@ const SavedConversations = () => {
       <p className="page-instructions">Manage your saved game sessions. Click "Load" to continue a previous adventure.</p>
 
       {conversations.length === 0 ? (
-        <p>No saved conversations found. Start a new game to create your first adventure!</p>
+        <div className="onboarding-empty">
+          <div className="onboarding-empty-icon">📖</div>
+          <h3>No chronicles yet</h3>
+          <p>Your saved adventures will appear here. Start a new game to create your first one.</p>
+          <button onClick={() => navigate("/new-game")} className="primary-button">
+            Start a New Game →
+          </button>
+        </div>
       ) : (
         <div className="conversations-list">
           {conversations.map((conversation) => {

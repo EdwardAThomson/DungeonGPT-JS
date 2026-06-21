@@ -1,13 +1,14 @@
 // AllHeroes.js
 
 import React, { useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { downloadJSONFile } from "../utils/fileHelper";
 import HeroContext from "../contexts/HeroContext";
 import { calculateMaxHP } from "../utils/healthSystem";
 import { heroesApi } from "../services/heroesApi";
 import { createLogger } from "../utils/logger";
 import { resolveProfilePicture } from "../utils/assetHelper";
+import OnboardingSteps from "../components/OnboardingSteps";
 
 const logger = createLogger('all-heroes');
 
@@ -16,6 +17,9 @@ const AllHeroes = () => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [alertMessage, setAlertMessage] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  // Set when arriving straight from creating a hero — spotlight the next step.
+  const justAdded = location.state?.justAdded;
 
   // insert database retrieval here
   useEffect(() => {
@@ -67,6 +71,11 @@ const AllHeroes = () => {
 
   return (
     <div className="page-container all-heroes-page">
+      <OnboardingSteps
+        currentStep={heroes.length > 0 ? 2 : 1}
+        completedSteps={heroes.length > 0 ? [1] : []}
+      />
+
       {/* Add a header container for Title + Button */}
       <div className="page-header">
         <h2>All Heroes</h2>
@@ -81,8 +90,31 @@ const AllHeroes = () => {
         </div>
       </div>
 
+      {heroes.length > 0 && (
+        <div className={`next-step-banner${justAdded ? ' highlight' : ''}`}>
+          <div className="next-step-banner-text">
+            <span className="next-step-banner-title">
+              {justAdded ? "Hero added to your roster!" : "Ready to play?"}
+            </span>
+            <span className="next-step-banner-subtitle">
+              Start a new game, choose a story, and pick your party.
+            </span>
+          </div>
+          <button onClick={() => navigate("/new-game")} className="primary-button" data-tour="start-new-game">
+            Start a New Game →
+          </button>
+        </div>
+      )}
+
       {heroes.length === 0 ? (
-        <h3>No heroes found. Create one or make sure the server is running.</h3>
+        <div className="onboarding-empty">
+          <div className="onboarding-empty-icon">🧙‍♂️</div>
+          <h3>No heroes yet</h3>
+          <p>Create your first hero to begin your adventure. You'll pick a class, race, stats, and backstory.</p>
+          <button onClick={() => navigate("/hero-creation")} className="primary-button">
+            Create Your First Hero →
+          </button>
+        </div>
       ) : (
         <ul className="all-heroes-list">
           {heroes.map((hero) => (

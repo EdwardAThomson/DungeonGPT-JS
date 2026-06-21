@@ -29,6 +29,8 @@ import { AISettingsModalContent } from "./components/Modals";
 import ErrorBoundary from "./components/ErrorBoundary";
 import NavDropdown from "./components/NavDropdown";
 import DatabaseIndicator from "./components/DatabaseIndicator";
+import { GuidedTourProvider, useGuidedTour } from "./contexts/GuidedTourContext";
+import TourOverlay from "./components/TourOverlay";
 
 const DebugRoutes = lazy(() => import('./pages/DebugRoutes'));
 
@@ -38,6 +40,7 @@ const AppContent = () => {
   const isDebugEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEBUG_ROUTES === 'true';
   const isGamePage = location.pathname === '/game';
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const { startTour } = useGuidedTour();
 
   const {
     selectedProvider,
@@ -97,7 +100,8 @@ const AppContent = () => {
             label="How to Play"
             items={[
               { label: "Getting Started", path: "/getting-started" },
-              { label: "Features & FAQ", path: "/features" }
+              { label: "Features & FAQ", path: "/features" },
+              { label: "Replay Tutorial", onClick: startTour }
             ]}
             onNavClose={() => setIsMobileNavOpen(false)}
           />
@@ -200,6 +204,7 @@ const AppContent = () => {
       </div>
 
       <DatabaseIndicator />
+      <TourOverlay />
 
       <footer className="app-footer">
         © 2026 Edward Thomson (<a href="https://octonion.io" target="_blank" rel="noopener noreferrer">Octonion Software</a>)
@@ -212,7 +217,9 @@ const AppContent = () => {
 const App = () => {
   return (
     <Router>
-      <AppContent />
+      <GuidedTourProvider>
+        <AppContent />
+      </GuidedTourProvider>
     </Router>
   );
 };

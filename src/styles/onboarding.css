@@ -1,0 +1,147 @@
+/* onboarding.css
+ * Purpose: new-player progress indicator and next-step prompts shown across the
+ * Create Hero -> Start a Game -> Begin Quest journey.
+ * Depends on: theme tokens from src/index.css.
+ */
+
+.onboarding-steps {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 0;
+  margin: 0 auto 24px;
+  max-width: 560px;
+}
+
+.onboarding-step {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+/* Connector runs from the previous step's marker to this one's. */
+.onboarding-step-connector {
+  position: absolute;
+  top: 17px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--border);
+  z-index: 0;
+}
+
+.onboarding-step-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-family: var(--header-font);
+  font-weight: 700;
+  z-index: 1;
+}
+
+.onboarding-step-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.onboarding-step.active .onboarding-step-marker {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.onboarding-step.active .onboarding-step-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.onboarding-step.done .onboarding-step-marker {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.onboarding-step.done .onboarding-step-connector {
+  background: var(--primary);
+}
+
+/* Next-step prompt banner (roster, summary confirmation, etc.) */
+.next-step-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.next-step-banner.highlight {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(125, 90, 200, 0.12);
+}
+
+.next-step-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.next-step-banner-title {
+  font-family: var(--header-font);
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.next-step-banner-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+/* Empty-state card (no heroes / no saved games) */
+.onboarding-empty {
+  text-align: center;
+  max-width: 460px;
+  margin: 32px auto;
+  padding: 28px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.onboarding-empty-icon {
+  font-size: 2.4rem;
+  margin-bottom: 8px;
+}
+
+.onboarding-empty h3 {
+  font-family: var(--header-font);
+  color: var(--text);
+  margin: 0 0 8px 0;
+}
+
+.onboarding-empty p {
+  color: var(--text-secondary);
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .onboarding-step-label { font-size: 0.72rem; }
+  .onboarding-step-marker { width: 30px; height: 30px; }
+  .onboarding-step-connector { top: 14px; }
+  .next-step-banner { flex-direction: column; align-items: stretch; text-align: center; }
+}
