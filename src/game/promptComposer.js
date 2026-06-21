@@ -1,6 +1,7 @@
 import { DM_PROTOCOL } from '../data/prompts';
 import { buildMovementPrompt } from '../utils/promptBuilder';
 import { areRequirementsMet } from '../game/milestoneEngine';
+import { getHPStatus } from '../utils/healthSystem';
 
 const formatCampaignMilestones = (milestones) => {
   if (!Array.isArray(milestones) || milestones.length === 0) {
@@ -24,11 +25,27 @@ const formatCampaignMilestones = (milestones) => {
   return text;
 };
 
+// Surface party condition as a coarse band, not raw HP numbers, so the AI can
+// narrate wounds believably (a near-death hero shouldn't read as unharmed) while
+// combat itself stays deterministic and AI-blind to exact mechanics.
+const WOUNDED_STATUS_TAGS = {
+  critical: 'critically wounded - near death',
+  wounded: 'badly wounded',
+  injured: 'injured'
+};
+
 export const formatPartyInfo = (selectedHeroes = []) => {
   return selectedHeroes.map((hero) => {
+    const label = `${hero.characterName} (${hero.characterClass})`;
     const defeated = hero.currentHP <= 0 || hero.isDefeated;
-    if (defeated) return `${hero.characterName} (${hero.characterClass}) [DEFEATED - unconscious/incapacitated, cannot act]`;
-    return `${hero.characterName} (${hero.characterClass})`;
+    if (defeated) return `${label} [DEFEATED - unconscious/incapacitated, cannot act]`;
+    // Only annotate when HP is known and the hero is below full health.
+    if (hero.currentHP != null && hero.maxHP) {
+      const { status } = getHPStatus(hero.currentHP, hero.maxHP);
+      const tag = WOUNDED_STATUS_TAGS[status];
+      if (tag) return `${label} [${tag}]`;
+    }
+    return label;
   }).join(', ');
 };
 

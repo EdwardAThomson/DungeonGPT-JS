@@ -15,6 +15,43 @@ describe('promptComposer', () => {
     expect(result).toBe('Aelin (Ranger), Bram (Cleric)');
   });
 
+  it('omits a condition tag for heroes at or near full health', () => {
+    const result = formatPartyInfo([
+      { characterName: 'Aelin', characterClass: 'Ranger', currentHP: 30, maxHP: 30 },
+      { characterName: 'Bram', characterClass: 'Cleric', currentHP: 28, maxHP: 30 }
+    ]);
+
+    expect(result).toBe('Aelin (Ranger), Bram (Cleric)');
+  });
+
+  it('annotates wounded heroes with a coarse condition band, not raw HP', () => {
+    const result = formatPartyInfo([
+      { characterName: 'Aelin', characterClass: 'Ranger', currentHP: 20, maxHP: 30 }, // 66% -> injured
+      { characterName: 'Bram', characterClass: 'Cleric', currentHP: 12, maxHP: 30 },  // 40% -> badly wounded
+      { characterName: 'Nyx', characterClass: 'Rogue', currentHP: 4, maxHP: 30 }      // 13% -> critical
+    ]);
+
+    expect(result).toBe(
+      'Aelin (Ranger) [injured], ' +
+      'Bram (Cleric) [badly wounded], ' +
+      'Nyx (Rogue) [critically wounded - near death]'
+    );
+    expect(result).not.toContain('30');
+    expect(result).not.toContain('12');
+  });
+
+  it('marks defeated heroes regardless of HP fields', () => {
+    const result = formatPartyInfo([
+      { characterName: 'Aelin', characterClass: 'Ranger', currentHP: 0, maxHP: 30 },
+      { characterName: 'Bram', characterClass: 'Cleric', isDefeated: true, currentHP: 5, maxHP: 30 }
+    ]);
+
+    expect(result).toBe(
+      'Aelin (Ranger) [DEFEATED - unconscious/incapacitated, cannot act], ' +
+      'Bram (Cleric) [DEFEATED - unconscious/incapacitated, cannot act]'
+    );
+  });
+
   it('builds location info for towns with revisit guidance', () => {
     const info = buildLocationInfo({
       tile: {
@@ -66,6 +103,24 @@ describe('promptComposer', () => {
     expect(prompt).toContain('Active Milestones: Reach the shrine; Recover the relic');
     expect(prompt).toContain('Recent descriptions (DO NOT repeat similar phrases):');
     expect(fullPrompt.startsWith(DM_PROTOCOL)).toBe(true);
+  });
+
+  it('surfaces wounded party condition in the composed prompt without leaking raw HP', () => {
+    const { prompt } = composeMovementNarrativePrompt({
+      tile: { biome: 'forest', poi: null, descriptionSeed: 'Dim woods.' },
+      coords: { x: 3, y: 3 },
+      settings: { shortDescription: 'A grim march', grimnessLevel: 'Moody', milestones: [] },
+      selectedHeroes: [{ characterName: 'Nyx', characterClass: 'Rogue', currentHP: 4, maxHP: 30 }],
+      currentSummary: 'They limp onward after the ambush.',
+      narrativeEncounter: null,
+      worldMap: [],
+      isNewArea: true,
+      conversation: [],
+      includeRecentContext: false
+    });
+
+    expect(prompt).toContain('Nyx (Rogue) [critically wounded - near death]');
+    expect(prompt).not.toContain('4/30');
   });
 
   it('can omit recent AI context when disabled', () => {

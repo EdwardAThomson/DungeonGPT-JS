@@ -4,6 +4,7 @@ import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
 import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver';
 import { areRequirementsMet } from '../game/milestoneEngine';
+import { formatPartyInfo } from '../game/promptComposer';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
 import { createLogger } from '../utils/logger';
 
@@ -301,7 +302,7 @@ const useGameInteraction = (
         // Ideally useGameMap handles the 'explored' bit, here we just do the AI part.
 
         // Construct Prompt
-        const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
+        const partyInfo = formatPartyInfo(selectedHeroes);
         const currentTile = getTile(worldMap, playerPosition.x, playerPosition.y);
 
         let locationInfo = `Player starts at coordinates (${playerPosition.x}, ${playerPosition.y}) in a ${currentTile?.biome || 'Unknown Area'} biome.`;
@@ -389,7 +390,7 @@ const useGameInteraction = (
         setIsLoading(true);
         setError(null);
 
-        const partyInfo = selectedHeroes.map(h => `${h.characterName} (${h.characterClass})`).join(', ');
+        const partyInfo = formatPartyInfo(selectedHeroes);
         const currentTile = getTile(worldMap, playerPosition.x, playerPosition.y);
         const locationInfo = buildLocationContext(currentTile, playerPosition, locationContext, worldMap);
         const goalInfo = settings.campaignGoal ? `\nGoal: ${settings.campaignGoal}` : '';

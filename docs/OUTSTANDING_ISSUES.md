@@ -72,6 +72,26 @@ Raw notes captured during a play session. Three items already fixed: hero cards 
 
 ---
 
+## Combat-system depth (competitor-analysis gaps, 2026-06-20)
+
+Surfaced while positioning DungeonGPT against group-2 ("real mechanics") AI-GM competitors — see [ai-game-master-competitor-analysis.md](../ai-game-master-competitor-analysis.md). Combat is already on the defensible *deterministic* side (rolls/damage computed in code, AI does not decide outcomes), but the rules layer is thinner than the combat-fidelity leaders (LoreKeeper, Friends & Fables). Each item below is "fix, or do a thorough check of current behaviour and decide deliberately" — not all are wanted.
+
+| # | Issue | Source | Size | Decision |
+|---|---|---|---|---|
+| 27 | **No attack-roll / AC / saving-throw loop.** Resolution is a single d20-vs-DC check (`encounterResolver.js`), not attack-roll-vs-armor-class + saving throws. Adds the biggest fidelity gap vs 5e-style competitors. | Competitor analysis | L | |
+| 28 | **No conditions / status effects.** No buffs/debuffs, concentration, poison/stun/ongoing effects — only direct HP damage (`healthSystem.js`). | Competitor analysis | M-L | |
+| 29 | **No real initiative / turn order.** Only a ~15% fumble check on action confirmation (`EncounterActionModal.js`); no initiative roll or turn sequencing. | Competitor analysis | M | |
+| 30 | **No death saves / downed state.** HP ≤ 0 flips `isDefeated: true` and ends the encounter — no stabilisation, revival, or party-rescue mechanics. | Competitor analysis | M | |
+| 31 | **No tactical positioning / battlemaps.** Encounters are abstract, not spatial; no token-on-grid layer (Friends & Fables has one). | Competitor analysis | L | |
+| 32 | **No real-time multiplayer.** Single-player only. Flagged in the analysis as the largest strategic moat (Whitespace #1) and the most expensive gap to close on our stack. | Competitor analysis | XL (strategic) | |
+| 33 | **Combat state only partially visible to the AI for later narrative.** Verify/decide what to pass. Today: encounter narration goes into conversation history + RAG, and defeated heroes show `[DEFEATED]` in the party list — but exact HP numbers, per-round damage dealt, and loot gained are **not** put in later prompts, so the AI is blind to tactical detail when narrating subsequent movement/location/story. | Session 2026-06-20 | S-M (design/check) | Partially done |
+
+> **#33 — partially addressed 2026-06-21.** `formatPartyInfo` (`promptComposer.js`) now appends a coarse condition band for wounded heroes — `[injured]` (≤75%), `[badly wounded]` (≤50%), `[critically wounded - near death]` (≤25%) — reusing `getHPStatus`; full-health heroes stay plain and **no raw HP numbers** reach the AI. Also consolidated the two inline party formatters in `useGameInteraction.js` (adventure-start + player-action prompts) onto `formatPartyInfo`; these previously omitted even the `[DEFEATED]` flag, so an unconscious hero could be narrated as acting. Unit tests added to `promptComposer.test.js`. **Still open:** per-round damage and loot-gained (loot = #8) are still not surfaced; no integration/hook-level test proves the band reaches the live prompt; deeper "what combat detail should the AI see" remains a design call.
+
+> **Not a deficiency — confirmed intentional:** combat narration is fully local/templated with **zero LLM calls** (`encounterResolver.js:53` — "Use base consequence for narration (fully local, no AI calls)"). This is a deliberate cost/latency win and should be preserved; the open question (#33) is only how much resolved *state* to surface to the AI for later actions, not whether to have the AI narrate combat itself.
+
+---
+
 ## Recommended prioritization (my take — subject to your call)
 
 **Do soon:**
