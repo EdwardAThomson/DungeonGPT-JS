@@ -7,6 +7,7 @@ import { generateMapData, findStartingTown } from "../utils/mapGenerator";
 import { generateTownMap } from "../utils/townMapGenerator";
 import { populateTown } from "../utils/npcGenerator";
 import WorldMapDisplay from "../components/WorldMapDisplay";
+import OnboardingSteps from "../components/OnboardingSteps";
 import { storyTemplates } from "../data/storyTemplates";
 import { spawnWorldMapEntities, injectQuestBuildings } from "../game/milestoneSpawner";
 import { getMilestoneLocationNames } from "../game/milestoneEngine";
@@ -126,7 +127,6 @@ const NewGame = () => {
   const technologyOptions = ['Ancient', 'Medieval', 'Renaissance', 'Industrial']; // Excluded 'Futuristic'
   const verbosityOptions = ['Concise', 'Moderate', 'Descriptive'];
 
-  const { setIsSettingsModalOpen } = useContext(SettingsContext);
 
   const applyTemplate = (template) => {
     setSelectedTemplate(template.id);
@@ -260,7 +260,11 @@ const NewGame = () => {
 
     // Shared validation
     if (!shortDescription.trim() && activeTab !== 'custom') {
-      setFormError('Please enter a story description.');
+      setFormError(
+        activeTab === 'templates'
+          ? 'Please select a story to begin.'
+          : 'Please enter a story description.'
+      );
       return;
     }
     if (!grimnessLevel) {
@@ -271,12 +275,12 @@ const NewGame = () => {
       setFormError('Please select a Darkness level.');
       return;
     }
-    if (!generatedMap) {
-      setFormError('Please generate a world map before proceeding.');
-      return;
-    }
-
     setFormError('');
+
+    // Auto-generate the world map if one wasn't built manually. Ready-Made
+    // adventures skip the map step entirely, so this is the normal path for them.
+    const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
+    const mapData = generatedMap || generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones));
 
     const templateName = selectedTemplate === 'ai' ? 'AI Generated World' :
       selectedTemplate === 'custom' || !selectedTemplate ? 'Custom Tale' :
@@ -292,16 +296,16 @@ const NewGame = () => {
       `A custom ${(THEME_DEFAULTS[customTheme]?.name || 'fantasy').toLowerCase()} adventure.`;
 
     // Spawn milestone entities onto the world map before resolving coords
-    const spawnResult = spawnWorldMapEntities(generatedMap, milestones);
+    const spawnResult = spawnWorldMapEntities(mapData, milestones);
 
     // Pre-generate all town maps so saves are never affected by generator changes
     const townMapsCache = {};
-    for (let y = 0; y < generatedMap.length; y++) {
-      for (let x = 0; x < generatedMap[y].length; x++) {
-        const tile = generatedMap[y][x];
+    for (let y = 0; y < mapData.length; y++) {
+      for (let x = 0; x < mapData[y].length; x++) {
+        const tile = mapData[y][x];
         if (tile.poi === 'town' && tile.townName) {
           const townSize = tile.townSize || tile.poiType || 'village';
-          const seed = parseInt(worldSeed) + (x * 1000) + (y * 10000);
+          const seed = parseInt(seedToUse) + (x * 1000) + (y * 10000);
           const townMapData = generateTownMap(townSize, tile.townName, 'south', seed, tile.hasRiver, tile.riverDirection);
 
           // Inject quest buildings if needed
@@ -334,8 +338,8 @@ const NewGame = () => {
       technologyLevel,
       responseVerbosity,
       campaignGoal: derivedGoal,
-      milestones: resolveMilestoneCoords(milestones, generatedMap),
-      worldSeed,
+      milestones: resolveMilestoneCoords(milestones, mapData),
+      worldSeed: seedToUse,
       templateName,
       tier: campaignTier,
       levelRange: campaignLevelRange,
@@ -349,7 +353,7 @@ const NewGame = () => {
     localStorage.setItem('activeGameSessionId', gameSessionId);
 
     setSettings(settingsData);
-    navigate('/hero-selection', { state: { heroes, generatedMap, worldSeed, gameSessionId, townMapsCache } });
+    navigate('/hero-selection', { state: { heroes, generatedMap: mapData, worldSeed: seedToUse, gameSessionId, townMapsCache } });
   };
 
   // Tab state
@@ -535,15 +539,8 @@ const NewGame = () => {
               <button
                 onClick={() => {
                   setPreviewTemplate(null);
-                  if (generatedMap) {
-                    // Map already exists — submit directly
-                    setTimeout(() => handleSubmit(), 100);
-                  } else {
-                    // Scroll to map section so user can generate first
-                    setTimeout(() => {
-                      document.querySelector('.map-generation-section')?.scrollIntoView({ behavior: 'smooth' });
-                    }, 100);
-                  }
+                  // Map is generated automatically in handleSubmit — go straight on.
+                  setTimeout(() => handleSubmit(), 100);
                 }}
                 style={{
                   padding: '8px 24px',
@@ -552,7 +549,7 @@ const NewGame = () => {
                   fontSize: '0.9rem', fontWeight: 'bold',
                 }}
               >
-                {generatedMap ? 'Continue to Hero Selection' : 'Generate World Map'}
+                Next: Select Heroes
               </button>
             ) : (
               <button
@@ -576,19 +573,13 @@ const NewGame = () => {
     );
   };
 
-  // Group templates by theme for section display
-  const templatesByTheme = storyTemplates.reduce((acc, t) => {
-    if (!acc[t.theme]) acc[t.theme] = [];
-    acc[t.theme].push(t);
-    return acc;
-  }, {});
-
-  const renderTemplateCard = (template) => {
+  const renderTemplateCard = (template, isFirst = false) => {
     const isSelected = selectedTemplate === template.id;
     const isLocked = template.comingSoon;
     return (
       <div
         key={template.id}
+        data-tour={isFirst ? 'first-adventure' : undefined}
         onClick={isLocked ? undefined : () => applyTemplate(template)}
         style={{
           background: 'var(--surface)',
@@ -656,26 +647,19 @@ const NewGame = () => {
     );
   };
 
+  // Only the starter (tier 1) adventures are shown — higher-level chapters are
+  // hidden to keep the choice simple for new players.
+  const starterTemplates = storyTemplates.filter((t) => t.tier === 1);
+
   const renderTemplateTab = () => (
     <div className="form-section story-settings-section">
       <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-        Pick a pre-built adventure. Click a card for details.
+        Pick a starter adventure to begin. Click a card for details.
       </p>
 
-      {Object.entries(templatesByTheme).map(([theme, templates]) => (
-        <div key={theme} style={{ marginBottom: '28px' }}>
-          <h3 style={{
-            margin: '0 0 12px 0', fontSize: '1rem', color: 'var(--text)',
-            fontFamily: 'var(--header-font)',
-            paddingBottom: '8px', borderBottom: '1px solid var(--border)',
-          }}>
-            {templates[0].icon} {templates[0].name}
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-            {templates.map(renderTemplateCard)}
-          </div>
-        </div>
-      ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
+        {starterTemplates.map((t, i) => renderTemplateCard(t, i === 0))}
+      </div>
     </div>
   );
 
@@ -1260,6 +1244,7 @@ const NewGame = () => {
 
   return (
     <div className="page-container new-game-page">
+      <OnboardingSteps currentStep={2} completedSteps={heroes.length > 0 ? [1] : []} />
       <h1>New Game Setup</h1>
 
       {/* Tab Navigation */}
@@ -1270,7 +1255,7 @@ const NewGame = () => {
         borderBottom: '2px solid var(--border)',
       }}>
         {[
-          { id: 'templates', label: 'Templates', icon: '📜' },
+          { id: 'templates', label: 'Ready-Made', icon: '📜' },
           { id: 'custom', label: 'Custom', icon: '🛠️' },
           { id: 'freeform', label: 'Freeform', icon: '✍️' },
         ].map(tab => (
@@ -1311,7 +1296,9 @@ const NewGame = () => {
       {/* Template Detail Modal */}
       {renderTemplateModal()}
 
-      {/* World Map Generation Section */}
+      {/* World Map Generation Section — hidden for Ready-Made adventures (the map
+          is generated automatically on submit); shown for Custom/Freeform. */}
+      {activeTab !== 'templates' && (
       <div className="form-section map-generation-section">
         <h2>World Map</h2>
         <p>Generate a random world map for your adventure. Each map is unique with forests, mountains, and towns.</p>
@@ -1389,22 +1376,12 @@ const NewGame = () => {
           </div>
         )}
       </div>
-
-      <div style={{ textAlign: 'center', marginTop: '40px', marginBottom: '40px', padding: '20px', background: 'var(--surface)', borderRadius: '12px', border: '1px solid var(--border)', boxShadow: '0 4px 12px var(--shadow)' }}>
-        <h4 style={{ margin: '0 0 10px 0', color: 'var(--text-secondary)', fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px' }}>🤖 Global AI Configuration</h4>
-        <p style={{ margin: '0 0 15px 0', fontSize: '0.9rem', color: 'var(--text)' }}>Current: <strong>{selectedProvider}</strong> / <strong>{selectedModel}</strong></p>
-        <button
-          onClick={() => setIsSettingsModalOpen(true)}
-          style={{ padding: '8px 20px', background: 'transparent', color: 'var(--primary)', border: '2px solid var(--primary)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.9rem' }}
-        >
-          ⚙️ Technical AI Settings
-        </button>
-      </div>
+      )}
 
       {/* Action Button & Error Message */}
       <div className="form-actions">
         {formError && <p className="error-message">{formError}</p>}
-        <button onClick={handleSubmit} className="settings-submit-button">
+        <button onClick={handleSubmit} className="settings-submit-button" data-tour="newgame-submit">
           Next: Select Heroes
         </button>
       </div>
