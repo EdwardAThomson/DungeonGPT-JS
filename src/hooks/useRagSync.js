@@ -12,14 +12,16 @@ const logger = createLogger('rag-sync');
  * @param {Array} conversation - Current conversation array
  * @param {boolean} hasAdventureStarted - Whether the game has begun
  */
-const useRagSync = (sessionId, conversation, hasAdventureStarted) => {
+const useRagSync = (sessionId, conversation, hasAdventureStarted, enabled = true) => {
   const [ragStatus, setRagStatus] = useState(null); // { status, indexed, total }
   const [isBackfilling, setIsBackfilling] = useState(false);
   const [backfillProgress, setBackfillProgress] = useState(null); // { indexed, total }
   const hasChecked = useRef(false);
 
-  // Check index status on mount (when loading a saved game)
+  // Check index status on mount (when loading a saved game). Skipped when disabled
+  // (e.g. guests — RAG embedding needs auth and would just 401).
   useEffect(() => {
+    if (!enabled) return;
     if (!sessionId || !hasAdventureStarted || hasChecked.current) return;
     if (!conversation || conversation.length === 0) return;
 
@@ -39,7 +41,7 @@ const useRagSync = (sessionId, conversation, hasAdventureStarted) => {
         logger.warn('Failed to check RAG index status:', err);
       }
     })();
-  }, [sessionId, hasAdventureStarted, conversation]);
+  }, [sessionId, hasAdventureStarted, conversation, enabled]);
 
   const runBackfill = useCallback(async (conv) => {
     if (!sessionId || isBackfilling) return;

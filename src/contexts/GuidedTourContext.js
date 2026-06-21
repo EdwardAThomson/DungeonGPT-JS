@@ -70,7 +70,7 @@ export const TOUR_STEPS = [
     route: '/new-game',
     target: '[data-tour="first-adventure"]',
     title: 'Pick an adventure',
-    body: 'Choose a starter adventure — this first one is a great place to begin. Then click “Next: Select Heroes”.',
+    body: 'Click an adventure card to choose your story — this first one is a great place to begin. Then click “Next: Select Heroes”.',
   },
   {
     id: 'select-party',

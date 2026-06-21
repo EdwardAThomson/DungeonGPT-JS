@@ -109,6 +109,9 @@ const NewGame = () => {
   const [worldSeed, setWorldSeed] = useState(settings?.worldSeed || null);
   const [showMapPreview, setShowMapPreview] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  // Display name of the chosen story, captured at selection time so it survives
+  // selectedTemplate being reset to 'custom' when the player visits other tabs.
+  const [templateLabel, setTemplateLabel] = useState(null);
   const [customNames, setCustomNames] = useState({ towns: [], mountains: [] });
 
   // AI Generation state
@@ -130,6 +133,7 @@ const NewGame = () => {
 
   const applyTemplate = (template) => {
     setSelectedTemplate(template.id);
+    setTemplateLabel(template.subtitle ? `${template.name} — ${template.subtitle}` : template.name);
     setShortDescription(template.settings.shortDescription);
     setGrimnessLevel(template.settings.grimnessLevel);
     setDarknessLevel(template.settings.darknessLevel);
@@ -145,6 +149,7 @@ const NewGame = () => {
     setIsAiGenerating(true);
     setAiError('');
     setSelectedTemplate('ai');
+    setTemplateLabel('AI Generated World');
 
     const prompt = `You are a world-class RPG campaign designer. Create a unique, compelling story preset for a tabletop-style RPG.
     Provide the output in STRICT JSON format with the following keys:
@@ -282,9 +287,10 @@ const NewGame = () => {
     const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
     const mapData = generatedMap || generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones));
 
-    const templateName = selectedTemplate === 'ai' ? 'AI Generated World' :
-      selectedTemplate === 'custom' || !selectedTemplate ? 'Custom Tale' :
-        storyTemplates.find(t => t.id === selectedTemplate)?.name || 'Unknown Template';
+    const templateName = templateLabel
+      || (selectedTemplate === 'ai' ? 'AI Generated World'
+        : selectedTemplate === 'custom' || !selectedTemplate ? 'Custom Tale'
+          : storyTemplates.find(t => t.id === selectedTemplate)?.name || 'Unknown Template');
 
     // Derive campaignGoal from the final milestone if not explicitly set
     const derivedGoal = campaignGoal || (milestones.length > 0
@@ -882,6 +888,7 @@ const NewGame = () => {
     if (built.length > 0) {
       setMilestones(built);
       setSelectedTemplate('custom');
+      setTemplateLabel('Custom Tale');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slot1Item, slot1Building, slot1Town, slot2Role, slot2Building, slot2Town, slot3Poi, slot3Mountain, slot4Enemy, customTier, customTheme, activeTab]);

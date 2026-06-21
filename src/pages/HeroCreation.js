@@ -41,6 +41,8 @@ const HeroCreation = () => {
   const [alertMessage, setAlertMessage] = useState(null);
   // Whether the portrait picker modal is open.
   const [showPortraitModal, setShowPortraitModal] = useState(false);
+  // Unspent-points confirmation: { hero, points } when warning before create.
+  const [confirmUnspent, setConfirmUnspent] = useState(null);
 
   const [heroName, setHeroName] = useState(heroToEdit?.heroName || "");
   const [selectedGender, setSelectedGender] = useState(heroToEdit?.heroGender || "");
@@ -128,6 +130,12 @@ const HeroCreation = () => {
     const { valid, reasons } = validateHero(newHero, { enforcePointBuy: !state?.editing });
     if (!valid) {
       setAlertMessage(reasons);
+      return;
+    }
+
+    // Warn (don't block) if the player left point-buy points unspent (new heroes only).
+    if (!state?.editing && remainingPoints > 0) {
+      setConfirmUnspent({ hero: newHero, points: remainingPoints });
       return;
     }
 
@@ -391,6 +399,37 @@ const HeroCreation = () => {
             <button className="modal-close-button" onClick={() => setAlertMessage(null)} style={{ width: '100%', padding: '12px' }}>
               Understood
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Unspent points warning (non-blocking) */}
+      {confirmUnspent && (
+        <div className="modal-overlay" onClick={() => setConfirmUnspent(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', textAlign: 'center' }}>
+            <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', margin: '0 0 16px 0' }}>Unspent Points</h2>
+            <p style={{ color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0' }}>
+              You still have <strong>{confirmUnspent.points}</strong> unspent stat point{confirmUnspent.points === 1 ? '' : 's'}. Spending them now makes your hero stronger — you can't add them later.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button
+                className="modal-close-button"
+                onClick={() => setConfirmUnspent(null)}
+                style={{ background: 'transparent', color: 'var(--text)' }}
+              >
+                Keep editing
+              </button>
+              <button
+                className="modal-close-button"
+                onClick={() => {
+                  const hero = confirmUnspent.hero;
+                  setConfirmUnspent(null);
+                  navigate('/hero-summary', { state: { newCharacter: hero } });
+                }}
+              >
+                Create anyway
+              </button>
+            </div>
           </div>
         </div>
       )}

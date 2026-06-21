@@ -54,7 +54,8 @@ const AppContent = () => {
     setAssistantModel,
     isSettingsModalOpen,
     setIsSettingsModalOpen,
-    theme
+    theme,
+    setTheme
   } = useContext(SettingsContext);
 
   // Sync theme to document.body so Portal content inherits CSS variables
@@ -124,10 +125,12 @@ const AppContent = () => {
           />
           <li className="nav-settings-item">
             <button
-              onClick={() => { setIsMobileNavOpen(false); setIsSettingsModalOpen(true); }}
+              onClick={() => setTheme(theme === 'light-fantasy' ? 'dark-fantasy' : 'light-fantasy')}
               className="nav-settings-btn"
+              title={theme === 'light-fantasy' ? 'Switch to dark mode' : 'Switch to light mode'}
+              aria-label="Toggle light/dark theme"
             >
-              ⚙️ <span className="settings-text">Settings</span>
+              {theme === 'light-fantasy' ? '🌙' : '☀️'} <span className="settings-text">{theme === 'light-fantasy' ? 'Dark' : 'Light'}</span>
             </button>
           </li>
           {isGamePage && user && (
@@ -189,13 +192,14 @@ const AppContent = () => {
               <Route path="/hero-summary" element={<HeroSummary />} />
               <Route path="/new-game" element={<NewGame />} />
 
-              {/* Roster is available to guests (heroes saved locally until sign-in) */}
+              {/* Guest-accessible: heroes/games are saved locally until sign-in.
+                  The AI Dungeon Master is gated in-page for guests (see useAiAvailable). */}
               <Route path="/all-heroes" element={<AllHeroes />} />
+              <Route path="/hero-selection" element={<HeroSelection />} />
+              <Route path="/game" element={<Game />} />
+              <Route path="/saved-conversations" element={<SavedConversations />} />
 
               {/* Protected routes */}
-              <Route path="/hero-selection" element={<ProtectedRoute><HeroSelection /></ProtectedRoute>} />
-              <Route path="/game" element={<ProtectedRoute><Game /></ProtectedRoute>} />
-              <Route path="/saved-conversations" element={<ProtectedRoute><SavedConversations /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/cf-worker-debug" element={<ProtectedRoute><CFWorkerDebug /></ProtectedRoute>} />
               {isDebugEnabled && <Route path="/encounter-debug" element={<EncounterModalDebug />} />}

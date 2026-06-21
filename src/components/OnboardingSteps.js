@@ -1,6 +1,6 @@
 // OnboardingSteps.js
 // Lightweight 3-step progress indicator for the new-player journey:
-// Create Hero -> Start a Game -> Begin Quest. Rendered on the setup pages so a
+// Create Hero -> Choose Adventure -> Begin Quest. Rendered on the setup pages so a
 // first-time player always knows where they are and what comes next.
 
 import React from 'react';
@@ -8,7 +8,7 @@ import '../styles/onboarding.css';
 
 const STEPS = [
   { n: 1, label: 'Create Hero' },
-  { n: 2, label: 'Start a Game' },
+  { n: 2, label: 'Choose Adventure' },
   { n: 3, label: 'Begin Quest' },
 ];
 

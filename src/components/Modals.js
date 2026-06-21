@@ -242,9 +242,8 @@ export const StorySettingsModalContent = ({
   assistantModel, setAssistantModel,
   worldSeed
 }) => {
-  const [activeTab, setActiveTab] = useState('story'); // 'story' or 'ai'
+  const [activeTab] = useState('story'); // always 'story' now; 'ai' branch retained but unused
   const { apiKeys, setApiKeys } = useContext(ApiKeysContext);
-  const { theme, setTheme } = useContext(SettingsContext);
   const AVAILABLE_MODELS = getAvailableModels();
 
   if (!isOpen) return null;
@@ -269,49 +268,7 @@ export const StorySettingsModalContent = ({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content settings-modal-refined" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
         <div style={{ padding: '20px 20px 10px 20px', borderBottom: '1px solid var(--border)' }}>
-          <h2 style={{ margin: 0, color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>⚙️ System Scroll</h2>
-        </div>
-
-        {/* Tab Navigation */}
-        <div style={{ display: 'flex', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
-          <button
-            onClick={() => setActiveTab('story')}
-            style={{
-              flex: 1,
-              padding: '12px',
-              background: activeTab === 'story' ? 'var(--surface)' : 'transparent',
-              color: activeTab === 'story' ? 'var(--primary)' : 'var(--text-secondary)',
-              border: 'none',
-              borderBottom: activeTab === 'story' ? '3px solid var(--primary)' : 'none',
-              fontFamily: 'var(--header-font)',
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              textTransform: 'uppercase',
-              letterSpacing: '1px'
-            }}
-          >
-            📖 Story & Style
-          </button>
-          <button
-            onClick={() => setActiveTab('ai')}
-            style={{
-              flex: 1,
-              padding: '12px',
-              background: activeTab === 'ai' ? 'var(--surface)' : 'transparent',
-              color: activeTab === 'ai' ? 'var(--primary)' : 'var(--text-secondary)',
-              border: 'none',
-              borderBottom: activeTab === 'ai' ? '3px solid var(--primary)' : 'none',
-              fontFamily: 'var(--header-font)',
-              fontSize: '0.85rem',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              textTransform: 'uppercase',
-              letterSpacing: '1px'
-            }}
-          >
-            🤖 AI Engine
-          </button>
+          <h2 style={{ margin: 0, color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>📖 Journal</h2>
         </div>
 
         <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
@@ -319,29 +276,30 @@ export const StorySettingsModalContent = ({
             <>
               {/* Story Profile Section */}
               <div className="modal-section" style={{ marginBottom: '25px' }}>
-                <h3 style={{ margin: '0 0 18px 0', fontSize: '1.1rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>📖 Active Story Profile</h3>
                 <div style={{ fontSize: '0.9rem', color: 'var(--text)', background: 'var(--surface)', padding: '18px 18px 14px', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: 'inset 0 2px 4px var(--shadow)' }}>
-                  {settings.templateName && (
-                    <p style={{ margin: '0 0 14px 0', fontSize: '0.75rem', color: 'var(--text-secondary)', letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-                      Template: {settings.templateName}
-                    </p>
+                  {/* Quest box (moved up): adventure name + goal */}
+                  {(settings.templateName || settings.campaignGoal) && (
+                    <div style={{ margin: '0 0 16px 0', padding: '14px 16px', background: 'var(--primary-tint-10)', border: '1px solid var(--primary)', borderRadius: '8px', textAlign: 'center' }}>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>Quest</p>
+                      {settings.templateName && (
+                        <p style={{ margin: '0 0 8px 0', color: 'var(--primary)', fontWeight: '700', fontSize: '1.3rem', fontFamily: 'var(--header-font)', lineHeight: '1.3' }}>{settings.templateName}</p>
+                      )}
+                      {settings.campaignGoal && (
+                        <p style={{ margin: '0', color: 'var(--text)', fontWeight: '500', fontSize: '1.1rem', lineHeight: '1.45' }}>{settings.campaignGoal}</p>
+                      )}
+                    </div>
                   )}
-                  <p style={{ margin: '0 0 16px 0', fontSize: '0.95rem', lineHeight: '1.5', color: 'var(--text)' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontStyle: 'italic' }}>Setting:</span>{' '}
-                    {settings.shortDescription || 'Default Fantasy World'}
-                  </p>
                   {settings.campaignComplete && (
                     <div style={{ margin: '0 0 18px 0', padding: '12px', background: 'var(--success-tint-20)', borderLeft: '4px solid var(--state-success)', borderRadius: '6px', textAlign: 'center' }}>
                       <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--state-success)' }}>🏆 CAMPAIGN COMPLETE 🏆</div>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Victory Achieved!</div>
                     </div>
                   )}
-                  {settings.campaignGoal && (
-                    <div style={{ margin: '0 0 18px 0', padding: '14px 16px', background: 'var(--primary-tint-10)', border: '1px solid var(--primary)', borderRadius: '8px', textAlign: 'center' }}>
-                      <p style={{ margin: '0 0 6px 0', fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>Quest</p>
-                      <p style={{ margin: '0', color: 'var(--primary)', fontWeight: '600', fontSize: '1rem', lineHeight: '1.45' }}>{settings.campaignGoal}</p>
-                    </div>
-                  )}
+                  <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px 16px', margin: '0 0 16px 0' }}>
+                    <p style={{ margin: 0, fontSize: '1.05rem', lineHeight: '1.55', color: 'var(--text)' }}>
+                      {settings.shortDescription || 'Default Fantasy World'}
+                    </p>
+                  </div>
                   {settings.milestones && settings.milestones.length > 0 && (() => {
                     // Normalize milestones for display
                     const normalizeMilestones = (milestones) => {
@@ -358,14 +316,14 @@ export const StorySettingsModalContent = ({
                     const currentIndex = normalized.findIndex(m => !m.completed);
 
                     return (
-                      <div style={{ margin: '0 0 14px 0' }}>
+                      <div style={{ margin: '0 0 14px 0', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px 16px' }}>
                         {/* Milestones Header with Progress */}
                         {totalCount > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', margin: '0 0 10px 0', paddingBottom: '6px', borderBottom: '1px solid var(--border)' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--primary)', fontFamily: 'var(--header-font)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>
+                            <span style={{ fontSize: '0.95rem', color: 'var(--primary)', fontFamily: 'var(--header-font)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>
                               Milestones
                             </span>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
                               {completedCount}/{totalCount} complete
                             </span>
                           </div>
@@ -393,17 +351,18 @@ export const StorySettingsModalContent = ({
                                 }}
                               >
                                 <span style={{
-                                  fontSize: '0.75rem',
+                                  fontSize: '0.95rem',
+                                  fontWeight: 700,
                                   color: 'var(--text-secondary)',
-                                  opacity: 0.6,
-                                  minWidth: '18px',
+                                  opacity: 0.85,
+                                  minWidth: '20px',
                                   fontVariantNumeric: 'tabular-nums'
                                 }}>
                                   {idx + 1}.
                                 </span>
                                 <span style={{
-                                  fontSize: isCurrent ? '0.95rem' : '0.85rem',
-                                  lineHeight: '1.4',
+                                  fontSize: isCurrent ? '1.15rem' : '1.02rem',
+                                  lineHeight: '1.45',
                                   color: isCompleted ? 'var(--text-secondary)' : 'var(--text)',
                                   textDecoration: isCompleted ? 'line-through' : 'none',
                                   opacity: isFuture ? 0.6 : 1,
@@ -423,7 +382,7 @@ export const StorySettingsModalContent = ({
                       </div>
                     );
                   })()}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '6px 20px', paddingTop: '12px', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', gap: '6px 20px', paddingTop: '12px', borderTop: '1px solid var(--border)', fontSize: '0.92rem', color: 'var(--text-secondary)' }}>
                     <span title="The overall tone and atmosphere of the story - from light-hearted to grim and serious">
                       <span style={{ opacity: 0.7 }}>Mood:</span> {settings.grimnessLevel || 'Neutral'} / {settings.darknessLevel || 'Neutral'}
                     </span>
@@ -440,46 +399,6 @@ export const StorySettingsModalContent = ({
                 </p>
               </div>
 
-              {/* Appearance Section */}
-              <div className="modal-section" style={{ borderTop: '1px solid var(--border)', paddingTop: '20px' }}>
-                <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>🎭 Appearance</h3>
-                <div style={{ display: 'flex', gap: '15px' }}>
-                  <button
-                    onClick={() => setTheme('light-fantasy')}
-                    style={{
-                      flex: 1,
-                      padding: '16px',
-                      background: theme === 'light-fantasy' ? 'var(--primary)' : 'var(--bg)',
-                      color: theme === 'light-fantasy' ? 'var(--bg)' : 'var(--text)',
-                      border: '1px solid var(--primary)',
-                      fontFamily: 'var(--header-font)',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      boxShadow: theme === 'light-fantasy' ? '0 4px 12px var(--shadow)' : 'none'
-                    }}
-                  >
-                    📜 Parchment (Light)
-                  </button>
-                  <button
-                    onClick={() => setTheme('dark-fantasy')}
-                    style={{
-                      flex: 1,
-                      padding: '16px',
-                      background: theme === 'dark-fantasy' ? 'var(--primary)' : 'var(--bg)',
-                      color: theme === 'dark-fantasy' ? 'var(--bg)' : 'var(--text)',
-                      border: '1px solid var(--primary)',
-                      fontFamily: 'var(--header-font)',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease',
-                      boxShadow: theme === 'dark-fantasy' ? '0 4px 12px var(--shadow)' : 'none'
-                    }}
-                  >
-                    🌑 Stone (Dark)
-                  </button>
-                </div>
-              </div>
             </>
           ) : (
             <>

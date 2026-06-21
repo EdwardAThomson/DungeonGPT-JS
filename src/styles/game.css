@@ -216,15 +216,15 @@
 
 .header-button-group {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: flex-end;
 }
 
 .header-button-group button {
-  padding: 8px 12px;
-  font-size: 0.7rem;
+  padding: 11px 18px;
+  font-size: 0.9rem;
   letter-spacing: 0.5px;
   white-space: nowrap;
   flex-shrink: 0;
@@ -296,6 +296,26 @@
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* Guest (no-AI) mode: the chat box stays visible but disabled; the send button
+   becomes a sign-in link and an info line explains why. */
+.guest-ai-gate-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.guest-ai-info {
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--surface);
+}
+
+.guest-ai-info strong {
+  color: var(--text);
 }
 
 .user-input {

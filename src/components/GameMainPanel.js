@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import SafeMarkdownMessage from './SafeMarkdownMessage';
 
 const GameMainPanel = ({
@@ -30,6 +31,7 @@ const GameMainPanel = ({
   showDebugInfo,
   onToggleAiNarrative,
   aiNarrativeEnabled,
+  aiAvailable = true,
   isMapLoaded,
   lastPrompt
 }) => {
@@ -54,8 +56,8 @@ const GameMainPanel = ({
             <button onClick={onOpenHowToPlay} className="how-to-play-button" aria-label="Open how to play guide">
               <span aria-hidden="true">📜</span> How to Play
             </button>
-            <button onClick={onOpenSettings} className="view-settings-button" aria-label="Open full settings">
-              <span aria-hidden="true">⚙️</span> Full Settings
+            <button onClick={onOpenSettings} className="view-settings-button" aria-label="Open journal">
+              <span aria-hidden="true">📖</span> Journal
             </button>
             <button onClick={onManualSave} className="manual-save-button" disabled={!canManualSave} aria-label="Save game manually">
               <span aria-hidden="true">💾</span> Save
@@ -96,23 +98,35 @@ const GameMainPanel = ({
       </div>
 
       <div className="game-lower-section">
-        <form onSubmit={onSubmit}>
+        <form onSubmit={aiAvailable ? onSubmit : (e) => e.preventDefault()}>
           <label htmlFor="user-action-input" className="sr-only">Your action</label>
           <textarea
             id="user-action-input"
             value={userInput}
             onChange={onInputChange}
-            placeholder={hasAdventureStarted ? "Type your action..." : "Click 'Start Adventure' above..."}
+            placeholder={
+              !aiAvailable
+                ? "Sign in to type actions and unlock the AI Dungeon Master…"
+                : hasAdventureStarted ? "Type your action..." : "Click 'Start Adventure' above..."
+            }
             rows="4"
             className="user-input"
-            disabled={!hasAdventureStarted || isLoading}
+            disabled={!aiAvailable || !hasAdventureStarted || isLoading}
             aria-label="Type your action or command"
           />
-          <button type="submit" className="game-send-button" disabled={!hasAdventureStarted || !userInput.trim() || isLoading}>
-            {isLoading ? '...' : '↑ Send'}
-          </button>
+          {aiAvailable ? (
+            <button type="submit" className="game-send-button" disabled={!hasAdventureStarted || !userInput.trim() || isLoading}>
+              {isLoading ? '...' : '↑ Send'}
+            </button>
+          ) : (
+            <Link to="/login" className="game-send-button guest-ai-gate-btn">Sign in</Link>
+          )}
         </form>
-        <p className="info">AI responses may not always be accurate or coherent.</p>
+        {aiAvailable ? (
+          <p className="info">AI responses may not always be accurate or coherent.</p>
+        ) : (
+          <p className="info guest-ai-info">✨ <strong>The AI Dungeon Master is resting.</strong> Keep exploring and fighting as a guest — sign in to type free-form actions and unlock full AI narration.</p>
+        )}
 
         {showDebugInfo && (
           <div className="debug-info-box">

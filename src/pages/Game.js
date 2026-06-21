@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import SettingsContext from "../contexts/SettingsContext";
+import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
 import { checkForEncounter } from '../utils/encounterGenerator';
 import useGameSession from '../hooks/useGameSession';
@@ -124,6 +125,11 @@ const Game = () => {
   const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [isMobilePartySidebarOpen, setIsMobilePartySidebarOpen] = useState(false);
 
+  // The AI Dungeon Master requires auth; guests play the local mechanical loop
+  // (exploration + deterministic combat) and the AI is the sign-in upsell.
+  const { user } = useAuth();
+  const aiAvailable = !!user;
+
   // --- HOOKS ---
   const {
     sessionId,
@@ -152,7 +158,8 @@ const Game = () => {
       currentTownMap: mapHook.currentTownMap,
       townPlayerPosition: mapHook.townPlayerPosition
     },
-    sessionId
+    sessionId,
+    aiAvailable
   );
   const { performSave } = useGamePersistence({
     sessionId,
@@ -173,7 +180,8 @@ const Game = () => {
   const { ragStatus, isBackfilling, backfillProgress } = useRagSync(
     sessionId,
     interactionHook.conversation,
-    hasAdventureStarted
+    hasAdventureStarted,
+    aiAvailable
   );
 
   // --- Hero HP Update Handler ---
@@ -377,8 +385,8 @@ const Game = () => {
     // First visit to a new biome/town gets a richer description
     const isNewArea = !isBiomeVisited || (townName && !isTownVisited);
 
-    // Skip AI narrative if toggle is disabled (for testing)
-    if (!aiNarrativeEnabled) {
+    // Skip AI narrative if toggle is disabled (for testing) or for guests (no AI).
+    if (!aiNarrativeEnabled || !aiAvailable) {
       return;
     }
 
@@ -518,7 +526,7 @@ const Game = () => {
     const { tile, coords, needsAiDescription } = pendingNarrativeTile;
     setPendingNarrativeTile(null);
 
-    if (!needsAiDescription || !aiNarrativeEnabled) return;
+    if (!needsAiDescription || !aiNarrativeEnabled || !aiAvailable) return;
 
     (async () => {
       const resolvedModel = resolveProviderAndModel(selectedProvider, selectedModel);
@@ -675,6 +683,7 @@ const Game = () => {
           showDebugInfo={showDebugInfo}
           onToggleAiNarrative={() => setAiNarrativeEnabled((prev) => !prev)}
           aiNarrativeEnabled={aiNarrativeEnabled}
+          aiAvailable={aiAvailable}
           isMapLoaded={!!mapHook.worldMap}
           lastPrompt={interactionHook.lastPrompt}
         />

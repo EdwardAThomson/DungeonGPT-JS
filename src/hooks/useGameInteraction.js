@@ -6,6 +6,7 @@ import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver
 import { areRequirementsMet } from '../game/milestoneEngine';
 import { formatPartyInfo } from '../game/promptComposer';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
+import { composeIntro } from '../game/introComposer';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-interaction');
@@ -236,7 +237,8 @@ const useGameInteraction = (
     hasAdventureStarted,
     setHasAdventureStarted,
     locationContext = {},
-    sessionId = null
+    sessionId = null,
+    aiAvailable = true
 ) => {
     const [userInput, setUserInput] = useState('');
     const [conversation, setConversation] = useState(loadedConversation?.conversation_data || []);
@@ -296,6 +298,16 @@ const useGameInteraction = (
         setHasAdventureStarted(true);
         setIsLoading(true);
         setError(null);
+
+        // Guests (no AI): open with a local templated intro instead of calling the AI.
+        if (!aiAvailable) {
+            const startTile = getTile(worldMap, playerPosition.x, playerPosition.y);
+            const introText = composeIntro(settings, selectedHeroes, startTile);
+            setConversation(prev => [...prev, { role: 'ai', content: introText }]);
+            setIsLoading(false);
+            return;
+        }
+
         const model = getCurrentModel();
 
         // Note: marking tile as explored is handled in Game.js/useGameMap, or we assume starting town is explored.
@@ -374,6 +386,7 @@ const useGameInteraction = (
     const handleSubmit = async (event) => {
         event.preventDefault();
         if (!hasAdventureStarted || !userInput.trim() || isLoading) return;
+        if (!aiAvailable) return; // free-text actions need the AI DM (gated for guests)
 
         if (!selectedHeroes || selectedHeroes.length === 0) {
             setError('Cannot start game without selecting heroes.');

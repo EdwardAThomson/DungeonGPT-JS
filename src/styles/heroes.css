@@ -468,7 +468,7 @@
   cursor: pointer;
   position: relative;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  border: 2px solid transparent;
+  border: 2px solid var(--border);
   padding: 13px;
 }
 

@@ -228,7 +228,7 @@ const HeroSelection = () => {
         )}
         {selectionError && <p className="error-message">{selectionError}</p>}
         <button onClick={handleBack} className="back-button">
-          Back to Settings
+          ← Back to Story Setup
         </button>
         <button onClick={handleNext} className="next-button" disabled={selectedHeroes.length === 0 || selectedHeroes.length > 4}>
           Start Game with Selected Heroes

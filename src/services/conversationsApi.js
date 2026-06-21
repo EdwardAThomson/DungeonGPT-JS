@@ -1,5 +1,6 @@
 import { apiFetch, getErrorMessage } from './apiClient';
 import { supabase } from './supabaseClient';
+import { localGameStore } from './localGameStore';
 
 // Use CF Worker in production, Express/SQLite in dev
 const forceSQLite = process.env.REACT_APP_USE_SQLITE === 'true';
@@ -138,28 +139,41 @@ const expressConversationsApi = {
   }
 };
 
+const backend = useCfWorker ? cfWorkerConversationsApi : expressConversationsApi;
+
+// Logged-out (guest) players save/load games to a browser-local IndexedDB store;
+// signed-in players use the cloud backend. Local games are synced on sign-in.
+async function isSignedIn() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return !!session?.access_token;
+  } catch (e) {
+    return false;
+  }
+}
+
 export const conversationsApi = {
   async list() {
-    return useCfWorker ? cfWorkerConversationsApi.list() : expressConversationsApi.list();
+    return (await isSignedIn()) ? backend.list() : localGameStore.list();
   },
 
   async getById(sessionId) {
-    return useCfWorker ? cfWorkerConversationsApi.getById(sessionId) : expressConversationsApi.getById(sessionId);
+    return (await isSignedIn()) ? backend.getById(sessionId) : localGameStore.getById(sessionId);
   },
 
   async save(payload) {
-    return useCfWorker ? cfWorkerConversationsApi.save(payload) : expressConversationsApi.save(payload);
+    return (await isSignedIn()) ? backend.save(payload) : localGameStore.save(payload);
   },
 
   async updateMessages(sessionId, conversationData) {
-    return useCfWorker ? cfWorkerConversationsApi.updateMessages(sessionId, conversationData) : expressConversationsApi.updateMessages(sessionId, conversationData);
+    return (await isSignedIn()) ? backend.updateMessages(sessionId, conversationData) : localGameStore.updateMessages(sessionId, conversationData);
   },
 
   async updateName(sessionId, conversationName) {
-    return useCfWorker ? cfWorkerConversationsApi.updateName(sessionId, conversationName) : expressConversationsApi.updateName(sessionId, conversationName);
+    return (await isSignedIn()) ? backend.updateName(sessionId, conversationName) : localGameStore.updateName(sessionId, conversationName);
   },
 
   async remove(sessionId) {
-    return useCfWorker ? cfWorkerConversationsApi.remove(sessionId) : expressConversationsApi.remove(sessionId);
+    return (await isSignedIn()) ? backend.remove(sessionId) : localGameStore.remove(sessionId);
   }
 };
