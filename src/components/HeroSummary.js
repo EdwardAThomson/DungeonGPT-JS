@@ -9,6 +9,8 @@ import { calculateMaxHP } from "../utils/healthSystem";
 import { heroesApi } from "../services/heroesApi";
 import { createLogger } from "../utils/logger";
 import { resolveProfilePicture } from "../utils/assetHelper";
+import OnboardingSteps from "./OnboardingSteps";
+import { validateHero } from "../game/heroValidation";
 
 const logger = createLogger('hero-summary');
 
@@ -27,6 +29,17 @@ const HeroSummary = () => {
 
   const handleSaveOrUpdate = async () => {
     if (!newHero) return; // Safety check
+
+    // Block saving an invalid character. The point-buy budget is enforced only
+    // for new characters; editing an existing one stays lenient (structural only).
+    const { valid, reasons } = validateHero(newHero, { enforcePointBuy: !isEditing });
+    if (!valid) {
+      setFeedbackModal({
+        title: "Character Not Ready",
+        message: `This character can't be saved yet: ${reasons.join(' ')}`,
+      });
+      return;
+    }
 
     // Check if user is logged in
     if (!user) {
@@ -79,7 +92,8 @@ const HeroSummary = () => {
     if (state?.returnToHeroSelection) {
       navigate('/hero-selection', { state: { heroes: finalHeroes, settingsData: state.settingsData } });
     } else {
-      navigate("/all-heroes");
+      // Flag a freshly-added hero so the roster can spotlight the next step.
+      navigate("/all-heroes", { state: { justAdded: !isEditing } });
     }
   };
 
@@ -96,6 +110,7 @@ const HeroSummary = () => {
   return (
     // Use a specific container class
     <div className="summary-container">
+      {!isEditing && <OnboardingSteps currentStep={1} />}
       {/* Removed main h2, using name as header */}
       <div className="summary-content">
         {/* Image Column */}
@@ -160,8 +175,10 @@ const HeroSummary = () => {
           Back (Edit)
         </button>
         {/* Save/Add Button - Text changes based on isEditing */}
-        <button onClick={handleSaveOrUpdate} className="summary-action-btn summary-primary-btn">
-          {isEditing ? "Save Changes & Continue" : "Add to Roster & Continue"}
+        <button onClick={handleSaveOrUpdate} className="summary-action-btn summary-primary-btn" data-tour="save-hero">
+          {state?.returnToHeroSelection
+            ? (isEditing ? "Save Changes & Continue" : "Add & Continue to Party")
+            : (isEditing ? "Save Changes" : "Add to Roster")}
         </button>
         {/* Download Button */}
         <button

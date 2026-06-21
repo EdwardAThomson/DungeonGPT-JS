@@ -7,129 +7,27 @@ import { v4 as uuidv4 } from "uuid";
 import HeroContext from "../contexts/HeroContext";
 import { generateName } from "../utils/npcGenerator";
 import { calculateMaxHP } from "../utils/healthSystem";
-
-
-const profilePictures = [
-  // Male portraits
-  { imageId: 1, src: "assets/characters/barbarian.webp", gender: "Male" },
-  { imageId: 2, src: "assets/characters/wizard.webp", gender: "Male" },
-  { imageId: 3, src: "assets/characters/ranger.webp", gender: "Male" },
-  { imageId: 4, src: "assets/characters/paladin.webp", gender: "Male" },
-  { imageId: 5, src: "assets/characters/cleric.webp", gender: "Male" },
-  { imageId: 6, src: "assets/characters/bard.webp", gender: "Male" },
-  { imageId: 7, src: "assets/characters/fighter.webp", gender: "Male" },
-  { imageId: 8, src: "assets/characters/druid.webp", gender: "Male" },
-  // Female portraits
-  { imageId: 9, src: "assets/characters/female_barbarian.webp", gender: "Female" },
-  { imageId: 10, src: "assets/characters/female_wizard.webp", gender: "Female" },
-  { imageId: 11, src: "assets/characters/female_ranger.webp", gender: "Female" },
-  { imageId: 12, src: "assets/characters/female_paladin.webp", gender: "Female" },
-  { imageId: 13, src: "assets/characters/female_cleric.webp", gender: "Female" },
-  { imageId: 14, src: "assets/characters/female_bard.webp", gender: "Female" },
-  { imageId: 15, src: "assets/characters/female_fighter.webp", gender: "Female" },
-  { imageId: 16, src: "assets/characters/female_druid.webp", gender: "Female" },
-];
-
-const heroGenders = ["Male", "Female"];
-const heroClasses = ["Barbarian", "Bard", "Cleric", "Druid", "Fighter", "Monk", "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard"]
-const heroRaces = ["Human", "Dwarf", "Elf", "Smallfolk", "Dragonkin", "Gnome", "Half-Elf", "Half-Orc", "Demonkin"];
-
-const alignmentOptions = [
-  "Lawful Good",
-  "Neutral Good",
-  "Chaotic Good",
-  "Lawful Neutral",
-  "True Neutral",
-  "Chaotic Neutral",
-  "Lawful Evil",
-  "Neutral Evil",
-  "Chaotic Evil",
-];
-
-const initialStats = {
-  Strength: 8,
-  Dexterity: 8,
-  Constitution: 8,
-  Intelligence: 8,
-  Wisdom: 8,
-  Charisma: 8,
-};
-
-// --- Hero Class Templates (Level 1) ---
-const heroTemplates = {
-  Barbarian: {
-    race: "Half-Orc",
-    stats: { Strength: 15, Dexterity: 13, Constitution: 14, Intelligence: 8, Wisdom: 12, Charisma: 10 },
-    alignment: "Chaotic Neutral",
-    backgroundSnippet: "Hails from a remote tribe, fiercely protective and quick to anger.",
-  },
-  Bard: {
-    race: "Half-Elf",
-    stats: { Strength: 10, Dexterity: 14, Constitution: 12, Intelligence: 10, Wisdom: 13, Charisma: 15 },
-    alignment: "Chaotic Good",
-    backgroundSnippet: "A charismatic wanderer who collects stories and inspires others.",
-  },
-  Cleric: {
-    race: "Human",
-    stats: { Strength: 14, Dexterity: 10, Constitution: 13, Intelligence: 10, Wisdom: 15, Charisma: 12 },
-    alignment: "Lawful Good",
-    backgroundSnippet: "Devoted servant of a deity, provides healing and guidance.",
-  },
-  Druid: {
-    race: "Elf", // Wood Elf often
-    stats: { Strength: 10, Dexterity: 14, Constitution: 13, Intelligence: 12, Wisdom: 15, Charisma: 10 },
-    alignment: "Neutral",
-    backgroundSnippet: "Guardian of the wilds, draws power from nature itself.",
-  },
-  Fighter: {
-    race: "Dwarf", // Hill Dwarf often
-    stats: { Strength: 15, Dexterity: 10, Constitution: 14, Intelligence: 10, Wisdom: 13, Charisma: 12 },
-    alignment: "Lawful Neutral",
-    backgroundSnippet: "A disciplined warrior, master of arms and tactics.",
-  },
-  Monk: {
-    race: "Human",
-    stats: { Strength: 10, Dexterity: 15, Constitution: 13, Intelligence: 10, Wisdom: 14, Charisma: 12 },
-    alignment: "Lawful Neutral",
-    backgroundSnippet: "A practitioner of ancient martial arts, seeks inner harmony.",
-  },
-  Paladin: {
-    race: "Dragonkin",
-    stats: { Strength: 15, Dexterity: 10, Constitution: 13, Intelligence: 10, Wisdom: 12, Charisma: 14 },
-    alignment: "Lawful Good",
-    backgroundSnippet: "A holy warrior bound by an oath to uphold justice and righteousness.",
-  },
-  Ranger: {
-    race: "Elf", // Wood Elf often
-    stats: { Strength: 10, Dexterity: 15, Constitution: 13, Intelligence: 10, Wisdom: 14, Charisma: 12 },
-    alignment: "Neutral Good",
-    backgroundSnippet: "A skilled hunter and tracker, comfortable in the wilderness.",
-  },
-  Rogue: {
-    race: "Smallfolk",
-    stats: { Strength: 8, Dexterity: 15, Constitution: 12, Intelligence: 14, Wisdom: 10, Charisma: 14 },
-    alignment: "Chaotic Neutral",
-    backgroundSnippet: "Operates in the shadows, relies on stealth and cunning.",
-  },
-  Sorcerer: {
-    race: "Demonkin",
-    stats: { Strength: 8, Dexterity: 14, Constitution: 14, Intelligence: 12, Wisdom: 10, Charisma: 15 },
-    alignment: "Chaotic Good",
-    backgroundSnippet: "Wields innate magical power derived from an arcane bloodline.",
-  },
-  Warlock: {
-    race: "Demonkin",
-    stats: { Strength: 8, Dexterity: 13, Constitution: 14, Intelligence: 12, Wisdom: 10, Charisma: 15 },
-    alignment: "Chaotic Neutral",
-    backgroundSnippet: "Gained magical abilities through a pact with an otherworldly patron.",
-  },
-  Wizard: {
-    race: "Gnome", // Rock Gnome often
-    stats: { Strength: 8, Dexterity: 14, Constitution: 14, Intelligence: 15, Wisdom: 12, Charisma: 10 },
-    alignment: "Lawful Neutral",
-    backgroundSnippet: "A dedicated scholar of the arcane arts, seeks knowledge and power.",
-  },
-};
+import OnboardingSteps from "../components/OnboardingSteps";
+import PortraitPickerModal from "../components/PortraitPickerModal";
+import {
+  heroGenders,
+  heroClasses,
+  heroRaces,
+  alignmentOptions,
+  STAT_KEYS,
+  INITIAL_STATS,
+  heroTemplates,
+  profilePictures,
+  POINT_BUY_BUDGET,
+} from "../data/heroData";
+import {
+  validateHero,
+  pointsRemaining,
+  canIncreaseStat,
+  canDecreaseStat,
+  increaseCost,
+  decreaseRefund,
+} from "../game/heroValidation";
 
 const HeroCreation = () => {
 
@@ -138,36 +36,32 @@ const HeroCreation = () => {
   const { state } = useLocation();
   const heroToEdit = state?.newCharacter || heroes[editingHeroIndex];
 
-
   // State for selected template
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [alertMessage, setAlertMessage] = useState(null);
+  // Whether the portrait picker modal is open.
+  const [showPortraitModal, setShowPortraitModal] = useState(false);
 
-  /*
-   Name
-   Gender
-   Profile Picture
-   Race
-   Class
-   Level
-   Stats
-   Background
-   Alignment
-   */
   const [heroName, setHeroName] = useState(heroToEdit?.heroName || "");
   const [selectedGender, setSelectedGender] = useState(heroToEdit?.heroGender || "");
   const [selectedProfilePicture, setSelectedProfilePicture] = useState(heroToEdit?.profilePicture || null);
   const [selectedRace, setSelectedRace] = useState(heroToEdit?.heroRace || "");
   const [selectedClass, setSelectedClass] = useState(heroToEdit?.heroClass || "");
-  const [level, setLevel] = useState(heroToEdit?.heroLevel || 1);
-  const [stats, setStats] = useState(heroToEdit?.stats || initialStats);
+  const [stats, setStats] = useState(heroToEdit?.stats || INITIAL_STATS);
   const [heroBackground, setHeroBackground] = useState(heroToEdit?.heroBackground || "");
   const [alignment, setAlignment] = useState(heroToEdit?.heroAlignment || "");
 
+  // Level is fixed at 1 for new characters (premium higher-level templates come
+  // later). Editing preserves an existing character's level.
+  const heroLevel = heroToEdit?.heroLevel || 1;
+
   const navigate = useNavigate();
 
-  const handleProfilePictureChange = (e) => {
-    setSelectedProfilePicture(e.target.value);
+  const remainingPoints = pointsRemaining(stats);
+
+  const handlePortraitSelect = (src) => {
+    setSelectedProfilePicture(src);
+    setShowPortraitModal(false); // pick + close in one click
   };
 
   const handleGenderChange = (e) => {
@@ -183,106 +77,91 @@ const HeroCreation = () => {
     }
   };
 
-  const handleRaceChange = (e) => {
-    setSelectedRace(e.target.value);
-  };
-
-  const handleClassChange = (e) => {
-    setSelectedClass(e.target.value);
-  };
-
-  const handleStatChange = (stat, value) => {
-    setStats((prevStats) => ({
-      ...prevStats,
-      [stat]: parseInt(value) || 0,
-    }));
-  };
-
-  const handleLevelChange = (e) => setLevel(parseInt(e.target.value) || 1);
-
+  const handleRaceChange = (e) => setSelectedRace(e.target.value);
+  const handleClassChange = (e) => setSelectedClass(e.target.value);
   const handleAlignmentChange = (e) => setAlignment(e.target.value);
-
   const handleNameChange = (e) => setHeroName(e.target.value);
-
   const handleBackgroundChange = (e) => setHeroBackground(e.target.value);
 
-  // --- New Template Application Function ---
+  const increaseStat = (stat) => {
+    if (canIncreaseStat(stats, stat)) {
+      setStats((prev) => ({ ...prev, [stat]: prev[stat] + 1 }));
+    }
+  };
+
+  const decreaseStat = (stat) => {
+    if (canDecreaseStat(stats, stat)) {
+      setStats((prev) => ({ ...prev, [stat]: prev[stat] - 1 }));
+    }
+  };
+
+  // --- Apply a class template (level 1, valid 27-point spread) ---
   const handleApplyTemplate = () => {
     if (!selectedTemplate || !heroTemplates[selectedTemplate]) {
       setAlertMessage("Please select a class template to apply.");
       return;
     }
     const template = heroTemplates[selectedTemplate];
-
-    // Apply template values to state
-    setSelectedClass(selectedTemplate); // Set class to the selected template key
+    setSelectedClass(selectedTemplate);
     setSelectedRace(template.race);
     setStats(template.stats);
     setAlignment(template.alignment);
     setHeroBackground(template.backgroundSnippet);
-    setLevel(1); // Always set level to 1 for templates
   };
 
   const handleSubmit = async () => {
-    // Specific check for profile picture first
-    if (!selectedProfilePicture) {
-      setAlertMessage("Please select a profile picture.");
-      return;
-    }
-
-    // Check other required fields
-    if (!heroName || !selectedRace || !selectedClass || !heroBackground || !alignment || !selectedGender || !level) {
-      setAlertMessage("Please fill in all remaining hero details (Name, Gender, Race, Class, Level, Alignment, Background).");
-      return;
-    }
-
-    // If all checks pass, proceed
     const newHero = {
       heroId: heroToEdit?.heroId || uuidv4(),
-      heroName: heroName,
+      heroName,
       heroGender: selectedGender,
       profilePicture: selectedProfilePicture,
       heroRace: selectedRace,
       heroClass: selectedClass,
-      heroLevel: level,
-      heroBackground: heroBackground,
+      heroLevel,
+      heroBackground,
       heroAlignment: alignment,
-      stats: stats,
+      stats,
     };
 
-    if (state?.editing) {
-      // Don't update context here, just navigate back to summary with updated data
-      /*
-      const updatedHeroes = heroes.map((hero, index) =>
-        index === editingHeroIndex ? newHero : hero
-      );
-      setHeroes(updatedHeroes);
-      setEditingHeroIndex(null);
-      navigate("/all-heroes");
-      */
-      // Navigate back to summary page with the edited hero data
-      navigate("/hero-summary", { state: { newCharacter: newHero } });
-    } else {
-      // This is for initial creation, navigate to summary
-      navigate("/hero-summary", { state: { newCharacter: newHero } });
+    // Enforce the point-buy budget only when creating a brand-new character;
+    // editing an existing one stays lenient (structural checks only).
+    const { valid, reasons } = validateHero(newHero, { enforcePointBuy: !state?.editing });
+    if (!valid) {
+      setAlertMessage(reasons);
+      return;
     }
+
+    navigate("/hero-summary", { state: { newCharacter: newHero } });
   };
 
-  // --- Update Name Generation Function --- // (Now using centralized dataset)
+  // Name generation is tied to gender. If no gender is chosen yet, the dice picks
+  // one first so the name always matches a gender.
   const generateRandomName = () => {
-    setHeroName(generateName(selectedGender));
+    let gender = selectedGender;
+    if (!gender) {
+      gender = heroGenders[Math.floor(Math.random() * heroGenders.length)];
+      setSelectedGender(gender);
+      // Clear a portrait that doesn't match the newly-picked gender.
+      if (selectedProfilePicture) {
+        const currentPic = profilePictures.find(pic => pic.src === selectedProfilePicture);
+        if (currentPic && currentPic.gender !== gender) setSelectedProfilePicture(null);
+      }
+    }
+    setHeroName(generateName(gender));
   };
 
   return (
     <div className="Home-page hero-creation-form">
-      {/* Top Container: Header, Name, Gender, and Pictures */}
-      <div className="top-container">
-        {/* Header + Name */}
-        <div className="form-section">
-          <h1>{state?.editing ? "Edit Hero" : "Create Your Hero"}</h1>
-          <div className="name-section">
-            <label htmlFor="heroName">Hero Name:</label>
-            <div className="name-input-group">
+      {!state?.editing && <OnboardingSteps currentStep={1} />}
+      <h1 className="hero-creation-title">{state?.editing ? "Edit Hero" : "Create Your Hero"}</h1>
+
+      {/* Top Container: Name + Gender (left), Profile Picture (right) */}
+      <div className="top-container" data-tour="hero-identity">
+        <div className="top-left">
+          {/* Name */}
+          <div className="form-section">
+            <div className="name-section">
+              <label htmlFor="heroName">Hero Name:</label>
               <input
                 type="text"
                 id="heroName"
@@ -292,57 +171,73 @@ const HeroCreation = () => {
                 onChange={handleNameChange}
                 required
               />
-              <button type="button" onClick={generateRandomName} className="generate-name-btn" title="Generate Random Name">
-                🎲
+              <button
+                type="button"
+                onClick={generateRandomName}
+                className="generate-name-btn"
+                title="Generate a random name (picks a gender if none is set)"
+              >
+                🎲 Random name
               </button>
             </div>
           </div>
+
+          {/* Gender Selection */}
+          <div className="form-section">
+            <label htmlFor="gender">Gender:</label>
+            <select id="gender" value={selectedGender} onChange={handleGenderChange} required>
+              <option value="">Select Gender</option>
+              {heroGenders.map((heroGender) => (
+                <option key={heroGender} value={heroGender}>
+                  {heroGender}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* Gender Selection - Moved here */}
-        <div className="form-section">
-          <label htmlFor="gender">Gender:</label>
-          <select id="gender" value={selectedGender} onChange={handleGenderChange} required>
-            <option value="">Select Gender</option>
-            {heroGenders.map((heroGender) => (
-              <option key={heroGender} value={heroGender}>
-                {heroGender}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Picture Selection */}
+        {/* Picture Selection — opens a modal grid */}
         <div className="form-section profile-pictures">
           <label>Profile Picture:</label>
-          <div className="picture-options">
-            {profilePictures
-              .filter(pic => !selectedGender || pic.gender === selectedGender)
-              .map((pic) => (
-                <label key={pic.imageId} className={selectedProfilePicture === pic.src ? 'selected' : ''}>
-                  <input
-                    type="radio"
-                    name="profilePicture"
-                    value={pic.src}
-                    checked={selectedProfilePicture === pic.src}
-                    onChange={handleProfilePictureChange}
-                    required
-                  />
-                  <img src={pic.src} alt={`Profile ${pic.imageId}`} />
-                </label>
-              ))}
-          </div>
+          {selectedProfilePicture ? (
+            <div className="picture-selected">
+              <img src={selectedProfilePicture} alt="Selected portrait" className="picture-selected-img" />
+              <button
+                type="button"
+                className="change-portrait-btn"
+                onClick={() => setShowPortraitModal(true)}
+                disabled={!selectedGender}
+              >
+                Change picture
+              </button>
+            </div>
+          ) : (
+            <div className="picture-empty">
+              <div className="picture-placeholder" aria-hidden="true">?</div>
+              <button
+                type="button"
+                className="change-portrait-btn"
+                onClick={() => setShowPortraitModal(true)}
+                disabled={!selectedGender}
+              >
+                Choose picture
+              </button>
+            </div>
+          )}
+          {!selectedGender && (
+            <p className="field-hint">Choose a gender first to pick a portrait.</p>
+          )}
         </div>
       </div> {/* End Top Container */}
 
-      {/* Middle Container: Details Left (NO GENDER), Stats Right */}
+      {/* Middle Container: Details Left, Stats Right */}
       <div className="middle-container">
         {/* Middle Left Column */}
         <div className="middle-left">
-          {/* Apply Template Section - NEW */}
+          {/* Apply Template Section */}
           <div className="form-section">
-            <label htmlFor="template-select">Apply Class Template (Level 1):</label>
-            <div className="template-controls">
+            <label htmlFor="template-select">Quick start — apply a class template:</label>
+            <div className="template-controls" data-tour="hero-template">
               <select
                 id="template-select"
                 value={selectedTemplate}
@@ -364,7 +259,7 @@ const HeroCreation = () => {
             </div>
           </div>
 
-          {/* Details Row (Race, Class, Level, Alignment ONLY) */}
+          {/* Details Row (Race, Class, Level, Alignment) */}
           <div className="form-row">
             {/* Race */}
             <div className="form-item">
@@ -386,18 +281,10 @@ const HeroCreation = () => {
                 ))}
               </select>
             </div>
-            {/* Level */}
+            {/* Level (fixed at 1) */}
             <div className="form-item form-item-level">
               <label htmlFor="level">Level:</label>
-              <input
-                type="number"
-                id="level"
-                min="1"
-                max="20"
-                value={level}
-                onChange={handleLevelChange}
-                required
-              />
+              <span id="level" className="level-fixed" title="All heroes start at level 1">{heroLevel}</span>
             </div>
             {/* Alignment */}
             <div className="form-item form-item-alignment">
@@ -429,24 +316,44 @@ const HeroCreation = () => {
         </div> {/* End Middle Left */}
 
         {/* Middle Right Column */}
-        <div className="middle-right">
-          {/* Stats */}
+        <div className="middle-right" data-tour="hero-stats">
+          {/* Stats — point-buy */}
           <h2>Stats</h2>
+          <p className={`points-remaining${remainingPoints < 0 ? ' over-budget' : ''}`}>
+            Points remaining: <strong>{remainingPoints}</strong> / {POINT_BUY_BUDGET}
+          </p>
+          <p className="points-hint">Scores 14 and 15 cost 2 points each.</p>
           <div className="stats-section">
-            {Object.entries(stats).map(([stat, value]) => (
-              <div key={stat} className="stat-input">
-                <label htmlFor={stat}>{stat}:</label>
-                <input
-                  type="number"
-                  id={stat}
-                  min="1"
-                  max="20"
-                  value={value}
-                  onChange={(e) => handleStatChange(stat, e.target.value)}
-                  required
-                />
-              </div>
-            ))}
+            {STAT_KEYS.map((stat) => {
+              const upCost = increaseCost(stats[stat]);
+              const downRefund = decreaseRefund(stats[stat]);
+              return (
+                <div key={stat} className="stat-input pointbuy-row">
+                  <label>{stat}:</label>
+                  <div className="pointbuy-controls">
+                    <button
+                      type="button"
+                      className="pointbuy-btn"
+                      onClick={() => decreaseStat(stat)}
+                      disabled={!canDecreaseStat(stats, stat)}
+                      aria-label={`Decrease ${stat}${downRefund ? ` (refunds ${downRefund})` : ''}`}
+                    >
+                      {downRefund ? `−${downRefund}` : '−'}
+                    </button>
+                    <span className="pointbuy-value">{stats[stat]}</span>
+                    <button
+                      type="button"
+                      className="pointbuy-btn"
+                      onClick={() => increaseStat(stat)}
+                      disabled={!canIncreaseStat(stats, stat)}
+                      aria-label={`Increase ${stat}${upCost ? ` (costs ${upCost})` : ''}`}
+                    >
+                      {upCost ? `+${upCost}` : '+'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <p className="max-hp-text">
             <span className="detail-label">Max HP:</span> {calculateMaxHP({ stats })}
@@ -456,15 +363,31 @@ const HeroCreation = () => {
 
       {/* Actions Row */}
       <div className="form-actions">
-        <button type="button" onClick={handleSubmit}>{state?.editing ? "Update Hero" : "Create Hero"}</button>
+        <button type="button" onClick={handleSubmit} data-tour="create-hero">{state?.editing ? "Update Hero" : "Create Hero"}</button>
       </div>
+
+      {/* Portrait Picker Modal */}
+      {showPortraitModal && (
+        <PortraitPickerModal
+          gender={selectedGender}
+          selected={selectedProfilePicture}
+          onSelect={handlePortraitSelect}
+          onClose={() => setShowPortraitModal(false)}
+        />
+      )}
 
       {/* Validation Alert Modal */}
       {alertMessage && (
         <div className="modal-overlay" onClick={() => setAlertMessage(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', textAlign: 'center' }}>
-            <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', margin: '0 0 16px 0' }}>Hold, Adventurer!</h2>
-            <p style={{ color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0' }}>{alertMessage}</p>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', margin: '0 0 16px 0', textAlign: 'center' }}>Hold, Adventurer!</h2>
+            {Array.isArray(alertMessage) ? (
+              <ul style={{ color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0', paddingLeft: '20px' }}>
+                {alertMessage.map((reason, i) => <li key={i}>{reason}</li>)}
+              </ul>
+            ) : (
+              <p style={{ color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0', textAlign: 'center' }}>{alertMessage}</p>
+            )}
             <button className="modal-close-button" onClick={() => setAlertMessage(null)} style={{ width: '100%', padding: '12px' }}>
               Understood
             </button>

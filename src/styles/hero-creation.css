@@ -4,20 +4,41 @@
  * Font usage: inherits --body-font globally; form controls continue to use --ui-font.
  */
 
-/* Top Container: Header + Pictures */
+/* Roomier padding so content isn't tight against the card's golden border/accent. */
+.hero-creation-form {
+  padding: 40px 48px 44px;
+}
+
+.hero-creation-title {
+  margin: 0 0 20px;
+}
+
+/* Top Container: Name + Gender on the left, Profile Picture on the right */
 .top-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 40px;
   margin-bottom: 30px;
-  /* Space below pictures */
 }
 
-.top-container .form-section {
-  margin-bottom: 25px;
-  /* Space between header/name and pictures */
+/* Left column holds name + gender; keep it narrow so the inputs don't span the
+   whole page and the portrait can sit up to the right. */
+.top-left {
+  flex: 0 1 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.top-container .form-section:last-child {
+.top-left .form-section {
   margin-bottom: 0;
-  /* No extra margin after pictures */
+}
+
+.top-container .profile-pictures {
+  flex: 1;
+  min-width: 260px;
+  margin-bottom: 0;
 }
 
 /* Middle Container: Two Columns (Details Left, Stats Right) */
@@ -49,15 +70,20 @@
   margin-bottom: 8px;
 }
 
+/* Right-align the portrait label so the whole right column reads as right-aligned,
+   balancing the left-aligned name/gender column. */
+.top-container .profile-pictures > label {
+  display: block;
+  text-align: right;
+}
+
 .profile-pictures .picture-options {
   display: grid;
-  /* Use CSS Grid */
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  /* Create auto-fitting columns */
+  /* Fixed track width (not 1fr) so the tiles can pack to the right. */
+  grid-template-columns: repeat(auto-fill, 130px);
   gap: 15px;
-  /* Space between pictures */
-  justify-content: start;
-  /* Align grid items to the start if the grid doesn't fill the container */
+  justify-content: end;
+  /* Drift the portrait tiles toward the right edge of the column. */
 }
 
 .profile-pictures label {
@@ -78,9 +104,8 @@
 }
 
 .profile-pictures img {
-  width: 100px;
-  /* Adjust size as needed */
-  height: 100px;
+  width: 130px;
+  height: 130px;
   object-fit: cover;
   border-radius: 4px;
   display: block;
@@ -92,30 +117,123 @@
   /* Highlight selected/hovered picture */
 }
 
-.name-section .name-input-group {
+/* Collapsed view: just the chosen portrait + a change button, drifted right */
+.picture-selected {
   display: flex;
   align-items: center;
-  /* Align input and button vertically */
-  gap: 10px;
-  /* Space between input and button */
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.picture-selected-img {
+  width: 180px;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 2px solid var(--primary);
+}
+
+.change-portrait-btn {
+  padding: 8px 14px;
+  flex-shrink: 0;
+}
+
+/* Empty state: dashed placeholder + choose button, drifted right */
+.picture-empty {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.picture-placeholder {
+  width: 180px;
+  height: 180px;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 2.4rem;
+}
+
+/* Portrait picker modal — sit above the nav (z-index 1000-1200) and tour layers */
+.portrait-modal-overlay {
+  z-index: 10050;
+}
+
+.portrait-modal {
+  max-width: 640px;
+  width: 90vw;
+}
+
+.portrait-modal-title {
+  margin-top: 0;
+  font-family: var(--header-font);
+  color: var(--text);
+}
+
+.portrait-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 120px);
+  gap: 14px;
+  justify-content: center;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.portrait-option {
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 4px;
+  background: transparent;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.portrait-option img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 4px;
+  display: block;
+}
+
+.portrait-option.selected,
+.portrait-option:hover {
+  border-color: var(--primary);
+}
+
+.portrait-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* Name field stacks vertically so the dice button sits beneath the input and
+   never reduces the name box width. */
+.name-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .name-section input {
-  flex-grow: 1;
-  /* Allow input to take up available space */
+  width: 100%;
+  box-sizing: border-box;
   margin-bottom: 0;
-  /* Remove default bottom margin if needed */
 }
 
 .generate-name-btn {
-  padding: 8px 12px;
-  /* Adjust padding */
-  font-size: 1.2rem;
-  /* Make dice icon larger */
+  padding: 7px 12px;
+  font-size: 0.85rem;
   line-height: 1;
-  /* Ensure button height matches input */
   flex-shrink: 0;
-  /* Prevent button from shrinking */
+  border-radius: 6px;
+  cursor: pointer;
   background-color: var(--surface-soft);
   color: var(--control-text);
   border: 1px solid var(--control-border);
@@ -140,4 +258,96 @@
   padding: 8px 15px;
   /* Match input height */
   flex-shrink: 0;
+}
+
+/* --- Field hints & fixed level --- */
+.field-hint {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 4px 0 0;
+}
+
+.form-item-level {
+  display: flex;
+  flex-direction: column;
+}
+
+.level-fixed {
+  align-self: center;
+  font-weight: 700;
+  color: var(--text);
+  padding: 6px 0;
+}
+
+/* --- Point-buy stats --- */
+.points-remaining {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0 0 2px;
+}
+
+.points-hint {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin: 0 0 12px;
+  opacity: 0.85;
+}
+
+.points-remaining strong {
+  color: var(--text);
+}
+
+.points-remaining.over-budget {
+  color: #e05252;
+  font-weight: 700;
+}
+
+.points-remaining.over-budget strong {
+  color: #e05252;
+}
+
+.pointbuy-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pointbuy-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pointbuy-btn {
+  min-width: 36px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pointbuy-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.pointbuy-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pointbuy-value {
+  min-width: 26px;
+  text-align: center;
+  font-weight: 700;
+  color: var(--text);
 }

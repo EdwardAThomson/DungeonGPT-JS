@@ -8,6 +8,8 @@ import { initializeHP } from '../utils/healthSystem';
 import { heroesApi } from '../services/heroesApi';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { createLogger } from '../utils/logger';
+import OnboardingSteps from '../components/OnboardingSteps';
+import { validateHero } from '../game/heroValidation';
 
 const logger = createLogger('hero-selection');
 
@@ -77,6 +79,17 @@ const HeroSelection = () => {
       setSelectionError('Please select between 1 and 4 heroes to start.');
       return;
     }
+
+    // Block starting a game with a structurally invalid character. Point-buy is
+    // not enforced here so heroes made before that rule aren't locked out.
+    const invalidHeroes = selectedHeroes.filter(
+      (hero) => !validateHero(hero, { enforcePointBuy: false }).valid
+    );
+    if (invalidHeroes.length > 0) {
+      const names = invalidHeroes.map((h) => h.heroName || 'Unnamed hero').join(', ');
+      setSelectionError(`These heroes have an incomplete character sheet and can't start a game: ${names}. Edit them to fix.`);
+      return;
+    }
     setSelectionError('');
 
     // Initialize HP for all selected heroes
@@ -92,13 +105,14 @@ const HeroSelection = () => {
 
   return (
     <div className="page-container hero-selection-page">
+      <OnboardingSteps currentStep={2} completedSteps={heroes.length > 0 ? [1] : []} />
       <div className="page-header">
         <h2>Select Your Party (1-4 Heroes)</h2>
         <div className="page-header-actions">
           <button onClick={handleCreateHero} className="create-new-button">
             New Hero
           </button>
-          <button onClick={handleNext} className="next-button" disabled={selectedHeroes.length === 0 || selectedHeroes.length > 4}>
+          <button onClick={handleNext} className="next-button" disabled={selectedHeroes.length === 0 || selectedHeroes.length > 4} data-tour="start-game">
             Start Game ({selectedHeroes.length})
           </button>
         </div>
