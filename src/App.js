@@ -32,6 +32,7 @@ import DatabaseIndicator from "./components/DatabaseIndicator";
 import { GuidedTourProvider, useGuidedTour } from "./contexts/GuidedTourContext";
 import TourOverlay from "./components/TourOverlay";
 import LocalHeroSync from "./components/LocalHeroSync";
+import LocalGameSync from "./components/LocalGameSync";
 
 const DebugRoutes = lazy(() => import('./pages/DebugRoutes'));
 
@@ -213,6 +214,7 @@ const AppContent = () => {
       <DatabaseIndicator />
       <TourOverlay />
       <LocalHeroSync />
+      <LocalGameSync />
 
       <footer className="app-footer">
         © 2026 Edward Thomson (<a href="https://octonion.io" target="_blank" rel="noopener noreferrer">Octonion Software</a>)

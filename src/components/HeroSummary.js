@@ -2,7 +2,7 @@
 
 import React, { useContext, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { downloadJSONFile } from "../utils/fileHelper";
+// import { downloadJSONFile } from "../utils/fileHelper"; // unused while Download Hero is hidden
 import HeroContext from "../contexts/HeroContext";
 import { useAuth } from "../contexts/AuthContext";
 import { calculateMaxHP } from "../utils/healthSystem";
@@ -175,13 +175,14 @@ const HeroSummary = () => {
             ? (isEditing ? "Save Changes & Continue" : "Add & Continue to Party")
             : (isEditing ? "Save Changes" : "Add to Roster")}
         </button>
-        {/* Download Button */}
+        {/* Download Button — hidden for now (unused); re-enable if requested.
         <button
           onClick={() => downloadJSONFile(`${newHero.heroName}-hero.json`, newHero)}
           className="summary-action-btn summary-download-btn"
         >
           Download Hero JSON
         </button>
+        */}
       </div>
 
       {feedbackModal && (

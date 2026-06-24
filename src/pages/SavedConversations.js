@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { conversationsApi } from '../services/conversationsApi';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
+import { useAuth } from '../contexts/AuthContext';
+import { hasHadAccount } from '../services/accountFlag';
 
 // Lazy load the details modal for better performance
 const SavedGameDetailsModal = lazy(() => import('../components/SavedGameDetailsModal'));
@@ -19,6 +21,7 @@ const SavedConversations = () => {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     logger.debug('SavedConversations: Component mounted, fetching conversations...');
@@ -146,14 +149,25 @@ const SavedConversations = () => {
       <p className="page-instructions">Manage your saved game sessions. Click "Load" to continue a previous adventure.</p>
 
       {conversations.length === 0 ? (
-        <div className="onboarding-empty">
-          <div className="onboarding-empty-icon">📖</div>
-          <h3>No chronicles yet</h3>
-          <p>Your saved adventures will appear here. Start a new game to create your first one.</p>
-          <button onClick={() => navigate("/new-game")} className="primary-button">
-            Start a New Game →
-          </button>
-        </div>
+        !user && hasHadAccount() ? (
+          <div className="onboarding-empty">
+            <div className="onboarding-empty-icon">🔒</div>
+            <h3>Your adventures are in your account</h3>
+            <p>You're browsing as a guest on this device. Sign in to access the games saved to your account.</p>
+            <button onClick={() => navigate("/login")} className="primary-button">
+              Sign In →
+            </button>
+          </div>
+        ) : (
+          <div className="onboarding-empty">
+            <div className="onboarding-empty-icon">📖</div>
+            <h3>No chronicles yet</h3>
+            <p>Your saved adventures will appear here. Start a new game to create your first one.</p>
+            <button onClick={() => navigate("/new-game")} className="primary-button">
+              Start a New Game →
+            </button>
+          </div>
+        )
       ) : (
         <div className="conversations-list">
           {conversations.map((conversation) => {

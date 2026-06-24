@@ -1,6 +1,6 @@
 # Guest Mode Plan (Phase B) — local-first, AI-free guest play
 
-Status: **B1 shipped** (commit `201ac23`, 2026-06-21) — guests can run the full local mechanical loop. **B2 planned** (detailed below). Phase A (local hero roster + import-on-sign-in) shipped earlier.
+Status: **B1 shipped** (commit `201ac23`, 2026-06-21) — guests can run the full local mechanical loop. **B2 shipped** (`LocalGameSync` — sync guest games on sign-in; the conversion banner remains a follow-up). Phase A (local hero roster + import-on-sign-in) shipped earlier.
 
 ## Goal
 Let a logged-out visitor experience real gameplay before creating an account, with everything saved locally and a one-click sync when they sign up — to reduce signup friction and improve retention.
@@ -56,7 +56,7 @@ Is a **mechanics-only** taste (explore + deterministic combat + progression, no 
 
 ## Suggested phasing within Phase B
 - **B1 (DONE — `201ac23`):** `localGameStore` + `conversationsApi` auth-routing + un-gate routes + guest AI gating (free-text action → sign-in affordance, narration off, templated intro). Guests run the mechanical loop, persisted locally.
-- **B2 (planned — see detailed section above):** `LocalGameSync` (sync games on sign-in) + conversion banner/prompts.
+- **B2 (DONE — `LocalGameSync`):** sync local games to the cloud on sign-in (mirrors `LocalHeroSync`, mounted after it in `App.js`; maps snake_case rows → camelCase save payloads; removes each row as it syncs, leaves failed rows for retry, toasts "N games saved"). Conversion banner/prompts remain a follow-up (the game page already nudges via the guest AI-gate notice).
 - **B3 (optional):** local templated movement/location narration fallback for a richer guest feel.
 
 ## Phase B2 — sync guest games on sign-in (detailed plan)

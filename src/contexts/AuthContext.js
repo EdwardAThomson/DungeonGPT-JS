@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
+import { markHadAccount } from '../services/accountFlag';
 
 const HUB_URL = process.env.REACT_APP_HUB_URL || 'https://octonion.io';
 const CALLBACK_URL = `${window.location.origin}/auth/callback`;
@@ -19,6 +20,7 @@ export const AuthProvider = ({ children }) => {
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
         setUser(session?.user ?? null);
+        if (session?.user) markHadAccount();
       })
       .catch((err) => {
         console.error('Failed to get session:', err);
@@ -30,6 +32,7 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user ?? null);
+        if (session?.user) markHadAccount();
       }
     );
 

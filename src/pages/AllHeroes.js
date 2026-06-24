@@ -2,7 +2,8 @@
 
 import React, { useContext, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { downloadJSONFile } from "../utils/fileHelper";
+// import { downloadJSONFile } from "../utils/fileHelper"; // unused while Download hero is hidden
+import { hasHadAccount } from "../services/accountFlag";
 import HeroContext from "../contexts/HeroContext";
 import { calculateMaxHP } from "../utils/healthSystem";
 import { heroesApi } from "../services/heroesApi";
@@ -115,14 +116,25 @@ const AllHeroes = () => {
       )}
 
       {heroes.length === 0 ? (
-        <div className="onboarding-empty">
-          <div className="onboarding-empty-icon">🧙‍♂️</div>
-          <h3>No heroes yet</h3>
-          <p>Create your first hero to begin your adventure. You'll pick a class, race, stats, and backstory.</p>
-          <button onClick={() => navigate("/hero-creation")} className="primary-button">
-            Create Your First Hero →
-          </button>
-        </div>
+        !user && hasHadAccount() ? (
+          <div className="onboarding-empty">
+            <div className="onboarding-empty-icon">🔒</div>
+            <h3>Your heroes are in your account</h3>
+            <p>You're browsing as a guest on this device. Sign in to access the heroes saved to your account.</p>
+            <button onClick={() => navigate("/login")} className="primary-button">
+              Sign In →
+            </button>
+          </div>
+        ) : (
+          <div className="onboarding-empty">
+            <div className="onboarding-empty-icon">🧙‍♂️</div>
+            <h3>No heroes yet</h3>
+            <p>Create your first hero to begin your adventure. You'll pick a class, race, stats, and backstory.</p>
+            <button onClick={() => navigate("/hero-creation")} className="primary-button">
+              Create Your First Hero →
+            </button>
+          </div>
+        )
       ) : (
         <ul className="all-heroes-list">
           {heroes.map((hero) => (
@@ -171,12 +183,14 @@ const AllHeroes = () => {
                 <button onClick={() => handleEdit(hero)} className="action-button edit-button">
                   Edit
                 </button>
+                {/* Download — hidden for now (unused); re-enable if requested.
                 <button
                   onClick={() => downloadJSONFile(`${hero.heroName}-hero.json`, hero)}
                   className="action-button download-button"
                 >
                   Download
                 </button>
+                */}
                 <button
                   onClick={() => handleDeleteClick(hero)}
                   className="action-button delete-button"

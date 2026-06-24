@@ -43,7 +43,8 @@ const _delete = (sessionId) => run('readwrite', (s) => s.delete(sessionId));
 const _clear = () => run('readwrite', (s) => s.clear());
 
 // Replicates cf-worker db.ts conversation upsert so local rows match cloud rows.
-const mapPayloadToRow = (payload) => {
+// Exported for the LocalGameSync round-trip test (must invert rowToPayload).
+export const mapPayloadToRow = (payload) => {
   const now = new Date().toISOString();
   const sessionId = payload.sessionId || payload.session_id;
   return {
