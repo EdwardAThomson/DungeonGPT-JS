@@ -161,6 +161,64 @@
   text-decoration: underline;
 }
 
+/* Guest conversion banner (app-wide, dismissible) */
+.guest-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  padding: 10px 16px;
+  margin: 0 auto 16px;
+  max-width: 1100px;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.guest-banner-text strong {
+  color: var(--primary);
+}
+
+.guest-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.guest-banner-cta {
+  background: var(--primary);
+  color: var(--bg);
+  border: none;
+  border-radius: 6px;
+  padding: 7px 16px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.guest-banner-cta:hover {
+  filter: brightness(1.08);
+}
+
+.guest-banner-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.guest-banner-close:hover {
+  color: var(--text);
+}
+
 /* Local-hero import confirmation toast */
 .local-sync-toast {
   position: fixed;

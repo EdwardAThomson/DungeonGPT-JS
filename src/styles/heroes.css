@@ -473,16 +473,16 @@
 }
 
 .hero-item.selected {
-  border-color: var(--state-info);
-  box-shadow: 0 4px 12px var(--glow-info-30);
+  border-color: var(--primary);
+  box-shadow: 0 4px 12px var(--primary-tint-10);
 }
 
 .selection-indicator {
   position: absolute;
   top: 10px;
   right: 10px;
-  background-color: var(--state-info);
-  color: white;
+  background-color: var(--primary);
+  color: var(--bg);
   width: 24px;
   height: 24px;
   border-radius: 50%;
@@ -546,9 +546,9 @@
 
 .hero-select-cta.is-selected {
   border-style: solid;
-  border-color: var(--state-info);
-  background-color: var(--state-info);
-  color: #fff;
+  border-color: var(--primary);
+  background-color: var(--primary);
+  color: var(--bg);
 }
 
 .hero-item.at-limit {

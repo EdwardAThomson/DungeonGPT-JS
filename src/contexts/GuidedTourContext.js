@@ -75,9 +75,9 @@ export const TOUR_STEPS = [
   {
     id: 'select-party',
     route: '/hero-selection',
-    target: null,
+    target: '[data-tour="start-game"]',
     title: 'Choose your party',
-    body: 'Select 1–4 heroes by clicking them, then Start Game — your quest begins!',
+    body: 'Select 1–4 heroes by clicking them, then click Start Game — your quest begins!',
   },
   {
     id: 'start-adventure',

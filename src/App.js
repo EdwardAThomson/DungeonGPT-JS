@@ -33,6 +33,7 @@ import { GuidedTourProvider, useGuidedTour } from "./contexts/GuidedTourContext"
 import TourOverlay from "./components/TourOverlay";
 import LocalHeroSync from "./components/LocalHeroSync";
 import LocalGameSync from "./components/LocalGameSync";
+import GuestBanner from "./components/GuestBanner";
 
 const DebugRoutes = lazy(() => import('./pages/DebugRoutes'));
 
@@ -179,6 +180,7 @@ const AppContent = () => {
 
       {/* === Add this wrapper div === */}
       <div id="main-content" className={`main-content ${isGamePage ? 'game-page-content' : ''}`}>
+        <GuestBanner />
         <ErrorBoundary>
           <Suspense fallback={<div className="page-container">Loading...</div>}>
             <Routes>
