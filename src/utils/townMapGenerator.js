@@ -170,8 +170,9 @@ function placeMainRoad(mapData, entryPos, direction, width, height, townSize, ri
   const centerX = Math.floor(width / 2);
   const centerY = Math.floor(height / 2);
 
-  // Determine road width and type based on town size
-  const isWideRoad = (townSize === 'town' || townSize === 'city');
+  // Single-width approach road for every town size (the 2-wide road read as a
+  // gash through the gate; one tile looks cleaner with the new tileset).
+  const isWideRoad = false;
   const roadType = townSize === 'city' ? 'stone_path' : 'dirt_path';
 
   // Create path from entry to center
@@ -293,9 +294,10 @@ function placeTownCenter(mapData, centerPos, townSize) {
         // Town square is a solid tile (not thin path)
         mapData[y][x].type = 'town_square';
 
-        // Place fountain/well in the very center (on top of square)
+        // Place a fountain in the very center (on top of square) for every town
+        // size — the old bucket/well for smaller towns never looked great.
         if (dx === 0 && dy === 0) {
-          mapData[y][x].poi = townSize === 'city' ? 'fountain' : 'well';
+          mapData[y][x].poi = 'fountain';
         }
       }
     }

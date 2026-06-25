@@ -5,6 +5,7 @@ import DiceTest from './DiceTest';
 import NPCTest from './NPCTest';
 import SeedDebugTest from './SeedDebugTest';
 import WorldMapTest from './WorldMapTest';
+import TilesetTest from './TilesetTest';
 import TerrainStudio from './TerrainStudio';
 import TerrainStudioV2 from './TerrainStudioV2';
 import MilestoneTest from './MilestoneTest';
@@ -38,6 +39,7 @@ const debugSections = [
       { to: 'terrain-studio', label: 'Terrain Studio (Old)' },
       { to: 'town-map-test', label: 'Town Map Test' },
       { to: 'world-map-test', label: 'World Map Test' },
+      { to: 'tileset', label: 'Tileset Preview (SVG)' },
     ],
   },
   {
@@ -184,6 +186,7 @@ const DebugRoutes = () => {
           <Route path="dice-test" element={<DiceTest />} />
           <Route path="town-map-test" element={<TownMapTest />} />
           <Route path="world-map-test" element={<WorldMapTest />} />
+          <Route path="tileset" element={<TilesetTest />} />
           <Route path="npc-test" element={<NPCTest />} />
           <Route path="seed-debug-test" element={<SeedDebugTest />} />
           <Route path="milestone-test" element={<MilestoneTest />} />
