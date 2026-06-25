@@ -1,6 +1,6 @@
 # Roadmap — DungeonGPT (JS)
 
-_Status: active · updated 2026-05-31_
+_Status: active · updated 2026-06-25_
 
 The production rewrite of DungeonGPT — a React web app for creating fantasy
 characters and playing AI-narrated RPG campaigns. Deployed at dungeongpt.xyz on
@@ -25,19 +25,25 @@ backlog; see the `docs/` design docs for each system.
 - [x] Responsive React UI (modals, dice roller, party sidebar, world/town maps, QR share)
 - [x] Playwright E2E tests (new game, save/reload, hero save) + Worker health endpoint + error boundary
 - [x] CF Pages auto-deploy; Apache 2.0 license; copyright/content review complete; asset provenance manifest
+- [x] Narrative milestones (AI-judged quest outcomes via `[COMPLETE_MILESTONE]`) — completes the milestone engine
+- [x] RAG memory: in-game retrieval + auto-sync/backfill of conversation embeddings (Workers-AI BGE, IndexedDB)
+- [x] Local-first guest play: on-device hero roster + IndexedDB game saves, AI-free mechanical loop (explore / combat / progression), one-click sync to the cloud on sign-in, guest conversion banner (`docs/GUEST_MODE_PLAN.md`)
+- [x] New-player onboarding: replayable guided tour (coachmarks), reworked hero creator (27-point-buy validation, gender↔name, portrait picker), simplified New Game, Journal redesign, map discoverability
+- [x] Combat condition surfaced to the AI for believable wounds (deterministic combat stays AI-blind); hardened local-dev CLI task runner
 
 ## Next
 
 - [ ] Fix magic-link email template (OTP token shown but no UI input) — critical quick fix
-- [ ] Narrative milestones (conversation-gated quest outcomes) — designed, not yet coded
 - [ ] Rate limiting on `/api/ai` and `/api/db/*` (abuse prevention)
-- [ ] Add missing assets (9 building interiors, 4 quest-item icons)
+- [ ] Add missing assets (building interiors incl. `workshop` — Henry #26; quest-item icons)
 - [ ] Replace fragile keyword-based encounter-engagement detection
 - [ ] Mobile UI fixes (sign-in/nav overlap, How-To-Play layout)
+- [ ] Guest conversion: prompt at a high-intent moment (e.g. first milestone), beyond the persistent banner
 
 ## Backlog
 
 - [ ] Billing + credit system (Lemon Squeezy) + AI usage tracking → unlocks OpenRouter premium tier
+- [ ] Tiered narration — local templated prose for routine moves, AI for notable moments, as a cost/latency lever; subsumes guest movement narration / Guest Mode B3 (`docs/TIERED_NARRATION_PLAN.md`)
 - [ ] Streaming AI responses
 - [ ] Team / turn-based tactical combat (party Lead + Support roles)
 - [ ] Dungeon sub-maps (procedural caves / dungeons)
@@ -46,4 +52,4 @@ backlog; see the `docs/` design docs for each system.
 - [ ] Cloudflare D1 / R2 / KV migration (off Supabase)
 - [ ] SSO expansion (Google, GitHub, Discord) + magic-link sign-in
 - [ ] Monitoring (Sentry), structured logging, automated Worker deploy, ops runbook
-- [ ] RAG + conversation summarization for long-context quests
+- [ ] Graph-enhanced RAG for long-context quests (basic RAG shipped; see `docs/RAG_GRAPH_ENHANCEMENT_PLAN.md`)

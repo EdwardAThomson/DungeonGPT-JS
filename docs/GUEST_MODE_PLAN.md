@@ -57,7 +57,7 @@ Is a **mechanics-only** taste (explore + deterministic combat + progression, no 
 ## Suggested phasing within Phase B
 - **B1 (DONE — `201ac23`):** `localGameStore` + `conversationsApi` auth-routing + un-gate routes + guest AI gating (free-text action → sign-in affordance, narration off, templated intro). Guests run the mechanical loop, persisted locally.
 - **B2 (DONE — `LocalGameSync`):** sync local games to the cloud on sign-in (mirrors `LocalHeroSync`, mounted after it in `App.js`; maps snake_case rows → camelCase save payloads; removes each row as it syncs, leaves failed rows for retry, toasts "N games saved"). Conversion banner/prompts remain a follow-up (the game page already nudges via the guest AI-gate notice).
-- **B3 (optional):** local templated movement/location narration fallback for a richer guest feel.
+- **B3 (optional):** local templated movement/location narration fallback for a richer guest feel. Generalized into an app-wide narration-cost lever (local routine prose + AI for notable moments) in `docs/TIERED_NARRATION_PLAN.md`.
 
 ## Phase B2 — sync guest games on sign-in (detailed plan)
 
