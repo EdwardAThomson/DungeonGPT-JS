@@ -1,13 +1,20 @@
 import React, { useState } from 'react';
-import { getTownTileEmoji } from '../utils/townMapGenerator';
+import { tileBackground } from '../utils/townTileArt';
 import BuildingModal from './BuildingModal';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
 
 const logger = createLogger('town-map-display');
 
+const TILE = 30;
+
+// Decorations the tileset doesn't draw itself are overlaid as emoji (buildings/terrain
+// are fully rendered by the tileset, so only POI markers ride on top). 'well' is kept
+// for backwards-compatibility with old saves generated before the fountain change.
+const POI_EMOJI = { fountain: '⛲', well: '🪣', tree: '🌳', bush: '🌿', flowers: '🌸' };
+
 /**
- * TownMapDisplay - Renders a town map with paths, buildings, and player position
+ * TownMapDisplay - Renders a town map with the SVG tileset, buildings, and player.
  * @param {Object} townMapData - Town map data from generateTownMap()
  * @param {Object} playerPosition - Player position {x, y} within town
  * @param {Function} onTileClick - Optional callback for tile clicks
@@ -24,6 +31,9 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
   if (!townMapData) return null;
 
   const discoveredBuildings = townMapData.discoveredBuildings || [];
+  const { width, height, mapData } = townMapData;
+
+  const typeAt = (c, r) => (r >= 0 && r < height && c >= 0 && c < width && mapData[r][c]) ? mapData[r][c].type : null;
 
   const handleBuildingClick = (tile) => {
     if (!playerPosition) return;
@@ -33,12 +43,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
     const coordString = `${tile.x},${tile.y}`;
     const isDiscovered = discoveredBuildings.includes(coordString);
 
-    logger.debug('Building click debug:', {
-      tileCoords: coordString,
-      discoveredBuildings,
-      isDiscovered,
-      distance
-    });
+    logger.debug('Building click debug:', { tileCoords: coordString, discoveredBuildings, isDiscovered, distance });
 
     // Allow seeing info if close enough (within 2 tiles) OR if already discovered
     if (distance <= 2 || isDiscovered) {
@@ -63,109 +68,51 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
     }
   };
 
-  // Always use playerPosition - CSS transition handles smooth movement
-
   return (
     <div>
       <div style={{
         position: 'relative',
         display: 'grid',
-        gridTemplateColumns: `repeat(${townMapData.width}, 30px)`,
-        gap: '1px',
-        border: '1px solid #ccc',
-        width: `${townMapData.width * 30 + (townMapData.width - 1)}px`,
+        gridTemplateColumns: `repeat(${width}, ${TILE}px)`,
+        gap: 0,
+        border: '2px solid #5d4530',
+        borderRadius: 4,
+        width: `${width * TILE}px`,
         margin: '20px auto',
-        backgroundColor: '#eee',
-        fontSize: '16px'
+        boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+        fontSize: '16px',
       }}>
-        {townMapData.mapData.flat().map((tile, index) => {
-          const row = Math.floor(index / townMapData.width);
-          const col = index % townMapData.width;
+        {mapData.flat().map((tile, index) => {
+          const row = Math.floor(index / width);
+          const col = index % width;
           const isPlayer = playerPosition && playerPosition.x === col && playerPosition.y === row;
-          const isPath = tile.type === 'dirt_path' || tile.type === 'stone_path';
-          const isWall = tile.type === 'wall';
-          const isKeepWall = tile.type === 'keep_wall';
-          const pathColor = tile.type === 'dirt_path' ? '#8B4513' : '#808080';
-          const wallColor = '#A9A9A9';
-          const keepWallColor = '#696969';
-
-          // Calculate if tile is clickable
-          const distance = playerPosition ? Math.abs(col - playerPosition.x) + Math.abs(row - playerPosition.y) : 999;
-          const isInRange = distance > 0 && distance <= 5;
           const isBuilding = tile.type === 'building';
 
-          // Hover info discovery
+          const distance = playerPosition ? Math.abs(col - playerPosition.x) + Math.abs(row - playerPosition.y) : 999;
+          const isInRange = distance > 0 && distance <= 5;
           const isDiscovered = discoveredBuildings.includes(`${tile.x},${tile.y}`);
           const canSeeName = distance <= 2 || isDiscovered;
           const displayName = canSeeName && tile.buildingName ? tile.buildingName : (tile.buildingType || tile.type);
-
           const isClickable = onTileClick && isInRange && (tile.walkable || isBuilding) && !isPlayer;
 
-          // Check adjacent tiles for path/wall connections
-          let hasPathNorth = false, hasPathSouth = false, hasPathEast = false, hasPathWest = false;
-          let hasWallNorth = false, hasWallSouth = false, hasWallEast = false, hasWallWest = false;
-          let hasKeepWallNorth = false, hasKeepWallSouth = false, hasKeepWallEast = false, hasKeepWallWest = false;
-
-          if (isPath) {
-            const north = row > 0 ? townMapData.mapData[row - 1][col] : null;
-            const south = row < townMapData.height - 1 ? townMapData.mapData[row + 1][col] : null;
-            const east = col < townMapData.width - 1 ? townMapData.mapData[row][col + 1] : null;
-            const west = col > 0 ? townMapData.mapData[row][col - 1] : null;
-
-            hasPathNorth = north && (north.type === 'dirt_path' || north.type === 'stone_path' || north.type === 'building' || north.type === 'town_square' || north.type === 'keep');
-            hasPathSouth = south && (south.type === 'dirt_path' || south.type === 'stone_path' || south.type === 'building' || south.type === 'town_square' || south.type === 'keep');
-            hasPathEast = east && (east.type === 'dirt_path' || east.type === 'stone_path' || east.type === 'building' || east.type === 'town_square' || east.type === 'keep');
-            hasPathWest = west && (west.type === 'dirt_path' || west.type === 'stone_path' || west.type === 'building' || west.type === 'town_square' || west.type === 'keep');
-          }
-
-          if (isWall) {
-            const north = row > 0 ? townMapData.mapData[row - 1][col] : null;
-            const south = row < townMapData.height - 1 ? townMapData.mapData[row + 1][col] : null;
-            const east = col < townMapData.width - 1 ? townMapData.mapData[row][col + 1] : null;
-            const west = col > 0 ? townMapData.mapData[row][col - 1] : null;
-
-            hasWallNorth = north && north.type === 'wall';
-            hasWallSouth = south && south.type === 'wall';
-            hasWallEast = east && east.type === 'wall';
-            hasWallWest = west && west.type === 'wall';
-          }
-
-          if (isKeepWall) {
-            const north = row > 0 ? townMapData.mapData[row - 1][col] : null;
-            const south = row < townMapData.height - 1 ? townMapData.mapData[row + 1][col] : null;
-            const east = col < townMapData.width - 1 ? townMapData.mapData[row][col + 1] : null;
-            const west = col > 0 ? townMapData.mapData[row][col - 1] : null;
-
-            hasKeepWallNorth = north && north.type === 'keep_wall';
-            hasKeepWallSouth = south && south.type === 'keep_wall';
-            hasKeepWallEast = east && east.type === 'keep_wall';
-            hasKeepWallWest = west && west.type === 'keep_wall';
-          }
+          const neighbours = { n: typeAt(col, row - 1), e: typeAt(col + 1, row), s: typeAt(col, row + 1), w: typeAt(col - 1, row) };
+          const poiEmoji = tile.poi ? (POI_EMOJI[tile.poi] || null) : null;
 
           return (
             <div
               key={index}
               style={{
-                backgroundColor: tile.type === 'grass' ? '#90EE90' :
-                  tile.type === 'stone_path' ? '#90EE90' :
-                    tile.type === 'dirt_path' ? '#90EE90' :
-                      tile.type === 'wall' ? '#90EE90' :
-                        tile.type === 'keep_wall' ? '#90EE90' :
-                          tile.type === 'town_square' ? '#E0E0E0' :
-                            tile.type === 'farm_field' ? '#D2B48C' :
-                              tile.type === 'water' ? '#007bff' :
-                                tile.type === 'bridge' ? '#5d4037' :
-                                  tile.type === 'building' ? '#90EE90' : '#FFF',
+                width: TILE,
+                height: TILE,
+                backgroundImage: tileBackground(tile, neighbours, col, row),
+                backgroundSize: 'cover',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                outline: isPlayer ? '2px solid yellow' :
-                  tile.isEntry ? '2px solid yellow' : 'none',
-                outlineOffset: '-2px',
                 position: 'relative',
-                width: '30px',
-                height: '30px',
-                cursor: isClickable ? 'pointer' : 'default'
+                outline: (isPlayer || tile.isEntry) ? '2px solid yellow' : 'none',
+                outlineOffset: '-2px',
+                cursor: isClickable ? 'pointer' : 'default',
               }}
               onClick={() => {
                 if (isBuilding) {
@@ -176,113 +123,11 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
               }}
               title={`(${tile.x}, ${tile.y}) - ${displayName}${isInRange ? ` [${distance} tiles away]` : ''}${isDiscovered ? ' (Discovered)' : ''}`}
             >
-              {/* Path rendering */}
-              {isPath && (
-                <>
-                  {/* North segment - only if there's a path north */}
-                  {hasPathNorth && (
-                    <div style={{
-                      position: 'absolute',
-                      width: '4px',
-                      height: '50%',
-                      backgroundColor: pathColor,
-                      left: '50%',
-                      top: '0',
-                      transform: 'translateX(-50%)'
-                    }} />
-                  )}
-                  {/* South segment - only if there's a path south */}
-                  {hasPathSouth && (
-                    <div style={{
-                      position: 'absolute',
-                      width: '4px',
-                      height: '50%',
-                      backgroundColor: pathColor,
-                      left: '50%',
-                      bottom: '0',
-                      transform: 'translateX(-50%)'
-                    }} />
-                  )}
-                  {/* East segment - only if there's a path east */}
-                  {hasPathEast && (
-                    <div style={{
-                      position: 'absolute',
-                      height: '4px',
-                      width: '50%',
-                      backgroundColor: pathColor,
-                      top: '50%',
-                      right: '0',
-                      transform: 'translateY(-50%)'
-                    }} />
-                  )}
-                  {/* West segment - only if there's a path west */}
-                  {hasPathWest && (
-                    <div style={{
-                      position: 'absolute',
-                      height: '4px',
-                      width: '50%',
-                      backgroundColor: pathColor,
-                      top: '50%',
-                      left: '0',
-                      transform: 'translateY(-50%)'
-                    }} />
-                  )}
-                  {/* Center dot only for corners/intersections (2+ connections) */}
-                  {(hasPathNorth || hasPathSouth) && (hasPathEast || hasPathWest) && (
-                    <div style={{
-                      position: 'absolute',
-                      width: '6px',
-                      height: '6px',
-                      backgroundColor: pathColor,
-                      borderRadius: '50%'
-                    }} />
-                  )}
-                </>
+              {poiEmoji && (
+                <span style={{ position: 'relative', zIndex: 2, fontSize: 18, filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.45))' }}>
+                  {poiEmoji}
+                </span>
               )}
-              {/* Wall rendering */}
-              {isWall && (
-                <>
-                  {hasWallNorth && (
-                    <div style={{ position: 'absolute', width: '12px', height: '50%', backgroundColor: wallColor, left: '50%', top: '0', transform: 'translateX(-50%)' }} />
-                  )}
-                  {hasWallSouth && (
-                    <div style={{ position: 'absolute', width: '12px', height: '50%', backgroundColor: wallColor, left: '50%', bottom: '0', transform: 'translateX(-50%)' }} />
-                  )}
-                  {hasWallEast && (
-                    <div style={{ position: 'absolute', height: '12px', width: '50%', backgroundColor: wallColor, top: '50%', right: '0', transform: 'translateY(-50%)' }} />
-                  )}
-                  {hasWallWest && (
-                    <div style={{ position: 'absolute', height: '12px', width: '50%', backgroundColor: wallColor, top: '50%', left: '0', transform: 'translateY(-50%)' }} />
-                  )}
-                  {(hasWallNorth || hasWallSouth) && (hasWallEast || hasWallWest) && (
-                    <div style={{ position: 'absolute', width: '14px', height: '14px', backgroundColor: wallColor, borderRadius: '2px' }} />
-                  )}
-                </>
-              )}
-              {/* Keep wall rendering */}
-              {isKeepWall && (
-                <>
-                  {hasKeepWallNorth && (
-                    <div style={{ position: 'absolute', width: '4px', height: '50%', backgroundColor: keepWallColor, left: '50%', top: '0', transform: 'translateX(-50%)' }} />
-                  )}
-                  {hasKeepWallSouth && (
-                    <div style={{ position: 'absolute', width: '4px', height: '50%', backgroundColor: keepWallColor, left: '50%', bottom: '0', transform: 'translateX(-50%)' }} />
-                  )}
-                  {hasKeepWallEast && (
-                    <div style={{ position: 'absolute', height: '4px', width: '50%', backgroundColor: keepWallColor, top: '50%', right: '0', transform: 'translateY(-50%)' }} />
-                  )}
-                  {hasKeepWallWest && (
-                    <div style={{ position: 'absolute', height: '4px', width: '50%', backgroundColor: keepWallColor, top: '50%', left: '0', transform: 'translateY(-50%)' }} />
-                  )}
-                  {(hasKeepWallNorth || hasKeepWallSouth) && (hasKeepWallEast || hasKeepWallWest) && (
-                    <div style={{ position: 'absolute', width: '6px', height: '6px', backgroundColor: keepWallColor, borderRadius: '50%' }} />
-                  )}
-                </>
-              )}
-              {/* Emoji/POI */}
-              <span style={{ position: 'relative', zIndex: 2 }}>
-                {getTownTileEmoji(tile)}
-              </span>
             </div>
           );
         })}
@@ -291,16 +136,16 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           <div
             style={{
               position: 'absolute',
-              left: `${playerPosition.x * 31}px`,
-              top: `${playerPosition.y * 31}px`,
-              width: '30px',
-              height: '30px',
+              left: `${playerPosition.x * TILE}px`,
+              top: `${playerPosition.y * TILE}px`,
+              width: TILE,
+              height: TILE,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               pointerEvents: 'none',
               zIndex: 10,
-              transition: 'left 0.6s ease-in-out, top 0.6s ease-in-out'
+              transition: 'left 0.6s ease-in-out, top 0.6s ease-in-out',
             }}
           >
             {firstHero ? (

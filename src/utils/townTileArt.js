@@ -265,11 +265,8 @@ const building = (buildingType) => {
 };
 
 // --- public API --------------------------------------------------------------
-// Returns a CSS background-image string for a tile. `neighbours` is { n,e,s,w } of
-// tile types, used for wall autotiling.
-export function tileBackground(tile, neighbours = {}, x = 0, y = 0) {
-  const seed = variantSeed(x, y);
-  switch (tile.type) {
+const _generate = (type, tile, mask, seed) => {
+  switch (type) {
     case 'water': return water(seed);
     case 'bridge': return bridge();
     case 'farm_field': return field(seed);
@@ -277,16 +274,39 @@ export function tileBackground(tile, neighbours = {}, x = 0, y = 0) {
     case 'stone_path': return stone(seed, true);
     case 'dirt_path': return dirt(seed);
     case 'building': return building(tile.buildingType);
-    case 'wall':
-    case 'keep_wall': {
-      const keep = tile.type === 'keep_wall';
-      const isW = (t) => t === tile.type;
-      const mask = (isW(neighbours.n) ? 1 : 0) | (isW(neighbours.e) ? 2 : 0) | (isW(neighbours.s) ? 4 : 0) | (isW(neighbours.w) ? 8 : 0);
-      return wall(mask, keep);
-    }
+    case 'wall': return wall(mask, false);
+    case 'keep_wall': return wall(mask, true);
     case 'grass':
     default: return grass(seed);
   }
+};
+
+// data-URIs are pure functions of (type, wall-mask, buildingType, coord-variant), so
+// we memoise — the live town re-renders on every move and would otherwise rebuild
+// every tile's SVG each time. Bounded: ~32 wall variants + ~18 buildings + one entry
+// per terrain coordinate.
+const _cache = new Map();
+
+// Returns a CSS background-image string for a tile. `neighbours` is { n,e,s,w } of
+// tile types, used for wall autotiling.
+export function tileBackground(tile, neighbours = {}, x = 0, y = 0) {
+  const type = tile.type;
+  let mask = 0;
+  let key;
+  if (type === 'wall' || type === 'keep_wall') {
+    mask = (neighbours.n === type ? 1 : 0) | (neighbours.e === type ? 2 : 0) | (neighbours.s === type ? 4 : 0) | (neighbours.w === type ? 8 : 0);
+    key = `${type}|${mask}`;
+  } else if (type === 'building') {
+    key = `building|${tile.buildingType || 'house'}`;
+  } else {
+    key = `${type}|${variantSeed(x, y)}`;
+  }
+  let bg = _cache.get(key);
+  if (bg === undefined) {
+    bg = _generate(type, tile, mask, variantSeed(x, y));
+    _cache.set(key, bg);
+  }
+  return bg;
 }
 
 // Direct accessors for the swatch gallery / docs.
