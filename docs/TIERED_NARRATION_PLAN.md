@@ -184,6 +184,26 @@ gate for Phase 2** — Smart mode must not promote until the local prose is prov
 | 3 | telemetry + tuned thresholds | mis-tuned scorer | low override rate |
 | 4 | richer templates, voice polish | staleness over time | — |
 
+## Revisited (2026-06-26) — fit with themed maps & guest mode
+- **Biome/theme-aware templates.** Phase 2b adds per-map themes (desert/snow/…). The local
+  narrator should key its template pools on `tile.biome` + `settings.theme`, so a desert
+  crossing reads as desert. This gives the narrator far more material and makes **Smart**
+  mode coherent on a themed map (the biome is consistent across the region).
+- **Reuse existing precedents.** Combat narration is already local/templated, and
+  `src/game/introComposer.js` (the guest templated intro) is a working local-narration
+  pattern — `localNarrator.js` should generalize it and copy its conventions (markdown
+  `*italics*`, not `_`; deterministic, no `Math.random()`).
+- **First slice = B3a (guest-only) — and it's the lowest-risk seam.** It's essentially a new
+  `localNarrator.js` plus one hook in the guest movement path; it needs neither the 3-way
+  setting nor the scorer yet. Ship it as the quality gate before promoting Smart mode.
+- **Sequencing / conflict note.** Smart-mode wiring touches `Game.js` movement narration,
+  `useGameInteraction.js`, `promptComposer.js`, and `SettingsContext` — the same files the
+  in-flight WorldMapDisplay-migration and Phase-2b agents are editing. **Don't start the
+  code until those land and merge**, or expect conflicts. Refining these notes is safe.
+- **Why it matters (cost/latency/scale).** This is the lever that keeps AI spend and latency
+  sane as play scales, and it's what makes richer guest play possible — reserve LLM calls
+  for novel/notable beats, template the routine.
+
 ## Open questions
 
 - Default for **existing** signed-in users on rollout: Smart (cost win, slight
