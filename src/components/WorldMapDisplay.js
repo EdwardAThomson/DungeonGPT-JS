@@ -1,40 +1,15 @@
 import React from 'react';
 import { resolveProfilePicture } from '../utils/assetHelper';
+import { biomeBackground, poiSprite } from '../utils/worldTileArt';
+import WorldMapLabels from './WorldMapLabels';
 
-// Biome background colors
-const biomeColors = {
-  plains: { backgroundColor: '#c3e6cb' }, // Light green
-  water: { backgroundColor: '#007bff' }, // Blue
-  beach: { backgroundColor: '#f5deb3' }, // Wheat/Sand
-};
+const TILE = 40;
 
-// POI emojis - displayed on top of biome tiles
-const poiEmojis = {
-  forest: '🌲',      // Tree emoji on plains-colored tile
-  mountain: '⛰️',    // Mountain emoji on plains-colored tile
-  hills: '🌄',       // Rolling hills
-  ruins: '🏛️',       // Ancient ruins
-  cave_entrance: '🕳️', // Cave entrance
-  // Town emojis by size
-  town_hamlet: '🛖',   // Hamlet
-  town_village: '🏡',  // Village
-  town_town: '🏘️',    // Town
-  town_city: '🏰',     // City
-};
+// Beach offset: water sits on one edge of the tile, so overlays/sprites/marker are
+// nudged toward the land side. beachDirection: 0 = water North, 1 = East, 2 = South, 3 = West.
+const BEACH_SHIFT = ['translateY(10px)', 'translateX(-10px)', 'translateY(-10px)', 'translateX(10px)'];
 
-// Helper function to get the appropriate town emoji
-const getTownEmoji = (tile) => {
-  if (tile.poi === 'town') {
-    if (tile.townSize) {
-      return poiEmojis[`town_${tile.townSize}`] || poiEmojis.town_village;
-    }
-    // Backward compatibility: if no townSize, default to village emoji
-    return poiEmojis.town_village;
-  }
-  return null;
-};
-
-// SVG path definitions for different path directions
+// SVG path definitions for different path/river directions (viewBox 40x40)
 const pathSVGs = {
   NORTH_SOUTH: 'M20,0 L20,40',           // Straight vertical
   EAST_WEST: 'M0,20 L40,20',             // Straight horizontal
@@ -101,12 +76,9 @@ const renderPathOverlay = (tile) => {
         height: '100%',
         pointerEvents: 'none',
         zIndex: 1,
-        transform: (tile.biome === 'beach' && tile.beachDirection !== undefined) ? [
-          'translateY(10px)',  // 0: North
-          'translateX(-10px)', // 1: East
-          'translateY(-10px)', // 2: South
-          'translateX(10px)'   // 3: West
-        ][tile.beachDirection] : 'none'
+        transform: (tile.biome === 'beach' && tile.beachDirection !== undefined)
+          ? BEACH_SHIFT[tile.beachDirection]
+          : 'none'
       }}
       viewBox="0 0 40 40"
     >
@@ -130,19 +102,22 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
   const mapHeight = mapData.length;
   const mapWidth = mapData[0].length;
 
-  // Calculate grid template styles dynamically
+  // No grid gap so the WorldMapLabels overlay (which positions names at x*TILE) aligns
+  // exactly with the tiles; the container is position:relative so that overlay anchors here.
   const gridStyle = {
+    position: 'relative',
     display: 'grid',
-    gridTemplateColumns: `repeat(${mapWidth}, 40px)`, // Example: 40px wide tiles
-    gridTemplateRows: `repeat(${mapHeight}, 40px)`, // Example: 40px high tiles
-    gap: '1px', // Small gap for grid lines effect
+    gridTemplateColumns: `repeat(${mapWidth}, ${TILE}px)`,
+    gridTemplateRows: `repeat(${mapHeight}, ${TILE}px)`,
     border: '1px solid #ccc',
-    width: `${mapWidth * 40 + (mapWidth - 1)}px`, // Adjust width based on tile size + gaps
+    width: `${mapWidth * TILE}px`,
     margin: '20px auto', // Center the map
-    backgroundColor: '#eee' // Background for gaps
   };
 
-  // <h4>World Map</h4> // don't need this
+  // Place names for the scroll-label overlay: towns, named mountains (first in range),
+  // and visible milestone POIs.
+  const labels = [];
+
   return (
     <div className="world-map-container">
 
@@ -150,46 +125,27 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
         {mapData.flat().map((tile) => { // Flatten the 2D array for easier mapping
           const isPlayerHere = playerPosition.x === tile.x && playerPosition.y === tile.y;
 
-          // Handle backward compatibility: old maps had 'forest' as biome, new maps have it as poi
-          let tileStyle = biomeColors[tile.biome] || biomeColors.plains;
-
-          // Handle beach gradients (multi-area tiles)
-          if (tile.biome === 'beach' && tile.beachDirection !== undefined) {
-            const directions = [
-              'to top',    // 0: North (water is north)
-              'to right',  // 1: East (water is east)
-              'to bottom', // 2: South (water is south)
-              'to left'    // 3: West (water is west)
-            ];
-            const direction = directions[tile.beachDirection];
-            tileStyle = {
-              background: `linear-gradient(${direction}, #f5deb3 0%, #f5deb3 50%, #007bff 50%, #007bff 100%)`
-            };
-          } else if (tile.isLake) {
-            tileStyle = {
-              backgroundColor: '#007bff',
-              boxShadow: 'inset 0 0 10px #f5deb3' // Sandy inner glow/border
-            };
-          }
-          let poiContent = null;
-
-          // Hide milestone POIs that aren't unlocked yet
+          // Hide milestone POIs (sprite + name) that aren't unlocked yet
           const isMilestoneHidden = tile.milestonePoi && visibleMilestonePois && !visibleMilestonePois.has(tile.poi);
 
-          // Check if it's a town with size information
-          if (tile.poi === 'town') {
-            poiContent = getTownEmoji(tile);
-          } else if (tile.poi && !isMilestoneHidden) {
-            poiContent = poiEmojis[tile.poi] || (tile.milestonePoi ? '🏴' : tile.poi);
-          }
+          const beachShift = (tile.biome === 'beach' && tile.beachDirection !== undefined)
+            ? BEACH_SHIFT[tile.beachDirection]
+            : 'none';
 
-          // If biome is 'forest' or 'mountains' (old system), convert to POI emoji
-          if (tile.biome === 'forest' && !tile.poi) {
-            tileStyle = biomeColors.plains; // Use plains color
-            poiContent = poiEmojis.forest; // Show tree emoji
-          } else if (tile.biome === 'mountains' && !tile.poi) {
-            tileStyle = biomeColors.plains; // Use plains color
-            poiContent = poiEmojis.mountain; // Show mountain emoji
+          // POI sprite overlay (town/forest/mountain/hills/cave_entrance/ruins/milestone)
+          const poi = isMilestoneHidden ? null : poiSprite(tile);
+
+          // Collect a name label for this tile if applicable
+          const labelText = tile.townName
+            || (tile.mountainName && tile.isFirstMountainInRange ? tile.mountainName : null)
+            || (tile.milestonePoi && tile.poiName && !isMilestoneHidden ? tile.poiName : null);
+          if (labelText) {
+            labels.push({
+              x: tile.x,
+              y: tile.y,
+              text: labelText,
+              kind: tile.milestonePoi ? 'milestone' : tile.townName ? 'town' : 'mountain',
+            });
           }
 
           return (
@@ -197,13 +153,10 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
               key={`${tile.x}-${tile.y}`}
               className={`map-tile ${isPlayerHere ? 'player-tile' : ''} ${!tile.isExplored ? 'unexplored' : ''}`}
               style={{
-                ...tileStyle,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '20px', // Emoji size
+                backgroundImage: biomeBackground(tile, tile.x, tile.y),
+                backgroundSize: 'cover',
                 cursor: 'pointer', // Indicate clickable
-                position: 'relative', // For player marker positioning
+                position: 'relative', // For overlays / player marker positioning
               }}
               onClick={() => onTileClick(tile.x, tile.y)}
               title={`${tile.townName || tile.mountainName || `(${tile.x}, ${tile.y})`} - ${tile.biome}${tile.poi ? ` (${tile.poi})` : ''}${tile.townSize ? ` [${tile.townSize}]` : ''}${tile.isExplored ? ' (Explored)' : ''}`} // Tooltip
@@ -214,71 +167,60 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
               {/* Render path overlay (below POI) */}
               {renderPathOverlay(tile)}
 
-              {/* Display POI emoji if it exists */}
-              <span style={{
-                position: 'relative',
-                zIndex: 2,
-                opacity: (tile.poi === 'mountain' && tile.hasPath) ? 0.8 : 1,
-                transform: `
-                  ${(tile.biome === 'beach' && tile.beachDirection !== undefined) ? [
-                    'translateY(10px)',  // 0: North
-                    'translateX(-10px)', // 1: East
-                    'translateY(-10px)', // 2: South
-                    'translateX(10px)'   // 3: West
-                  ][tile.beachDirection] : 'none'}
-                  ${(tile.poi === 'mountain' && tile.hasPath) ? 'scale(0.8)' : ''}
-                `.trim()
-              }}>
-                {poiContent}
-              </span>
-
-              {/* Display name label for towns, named mountains, and milestone POIs */}
-              {(tile.townName || (tile.mountainName && tile.isFirstMountainInRange) || (tile.milestonePoi && tile.poiName && !isMilestoneHidden)) && (
-                <span style={{
-                  position: 'absolute',
-                  bottom: '-6px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  fontSize: '7px',
-                  fontWeight: 'bold',
-                  color: tile.milestonePoi ? '#8b0000' : tile.townName ? '#2c1810' : '#4a3728',
-                  whiteSpace: 'nowrap',
-                  zIndex: 4,
-                  pointerEvents: 'none',
-                  textShadow: '0 0 2px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.7)',
-                  lineHeight: 1,
-                }}>
-                  {tile.townName || tile.mountainName || tile.poiName}
-                </span>
+              {/* POI sprite overlay */}
+              {poi && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 2,
+                    backgroundImage: poi,
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                    pointerEvents: 'none',
+                    transform: beachShift,
+                  }}
+                />
               )}
 
               {/* Display player marker when on this tile */}
-              {isPlayerHere && firstHero && (
-                <div
-                  className="player-marker-portrait"
-                  style={{
+              {isPlayerHere && (
+                firstHero ? (
+                  <div
+                    className="player-marker-portrait"
+                    style={{
+                      zIndex: 3,
+                      transform: beachShift
+                    }}
+                  >
+                    <img
+                      src={resolveProfilePicture(firstHero.profilePicture)}
+                      alt={firstHero.characterName}
+                      loading="lazy"
+                      width="40"
+                      height="40"
+                    />
+                    <div className="player-marker-pointer"></div>
+                  </div>
+                ) : (
+                  <span style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: `translate(-50%, -50%) ${beachShift === 'none' ? '' : beachShift}`.trim(),
+                    fontSize: '20px',
                     zIndex: 3,
-                    transform: (tile.biome === 'beach' && tile.beachDirection !== undefined) ? [
-                      'translateY(10px)',  // 0: North
-                      'translateX(-10px)', // 1: East
-                      'translateY(-10px)', // 2: South
-                      'translateX(10px)'   // 3: West
-                    ][tile.beachDirection] : 'none'
-                  }}
-                >
-                  <img
-                    src={resolveProfilePicture(firstHero.profilePicture)}
-                    alt={firstHero.characterName}
-                    loading="lazy"
-                    width="40"
-                    height="40"
-                  />
-                  <div className="player-marker-pointer"></div>
-                </div>
+                    pointerEvents: 'none',
+                  }}>⭐</span>
+                )
               )}
             </div>
           );
         })}
+
+        {/* Name labels drawn as parchment scrolls over the (position:relative) grid */}
+        <WorldMapLabels labels={labels} tile={TILE} />
       </div>
     </div>
   );
