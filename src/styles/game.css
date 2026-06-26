@@ -367,6 +367,60 @@
   text-decoration: none;
 }
 
+/* World-map place names drawn as little parchment scrolls (rolled ends via ::before/::after). */
+.map-name-scroll {
+  position: absolute;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #f3e6c4, #e6d2a2);
+  border: 1px solid #b08d50;
+  border-radius: 2px;
+  color: #3a2a14;
+  font-weight: 700;
+  font-family: var(--header-font, inherit);
+  line-height: 1.1;
+  padding: 1px 7px;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.map-name-scroll::before,
+.map-name-scroll::after {
+  content: '';
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 4px;
+  background: linear-gradient(180deg, #d8b676, #c09a54);
+  border: 1px solid #8f6f3c;
+  border-radius: 2px;
+}
+
+.map-name-scroll::before { left: -3px; }
+.map-name-scroll::after { right: -3px; }
+
+/* Mountains: a chiselled stone tablet — cooler, square, no scroll rolls. */
+.map-name-scroll.mountain {
+  background: linear-gradient(180deg, #e2e4e2, #c4c8c6);
+  border-color: #8b8f8c;
+  border-radius: 1px;
+  color: #33403f;
+}
+.map-name-scroll.mountain::before,
+.map-name-scroll.mountain::after { display: none; }
+
+/* Milestones: a quest banner — gold edge, deep-red text. */
+.map-name-scroll.milestone {
+  background: linear-gradient(180deg, #f6ddae, #ecc987);
+  border-color: #b5862f;
+  color: #7a1414;
+}
+.map-name-scroll.milestone::before,
+.map-name-scroll.milestone::after {
+  background: linear-gradient(180deg, #d9b25a, #c39a44);
+  border-color: #8a6a2f;
+}
+
 .user-input {
   flex-grow: 1;
   margin-bottom: 0;

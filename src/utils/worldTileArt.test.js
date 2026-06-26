@@ -25,6 +25,12 @@ describe('worldTileArt', () => {
     decode(poiSprite({ poi: 'ruins' }));
   });
 
+  test('hills have multiple variants across coordinates', () => {
+    const set = new Set();
+    for (let i = 0; i < 16; i++) set.add(poiSprite({ poi: 'hills', x: i, y: i * 2 + 1 }));
+    expect(set.size).toBeGreaterThan(1);
+  });
+
   test('beach direction changes the geometry', () => {
     const n = decode(biomeBackground({ biome: 'beach', beachDirection: 0 }));
     const e = decode(biomeBackground({ biome: 'beach', beachDirection: 1 }));

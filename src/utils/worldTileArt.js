@@ -230,32 +230,55 @@ const MOUNTAIN_VARIANTS = [
 ];
 const mountain = (v = 0) => wrap(MOUNTAIN_VARIANTS[v % MOUNTAIN_VARIANTS.length]);
 
-// rolling green hills (lower, rounder than mountains; no snow)
-const hills = () => wrap(
-  `<ellipse cx='26' cy='28' rx='14' ry='10' fill='${shade(C.plains, 0.72)}'/>` +
-  `<ellipse cx='24' cy='24' rx='8' ry='4.5' fill='${shade(C.plains, 0.95)}'/>` +
-  `<ellipse cx='13' cy='29' rx='12' ry='9' fill='${shade(C.plains, 0.82)}'/>` +
-  `<ellipse cx='11' cy='26' rx='7' ry='4' fill='${C.plainsLight}'/>` +
-  `<path d='M8 28 q1.2 -2.8 2.4 0' stroke='${C.plainsDark}' stroke-width='1' fill='none' stroke-linecap='round'/>` +
-  `<path d='M22 27 q1.2 -2.8 2.4 0' stroke='${C.plainsDark}' stroke-width='1' fill='none' stroke-linecap='round'/>`
-);
+// rolling green hills — shaded mounds (dark base, mid body, sunlit top-left) so they read
+// as raised humps, not flat blobs. Several variants for variety.
+const HILL = { lo: '#4f7d3c', mid: '#6aa84f', hi: '#88c468' };
+const hump = (cx, by, rx, ry) =>
+  `<ellipse cx='${cx}' cy='${by}' rx='${rx}' ry='${ry}' fill='${HILL.lo}'/>` +
+  `<ellipse cx='${cx}' cy='${(by - ry * 0.2).toFixed(1)}' rx='${(rx * 0.9).toFixed(1)}' ry='${(ry * 0.8).toFixed(1)}' fill='${HILL.mid}'/>` +
+  `<ellipse cx='${(cx - rx * 0.32).toFixed(1)}' cy='${(by - ry * 0.55).toFixed(1)}' rx='${(rx * 0.4).toFixed(1)}' ry='${(ry * 0.3).toFixed(1)}' fill='${HILL.hi}'/>`;
+const tuft = (x, y) => `<path d='M${x} ${y} q1 -2.4 2 0' stroke='${HILL.lo}' stroke-width='1' fill='none' stroke-linecap='round'/>`;
+const HILL_VARIANTS = [
+  hump(20, 31, 16, 12) + tuft(15, 24) + tuft(24, 23),                                   // one broad hill
+  hump(12, 32, 11, 9) + hump(28, 31, 12, 10) + tuft(25, 24),                            // twin hills
+  hump(9, 33, 8, 6) + hump(20, 31, 10, 8) + hump(31, 33, 8, 6) + tuft(18, 25),          // three low hills
+  hump(25, 31, 14, 12) + hump(9, 34, 7, 5) + tuft(22, 23),                              // big + foothill
+];
+const hills = (v = 0) => wrap(HILL_VARIANTS[v % HILL_VARIANTS.length]);
 
+// a craggy rock outcrop with a dark cave mouth (inner depth) and a couple of boulders
 const cave = () => wrap(
-  `<ellipse cx='20' cy='29' rx='15' ry='10' fill='${C.rockDark}'/>` +
-  `<ellipse cx='20' cy='27' rx='15' ry='10' fill='${C.rock}'/>` +
-  `<path d='M12 33 a8 11 0 0 1 16 0 z' fill='#241f1b'/>`
+  `<path d='M4 34 L8 17 Q20 8 32 17 L36 34 Z' fill='${C.rock}'/>` +                    // rock face
+  `<path d='M20 11 Q32 17 36 34 L23 34 Z' fill='${C.rockDark}'/>` +                    // shaded right side
+  `<path d='M8 17 Q20 8 32 17' fill='none' stroke='${shade(C.rock, 1.14)}' stroke-width='1.4' opacity='0.7'/>` + // lit ridge
+  `<path d='M14 24 l3 4 M29 22 l-3 5' stroke='${C.rockDark}' stroke-width='1' opacity='0.6'/>` + // cracks
+  `<path d='M13 34 Q13 21 20 21 Q27 21 27 34 Z' fill='#1b1713'/>` +                    // cave mouth
+  `<path d='M16 34 Q16 26 20 26 Q24 26 24 34 Z' fill='#000000'/>` +                    // inner depth
+  `<ellipse cx='9' cy='34' rx='3.2' ry='2' fill='${C.rockDark}'/>` +                   // boulders
+  `<ellipse cx='31' cy='34' rx='2.6' ry='1.8' fill='${shade(C.rock, 0.9)}'/>`
 );
 
-// ruins: broken walls + toppled columns with a fallen lintel and rubble
-const ruins = () => wrap(
-  `<rect x='7' y='23' width='11' height='8' fill='${shade(ROOF.stone, 0.92)}'/>` +
-  `<rect x='7' y='19' width='3' height='12' fill='${ROOF.stone}'/>` +
-  `<rect x='14' y='21' width='3' height='10' fill='${ROOF.stone}'/>` +
-  `<rect x='23' y='16' width='3' height='15' fill='${ROOF.stone}'/>` +
-  `<rect x='30' y='14' width='3' height='17' fill='${ROOF.stone}'/>` +
-  `<rect x='22' y='13' width='12' height='2.5' fill='${shade(ROOF.stone, 0.82)}'/>` +
-  `<circle cx='19' cy='31' r='1.6' fill='${shade(ROOF.stone, 0.85)}'/><circle cx='27' cy='31' r='1.3' fill='${shade(ROOF.stone, 0.85)}'/>`
-);
+// ruins: broken walls + toppled columns with a fallen lintel and rubble. Each stone piece
+// gets a dark outline + top highlight so it reads against grass (the stone/grass values are
+// otherwise too close).
+const ruins = () => {
+  const stone = ROOF.stone;
+  const edge = shade(stone, 0.45);   // dark outline / mortar shadow
+  const lite = shade(stone, 1.15);   // sunlit top
+  const block = (x, y, w, h) =>
+    `<rect x='${x}' y='${y}' width='${w}' height='${h}' fill='${stone}' stroke='${edge}' stroke-width='1' rx='0.5'/>` +
+    `<rect x='${x + 0.6}' y='${y + 0.6}' width='${w - 1.2}' height='1.4' fill='${lite}'/>`;
+  return wrap(
+    `<ellipse cx='20' cy='33' rx='15' ry='3.4' fill='#000000' opacity='0.18'/>` + // ground shadow
+    block(6, 22, 12, 10) +                                  // broken wall chunk
+    block(6, 18, 4, 14) +                                   // standing jamb
+    block(22, 15, 3.8, 17) +                                // column
+    block(29, 13, 3.8, 19) +                                // column
+    block(21, 11.5, 13, 3) +                                // fallen lintel across the columns
+    `<circle cx='17' cy='32' r='1.9' fill='${stone}' stroke='${edge}' stroke-width='0.7'/>` + // rubble
+    `<circle cx='26' cy='32' r='1.5' fill='${stone}' stroke='${edge}' stroke-width='0.7'/>`
+  );
+};
 
 // a little pitched-roof house: wall + gable roof + door (footprint ~s)
 const house = (x, y, s, c) =>
@@ -320,7 +343,7 @@ export function poiSprite(tile) {
   if (tile.poi === 'town') { key = `town|${tile.townSize || 'village'}`; build = () => townSprite(tile.townSize || 'village'); }
   else if (tile.poi === 'forest') { const v = variantSeed(tile.x || 0, tile.y || 0) % 8; key = `forest|${v}`; build = () => forest(v); }
   else if (tile.poi === 'mountain') { const v = variantSeed(tile.x || 0, tile.y || 0) % MOUNTAIN_VARIANTS.length; key = `mountain|${v}`; build = () => mountain(v); }
-  else if (tile.poi === 'hills') { key = 'hills'; build = hills; }
+  else if (tile.poi === 'hills') { const v = variantSeed(tile.x || 0, tile.y || 0) % HILL_VARIANTS.length; key = `hills|${v}`; build = () => hills(v); }
   else if (tile.poi === 'cave_entrance') { key = 'cave'; build = cave; }
   else if (tile.poi === 'ruins') { key = 'ruins'; build = ruins; }
   else if (tile.milestonePoi) { key = 'milestone'; build = milestone; }
@@ -350,7 +373,9 @@ export const samplePois = {
   mountain: () => mountain(0),
   'mtn twin': () => mountain(1),
   'mtn ridge': () => mountain(2),
-  hills: () => hills(),
+  hills: () => hills(0),
+  'hills 2': () => hills(1),
+  'hills 3': () => hills(2),
   cave: () => cave(),
   ruins: () => ruins(),
   hamlet: () => townSprite('hamlet'),
