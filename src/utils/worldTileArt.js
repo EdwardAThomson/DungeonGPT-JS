@@ -177,6 +177,16 @@ const MOUNTAIN_VARIANTS = [
 ];
 const mountain = (v = 0) => wrap(MOUNTAIN_VARIANTS[v % MOUNTAIN_VARIANTS.length]);
 
+// rolling green hills (lower, rounder than mountains; no snow)
+const hills = () => wrap(
+  `<ellipse cx='26' cy='28' rx='14' ry='10' fill='${shade(C.plains, 0.72)}'/>` +
+  `<ellipse cx='24' cy='24' rx='8' ry='4.5' fill='${shade(C.plains, 0.95)}'/>` +
+  `<ellipse cx='13' cy='29' rx='12' ry='9' fill='${shade(C.plains, 0.82)}'/>` +
+  `<ellipse cx='11' cy='26' rx='7' ry='4' fill='${C.plainsLight}'/>` +
+  `<path d='M8 28 q1.2 -2.8 2.4 0' stroke='${C.plainsDark}' stroke-width='1' fill='none' stroke-linecap='round'/>` +
+  `<path d='M22 27 q1.2 -2.8 2.4 0' stroke='${C.plainsDark}' stroke-width='1' fill='none' stroke-linecap='round'/>`
+);
+
 const cave = () => wrap(
   `<ellipse cx='20' cy='29' rx='15' ry='10' fill='${C.rockDark}'/>` +
   `<ellipse cx='20' cy='27' rx='15' ry='10' fill='${C.rock}'/>` +
@@ -193,14 +203,26 @@ const townSprite = (size) => {
   if (size === 'hamlet') return wrap(house(13, 16, 13, ROOF.red) + tree(31, 28, 5));
   if (size === 'village') return wrap(house(7, 17, 11, ROOF.red) + house(20, 19, 12, ROOF.amber) + tree(34, 30, 4));
   if (size === 'town') return wrap(house(5, 18, 9, ROOF.red) + house(14, 13, 12, ROOF.amber) + house(25, 19, 10, ROOF.teal) + tree(35, 31, 4));
-  // city: walled cluster with twin towers + a gate
+  // city: a clearly crenellated curtain wall enclosing roofs, with corner towers,
+  // a central keep, and a gate.
+  const wallD = '#867d6a', wallL = '#b3a98f', court = '#c2ad84';
+  let merlons = '';
+  for (let mx = 5; mx <= 31; mx += 5) merlons += `<rect x='${mx}' y='6' width='3' height='4' fill='${wallD}'/>`;
+  const tower = (x, y, h) => `<rect x='${x}' y='${y}' width='7' height='${h}' rx='1' fill='${wallD}'/><rect x='${x}' y='${y}' width='7' height='2' fill='${wallL}' opacity='0.7'/>`;
   return wrap(
-    `<rect x='4' y='12' width='32' height='23' rx='2' fill='${ROOF.stone}'/>` +
-    `<rect x='4' y='12' width='32' height='3' fill='#ffffff' opacity='0.12'/>` +
-    house(9, 17, 8, ROOF.red) + house(18, 15, 9, ROOF.amber) + house(26, 18, 8, ROOF.teal) +
-    `<rect x='3' y='10' width='6' height='10' rx='1' fill='${ROOF.slate}'/>` +
-    `<rect x='31' y='10' width='6' height='10' rx='1' fill='${ROOF.slate}'/>` +
-    `<rect x='17' y='31' width='6' height='4' fill='${shade(ROOF.stone, 0.5)}'/>`
+    `<rect x='3' y='9' width='34' height='28' rx='2' fill='${wallD}'/>` +       // curtain wall
+    `<rect x='8' y='14' width='24' height='20' rx='1' fill='${court}'/>` +       // courtyard (inside the wall)
+    merlons +                                                                     // battlements along the top
+    tower(2, 6, 11) + tower(31, 6, 11) + tower(2, 28, 9) + tower(31, 28, 9) +     // corner towers
+    house(10, 23, 7, ROOF.red) + house(24, 24, 6, ROOF.amber) +                  // a couple of roofs inside
+    `<rect x='15.5' y='11' width='9' height='15' rx='1' fill='${ROOF.slate}'/>` + // central keep
+    `<rect x='15.5' y='11' width='9' height='2' fill='#9aa0a6' opacity='0.6'/>` +
+    `<rect x='15.5' y='9' width='2.6' height='2.6' fill='${ROOF.slate}'/><rect x='21.9' y='9' width='2.6' height='2.6' fill='${ROOF.slate}'/>` + // keep merlons
+    `<rect x='17.8' y='14.5' width='0.9' height='3' fill='${shade(ROOF.slate, 0.4)}'/>` + // dark arrow-slit windows
+    `<rect x='21.3' y='14.5' width='0.9' height='3' fill='${shade(ROOF.slate, 0.4)}'/>` +
+    `<rect x='17.8' y='19.5' width='0.9' height='3' fill='${shade(ROOF.slate, 0.4)}'/>` +
+    `<rect x='21.3' y='19.5' width='0.9' height='3' fill='${shade(ROOF.slate, 0.4)}'/>` +
+    `<rect x='17' y='32' width='6' height='5' rx='0.5' fill='#352f27'/>`          // gate
   );
 };
 
@@ -230,6 +252,7 @@ export function poiSprite(tile) {
   if (tile.poi === 'town') { key = `town|${tile.townSize || 'village'}`; build = () => townSprite(tile.townSize || 'village'); }
   else if (tile.poi === 'forest') { const v = variantSeed(tile.x || 0, tile.y || 0) % 8; key = `forest|${v}`; build = () => forest(v); }
   else if (tile.poi === 'mountain') { const v = variantSeed(tile.x || 0, tile.y || 0) % MOUNTAIN_VARIANTS.length; key = `mountain|${v}`; build = () => mountain(v); }
+  else if (tile.poi === 'hills') { key = 'hills'; build = hills; }
   else if (tile.poi === 'cave_entrance') { key = 'cave'; build = cave; }
   else if (tile.milestonePoi) { key = 'milestone'; build = milestone; }
   else return null;
@@ -254,6 +277,7 @@ export const samplePois = {
   mountain: () => mountain(0),
   'mtn twin': () => mountain(1),
   'mtn ridge': () => mountain(2),
+  hills: () => hills(),
   cave: () => cave(),
   hamlet: () => townSprite('hamlet'),
   village: () => townSprite('village'),
