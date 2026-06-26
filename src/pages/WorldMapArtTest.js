@@ -8,6 +8,7 @@
 import React, { useMemo, useState } from 'react';
 import { generateMapData } from '../utils/mapGenerator';
 import { biomeBackground, poiSprite, sampleBiomes, samplePois } from '../utils/worldTileArt';
+import WorldMapLabels from '../components/WorldMapLabels';
 
 const TILE = 40;
 
@@ -55,6 +56,25 @@ const WorldMapArtTest = () => {
   const heading = { fontSize: 14, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' };
   const cols = world[0].length;
 
+  // Live POI tally — distinguishes "not generated" from "not rendered" while iterating.
+  const poiCounts = useMemo(() => {
+    const counts = {};
+    world.flat().forEach((t) => { if (t.poi) counts[t.poi] = (counts[t.poi] || 0) + 1; });
+    return counts;
+  }, [world]);
+
+  // Place names for the scroll-label overlay (towns, named mountains, milestone POIs).
+  const mapLabels = useMemo(() => {
+    const out = [];
+    world.flat().forEach((t) => {
+      const text = t.townName
+        || (t.mountainName && t.isFirstMountainInRange ? t.mountainName : null)
+        || (t.milestonePoi ? t.poiName : null);
+      if (text) out.push({ x: t.x, y: t.y, text, kind: t.milestonePoi ? 'milestone' : t.townName ? 'town' : 'mountain' });
+    });
+    return out;
+  }, [world]);
+
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>World Map Art <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>— preview / iteration (not live)</span></h2>
@@ -86,8 +106,14 @@ const WorldMapArtTest = () => {
           <Toggle on={showGrid} set={setShowGrid}>grid</Toggle>
         </div>
 
+        <p style={{ fontSize: 12, color: 'var(--text-secondary)', margin: '0 0 8px' }}>
+          POIs generated: {Object.keys(poiCounts).length === 0 ? 'none' :
+            Object.entries(poiCounts).sort().map(([k, n]) => `${k}: ${n}`).join(' · ')}
+        </p>
+
         <div style={{ overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 8, background: 'var(--surface)' }}>
           <div style={{
+            position: 'relative',
             display: 'grid', gridTemplateColumns: `repeat(${cols}, ${TILE}px)`, width: cols * TILE,
             gap: showGrid ? 1 : 0, background: showGrid ? 'var(--border)' : 'transparent',
             transform: `scale(${zoom})`, transformOrigin: 'top left',
@@ -95,7 +121,6 @@ const WorldMapArtTest = () => {
             {world.flat().map((tile) => {
               const poi = showPois ? poiSprite(tile) : null;
               const beachShift = (tile.biome === 'beach' && tile.beachDirection != null) ? BEACH_SHIFT[tile.beachDirection] : 'none';
-              const label = tile.townName || (tile.mountainName && tile.isFirstMountainInRange ? tile.mountainName : null) || (tile.milestonePoi ? tile.poiName : null);
               return (
                 <div key={`${tile.x},${tile.y}`} style={{
                   width: TILE, height: TILE, backgroundImage: biomeBackground(tile, tile.x, tile.y), backgroundSize: 'cover', position: 'relative',
@@ -113,16 +138,10 @@ const WorldMapArtTest = () => {
                       <span style={{ position: 'absolute', top: -6, right: -3, zIndex: 5, fontSize: 13, pointerEvents: 'none' }}>⭐</span>
                     </>
                   )}
-                  {showLabels && label && (
-                    <span style={{
-                      position: 'absolute', bottom: -5, left: '50%', transform: 'translateX(-50%)', fontSize: 7, fontWeight: 'bold',
-                      color: tile.milestonePoi ? '#8b0000' : tile.townName ? '#2c1810' : '#4a3728', whiteSpace: 'nowrap', zIndex: 4,
-                      textShadow: '0 0 2px rgba(255,255,255,0.9), 0 0 4px rgba(255,255,255,0.7)', lineHeight: 1, pointerEvents: 'none',
-                    }}>{label}</span>
-                  )}
                 </div>
               );
             })}
+            {showLabels && <WorldMapLabels labels={mapLabels} tile={TILE} />}
           </div>
         </div>
         <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
