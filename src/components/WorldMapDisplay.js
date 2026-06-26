@@ -12,6 +12,8 @@ const biomeColors = {
 const poiEmojis = {
   forest: '🌲',      // Tree emoji on plains-colored tile
   mountain: '⛰️',    // Mountain emoji on plains-colored tile
+  hills: '🌄',       // Rolling hills
+  ruins: '🏛️',       // Ancient ruins
   cave_entrance: '🕳️', // Cave entrance
   // Town emojis by size
   town_hamlet: '🛖',   // Hamlet

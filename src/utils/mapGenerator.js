@@ -74,6 +74,9 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
     generateRivers(mapData, mountainTiles, rng);
   }
 
+  // 5b. Rolling hills — foothills near mountains plus the odd standalone cluster (Phase 2a)
+  placeHills(mapData, width, height, rng);
+
   // 6. Place towns. Normally 2-4, but never fewer than the number of named towns
   // the campaign requires — each custom name is a milestone/quest location that
   // must exist on the map, otherwise its quest building/item/POI is silently lost.
@@ -127,6 +130,9 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
     const paths = generateTownPaths(mapData, townsList);
     markPathTiles(mapData, paths);
   }
+
+  // Occasionally drop ancient ruins on open ground, clear of paths (Phase 2a)
+  placeRuins(mapData, width, height, rng);
 
   // Harmonize mountain names: flood-fill adjacent tiles into clusters, assign one name per cluster
   harmonizeMountainNames(mapData, rng, normalizedNames.mountains);
@@ -271,6 +277,58 @@ function placeTown(mapData, width, height, rng, existingTowns = [], minDistance 
 
   logger.warn('[PLACE_TOWN] Failed to place town after 30 attempts');
   return null; // Return null if placement failed
+}
+
+// Place rolling hills: foothills hugging mountains, plus an occasional standalone cluster.
+function placeHills(mapData, width, height, rng) {
+  const dirs = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }];
+  const shuffled = () => dirs.slice().sort(() => rng() - 0.5);
+  const setHill = (x, y, seed) => {
+    if (!isValidPlacement(mapData, x, y, width, height, false)) return false;
+    mapData[y][x].poi = 'hills';
+    mapData[y][x].descriptionSeed = seed;
+    return true;
+  };
+
+  // Foothills: a couple of mountains get an adjacent hill tile.
+  const mountains = [];
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    if (mapData[y][x].poi === 'mountain') mountains.push({ x, y });
+  }
+  const foothills = 1 + Math.floor(rng() * 2);
+  for (let i = 0; i < foothills && mountains.length > 0; i++) {
+    const m = mountains[Math.floor(rng() * mountains.length)];
+    for (const d of shuffled()) {
+      if (setHill(m.x + d.dx, m.y + d.dy, 'Rolling foothills')) break;
+    }
+  }
+
+  // One standalone cluster of 1-3 hills on open plains.
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const sx = Math.floor(rng() * width), sy = Math.floor(rng() * height);
+    if (!setHill(sx, sy, 'Rolling hills')) continue;
+    const extra = 1 + Math.floor(rng() * 2);
+    let grown = 0;
+    for (const d of shuffled()) {
+      if (grown >= extra) break;
+      if (setHill(sx + d.dx, sy + d.dy, 'Rolling hills')) grown++;
+    }
+    break;
+  }
+}
+
+// Occasionally place ancient ruins on open ground, clear of paths (Phase 2a).
+function placeRuins(mapData, width, height, rng) {
+  if (rng() > 0.5) return; // roughly half of maps get a ruin
+  for (let attempt = 0; attempt < 25; attempt++) {
+    const x = Math.floor(rng() * width), y = Math.floor(rng() * height);
+    if (mapData[y][x].hasPath) continue;
+    if (isValidPlacement(mapData, x, y, width, height, false)) {
+      mapData[y][x].poi = 'ruins';
+      mapData[y][x].descriptionSeed = 'Crumbling ancient ruins';
+      return;
+    }
+  }
 }
 
 // Place a cave entrance near mountains

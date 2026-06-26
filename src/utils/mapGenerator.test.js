@@ -38,6 +38,30 @@ describe('generateMapData', () => {
     expect(startingTowns).toHaveLength(1);
   });
 
+  describe('Phase 2a POI sprinkle (hills / ruins)', () => {
+    const tiles = (map) => map.flat();
+
+    it('places hills on at least some maps', () => {
+      let withHills = 0;
+      for (let s = 1; s <= 12; s++) {
+        if (tiles(generateMapData(10, 10, s * 7)).some((t) => t.poi === 'hills')) withHills++;
+      }
+      expect(withHills).toBeGreaterThan(0);
+    });
+
+    it('never places hills or ruins on water or beach, or over a town', () => {
+      for (let s = 1; s <= 12; s++) {
+        tiles(generateMapData(10, 10, s * 13))
+          .filter((t) => t.poi === 'hills' || t.poi === 'ruins')
+          .forEach((t) => {
+            expect(t.biome).not.toBe('water');
+            expect(t.biome).not.toBe('beach');
+            expect(t.townName).toBeUndefined();
+          });
+      }
+    });
+  });
+
   it('places every campaign-required named town, regardless of the random count', () => {
     const requiredTowns = ['Cogsworth', 'Tinker-Row', 'Brasswick', 'Gear-End'];
 
