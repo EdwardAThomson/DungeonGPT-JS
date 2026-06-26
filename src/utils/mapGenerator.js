@@ -15,9 +15,13 @@ const logger = createLogger('map-generator');
  * @param {number} height - Map height (default 10)
  * @param {number} seed - Optional seed for reproducible maps
  * @param {Object|Array} customNames - Optional names: { towns: [...], mountains: [...] } or legacy array of town names
+ * @param {string} theme - Optional biome theme for the whole map. Defaults to 'grassland'
+ *   (base biome 'plains' — byte-identical to historical behaviour). 'desert' bases land
+ *   tiles on the 'desert' biome instead. Themed-region maps (Phase 2b): the whole map IS
+ *   one biome theme; water/beach/coast/lake/POI logic is otherwise unchanged.
  * @returns {Array} 2D array of map tiles
  */
-export const generateMapData = (width = 10, height = 10, seed = null, customNames = {}) => {
+export const generateMapData = (width = 10, height = 10, seed = null, customNames = {}, theme = 'grassland') => {
   // Normalize customNames: support legacy flat array or new structured object
   const normalizedNames = Array.isArray(customNames)
     ? { towns: customNames, mountains: [] }
@@ -25,19 +29,26 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   // Use seed for reproducible maps, or random
   const rng = seed !== null ? seededRandom(seed) : Math.random;
 
+  // The base biome of dry land. Grassland (default) keeps the historical 'plains' so
+  // existing behaviour and tests stay byte-identical; a themed map (e.g. desert) bases
+  // its land tiles on the theme biome instead. Water/beach/lake placement still keys off
+  // this land biome so themed maps keep their coasts and (oasis-like) lakes.
+  const landBiome = theme === 'desert' ? 'desert' : 'plains';
+  const landDescription = landBiome === 'desert' ? 'Open desert' : 'Open fields';
+
   const mapData = [];
   const townsList = []; // Keep track of all towns
 
-  // Initialize all tiles as plains
+  // Initialize all tiles to the land base biome
   for (let y = 0; y < height; y++) {
     const row = [];
     for (let x = 0; x < width; x++) {
       row.push({
         x,
         y,
-        biome: 'plains',
+        biome: landBiome,
         poi: null,
-        descriptionSeed: "Open fields",
+        descriptionSeed: landDescription,
         isExplored: false,
       });
     }
@@ -50,7 +61,7 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   // 2. Generate 1-2 Lake clusters
   const numLakes = 1 + Math.floor(rng() * 2);
   for (let i = 0; i < numLakes; i++) {
-    placeLakeCluster(mapData, width, height, rng);
+    placeLakeCluster(mapData, width, height, rng, landBiome);
   }
 
   // 3. Generate 3-5 forest clusters
@@ -110,7 +121,7 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   }
 
   // Improve map distribution by adding features to sparse quadrants
-  improveMapDistribution(mapData, width, height, rng);
+  improveMapDistribution(mapData, width, height, rng, landBiome);
 
   // Selected starting town first so the name assigner knows which one it is
   if (townsList.length > 0) {
@@ -534,8 +545,9 @@ function harmonizeMountainNames(mapData, rng, customMountainNames = []) {
   });
 }
 
-// Improve map distribution by adding features to sparse quadrants
-function improveMapDistribution(mapData, width, height, rng) {
+// Improve map distribution by adding features to sparse quadrants. landBiome is the
+// map's dry-land base biome — only open tiles of that biome are candidates for fill.
+function improveMapDistribution(mapData, width, height, rng, landBiome = 'plains') {
   const minFeaturesPerQuadrant = 3;
 
   // Define quadrants without overlap - clean 5x5 sections
@@ -556,7 +568,7 @@ function improveMapDistribution(mapData, width, height, rng) {
         if (mapData[y] && mapData[y][x]) {
           if (mapData[y][x].poi !== null) {
             featureCount++;
-          } else if (mapData[y][x].biome === 'plains') {
+          } else if (mapData[y][x].biome === landBiome) {
             plainsTiles.push({ x, y });
           }
         }
@@ -716,14 +728,15 @@ function isNearCoast(mapData, x, y, width, height) {
   return false;
 }
 
-// Place a single lake tile
-function placeLakeCluster(mapData, width, height, rng) {
+// Place a single lake tile. landBiome is the map's dry-land base biome (plains for
+// grassland, desert for desert) — lakes only carve into open land of that biome.
+function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains') {
   // Find a random spot not on the extreme edge and not on water/beach
   let startX, startY;
   for (let attempt = 0; attempt < 50; attempt++) {
     startX = 2 + Math.floor(rng() * (width - 4));
     startY = 2 + Math.floor(rng() * (height - 4));
-    if (mapData[startY][startX].biome === 'plains' && !isNearCoast(mapData, startX, startY, width, height)) {
+    if (mapData[startY][startX].biome === landBiome && !isNearCoast(mapData, startX, startY, width, height)) {
       mapData[startY][startX].biome = 'water';
       mapData[startY][startX].descriptionSeed = "A clear lake";
       mapData[startY][startX].isLake = true;

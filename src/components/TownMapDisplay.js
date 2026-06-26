@@ -32,6 +32,9 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
 
   const discoveredBuildings = townMapData.discoveredBuildings || [];
   const { width, height, mapData } = townMapData;
+  // Biome theme drives the ground palette (sand for desert). Older cached town maps
+  // lack this field and fall back to grassland — unchanged rendering.
+  const townTheme = townMapData.theme || 'grassland';
 
   const typeAt = (c, r) => (r >= 0 && r < height && c >= 0 && c < width && mapData[r][c]) ? mapData[r][c].type : null;
 
@@ -104,7 +107,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
               style={{
                 width: TILE,
                 height: TILE,
-                backgroundImage: tileBackground(tile, neighbours, col, row),
+                backgroundImage: tileBackground(tile, neighbours, col, row, townTheme),
                 backgroundSize: 'cover',
                 display: 'flex',
                 alignItems: 'center',

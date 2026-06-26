@@ -14,10 +14,16 @@ const logger = createLogger('town-map-generator');
  * @param {number} seed - Optional seed for reproducible maps
  * @param {boolean} hasRiver - Whether the town has a river passing through it
  * @param {string} riverDirection - Direction of the river on the world map
+ * @param {string} theme - Optional biome theme. Defaults to 'grassland' (byte-identical
+ *   to historical output). 'desert' tags the town so the tileset renders a sand ground,
+ *   and drops the green farm fields. The ground tile `type` stays 'grass' so all building/
+ *   road/decoration placement is unchanged; the theme rides on the returned town object
+ *   and is applied purely at render time (see townTileArt.tileBackground).
  * @returns {Object} Town map data with tiles and metadata
  */
-export const generateTownMap = (townSize, townName, entryPoint = 'south', seed = null, hasRiver = false, riverDirection = 'NORTH_SOUTH') => {
-  logger.debug(`[TOWN_MAP] Generating ${townSize} map for ${townName}`);
+export const generateTownMap = (townSize, townName, entryPoint = 'south', seed = null, hasRiver = false, riverDirection = 'NORTH_SOUTH', theme = 'grassland') => {
+  logger.debug(`[TOWN_MAP] Generating ${townSize} map for ${townName} (theme: ${theme})`);
+  const isDesert = theme === 'desert';
 
   // Generate at the settlement's native size so the buildings stay huddled (the proven
   // layout), then frame it with surrounding countryside up to a uniform canvas — see
@@ -90,8 +96,9 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   // Generate paths connecting all buildings to the road network
   generateBuildingPaths(mapData, centerPos, rng);
 
-  // Place farm fields (Hamlets, Villages, and Towns)
-  if (townSize === 'hamlet' || townSize === 'village' || townSize === 'town') {
+  // Place farm fields (Hamlets, Villages, and Towns). Desert towns skip the green
+  // fields — there's no farmland to render on sand.
+  if (!isDesert && (townSize === 'hamlet' || townSize === 'village' || townSize === 'town')) {
     placeFarmFields(mapData, townSize, rng);
   }
 
@@ -108,6 +115,7 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
     height,
     townName,
     townSize,
+    theme,
     entryPoint: entryPos,
     centerPoint: centerPos
   };
@@ -178,8 +186,9 @@ export function padTownToUniform(town, targetW, targetH, rng) {
   town.entryPoint = edge;
 
   // scatter farm-field clusters in the countryside ring (never over the core or road).
-  // Smaller settlements have a thicker ring, so they get more farmland.
-  const ringClusters = town.townSize === 'hamlet' ? 12 : town.townSize === 'village' ? 8 : 5;
+  // Smaller settlements have a thicker ring, so they get more farmland. Desert towns
+  // get none — there are no green fields on sand.
+  const ringClusters = town.theme === 'desert' ? 0 : (town.townSize === 'hamlet' ? 12 : town.townSize === 'village' ? 8 : 5);
   for (let i = 0; i < ringClusters; i++) {
     let sx, sy, found = false;
     for (let a = 0; a < 15; a++) {

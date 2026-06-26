@@ -2,6 +2,7 @@ import { DM_PROTOCOL } from '../data/prompts';
 import {
   formatPartyInfo,
   buildLocationInfo,
+  buildRegionThemeInfo,
   composeMovementNarrativePrompt
 } from './promptComposer';
 
@@ -146,5 +147,36 @@ describe('promptComposer', () => {
     });
 
     expect(prompt).not.toContain('Recent descriptions (DO NOT repeat similar phrases):');
+  });
+
+  it('describes a desert region but stays silent for grassland (default)', () => {
+    expect(buildRegionThemeInfo('grassland')).toBe('');
+    expect(buildRegionThemeInfo(undefined)).toBe('');
+    expect(buildRegionThemeInfo('desert')).toContain('desert');
+  });
+
+  it('injects the desert region descriptor into the composed prompt', () => {
+    const base = {
+      tile: { biome: 'desert', poi: null, descriptionSeed: 'Endless dunes' },
+      coords: { x: 2, y: 2 },
+      selectedHeroes: [{ characterName: 'Tor', characterClass: 'Fighter' }],
+      currentSummary: 'The sun beats down.',
+      narrativeEncounter: null,
+      worldMap: [],
+      isNewArea: true,
+      conversation: [],
+      includeRecentContext: false
+    };
+    const desert = composeMovementNarrativePrompt({
+      ...base,
+      settings: { shortDescription: 'A trek across the sands', grimnessLevel: 'Neutral', milestones: [], theme: 'desert' }
+    });
+    expect(desert.prompt).toContain('arid desert');
+
+    const grassland = composeMovementNarrativePrompt({
+      ...base,
+      settings: { shortDescription: 'A trek across the sands', grimnessLevel: 'Neutral', milestones: [] }
+    });
+    expect(grassland.prompt).not.toContain('arid desert');
   });
 });

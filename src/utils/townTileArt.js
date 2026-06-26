@@ -12,6 +12,8 @@
 // --- palette -----------------------------------------------------------------
 const C = {
   grass: '#6aa84f', grassDark: '#4c8038', grassLight: '#86c267',
+  // desert town ground — sandy palette (kept loosely in sync with worldTileArt's desert)
+  sand: '#e0c178', sandDark: '#cda85f', sandLight: '#efd9a0',
   dirt: '#b07b46', dirtDark: '#8f5f31', dirtLight: '#c89a64',
   water: '#3f7cc2', waterLight: '#5a93d6', foam: '#bcd8f5',
   soil: '#6f4a2a', soilDark: '#553820', crop: '#7fb04a', cropDark: '#5f8a34',
@@ -68,6 +70,24 @@ const grass = (seed) => {
     marks += `<path d='M${x} ${y} q1.2 -3 2.4 0' stroke='${c}' stroke-width='1.1' fill='none' stroke-linecap='round'/>`;
   }
   return wrap(`<rect width='32' height='32' fill='${C.grass}'/>${marks}`);
+};
+
+// desert town ground: a sandy base with scattered grains and the odd ripple, mirroring
+// the grass tile's role for desert-themed towns (Phase 2b)
+const sand = (seed) => {
+  const r = rng(seed + 6);
+  let marks = '';
+  for (let i = 0; i < 9; i++) {
+    const x = (r() * 30 + 1).toFixed(1);
+    const y = (r() * 30 + 1).toFixed(1);
+    const c = r() > 0.5 ? C.sandDark : C.sandLight;
+    marks += `<circle cx='${x}' cy='${y}' r='${(r() * 1.0 + 0.4).toFixed(1)}' fill='${c}'/>`;
+  }
+  for (let i = 0; i < 2; i++) {
+    const y = 9 + i * 12 + Math.floor(r() * 4);
+    marks += `<path d='M0 ${y} q8 -2.5 16 0 t16 0' stroke='${C.sandDark}' stroke-width='1' fill='none' opacity='0.5'/>`;
+  }
+  return wrap(`<rect width='32' height='32' fill='${C.sand}'/>${marks}`);
 };
 
 const dirt = (seed) => {
@@ -133,7 +153,7 @@ const bridge = () => {
 
 // --- walls (autotiled) -------------------------------------------------------
 // mask bits: N=1, E=2, S=4, W=8
-const wall = (mask, keep) => {
+const wall = (mask, keep, ground = C.grass) => {
   const col = keep ? { m: C.keep, l: C.keepLight, d: C.keepDark } : { m: C.wall, l: C.wallLight, d: C.wallDark };
   const half = 16;
   const t = keep ? 9 : 11; // arm thickness
@@ -162,8 +182,8 @@ const wall = (mask, keep) => {
     body += `<circle cx='16' cy='16' r='${r - 1.6}' fill='${col.m}'/>`;
     body += `<circle cx='13.5' cy='13.5' r='${r - 5}' fill='${col.l}' opacity='0.6'/>`;
   }
-  // grass shows through where there's no arm
-  return wrap(`<rect width='32' height='32' fill='${C.grass}'/>${body}`);
+  // ground (grass / desert sand) shows through where there's no arm
+  return wrap(`<rect width='32' height='32' fill='${ground}'/>${body}`);
 };
 
 // --- buildings ---------------------------------------------------------------
@@ -336,18 +356,20 @@ const BUILDING_SHAPE = {
   guild: 'banner', archives: 'banner', library: 'library',
 };
 
-const building = (buildingType) => {
+const building = (buildingType, ground = C.grass) => {
   const roof = ROOFS[buildingType] || ROOFS.house;
   const shape = SHAPES[BUILDING_SHAPE[buildingType] || 'gable'];
   return wrap(
-    `<rect width='32' height='32' fill='${C.grass}'/>` +
+    `<rect width='32' height='32' fill='${ground}'/>` +
     `<ellipse cx='16' cy='27' rx='12' ry='3' fill='#000000' opacity='0.16'/>` + // ground shadow
     shape(roof)
   );
 };
 
 // --- public API --------------------------------------------------------------
-const _generate = (type, tile, mask, seed) => {
+const _generate = (type, tile, mask, seed, theme) => {
+  const isDesert = theme === 'desert';
+  const ground = isDesert ? C.sand : C.grass;
   switch (type) {
     case 'water': return water(seed);
     case 'bridge': return bridge();
@@ -355,11 +377,11 @@ const _generate = (type, tile, mask, seed) => {
     case 'town_square': return stone(seed, true);
     case 'stone_path': return stone(seed, true);
     case 'dirt_path': return dirt(seed);
-    case 'building': return building(tile.buildingType);
-    case 'wall': return wall(mask, false);
-    case 'keep_wall': return wall(mask, true);
+    case 'building': return building(tile.buildingType, ground);
+    case 'wall': return wall(mask, false, ground);
+    case 'keep_wall': return wall(mask, true, ground);
     case 'grass':
-    default: return grass(seed);
+    default: return isDesert ? sand(seed) : grass(seed);
   }
 };
 
@@ -370,22 +392,26 @@ const _generate = (type, tile, mask, seed) => {
 const _cache = new Map();
 
 // Returns a CSS background-image string for a tile. `neighbours` is { n,e,s,w } of
-// tile types, used for wall autotiling.
-export function tileBackground(tile, neighbours = {}, x = 0, y = 0) {
+// tile types, used for wall autotiling. `theme` selects the town's ground palette
+// (default 'grassland' renders exactly as before; 'desert' renders a sand base).
+export function tileBackground(tile, neighbours = {}, x = 0, y = 0, theme = 'grassland') {
   const type = tile.type;
+  // Theme tag in the cache key so desert and grassland tiles never collide. Grassland
+  // is the default, so its keys/output are unchanged from before.
+  const tt = theme === 'desert' ? 'd' : 'g';
   let mask = 0;
   let key;
   if (type === 'wall' || type === 'keep_wall') {
     mask = (neighbours.n === type ? 1 : 0) | (neighbours.e === type ? 2 : 0) | (neighbours.s === type ? 4 : 0) | (neighbours.w === type ? 8 : 0);
-    key = `${type}|${mask}`;
+    key = `${type}|${mask}|${tt}`;
   } else if (type === 'building') {
-    key = `building|${tile.buildingType || 'house'}`;
+    key = `building|${tile.buildingType || 'house'}|${tt}`;
   } else {
-    key = `${type}|${variantSeed(x, y)}`;
+    key = `${type}|${variantSeed(x, y)}|${tt}`;
   }
   let bg = _cache.get(key);
   if (bg === undefined) {
-    bg = _generate(type, tile, mask, variantSeed(x, y));
+    bg = _generate(type, tile, mask, variantSeed(x, y), theme);
     _cache.set(key, bg);
   }
   return bg;
@@ -394,6 +420,7 @@ export function tileBackground(tile, neighbours = {}, x = 0, y = 0) {
 // Direct accessors for the swatch gallery / docs.
 export const sampleTiles = {
   grass: () => grass(variantSeed(1, 1)),
+  sand: () => sand(variantSeed(1, 2)),
   dirt: () => dirt(variantSeed(2, 1)),
   water: () => water(variantSeed(3, 1)),
   farm_field: () => field(variantSeed(4, 1)),

@@ -63,4 +63,15 @@ describe('townTileArt', () => {
     decode(buildingTile('temple'));
     decode(wallVariant(15, true));
   });
+
+  test('desert theme renders a sand ground; grassland default is unchanged', () => {
+    const grassDefault = tileBackground({ type: 'grass' }, {}, 2, 2);
+    const grassExplicit = tileBackground({ type: 'grass' }, {}, 2, 2, 'grassland');
+    const desertGround = tileBackground({ type: 'grass' }, {}, 2, 2, 'desert');
+    expect(grassExplicit).toBe(grassDefault);     // passing the default changes nothing
+    expect(desertGround).not.toBe(grassDefault);  // desert is visually distinct
+    expect(decode(desertGround)).toContain('e0c178'); // sand base colour
+    // buildings/walls sit on a sand base too for desert towns
+    expect(decode(tileBackground({ type: 'building', buildingType: 'house' }, {}, 1, 1, 'desert'))).toContain('e0c178');
+  });
 });

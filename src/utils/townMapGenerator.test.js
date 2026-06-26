@@ -110,4 +110,23 @@ describe('generateTownMap — uniform canvas + countryside padding', () => {
     expect(countType(generateTownMap('town', 'T', 'south', 1), 'wall')).toBeGreaterThan(0);
     expect(countType(generateTownMap('city', 'C', 'south', 1), 'wall')).toBeGreaterThan(0);
   });
+
+  describe('Phase 2b — desert town theming', () => {
+    test('grassland default is unchanged and carries the grassland theme', () => {
+      const a = generateTownMap('village', 'G', 'south', 777);
+      const b = generateTownMap('village', 'G', 'south', 777, false, 'NORTH_SOUTH', 'grassland');
+      expect(JSON.stringify(a.mapData)).toBe(JSON.stringify(b.mapData));
+      expect(a.theme).toBe('grassland');
+      expect(countType(a, 'farm_field')).toBeGreaterThan(0); // grassland villages still farm
+    });
+
+    test('desert town carries the theme, grows no farm fields, keeps buildings/ground', () => {
+      const desert = generateTownMap('village', 'D', 'south', 777, false, 'NORTH_SOUTH', 'desert');
+      expect(desert.theme).toBe('desert');
+      expect(countType(desert, 'farm_field')).toBe(0); // sand ground -> no green fields
+      // ground tiles stay type 'grass' so building/road placement logic is untouched
+      expect(countType(desert, 'building')).toBeGreaterThan(0);
+      expect(countType(desert, 'grass')).toBeGreaterThan(0);
+    });
+  });
 });

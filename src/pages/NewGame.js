@@ -113,6 +113,9 @@ const NewGame = () => {
   // selectedTemplate being reset to 'custom' when the player visits other tabs.
   const [templateLabel, setTemplateLabel] = useState(null);
   const [customNames, setCustomNames] = useState({ towns: [], mountains: [] });
+  // World biome theme for the generated map (Phase 2b). 'grassland' (default) reproduces
+  // the historical plains map; a themed template (e.g. desert) overrides it.
+  const [worldTheme, setWorldTheme] = useState('grassland');
 
   // AI Generation state
   const [isAiGenerating, setIsAiGenerating] = useState(false);
@@ -143,6 +146,7 @@ const NewGame = () => {
     setCampaignGoal(template.settings.campaignGoal || '');
     setMilestones(template.settings.milestones || []);
     setCustomNames(template.customNames || { towns: [], mountains: [] });
+    setWorldTheme(template.settings.theme || 'grassland');
   };
 
   const handleAiGenerateStory = async () => {
@@ -285,7 +289,7 @@ const NewGame = () => {
     // Auto-generate the world map if one wasn't built manually. Ready-Made
     // adventures skip the map step entirely, so this is the normal path for them.
     const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
-    const mapData = generatedMap || generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones));
+    const mapData = generatedMap || generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme);
 
     const templateName = templateLabel
       || (selectedTemplate === 'ai' ? 'AI Generated World'
@@ -312,7 +316,7 @@ const NewGame = () => {
         if (tile.poi === 'town' && tile.townName) {
           const townSize = tile.townSize || tile.poiType || 'village';
           const seed = parseInt(seedToUse) + (x * 1000) + (y * 10000);
-          const townMapData = generateTownMap(townSize, tile.townName, 'south', seed, tile.hasRiver, tile.riverDirection);
+          const townMapData = generateTownMap(townSize, tile.townName, 'south', seed, tile.hasRiver, tile.riverDirection, worldTheme);
 
           // Inject quest buildings if needed
           if (spawnResult.requiredBuildings?.[tile.townName]) {
@@ -346,6 +350,10 @@ const NewGame = () => {
       campaignGoal: derivedGoal,
       milestones: resolveMilestoneCoords(milestones, mapData),
       worldSeed: seedToUse,
+      // Biome theme + map-format version travel with the save (the map itself is a bare
+      // 2D array, so version/theme live on game_settings — see WORLD_BIOME_PLAN / CLAUDE.md).
+      theme: worldTheme,
+      mapVersion: 2,
       templateName,
       tier: campaignTier,
       levelRange: campaignLevelRange,
@@ -1336,7 +1344,7 @@ const NewGame = () => {
             onClick={() => {
               const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
               if (!worldSeed) setWorldSeed(seedToUse);
-              const newMap = generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones));
+              const newMap = generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme);
               setGeneratedMap(newMap);
               setShowMapPreview(true);
             }}

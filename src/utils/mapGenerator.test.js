@@ -133,4 +133,26 @@ describe('generateMapData', () => {
       });
     }
   });
+
+  describe('Phase 2b themed regions (desert)', () => {
+    it('grassland default/explicit is byte-identical to the legacy plains map', () => {
+      const legacy = generateMapData(10, 10, 4242);
+      const explicit = generateMapData(10, 10, 4242, {}, 'grassland');
+      expect(explicit).toEqual(legacy);
+    });
+
+    it('desert theme bases all dry land on the desert biome (never plains)', () => {
+      const tiles = generateMapData(10, 10, 4242, {}, 'desert').flat();
+      const land = tiles.filter((t) => t.biome !== 'water' && t.biome !== 'beach');
+      expect(land.length).toBeGreaterThan(0);
+      expect(land.every((t) => t.biome === 'desert')).toBe(true);
+      expect(tiles.some((t) => t.biome === 'plains')).toBe(false);
+    });
+
+    it('desert maps keep coast/beach, lakes, and a starting town', () => {
+      const tiles = generateMapData(10, 10, 4242, {}, 'desert').flat();
+      expect(tiles.some((t) => t.biome === 'water' || t.biome === 'beach')).toBe(true);
+      expect(tiles.some((t) => t.poi === 'town' && t.isStartingTown)).toBe(true);
+    });
+  });
 });

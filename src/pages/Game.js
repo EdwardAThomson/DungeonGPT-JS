@@ -145,7 +145,10 @@ const Game = () => {
   } = useGameSession(loadedConversation, setSettings, setSelectedProvider, setSelectedModel, stateGameSessionId);
 
   // Pass dummy/empty functions for now where we handle logic in Game.js wrapper
-  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache);
+  // Biome theme for lazily-generated town maps (Phase 2b). Falls back to the raw parsed
+  // settings (loaded saves) and finally 'grassland' so older saves are unaffected.
+  const mapTheme = settings?.theme || settingsObj?.theme || 'grassland';
+  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme);
 
   const interactionHook = useGameInteraction(
     loadedConversation,

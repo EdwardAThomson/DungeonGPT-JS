@@ -51,6 +51,13 @@ export const formatPartyInfo = (selectedHeroes = []) => {
   }).join(', ');
 };
 
+// Map a biome theme to a short region descriptor for the AI's setting context. Grassland
+// (the default) returns '' so existing narration prompts are unchanged.
+const REGION_THEME_DESCRIPTIONS = {
+  desert: ' The whole region is an arid desert of windswept sand, dunes, and scorching sun, with shade and water scarce.',
+};
+export const buildRegionThemeInfo = (theme) => REGION_THEME_DESCRIPTIONS[theme] || '';
+
 export const buildLocationInfo = ({ tile, coords, isNewArea }) => {
   let locationInfo = `Player has moved to coordinates (${coords.x}, ${coords.y}) in a ${tile.biome} biome.`;
   if (tile.poi === 'town' && tile.townName) {
@@ -97,7 +104,10 @@ export const composeMovementNarrativePrompt = ({
   const locationInfo = buildLocationInfo({ tile, coords, isNewArea });
   const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
   const milestonesInfo = formatCampaignMilestones(settings.milestones);
-  const gameContext = `Setting: ${settings.shortDescription}. Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
+  // Themed-region maps (Phase 2b): tell the model the whole region's biome so a desert
+  // map reads as desert. Grassland (default) adds nothing, keeping existing prompts intact.
+  const themeInfo = buildRegionThemeInfo(settings.theme);
+  const gameContext = `Setting: ${settings.shortDescription}.${themeInfo} Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
   const recentContext = includeRecentContext ? buildRecentAiContext(conversation) : '';
   const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary}${recentContext}\n\n${movementDescription}${ragContext}`;
 

@@ -201,6 +201,104 @@ export const storyTemplates = [
     },
 
     // ============================================================
+    // DESERT EXPEDITION (Phase 2b — first themed-region adventure)
+    // ============================================================
+    // Note: the top-level `theme` here is the campaign GENRE (reused for grouping),
+    // while `settings.theme` is the world BIOME theme that drives map/town/narration.
+    {
+        id: 'desert-expedition-t1',
+        theme: 'heroic-fantasy',
+        tier: 1,
+        levelRange: [1, 2],
+        name: 'Desert Expedition',
+        subtitle: 'The Sunscorched Road',
+        icon: '🏜️',
+        description: 'A caravan has vanished in the deep desert and a sandstorm cult stirs among the dunes. Cross the burning sands and end the threat.',
+        customNames: { towns: ['Sandreach', 'Dustmere', 'Oasis Karn', 'Suncradle'], mountains: ['The Scorched Bluffs'] },
+        settings: {
+            theme: 'desert',
+            shortDescription: 'The trading caravans out of Sandreach have stopped arriving, swallowed by the dunes. Survivors whisper of robed figures who command the sandstorms. Someone must brave the deep desert and uncover what stalks the Sunscorched Road.',
+            campaignGoal: 'Discover the fate of the lost caravans and defeat the leader of the sandstorm cult.',
+            milestones: [
+                {
+                    id: 1,
+                    text: 'Recover the lost caravan ledger from the Sandreach trading post',
+                    location: 'Sandreach',
+                    type: 'item',
+                    requires: [],
+                    trigger: { item: 'map_fragment', action: 'acquire' },
+                    spawn: { type: 'item', id: 'map_fragment', name: 'Caravan Ledger', location: 'Sandreach' },
+                    building: { type: 'warehouse', name: 'The Sandreach Caravanserai', location: 'Sandreach' },
+                    rewards: { xp: 25, gold: '1d6', items: [] },
+                    minLevel: null
+                },
+                {
+                    id: 2,
+                    text: 'Win the trust of the well-keeper at Oasis Karn',
+                    location: 'Oasis Karn',
+                    type: 'narrative',
+                    requires: [],
+                    trigger: null,
+                    spawn: { type: 'npc', id: 'well_keeper', name: 'Keeper Najwa', location: 'Oasis Karn', role: 'Merchant', personality: 'weathered, watchful, fiercely protective of the oasis water' },
+                    building: { type: 'inn', name: 'The Last Drop', location: 'Oasis Karn' },
+                    rewards: { xp: 25, gold: '1d6', items: ['rations'] },
+                    minLevel: null
+                },
+                {
+                    id: 3,
+                    text: 'Find the cult\'s hideout among the Scorched Bluffs',
+                    location: 'The Scorched Bluffs',
+                    type: 'location',
+                    requires: [1, 2],
+                    trigger: { location: 'sandstorm_hideout', action: 'visit' },
+                    spawn: { type: 'poi', id: 'sandstorm_hideout', name: 'Sandstorm Hideout', location: 'The Scorched Bluffs' },
+                    building: null,
+                    rewards: { xp: 50, gold: '1d10', items: [] },
+                    minLevel: null
+                },
+                {
+                    id: 4,
+                    text: 'Defeat the Sandstorm Cult Leader',
+                    location: 'The Scorched Bluffs',
+                    type: 'combat',
+                    requires: [3],
+                    trigger: { enemy: 'sandstorm_cultist', action: 'defeat' },
+                    spawn: { type: 'enemy', id: 'sandstorm_cultist', name: 'Sandstorm Cult Leader', location: 'The Scorched Bluffs' },
+                    building: null,
+                    encounter: {
+                        name: 'Sandstorm Cult Leader',
+                        icon: '🌪️',
+                        image: '/assets/icons/items/ritual_dagger.webp',
+                        encounterTier: 'boss',
+                        difficulty: 'medium',
+                        multiRound: true,
+                        enemyHP: 30,
+                        suggestedActions: [
+                            { label: 'Fight', skill: 'Athletics', description: 'Charge through the stinging sand' },
+                            { label: 'Read the Wind', skill: 'Survival', description: 'Use the ledger\'s notes to time the storm\'s lulls' },
+                            { label: 'Sever the Ritual', skill: 'Arcana', description: 'Disrupt the chant that summons the sandstorm' }
+                        ],
+                        consequences: {
+                            criticalSuccess: 'The storm collapses as the leader falls; the dunes fall silent.',
+                            success: 'After a punishing fight in the swirling sand, the cult leader is defeated.',
+                            failure: 'A wall of sand batters you, but you keep your footing.',
+                            criticalFailure: 'The storm engulfs you. You stagger clear, half-buried and gasping.'
+                        },
+                        rewards: { xp: 75, gold: '2d10', items: ['rusty_dagger'] }
+                    },
+                    rewards: { xp: 50, gold: '1d10', items: [] },
+                    minLevel: 2
+                }
+            ],
+            grimnessLevel: 'Neutral',
+            darknessLevel: 'Bright',
+            magicLevel: 'Low Magic',
+            technologyLevel: 'Medieval',
+            responseVerbosity: 'Descriptive'
+        }
+    },
+
+    // ============================================================
     // GRIMDARK SURVIVAL
     // ============================================================
     {

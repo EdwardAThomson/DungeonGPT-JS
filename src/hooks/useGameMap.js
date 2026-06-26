@@ -7,7 +7,7 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-map');
 
-const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null, requiredBuildings = null, initialTownMapsCache = null) => {
+const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null, requiredBuildings = null, initialTownMapsCache = null, mapTheme = 'grassland') => {
     // --- State Initialization --- //
 
     const [mapAndPosition] = useState(() => {
@@ -193,7 +193,8 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                     'south',
                     seed,
                     currentTownTile.hasRiver,
-                    currentTownTile.riverDirection
+                    currentTownTile.riverDirection,
+                    mapTheme
                 );
 
                 // Inject quest buildings if needed
@@ -229,7 +230,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 logger.info('Generating new town map', townName);
                 const rawSeed = worldSeed ? (parseInt(worldSeed) + ((townTile.x || 0) * 1000) + ((townTile.y || 0) * 10000)) : (loadedConversation?.sessionId || Math.floor(Math.random() * 1000000));
                 const seed = Number.isFinite(rawSeed) ? rawSeed : Math.floor(Math.random() * 1000000);
-                townMapData = generateTownMap(townSize, townName, 'south', seed, townTile.hasRiver, townTile.riverDirection);
+                townMapData = generateTownMap(townSize, townName, 'south', seed, townTile.hasRiver, townTile.riverDirection, mapTheme);
 
                 // Inject quest buildings if needed
                 if (requiredBuildings?.[townName]) {
@@ -320,7 +321,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             }
 
             logger.debug('Using town seed', seed);
-            townMapData = generateTownMap(townSize, townName, 'south', seed, currentTile.hasRiver, currentTile.riverDirection);
+            townMapData = generateTownMap(townSize, townName, 'south', seed, currentTile.hasRiver, currentTile.riverDirection, mapTheme);
 
             // Inject quest buildings if needed
             if (requiredBuildings?.[townName]) {
