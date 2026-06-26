@@ -14,21 +14,31 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         if (loadedConversation?.world_map && loadedConversation?.player_position) {
             const map = loadedConversation.world_map;
 
-            // --- MIGRATION: Patch old saves missing x/y on tiles ---
+            // --- MIGRATION: patch old saves ---
             logger.debug('Checking map data compatibility');
-            let migrationCount = 0;
+            let coordPatch = 0;
+            let biomePatch = 0;
             for (let y = 0; y < map.length; y++) {
                 for (let x = 0; x < map[y].length; x++) {
-                    if (map[y][x].x === undefined || map[y][x].y === undefined) {
-                        map[y][x].x = x;
-                        map[y][x].y = y;
-                        migrationCount++;
+                    const t = map[y][x];
+                    // (a) tiles missing x/y coordinates
+                    if (t.x === undefined || t.y === undefined) {
+                        t.x = x;
+                        t.y = y;
+                        coordPatch++;
+                    }
+                    // (b) very old maps stored forest/mountains as a *biome*; the renderer
+                    // now expects them as a POI on plains (unknown biomes fall back to plains
+                    // with no terrain sprite, which would otherwise lose that art).
+                    if (!t.poi && (t.biome === 'forest' || t.biome === 'mountains')) {
+                        t.poi = t.biome === 'forest' ? 'forest' : 'mountain';
+                        t.biome = 'plains';
+                        biomePatch++;
                     }
                 }
             }
-            if (migrationCount > 0) {
-                logger.info(`Patched ${migrationCount} tiles with coordinates`);
-            }
+            if (coordPatch > 0) logger.info(`Patched ${coordPatch} tiles with coordinates`);
+            if (biomePatch > 0) logger.info(`Converted ${biomePatch} legacy forest/mountain biome tiles to POIs`);
 
             // Legacy upgrade: add hills/ruins/cave POIs to maps generated before they
             // existed (idempotent — no-op once present). Persists on the next autosave.
