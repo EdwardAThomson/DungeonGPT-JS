@@ -3,7 +3,7 @@ import { resolveProfilePicture } from '../utils/assetHelper';
 import { biomeBackground, poiSprite } from '../utils/worldTileArt';
 import WorldMapLabels from './WorldMapLabels';
 
-const TILE = 40;
+const TILE = 48; // ~20% larger than the original 40px for readability
 
 // Beach offset: water sits on one edge of the tile, so overlays/sprites/marker are
 // nudged toward the land side. beachDirection: 0 = water North, 1 = East, 2 = South, 3 = West.

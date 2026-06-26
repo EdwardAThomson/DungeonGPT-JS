@@ -31,6 +31,14 @@ describe('worldTileArt', () => {
     expect(set.size).toBeGreaterThan(1);
   });
 
+  test('forest and hills POIs are biome-aware (desert / snow differ from temperate)', () => {
+    const at = (poi, biome) => poiSprite({ poi, biome, x: 3, y: 4 });
+    // forest: temperate vs desert (cacti) vs snow (snow-laden) all differ
+    expect(new Set([at('forest', 'plains'), at('forest', 'desert'), at('forest', 'snow')]).size).toBe(3);
+    // hills: temperate vs desert (sand) vs snow (snow-capped) all differ
+    expect(new Set([at('hills', 'plains'), at('hills', 'desert'), at('hills', 'snow')]).size).toBe(3);
+  });
+
   test('beach direction changes the geometry', () => {
     const n = decode(biomeBackground({ biome: 'beach', beachDirection: 0 }));
     const e = decode(biomeBackground({ biome: 'beach', beachDirection: 1 }));

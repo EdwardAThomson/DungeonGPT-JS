@@ -51,10 +51,22 @@ const WorldMapArtTest = () => {
   const [showPois, setShowPois] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
+  const [theme, setTheme] = useState('grassland');
 
-  const world = useMemo(() => generateMapData(dim, Math.round(dim * 0.7), seed), [dim, seed]);
+  // Pass the theme to the real generator (desert is wired end-to-end). For themes whose
+  // generation isn't wired yet (snow/swamp/woodland), override the land base biome here so
+  // the biome art is still previewable — clearly a debug-only preview, not real generation.
+  const THEME_BIOME = { desert: 'desert', snow: 'snow', swamp: 'swamp', woodland: 'woodland' };
+  const world = useMemo(() => {
+    const m = generateMapData(dim, Math.round(dim * 0.7), seed, {}, theme);
+    const biome = THEME_BIOME[theme];
+    if (biome) m.flat().forEach((t) => { if (t.biome === 'plains') t.biome = biome; });
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dim, seed, theme]);
   const heading = { fontSize: 14, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' };
   const cols = world[0].length;
+  const THEMES = ['grassland', 'desert', 'snow', 'swamp', 'woodland'];
 
   // Live POI tally — distinguishes "not generated" from "not rendered" while iterating.
   const poiCounts = useMemo(() => {
@@ -96,6 +108,12 @@ const WorldMapArtTest = () => {
       <section>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
           <h3 style={{ ...heading, margin: 0 }}>Generated world</h3>
+          <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+            theme{' '}
+            <select value={theme} onChange={(e) => setTheme(e.target.value)}>
+              {THEMES.map((t) => <option key={t} value={t}>{t}{t === 'desert' || t === 'grassland' ? '' : ' (preview)'}</option>)}
+            </select>
+          </label>
           <button className="secondary-button" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setSeed(Math.floor(Math.random() * 100000))}>🎲 reseed</button>
           <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>size <input type="range" min="12" max="32" step="2" value={dim} onChange={(e) => setDim(Number(e.target.value))} /> {dim}×{Math.round(dim * 0.7)}</label>
           <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>zoom <input type="range" min="0.6" max="2" step="0.1" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} /></label>

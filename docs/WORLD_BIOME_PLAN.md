@@ -69,6 +69,19 @@ theme. The theme rides along with the settings the game is created from.
 - **2c — theme-tag templates + author themed adventures**, pass theme into narration, then
   fan out to the remaining themes (snow, swamp, …).
 
+## Revisited (2026-06-26) — playtest of themed previews
+- **Whole-region themes that work: desert & snow.** Deserts and tundra read naturally as a
+  uniform region. Their POIs are now **biome-aware** (`poiSprite` branches on `tile.biome`):
+  desert → sand-dune hills + cacti; snow → snow-capped hills + snow-laden pines. Mountains
+  already carry snow caps. (Town decorations are still grassland — a 2c follow-up.)
+- **Woodland & swamp should NOT be whole-region.** An all-swamp map isn't fun and an all-
+  woodland map wants grass clearings. These belong as **patches inside a grassland map**,
+  which needs the in-map biome-clustering algorithm (model A) we deferred. So: keep them out
+  of the live theme set; revisit as a clustering pass (a grassland base with seeded
+  forest/marsh blobs + transitions), not a base-biome swap.
+- Implication: themed-region (model B) is right for desert/snow; woodland/swamp move to a
+  future **model-A clustering** track.
+
 ## Open questions
 - Desert/snow towns: keep farmland (oasis/greenhouse) or drop it? Adobe vs stone palette?
 - Do themed maps need theme-appropriate **encounter tables**, or is that purely narration?

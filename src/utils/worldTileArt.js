@@ -9,7 +9,7 @@
 const C = {
   plains: '#7fb86a', plainsDark: '#5f9a4c', plainsLight: '#9bcf82',
   water: '#3f7cc2', waterLight: '#5a93d6', foam: '#bcd8f5',
-  sand: '#e6d29a', sandDark: '#cdb878',
+  sand: '#dccfac', sandDark: '#c5b78f',
   rock: '#8a8278', rockDark: '#6f685f', snow: '#f2f2f2',
   trunk: '#6b4a2b', leafLo: '#2f7d3f', leafHi: '#3a924c',
   desert: '#e0c178', desertDark: '#cda85f',
@@ -159,14 +159,19 @@ const snow = (seed) => {
 // green palettes so trees aren't all the same shade
 const GREENS = [[C.leafLo, C.leafHi], ['#357a3a', '#46a052'], ['#2b6e46', '#3a8a58'], ['#4a8a3a', '#5fa84a']];
 
+// Dark outline so tree/mountain peaks read against pale (snow) biomes.
+const EDGE = '#2b2b2b';
+const outline = (pts) => `<polygon points='${pts}' fill='none' stroke='${EDGE}' stroke-width='1.1' stroke-linejoin='round'/>`;
+const ES = `stroke='${EDGE}' stroke-width='0.7' stroke-linejoin='round'`;
+
 const pineT = (cx, cy, s, lo = C.leafLo, hi = C.leafHi) =>
   `<rect x='${(cx - 1).toFixed(1)}' y='${(cy + s * 0.5).toFixed(1)}' width='2' height='${(s * 0.5).toFixed(1)}' fill='${C.trunk}'/>` +
-  `<polygon points='${cx},${(cy - s).toFixed(1)} ${(cx - s * 0.72).toFixed(1)},${(cy + s * 0.45).toFixed(1)} ${(cx + s * 0.72).toFixed(1)},${(cy + s * 0.45).toFixed(1)}' fill='${lo}'/>` +
-  `<polygon points='${cx},${(cy - s * 1.35).toFixed(1)} ${(cx - s * 0.55).toFixed(1)},${cy} ${(cx + s * 0.55).toFixed(1)},${cy}' fill='${hi}'/>`;
+  `<polygon points='${cx},${(cy - s).toFixed(1)} ${(cx - s * 0.72).toFixed(1)},${(cy + s * 0.45).toFixed(1)} ${(cx + s * 0.72).toFixed(1)},${(cy + s * 0.45).toFixed(1)}' fill='${lo}' ${ES}/>` +
+  `<polygon points='${cx},${(cy - s * 1.35).toFixed(1)} ${(cx - s * 0.55).toFixed(1)},${cy} ${(cx + s * 0.55).toFixed(1)},${cy}' fill='${hi}' ${ES}/>`;
 
 const roundT = (cx, cy, s, lo = C.leafLo, hi = C.leafHi) =>
   `<rect x='${(cx - 1).toFixed(1)}' y='${(cy + s * 0.3).toFixed(1)}' width='2' height='${(s * 0.6).toFixed(1)}' fill='${C.trunk}'/>` +
-  `<circle cx='${cx}' cy='${(cy - s * 0.1).toFixed(1)}' r='${(s * 0.72).toFixed(1)}' fill='${lo}'/>` +
+  `<circle cx='${cx}' cy='${(cy - s * 0.1).toFixed(1)}' r='${(s * 0.72).toFixed(1)}' fill='${lo}' ${ES}/>` +
   `<circle cx='${(cx - s * 0.28).toFixed(1)}' cy='${(cy - s * 0.38).toFixed(1)}' r='${(s * 0.42).toFixed(1)}' fill='${hi}'/>`;
 
 // single tree (pine) for town clusters
@@ -210,23 +215,27 @@ const MOUNTAIN_VARIANTS = [
   // single peak
   `<polygon points='20,4 36,34 4,34' fill='${C.rock}'/>` +
   `<polygon points='20,4 36,34 24,34' fill='${C.rockDark}'/>` +
-  `<polygon points='20,4 27,17 13,17' fill='${C.snow}'/>`,
+  `<polygon points='20,4 27,17 13,17' fill='${C.snow}'/>` +
+  outline('20,4 36,34 4,34'),
   // twin peaks
   `<polygon points='13,9 24,34 2,34' fill='${C.rock}'/>` +
   `<polygon points='27,6 38,34 16,34' fill='${C.rockDark}'/>` +
   `<polygon points='27,6 33,18 21,18' fill='${C.snow}'/>` +
-  `<polygon points='13,9 18,19 8,19' fill='${C.snow}'/>`,
+  `<polygon points='13,9 18,19 8,19' fill='${C.snow}'/>` +
+  outline('13,9 24,34 2,34') + outline('27,6 38,34 16,34'),
   // wide ridge (edge-to-edge -> connects with neighbours)
   `<polygon points='0,35 10,16 20,27 30,13 40,35' fill='${C.rock}'/>` +
   `<polygon points='20,27 30,13 40,35' fill='${C.rockDark}'/>` +
   `<polygon points='10,16 14,23 6,23' fill='${C.snow}'/>` +
-  `<polygon points='30,13 34,21 26,21' fill='${C.snow}'/>`,
+  `<polygon points='30,13 34,21 26,21' fill='${C.snow}'/>` +
+  `<polyline points='0,35 10,16 20,27 30,13 40,35' fill='none' stroke='${EDGE}' stroke-width='1.1' stroke-linejoin='round'/>`,
   // peak with a foothill
   `<polygon points='23,6 38,34 8,34' fill='${C.rock}'/>` +
   `<polygon points='23,6 38,34 27,34' fill='${C.rockDark}'/>` +
   `<polygon points='23,6 29,18 17,18' fill='${C.snow}'/>` +
   `<polygon points='9,21 19,34 0,34' fill='${C.rock}'/>` +
-  `<polygon points='9,21 19,34 12,34' fill='${C.rockDark}'/>`,
+  `<polygon points='9,21 19,34 12,34' fill='${C.rockDark}'/>` +
+  outline('23,6 38,34 8,34') + outline('9,21 19,34 0,34'),
 ];
 const mountain = (v = 0) => wrap(MOUNTAIN_VARIANTS[v % MOUNTAIN_VARIANTS.length]);
 
@@ -245,6 +254,55 @@ const HILL_VARIANTS = [
   hump(25, 31, 14, 12) + hump(9, 34, 7, 5) + tuft(22, 23),                              // big + foothill
 ];
 const hills = (v = 0) => wrap(HILL_VARIANTS[v % HILL_VARIANTS.length]);
+
+// --- theme-aware POI variants -------------------------------------------------
+// poiSprite picks these by tile.biome: desert → sand dunes + cacti, snow → snow-capped
+// hills + snow-laden pines. (Temperate keeps the green forest/hills above.)
+const shadedHump = (cx, by, rx, ry, pal) =>
+  `<ellipse cx='${cx}' cy='${by}' rx='${rx}' ry='${ry}' fill='${pal.lo}'/>` +
+  `<ellipse cx='${cx}' cy='${(by - ry * 0.2).toFixed(1)}' rx='${(rx * 0.9).toFixed(1)}' ry='${(ry * 0.8).toFixed(1)}' fill='${pal.mid}'/>` +
+  `<ellipse cx='${(cx - rx * 0.32).toFixed(1)}' cy='${(by - ry * 0.55).toFixed(1)}' rx='${(rx * 0.4).toFixed(1)}' ry='${(ry * 0.3).toFixed(1)}' fill='${pal.hi}'/>`;
+const hillVariantsFor = (pal) => [
+  shadedHump(20, 31, 16, 12, pal),
+  shadedHump(12, 32, 11, 9, pal) + shadedHump(28, 31, 12, 10, pal),
+  shadedHump(9, 33, 8, 6, pal) + shadedHump(20, 31, 10, 8, pal) + shadedHump(31, 33, 8, 6, pal),
+  shadedHump(25, 31, 14, 12, pal) + shadedHump(9, 34, 7, 5, pal),
+];
+const SAND_HILL_VARIANTS = hillVariantsFor({ lo: '#c5b78f', mid: '#dccfac', hi: '#ece1c2' });
+const SNOW_HILL_VARIANTS = hillVariantsFor({ lo: '#bcc7d2', mid: '#dde6ec', hi: '#ffffff' });
+const sandHills = (v = 0) => wrap(SAND_HILL_VARIANTS[v % SAND_HILL_VARIANTS.length]);
+const snowHills = (v = 0) => wrap(SNOW_HILL_VARIANTS[v % SNOW_HILL_VARIANTS.length]);
+
+// snow-laden pine (darker green with snow on the boughs)
+const snowPine = (cx, cy, s) =>
+  `<rect x='${(cx - 1).toFixed(1)}' y='${(cy + s * 0.5).toFixed(1)}' width='2' height='${(s * 0.5).toFixed(1)}' fill='${C.trunk}'/>` +
+  `<polygon points='${cx},${(cy - s).toFixed(1)} ${(cx - s * 0.72).toFixed(1)},${(cy + s * 0.45).toFixed(1)} ${(cx + s * 0.72).toFixed(1)},${(cy + s * 0.45).toFixed(1)}' fill='#3f6e52' ${ES}/>` +
+  `<polygon points='${cx},${(cy - s * 1.35).toFixed(1)} ${(cx - s * 0.55).toFixed(1)},${cy} ${(cx + s * 0.55).toFixed(1)},${cy}' fill='#4a805f' ${ES}/>` +
+  `<polygon points='${cx},${(cy - s * 1.35).toFixed(1)} ${(cx - s * 0.34).toFixed(1)},${(cy - s * 0.55).toFixed(1)} ${(cx + s * 0.34).toFixed(1)},${(cy - s * 0.55).toFixed(1)}' fill='#ffffff'/>` +
+  `<polygon points='${cx},${(cy - s * 0.62).toFixed(1)} ${(cx - s * 0.5).toFixed(1)},${(cy + s * 0.32).toFixed(1)} ${(cx + s * 0.5).toFixed(1)},${(cy + s * 0.32).toFixed(1)}' fill='#ffffff' opacity='0.7'/>`;
+const snowForest = (v = 0) => {
+  const r = rng(v + 21);
+  const slots = [[12, 18], [28, 20], [19, 24], [9, 28], [30, 29], [20, 31]];
+  const n = 2 + Math.floor(r() * 3);
+  let s = '';
+  for (let i = 0; i < n; i++) { const [bx, by] = slots[i]; s += snowPine(bx + (Math.floor(r() * 5) - 2), by, 6 + Math.floor(r() * 4)); }
+  return wrap(s);
+};
+
+// desert saguaro cactus
+const cactus = (cx, by, h) =>
+  `<rect x='${(cx - 1.7).toFixed(1)}' y='${(by - h).toFixed(1)}' width='3.4' height='${h.toFixed(1)}' rx='1.7' fill='#4e8b4a'/>` +
+  `<rect x='${(cx - 1.7).toFixed(1)}' y='${(by - h).toFixed(1)}' width='1.3' height='${h.toFixed(1)}' rx='0.6' fill='#5fa05a'/>` +
+  `<path d='M${(cx - 1.7).toFixed(1)} ${(by - h * 0.55).toFixed(1)} h-3 v-${(h * 0.32).toFixed(1)}' stroke='#4e8b4a' stroke-width='2.8' fill='none' stroke-linecap='round'/>` +
+  `<path d='M${(cx + 1.7).toFixed(1)} ${(by - h * 0.42).toFixed(1)} h3 v-${(h * 0.26).toFixed(1)}' stroke='#4e8b4a' stroke-width='2.8' fill='none' stroke-linecap='round'/>`;
+const desertForest = (v = 0) => {
+  const r = rng(v + 22);
+  const slots = [[13, 31], [26, 32], [20, 29], [9, 30]];
+  const n = 2 + Math.floor(r() * 2);
+  let s = '';
+  for (let i = 0; i < n; i++) { const [bx, by] = slots[i]; s += cactus(bx + (Math.floor(r() * 4) - 2), by, 12 + Math.floor(r() * 6)); }
+  return wrap(s);
+};
 
 // a craggy rock outcrop with a dark cave mouth (inner depth) and a couple of boulders
 const cave = () => wrap(
@@ -341,9 +399,19 @@ export function biomeBackground(tile, x = 0, y = 0) {
 export function poiSprite(tile) {
   let key, build;
   if (tile.poi === 'town') { key = `town|${tile.townSize || 'village'}`; build = () => townSprite(tile.townSize || 'village'); }
-  else if (tile.poi === 'forest') { const v = variantSeed(tile.x || 0, tile.y || 0) % 8; key = `forest|${v}`; build = () => forest(v); }
+  else if (tile.poi === 'forest') {
+    const v = variantSeed(tile.x || 0, tile.y || 0) % 8;
+    if (tile.biome === 'desert') { key = `forest-d|${v}`; build = () => desertForest(v); }
+    else if (tile.biome === 'snow') { key = `forest-s|${v}`; build = () => snowForest(v); }
+    else { key = `forest|${v}`; build = () => forest(v); }
+  }
   else if (tile.poi === 'mountain') { const v = variantSeed(tile.x || 0, tile.y || 0) % MOUNTAIN_VARIANTS.length; key = `mountain|${v}`; build = () => mountain(v); }
-  else if (tile.poi === 'hills') { const v = variantSeed(tile.x || 0, tile.y || 0) % HILL_VARIANTS.length; key = `hills|${v}`; build = () => hills(v); }
+  else if (tile.poi === 'hills') {
+    const v = variantSeed(tile.x || 0, tile.y || 0) % HILL_VARIANTS.length;
+    if (tile.biome === 'desert') { key = `hills-d|${v}`; build = () => sandHills(v); }
+    else if (tile.biome === 'snow') { key = `hills-s|${v}`; build = () => snowHills(v); }
+    else { key = `hills|${v}`; build = () => hills(v); }
+  }
   else if (tile.poi === 'cave_entrance') { key = 'cave'; build = cave; }
   else if (tile.poi === 'ruins') { key = 'ruins'; build = ruins; }
   else if (tile.milestonePoi) { key = 'milestone'; build = milestone; }

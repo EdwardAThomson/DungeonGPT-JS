@@ -6,7 +6,7 @@ import { resolveProfilePicture } from '../utils/assetHelper';
 
 const logger = createLogger('town-map-display');
 
-const TILE = 30;
+const TILE = 36; // ~20% larger than the original 30px for readability
 
 // Decorations the tileset doesn't draw itself are overlaid as emoji (buildings/terrain
 // are fully rendered by the tileset, so only POI markers ride on top). 'well' is kept
