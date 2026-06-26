@@ -108,4 +108,7 @@ docs/ambient_soundscapes.md
 .dev.vars*
 !.dev.vars.example
 
-
+# Competitor analysis (local-only, not for the public repo)
+COMPETITORS.md
+ai-game-master-competitor-analysis.md
+more_competitors.txt
