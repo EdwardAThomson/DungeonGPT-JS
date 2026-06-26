@@ -330,6 +330,43 @@
   color: var(--text);
 }
 
+/* Guest chat box: a transparent layer over the disabled input turns a click into a
+   high-intent sign-in prompt (disabled inputs don't reliably emit events). */
+.user-input-wrap {
+  position: relative;
+  flex-grow: 1;
+  display: flex;
+}
+
+.user-input-wrap .user-input {
+  flex-grow: 1;
+}
+
+.guest-ai-overlay {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.guest-ai-prompt {
+  max-width: 420px;
+  text-align: center;
+}
+
+.guest-ai-prompt-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.guest-ai-prompt-actions .primary-button {
+  text-decoration: none;
+}
+
 .user-input {
   flex-grow: 1;
   margin-bottom: 0;

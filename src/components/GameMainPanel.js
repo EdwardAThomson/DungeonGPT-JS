@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import SafeMarkdownMessage from './SafeMarkdownMessage';
 
@@ -35,6 +35,8 @@ const GameMainPanel = ({
   isMapLoaded,
   lastPrompt
 }) => {
+  // High-intent conversion prompt: fired when a guest reaches for the gated AI chat.
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   return (
     <div className="game-main">
       <div className="game-top">
@@ -100,20 +102,31 @@ const GameMainPanel = ({
       <div className="game-lower-section">
         <form onSubmit={aiAvailable ? onSubmit : (e) => e.preventDefault()}>
           <label htmlFor="user-action-input" className="sr-only">Your action</label>
-          <textarea
-            id="user-action-input"
-            value={userInput}
-            onChange={onInputChange}
-            placeholder={
-              !aiAvailable
-                ? "Sign in to type actions and unlock the AI Dungeon Master…"
-                : hasAdventureStarted ? "Type your action..." : "Click 'Start Adventure' above..."
-            }
-            rows="4"
-            className="user-input"
-            disabled={!aiAvailable || !hasAdventureStarted || isLoading}
-            aria-label="Type your action or command"
-          />
+          <div className="user-input-wrap">
+            <textarea
+              id="user-action-input"
+              value={userInput}
+              onChange={onInputChange}
+              placeholder={
+                !aiAvailable
+                  ? "Sign in to type actions and unlock the AI Dungeon Master…"
+                  : hasAdventureStarted ? "Type your action..." : "Click 'Start Adventure' above..."
+              }
+              rows="4"
+              className="user-input"
+              disabled={!aiAvailable || !hasAdventureStarted || isLoading}
+              aria-label="Type your action or command"
+            />
+            {/* Guests can't type to the DM — a click here is peak intent, so prompt to sign in. */}
+            {!aiAvailable && (
+              <button
+                type="button"
+                className="guest-ai-overlay"
+                onClick={() => setShowAuthPrompt(true)}
+                aria-label="Sign in to unlock the AI Dungeon Master"
+              />
+            )}
+          </div>
           {aiAvailable ? (
             <button type="submit" className="game-send-button" disabled={!hasAdventureStarted || !userInput.trim() || isLoading}>
               {isLoading ? '...' : '↑ Send'}
@@ -126,6 +139,19 @@ const GameMainPanel = ({
           <p className="info">AI responses may not always be accurate or coherent.</p>
         ) : (
           <p className="info guest-ai-info">✨ <strong>The AI Dungeon Master is resting.</strong> Keep exploring and fighting as a guest — sign in to type free-form actions and unlock full AI narration.</p>
+        )}
+
+        {showAuthPrompt && (
+          <div className="modal-overlay" onClick={() => setShowAuthPrompt(false)}>
+            <div className="modal-content guest-ai-prompt" onClick={(e) => e.stopPropagation()}>
+              <h2>✨ Unlock the AI Dungeon Master</h2>
+              <p>Sign in to type free-form actions and get live AI narration — and your adventures save to your account so you can keep playing across devices.</p>
+              <div className="guest-ai-prompt-actions">
+                <Link to="/login" className="primary-button">Sign in</Link>
+                <button type="button" className="secondary-button" onClick={() => setShowAuthPrompt(false)}>Maybe later</button>
+              </div>
+            </div>
+          </div>
         )}
 
         {showDebugInfo && (
