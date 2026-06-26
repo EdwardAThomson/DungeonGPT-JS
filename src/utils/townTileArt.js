@@ -21,13 +21,21 @@ const C = {
   keep: '#76706a', keepLight: '#938c84', keepDark: '#564f49',
 };
 
-// roof colours keyed loosely by building purpose
+// roof colours keyed loosely by building purpose — kept distinct for readability
 const ROOFS = {
-  house: '#9c4a3c', inn: '#b5762d', tavern: '#b5762d', shop: '#3f7d6e',
-  market: '#3f7d6e', temple: '#c9b04a', guild: '#5a6fae', bank: '#c9b04a',
-  barracks: '#6b6f76', manor: '#6b6f76', keep: '#6b6f76', blacksmith: '#5a5550',
-  foundry: '#5a5550', barn: '#8a5a32', warehouse: '#8a5a32',
-  archives: '#5a6fae', library: '#5a6fae', alchemist: '#3f7d6e',
+  house: '#9c4a3c',      // brick red
+  manor: '#8a5273',      // noble plum
+  keep: '#6b6f76',       // slate (tall tower)
+  barracks: '#566069',   // darker military slate
+  inn: '#b5762d', tavern: '#a05a36',  // amber / brown
+  shop: '#3f7d6e',       // teal
+  market: '#cf8a3a',     // market orange
+  temple: '#c9b04a',     // temple gold
+  bank: '#bdb39a',       // pale stone
+  guild: '#5a6fae', archives: '#4f63a0', library: '#4f63a0', // blues
+  blacksmith: '#5a5550', foundry: '#4f4a45',                 // dark forge
+  barn: '#8a5a32', warehouse: '#7a5230',                     // timber browns
+  alchemist: '#7a5a9c',  // arcane purple
 };
 
 // --- helpers -----------------------------------------------------------------
@@ -190,13 +198,26 @@ const SHAPES = {
     `<rect x='4' y='11' width='24' height='4' fill='${shade(r, 1.12)}'/>` +
     `<rect x='10' y='17' width='12' height='9' fill='${shade(r, 0.5)}'/>` +
     `<path d='M10 17 L22 26 M22 17 L10 26' stroke='${shade(r, 1.25)}' stroke-width='1'/>`,
-  // smithy: tall smoking chimney
+  // blacksmith: single tall smoking chimney + an anvil out front
   smithy: (r) =>
     `<rect x='7' y='12' width='15' height='14' rx='1' fill='${r}'/>${hi}` +
     `<rect x='22' y='5' width='4' height='11' fill='${shade(r, 0.5)}'/>` +
     `<circle cx='24' cy='4' r='2.2' fill='#9a9a9a' opacity='0.7'/>` +
     `<circle cx='26.5' cy='1.5' r='1.6' fill='#aaaaaa' opacity='0.6'/>` +
-    door(r, 11, 5),
+    door(r, 8, 4) +
+    `<rect x='15' y='20' width='6' height='1.8' rx='0.4' fill='#37343a'/>` +
+    `<rect x='17' y='21.8' width='2' height='2.4' fill='#37343a'/>`,
+  // foundry: wide industrial hall, twin chimneys, more smoke, a molten furnace glow
+  foundry: (r) =>
+    `<rect x='5' y='13' width='22' height='14' rx='1' fill='${r}'/>` +
+    `<rect x='5' y='13' width='22' height='2.2' fill='#ffffff' opacity='0.12'/>` +
+    `<rect x='7' y='4' width='4' height='10' fill='${shade(r, 0.5)}'/>` +
+    `<rect x='21' y='4' width='4' height='10' fill='${shade(r, 0.5)}'/>` +
+    `<circle cx='9' cy='3' r='2.1' fill='#9a9a9a' opacity='0.7'/>` +
+    `<circle cx='23' cy='3' r='2.1' fill='#9a9a9a' opacity='0.7'/>` +
+    `<circle cx='11' cy='1' r='1.5' fill='#aaaaaa' opacity='0.55'/>` +
+    `<rect x='13' y='20' width='6' height='6' rx='0.5' fill='#e8923a'/>` +
+    `<rect x='14.5' y='22' width='3' height='4' fill='#ffd27a'/>`,
   // temple: peaked roof topped with a cross
   temple: (r) =>
     `<rect x='9' y='13' width='14' height='13' rx='1' fill='${shade(r, 0.82)}'/>` +
@@ -212,46 +233,107 @@ const SHAPES = {
     `<rect x='13' y='15' width='2' height='9' fill='${shade(r, 0.68)}'/>` +
     `<rect x='17' y='15' width='2' height='9' fill='${shade(r, 0.68)}'/>` +
     `<rect x='21' y='15' width='2' height='9' fill='${shade(r, 0.68)}'/>`,
-  // fortified keep: crenellated top + corner tower
-  keep: (r) =>
-    `<rect x='8' y='10' width='3' height='3' fill='${r}'/>` +
-    `<rect x='14.5' y='10' width='3' height='3' fill='${r}'/>` +
-    `<rect x='21' y='10' width='3' height='3' fill='${r}'/>` +
-    `<rect x='8' y='12' width='16' height='14' rx='1' fill='${r}'/>${hi}` +
-    `<circle cx='23' cy='25' r='3.6' fill='${shade(r, 0.85)}'/>` +
-    door(r, 14, 4),
-  // alchemist: domed roof with a finial
+  // barracks: low, wide, crenellated military block
+  fortified: (r) =>
+    `<rect x='6' y='10' width='3' height='3' fill='${r}'/>` +
+    `<rect x='11.5' y='10' width='3' height='3' fill='${r}'/>` +
+    `<rect x='17.5' y='10' width='3' height='3' fill='${r}'/>` +
+    `<rect x='23' y='10' width='3' height='3' fill='${r}'/>` +
+    `<rect x='6' y='12' width='20' height='14' rx='1' fill='${r}'/>` +
+    `<rect x='6' y='12' width='20' height='2.2' fill='#ffffff' opacity='0.12'/>` +
+    `<rect x='6' y='18' width='20' height='1.6' fill='${shade(r, 0.7)}'/>` +
+    `<rect x='10' y='20' width='3' height='6' fill='${shade(r, 0.45)}'/>` +
+    `<rect x='19' y='20' width='3' height='6' fill='${shade(r, 0.45)}'/>`,
+  // keep: a single tall crenellated tower (reads taller via side shadow + height)
+  tower: (r) =>
+    `<rect x='21' y='9' width='6' height='19' fill='#000000' opacity='0.13'/>` +
+    `<rect x='10' y='5' width='2.6' height='3' fill='${r}'/>` +
+    `<rect x='14.7' y='5' width='2.6' height='3' fill='${r}'/>` +
+    `<rect x='19.4' y='5' width='2.6' height='3' fill='${r}'/>` +
+    `<rect x='10' y='7' width='12' height='20' rx='1' fill='${r}'/>` +
+    `<rect x='10' y='7' width='12' height='2.4' fill='#ffffff' opacity='0.16'/>` +
+    `<rect x='20.6' y='7' width='1.4' height='20' fill='#000000' opacity='0.12'/>` +
+    `<rect x='13' y='12' width='2.6' height='4' fill='${shade(r, 0.55)}'/>` +
+    `<rect x='13' y='18' width='2.6' height='4' fill='${shade(r, 0.55)}'/>` +
+    `<rect x='13.5' y='23' width='5' height='4' fill='${shade(r, 0.42)}'/>`,
+  // manor: a grand, taller, house-like estate (big gable, twin chimneys, windows)
+  manor: (r) =>
+    `<rect x='13' y='25' width='13' height='3' fill='#000000' opacity='0.14'/>` +
+    `<rect x='6' y='13' width='20' height='14' rx='1' fill='${shade(r, 0.82)}'/>` +
+    `<polygon points='4,15 16,5 28,15' fill='${r}'/>` +
+    `<polygon points='16,5 28,15 16,15' fill='${shade(r, 0.86)}'/>` +
+    `<rect x='9' y='6' width='2.6' height='6' fill='${shade(r, 0.6)}'/>` +
+    `<rect x='20.5' y='6' width='2.6' height='6' fill='${shade(r, 0.6)}'/>` +
+    `<rect x='8' y='17' width='3' height='3' fill='${shade(r, 1.12)}'/>` +
+    `<rect x='21' y='17' width='3' height='3' fill='${shade(r, 1.12)}'/>` +
+    `<rect x='14' y='20' width='4' height='7' rx='0.5' fill='${shade(r, 0.45)}'/>`,
+  // inn: two storeys — wider ground floor with a smaller floor stacked on top + sign
+  inn: (r) =>
+    `<rect x='5' y='13' width='22' height='14' rx='1.5' fill='${shade(r, 0.8)}'/>` +
+    `<rect x='5' y='13' width='22' height='2.2' fill='#ffffff' opacity='0.12'/>` +
+    `<rect x='7' y='18' width='3' height='3' fill='${shade(r, 1.1)}'/>` +
+    `<rect x='22' y='18' width='3' height='3' fill='${shade(r, 1.1)}'/>` +
+    door(r, 14, 4) +
+    `<rect x='8' y='5' width='16' height='9' rx='1.5' fill='${r}'/>` +
+    `<rect x='8' y='5' width='16' height='2' fill='#ffffff' opacity='0.16'/>` +
+    `<rect x='10' y='8' width='3' height='3' fill='${shade(r, 1.1)}'/>` +
+    `<rect x='19' y='8' width='3' height='3' fill='${shade(r, 1.1)}'/>` +
+    `<rect x='22' y='2' width='2.6' height='4' fill='${shade(r, 0.55)}'/>` +
+    `<rect x='3' y='17' width='4' height='3' rx='0.5' fill='${shade(r, 1.05)}'/>`,
+  // alchemist: domed roof with a finial + a door
   dome: (r) =>
     `<rect x='10' y='16' width='12' height='10' rx='1' fill='${shade(r, 0.82)}'/>` +
     `<path d='M9 17 a7 7 0 0 1 14 0 z' fill='${r}'/>` +
     `<rect x='15.4' y='6' width='1.5' height='4' fill='${shade(r, 0.7)}'/>` +
-    `<circle cx='16.15' cy='6' r='1.4' fill='${shade(r, 0.7)}'/>`,
-  // market/shop: striped awning over an open stall
+    `<circle cx='16.15' cy='6' r='1.4' fill='${shade(r, 0.7)}'/>` +
+    door(r, 14, 4),
+  // market/shop: striped awning over a stall, with a doorway behind the counter
   stall: (r) => {
     let aw = '';
     for (let i = 0; i < 6; i++) aw += `<rect x='${7 + i * 3}' y='9' width='3' height='6' fill='${i % 2 ? '#f2ead6' : r}'/>`;
-    return `<rect x='7' y='15' width='18' height='11' rx='0.5' fill='${shade(r, 0.62)}'/>${aw}<rect x='7' y='15' width='18' height='1.6' fill='${shade(r, 0.45)}'/>`;
+    return `<rect x='7' y='15' width='18' height='11' rx='0.5' fill='${shade(r, 0.62)}'/>${aw}` +
+      `<rect x='7' y='15' width='18' height='1.6' fill='${shade(r, 0.45)}'/>` +
+      door(r, 13.5, 5);
   },
-  // guild/library: square hall flying a banner
+  // guild/archives: square hall flying a banner
   banner: (r) =>
     `<rect x='8' y='12' width='16' height='14' rx='1' fill='${r}'/>${hi}` +
     `<rect x='8' y='17.5' width='16' height='1.8' fill='${shade(r, 0.7)}'/>` +
     `<rect x='15.4' y='4' width='1.4' height='9' fill='${shade(r, 0.55)}'/>` +
     `<polygon points='16.8,4 23,5.6 16.8,8.4' fill='${shade(r, 1.15)}'/>` +
     door(r, 14, 4),
+  // library: scholarly hall with columns and an open-book emblem on the roof
+  library: (r) =>
+    `<rect x='7' y='12' width='18' height='15' rx='1' fill='${r}'/>` +
+    `<rect x='7' y='12' width='18' height='2.2' fill='#ffffff' opacity='0.14'/>` +
+    `<rect x='9' y='16' width='2' height='8' fill='${shade(r, 0.7)}'/>` +
+    `<rect x='21' y='16' width='2' height='8' fill='${shade(r, 0.7)}'/>` +
+    `<polygon points='12,9 16,7.2 16,11 12,11' fill='#f2ead6'/>` +
+    `<polygon points='20,9 16,7.2 16,11 20,11' fill='#e0d6bd'/>` +
+    `<rect x='15.6' y='7.2' width='0.8' height='3.8' fill='${shade(r, 0.5)}'/>` +
+    door(r, 14, 4),
+  // warehouse: flat-roofed storage with twin bay doors and a stacked crate
+  warehouse: (r) =>
+    `<rect x='4' y='12' width='24' height='15' rx='0.5' fill='${r}'/>` +
+    `<rect x='4' y='12' width='24' height='3' fill='${shade(r, 1.12)}'/>` +
+    `<rect x='4' y='17.5' width='24' height='1' fill='${shade(r, 0.7)}'/>` +
+    `<rect x='8' y='19' width='6' height='8' fill='${shade(r, 0.45)}'/>` +
+    `<rect x='18' y='19' width='6' height='8' fill='${shade(r, 0.45)}'/>` +
+    `<rect x='14.5' y='21' width='3' height='3' fill='${shade(r, 0.78)}'/>` +
+    `<rect x='14.5' y='23.5' width='3' height='3' fill='${shade(r, 0.68)}'/>`,
 };
 
 const BUILDING_SHAPE = {
   house: 'gable',
-  inn: 'hall', tavern: 'hall',
-  barn: 'barn', warehouse: 'barn',
-  blacksmith: 'smithy', foundry: 'smithy',
+  inn: 'inn', tavern: 'hall',
+  barn: 'barn', warehouse: 'warehouse',
+  blacksmith: 'smithy', foundry: 'foundry',
   temple: 'temple',
   bank: 'bank',
-  manor: 'keep', keep: 'keep', barracks: 'keep',
+  manor: 'manor', keep: 'tower', barracks: 'fortified',
   alchemist: 'dome',
   shop: 'stall', market: 'stall',
-  guild: 'banner', archives: 'banner', library: 'banner',
+  guild: 'banner', archives: 'banner', library: 'library',
 };
 
 const building = (buildingType) => {

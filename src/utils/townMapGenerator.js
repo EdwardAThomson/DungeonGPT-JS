@@ -19,7 +19,10 @@ const logger = createLogger('town-map-generator');
 export const generateTownMap = (townSize, townName, entryPoint = 'south', seed = null, hasRiver = false, riverDirection = 'NORTH_SOUTH') => {
   logger.debug(`[TOWN_MAP] Generating ${townSize} map for ${townName}`);
 
-  // Determine map size based on town size
+  // Generate at the settlement's native size so the buildings stay huddled (the proven
+  // layout), then frame it with surrounding countryside up to a uniform canvas — see
+  // padTownToUniform below. Building counts unchanged.
+  const UNIFORM_TOWN_SIZE = 20;
   const sizeConfig = {
     hamlet: { width: 8, height: 8, buildings: 3 },
     village: { width: 12, height: 12, buildings: 6 },
@@ -67,8 +70,10 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   logger.debug('[TOWN_MAP] centerPos:', centerPos);
   placeTownCenter(mapData, centerPos, townSize);
 
-  // Place city walls (cities only)
-  if (townSize === 'city') {
+  // Walls enclose the larger settlements (town + city); hamlets and villages stay
+  // open clusters surrounded by countryside. (Walls only overwrite perimeter *grass*,
+  // so the single-tile road gate punched earlier stays open.)
+  if (townSize === 'city' || townSize === 'town') {
     placeCityWalls(mapData);
   }
 
@@ -97,7 +102,7 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   // Mark entry point
   mapData[entryPos.y][entryPos.x].isEntry = true;
 
-  return {
+  const result = {
     mapData,
     width,
     height,
@@ -106,7 +111,113 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
     entryPoint: entryPos,
     centerPoint: centerPos
   };
+
+  // Frame the native layout with countryside so every town fills a uniform canvas
+  // while its buildings stay huddled exactly as generated.
+  return padTownToUniform(result, UNIFORM_TOWN_SIZE, UNIFORM_TOWN_SIZE, rng);
 };
+
+// Centre a natively-sized town in a larger uniform canvas, then dress the surrounding
+// ring with grass, an entry road out to the map edge, scattered farm fields, and trees
+// — so small settlements sit in open countryside instead of a cramped box. The core is
+// copied verbatim (only its tile coords + entry/centre are re-indexed); randomness here
+// touches the ring only.
+export function padTownToUniform(town, targetW, targetH, rng) {
+  const { mapData, width, height } = town;
+  if (width >= targetW && height >= targetH) return town; // city is already full-size
+
+  const offX = Math.floor((targetW - width) / 2);
+  const offY = Math.floor((targetH - height) / 2);
+
+  // fresh grass canvas
+  const newMap = [];
+  for (let y = 0; y < targetH; y++) {
+    const row = [];
+    for (let x = 0; x < targetW; x++) {
+      row.push({ x, y, type: 'grass', poi: null, walkable: true, isExplored: false });
+    }
+    newMap.push(row);
+  }
+
+  // drop the native core into the centre, re-indexing each tile's coordinates
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const tile = mapData[y][x];
+      tile.x = x + offX;
+      tile.y = y + offY;
+      newMap[y + offY][x + offX] = tile;
+    }
+  }
+
+  const inCore = (x, y) => x >= offX && x < offX + width && y >= offY && y < offY + height;
+
+  // Extend the entry road straight out through the ring to the map edge — BEFORE fields
+  // so farmland frames the road instead of blocking it. The native entry sits on a core
+  // edge; we carry that lane to the canvas border and move the spawn/entry there, so the
+  // party arrives at the outskirts and walks in.
+  const roadType = town.townSize === 'city' ? 'stone_path' : 'dirt_path';
+  const ne = town.entryPoint || { x: Math.floor(width / 2), y: height - 1 };
+  const gateX = ne.x + offX, gateY = ne.y + offY;
+  let edge = { x: gateX, y: gateY };
+  const layRoad = (x, y) => { newMap[y][x].type = roadType; newMap[y][x].walkable = true; };
+  if (ne.y === 0) {                       // north edge
+    for (let y = gateY - 1; y >= 0; y--) layRoad(gateX, y);
+    edge = { x: gateX, y: 0 };
+  } else if (ne.y === height - 1) {        // south edge
+    for (let y = gateY + 1; y < targetH; y++) layRoad(gateX, y);
+    edge = { x: gateX, y: targetH - 1 };
+  } else if (ne.x === 0) {                 // west edge
+    for (let x = gateX - 1; x >= 0; x--) layRoad(x, gateY);
+    edge = { x: 0, y: gateY };
+  } else if (ne.x === width - 1) {          // east edge
+    for (let x = gateX + 1; x < targetW; x++) layRoad(x, gateY);
+    edge = { x: targetW - 1, y: gateY };
+  }
+  newMap[gateY][gateX].isEntry = false;   // the gate is now an interior tile on the lane
+  newMap[edge.y][edge.x].isEntry = true;
+  town.entryPoint = edge;
+
+  // scatter farm-field clusters in the countryside ring (never over the core or road).
+  // Smaller settlements have a thicker ring, so they get more farmland.
+  const ringClusters = town.townSize === 'hamlet' ? 12 : town.townSize === 'village' ? 8 : 5;
+  for (let i = 0; i < ringClusters; i++) {
+    let sx, sy, found = false;
+    for (let a = 0; a < 15; a++) {
+      sx = Math.floor(rng() * targetW);
+      sy = Math.floor(rng() * targetH);
+      if (!inCore(sx, sy) && newMap[sy][sx].type === 'grass') { found = true; break; }
+    }
+    if (!found) continue;
+    const cw = 2 + Math.floor(rng() * 2);
+    const ch = 2 + Math.floor(rng() * 2);
+    for (let dy = 0; dy < ch; dy++) {
+      for (let dx = 0; dx < cw; dx++) {
+        const x = sx + dx, y = sy + dy;
+        if (x < targetW && y < targetH && !inCore(x, y) && newMap[y][x].type === 'grass' && newMap[y][x].poi === null) {
+          newMap[y][x].type = 'farm_field';
+        }
+      }
+    }
+  }
+
+  // dress remaining ring grass with trees/bushes/flowers
+  const deco = ['tree', 'tree', 'tree', 'bush', 'flowers', 'tree'];
+  const decoCount = Math.floor((targetW * targetH - width * height) * 0.18);
+  for (let i = 0; i < decoCount; i++) {
+    const x = Math.floor(rng() * targetW);
+    const y = Math.floor(rng() * targetH);
+    if (!inCore(x, y) && newMap[y][x].type === 'grass' && newMap[y][x].poi === null) {
+      newMap[y][x].poi = deco[Math.floor(rng() * deco.length)];
+    }
+  }
+
+  town.mapData = newMap;
+  town.width = targetW;
+  town.height = targetH;
+  // entryPoint was moved to the map edge during road extension above.
+  if (town.centerPoint) town.centerPoint = { x: town.centerPoint.x + offX, y: town.centerPoint.y + offY };
+  return town;
+}
 
 // Seeded random number generator
 function seededRandom(seed) {
@@ -749,6 +860,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
 
 // Place decorative elements
 function placeDecorations(mapData, townSize, rng) {
+  // Core decoration (the countryside ring is dressed separately in padTownToUniform)
   const decorationCount = {
     hamlet: 36,   // Lots of trees in hamlets (tripled)
     village: 45,  // More trees in villages (tripled)
@@ -778,7 +890,7 @@ function placeFarmFields(mapData, townSize, rng) {
   const width = mapData[0].length;
   const height = mapData.length;
 
-  // Decide how many clusters to place
+  // Decide how many clusters to place (core only; the countryside ring adds more)
   const clusterCount = townSize === 'hamlet' ? 2 : (townSize === 'village' ? 4 : 6);
 
   for (let i = 0; i < clusterCount; i++) {

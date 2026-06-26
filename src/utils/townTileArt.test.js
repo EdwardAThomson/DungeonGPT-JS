@@ -38,10 +38,24 @@ describe('townTileArt', () => {
   });
 
   test('building archetypes have distinct shapes (not just recoloured)', () => {
-    // One per shape family — each should render different geometry.
-    const families = ['house', 'inn', 'barn', 'blacksmith', 'temple', 'bank', 'keep', 'alchemist', 'market', 'guild'];
+    // One per shape family — each should render different geometry. Includes the
+    // manor/keep/barracks trio that used to share one shape.
+    const families = ['house', 'inn', 'barn', 'blacksmith', 'temple', 'bank', 'manor', 'keep', 'barracks', 'alchemist', 'market', 'guild'];
     const svgs = families.map((b) => decode(buildingTile(b)));
     expect(new Set(svgs).size).toBe(families.length);
+  });
+
+  test('shop and market are visually distinct (different colour)', () => {
+    expect(decode(buildingTile('shop'))).not.toBe(decode(buildingTile('market')));
+  });
+
+  test('previously-shared shapes are now differentiated', () => {
+    const pairs = [['blacksmith', 'foundry'], ['library', 'archives'], ['barn', 'warehouse']];
+    pairs.forEach(([a, b]) => expect(decode(buildingTile(a))).not.toBe(decode(buildingTile(b))));
+  });
+
+  test('stall and dome buildings have a door (door rect at y=20)', () => {
+    ['shop', 'market', 'alchemist'].forEach((b) => expect(decode(buildingTile(b))).toContain("y='20'"));
   });
 
   test('gallery accessors produce valid SVG', () => {
