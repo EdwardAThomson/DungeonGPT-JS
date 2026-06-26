@@ -12,6 +12,9 @@ const C = {
   sand: '#e6d29a', sandDark: '#cdb878',
   rock: '#8a8278', rockDark: '#6f685f', snow: '#f2f2f2',
   trunk: '#6b4a2b', leafLo: '#2f7d3f', leafHi: '#3a924c',
+  desert: '#e0c178', desertDark: '#cda85f',
+  swamp: '#5a6b4c', swampLite: '#74855c', reed: '#8a7a3a',
+  snowShade: '#d7dee6',
 };
 
 // roof colours reused for town clusters (kept loosely in sync with townTileArt)
@@ -116,6 +119,42 @@ const beach = (dir) => {
   return wrap(`<rect width='40' height='40' fill='${C.sand}'/>${sandNoise(dir)}${waterRect}${shore}`);
 };
 
+const desert = (seed) => {
+  const r = rng(seed + 11);
+  let d = '';
+  for (let i = 0; i < 3; i++) {
+    const y = 11 + i * 10 + Math.floor(r() * 3);
+    d += `<path d='M0 ${y} q12 -5 20 0 t20 0' stroke='${C.desertDark}' stroke-width='2' fill='none' opacity='0.55'/>`;
+  }
+  for (let i = 0; i < 5; i++) {
+    const x = (r() * 40).toFixed(1), y = (r() * 40).toFixed(1);
+    d += `<circle cx='${x}' cy='${y}' r='${(r() * 0.8 + 0.4).toFixed(1)}' fill='${C.desertDark}' opacity='0.4'/>`;
+  }
+  return wrap(`<rect width='40' height='40' fill='${C.desert}'/>${d}`);
+};
+
+const swamp = (seed) => {
+  const r = rng(seed + 12);
+  let s = `<rect width='40' height='40' fill='${C.swamp}'/>`;
+  s += `<ellipse cx='13' cy='15' rx='8' ry='5' fill='${C.swampLite}' opacity='0.55'/>`;
+  s += `<ellipse cx='28' cy='27' rx='9' ry='5' fill='${C.swampLite}' opacity='0.45'/>`;
+  for (let i = 0; i < 7; i++) {
+    const x = Math.floor(r() * 36) + 2, by = Math.floor(r() * 18) + 18, h = Math.floor(r() * 6) + 5;
+    s += `<rect x='${x}' y='${by - h}' width='1' height='${h}' fill='${C.reed}'/>`;
+  }
+  return wrap(s);
+};
+
+const snow = (seed) => {
+  const r = rng(seed + 13);
+  let s = `<rect width='40' height='40' fill='${C.snow}'/>`;
+  for (let i = 0; i < 6; i++) {
+    const x = (r() * 40).toFixed(1), y = (r() * 40).toFixed(1);
+    s += `<circle cx='${x}' cy='${y}' r='${(r() * 1.3 + 0.6).toFixed(1)}' fill='${C.snowShade}' opacity='0.55'/>`;
+  }
+  return wrap(s);
+};
+
 // --- POI sprites (transparent background) ------------------------------------
 // green palettes so trees aren't all the same shade
 const GREENS = [[C.leafLo, C.leafHi], ['#357a3a', '#46a052'], ['#2b6e46', '#3a8a58'], ['#4a8a3a', '#5fa84a']];
@@ -147,6 +186,20 @@ const forest = (v = 0) => {
     const sz = 6 + Math.floor(r() * 4);
     const [lo, hi] = GREENS[Math.floor(r() * GREENS.length)];
     s += (r() > 0.45 ? pineT : roundT)(cx, cy, sz, lo, hi);
+  }
+  return wrap(s);
+};
+
+// woodland biome: a grass floor densely filled with mixed trees (a forest *region*,
+// vs the single-cluster forest POI)
+const woodland = (seed) => {
+  const r = rng(seed + 14);
+  let s = `<rect width='40' height='40' fill='${shade(C.plains, 0.9)}'/>`;
+  const slots = [[8, 13], [21, 11], [33, 14], [14, 22], [27, 22], [7, 30], [20, 31], [33, 30]];
+  for (const [bx, by] of slots) {
+    const sz = 6 + Math.floor(r() * 3);
+    const [lo, hi] = GREENS[Math.floor(r() * GREENS.length)];
+    s += (r() > 0.5 ? pineT : roundT)(bx + (Math.floor(r() * 3) - 1), by, sz, lo, hi);
   }
   return wrap(s);
 };
@@ -191,6 +244,17 @@ const cave = () => wrap(
   `<ellipse cx='20' cy='29' rx='15' ry='10' fill='${C.rockDark}'/>` +
   `<ellipse cx='20' cy='27' rx='15' ry='10' fill='${C.rock}'/>` +
   `<path d='M12 33 a8 11 0 0 1 16 0 z' fill='#241f1b'/>`
+);
+
+// ruins: broken walls + toppled columns with a fallen lintel and rubble
+const ruins = () => wrap(
+  `<rect x='7' y='23' width='11' height='8' fill='${shade(ROOF.stone, 0.92)}'/>` +
+  `<rect x='7' y='19' width='3' height='12' fill='${ROOF.stone}'/>` +
+  `<rect x='14' y='21' width='3' height='10' fill='${ROOF.stone}'/>` +
+  `<rect x='23' y='16' width='3' height='15' fill='${ROOF.stone}'/>` +
+  `<rect x='30' y='14' width='3' height='17' fill='${ROOF.stone}'/>` +
+  `<rect x='22' y='13' width='12' height='2.5' fill='${shade(ROOF.stone, 0.82)}'/>` +
+  `<circle cx='19' cy='31' r='1.6' fill='${shade(ROOF.stone, 0.85)}'/><circle cx='27' cy='31' r='1.3' fill='${shade(ROOF.stone, 0.85)}'/>`
 );
 
 // a little pitched-roof house: wall + gable roof + door (footprint ~s)
@@ -241,6 +305,10 @@ export function biomeBackground(tile, x = 0, y = 0) {
   if (tile.isLake) { key = `lake|${seed}`; build = () => lake(seed); }
   else if (tile.biome === 'water') { key = `water|${seed}`; build = () => water(seed); }
   else if (tile.biome === 'beach' && tile.beachDirection != null) { key = `beach|${tile.beachDirection}`; build = () => beach(tile.beachDirection); }
+  else if (tile.biome === 'desert') { key = `desert|${seed}`; build = () => desert(seed); }
+  else if (tile.biome === 'swamp') { key = `swamp|${seed}`; build = () => swamp(seed); }
+  else if (tile.biome === 'snow') { key = `snow|${seed}`; build = () => snow(seed); }
+  else if (tile.biome === 'woodland') { key = `woodland|${seed}`; build = () => woodland(seed); }
   else { key = `plains|${seed}`; build = () => plains(seed); }
   let bg = _bgCache.get(key);
   if (bg === undefined) { bg = build(); _bgCache.set(key, bg); }
@@ -254,6 +322,7 @@ export function poiSprite(tile) {
   else if (tile.poi === 'mountain') { const v = variantSeed(tile.x || 0, tile.y || 0) % MOUNTAIN_VARIANTS.length; key = `mountain|${v}`; build = () => mountain(v); }
   else if (tile.poi === 'hills') { key = 'hills'; build = hills; }
   else if (tile.poi === 'cave_entrance') { key = 'cave'; build = cave; }
+  else if (tile.poi === 'ruins') { key = 'ruins'; build = ruins; }
   else if (tile.milestonePoi) { key = 'milestone'; build = milestone; }
   else return null;
   let s = _poiCache.get(key);
@@ -264,8 +333,12 @@ export function poiSprite(tile) {
 // gallery accessors for the preview
 export const sampleBiomes = {
   plains: () => plains(variantSeed(1, 1)),
+  woodland: () => woodland(variantSeed(8, 2)),
   water: () => water(variantSeed(2, 1)),
   lake: () => lake(variantSeed(3, 1)),
+  desert: () => desert(variantSeed(5, 2)),
+  swamp: () => swamp(variantSeed(6, 2)),
+  snow: () => snow(variantSeed(7, 2)),
   'beach N': () => beach(0),
   'beach E': () => beach(1),
   'beach S': () => beach(2),
@@ -279,6 +352,7 @@ export const samplePois = {
   'mtn ridge': () => mountain(2),
   hills: () => hills(),
   cave: () => cave(),
+  ruins: () => ruins(),
   hamlet: () => townSprite('hamlet'),
   village: () => townSprite('village'),
   town: () => townSprite('town'),

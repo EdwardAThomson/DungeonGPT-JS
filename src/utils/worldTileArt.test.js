@@ -11,10 +11,18 @@ const decode = (bg) => {
 
 describe('worldTileArt', () => {
   test('biomes yield well-formed SVG data-URIs', () => {
-    decode(biomeBackground({ biome: 'plains' }, 1, 1));
-    decode(biomeBackground({ biome: 'water' }, 2, 1));
+    ['plains', 'water', 'desert', 'swamp', 'snow', 'woodland'].forEach((b, i) => decode(biomeBackground({ biome: b }, i + 1, 1)));
     decode(biomeBackground({ biome: 'beach', beachDirection: 0 }, 3, 1));
     decode(biomeBackground({ biome: 'water', isLake: true }, 4, 1));
+  });
+
+  test('unknown biome falls back to a valid tile (old saves)', () => {
+    decode(biomeBackground({ biome: 'totally-new-biome' }, 1, 1));
+  });
+
+  test('hills and ruins POIs render', () => {
+    decode(poiSprite({ poi: 'hills' }));
+    decode(poiSprite({ poi: 'ruins' }));
   });
 
   test('beach direction changes the geometry', () => {
