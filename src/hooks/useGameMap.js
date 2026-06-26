@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { generateMapData, getTile, findStartingTown } from '../utils/mapGenerator';
+import { generateMapData, getTile, findStartingTown, enrichWorldMap } from '../utils/mapGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
 import { populateTown } from '../utils/npcGenerator';
 import { injectQuestBuildings } from '../game/milestoneSpawner';
@@ -29,6 +29,10 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             if (migrationCount > 0) {
                 logger.info(`Patched ${migrationCount} tiles with coordinates`);
             }
+
+            // Legacy upgrade: add hills/ruins/cave POIs to maps generated before they
+            // existed (idempotent — no-op once present). Persists on the next autosave.
+            enrichWorldMap(map, worldSeed);
 
             return {
                 map: map,

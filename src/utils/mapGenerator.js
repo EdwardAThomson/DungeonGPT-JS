@@ -77,6 +77,9 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   // 5b. Rolling hills — foothills near mountains plus the odd standalone cluster (Phase 2a)
   placeHills(mapData, width, height, rng);
 
+  // 5c. A cave entrance tucked against the mountains (Phase 2a — placeCave was never wired up)
+  placeCave(mapData, width, height, rng);
+
   // 6. Place towns. Normally 2-4, but never fewer than the number of named towns
   // the campaign requires — each custom name is a milestone/quest location that
   // must exist on the map, otherwise its quest building/item/POI is silently lost.
@@ -317,10 +320,9 @@ function placeHills(mapData, width, height, rng) {
   }
 }
 
-// Occasionally place ancient ruins on open ground, clear of paths (Phase 2a).
+// Place ancient ruins on open ground, clear of paths (Phase 2a). One per map.
 function placeRuins(mapData, width, height, rng) {
-  if (rng() > 0.5) return; // roughly half of maps get a ruin
-  for (let attempt = 0; attempt < 25; attempt++) {
+  for (let attempt = 0; attempt < 40; attempt++) {
     const x = Math.floor(rng() * width), y = Math.floor(rng() * height);
     if (mapData[y][x].hasPath) continue;
     if (isValidPlacement(mapData, x, y, width, height, false)) {
@@ -329,6 +331,27 @@ function placeRuins(mapData, width, height, rng) {
       return;
     }
   }
+}
+
+// Retroactively add the newer decorative POIs (hills, ruins, cave) to a world map that
+// predates them — a deliberate, one-time legacy upgrade applied on load (see useGameMap),
+// alongside the existing x/y patch. Idempotent: if the map already has any of these POIs
+// (a new map, or one already upgraded) it's left untouched. Deterministic by seed.
+export function enrichWorldMap(mapData, seed) {
+  if (!Array.isArray(mapData) || mapData.length === 0 || !mapData[0]) return mapData;
+  const alreadyEnriched = mapData.flat().some(
+    (t) => t.poi === 'hills' || t.poi === 'ruins' || t.poi === 'cave_entrance'
+  );
+  if (alreadyEnriched) return mapData;
+
+  const height = mapData.length;
+  const width = mapData[0].length;
+  const rng = seededRandom(Number.isFinite(seed) ? seed + 31 : 31);
+  placeHills(mapData, width, height, rng);
+  placeRuins(mapData, width, height, rng);
+  placeCave(mapData, width, height, rng);
+  logger.info('[MAP_GENERATION] Enriched a legacy world map with hills/ruins/cave');
+  return mapData;
 }
 
 // Place a cave entrance near mountains
@@ -345,21 +368,23 @@ function placeCave(mapData, width, height, rng) {
 
   if (mountains.length === 0) return;
 
-  // Pick a random mountain and try to place cave adjacent
-  const mountain = mountains[Math.floor(rng() * mountains.length)];
   const directions = [
     { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
     { dx: 0, dy: 1 }, { dx: 0, dy: -1 }
   ];
 
-  for (const dir of directions) {
-    const x = mountain.x + dir.dx;
-    const y = mountain.y + dir.dy;
-
-    if (isValidPlacement(mapData, x, y, width, height, false)) {
-      mapData[y][x].poi = 'cave_entrance';
-      mapData[y][x].descriptionSeed = "A dark cave entrance";
-      return;
+  // Try mountains in random order until one has a free neighbour for the cave — a single
+  // random mountain often has all-occupied neighbours, which left maps with no cave at all.
+  const shuffledMountains = mountains.slice().sort(() => rng() - 0.5);
+  for (const mountain of shuffledMountains) {
+    for (const dir of directions.slice().sort(() => rng() - 0.5)) {
+      const x = mountain.x + dir.dx;
+      const y = mountain.y + dir.dy;
+      if (isValidPlacement(mapData, x, y, width, height, false)) {
+        mapData[y][x].poi = 'cave_entrance';
+        mapData[y][x].descriptionSeed = "A dark cave entrance";
+        return;
+      }
     }
   }
 }

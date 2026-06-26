@@ -1,4 +1,4 @@
-import { generateMapData } from './mapGenerator';
+import { generateMapData, enrichWorldMap } from './mapGenerator';
 
 describe('generateMapData', () => {
   it('produces identical maps for the same seed and dimensions', () => {
@@ -59,6 +59,60 @@ describe('generateMapData', () => {
             expect(t.townName).toBeUndefined();
           });
       }
+    });
+
+    it('ruins appear on essentially every map', () => {
+      let withRuins = 0;
+      const N = 12;
+      for (let s = 1; s <= N; s++) {
+        if (tiles(generateMapData(20, 14, s * 17)).some((t) => t.poi === 'ruins')) withRuins++;
+      }
+      expect(withRuins).toBeGreaterThanOrEqual(N - 1);
+    });
+
+    it('caves are wired into generation and appear reliably (mountains are guaranteed)', () => {
+      let withCaves = 0;
+      const N = 12;
+      for (let s = 1; s <= N; s++) {
+        if (tiles(generateMapData(20, 14, s * 11)).some((t) => t.poi === 'cave_entrance')) withCaves++;
+      }
+      // mountains are guaranteed and placeCave now tries them all, so most maps get a cave
+      expect(withCaves).toBeGreaterThanOrEqual(N - 2);
+    });
+  });
+
+  describe('enrichWorldMap — legacy upgrade for old saves', () => {
+    // a pre-feature map: plains everywhere with a single mountain, no hills/ruins/cave
+    const legacyMap = () => {
+      const m = [];
+      for (let y = 0; y < 10; y++) {
+        const row = [];
+        for (let x = 0; x < 10; x++) row.push({ x, y, biome: 'plains', poi: null });
+        m.push(row);
+      }
+      m[5][5].poi = 'mountain';
+      return m;
+    };
+
+    it('adds hills/ruins/cave POIs to an old map', () => {
+      const map = enrichWorldMap(legacyMap(), 42);
+      const pois = new Set(map.flat().map((t) => t.poi).filter(Boolean));
+      expect(pois.has('hills')).toBe(true);
+      expect(pois.has('cave_entrance')).toBe(true); // mountain present -> cave placed
+    });
+
+    it('is idempotent — re-running adds nothing new', () => {
+      const map = enrichWorldMap(legacyMap(), 42);
+      const before = JSON.stringify(map);
+      enrichWorldMap(map, 42);
+      expect(JSON.stringify(map)).toBe(before);
+    });
+
+    it('leaves an already-populated (new) map untouched', () => {
+      const fresh = generateMapData(10, 10, 4242);
+      const before = JSON.stringify(fresh);
+      enrichWorldMap(fresh, 4242);
+      expect(JSON.stringify(fresh)).toBe(before);
     });
   });
 
