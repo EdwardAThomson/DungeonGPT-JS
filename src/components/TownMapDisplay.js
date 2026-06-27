@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { tileBackground } from '../utils/townTileArt';
+import { tileBackground, POI_EMOJI } from '../utils/townTileArt';
 import BuildingModal from './BuildingModal';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
@@ -8,10 +8,8 @@ const logger = createLogger('town-map-display');
 
 const TILE = 34; // bigger than the original 30 but small enough that a 20x20 town fits a laptop
 
-// Decorations the tileset doesn't draw itself are overlaid as emoji (buildings/terrain
-// are fully rendered by the tileset, so only POI markers ride on top). 'well' is kept
-// for backwards-compatibility with old saves generated before the fountain change.
-const POI_EMOJI = { fountain: '⛲', well: '🪣', tree: '🌳', bush: '🌿', flowers: '🌸' };
+// Decoration / POI overlay emoji live in townTileArt (the art module) so the live
+// renderer, the tileset gallery, and themed towns share one source of truth.
 
 /**
  * TownMapDisplay - Renders a town map with the SVG tileset, buildings, and player.

@@ -6,6 +6,28 @@ import { createLogger } from './logger';
 
 const logger = createLogger('town-map-generator');
 
+// Theme-aware decoration palettes. These are the POI values scattered as the town's
+// natural cover — drawn as emoji overlays by townTileArt's POI_EMOJI map. Grassland is
+// the historical set (unchanged, so existing towns regenerate byte-identically); desert
+// and snow swap the green tree/bush/flowers for biome-appropriate decorations so themed
+// towns read correctly on their sand/snow ground. `core` dresses the native settlement
+// (placeDecorations); `ring` dresses the surrounding countryside (padTownToUniform).
+const DECORATION_SETS = {
+  grassland: {
+    core: ['tree', 'tree', 'tree', 'tree', 'bush', 'flowers', 'tree', 'tree'],
+    ring: ['tree', 'tree', 'tree', 'bush', 'flowers', 'tree'],
+  },
+  desert: {
+    core: ['cactus', 'cactus', 'rock', 'dead_bush', 'cactus', 'rock', 'cactus', 'dead_bush'],
+    ring: ['cactus', 'rock', 'dead_bush', 'cactus', 'rock', 'cactus'],
+  },
+  snow: {
+    core: ['pine', 'pine', 'pine', 'rock', 'snowdrift', 'pine', 'pine', 'rock'],
+    ring: ['pine', 'pine', 'rock', 'snowdrift', 'pine', 'rock'],
+  },
+};
+const decorationSet = (theme) => DECORATION_SETS[theme] || DECORATION_SETS.grassland;
+
 /**
  * Generate a town interior map based on town size
  * @param {string} townSize - Size of the town: 'hamlet', 'village', 'town', 'city'
@@ -103,8 +125,9 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   }
 
   // Place decorations (trees, wells, etc.) LAST
-  // This way they fill in empty spaces without blocking buildings or paths
-  placeDecorations(mapData, townSize, rng);
+  // This way they fill in empty spaces without blocking buildings or paths.
+  // The theme picks the decoration palette (desert cacti/rocks, snow pines/drifts).
+  placeDecorations(mapData, townSize, rng, theme);
 
   // Mark entry point
   mapData[entryPos.y][entryPos.x].isEntry = true;
@@ -209,8 +232,9 @@ export function padTownToUniform(town, targetW, targetH, rng) {
     }
   }
 
-  // dress remaining ring grass with trees/bushes/flowers
-  const deco = ['tree', 'tree', 'tree', 'bush', 'flowers', 'tree'];
+  // dress remaining ring grass with theme-appropriate cover (grassland trees/bushes/
+  // flowers; desert cacti/rocks; snow pines/drifts)
+  const deco = decorationSet(town.theme).ring;
   const decoCount = Math.floor((targetW * targetH - width * height) * 0.18);
   for (let i = 0; i < decoCount; i++) {
     const x = Math.floor(rng() * targetW);
@@ -868,7 +892,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
 }
 
 // Place decorative elements
-function placeDecorations(mapData, townSize, rng) {
+function placeDecorations(mapData, townSize, rng, theme = 'grassland') {
   // Core decoration (the countryside ring is dressed separately in padTownToUniform)
   const decorationCount = {
     hamlet: 36,   // Lots of trees in hamlets (tripled)
@@ -878,8 +902,8 @@ function placeDecorations(mapData, townSize, rng) {
   };
 
   const count = decorationCount[townSize] || 30;
-  // More trees, fewer other decorations
-  const decorations = ['tree', 'tree', 'tree', 'tree', 'bush', 'flowers', 'tree', 'tree'];
+  // Theme-weighted cover (grassland keeps the historical tree-heavy mix)
+  const decorations = decorationSet(theme).core;
 
   for (let i = 0; i < count; i++) {
     const x = Math.floor(rng() * mapData[0].length);
@@ -1112,6 +1136,11 @@ export const getTownTileEmoji = (tile) => {
       tree: '🌳',
       bush: '🌿',
       flowers: '🌸',
+      cactus: '🌵',     // desert
+      rock: '🪨',       // desert / snow
+      dead_bush: '🥀',  // desert
+      pine: '🌲',       // snow
+      snowdrift: '⛄',  // snow
       '🔲': '🔲'  // Wall emoji passes through
     };
     return poiEmojis[tile.poi] || tile.poi || '❓';  // Return the poi itself if not in map

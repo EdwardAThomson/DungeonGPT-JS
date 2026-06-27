@@ -1,4 +1,4 @@
-import { tileBackground, sampleTiles, wallVariant, buildingTile } from './townTileArt';
+import { tileBackground, sampleTiles, wallVariant, buildingTile, POI_EMOJI } from './townTileArt';
 
 const TYPES = ['grass', 'dirt_path', 'stone_path', 'town_square', 'farm_field', 'water', 'bridge', 'wall', 'keep_wall', 'building'];
 
@@ -73,5 +73,30 @@ describe('townTileArt', () => {
     expect(decode(desertGround)).toContain('e0c178'); // sand base colour
     // buildings/walls sit on a sand base too for desert towns
     expect(decode(tileBackground({ type: 'building', buildingType: 'house' }, {}, 1, 1, 'desert'))).toContain('e0c178');
+  });
+
+  test('snow theme renders a pale snow ground distinct from grassland and desert', () => {
+    const grassDefault = tileBackground({ type: 'grass' }, {}, 2, 2);
+    const desertGround = tileBackground({ type: 'grass' }, {}, 2, 2, 'desert');
+    const snowGround = tileBackground({ type: 'grass' }, {}, 2, 2, 'snow');
+    expect(snowGround).not.toBe(grassDefault);
+    expect(snowGround).not.toBe(desertGround);
+    expect(decode(snowGround)).toContain('eef3f7'); // snow base colour
+    // buildings sit on a snow base too for snow towns
+    expect(decode(tileBackground({ type: 'building', buildingType: 'house' }, {}, 1, 1, 'snow'))).toContain('eef3f7');
+  });
+
+  test('POI_EMOJI maps grassland + desert + snow decorations to renderable glyphs', () => {
+    // grassland (unchanged)
+    expect(POI_EMOJI.tree).toBe('🌳');
+    expect(POI_EMOJI.bush).toBe('🌿');
+    expect(POI_EMOJI.flowers).toBe('🌸');
+    // desert / snow decorations placed by the generator must render
+    ['cactus', 'rock', 'dead_bush', 'pine', 'snowdrift'].forEach((d) => {
+      expect(typeof POI_EMOJI[d]).toBe('string');
+      expect(POI_EMOJI[d].length).toBeGreaterThan(0);
+    });
+    // desert cover is visually distinct from the grassland tree
+    expect(POI_EMOJI.cactus).not.toBe(POI_EMOJI.tree);
   });
 });

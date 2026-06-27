@@ -2,6 +2,7 @@ import { generateTownMap, padTownToUniform } from './townMapGenerator';
 
 const SIZES = ['hamlet', 'village', 'town', 'city'];
 const countType = (town, type) => town.mapData.flat().filter((t) => t.type === type).length;
+const countPoi = (town, poi) => town.mapData.flat().filter((t) => t.poi === poi).length;
 
 // deterministic rng for the isolated pad test
 const makeRng = () => { let s = 12345; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; };
@@ -127,6 +128,34 @@ describe('generateTownMap — uniform canvas + countryside padding', () => {
       // ground tiles stay type 'grass' so building/road placement logic is untouched
       expect(countType(desert, 'building')).toBeGreaterThan(0);
       expect(countType(desert, 'grass')).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Phase 2c — theme-aware town decorations', () => {
+    test('grassland places green decorations (trees/bushes/flowers), no desert cover', () => {
+      const grass = generateTownMap('village', 'G', 'south', 777);
+      expect(countPoi(grass, 'tree')).toBeGreaterThan(0);
+      // none of the themed decorations leak into a grassland town
+      ['cactus', 'rock', 'dead_bush', 'pine', 'snowdrift'].forEach((d) =>
+        expect(countPoi(grass, d)).toBe(0)
+      );
+    });
+
+    test('desert town places desert decorations (cacti/rocks), never trees', () => {
+      const desert = generateTownMap('village', 'D', 'south', 777, false, 'NORTH_SOUTH', 'desert');
+      expect(countPoi(desert, 'tree')).toBe(0);
+      expect(countPoi(desert, 'bush')).toBe(0);
+      expect(countPoi(desert, 'flowers')).toBe(0);
+      const desertCover = countPoi(desert, 'cactus') + countPoi(desert, 'rock') + countPoi(desert, 'dead_bush');
+      expect(desertCover).toBeGreaterThan(0);
+    });
+
+    test('snow town places snowy decorations (pines/drifts), never trees', () => {
+      const snowTown = generateTownMap('village', 'S', 'south', 777, false, 'NORTH_SOUTH', 'snow');
+      expect(snowTown.theme).toBe('snow');
+      expect(countPoi(snowTown, 'tree')).toBe(0);
+      const snowCover = countPoi(snowTown, 'pine') + countPoi(snowTown, 'rock') + countPoi(snowTown, 'snowdrift');
+      expect(snowCover).toBeGreaterThan(0);
     });
   });
 });

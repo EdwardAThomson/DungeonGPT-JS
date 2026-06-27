@@ -14,6 +14,8 @@ const C = {
   grass: '#6aa84f', grassDark: '#4c8038', grassLight: '#86c267',
   // desert town ground — sandy palette (kept loosely in sync with worldTileArt's desert)
   sand: '#e0c178', sandDark: '#cda85f', sandLight: '#efd9a0',
+  // snow town ground — pale palette (kept loosely in sync with worldTileArt's snow)
+  snow: '#eef3f7', snowDark: '#d2dde6', snowLight: '#ffffff',
   dirt: '#b07b46', dirtDark: '#8f5f31', dirtLight: '#c89a64',
   water: '#3f7cc2', waterLight: '#5a93d6', foam: '#bcd8f5',
   soil: '#6f4a2a', soilDark: '#553820', crop: '#7fb04a', cropDark: '#5f8a34',
@@ -88,6 +90,23 @@ const sand = (seed) => {
     marks += `<path d='M0 ${y} q8 -2.5 16 0 t16 0' stroke='${C.sandDark}' stroke-width='1' fill='none' opacity='0.5'/>`;
   }
   return wrap(`<rect width='32' height='32' fill='${C.sand}'/>${marks}`);
+};
+
+// snow town ground: a pale base with soft drifts and a few sparkles, mirroring the grass
+// tile's role for snow-themed towns (Phase 2c)
+const snow = (seed) => {
+  const r = rng(seed + 7);
+  let marks = '';
+  for (let i = 0; i < 2; i++) {
+    const y = 10 + i * 12 + Math.floor(r() * 4);
+    marks += `<path d='M0 ${y} q8 -2.5 16 0 t16 0' stroke='${C.snowDark}' stroke-width='1.2' fill='none' opacity='0.5'/>`;
+  }
+  for (let i = 0; i < 7; i++) {
+    const x = (r() * 30 + 1).toFixed(1);
+    const y = (r() * 30 + 1).toFixed(1);
+    marks += `<circle cx='${x}' cy='${y}' r='${(r() * 0.8 + 0.4).toFixed(1)}' fill='${C.snowLight}'/>`;
+  }
+  return wrap(`<rect width='32' height='32' fill='${C.snow}'/>${marks}`);
 };
 
 const dirt = (seed) => {
@@ -368,8 +387,9 @@ const building = (buildingType, ground = C.grass) => {
 
 // --- public API --------------------------------------------------------------
 const _generate = (type, tile, mask, seed, theme) => {
-  const isDesert = theme === 'desert';
-  const ground = isDesert ? C.sand : C.grass;
+  // ground fill + open-tile texture follow the theme (desert→sand, snow→snow, else grass)
+  const ground = theme === 'desert' ? C.sand : theme === 'snow' ? C.snow : C.grass;
+  const groundTile = (s) => theme === 'desert' ? sand(s) : theme === 'snow' ? snow(s) : grass(s);
   switch (type) {
     case 'water': return water(seed);
     case 'bridge': return bridge();
@@ -381,7 +401,7 @@ const _generate = (type, tile, mask, seed, theme) => {
     case 'wall': return wall(mask, false, ground);
     case 'keep_wall': return wall(mask, true, ground);
     case 'grass':
-    default: return isDesert ? sand(seed) : grass(seed);
+    default: return groundTile(seed);
   }
 };
 
@@ -393,12 +413,13 @@ const _cache = new Map();
 
 // Returns a CSS background-image string for a tile. `neighbours` is { n,e,s,w } of
 // tile types, used for wall autotiling. `theme` selects the town's ground palette
-// (default 'grassland' renders exactly as before; 'desert' renders a sand base).
+// (default 'grassland' renders exactly as before; 'desert' renders a sand base; 'snow'
+// renders a pale snow base).
 export function tileBackground(tile, neighbours = {}, x = 0, y = 0, theme = 'grassland') {
   const type = tile.type;
-  // Theme tag in the cache key so desert and grassland tiles never collide. Grassland
-  // is the default, so its keys/output are unchanged from before.
-  const tt = theme === 'desert' ? 'd' : 'g';
+  // Theme tag in the cache key so each theme's tiles never collide. Grassland is the
+  // default, so its keys/output are unchanged from before ('g').
+  const tt = theme === 'desert' ? 'd' : theme === 'snow' ? 's' : 'g';
   let mask = 0;
   let key;
   if (type === 'wall' || type === 'keep_wall') {
@@ -417,10 +438,23 @@ export function tileBackground(tile, neighbours = {}, x = 0, y = 0, theme = 'gra
   return bg;
 }
 
+// POI / decoration overlay emoji. The SVG tileset fully renders terrain, walls and
+// buildings; small decorations and markers ride on top as emoji (matching the existing
+// decoration layer rather than baking them into the ground tile). Grassland
+// (tree/bush/flowers) is unchanged; desert and snow add biome-appropriate cover so a
+// sand/snow town reads correctly. 'well' is kept for old saves predating the fountain.
+export const POI_EMOJI = {
+  fountain: '⛲', well: '🪣',
+  tree: '🌳', bush: '🌿', flowers: '🌸',      // grassland
+  cactus: '🌵', rock: '🪨', dead_bush: '🥀',  // desert
+  pine: '🌲', snowdrift: '⛄',                // snow (rock shared with desert)
+};
+
 // Direct accessors for the swatch gallery / docs.
 export const sampleTiles = {
   grass: () => grass(variantSeed(1, 1)),
   sand: () => sand(variantSeed(1, 2)),
+  snow: () => snow(variantSeed(1, 3)),
   dirt: () => dirt(variantSeed(2, 1)),
   water: () => water(variantSeed(3, 1)),
   farm_field: () => field(variantSeed(4, 1)),

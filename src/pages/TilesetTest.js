@@ -7,14 +7,13 @@
 
 import React, { useMemo, useState } from 'react';
 import { generateTownMap } from '../utils/townMapGenerator';
-import { tileBackground, sampleTiles, wallVariant, buildingTile } from '../utils/townTileArt';
+import { tileBackground, sampleTiles, wallVariant, buildingTile, POI_EMOJI } from '../utils/townTileArt';
 
-const POI_EMOJI = { fountain: '⛲', tree: '🌳', well: '🪣', bush: '🌿', flowers: '🌸' };
 const SIZES = ['hamlet', 'village', 'town', 'city'];
 const TILE = 28;
 
-const Cell = ({ tile, neighbours }) => {
-  const bg = tileBackground(tile, neighbours, tile.x, tile.y);
+const Cell = ({ tile, neighbours, theme = 'grassland' }) => {
+  const bg = tileBackground(tile, neighbours, tile.x, tile.y, theme);
   const emoji = tile.poi ? POI_EMOJI[tile.poi] : null;
   return (
     <div style={{
@@ -37,8 +36,12 @@ const TilesetTest = () => {
   const [zoom, setZoom] = useState(1);
   const [size, setSize] = useState('town');
   const [seed, setSeed] = useState(12345);
+  const [theme, setTheme] = useState('grassland');
 
-  const town = useMemo(() => generateTownMap(size, `Demo ${size}`, 'south', seed), [size, seed]);
+  const town = useMemo(
+    () => generateTownMap(size, `Demo ${size}`, 'south', seed, false, 'NORTH_SOUTH', theme),
+    [size, seed, theme]
+  );
   const grid = town.mapData;
   const W = town.width;
   const H = town.height;
@@ -94,6 +97,13 @@ const TilesetTest = () => {
                 style={{ padding: '4px 10px', fontSize: 12 }}>{s}</button>
             ))}
           </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {['grassland', 'desert', 'snow'].map((t) => (
+              <button key={t} onClick={() => setTheme(t)}
+                className={t === theme ? 'primary-button' : 'secondary-button'}
+                style={{ padding: '4px 10px', fontSize: 12 }}>{t}</button>
+            ))}
+          </div>
           <button className="secondary-button" style={{ padding: '4px 10px', fontSize: 12 }}
             onClick={() => setSeed(Math.floor(Math.random() * 100000))}>🎲 reseed</button>
           <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -109,7 +119,7 @@ const TilesetTest = () => {
             {grid.flatMap((rowArr, gy) =>
               rowArr.map((tile, gx) => {
                 const neighbours = { n: at(gx, gy - 1), e: at(gx + 1, gy), s: at(gx, gy + 1), w: at(gx - 1, gy) };
-                return <Cell key={`${gx},${gy}`} tile={tile} neighbours={neighbours} />;
+                return <Cell key={`${gx},${gy}`} tile={tile} neighbours={neighbours} theme={theme} />;
               })
             )}
           </div>
