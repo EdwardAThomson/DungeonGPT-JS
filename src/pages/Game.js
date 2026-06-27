@@ -17,6 +17,7 @@ import GameModals from '../components/GameModals';
 import ModalShell from '../components/ModalShell';
 import { calculateMaxHP, shortRest, longRest } from '../utils/healthSystem';
 import { composeMovementNarrativePrompt } from '../game/promptComposer';
+import { composeLocalMovementNarrative } from '../game/localNarrator';
 import { generateMovementNarrative } from '../game/movementController';
 import {
   applyWorldMapMove,
@@ -295,6 +296,24 @@ const Game = () => {
     }
   }, [interactionHook.checkRequest]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Guest (no-AI) movement narration: append deterministic, templated prose to the log
+  // so logged-out players get on-tone movement narration instead of silence. Pure local
+  // path — no /api/ai call, no RAG embed (matches guest play today). The signed-in AI
+  // path is untouched. (Phase B3a of TIERED_NARRATION_PLAN.md.)
+  const appendLocalMovementNarrative = ({ tile, coords, isNewArea, heroes }) => {
+    const text = composeLocalMovementNarrative({
+      tile,
+      coords,
+      worldSeed,
+      worldMap: mapHook.worldMap,
+      settings,
+      selectedHeroes: heroes || selectedHeroes,
+      isNewArea
+    });
+    if (!text || !text.trim()) return;
+    interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
+  };
+
   // --- Map Movement Handler with AI ---
   const handleMoveOnWorldMap = async (clickedX, clickedY) => {
     if (!hasAdventureStarted || interactionHook.isLoading) return;
@@ -403,8 +422,16 @@ const Game = () => {
     // First visit to a new biome/town gets a richer description
     const isNewArea = !isBiomeVisited || (townName && !isTownVisited);
 
-    // Skip AI narrative if toggle is disabled (for testing) or for guests (no AI).
-    if (!aiNarrativeEnabled || !aiAvailable) {
+    // Guests (no AI) get local, templated narration instead of silence.
+    if (!aiAvailable) {
+      if (aiNarrativeEnabled) {
+        appendLocalMovementNarrative({ tile: targetTile, coords: { x: clickedX, y: clickedY }, isNewArea });
+      }
+      return;
+    }
+
+    // Skip AI narrative if toggle is disabled (for testing).
+    if (!aiNarrativeEnabled) {
       return;
     }
 
@@ -550,7 +577,15 @@ const Game = () => {
     const { tile, coords, needsAiDescription } = pendingNarrativeTile;
     setPendingNarrativeTile(null);
 
-    if (!needsAiDescription || !aiNarrativeEnabled || !aiAvailable) return;
+    // Guests (no AI): append local templated narration for the post-encounter tile.
+    if (!aiAvailable) {
+      if (aiNarrativeEnabled) {
+        appendLocalMovementNarrative({ tile, coords, isNewArea: !!needsAiDescription, heroes: updatedParty });
+      }
+      return;
+    }
+
+    if (!needsAiDescription || !aiNarrativeEnabled) return;
 
     (async () => {
       const resolvedModel = resolveProviderAndModel(selectedProvider, selectedModel);
