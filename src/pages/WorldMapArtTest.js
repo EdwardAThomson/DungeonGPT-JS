@@ -21,7 +21,11 @@ const pathSVGs = {
   START_NORTH: 'M20,20 L20,0', START_SOUTH: 'M20,20 L20,40', START_EAST: 'M20,20 L40,20', START_WEST: 'M20,20 L0,20',
   END_NORTH: 'M20,40 L20,20', END_SOUTH: 'M20,0 L20,20', END_EAST: 'M0,20 L20,20', END_WEST: 'M40,20 L20,20',
 };
-const BEACH_SHIFT = ['translateY(10px)', 'translateX(-10px)', 'translateY(-10px)', 'translateX(10px)'];
+const BEACH_SHIFT = [
+  'translateY(10px)', 'translateX(-10px)', 'translateY(-10px)', 'translateX(10px)',
+  'translate(-7px, 7px)', 'translate(-7px, -7px)', 'translate(7px, -7px)', 'translate(7px, 7px)',
+  'translate(-5px, 5px)', 'translate(-5px, -5px)', 'translate(5px, -5px)', 'translate(5px, 5px)',
+];
 
 const Overlay = ({ d, stroke, width, opacity, transform }) => (
   <svg viewBox="0 0 40 40" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1, transform }}>

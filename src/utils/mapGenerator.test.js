@@ -203,18 +203,76 @@ describe('generateMapData', () => {
 
     it('lakeshore beaches point their beachDirection at adjacent water', () => {
       const offsets = { 0: [0, -1], 1: [1, 0], 2: [0, 1], 3: [-1, 0] };
+      const concaveDirs = { 4: [0, 1], 5: [1, 2], 6: [2, 3], 7: [0, 3] }; // two adjacent orthogonals
+      const convexDiag = { 8: [1, -1], 9: [1, 1], 10: [-1, 1], 11: [-1, -1] }; // single diagonal
+      const isWater = (map, x, y) => !!(map[y] && map[y][x] && map[y][x].biome === 'water');
       let sawShore = false;
       for (let s = 1; s <= 12; s++) {
         const map = generateMapData(10, 10, s * 7);
         for (const shore of lakeShores(map)) {
           sawShore = true;
-          expect([0, 1, 2, 3]).toContain(shore.beachDirection);
-          const [dx, dy] = offsets[shore.beachDirection];
-          const water = map[shore.y + dy] && map[shore.y + dy][shore.x + dx];
-          expect(water && water.biome).toBe('water');
+          expect(shore.beachDirection).toBeGreaterThanOrEqual(0);
+          expect(shore.beachDirection).toBeLessThanOrEqual(11);
+          if (shore.beachDirection <= 3) {
+            const [dx, dy] = offsets[shore.beachDirection];
+            expect(isWater(map, shore.x + dx, shore.y + dy)).toBe(true);
+          } else if (shore.beachDirection <= 7) {
+            // concave corner: both implied adjacent sides must be water
+            for (const d of concaveDirs[shore.beachDirection]) {
+              const [dx, dy] = offsets[d];
+              expect(isWater(map, shore.x + dx, shore.y + dy)).toBe(true);
+            }
+          } else {
+            // convex outer corner: the diagonal is water and there's NO orthogonal water.
+            // (With lake separation enforced, a convex corner never abuts another water body.)
+            const [dx, dy] = convexDiag[shore.beachDirection];
+            expect(isWater(map, shore.x + dx, shore.y + dy)).toBe(true);
+            for (const o of Object.values(offsets)) {
+              expect(isWater(map, shore.x + o[0], shore.y + o[1])).toBe(false);
+            }
+          }
         }
       }
       expect(sawShore).toBe(true);
+    });
+
+    it('separate lakes never crowd together (>= 2 land tiles apart)', () => {
+      for (let s = 1; s <= 12; s++) {
+        const map = generateMapData(12, 12, s * 5);
+        const H = map.length, W = map[0].length;
+        const isLakeWater = (x, y) => x >= 0 && x < W && y >= 0 && y < H
+          && map[y][x].biome === 'water' && map[y][x].descriptionSeed === 'A clear lake';
+        // label connected lake-water components
+        const comp = Array.from({ length: H }, () => new Array(W).fill(-1));
+        let id = 0;
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            if (isLakeWater(x, y) && comp[y][x] === -1) {
+              const stack = [[x, y]];
+              comp[y][x] = id;
+              while (stack.length) {
+                const [cx, cy] = stack.pop();
+                for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+                  const nx = cx + dx, ny = cy + dy;
+                  if (isLakeWater(nx, ny) && comp[ny][nx] === -1) { comp[ny][nx] = id; stack.push([nx, ny]); }
+                }
+              }
+              id++;
+            }
+          }
+        }
+        if (id < 2) continue; // only one lake this seed
+        const cells = [];
+        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (comp[y][x] >= 0) cells.push([x, y, comp[y][x]]);
+        for (let i = 0; i < cells.length; i++) {
+          for (let j = i + 1; j < cells.length; j++) {
+            if (cells[i][2] !== cells[j][2]) {
+              const cheb = Math.max(Math.abs(cells[i][0] - cells[j][0]), Math.abs(cells[i][1] - cells[j][1]));
+              expect(cheb).toBeGreaterThanOrEqual(3); // >=2 land tiles between bodies
+            }
+          }
+        }
+      }
     });
 
     it('keeps the map playable with lakes present (towns + a starting town)', () => {

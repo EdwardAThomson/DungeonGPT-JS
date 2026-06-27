@@ -7,7 +7,12 @@ const TILE = 56; // larger tiles for readability (was 40 originally)
 
 // Beach offset: water sits on one edge of the tile, so overlays/sprites/marker are
 // nudged toward the land side. beachDirection: 0 = water North, 1 = East, 2 = South, 3 = West.
-const BEACH_SHIFT = ['translateY(10px)', 'translateX(-10px)', 'translateY(-10px)', 'translateX(10px)'];
+// 0-3 = water N/E/S/W (shift toward land); 4-7 = corner shores (shift diagonally toward sand).
+const BEACH_SHIFT = [
+  'translateY(10px)', 'translateX(-10px)', 'translateY(-10px)', 'translateX(10px)',     // 0-3 straight
+  'translate(-7px, 7px)', 'translate(-7px, -7px)', 'translate(7px, -7px)', 'translate(7px, 7px)', // 4-7 concave
+  'translate(-5px, 5px)', 'translate(-5px, -5px)', 'translate(5px, -5px)', 'translate(5px, 5px)',  // 8-11 convex
+];
 
 // SVG path definitions for different path/river directions (viewBox 40x40)
 const pathSVGs = {

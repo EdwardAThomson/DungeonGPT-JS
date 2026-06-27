@@ -45,6 +45,18 @@ describe('worldTileArt', () => {
     expect(n).not.toBe(e);
   });
 
+  test('corner beach shores (concave 4-7 + convex 8-11) render valid, distinct from straight', () => {
+    const straight = decode(biomeBackground({ biome: 'beach', beachDirection: 2 }));
+    const seen = new Set();
+    [4, 5, 6, 7, 8, 9, 10, 11].forEach((dir) => {
+      const svg = decode(biomeBackground({ biome: 'beach', beachDirection: dir }));
+      expect(svg).toContain('<polygon'); // diagonal sand/water boundary
+      expect(svg).not.toBe(straight);
+      seen.add(svg);
+    });
+    expect(seen.size).toBe(8); // all eight corner variants are distinct
+  });
+
   test('plains variant is deterministic per coordinate', () => {
     expect(biomeBackground({ biome: 'plains' }, 5, 6)).toBe(biomeBackground({ biome: 'plains' }, 5, 6));
     expect(biomeBackground({ biome: 'plains' }, 5, 6)).not.toBe(biomeBackground({ biome: 'plains' }, 9, 2));

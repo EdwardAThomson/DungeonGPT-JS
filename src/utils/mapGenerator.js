@@ -745,17 +745,35 @@ function isNearCoast(mapData, x, y, width, height) {
 //   rendering their single-tile ponds (going-forward-only; no migration). Lakes stay marked
 //   semantically via descriptionSeed ("A clear lake" / "A sandy lakeshore").
 function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains') {
-  // 1. Find a seed tile away from the border and clear of the coast, on open land.
+  // Keep lakes apart: no other water/beach (another lake or the coast) within this many
+  // tiles of any lake tile, so two lakes never crowd together (which produced ugly merged
+  // corners and a confused path squeezing through the gap). Tiles of THIS lake are excluded.
+  const SEPARATION = 2;
+  const lakeSet = new Set();
+  const clearOfOtherWater = (x, y) => {
+    for (let dy = -SEPARATION; dy <= SEPARATION; dy++) {
+      for (let dx = -SEPARATION; dx <= SEPARATION; dx++) {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+        const b = mapData[ny][nx].biome;
+        if ((b === 'water' || b === 'beach') && !lakeSet.has(`${nx},${ny}`)) return false;
+      }
+    }
+    return true;
+  };
+
+  // 1. Find a seed tile away from the border, clear of the coast, and clear of other lakes.
   let seed = null;
-  for (let attempt = 0; attempt < 50; attempt++) {
+  for (let attempt = 0; attempt < 60; attempt++) {
     const sx = 2 + Math.floor(rng() * (width - 4));
     const sy = 2 + Math.floor(rng() * (height - 4));
-    if (mapData[sy][sx].biome === landBiome && !isNearCoast(mapData, sx, sy, width, height)) {
+    if (mapData[sy][sx].biome === landBiome && !isNearCoast(mapData, sx, sy, width, height) && clearOfOtherWater(sx, sy)) {
       seed = { x: sx, y: sy };
       break;
     }
   }
-  if (!seed) return;
+  if (!seed) return; // no room for another well-separated lake — fine, fewer lakes
 
   // 2. Target a small multi-tile blob (~4-9 tiles), scaled modestly with map size so we
   //    never flood a small map.
@@ -768,6 +786,7 @@ function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains') {
     mapData[y][x].biome = 'water';
     mapData[y][x].descriptionSeed = 'A clear lake';
     lakeTiles.push({ x, y });
+    lakeSet.add(`${x},${y}`);
   };
   carve(seed.x, seed.y);
 
@@ -782,9 +801,35 @@ function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains') {
     // Keep at least one tile inside the border so there's room for a shore ring.
     if (nx < 1 || nx >= width - 1 || ny < 1 || ny >= height - 1) continue;
     const t = mapData[ny][nx];
-    if (t.biome === landBiome && !t.poi) {
+    // Don't grow toward another lake/coast either — preserve the separation gap.
+    if (t.biome === landBiome && !t.poi && clearOfOtherWater(nx, ny)) {
       carve(nx, ny);
     }
+  }
+
+  // 3b. Smooth the blob so the shore has only clean corners (straight / concave / convex).
+  //     Fill land tiles hugged by water on 3+ sides (peninsula notches/tips), 1-tile channel
+  //     dividers (water on opposite sides), and diagonal saddles (no orthogonal water but two
+  //     diagonal water) — the configurations the corner tiles can't render cleanly. The
+  //     clearOfOtherWater guard keeps this from chewing into the coast or a neighbouring lake.
+  const waterAt = (x, y) => x >= 0 && x < width && y >= 0 && y < height && mapData[y][x].biome === 'water';
+  for (let pass = 0; pass < 4; pass++) {
+    let changed = false;
+    for (let cy = 1; cy < height - 1; cy++) {
+      for (let cx = 1; cx < width - 1; cx++) {
+        const t = mapData[cy][cx];
+        if (t.biome !== landBiome || t.poi) continue;
+        const n = waterAt(cx, cy - 1), e = waterAt(cx + 1, cy), s = waterAt(cx, cy + 1), w = waterAt(cx - 1, cy);
+        const orth = n + e + s + w;
+        const diag = waterAt(cx + 1, cy - 1) + waterAt(cx + 1, cy + 1) + waterAt(cx - 1, cy + 1) + waterAt(cx - 1, cy - 1);
+        const fill = orth >= 3 || (n && s) || (e && w) || (orth === 0 && diag >= 2);
+        if (fill && clearOfOtherWater(cx, cy)) {
+          carve(cx, cy);
+          changed = true;
+        }
+      }
+    }
+    if (!changed) break;
   }
 
   // 4. Lay down the shore ring.
@@ -795,34 +840,56 @@ function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains') {
 // beachDirection pointing at the nearest water (N=0, E=1, S=2, W=3 — the placeCoast
 // convention). Only converts land of the map's base biome, so existing coast water/beach is
 // left untouched.
-function addLakeShores(mapData, lakeTiles, width, height, landBiome) {
-  const neigh = [
+export function addLakeShores(mapData, lakeTiles, width, height, landBiome) {
+  const ORTH = [
     { dx: 0, dy: -1, dir: 0 }, // water North
     { dx: 1, dy: 0, dir: 1 },  // water East
     { dx: 0, dy: 1, dir: 2 },  // water South
     { dx: -1, dy: 0, dir: 3 }, // water West
   ];
+  // diagonal-only neighbours -> convex outer-corner beaches (codes 8-11)
+  const DIAG = [
+    { dx: 1, dy: -1, code: 8 },  // water NE
+    { dx: 1, dy: 1, code: 9 },   // water SE
+    { dx: -1, dy: 1, code: 10 }, // water SW
+    { dx: -1, dy: -1, code: 11 },// water NW
+  ];
+  const CORNER = { '0,1': 4, '1,2': 5, '2,3': 6, '0,3': 7 }; // concave: water on two adjacent sides
+  const isWater = (x, y) => x >= 0 && x < width && y >= 0 && y < height && mapData[y][x].biome === 'water';
   const seen = new Set();
+  // Visit ALL 8 neighbours of every lake tile so convex corners (touched only on a
+  // diagonal) get shored too — those were the grass gaps between the straight/concave pieces.
+  const candidates = [...ORTH, ...DIAG];
   for (const { x, y } of lakeTiles) {
-    for (const d of neigh) {
-      const sx = x + d.dx;
-      const sy = y + d.dy;
+    for (const n of candidates) {
+      const sx = x + n.dx;
+      const sy = y + n.dy;
       const key = `${sx},${sy}`;
       if (seen.has(key)) continue;
       seen.add(key);
       if (sx < 0 || sx >= width || sy < 0 || sy >= height) continue;
       const shore = mapData[sy][sx];
       if (shore.biome !== landBiome) continue; // skip the lake itself, coast, etc.
-      // Point the shore at the first water tile around it.
-      for (const e of neigh) {
-        const wx = sx + e.dx;
-        const wy = sy + e.dy;
-        if (wx < 0 || wx >= width || wy < 0 || wy >= height) continue;
-        if (mapData[wy][wx].biome === 'water') {
+
+      const waterDirs = ORTH.filter((o) => isWater(sx + o.dx, sy + o.dy)).map((o) => o.dir);
+      if (waterDirs.length >= 1) {
+        // straight edge (1) or concave corner (2 adjacent)
+        shore.biome = 'beach';
+        shore.descriptionSeed = 'A sandy lakeshore';
+        if (waterDirs.length >= 2) {
+          const a = Math.min(waterDirs[0], waterDirs[1]);
+          const b = Math.max(waterDirs[0], waterDirs[1]);
+          shore.beachDirection = CORNER[`${a},${b}`] !== undefined ? CORNER[`${a},${b}`] : waterDirs[0];
+        } else {
+          shore.beachDirection = waterDirs[0];
+        }
+      } else {
+        // no orthogonal water — convex outer corner if a diagonal is water
+        const d = DIAG.find((dd) => isWater(sx + dd.dx, sy + dd.dy));
+        if (d) {
           shore.biome = 'beach';
-          shore.beachDirection = e.dir;
           shore.descriptionSeed = 'A sandy lakeshore';
-          break;
+          shore.beachDirection = d.code;
         }
       }
     }

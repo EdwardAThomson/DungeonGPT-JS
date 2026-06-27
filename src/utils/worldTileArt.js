@@ -109,14 +109,37 @@ const lake = (seed) => {
 };
 
 // beachDirection: 0 = water North, 1 = East, 2 = South, 3 = West
+// Straight edges use dir 0-3 (water N/E/S/W). Corner shores use 4-7 (water wraps two
+// adjacent sides) and render a diagonal sand/water boundary so lake corners aren't a hard
+// 90 degrees: 4 = water NE, 5 = SE, 6 = SW, 7 = NW.
+// Chamfer through the edge MIDPOINTS (20) so corner tiles meet the half-water straight
+// tiles exactly at the shared borders (no notches at the seams).
+const BEACH_CORNERS = {
+  // 4-7: concave corners (water on two adjacent sides) — water fills most of the tile
+  4: { poly: '0,0 40,0 40,40 20,40 0,20', foam: 'M20 40 L0 20' }, // water NE, sand SW
+  5: { poly: '20,0 40,0 40,40 0,40 0,20', foam: 'M20 0 L0 20' },  // water SE, sand NW
+  6: { poly: '0,0 20,0 40,20 40,40 0,40', foam: 'M20 0 L40 20' }, // water SW, sand NE
+  7: { poly: '0,0 40,0 40,20 20,40 0,40', foam: 'M40 20 L20 40' }, // water NW, sand SE
+  // 8-11: convex outer corners (lake touches only this diagonal) — small water bite in the corner
+  8: { poly: '40,0 20,0 40,20', foam: 'M20 0 L40 20' },   // water NE corner
+  9: { poly: '40,40 20,40 40,20', foam: 'M20 40 L40 20' }, // water SE corner
+  10: { poly: '0,40 20,40 0,20', foam: 'M20 40 L0 20' },   // water SW corner
+  11: { poly: '0,0 20,0 0,20', foam: 'M20 0 L0 20' },      // water NW corner
+};
 const beach = (dir) => {
+  const base = `<rect width='40' height='40' fill='${C.sand}'/>${sandNoise(dir)}`;
+  const corner = BEACH_CORNERS[dir];
+  if (corner) {
+    return wrap(`${base}<polygon points='${corner.poly}' fill='${C.water}'/>` +
+      `<path d='${corner.foam}' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`);
+  }
   let waterRect = '';
   let shore = '';
   if (dir === 0) { waterRect = `<rect x='0' y='0' width='40' height='20' fill='${C.water}'/>`; shore = `<path d='M0 20 q10 -3 20 0 t20 0' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`; }
   else if (dir === 1) { waterRect = `<rect x='20' y='0' width='20' height='40' fill='${C.water}'/>`; shore = `<path d='M20 0 q3 10 0 20 t0 20' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`; }
   else if (dir === 2) { waterRect = `<rect x='0' y='20' width='40' height='20' fill='${C.water}'/>`; shore = `<path d='M0 20 q10 3 20 0 t20 0' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`; }
   else { waterRect = `<rect x='0' y='0' width='20' height='40' fill='${C.water}'/>`; shore = `<path d='M20 0 q-3 10 0 20 t0 20' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`; }
-  return wrap(`<rect width='40' height='40' fill='${C.sand}'/>${sandNoise(dir)}${waterRect}${shore}`);
+  return wrap(`${base}${waterRect}${shore}`);
 };
 
 const desert = (seed) => {
