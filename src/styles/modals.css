@@ -116,6 +116,12 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* Size to the map (town maps are 20x20 -> ~840px) instead of the generic 600px cap;
+     grow up to the viewport, and scroll only if it still doesn't fit. */
+  width: auto;
+  max-width: min(96vw, 980px);
+  max-height: 92vh;
+  overflow: auto;
 }
 
 .dice-modal {
@@ -225,6 +231,28 @@
   font-size: 12px;
   color: var(--text-secondary);
   margin-top: 5px;
+}
+
+/* Map modal action buttons in one horizontal row (saves vertical space) */
+.map-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: stretch;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+/* Normalise every button in the row so they share one height/thickness and baseline
+   (the close button otherwise carries a 25px top margin + its own padding). */
+.map-modal-actions button {
+  margin: 0;
+  padding: 10px 22px;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Ensure map grid margins are suitable inside modal */

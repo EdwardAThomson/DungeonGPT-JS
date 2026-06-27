@@ -9,6 +9,9 @@
   padding-top: 15px;
   border-top: 1px solid var(--state-muted-strong);
   text-align: center;
+  /* larger tiles can exceed the modal width — scroll instead of clipping */
+  max-width: 100%;
+  overflow: auto;
 }
 
 .world-map-container h4 {

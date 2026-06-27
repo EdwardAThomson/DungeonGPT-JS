@@ -55,28 +55,6 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                                 {townError}
                             </div>
                         )}
-                        {isOnTown && (
-                            <div style={{ textAlign: 'center', marginTop: '10px' }}>
-                                <button
-                                    className="primary-button"
-                                    onClick={() => {
-                                        onEnterCurrentTown();
-                                        // Don't close modal - it will switch to town view
-                                    }}
-                                    style={{ marginRight: '10px' }}
-                                    disabled={!hasAdventureStarted}
-                                    aria-label={isInsideTown ? `View ${currentTile.townName || currentTile.poi} map` : `Enter ${currentTile.townName || currentTile.poi}`}
-                                    title={!hasAdventureStarted ? 'Start the adventure first' : ''}
-                                >
-                                    {isInsideTown ? `View ${currentTile.townName || currentTile.poi} Map` : `Enter ${currentTile.townName || currentTile.poi}`}
-                                </button>
-                                {!hasAdventureStarted && (
-                                    <p className="town-entrance-warning">
-                                        Start your adventure to enter towns
-                                    </p>
-                                )}
-                            </div>
-                        )}
                     </>
                 ) : (
                     <TownMapDisplay
@@ -86,6 +64,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                         onTileClick={onTownTileClick}
                         firstHero={firstHero}
                         townError={townError}
+                        showLeaveButton={false}
                         markBuildingDiscovered={markBuildingDiscovered}
                         onQuestItemFound={onQuestItemFound}
                         onRest={onRest}
@@ -93,9 +72,31 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                         party={party}
                     />
                 )}
-                    <button className="modal-close-button" onClick={onClose} aria-label="Close map modal">
-                        Close Map
-                    </button>
+                    {/* All actions in one horizontal row to save vertical space */}
+                    <div className="map-modal-actions">
+                        {mapLevel === 'town' && onLeaveTown && (
+                            <button className="secondary-button" onClick={onLeaveTown} aria-label="Leave town">
+                                Leave Town
+                            </button>
+                        )}
+                        {mapLevel === 'world' && isOnTown && (
+                            <button
+                                className="primary-button"
+                                onClick={() => { onEnterCurrentTown(); /* keep modal open; it switches to town view */ }}
+                                disabled={!hasAdventureStarted}
+                                aria-label={isInsideTown ? `View ${currentTile.townName || currentTile.poi} map` : `Enter ${currentTile.townName || currentTile.poi}`}
+                                title={!hasAdventureStarted ? 'Start the adventure first' : ''}
+                            >
+                                {isInsideTown ? `View ${currentTile.townName || currentTile.poi} Map` : `Enter ${currentTile.townName || currentTile.poi}`}
+                            </button>
+                        )}
+                        <button className="modal-close-button" onClick={onClose} aria-label="Close map modal">
+                            Close Map
+                        </button>
+                    </div>
+                    {mapLevel === 'world' && isOnTown && !hasAdventureStarted && (
+                        <p className="town-entrance-warning">Start your adventure to enter towns</p>
+                    )}
                 </div>
             </FocusTrap>
         </div>
