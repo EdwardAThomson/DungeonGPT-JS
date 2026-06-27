@@ -17,11 +17,10 @@ import GameModals from '../components/GameModals';
 import ModalShell from '../components/ModalShell';
 import { calculateMaxHP, shortRest, longRest } from '../utils/healthSystem';
 import { composeMovementNarrativePrompt } from '../game/promptComposer';
-import { composeLocalMovementNarrative } from '../game/localNarrator';
+import { composeLocalMovementNarrative, composeLocalAmbientNarrative } from '../game/localNarrator';
 import { generateMovementNarrative } from '../game/movementController';
 import {
   applyWorldMapMove,
-  buildMovementSystemMessage,
   buildPendingNarrativeTile,
   buildPoiEncounter,
   getAreaIdentifiers,
@@ -123,6 +122,13 @@ const Game = () => {
     subMapsObj?.movesSinceEncounter || 0
   );
   const [pendingNarrativeTile, setPendingNarrativeTile] = useState(null);
+  // Smart narration (B3b): movement appends a local line; full AI narration is on
+  // demand (Look-around / typed actions). A narrative-tier encounter detected on a
+  // move is parked here so an on-demand Look-around can still weave it into the AI
+  // description (movement itself no longer auto-narrates it).
+  const [pendingLookEncounter, setPendingLookEncounter] = useState(null);
+  // Bumped on each guest/local Look-around so repeated looks at the same tile vary.
+  const lookNonceRef = useRef(0);
   const [aiNarrativeEnabled, setAiNarrativeEnabled] = useState(true);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [isMobilePartySidebarOpen, setIsMobilePartySidebarOpen] = useState(false);
@@ -314,7 +320,24 @@ const Game = () => {
     interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
   };
 
-  // --- Map Movement Handler with AI ---
+  // On-demand local ambient line for the Look-around button on the no-AI path
+  // (guests, or master toggle off). Deterministic per tile, but varied across
+  // repeated looks via a click nonce. No /api/ai call.
+  const appendLocalAmbientNarrative = ({ tile, coords }) => {
+    const nonce = lookNonceRef.current++;
+    const text = composeLocalAmbientNarrative({
+      tile,
+      coords,
+      worldSeed,
+      worldMap: mapHook.worldMap,
+      settings,
+      nonce
+    });
+    if (!text || !text.trim()) return;
+    interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
+  };
+
+  // --- Map Movement Handler (Smart narration: local line per move, AI on demand) ---
   const handleMoveOnWorldMap = async (clickedX, clickedY) => {
     if (!hasAdventureStarted || interactionHook.isLoading) return;
 
@@ -410,69 +433,78 @@ const Game = () => {
 
     if (plannedEncounterFlow.flowType === 'immediate') {
       setPendingNarrativeTile(plannedEncounterFlow.pendingNarrativeTile || null);
-      return; // AI narrative triggers after encounter resolution
+      return; // local narration triggers after encounter resolution
     }
 
-    let activeNarrativeEncounter = null;
+    // A narrative-tier encounter on this tile is parked for the Look-around button
+    // (movement no longer auto-narrates). Cleared otherwise so it doesn't leak to a
+    // later tile.
     if (plannedEncounterFlow.flowType === 'narrative_context') {
-      activeNarrativeEncounter = plannedEncounterFlow.narrativeEncounter;
+      setPendingLookEncounter(plannedEncounterFlow.narrativeEncounter || null);
+    } else {
+      setPendingLookEncounter(null);
     }
 
-    // Always generate AI narrative for world map movement (unless disabled)
-    // First visit to a new biome/town gets a richer description
+    // Smart narration (B3b): every move — guest OR signed-in — appends a short local
+    // templated line. No automatic /api/ai call; full AI narration is on demand only
+    // (Look-around button + typed free-text actions). aiNarrativeEnabled stays as a
+    // master on/off for the local lines.
+    // First visit to a new biome/town gets a richer arrival line.
     const isNewArea = !isBiomeVisited || (townName && !isTownVisited);
+    if (aiNarrativeEnabled) {
+      appendLocalMovementNarrative({ tile: targetTile, coords: { x: clickedX, y: clickedY }, isNewArea });
+    }
+  };
 
-    // Guests (no AI) get local, templated narration instead of silence.
-    if (!aiAvailable) {
-      if (aiNarrativeEnabled) {
-        appendLocalMovementNarrative({ tile: targetTile, coords: { x: clickedX, y: clickedY }, isNewArea });
-      }
+  // --- Look-around: on-demand description of the CURRENT tile ---
+  // Signed-in -> full AI location narration (reuses the movement-narrative path).
+  // Guest / master-off -> a local ambient line, never /api/ai. Respects isLoading so
+  // repeated clicks don't fire concurrent requests.
+  const handleLookAround = async () => {
+    if (!hasAdventureStarted || interactionHook.isLoading) return;
+
+    const { x, y } = mapHook.playerPosition;
+    const tile = getTile(mapHook.worldMap, x, y);
+    if (!tile) return;
+    const coords = { x, y };
+
+    // No-AI path (guests, or master toggle off): local ambient line.
+    if (!aiAvailable || !aiNarrativeEnabled) {
+      appendLocalAmbientNarrative({ tile, coords });
       return;
     }
-
-    // Skip AI narrative if toggle is disabled (for testing).
-    if (!aiNarrativeEnabled) {
-      return;
-    }
-
-    // API keys are now configured server-side in .env file
-    // CLI providers use OAuth/local auth, cloud providers use server .env keys
 
     const resolvedModel = resolveProviderAndModel(selectedProvider, selectedModel);
-
-    const systemMessage = buildMovementSystemMessage({
-      targetTile,
-      biomeType,
-      clickedX,
-      clickedY
-    });
-    interactionHook.setConversation(prev => [...prev, systemMessage]);
     interactionHook.setIsLoading(true);
 
     // Query RAG for relevant past events (appended at end for cache-friendliness)
     let ragContext = '';
     if (sessionId) {
       try {
-        const tileDesc = `${targetTile.biome} ${targetTile.poi || ''} ${targetTile.townName || ''}`.trim();
+        const tileDesc = `${tile.biome} ${tile.poi || ''} ${tile.townName || ''}`.trim();
         const ragResults = await ragQuery(sessionId, tileDesc);
         if (ragResults.length > 0) {
           ragContext = '\n\n[RECALLED MEMORIES FROM PAST EVENTS]\n' +
             ragResults.map(r => `- ${r.text.slice(0, 300)}`).join('\n');
         }
       } catch (err) {
-        logger.warn('RAG query failed for movement, continuing without:', err);
+        logger.warn('RAG query failed for look-around, continuing without:', err);
       }
     }
 
+    // Consume any parked narrative-tier encounter so the AI can weave it in.
+    const narrativeEncounter = pendingLookEncounter;
+    if (narrativeEncounter) setPendingLookEncounter(null);
+
     const { fullPrompt } = composeMovementNarrativePrompt({
-      tile: targetTile,
-      coords: { x: clickedX, y: clickedY },
+      tile,
+      coords,
       settings,
       selectedHeroes,
       currentSummary: interactionHook.currentSummary,
-      narrativeEncounter: activeNarrativeEncounter,
+      narrativeEncounter,
       worldMap: mapHook.worldMap,
-      isNewArea,
+      isNewArea: true,
       conversation: interactionHook.conversation,
       includeRecentContext: true,
       ragContext
@@ -488,7 +520,7 @@ const Game = () => {
       });
       interactionHook.setProgressStatus(null);
       if (!aiResponse || !aiResponse.trim()) {
-        logger.warn('Empty movement AI response, skipping');
+        logger.warn('Empty look-around AI response, skipping');
         return;
       }
       const aiMessage = { role: 'ai', content: aiResponse };
@@ -497,12 +529,12 @@ const Game = () => {
         // Fire-and-forget: embed for RAG
         if (sessionId) {
           embedAndStore(sessionId, aiResponse, { msgIndex: updated.length - 1 })
-            .catch(err => logger.warn('RAG embed failed (movement):', err));
+            .catch(err => logger.warn('RAG embed failed (look-around):', err));
         }
         return updated;
       });
     } catch (error) {
-      logger.error('Movement AI error', error);
+      logger.error('Look-around AI error', error);
       interactionHook.setError(error.message);
       interactionHook.setProgressStatus(null);
     } finally {
@@ -572,65 +604,16 @@ const Game = () => {
     // Trigger immediate save after encounter to preserve rewards
     setTimeout(() => performSave(), 500);
 
-    // Trigger deferred AI narrative if there's a pending tile
+    // Trigger deferred narration if there's a pending tile. Smart narration (B3b):
+    // the post-encounter move gets the same local templated line as any other move,
+    // for everyone — no automatic AI call. The player can Look-around for full AI.
     if (!pendingNarrativeTile) return;
     const { tile, coords, needsAiDescription } = pendingNarrativeTile;
     setPendingNarrativeTile(null);
 
-    // Guests (no AI): append local templated narration for the post-encounter tile.
-    if (!aiAvailable) {
-      if (aiNarrativeEnabled) {
-        appendLocalMovementNarrative({ tile, coords, isNewArea: !!needsAiDescription, heroes: updatedParty });
-      }
-      return;
+    if (aiNarrativeEnabled) {
+      appendLocalMovementNarrative({ tile, coords, isNewArea: !!needsAiDescription, heroes: updatedParty });
     }
-
-    if (!needsAiDescription || !aiNarrativeEnabled) return;
-
-    (async () => {
-      const resolvedModel = resolveProviderAndModel(selectedProvider, selectedModel);
-      const { fullPrompt } = composeMovementNarrativePrompt({
-        tile,
-        coords,
-        settings,
-        selectedHeroes: updatedParty,
-        currentSummary: interactionHook.currentSummary,
-        narrativeEncounter: null,
-        worldMap: mapHook.worldMap,
-        isNewArea: true,
-        conversation: interactionHook.conversation,
-        includeRecentContext: false
-      });
-
-      interactionHook.setIsLoading(true);
-      try {
-        const aiResponse = await generateMovementNarrative({
-          provider: resolvedModel.provider,
-          model: resolvedModel.model,
-          prompt: fullPrompt,
-          onProgress: (p) => interactionHook.setProgressStatus(p)
-        });
-        interactionHook.setProgressStatus(null);
-        if (!aiResponse || !aiResponse.trim()) {
-          logger.warn('Empty post-encounter AI response, skipping');
-          return;
-        }
-        const aiMessage = { role: 'ai', content: aiResponse };
-        interactionHook.setConversation((prev) => {
-          const updated = [...prev, aiMessage];
-          if (sessionId) {
-            embedAndStore(sessionId, aiResponse, { msgIndex: updated.length - 1 })
-              .catch(err => logger.warn('RAG embed failed (post-encounter):', err));
-          }
-          return updated;
-        });
-      } catch (error) {
-        logger.error('Post-encounter AI narrative error', error);
-        interactionHook.setProgressStatus(null);
-      } finally {
-        interactionHook.setIsLoading(false);
-      }
-    })();
   };
 
   const currentTile = getTile(mapHook.worldMap, mapHook.playerPosition.x, mapHook.playerPosition.y);
@@ -719,6 +702,7 @@ const Game = () => {
             }
           })}
           onOpenHowToPlay={openHowToPlay}
+          onLookAround={handleLookAround}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
           onManualSave={async () => {
             const timestamp = new Date();

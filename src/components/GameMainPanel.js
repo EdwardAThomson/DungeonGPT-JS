@@ -12,6 +12,7 @@ const GameMainPanel = ({
   onOpenMap,
   onOpenInventory,
   onOpenHowToPlay,
+  onLookAround,
   onOpenSettings,
   onManualSave,
   canManualSave,
@@ -52,6 +53,11 @@ const GameMainPanel = ({
             <button onClick={onOpenMap} className="view-map-button" data-tour="open-map" aria-label={townName ? `View ${townName} map` : 'View world map'}>
               <span aria-hidden="true">🗺️</span> {townName ? `${townName} Map` : 'Map'}
             </button>
+            {hasAdventureStarted && (
+              <button onClick={onLookAround} className="look-around-button" disabled={isLoading} aria-label="Look around the current location">
+                <span aria-hidden="true">🔍</span> Look around
+              </button>
+            )}
             <button onClick={onOpenInventory} className="view-settings-button" aria-label="Open party inventory">
               <span aria-hidden="true">📦</span> Inventory
             </button>

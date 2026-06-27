@@ -1,4 +1,4 @@
-import { composeLocalMovementNarrative, __test__ } from './localNarrator';
+import { composeLocalMovementNarrative, composeLocalAmbientNarrative, __test__ } from './localNarrator';
 
 const plainsTile = { biome: 'plains', poi: null, x: 3, y: 4, descriptionSeed: 'Open fields' };
 const desertTile = { biome: 'desert', poi: null, x: 3, y: 4, descriptionSeed: 'Open desert' };
@@ -164,5 +164,61 @@ describe('composeLocalMovementNarrative', () => {
   it('returns an empty string for a missing tile', () => {
     expect(composeLocalMovementNarrative({ tile: null })).toBe('');
     expect(composeLocalMovementNarrative({})).toBe('');
+  });
+});
+
+describe('composeLocalAmbientNarrative (Look-around, no-AI path)', () => {
+  it('is deterministic for the same tile + seed + nonce', () => {
+    const a = composeLocalAmbientNarrative({ tile: plainsTile, coords: { x: 3, y: 4 }, worldSeed: 12345, nonce: 0 });
+    const b = composeLocalAmbientNarrative({ tile: plainsTile, coords: { x: 3, y: 4 }, worldSeed: 12345, nonce: 0 });
+    expect(a).toBe(b);
+    expect(a.length).toBeGreaterThan(0);
+  });
+
+  it('varies across nonces so repeated looks at one tile differ', () => {
+    const texts = new Set();
+    for (let n = 0; n < 6; n++) {
+      texts.add(composeLocalAmbientNarrative({ tile: plainsTile, coords: { x: 3, y: 4 }, worldSeed: 7, nonce: n }));
+    }
+    expect(texts.size).toBeGreaterThan(1);
+  });
+
+  it('is biome-aware (desert vs snow vocabulary)', () => {
+    let desertText = '';
+    let snowText = '';
+    for (let n = 0; n < 6; n++) {
+      desertText += ' ' + composeLocalAmbientNarrative({ tile: desertTile, coords: { x: 1, y: 1 }, worldSeed: 5, nonce: n });
+      snowText += ' ' + composeLocalAmbientNarrative({ tile: snowTile, coords: { x: 1, y: 1 }, worldSeed: 5, nonce: n });
+    }
+    expect(desertText.toLowerCase()).toMatch(/sand|dune|desert|heat|vulture/);
+    expect(snowText.toLowerCase()).toMatch(/snow|frozen|cold|ice|frost|wind/);
+  });
+
+  it('uses asterisk italics and never underscore-italics', () => {
+    for (let n = 0; n < 5; n++) {
+      const text = composeLocalAmbientNarrative({ tile: forestTile, coords: { x: 2, y: 2 }, worldSeed: 9, nonce: n });
+      expect(text).toMatch(/\*[^*]+\*/);
+      expect(text).not.toMatch(/_[^_\s][^_]*_/);
+    }
+  });
+
+  it('mentions a notable neighbouring tile', () => {
+    const worldMap = [
+      [{ biome: 'plains', poi: null }, { biome: 'plains', poi: null }, { biome: 'plains', poi: null }],
+      [{ biome: 'plains', poi: null }, { biome: 'plains', poi: null }, { biome: 'plains', poi: 'mountain' }],
+      [{ biome: 'plains', poi: null }, { biome: 'plains', poi: null }, { biome: 'plains', poi: null }]
+    ];
+    const text = composeLocalAmbientNarrative({
+      tile: { biome: 'plains', poi: null, x: 1, y: 1 },
+      coords: { x: 1, y: 1 },
+      worldSeed: 11,
+      worldMap
+    });
+    expect(text.toLowerCase()).toContain('mountains rise to the east');
+  });
+
+  it('returns an empty string for a missing tile', () => {
+    expect(composeLocalAmbientNarrative({ tile: null })).toBe('');
+    expect(composeLocalAmbientNarrative({})).toBe('');
   });
 });

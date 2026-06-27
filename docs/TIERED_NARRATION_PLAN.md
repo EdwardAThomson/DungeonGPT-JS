@@ -1,7 +1,12 @@
 # Tiered Narration Plan — local templated prose + AI for the moments that matter
 
-Status: **Design / not started.** Generalizes Phase B3 of `GUEST_MODE_PLAN.md` (local
+Status: **B3a + B3b shipped.** Generalizes Phase B3 of `GUEST_MODE_PLAN.md` (local
 movement narration for guests) into an app-wide narration-cost lever for all players.
+
+> **B3b shipped as a simpler "Smart by default" model (supersedes the scorer + 3-way
+> setting sketched below).** See [B3b — what actually shipped](#b3b--what-actually-shipped-2026-06).
+> The weighted `shouldUseAiNarration` scorer and the Full-AI / Smart / Local-only
+> setting were **not** built; they're kept below only as possible future refinements.
 
 ## Problem
 
@@ -203,6 +208,49 @@ gate for Phase 2** — Smart mode must not promote until the local prose is prov
 - **Why it matters (cost/latency/scale).** This is the lever that keeps AI spend and latency
   sane as play scales, and it's what makes richer guest play possible — reserve LLM calls
   for novel/notable beats, template the routine.
+
+## B3b — what actually shipped (2026-06)
+
+B3b shipped as a deliberately simpler model than the scorer + 3-way setting above. The
+key realization: we don't need to *decide* whether a move is "worth" an AI call — we can
+just make routine narration always-local and let the player *pull* AI when they want it.
+
+**The behaviour, for everyone (no setting):**
+
+- **Movement = a local templated line.** Every world-map move — guest *and* signed-in —
+  appends one deterministic `composeLocalMovementNarrative` line (the same B3a guest
+  path). Moving no longer auto-calls `/api/ai`. This covers both the immediate-move path
+  and the deferred post-encounter path (the `pendingNarrativeTile` flow in
+  `handleEncounterResolve`).
+- **AI narration is on demand, two ways:**
+  1. **🔍 Look-around button** (`GameMainPanel`, shown once `hasAdventureStarted`):
+     signed-in → full AI description of the *current* tile via the existing
+     `composeMovementNarrativePrompt` → `generateMovementNarrative` path
+     (`handleLookAround` in `Game.js`); guest / master-off → a local ambient line via
+     `composeLocalAmbientNarrative` (**never** `/api/ai`). Respects `isLoading` to avoid
+     concurrent requests.
+  2. **Typed free-text actions** — unchanged; still go to the AI DM for signed-in
+     players, still gated behind sign-in for guests.
+- **Intro and encounter narration are unchanged** (AI for signed-in; local intro for
+  guests; deterministic templated combat for all).
+- A narrative-tier encounter detected on a move is parked (`pendingLookEncounter`) and
+  woven into the next Look-around's AI prompt, so encounter detection still "works."
+- `aiNarrativeEnabled` was **kept** as a master on/off for the local lines (not removed),
+  rather than being replaced by the 3-way mode.
+
+**What this deliberately did *not* build (future refinements):**
+
+- The weighted `shouldUseAiNarration(tile, context)` scorer (novelty / milestone /
+  momentum / party-state signals). Smart-by-pull made auto-scoring unnecessary for now.
+- The Full-AI / Smart / Local-only **setting** + boolean migration. There is no narration
+  setting yet; Smart-by-pull is simply the behaviour. A setting could return later if
+  players want always-on AI movement narration back.
+- Telemetry / tuning (Phase 3) — not needed without a scorer to tune.
+
+**Files touched:** `src/game/localNarrator.js` (added `composeLocalAmbientNarrative`;
+modestly expanded revisit pools), `src/pages/Game.js` (rerouted movement narration,
+added `handleLookAround`), `src/components/GameMainPanel.js` + `src/styles/game.css`
+(Look-around button), `src/game/localNarrator.test.js` (ambient-composer tests).
 
 ## Open questions
 

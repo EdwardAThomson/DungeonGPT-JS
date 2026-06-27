@@ -262,6 +262,7 @@
 
 .view-settings-button,
 .how-to-play-button,
+.look-around-button,
 .view-map-button,
 .manual-save-button {
   background-color: var(--bg);
@@ -279,11 +280,18 @@
 
 .view-settings-button:hover,
 .how-to-play-button:hover,
+.look-around-button:hover,
 .manual-save-button:hover {
   background-color: var(--surface);
   border-color: var(--primary);
   color: var(--primary);
   transform: translateY(-1px);
+}
+
+.look-around-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* Map is the primary navigation action — make it stand out. */

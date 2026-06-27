@@ -96,7 +96,9 @@ const TEMPLATES = {
     revisit: [
       'Familiar grassland spreads around the party again, the wind never quite still.',
       'The party moves on across more open fields, the grass tugging at their boots.',
-      'More rolling plains, the same restless grass bending in the breeze.'
+      'More rolling plains, the same restless grass bending in the breeze.',
+      'The open country goes on, one field much like the last under the wide sky.',
+      'The party tramps on through the grass, the horizon no nearer than before.'
     ],
     ambient: [
       'A hawk wheels somewhere high overhead.',
@@ -115,7 +117,9 @@ const TEMPLATES = {
     revisit: [
       'More burning sand, the dunes blurring together in the haze.',
       'The party pushes on across the parched desert, throats already dry.',
-      'Another stretch of shadeless sand, the heat pressing down like a hand.'
+      'Another stretch of shadeless sand, the heat pressing down like a hand.',
+      'The dunes roll on without end, every crest the same as the last.',
+      'The party trudges deeper into the waste, sand grinding in every seam.'
     ],
     ambient: [
       'Sand hisses across the dunes on a hot, gritty wind.',
@@ -134,7 +138,9 @@ const TEMPLATES = {
     revisit: [
       'More frozen ground, the snow squeaking underfoot.',
       'The party trudges on through the cold, fingers numb in the wind.',
-      'Another white expanse, the chill working deeper into their bones.'
+      'Another white expanse, the chill working deeper into their bones.',
+      'The snow stretches on, every drift the twin of the last.',
+      'The party presses deeper into the cold, breath freezing on their scarves.'
     ],
     ambient: [
       'Fine snow sifts down from a low grey sky.',
@@ -191,7 +197,9 @@ const TEMPLATES = {
     revisit: [
       'More close-grown trees, the same hush settling over the party.',
       'The party moves deeper among the trunks, twigs snapping underfoot.',
-      'Familiar woodland shadow folds around them again.'
+      'Familiar woodland shadow folds around them again.',
+      'The trees crowd on, the green gloom unbroken ahead.',
+      'The party threads further into the woods, roots catching at their boots.'
     ],
     ambient: [
       'Birdsong filters down through the leaves.',
@@ -229,7 +237,9 @@ const TEMPLATES = {
     revisit: [
       'More loose rock and steep ground, the climb no gentler than before.',
       'The party picks its way on across the stony heights.',
-      'Familiar crags rise around them, cold wind pouring down the slopes.'
+      'Familiar crags rise around them, cold wind pouring down the slopes.',
+      'The broken rock goes on, the path picking endlessly up and over.',
+      'The party scrambles higher, scree shifting away beneath their boots.'
     ],
     ambient: [
       'Loose stones clatter away down the slope.',
@@ -248,7 +258,9 @@ const TEMPLATES = {
     revisit: [
       'More rolling hills, the climbs and descents blurring together.',
       'The party tops another rise and starts down the far side.',
-      'Familiar green slopes rise and fall around them.'
+      'Familiar green slopes rise and fall around them.',
+      'The hills go on, each crest hiding another fold of land beyond.',
+      'The party labours up yet another slope, legs aching from the last.'
     ],
     ambient: [
       'Wind combs through the long hilltop grass.',
@@ -446,6 +458,57 @@ export const composeLocalMovementNarrative = ({
   if (neighbourClause) tail.push(neighbourClause);
   if (tail.length) sentences.push(`*${tail.join(' ')}*`);
   if (partyClause) sentences.push(partyClause);
+
+  return sentences.join(' ');
+};
+
+// --- Ambient "look around" composer ---------------------------------------------
+// On-demand observation of the CURRENT tile, used by the Look-around button for the
+// no-AI (guest / master-off) path. Reuses the per-terrain ambient pools but frames
+// them as the party deliberately taking stock, and stacks two sensory details for a
+// richer beat than a passing movement line. A `nonce` lets the caller (e.g. a click
+// counter) vary repeated looks at the same tile; with the default nonce it stays
+// deterministic per (worldSeed, coords) like the movement composer.
+const LOOK_OPENERS = [
+  'The party pauses to take in their surroundings.',
+  'You stop and look around, letting your eyes settle on the place.',
+  'The party halts a moment, taking stock of the land about them.',
+  'You take a slow look around, marking what stands out.',
+  'The party stands still and lets the place reveal itself.'
+];
+
+export const composeLocalAmbientNarrative = ({
+  tile,
+  coords = {},
+  worldSeed = null,
+  worldMap = null,
+  settings = {}, // eslint-disable-line no-unused-vars
+  nonce = 0
+} = {}) => {
+  if (!tile) return '';
+  const x = coords.x != null ? coords.x : tile.x;
+  const y = coords.y != null ? coords.y : tile.y;
+  const rng = mulberry32(hashSeed([worldSeed == null ? 'noseed' : worldSeed, x, y, 'look', nonce]));
+
+  const key = resolveTerrainKey(tile);
+  const pool = poolFor(key);
+
+  const opener = LOOK_OPENERS[Math.floor(rng() * LOOK_OPENERS.length)];
+
+  // Two distinct sensory details (avoid an immediate duplicate) for a fuller look.
+  const a1 = pool.ambient[Math.floor(rng() * pool.ambient.length)];
+  let a2 = pool.ambient[Math.floor(rng() * pool.ambient.length)];
+  if (a2 === a1 && pool.ambient.length > 1) {
+    a2 = pool.ambient[(pool.ambient.indexOf(a1) + 1) % pool.ambient.length];
+  }
+
+  const neighbourClause = buildNeighbourClause({ x, y }, worldMap, rng);
+
+  const tail = [a1];
+  if (a2 && a2 !== a1) tail.push(a2);
+
+  const sentences = [opener, `*${tail.join(' ')}*`];
+  if (neighbourClause) sentences.push(neighbourClause);
 
   return sentences.join(' ');
 };
