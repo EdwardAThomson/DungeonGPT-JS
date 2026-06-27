@@ -728,19 +728,103 @@ function isNearCoast(mapData, x, y, width, height) {
   return false;
 }
 
-// Place a single lake tile. landBiome is the map's dry-land base biome (plains for
-// grassland, desert for desert) — lakes only carve into open land of that biome.
+// Place a contiguous, natural-looking lake. landBiome is the map's dry-land base biome
+// (plains for grassland, desert for desert) — lakes only carve into open land of that
+// biome and never touch the coast/edges.
+//
+// Rendering model (see worldTileArt.biomeBackground + CLAUDE.md "Procedural maps"):
+//   - The lake *body* is plain `biome: 'water'` tiles, so the renderer draws them with the
+//     open-water sprite. A multi-tile blob therefore reads as ONE coherent water body
+//     rather than a grid of separate ponds.
+//   - The shore is the surrounding ring of `biome: 'beach'` tiles carrying a
+//     `beachDirection` that points at the water — exactly the same convention placeCoast
+//     uses — so worldTileArt renders a sandy shoreline instead of a hard water/grass edge.
+//   We deliberately do NOT set the legacy single-tile `isLake` flag on new lakes: that flag
+//   triggers the self-contained "pond" sprite (sand baked into the tile), which tiles badly
+//   into a contiguous body. The `isLake` branch stays in the renderer so OLD saves keep
+//   rendering their single-tile ponds (going-forward-only; no migration). Lakes stay marked
+//   semantically via descriptionSeed ("A clear lake" / "A sandy lakeshore").
 function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains') {
-  // Find a random spot not on the extreme edge and not on water/beach
-  let startX, startY;
+  // 1. Find a seed tile away from the border and clear of the coast, on open land.
+  let seed = null;
   for (let attempt = 0; attempt < 50; attempt++) {
-    startX = 2 + Math.floor(rng() * (width - 4));
-    startY = 2 + Math.floor(rng() * (height - 4));
-    if (mapData[startY][startX].biome === landBiome && !isNearCoast(mapData, startX, startY, width, height)) {
-      mapData[startY][startX].biome = 'water';
-      mapData[startY][startX].descriptionSeed = "A clear lake";
-      mapData[startY][startX].isLake = true;
+    const sx = 2 + Math.floor(rng() * (width - 4));
+    const sy = 2 + Math.floor(rng() * (height - 4));
+    if (mapData[sy][sx].biome === landBiome && !isNearCoast(mapData, sx, sy, width, height)) {
+      seed = { x: sx, y: sy };
       break;
+    }
+  }
+  if (!seed) return;
+
+  // 2. Target a small multi-tile blob (~4-9 tiles), scaled modestly with map size so we
+  //    never flood a small map.
+  const maxTiles = Math.max(3, Math.min(9, Math.floor((width * height) / 14)));
+  const targetSize = Math.min(maxTiles, 4 + Math.floor(rng() * Math.max(1, maxTiles - 3)));
+
+  // 3. Seeded flood-fill growth: repeatedly carve an open-land tile adjacent to the lake.
+  const lakeTiles = [];
+  const carve = (x, y) => {
+    mapData[y][x].biome = 'water';
+    mapData[y][x].descriptionSeed = 'A clear lake';
+    lakeTiles.push({ x, y });
+  };
+  carve(seed.x, seed.y);
+
+  const dirs = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }];
+  let guard = 0;
+  while (lakeTiles.length < targetSize && guard < targetSize * 12) {
+    guard++;
+    const base = lakeTiles[Math.floor(rng() * lakeTiles.length)];
+    const d = dirs[Math.floor(rng() * dirs.length)];
+    const nx = base.x + d.dx;
+    const ny = base.y + d.dy;
+    // Keep at least one tile inside the border so there's room for a shore ring.
+    if (nx < 1 || nx >= width - 1 || ny < 1 || ny >= height - 1) continue;
+    const t = mapData[ny][nx];
+    if (t.biome === landBiome && !t.poi) {
+      carve(nx, ny);
+    }
+  }
+
+  // 4. Lay down the shore ring.
+  addLakeShores(mapData, lakeTiles, width, height, landBiome);
+}
+
+// Turn each open-land tile orthogonally adjacent to a lake water tile into a beach, with
+// beachDirection pointing at the nearest water (N=0, E=1, S=2, W=3 — the placeCoast
+// convention). Only converts land of the map's base biome, so existing coast water/beach is
+// left untouched.
+function addLakeShores(mapData, lakeTiles, width, height, landBiome) {
+  const neigh = [
+    { dx: 0, dy: -1, dir: 0 }, // water North
+    { dx: 1, dy: 0, dir: 1 },  // water East
+    { dx: 0, dy: 1, dir: 2 },  // water South
+    { dx: -1, dy: 0, dir: 3 }, // water West
+  ];
+  const seen = new Set();
+  for (const { x, y } of lakeTiles) {
+    for (const d of neigh) {
+      const sx = x + d.dx;
+      const sy = y + d.dy;
+      const key = `${sx},${sy}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (sx < 0 || sx >= width || sy < 0 || sy >= height) continue;
+      const shore = mapData[sy][sx];
+      if (shore.biome !== landBiome) continue; // skip the lake itself, coast, etc.
+      // Point the shore at the first water tile around it.
+      for (const e of neigh) {
+        const wx = sx + e.dx;
+        const wy = sy + e.dy;
+        if (wx < 0 || wx >= width || wy < 0 || wy >= height) continue;
+        if (mapData[wy][wx].biome === 'water') {
+          shore.biome = 'beach';
+          shore.beachDirection = e.dir;
+          shore.descriptionSeed = 'A sandy lakeshore';
+          break;
+        }
+      }
     }
   }
 }

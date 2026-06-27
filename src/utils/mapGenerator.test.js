@@ -134,6 +134,120 @@ describe('generateMapData', () => {
     }
   });
 
+  describe('Bigger, natural lakes', () => {
+    const tiles = (map) => map.flat();
+    // Lake water carries descriptionSeed 'A clear lake'; coast water is 'The coastal sea'.
+    const lakeTiles = (map) => tiles(map).filter((t) => t.biome === 'water' && t.descriptionSeed === 'A clear lake');
+    const lakeShores = (map) => tiles(map).filter((t) => t.biome === 'beach' && t.descriptionSeed === 'A sandy lakeshore');
+
+    // Largest connected (4-directional) component among a set of {x,y} tiles.
+    const largestComponent = (set) => {
+      const key = (t) => `${t.x},${t.y}`;
+      const remaining = new Map(set.map((t) => [key(t), t]));
+      let best = 0;
+      for (const start of set) {
+        if (!remaining.has(key(start))) continue;
+        let size = 0;
+        const stack = [start];
+        remaining.delete(key(start));
+        while (stack.length) {
+          const t = stack.pop();
+          size++;
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nk = `${t.x + dx},${t.y + dy}`;
+            if (remaining.has(nk)) { stack.push(remaining.get(nk)); remaining.delete(nk); }
+          }
+        }
+        best = Math.max(best, size);
+      }
+      return best;
+    };
+
+    it('grows lakes into contiguous multi-tile water bodies', () => {
+      let maxBlob = 0;
+      let anyMultiTile = false;
+      for (let s = 1; s <= 12; s++) {
+        const map = generateMapData(10, 10, s * 7);
+        const lake = lakeTiles(map);
+        if (lake.length > 1) anyMultiTile = true;
+        maxBlob = Math.max(maxBlob, largestComponent(lake));
+      }
+      // Lakes are no longer single tiles: at least one seed yields a blob of several tiles.
+      expect(anyMultiTile).toBe(true);
+      expect(maxBlob).toBeGreaterThanOrEqual(3);
+    });
+
+    it('does not flood the map — lakes stay a modest fraction of tiles', () => {
+      for (let s = 1; s <= 12; s++) {
+        const map = generateMapData(10, 10, s * 7);
+        // 1-2 lakes of ~4-9 tiles each on a 100-tile map; well under a third.
+        expect(lakeTiles(map).length).toBeLessThan(33);
+      }
+    });
+
+    it('rings every lake with beach shores — no lake tile borders bare land', () => {
+      for (let s = 1; s <= 12; s++) {
+        const map = generateMapData(10, 10, s * 7);
+        const lake = lakeTiles(map);
+        for (const t of lake) {
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const n = map[t.y + dy] && map[t.y + dy][t.x + dx];
+            if (!n) continue;
+            // A land tile touching the lake must have been converted to beach, never left
+            // as bare plains (which would render as a hard water/grass edge).
+            expect(n.biome).not.toBe('plains');
+          }
+        }
+      }
+    });
+
+    it('lakeshore beaches point their beachDirection at adjacent water', () => {
+      const offsets = { 0: [0, -1], 1: [1, 0], 2: [0, 1], 3: [-1, 0] };
+      let sawShore = false;
+      for (let s = 1; s <= 12; s++) {
+        const map = generateMapData(10, 10, s * 7);
+        for (const shore of lakeShores(map)) {
+          sawShore = true;
+          expect([0, 1, 2, 3]).toContain(shore.beachDirection);
+          const [dx, dy] = offsets[shore.beachDirection];
+          const water = map[shore.y + dy] && map[shore.y + dy][shore.x + dx];
+          expect(water && water.biome).toBe('water');
+        }
+      }
+      expect(sawShore).toBe(true);
+    });
+
+    it('keeps the map playable with lakes present (towns + a starting town)', () => {
+      for (let s = 1; s <= 8; s++) {
+        const map = generateMapData(10, 10, s * 7);
+        const towns = tiles(map).filter((t) => t.poi === 'town');
+        const starting = towns.filter((t) => t.isStartingTown);
+        expect(towns.length).toBeGreaterThanOrEqual(2);
+        expect(starting).toHaveLength(1);
+        // The starting town is never underwater.
+        expect(starting[0].biome).not.toBe('water');
+      }
+    });
+
+    it('rivers can still reach lake water (mountains drain to a lake or coast)', () => {
+      // With mountains guaranteed and lakes present, at least some maps grow a river that
+      // terminates next to lake water — proving generateRivers still finds lakes as targets.
+      let connected = 0;
+      for (let s = 1; s <= 12; s++) {
+        const map = generateMapData(10, 10, s * 7);
+        const hasRiverByLake = tiles(map).some((t) =>
+          t.hasRiver &&
+          [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
+            const n = map[t.y + dy] && map[t.y + dy][t.x + dx];
+            return n && n.biome === 'water' && n.descriptionSeed === 'A clear lake';
+          })
+        );
+        if (hasRiverByLake) connected++;
+      }
+      expect(connected).toBeGreaterThan(0);
+    });
+  });
+
   describe('Phase 2b themed regions (desert)', () => {
     it('grassland default/explicit is byte-identical to the legacy plains map', () => {
       const legacy = generateMapData(10, 10, 4242);
