@@ -530,7 +530,12 @@ const Game = () => {
     if (!hasAdventureStarted || interactionHook.isLoading) return;
 
     if (!isAdjacentWorldMove(mapHook.playerPosition, clickedX, clickedY)) {
-      interactionHook.setError("You can only move to adjacent tiles.");
+      // Append to the conversation (a positioned log entry) rather than the sticky error
+      // banner, which always shows the latest message regardless of where it happened.
+      interactionHook.setConversation(prev => [...prev, {
+        role: 'system',
+        content: 'You can only move to an adjacent tile.'
+      }]);
       return;
     }
 

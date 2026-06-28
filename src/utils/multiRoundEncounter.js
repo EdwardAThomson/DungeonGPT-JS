@@ -1,4 +1,4 @@
-import { resolveEncounter } from './encounterResolver';
+import { resolveEncounter, clampPenaltyGold } from './encounterResolver';
 
 /**
  * Multi-round encounter system for prolonged hostile encounters
@@ -208,7 +208,10 @@ export const generateEncounterSummary = async (roundState) => {
     narration: fullNarration,
     outcome,
     rewards: totalRewards,
-    penalties: totalPenalties,
+    // Clamp the SUMMED gold loss to the hero's available gold so a multi-round fight can't
+    // display "Lost 44 gold" when the hero had less (the per-round sums are unbounded; the
+    // actual party deduction is clamped separately).
+    penalties: clampPenaltyGold(totalPenalties, roundState.character?.gold),
     roundCount: rounds.length
   };
 };

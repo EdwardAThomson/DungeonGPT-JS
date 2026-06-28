@@ -89,7 +89,7 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
     rollResult,
     outcomeTier,
     rewards: outcome.rewards,
-    penalties: outcome.penalties,
+    penalties: clampPenaltyGold(outcome.penalties, character?.gold),
     affectedFactions: encounter.affectedFactions?.[outcomeTier] || null,
     hpDamage,
     damageDescription
@@ -100,6 +100,23 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
  * Applies consequences based on outcome tier
  * Returns rewards and penalties
  */
+/**
+ * Clamp a penalty's gold loss to the gold actually available, and rewrite its gold message
+ * so the displayed consequence never overstates what was (or can be) taken. The actual party
+ * deduction is clamped separately too; this keeps the on-screen text honest. When the
+ * available gold is unknown (not a number), the penalty is returned unchanged.
+ */
+export const clampPenaltyGold = (penalties, availableGold) => {
+  if (!penalties) return penalties;
+  if (typeof availableGold !== 'number') return penalties;
+  const original = penalties.goldLoss || 0;
+  const clamped = Math.min(original, Math.max(0, availableGold));
+  if (clamped === original) return penalties;
+  const messages = (penalties.messages || []).filter((m) => !/lost \d+ gold/i.test(m));
+  if (clamped > 0) messages.push(`Lost ${clamped} gold`);
+  return { ...penalties, goldLoss: clamped, messages };
+};
+
 const applyConsequences = (outcomeTier, rewards, rollResult, encounter) => {
   const result = {
     rewards: null,
@@ -206,21 +223,26 @@ const determinePenalties = (outcomeTier, encounter) => {
 const generateLoot = (rewards, rollResult, outcomeTier, encounter) => {
   if (!rewards) return null;
 
+  // Positive rewards (XP / gold / items) are granted ONLY on success tiers. Failure tiers
+  // never pay out, even for healer encounters — they may still grant HEALING (below), but
+  // not loot. This prevents the "rewarded on a critical failure" bug.
+  const isSuccess = outcomeTier === 'success' || outcomeTier === 'criticalSuccess';
+
   const loot = {
-    xp: rewards.xp || 0,
+    xp: isSuccess ? (rewards.xp || 0) : 0,
     gold: 0,
     items: [],
     healing: 0
   };
 
   // Gold rewards (roll dice formula)
-  if (rewards.gold) {
+  if (isSuccess && rewards.gold) {
     const goldRoll = parseDiceFormula(rewards.gold);
     loot.gold = rollDice(goldRoll.count, goldRoll.sides);
   }
 
   // Item rewards (percentage chance)
-  if (rewards.items) {
+  if (isSuccess && rewards.items) {
     for (const itemEntry of rewards.items) {
       const [itemName, chanceStr] = itemEntry.split(':');
       const chance = parseInt(chanceStr) / 100;
