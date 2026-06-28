@@ -34,18 +34,18 @@ const decorationSet = (theme) => DECORATION_SETS[theme] || DECORATION_SETS.grass
 const BUILDING_CONFIG = {
   hamlet: {
     important: ['barn'],
-    secondary: ['shrine'],            // a small rural shrine
-    houses: 5,
+    secondary: ['shrine', 'mill'],    // a small rural shrine + a mill
+    houses: 9,
   },
   village: {
     important: ['inn', 'shop', 'blacksmith', 'tavern'],
     secondary: ['alchemist', 'mill', 'stables', 'shrine'],
-    houses: 12,
+    houses: 18,
   },
   town: {
     important: ['inn', 'shop', 'temple', 'blacksmith', 'tavern', 'tavern'],
     secondary: ['alchemist', 'archives', 'warehouse', 'tailor', 'fletcher', 'apothecary', 'stables', 'mill', 'townhall'],
-    houses: 32,
+    houses: 42,
   },
   city: {
     important: ['inn', 'temple', 'temple', 'market', 'blacksmith', 'tavern', 'tavern', 'tavern', 'bank', 'bank', 'bank'],
@@ -97,9 +97,9 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   // padTownToUniform below. Building counts unchanged.
   const UNIFORM_TOWN_SIZE = 20;
   const sizeConfig = {
-    hamlet: { width: 8, height: 8, buildings: 3 },
-    village: { width: 12, height: 12, buildings: 6 },
-    town: { width: 16, height: 16, buildings: 10 },
+    hamlet: { width: 10, height: 10, buildings: 3 },
+    village: { width: 14, height: 14, buildings: 6 },
+    town: { width: 18, height: 18, buildings: 10 },
     city: { width: 20, height: 20, buildings: 15 }
   };
 

@@ -190,13 +190,14 @@ describe('generateTownMap with water', () => {
     expect(buildings).toBeGreaterThan(50);
   });
 
-  test('core water stays within the 25% budget (town)', () => {
-    // measure water inside the native 16x16 core (exclude the cosmetic ring sea)
+  test('core water stays within the 20% budget (town)', () => {
+    // measure water inside the native town core (exclude the cosmetic ring sea). The town
+    // generates at 18x18 then pads to the 20x20 canvas, so the core sits at offset 1.
     const town = generateTownMap('town', 'Tideford', 'south', 404, false, 'NORTH_SOUTH', 'grassland', water('coast', { S: true }));
-    // native town core is 16x16 centred in the 20x20 canvas (offset 2)
+    const N = 18, off = (20 - N) / 2;
     let coreWater = 0;
-    for (let y = 2; y < 18; y++) for (let x = 2; x < 18; x++) if (town.mapData[y][x].type === 'water') coreWater++;
-    expect(coreWater).toBeLessThanOrEqual(Math.ceil(16 * 16 * 0.20));
+    for (let y = off; y < off + N; y++) for (let x = off; x < off + N; x++) if (town.mapData[y][x].type === 'water') coreWater++;
+    expect(coreWater).toBeLessThanOrEqual(Math.ceil(N * N * 0.20));
   });
 
   test('no water param = byte-identical landlocked town (no water tiles)', () => {

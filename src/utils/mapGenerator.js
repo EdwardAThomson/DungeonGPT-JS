@@ -91,11 +91,11 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   // 5c. A cave entrance tucked against the mountains (Phase 2a — placeCave was never wired up)
   placeCave(mapData, width, height, rng);
 
-  // 6. Place towns. Normally 2-4, but never fewer than the number of named towns
+  // 6. Place towns. Normally 3-6, but never fewer than the number of named towns
   // the campaign requires — each custom name is a milestone/quest location that
   // must exist on the map, otherwise its quest building/item/POI is silently lost.
   const requiredTowns = normalizedNames.towns.length;
-  const targetTowns = Math.max(requiredTowns, 2 + Math.floor(rng() * 3));
+  const targetTowns = Math.max(requiredTowns, 3 + Math.floor(rng() * 4));
   logger.debug(`[MAP_GENERATION] Placing ${targetTowns} towns (campaign requires ${requiredTowns})...`);
 
   let townSpacing = 3; // relaxed below if the map is too crowded to fit them all
