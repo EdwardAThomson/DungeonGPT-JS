@@ -54,7 +54,7 @@ const TOWN_BUILDINGS = [
   ['library', 'Library'], ['magetower', 'Mage tower'], ['foundry', 'Foundry'],
   ['warehouse', 'Warehouse'], ['mill', 'Mill'], ['tailor', 'Tailor'], ['fletcher', 'Fletcher'],
   ['stables', 'Stables'], ['barn', 'Barn'], ['barracks', 'Barracks'], ['jail', 'Jail'],
-  ['harbormaster', 'Harbormaster'], ['manor', 'Manor'], ['keep', 'Keep'],
+  ['harbormaster', 'Harbormaster'], ['workshop', 'Workshop'], ['manor', 'Manor'], ['keep', 'Keep'],
 ];
 
 export function townLegendGroups() {

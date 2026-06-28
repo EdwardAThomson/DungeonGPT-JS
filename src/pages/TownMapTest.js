@@ -2,12 +2,13 @@ import React, { useState, useMemo } from "react";
 import TownMapDisplay from "../components/TownMapDisplay";
 import { generateTownMap, getTownTileEmoji } from "../utils/townMapGenerator";
 import { populateTown } from "../utils/npcGenerator";
+import { injectQuestBuildings } from "../game/milestoneSpawner";
 
 const BUILDING_EMOJIS = {
     house: '🏠', inn: '🏨', shop: '🏪', temple: '⛪', tavern: '🍺',
     guild: '🏛️', market: '🏬', bank: '🏦', manor: '🏰', barn: '🏚️',
     blacksmith: '⚒️', keep: '🏰', archives: '📚', alchemist: '⚗️',
-    foundry: '🔥', warehouse: '📦', library: '📖'
+    foundry: '🔥', warehouse: '📦', library: '📖', townhall: '🏛️', workshop: '⚙️'
 };
 
 const TownMapTest = () => {
@@ -15,10 +16,16 @@ const TownMapTest = () => {
     const [showTownMapPreview, setShowTownMapPreview] = useState(false);
     const [selectedTownSize, setSelectedTownSize] = useState('village');
     const [townNpcs, setTownNpcs] = useState([]);
+    const [injectWorkshop, setInjectWorkshop] = useState(true);
 
     const handleGenerateTownMap = () => {
         const seed = Math.floor(Math.random() * 100000);
-        const townMap = generateTownMap(selectedTownSize, `Test ${selectedTownSize}`, 'south', seed);
+        let townMap = generateTownMap(selectedTownSize, `Test ${selectedTownSize}`, 'south', seed);
+        // Quest buildings (like the artificer's workshop) are injected lazily in-game, never
+        // in the base roster, so generate one here to preview its tile art in a real town.
+        if (injectWorkshop) {
+            townMap = injectQuestBuildings(townMap, [{ type: 'workshop', name: 'Tinker-Row Workshop' }]);
+        }
         setGeneratedTownMap(townMap);
         setShowTownMapPreview(true);
         const npcs = populateTown(townMap, seed);
@@ -73,6 +80,15 @@ const TownMapTest = () => {
                         <option value="town">Town (16x16)</option>
                         <option value="city">City (20x20)</option>
                     </select>
+
+                    <label style={{ marginLeft: 12, marginRight: 12 }}>
+                        <input
+                            type="checkbox"
+                            checked={injectWorkshop}
+                            onChange={(e) => setInjectWorkshop(e.target.checked)}
+                        />
+                        {' '}Inject workshop (quest building)
+                    </label>
 
                     <button
                         onClick={handleGenerateTownMap}

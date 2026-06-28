@@ -54,6 +54,7 @@ const ROOFS = {
   stables: '#8a6a3a',      // stable brown
   tailor: '#9c6a8a',       // cloth mauve
   townhall: '#9a8a5a',     // civic stone
+  workshop: '#4a8c8c',     // patina copper (tinker's workshop, deliberately un-medieval)
 };
 
 // --- helpers -----------------------------------------------------------------
@@ -475,6 +476,30 @@ const SHAPES = {
     `<rect x='18' y='19' width='6' height='8' fill='${shade(r, 0.45)}'/>` +
     `<rect x='14.5' y='21' width='3' height='3' fill='${shade(r, 0.78)}'/>` +
     `<rect x='14.5' y='23.5' width='3' height='3' fill='${shade(r, 0.68)}'/>`,
+  // workshop: a tinker's/artificer's shop — flat industrial roof, a big brass cog on the
+  // wall, a small secondary gear, and a slim vent puffing pale steam (deliberately a touch
+  // un-medieval). Distinct from the forge silhouettes (smithy/foundry).
+  workshop: (r) =>
+    `<rect x='7' y='13' width='18' height='13' rx='1' fill='${r}'/>${hi}` +
+    `<rect x='6' y='10.5' width='20' height='3.2' rx='0.8' fill='${shade(r, 1.12)}'/>` +
+    `<rect x='21' y='5' width='2.4' height='6' fill='${shade(r, 0.5)}'/>` +
+    `<circle cx='22.2' cy='4' r='1.7' fill='#dfe6ea' opacity='0.5'/>` +
+    `<circle cx='24' cy='2.4' r='1.2' fill='#dfe6ea' opacity='0.4'/>` +
+    `<g fill='#c89b3c'>` +
+      `<rect x='15.1' y='13.4' width='1.8' height='1.8'/>` +
+      `<rect x='15.1' y='21.8' width='1.8' height='1.8'/>` +
+      `<rect x='11.0' y='17.6' width='1.8' height='1.8'/>` +
+      `<rect x='19.2' y='17.6' width='1.8' height='1.8'/>` +
+      `<rect x='12.1' y='14.5' width='1.7' height='1.7'/>` +
+      `<rect x='18.2' y='14.5' width='1.7' height='1.7'/>` +
+      `<rect x='12.1' y='20.6' width='1.7' height='1.7'/>` +
+      `<rect x='18.2' y='20.6' width='1.7' height='1.7'/>` +
+    `</g>` +
+    `<circle cx='16' cy='18.5' r='4' fill='#d8a93f'/>` +
+    `<circle cx='16' cy='18.5' r='1.5' fill='${shade(r, 0.4)}'/>` +
+    `<circle cx='21' cy='15.5' r='2.2' fill='#b8860b'/>` +
+    `<circle cx='21' cy='15.5' r='0.8' fill='${shade(r, 0.4)}'/>` +
+    door(r, 8, 3),
 };
 
 const BUILDING_SHAPE = {
@@ -499,6 +524,7 @@ const BUILDING_SHAPE = {
   stables: 'stables',
   tailor: 'tailor',
   townhall: 'townhall',
+  workshop: 'workshop',
 };
 
 // Canonical list of every building type the renderer knows (single source of truth for

@@ -44,12 +44,14 @@ const BUILDING_CONFIG = {
   },
   town: {
     important: ['inn', 'shop', 'temple', 'blacksmith', 'tavern', 'tavern'],
-    secondary: ['alchemist', 'archives', 'warehouse', 'tailor', 'fletcher', 'apothecary', 'stables', 'mill', 'townhall'],
+    secondary: ['alchemist', 'archives', 'warehouse', 'tailor', 'fletcher', 'apothecary', 'stables', 'mill'],
+    civicHall: true, // townhall placed ON the square (see STEP 0.9), not in the outer ring
     houses: 42,
   },
   city: {
     important: ['inn', 'temple', 'temple', 'market', 'blacksmith', 'tavern', 'tavern', 'tavern', 'bank', 'bank', 'bank'],
-    secondary: ['guild', 'guild', 'guild', 'alchemist', 'alchemist', 'archives', 'library', 'foundry', 'warehouse', 'warehouse', 'townhall', 'magetower', 'tailor', 'apothecary', 'stables'],
+    secondary: ['guild', 'guild', 'guild', 'alchemist', 'alchemist', 'archives', 'library', 'foundry', 'warehouse', 'warehouse', 'magetower', 'tailor', 'apothecary', 'stables'],
+    civicHall: true, // townhall placed ON the square (see STEP 0.9), not in the outer ring
     houses: 55,
     hasKeep: true,
     hasJail: true, // the gaol is placed in the authority cluster by the keep (see placeBuildings)
@@ -66,7 +68,7 @@ const BUILDING_CONFIG = {
 function buildingTileEstimate(townSize) {
   const c = BUILDING_CONFIG[townSize] || BUILDING_CONFIG.village;
   return (c.important?.length || 0) + (c.secondary?.length || 0) +
-    (c.houses || 0) + (c.nobleEstate?.length || 0) + (c.hasKeep ? 1 : 0);
+    (c.houses || 0) + (c.nobleEstate?.length || 0) + (c.hasKeep ? 1 : 0) + (c.civicHall ? 1 : 0);
 }
 
 /**
@@ -983,6 +985,26 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
   // Left edge (bottom to top, skip corners)
   for (let dy = halfSize; dy >= -halfSize; dy--) {
     squarePositions.push({ x: centerX - halfSize - 1, y: centerY + dy });
+  }
+
+  // STEP 0.9: The civic hall faces the square itself. Claim the prominent top-centre
+  // frontage (middle of the square's top edge, looking down on the fountain) before the
+  // other important buildings fill the ring; fall back to any free square slot.
+  if (config.civicHall) {
+    const prime = { x: centerX, y: centerY - halfSize - 1 };
+    let hallPlaced = false;
+    if (!blockedFor(prime.x, prime.y, 'townhall')) {
+      placeBuilding(prime.x, prime.y, 'townhall');
+      hallPlaced = true;
+    }
+    for (let i = 0; i < squarePositions.length && !hallPlaced; i++) {
+      const pos = squarePositions[i];
+      if (pos && !blockedFor(pos.x, pos.y, 'townhall')) {
+        placeBuilding(pos.x, pos.y, 'townhall');
+        hallPlaced = true;
+      }
+    }
+    if (!hallPlaced) logger.warn('[TOWN_MAP] Could not place townhall on the square');
   }
 
   // Place important buildings
