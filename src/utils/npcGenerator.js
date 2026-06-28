@@ -256,6 +256,72 @@ const ROLES = {
         baseStats: { Strength: 12, Dexterity: 11, Constitution: 11, Intelligence: 13, Wisdom: 12, Charisma: 12 },
         inventory: ["Work Clothes", "Manifest Ledger", "Ring of Keys", "Measuring Rod"],
         hpRange: [8, 14]
+    },
+    // --- occupants for the newer building types ---
+    "Miller": {
+        possibleTitles: ["Miller", "Master Miller", "Grain Miller"],
+        defaultClass: "Commoner",
+        baseStats: { Strength: 13, Dexterity: 10, Constitution: 12, Intelligence: 10, Wisdom: 11, Charisma: 10 },
+        inventory: ["Flour-dusted Apron", "Sack of Grain"],
+        hpRange: [6, 10]
+    },
+    "Tailor": {
+        possibleTitles: {
+            Male: ["Tailor", "Clothier", "Weaver", "Garmentier"],
+            Female: ["Tailor", "Seamstress", "Clothier", "Weaver"]
+        },
+        defaultClass: "Expert",
+        baseStats: { Strength: 9, Dexterity: 13, Constitution: 10, Intelligence: 11, Wisdom: 11, Charisma: 12 },
+        inventory: ["Fine Clothes", "Needle & Thread", "Bolt of Cloth"],
+        hpRange: [5, 9]
+    },
+    "Fletcher": {
+        possibleTitles: ["Fletcher", "Bowyer", "Arrowsmith", "Master Fletcher"],
+        defaultClass: "Expert",
+        baseStats: { Strength: 11, Dexterity: 13, Constitution: 10, Intelligence: 11, Wisdom: 12, Charisma: 10 },
+        inventory: ["Leather Apron", "Bundle of Arrows", ["Shortbow", "Longbow"]],
+        hpRange: [6, 10]
+    },
+    "Stablemaster": {
+        possibleTitles: ["Stablemaster", "Hostler", "Groom", "Horsemaster"],
+        defaultClass: "Commoner",
+        baseStats: { Strength: 12, Dexterity: 12, Constitution: 12, Intelligence: 10, Wisdom: 12, Charisma: 10 },
+        inventory: ["Riding Boots", "Horse Brush", "Coil of Rope"],
+        hpRange: [7, 11]
+    },
+    "Harbormaster": {
+        possibleTitles: ["Harbormaster", "Dockmaster", "Port Warden", "Quaymaster"],
+        defaultClass: "Expert",
+        baseStats: { Strength: 11, Dexterity: 11, Constitution: 12, Intelligence: 13, Wisdom: 13, Charisma: 12 },
+        inventory: ["Oilskin Coat", "Brass Spyglass", "Shipping Ledger"],
+        hpRange: [8, 12]
+    },
+    "Mage": {
+        possibleTitles: {
+            Male: ["Mage", "Wizard", "Sorcerer", "Enchanter", "Archmage"],
+            Female: ["Mage", "Witch", "Sorceress", "Enchantress", "Archmage"]
+        },
+        defaultClass: "Wizard",
+        baseStats: { Strength: 8, Dexterity: 11, Constitution: 10, Intelligence: 16, Wisdom: 13, Charisma: 12 },
+        inventory: ["Robes", "Spellbook", "Arcane Focus"],
+        hpRange: [5, 9]
+    },
+    "Jailer": {
+        possibleTitles: ["Jailer", "Gaoler", "Warden", "Turnkey"],
+        defaultClass: "Fighter",
+        baseStats: { Strength: 14, Dexterity: 10, Constitution: 13, Intelligence: 9, Wisdom: 11, Charisma: 8 },
+        inventory: ["Leather Armor", "Cudgel", "Ring of Keys"],
+        hpRange: [10, 16]
+    },
+    "Magistrate": {
+        possibleTitles: {
+            Male: ["Mayor", "Magistrate", "Burgomaster", "Reeve", "Alderman"],
+            Female: ["Mayor", "Magistrate", "Burgomaster", "Reeve", "Alderwoman"]
+        },
+        defaultClass: "Aristocrat",
+        baseStats: { Strength: 9, Dexterity: 10, Constitution: 10, Intelligence: 14, Wisdom: 14, Charisma: 15 },
+        inventory: ["Fine Clothes", "Chain of Office", "Town Charter"],
+        hpRange: [6, 11]
     }
 };
 
@@ -620,6 +686,57 @@ export const populateTown = (townMapData, seed) => {
             banker.job = `Director of ${b.name}`;
             const clerk = addNPC("Bank Clerk", b, b);
             clerk.job = `Clerk at ${b.name}`;
+        } else if (b.type === 'mill') {
+            // family-run mill (proprietor + spouse, titles synced)
+            const miller = addNPC("Miller", b, b);
+            miller.job = `Miller of ${b.name}`;
+            const spouse = addNPC("Miller", b, b, {
+                gender: miller.gender === "Male" ? "Female" : "Male",
+                lastName: miller.lastName,
+                titleIndex: miller.selectedTitleIndex
+            });
+            spouse.job = `Miller at ${b.name}`;
+        } else if (b.type === 'tailor') {
+            const tailor = addNPC("Tailor", b, b);
+            tailor.job = `Proprietor of ${b.name}`;
+            const spouse = addNPC("Tailor", b, b, {
+                gender: tailor.gender === "Male" ? "Female" : "Male",
+                lastName: tailor.lastName,
+                titleIndex: tailor.selectedTitleIndex
+            });
+            spouse.job = `${spouse.title} at ${b.name}`;
+        } else if (b.type === 'fletcher') {
+            const fletcher = addNPC("Fletcher", b, b);
+            fletcher.job = `Master of ${b.name}`;
+        } else if (b.type === 'apothecary') {
+            const apothecary = addNPC("Alchemist", b, b, { title: "Apothecary" });
+            apothecary.job = `Apothecary of ${b.name}`;
+        } else if (b.type === 'stables') {
+            const master = addNPC("Stablemaster", b, b);
+            master.job = `${master.title} of ${b.name}`;
+            const hand = addNPC("Villager", b, b, { title: "Stablehand" });
+            hand.job = `Stablehand at ${b.name}`;
+        } else if (b.type === 'harbormaster') {
+            const hm = addNPC("Harbormaster", b, b);
+            hm.job = `${hm.title} of ${b.name}`;
+        } else if (b.type === 'magetower') {
+            const mage = addNPC("Mage", b, b);
+            mage.job = `${mage.title} of ${b.name}`;
+        } else if (b.type === 'jail') {
+            const jailer = addNPC("Jailer", b, b);
+            jailer.job = `${jailer.title} of ${b.name}`;
+        } else if (b.type === 'townhall') {
+            // The town hall is also the moot court; the constable (the medieval equivalent
+            // of a sheriff) keeps the peace from here — no separate sheriff's office.
+            const mayor = addNPC("Magistrate", b, b);
+            mayor.job = `${mayor.title} of ${townName}`;
+            const clerk = addNPC("Merchant", b, b, { title: "Clerk" });
+            clerk.job = `Town Clerk at ${b.name}`;
+            const constable = addNPC("Guard", b, b, { title: rng.pick(["Constable", "Reeve", "Bailiff"]) });
+            constable.job = `${constable.title} of ${townName}`;
+        } else if (b.type === 'shrine') {
+            const priest = addNPC("Priest", b, b);
+            priest.job = `${priest.title} of ${b.name}`;
         }
     });
 

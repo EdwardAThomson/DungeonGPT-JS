@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { generateMapData, getTile, findStartingTown, enrichWorldMap } from '../utils/mapGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
+import { analyzeTownWater, getTownRoadEdges } from '../utils/townWater';
 import { populateTown } from '../utils/npcGenerator';
 import { injectQuestBuildings } from '../game/milestoneSpawner';
 import { createLogger } from '../utils/logger';
@@ -200,11 +201,12 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 const newTownMap = generateTownMap(
                     townSize,
                     townName,
-                    'south',
+                    getTownRoadEdges(worldMap, currentTownTile.x, currentTownTile.y),
                     seed,
                     currentTownTile.hasRiver,
                     currentTownTile.riverDirection,
-                    mapTheme
+                    mapTheme,
+                    analyzeTownWater(worldMap, currentTownTile.x, currentTownTile.y)
                 );
 
                 // Inject quest buildings if needed
@@ -240,7 +242,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 logger.info('Generating new town map', townName);
                 const rawSeed = worldSeed ? (parseInt(worldSeed) + ((townTile.x || 0) * 1000) + ((townTile.y || 0) * 10000)) : (loadedConversation?.sessionId || Math.floor(Math.random() * 1000000));
                 const seed = Number.isFinite(rawSeed) ? rawSeed : Math.floor(Math.random() * 1000000);
-                townMapData = generateTownMap(townSize, townName, 'south', seed, townTile.hasRiver, townTile.riverDirection, mapTheme);
+                townMapData = generateTownMap(townSize, townName, getTownRoadEdges(worldMap, townTile.x, townTile.y), seed, townTile.hasRiver, townTile.riverDirection, mapTheme, analyzeTownWater(worldMap, townTile.x, townTile.y));
 
                 // Inject quest buildings if needed
                 if (requiredBuildings?.[townName]) {
@@ -331,7 +333,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             }
 
             logger.debug('Using town seed', seed);
-            townMapData = generateTownMap(townSize, townName, 'south', seed, currentTile.hasRiver, currentTile.riverDirection, mapTheme);
+            townMapData = generateTownMap(townSize, townName, getTownRoadEdges(worldMap, tileX, tileY), seed, currentTile.hasRiver, currentTile.riverDirection, mapTheme, analyzeTownWater(worldMap, tileX, tileY));
 
             // Inject quest buildings if needed
             if (requiredBuildings?.[townName]) {

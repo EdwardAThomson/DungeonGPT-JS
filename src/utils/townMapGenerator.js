@@ -28,6 +28,47 @@ const DECORATION_SETS = {
 };
 const decorationSet = (theme) => DECORATION_SETS[theme] || DECORATION_SETS.grassland;
 
+// Per-size building roster. Hoisted to module scope so the water step can reserve enough
+// dry land for the buildings each size needs BEFORE any water is carved (see placeTownWater
+// / buildingTileEstimate). placeBuildings reads the same object, so the two never drift.
+const BUILDING_CONFIG = {
+  hamlet: {
+    important: ['barn'],
+    secondary: ['shrine'],            // a small rural shrine
+    houses: 5,
+  },
+  village: {
+    important: ['inn', 'shop', 'blacksmith', 'tavern'],
+    secondary: ['alchemist', 'mill', 'stables', 'shrine'],
+    houses: 12,
+  },
+  town: {
+    important: ['inn', 'shop', 'temple', 'blacksmith', 'tavern', 'tavern'],
+    secondary: ['alchemist', 'archives', 'warehouse', 'tailor', 'fletcher', 'apothecary', 'stables', 'mill', 'townhall'],
+    houses: 32,
+  },
+  city: {
+    important: ['inn', 'temple', 'temple', 'market', 'blacksmith', 'tavern', 'tavern', 'tavern', 'bank', 'bank', 'bank'],
+    secondary: ['guild', 'guild', 'guild', 'alchemist', 'alchemist', 'archives', 'library', 'foundry', 'warehouse', 'warehouse', 'townhall', 'magetower', 'tailor', 'apothecary', 'stables'],
+    houses: 55,
+    hasKeep: true,
+    hasJail: true, // the gaol is placed in the authority cluster by the keep (see placeBuildings)
+    nobleEstate: ['manor', 'manor', 'manor', 'manor', 'manor'],
+  },
+};
+// `harbormaster` + dockside `warehouse`s are placed on the shore (not via these rosters)
+// only when the town sits on water — see the waterfront step in placeBuildings. A harbour
+// office makes no sense inland.
+
+// Total building tiles a size needs (important + secondary + houses + estate + keep). The
+// water step keeps at least this many tiles (plus breathing room for the square + paths)
+// dry, so adding a lakefront/coast never starves the settlement of buildable land.
+function buildingTileEstimate(townSize) {
+  const c = BUILDING_CONFIG[townSize] || BUILDING_CONFIG.village;
+  return (c.important?.length || 0) + (c.secondary?.length || 0) +
+    (c.houses || 0) + (c.nobleEstate?.length || 0) + (c.hasKeep ? 1 : 0);
+}
+
 /**
  * Generate a town interior map based on town size
  * @param {string} townSize - Size of the town: 'hamlet', 'village', 'town', 'city'
@@ -41,10 +82,14 @@ const decorationSet = (theme) => DECORATION_SETS[theme] || DECORATION_SETS.grass
  *   and drops the green farm fields. The ground tile `type` stays 'grass' so all building/
  *   road/decoration placement is unchanged; the theme rides on the returned town object
  *   and is applied purely at render time (see townTileArt.tileBackground).
+ * @param {Object|null} water - Optional water context derived from the WORLD map
+ *   (see townWater.analyzeTownWater): `{ kind:'lake'|'coast', edges:{N,E,S,W} }`. When
+ *   present, water is carved into the town BEFORE roads/buildings so the settlement sits
+ *   on a real lakefront/coastline. Null (default) = landlocked, byte-identical to before.
  * @returns {Object} Town map data with tiles and metadata
  */
-export const generateTownMap = (townSize, townName, entryPoint = 'south', seed = null, hasRiver = false, riverDirection = 'NORTH_SOUTH', theme = 'grassland') => {
-  logger.debug(`[TOWN_MAP] Generating ${townSize} map for ${townName} (theme: ${theme})`);
+export const generateTownMap = (townSize, townName, entryPoint = 'south', seed = null, hasRiver = false, riverDirection = 'NORTH_SOUTH', theme = 'grassland', water = null) => {
+  logger.debug(`[TOWN_MAP] Generating ${townSize} map for ${townName} (theme: ${theme}${water ? `, water: ${water.kind}` : ''})`);
   const isDesert = theme === 'desert';
 
   // Generate at the settlement's native size so the buildings stay huddled (the proven
@@ -81,8 +126,35 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
     mapData.push(row);
   }
 
-  // Calculate entry point position
-  const entryPos = calculateEntryPosition(width, height, entryPoint);
+  // Carve water FIRST (before roads/center/walls/buildings) so the lakefront/coastline
+  // is the base the settlement is laid out around. Water tiles are never grass, so every
+  // later placement step (which only writes onto grass) naturally avoids them.
+  let waterInfo = null;
+  if (water && (water.kind === 'lake' || water.kind === 'coast')) {
+    waterInfo = placeTownWater(mapData, water, width, height, rng, townSize);
+  }
+
+  // Entrances follow the world-map roads: `entryPoint` may be a single direction (legacy)
+  // or an array of directions (one per connecting road). The FIRST entrance is the party's
+  // spawn/primary gate.
+  let entryDirs = (Array.isArray(entryPoint) ? entryPoint : [entryPoint || 'south']).filter(Boolean);
+  if (waterInfo) {
+    // Drop a gate only when its ACTUAL gate tile is underwater — NOT merely because the
+    // edge is flagged wet. A lake/sea in a corner promotes both adjacent edges to "wet",
+    // but a road can still arrive at the dry middle of that edge, so we test the real tile
+    // the gate would sit on (water is already carved at this point).
+    const gateDry = (d) => {
+      const p = calculateEntryPosition(width, height, d);
+      return mapData[p.y] && mapData[p.y][p.x] && mapData[p.y][p.x].type !== 'water';
+    };
+    entryDirs = entryDirs.filter(gateDry);
+    if (entryDirs.length === 0) entryDirs = [['south', 'north', 'east', 'west'].find(gateDry) || 'south'];
+  }
+  if (entryDirs.length === 0) entryDirs = ['south'];
+  entryDirs = [...new Set(entryDirs)];
+
+  const entrances = entryDirs.map((dir) => ({ dir, pos: calculateEntryPosition(width, height, dir) }));
+  const entryPos = entrances[0].pos; // primary spawn
 
   // Place river if it exists
   let riverInfo = null;
@@ -90,8 +162,9 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
     riverInfo = placeRiverInTown(mapData, riverDirection, width, height, rng);
   }
 
-  // Place main road from entry to center
-  placeMainRoad(mapData, entryPos, entryPoint, width, height, townSize, riverInfo);
+  // Place an approach road from every entrance gate to the centre. Walls only overwrite
+  // grass, so each road tile already on the perimeter stays an open gate.
+  entrances.forEach(({ dir, pos }) => placeMainRoad(mapData, pos, dir, width, height, townSize, riverInfo));
 
   // Place town square/center
   const centerPos = { x: Math.floor(width / 2), y: Math.floor(height / 2) };
@@ -113,7 +186,7 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
     rngType: typeof rng,
     centerPos
   });
-  placeBuildings(mapData, buildingCount, townSize, rng, centerPos);
+  placeBuildings(mapData, buildingCount, townSize, rng, centerPos, !!waterInfo);
 
   // Generate paths connecting all buildings to the road network
   generateBuildingPaths(mapData, centerPos, rng);
@@ -129,7 +202,8 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   // The theme picks the decoration palette (desert cacti/rocks, snow pines/drifts).
   placeDecorations(mapData, townSize, rng, theme);
 
-  // Mark entry point
+  // Mark gates. Every entrance is a gate; the first is also the party's spawn entry.
+  entrances.forEach(({ pos }) => { mapData[pos.y][pos.x].isGate = true; });
   mapData[entryPos.y][entryPos.x].isEntry = true;
 
   const result = {
@@ -139,6 +213,8 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
     townName,
     townSize,
     theme,
+    water: waterInfo,
+    entrances,
     entryPoint: entryPos,
     centerPoint: centerPos
   };
@@ -182,31 +258,48 @@ export function padTownToUniform(town, targetW, targetH, rng) {
 
   const inCore = (x, y) => x >= offX && x < offX + width && y >= offY && y < offY + height;
 
-  // Extend the entry road straight out through the ring to the map edge — BEFORE fields
-  // so farmland frames the road instead of blocking it. The native entry sits on a core
-  // edge; we carry that lane to the canvas border and move the spawn/entry there, so the
-  // party arrives at the outskirts and walks in.
-  const roadType = town.townSize === 'city' ? 'stone_path' : 'dirt_path';
-  const ne = town.entryPoint || { x: Math.floor(width / 2), y: height - 1 };
-  const gateX = ne.x + offX, gateY = ne.y + offY;
-  let edge = { x: gateX, y: gateY };
-  const layRoad = (x, y) => { newMap[y][x].type = roadType; newMap[y][x].walkable = true; };
-  if (ne.y === 0) {                       // north edge
-    for (let y = gateY - 1; y >= 0; y--) layRoad(gateX, y);
-    edge = { x: gateX, y: 0 };
-  } else if (ne.y === height - 1) {        // south edge
-    for (let y = gateY + 1; y < targetH; y++) layRoad(gateX, y);
-    edge = { x: gateX, y: targetH - 1 };
-  } else if (ne.x === 0) {                 // west edge
-    for (let x = gateX - 1; x >= 0; x--) layRoad(x, gateY);
-    edge = { x: 0, y: gateY };
-  } else if (ne.x === width - 1) {          // east edge
-    for (let x = gateX + 1; x < targetW; x++) layRoad(x, gateY);
-    edge = { x: targetW - 1, y: gateY };
+  // Carry a coastline out to the canvas edge so the sea reaches the border rather than
+  // sitting in a grass moat. Lakes stay contained in the core. Done BEFORE the road/
+  // fields/decoration passes (which only write onto grass, so they avoid the new water).
+  if (town.water && town.water.kind === 'coast') {
+    extendCoastWater(newMap, town.water.edges, offX, offY, width, height, targetW, targetH);
   }
-  newMap[gateY][gateX].isEntry = false;   // the gate is now an interior tile on the lane
-  newMap[edge.y][edge.x].isEntry = true;
-  town.entryPoint = edge;
+
+  // Extend EVERY entrance road straight out through the ring to the map edge — BEFORE
+  // fields so farmland frames the roads instead of blocking them. Each native gate sits on
+  // a core edge; we carry its lane to the canvas border. The primary entrance (first) is
+  // the party's spawn; the others are extra gates the player can also leave/enter by.
+  const roadType = town.townSize === 'city' ? 'stone_path' : 'dirt_path';
+  const layRoad = (x, y) => { newMap[y][x].type = roadType; newMap[y][x].walkable = true; };
+  const nativeEntrances = (town.entrances && town.entrances.length)
+    ? town.entrances.map((e) => e.pos)
+    : [town.entryPoint || { x: Math.floor(width / 2), y: height - 1 }];
+
+  const borderEntrances = nativeEntrances.map((ne) => {
+    const gateX = ne.x + offX, gateY = ne.y + offY;
+    let edge = { x: gateX, y: gateY };
+    if (ne.y === 0) {                        // north edge
+      for (let y = gateY - 1; y >= 0; y--) layRoad(gateX, y);
+      edge = { x: gateX, y: 0 };
+    } else if (ne.y === height - 1) {        // south edge
+      for (let y = gateY + 1; y < targetH; y++) layRoad(gateX, y);
+      edge = { x: gateX, y: targetH - 1 };
+    } else if (ne.x === 0) {                 // west edge
+      for (let x = gateX - 1; x >= 0; x--) layRoad(x, gateY);
+      edge = { x: 0, y: gateY };
+    } else if (ne.x === width - 1) {         // east edge
+      for (let x = gateX + 1; x < targetW; x++) layRoad(x, gateY);
+      edge = { x: targetW - 1, y: gateY };
+    }
+    newMap[gateY][gateX].isEntry = false;   // the native gate is now interior on the lane
+    newMap[edge.y][edge.x].isGate = true;
+    return edge;
+  });
+
+  const primary = borderEntrances[0];
+  newMap[primary.y][primary.x].isEntry = true;
+  town.entryPoint = primary;
+  town.entrances = borderEntrances.map((pos, i) => ({ dir: (town.entrances?.[i]?.dir) || null, pos }));
 
   // scatter farm-field clusters in the countryside ring (never over the core or road).
   // Smaller settlements have a thicker ring, so they get more farmland. Desert towns
@@ -309,6 +402,118 @@ function placeRiverInTown(mapData, riverDirection, width, height, rng) {
   return { isHorizontal, center, riverWidth };
 }
 
+// --- world-driven water (lakefront / coastline) ------------------------------
+
+// Carve a lakefront ('lake') or coastline ('coast') into the native town core. Water
+// enters only from the flagged edges; a dry core around the square is always preserved
+// and total water is capped, so buildings always have room. A sand shore (beach tiles,
+// walkable) lines the land/water boundary. Returns the water descriptor for downstream
+// steps (padTownToUniform extends a coastline out to the canvas edge).
+function placeTownWater(mapData, water, width, height, rng, townSize) {
+  const { kind, edges } = water;
+  const centerX = Math.floor(width / 2);
+  const centerY = Math.floor(height / 2);
+  // Keep the central settlement footprint dry (square + important-building ring).
+  const coreR = Math.max(2, Math.round(Math.min(width, height) * 0.28));
+  const inDryCore = (x, y) => Math.max(Math.abs(x - centerX), Math.abs(y - centerY)) <= coreR;
+
+  // Water budget = the lower of a hard fraction of the core and "everything left after
+  // reserving land for the buildings this size needs". Buildings are placed only in the
+  // native core, so this guarantees the roster always fits no matter the coastline.
+  const coreArea = width * height;
+  const reserved = Math.ceil(buildingTileEstimate(townSize) * 1.8) + 9; // +square/fountain
+  const maxWater = Math.max(0, Math.min(Math.floor(coreArea * 0.20), coreArea - reserved));
+
+  let placed = 0;
+  const setWater = (x, y) => {
+    if (x < 0 || x >= width || y < 0 || y >= height) return;
+    if (inDryCore(x, y)) return;
+    const t = mapData[y][x];
+    if (t.type === 'water' || placed >= maxWater) return;
+    t.type = 'water';
+    t.walkable = false;
+    t.poi = null;
+    placed++;
+  };
+  const jitter = (n) => Math.floor(rng() * n);
+
+  if (kind === 'coast') {
+    // Open sea floods inward from each water edge with a slightly noisy depth.
+    const depthV = Math.max(2, Math.round(height * 0.15));
+    const depthH = Math.max(2, Math.round(width * 0.15));
+    if (edges.N) for (let x = 0; x < width; x++) { const d = depthV + jitter(2); for (let y = 0; y < d; y++) setWater(x, y); }
+    if (edges.S) for (let x = 0; x < width; x++) { const d = depthV + jitter(2); for (let y = 0; y < d; y++) setWater(x, height - 1 - y); }
+    if (edges.W) for (let y = 0; y < height; y++) { const d = depthH + jitter(2); for (let x = 0; x < d; x++) setWater(x, y); }
+    if (edges.E) for (let y = 0; y < height; y++) { const d = depthH + jitter(2); for (let x = 0; x < d; x++) setWater(width - 1 - x, y); }
+  } else {
+    // Lake: a single contained blob anchored against the water edge / corner.
+    const anchorX = edges.W ? 1 + jitter(2) : edges.E ? width - 2 - jitter(2) : centerX + jitter(3) - 1;
+    const anchorY = edges.N ? 1 + jitter(2) : edges.S ? height - 2 - jitter(2) : centerY + jitter(3) - 1;
+    const radius = Math.max(2, Math.round(Math.min(width, height) * 0.16));
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const dx = x - anchorX, dy = y - anchorY;
+        const wobble = radius + (rng() - 0.5) * 1.6;
+        if (dx * dx + dy * dy <= wobble * wobble) setWater(x, y);
+      }
+    }
+  }
+
+  sandShorePass(mapData, width, height);
+  return { kind, edges, coreR };
+}
+
+// Any grass tile orthogonally adjacent to water becomes a sand beach (walkable shore).
+function sandShorePass(mapData, width, height) {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (mapData[y][x].type !== 'grass') continue;
+      const touchesWater = [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => {
+        const nx = x + dx, ny = y + dy;
+        return nx >= 0 && nx < width && ny >= 0 && ny < height && mapData[ny][nx].type === 'water';
+      });
+      if (touchesWater) {
+        mapData[y][x].type = 'beach';
+        mapData[y][x].walkable = true;
+      }
+    }
+  }
+}
+
+// Carry a coastline out from the core through the countryside ring to the canvas edge,
+// so the sea reaches the border instead of sitting in a grass moat. For each watered
+// edge, columns/rows whose core-boundary tile is wet (or the ring corners) extend to the
+// border; dry central columns stay as a small headland the town sits on.
+function extendCoastWater(newMap, edges, offX, offY, coreW, coreH, targetW, targetH) {
+  const wet = (t) => t && (t.type === 'water' || t.type === 'beach');
+  const fillWater = (x, y) => {
+    const t = newMap[y] && newMap[y][x];
+    if (!t || t.type === 'water') return;
+    t.type = 'water'; t.walkable = false; t.poi = null;
+  };
+  const inCoreX = (x) => x >= offX && x < offX + coreW;
+  const inCoreY = (y) => y >= offY && y < offY + coreH;
+
+  if (edges.S) for (let x = 0; x < targetW; x++) {
+    if (inCoreX(x) && !wet(newMap[offY + coreH - 1][x])) continue;
+    for (let y = offY + coreH; y < targetH; y++) fillWater(x, y);
+  }
+  if (edges.N) for (let x = 0; x < targetW; x++) {
+    if (inCoreX(x) && !wet(newMap[offY][x])) continue;
+    for (let y = offY - 1; y >= 0; y--) fillWater(x, y);
+  }
+  if (edges.E) for (let y = 0; y < targetH; y++) {
+    if (inCoreY(y) && !wet(newMap[y][offX + coreW - 1])) continue;
+    for (let x = offX + coreW; x < targetW; x++) fillWater(x, y);
+  }
+  if (edges.W) for (let y = 0; y < targetH; y++) {
+    if (inCoreY(y) && !wet(newMap[y][offX])) continue;
+    for (let x = offX - 1; x >= 0; x--) fillWater(x, y);
+  }
+
+  sandShorePass(newMap, targetW, targetH);
+}
+
 // Place main road from entry to center
 function placeMainRoad(mapData, entryPos, direction, width, height, townSize, riverInfo = null) {
   const centerX = Math.floor(width / 2);
@@ -386,32 +591,24 @@ function placeMainRoad(mapData, entryPos, direction, width, height, townSize, ri
   }
 }
 
-// Place city walls around perimeter (cities only)
+// Place city walls around perimeter (cities only).
+// Walls run over grass AND along the sand shore (beach), but NEVER onto water — so a
+// wall that reaches the waterline simply ends there. The autotiler (townTileArt) keys
+// each wall tile off its wall neighbours, so the tile next to the gap renders as a clean
+// end-cap: the wall terminates at the water instead of floating across it.
 function placeCityWalls(mapData) {
   const width = mapData[0].length;
   const height = mapData.length;
+  const wallable = (t) => t.type === 'grass' || t.type === 'beach';
 
   // Place walls on all perimeter tiles
   for (let x = 0; x < width; x++) {
-    // Top wall
-    if (mapData[0][x].type === 'grass') {
-      mapData[0][x].type = 'wall';
-    }
-    // Bottom wall
-    if (mapData[height - 1][x].type === 'grass') {
-      mapData[height - 1][x].type = 'wall';
-    }
+    if (wallable(mapData[0][x])) mapData[0][x].type = 'wall';
+    if (wallable(mapData[height - 1][x])) mapData[height - 1][x].type = 'wall';
   }
-
   for (let y = 0; y < height; y++) {
-    // Left wall
-    if (mapData[y][0].type === 'grass') {
-      mapData[y][0].type = 'wall';
-    }
-    // Right wall
-    if (mapData[y][width - 1].type === 'grass') {
-      mapData[y][width - 1].type = 'wall';
-    }
+    if (wallable(mapData[y][0])) mapData[y][0].type = 'wall';
+    if (wallable(mapData[y][width - 1])) mapData[y][width - 1].type = 'wall';
   }
 
   logger.debug('[TOWN_MAP] Placed city walls around perimeter');
@@ -449,7 +646,7 @@ function placeTownCenter(mapData, centerPos, townSize) {
 }
 
 // Place buildings around the town - COMPLETELY REWRITTEN
-function placeBuildings(mapData, count, townSize, rng, centerPos) {
+function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = false) {
   if (!centerPos) {
     logger.warn('[TOWN_MAP] placeBuildings called with undefined centerPos, using map defaults');
     centerPos = { x: Math.floor(mapData[0].length / 2), y: Math.floor(mapData.length / 2) };
@@ -458,32 +655,8 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
   const centerX = centerPos.x;
   const centerY = centerPos.y;
 
-  // Define important buildings for each town size
-  const buildingConfig = {
-    hamlet: {
-      important: ['barn'],
-      houses: 5
-    },
-    village: {
-      important: ['inn', 'shop', 'blacksmith'],
-      secondary: ['alchemist'],
-      houses: 8
-    },
-    town: {
-      important: ['inn', 'shop', 'temple', 'blacksmith', 'tavern', 'tavern'],
-      secondary: ['alchemist', 'archives', 'warehouse'],
-      houses: 25
-    },
-    city: {
-      important: ['inn', 'temple', 'temple', 'market', 'blacksmith', 'tavern', 'tavern', 'tavern', 'bank', 'bank', 'bank'],
-      secondary: ['guild', 'guild', 'guild', 'alchemist', 'alchemist', 'archives', 'library', 'foundry', 'warehouse', 'warehouse'],
-      houses: 55,
-      hasKeep: true,
-      nobleEstate: ['manor', 'manor', 'manor', 'manor', 'manor']
-    }
-  };
-
-  const config = buildingConfig[townSize] || buildingConfig.village;
+  // Per-size building roster (module-level so the water step reserves matching land).
+  const config = BUILDING_CONFIG[townSize] || BUILDING_CONFIG.village;
   const { important, houses } = config;
 
   // Track occupied positions
@@ -518,69 +691,128 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
   const squareSize = townSize === 'hamlet' ? 1 : townSize === 'village' ? 2 : 3;
   const halfSize = Math.floor(squareSize / 2);
 
-  // STEP 0: Place keep at top of city (cities only)
+  // Shore-averse buildings: a stable (damp/footing), a barn (farmland, not docks) and a
+  // bank (kept central/civic) should not sit on the waterfront. They avoid any tile within
+  // one step of water/beach. Dock-appropriate buildings (harbormaster, warehouse) are
+  // placed separately on the shore (STEP 1.7) and are NOT averse.
+  const SHORE_AVERSE = new Set(['stables', 'barn', 'bank']);
+  const isShore = (x, y) => {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const t = mapData[y + dy] && mapData[y + dy][x + dx];
+        if (t && (t.type === 'water' || t.type === 'beach')) return true;
+      }
+    }
+    return false;
+  };
+  const blockedFor = (x, y, type) => isOccupied(x, y) || (SHORE_AVERSE.has(type) && isShore(x, y));
+
+  // The keep's anchor row, shared with the noble-estate step below. Defaults to the
+  // classic top-centre slot; relocated downward if a coastline floods the top of the city.
+  let keepX = centerX;
+  let keepY = 3;
+
+  // STEP 0: Place the keep (cities only). REQUIRED.
   if (config.hasKeep) {
-    logger.debug('[TOWN_MAP] Placing keep at top of city...');
+    const W = mapData[0].length, H = mapData.length;
+    const tileFree = (x, y) => x > 0 && x < W - 1 && y > 0 && y < H - 1 && mapData[y][x].type === 'grass';
+    const placeKeep = (x, y) => {
+      const t = mapData[y][x];
+      t.type = 'building'; t.buildingType = 'keep'; t.buildingName = generateManorName(rng);
+      t.walkable = false; t.poi = null; markOccupied(x, y);
+    };
+    // keep_wall is placed only on FREE GRASS, so it stops at water (a clean terminus) and
+    // never overwrites the city wall, a road, or another building — the walls are respected.
+    const keepWall = (x, y) => { if (tileFree(x, y)) { mapData[y][x].type = 'keep_wall'; markOccupied(x, y); } };
+    const pathTo = (fromX, fromY, toX, toY) => {
+      let x = fromX, y = fromY;
+      const lay = () => { if (mapData[y][x].type === 'grass') { mapData[y][x].type = 'stone_path'; mapData[y][x].walkable = true; } };
+      while (x !== toX) { x += x < toX ? 1 : -1; lay(); }
+      while (y !== toY) { y += y < toY ? 1 : -1; lay(); }
+    };
 
-    // Place keep at top center, inside the walls
-    const keepX = centerX;
-    const keepY = 3; // Inside the wall (y=0 is wall, y=1 is keep wall, y=2 might be road)
-
-    if (!isOccupied(keepX, keepY)) {
-      mapData[keepY][keepX].type = 'building';
-      mapData[keepY][keepX].buildingType = 'keep';
-      mapData[keepY][keepX].buildingName = generateManorName(rng); // Use Manor generator for Keep names
-      mapData[keepY][keepX].walkable = false;
-      mapData[keepY][keepX].poi = null;
-      markOccupied(keepX, keepY);
-
-      // Place thin wall around keep (3x3 area)
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const wallX = keepX + dx;
-          const wallY = keepY + dy;
-
-          // Only place on perimeter of 3x3 area
-          if ((Math.abs(dx) === 1 || Math.abs(dy) === 1) &&
-            wallX >= 1 && wallX < mapData[0].length - 1 &&
-            wallY >= 1 && wallY < mapData.length - 1) {
-
-            // Don't overwrite the keep itself
-            if (!(dx === 0 && dy === 0)) {
-              if (mapData[wallY][wallX].type === 'grass') {
-                mapData[wallY][wallX].type = 'keep_wall';
-                markOccupied(wallX, wallY);
-              }
-            }
+    // MAIN placement: classic top-centre slot. Search from the top for the first dry tile
+    // near the centre column (dodges a coastline), then ring it with a TIGHT 3x3 keep_wall.
+    const tryCentre = () => {
+      let fx = -1, fy = -1;
+      for (let y = 3; y <= centerY - 2 && fy < 0; y++) {
+        for (let off = 0; off <= 4 && fy < 0; off++) {
+          for (const xx of (off === 0 ? [centerX] : [centerX - off, centerX + off])) {
+            if (tileFree(xx, y)) { fx = xx; fy = y; break; }
           }
         }
       }
-
-      // Create stone path from keep wall to town square
-      let pathY = keepY + 2; // Start after keep wall
-      while (pathY < centerY) {
-        if (mapData[pathY][keepX].type === 'grass') {
-          mapData[pathY][keepX].type = 'stone_path';
+      if (fy < 0) return false;
+      keepX = fx; keepY = fy;
+      placeKeep(fx, fy);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if ((Math.abs(dx) === 1 || Math.abs(dy) === 1) && !(dx === 0 && dy === 0)) keepWall(fx + dx, fy + dy);
         }
-        pathY++;
       }
+      let py = keepY + 2; // path from below the wall to the square
+      while (py < centerY) { if (mapData[py][keepX].type === 'grass') { mapData[py][keepX].type = 'stone_path'; mapData[py][keepX].walkable = true; } py++; }
+      return true;
+    };
 
-      logger.debug(`[TOWN_MAP] Placed keep at (${keepX}, ${keepY}) with keep wall and path to square`);
-    }
+    // OPTIONAL placement: tuck the keep tight into a city corner, REUSING the two perimeter
+    // walls as two of its own sides; keep_wall hugs the keep on the other two (an L) with a
+    // gate toward the square. Used to free up the centre of busy/coastal cities — not the
+    // default. The keep sits one tile in from the corner so its walls stay tight.
+    const tryCorner = () => {
+      const corners = [
+        { cx: 0, cy: 0, sx: 1, sy: 1 },
+        { cx: W - 1, cy: 0, sx: -1, sy: 1 },
+        { cx: 0, cy: H - 1, sx: 1, sy: -1 },
+        { cx: W - 1, cy: H - 1, sx: -1, sy: -1 },
+      ];
+      for (let i = corners.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [corners[i], corners[j]] = [corners[j], corners[i]]; }
+      for (const c of corners) {
+        const kx = c.cx + c.sx, ky = c.cy + c.sy;          // inset 1: keep hugs the corner walls
+        const wallE = { x: c.cx + 2 * c.sx, y: c.cy + c.sy };       // inner wall, X side
+        const wallS = { x: c.cx + c.sx, y: c.cy + 2 * c.sy };       // gate side, Y axis (toward centre)
+        const wallC = { x: c.cx + 2 * c.sx, y: c.cy + 2 * c.sy };   // diagonal corner of the L
+        if (![{ x: kx, y: ky }, wallE, wallS, wallC].every((p) => tileFree(p.x, p.y))) continue;
+        keepX = kx; keepY = ky;
+        placeKeep(kx, ky);
+        // Fully enclose: the two city walls cover the outer sides; keep_wall covers the two
+        // inner sides + the diagonal corner, so the keep is walled on all sides (like the
+        // central keep). A path runs from just outside the wall to the square.
+        keepWall(wallE.x, wallE.y);
+        keepWall(wallS.x, wallS.y);
+        keepWall(wallC.x, wallC.y);
+        pathTo(c.cx + c.sx, c.cy + 3 * c.sy, centerX, centerY);
+        logger.debug(`[TOWN_MAP] Placed corner keep at (${kx}, ${ky}) reusing city walls`);
+        return true;
+      }
+      return false;
+    };
+
+    // The central keep is the default. A corner keep is an OPTION, used ~half the time on
+    // coastal cities to keep the lord's seat out of the crowded waterfront centre — not
+    // forced. Either way the keep falls back to the other strategy if the first can't
+    // place. Keep + walls are placed here, before any other building, so the footprint is
+    // reserved.
+    const wantCorner = hasWater && rng() < 0.5;
+    const placed = wantCorner
+      ? (tryCorner() || tryCentre())
+      : (tryCentre() || tryCorner());
+    if (!placed) logger.warn('[TOWN_MAP] Could not place the city keep');
   }
 
-  // STEP 0.5: Place noble estate manors between keep and town square (cities only)
+  // STEP 0.5: Place noble estate manors between keep and town square (cities only).
+  // Anchored off the keep's ACTUAL row (which may have moved inland to dodge a coastline).
   if (config.nobleEstate) {
-    const keepY = 3;
     const estateManors = config.nobleEstate;
     let manorsPlaced = 0;
 
-    // Pick a random side of the keep path (left or right) and a random starting row
-    const estateSide = rng() < 0.5 ? -1 : 1; // -1 = left of path, 1 = right
-    const estateMinY = keepY + 2;
-    const estateMaxY = centerY - 2;
-    const estateStartY = estateMinY + Math.floor(rng() * Math.max(1, estateMaxY - estateMinY - 1));
-    const estateStartX = centerX + (estateSide * (2 + Math.floor(rng() * 2))); // 2-3 tiles from path
+    // The noble quarter clusters NEAR THE KEEP (nobles live by the lord's seat), a few
+    // tiles toward the city interior — works whether the keep is central or in a corner.
+    const estateSide = rng() < 0.5 ? -1 : 1;
+    const towardCenterX = Math.sign(centerX - keepX) || 1;
+    const towardCenterY = Math.sign(centerY - keepY) || 1;
+    const estateStartX = keepX + towardCenterX * 2 + estateSide;
+    const estateStartY = keepY + towardCenterY * 2;
 
     // Build cluster: place first manor at anchor, then grow outward from placed manors
     const placedManorPositions = [];
@@ -710,6 +942,23 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
     markOccupied(x, y);
   };
 
+  // STEP 0.6: The gaol sits in the authority cluster — historically the town gaol was part
+  // of the castle, so we place it on the first free tile spiralling out from the keep
+  // (which is already placed). Done before the market/house steps so it claims its spot.
+  if (config.hasJail) {
+    let jailPlaced = false;
+    for (let r = 1; r <= 6 && !jailPlaced; r++) {
+      for (let dy = -r; dy <= r && !jailPlaced; dy++) {
+        for (let dx = -r; dx <= r && !jailPlaced; dx++) {
+          if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue; // ring perimeter only
+          const x = keepX + dx, y = keepY + dy;
+          if (!blockedFor(x, y, 'jail')) { placeBuilding(x, y, 'jail'); jailPlaced = true; }
+        }
+      }
+    }
+    if (!jailPlaced) logger.warn('[TOWN_MAP] No free tile near the keep for the gaol');
+  }
+
   // STEP 1: Place important buildings around town square clockwise
   logger.debug(`[TOWN_MAP] Placing ${important.length} important buildings around square...`);
 
@@ -750,7 +999,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
 
       if (!pos) continue;
 
-      if (!isOccupied(pos.x, pos.y)) {
+      if (!blockedFor(pos.x, pos.y, buildingType)) {
         placeBuilding(pos.x, pos.y, buildingType);
         importantPlaced++;
         placed = true;
@@ -767,7 +1016,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
               const x = centerX + dx;
               const y = centerY + dy;
 
-              if (!isOccupied(x, y)) {
+              if (!blockedFor(x, y, buildingType)) {
                 placeBuilding(x, y, buildingType);
                 importantPlaced++;
                 placed = true;
@@ -784,37 +1033,42 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
   }
   logger.debug(`[TOWN_MAP] Placed ${importantPlaced} important buildings`);
 
-  // STEP 1.5: Place secondary buildings in a second ring around the square (shuffled for variety)
+  // STEP 1.5: Place secondary buildings in a second ring around the square (shuffled for variety).
+  // Waterfront buildings (harbormaster, dockside warehouses) are handled separately in
+  // STEP 1.7 so they sit on the shore rather than the central ring.
   const secondary = config.secondary || [];
   if (secondary.length > 0) {
     logger.debug(`[TOWN_MAP] Placing ${secondary.length} secondary buildings in outer ring...`);
 
-    // Collect positions in rings 2-5 out from the square
-    const secondRingPositions = [];
-    for (let radius = halfSize + 2; radius <= halfSize + 5; radius++) {
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dx = -radius; dx <= radius; dx++) {
-          if (Math.abs(dx) === radius || Math.abs(dy) === radius) {
-            const x = centerX + dx;
-            const y = centerY + dy;
-            if (x >= 1 && x < mapData[0].length - 1 && y >= 1 && y < mapData.length - 1) {
-              secondRingPositions.push({ x, y });
+    // Two placement bands: an INNER ring just outside the square (the market/service
+    // district) and an OUTER ring on the outskirts. Commerce/civic buildings cluster near
+    // the square; rural/industrial buildings sit on the outskirts.
+    const ringBand = (minR, maxR) => {
+      const out = [];
+      for (let radius = minR; radius <= maxR; radius++) {
+        for (let dy = -radius; dy <= radius; dy++) {
+          for (let dx = -radius; dx <= radius; dx++) {
+            if (Math.abs(dx) === radius || Math.abs(dy) === radius) {
+              const x = centerX + dx, y = centerY + dy;
+              if (x >= 1 && x < mapData[0].length - 1 && y >= 1 && y < mapData.length - 1) out.push({ x, y });
             }
           }
         }
       }
-    }
+      for (let i = out.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [out[i], out[j]] = [out[j], out[i]]; }
+      return out;
+    };
+    const innerRing = ringBand(halfSize + 2, halfSize + 3);
+    const outerRing = ringBand(halfSize + 4, halfSize + 7);
 
-    // Shuffle positions so buildings don't always land in the same spots
-    for (let i = secondRingPositions.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [secondRingPositions[i], secondRingPositions[j]] = [secondRingPositions[j], secondRingPositions[i]];
-    }
+    // Rural / industrial buildings belong on the outskirts; everything else (alchemist,
+    // apothecary, tailor, archives, library, guild, townhall, jail, magetower, shrine,
+    // fletcher) clusters near the square.
+    const PERIPHERAL = new Set(['warehouse', 'foundry', 'mill', 'stables', 'barn']);
 
     // Building types that should not be placed in the noble estate zone
     const estateExcluded = new Set(['warehouse', 'foundry']);
     const estateZone = config._estateZone || null;
-
     const isInEstateZone = (x, y) => {
       if (!estateZone) return false;
       return x >= estateZone.minX && x <= estateZone.maxX &&
@@ -823,14 +1077,19 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
 
     let secondaryPlaced = 0;
     for (const buildingType of secondary) {
-      for (const pos of secondRingPositions) {
-        if (!isOccupied(pos.x, pos.y)) {
-          // Skip estate zone for industrial/warehouse buildings
+      const peripheral = PERIPHERAL.has(buildingType);
+      const bands = peripheral ? [outerRing, innerRing] : [innerRing, outerRing];
+      let done = false;
+      for (const band of bands) {
+        for (const pos of band) {
+          if (blockedFor(pos.x, pos.y, buildingType)) continue;
           if (estateExcluded.has(buildingType) && isInEstateZone(pos.x, pos.y)) continue;
           placeBuilding(pos.x, pos.y, buildingType);
           secondaryPlaced++;
+          done = true;
           break;
         }
+        if (done) break;
       }
     }
 
@@ -838,6 +1097,41 @@ function placeBuildings(mapData, count, townSize, rng, centerPos) {
       logger.warn(`[TOWN_MAP] Only placed ${secondaryPlaced}/${secondary.length} secondary buildings!`);
     }
     logger.debug(`[TOWN_MAP] Placed ${secondaryPlaced} secondary buildings`);
+  }
+
+  // STEP 1.7: Waterfront buildings. In a town on water, put the harbour office and a
+  // couple of dockside warehouses on the SHORE (free land next to water/beach), claimed
+  // before houses fill the front. Runs after the central buildings so it respects them,
+  // and before houses so the waterfront isn't all cottages. Silent if there's no shore room.
+  if (hasWater) {
+    const waterfront = townSize === 'hamlet' ? []
+      : townSize === 'village' ? ['harbormaster']
+      : ['harbormaster', 'warehouse', 'warehouse'];
+    if (waterfront.length > 0) {
+      const isShoreLand = (x, y) => !isOccupied(x, y) && [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => {
+        const t = mapData[y + dy] && mapData[y + dy][x + dx];
+        return t && (t.type === 'water' || t.type === 'beach');
+      });
+      const shore = [];
+      for (let y = 1; y < mapData.length - 1; y++) {
+        for (let x = 1; x < mapData[0].length - 1; x++) {
+          if (isShoreLand(x, y)) shore.push({ x, y });
+        }
+      }
+      for (let i = shore.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [shore[i], shore[j]] = [shore[j], shore[i]]; }
+
+      const placedWF = [];
+      let wfIndex = 0;
+      for (const pos of shore) {
+        if (wfIndex >= waterfront.length) break;
+        if (isOccupied(pos.x, pos.y)) continue;
+        if (placedWF.some((p) => Math.abs(p.x - pos.x) + Math.abs(p.y - pos.y) < 3)) continue; // spacing
+        placeBuilding(pos.x, pos.y, waterfront[wfIndex]);
+        placedWF.push(pos);
+        wfIndex++;
+      }
+      logger.debug(`[TOWN_MAP] Placed ${placedWF.length}/${waterfront.length} waterfront buildings`);
+    }
   }
 
   // STEP 2: Place houses away from center (exclude rings based on town size)
@@ -1171,7 +1465,17 @@ export const getTownTileEmoji = (tile) => {
       alchemist: '⚗️',
       foundry: '🔥',
       warehouse: '📦',
-      library: '📖'
+      library: '📖',
+      apothecary: '🧪',
+      fletcher: '🏹',
+      harbormaster: '⚓',
+      jail: '⛓️',
+      magetower: '🔮',
+      mill: '🌾',
+      shrine: '🛕',
+      stables: '🐴',
+      tailor: '🧵',
+      townhall: '🏛️'
     };
     return buildingEmojis[tile.buildingType] || '🏠';
   }

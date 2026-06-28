@@ -5,6 +5,7 @@ import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from "../contexts/AuthContext";
 import { generateMapData, findStartingTown } from "../utils/mapGenerator";
 import { generateTownMap } from "../utils/townMapGenerator";
+import { analyzeTownWater, getTownRoadEdges } from "../utils/townWater";
 import { populateTown } from "../utils/npcGenerator";
 import WorldMapDisplay from "../components/WorldMapDisplay";
 import OnboardingSteps from "../components/OnboardingSteps";
@@ -316,7 +317,7 @@ const NewGame = () => {
         if (tile.poi === 'town' && tile.townName) {
           const townSize = tile.townSize || tile.poiType || 'village';
           const seed = parseInt(seedToUse) + (x * 1000) + (y * 10000);
-          const townMapData = generateTownMap(townSize, tile.townName, 'south', seed, tile.hasRiver, tile.riverDirection, worldTheme);
+          const townMapData = generateTownMap(townSize, tile.townName, getTownRoadEdges(mapData, x, y), seed, tile.hasRiver, tile.riverDirection, worldTheme, analyzeTownWater(mapData, x, y));
 
           // Inject quest buildings if needed
           if (spawnResult.requiredBuildings?.[tile.townName]) {

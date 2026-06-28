@@ -9,6 +9,8 @@ import TilesetTest from './TilesetTest';
 import WorldMapArtTest from './WorldMapArtTest';
 import WorldFixedMapTest from './WorldFixedMapTest';
 import LakeTest from './LakeTest';
+import TownWaterTest from './TownWaterTest';
+import SiteMapTest from './SiteMapTest';
 import TerrainStudio from './TerrainStudio';
 import TerrainStudioV2 from './TerrainStudioV2';
 import MilestoneTest from './MilestoneTest';
@@ -46,6 +48,8 @@ const debugSections = [
       { to: 'world-map-art', label: 'World Map Art (SVG)' },
       { to: 'world-fixed', label: 'World Fixed Map (render test)' },
       { to: 'lake-test', label: 'Lake Test (corners)' },
+      { to: 'town-water', label: 'Town Water (lake/coast)' },
+      { to: 'site-map', label: 'Site Map (caves/ruins)' },
     ],
   },
   {
@@ -196,6 +200,8 @@ const DebugRoutes = () => {
           <Route path="world-map-art" element={<WorldMapArtTest />} />
           <Route path="world-fixed" element={<WorldFixedMapTest />} />
           <Route path="lake-test" element={<LakeTest />} />
+          <Route path="town-water" element={<TownWaterTest />} />
+          <Route path="site-map" element={<SiteMapTest />} />
           <Route path="npc-test" element={<NPCTest />} />
           <Route path="seed-debug-test" element={<SeedDebugTest />} />
           <Route path="milestone-test" element={<MilestoneTest />} />

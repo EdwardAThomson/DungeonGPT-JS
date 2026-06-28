@@ -1,39 +1,41 @@
 # Missing Building Images
 
-Building interior images needed for the BuildingModal. Output directory: `public/assets/buildings/`
+Building interior images for the BuildingModal. Output directory: `public/assets/buildings/`
+(BuildingModal loads `/assets/buildings/{buildingType}.webp`; `house`/`manor` use the
+`*_interior_*.webp` variants).
 
-Generated via `scripts/generate_image_api.js` (Gemini). See [IMAGE_GENERATION_PROMPTS.md](IMAGE_GENERATION_PROMPTS.md) for tooling and style guide.
+Generated via `scripts/generate_image_api.js` (Gemini). See
+[IMAGE_GENERATION_PROMPTS.md](IMAGE_GENERATION_PROMPTS.md) for tooling and
+[BUILDING_IMAGE_PROMPTS.md](BUILDING_IMAGE_PROMPTS.md) for ready-to-run prompts.
 
-**Style**: Interior scenes should match existing building images — painterly digital fantasy art, warm dramatic lighting, detailed medieval/fantasy interiors. Portrait or square composition. No text or UI elements.
-
----
-
-## Existing Images (for reference)
-
-| Building | File | Notes |
-|----------|------|-------|
-| Bank | `bank.webp` | |
-| Blacksmith | `blacksmith.webp` | |
-| Guild | `guild.webp` | |
-| House | `house_interior_1/2/3.webp` | 3 variants |
-| Inn | `inn.webp` | |
-| Manor | `manor_interior_1.webp` | 1 variant |
-| Shop | `shop.webp` | |
-| Tavern | `tavern.webp` | |
-| Temple | `temple.webp` | |
+**Style**: match existing images — painterly digital fantasy art, warm dramatic lighting,
+detailed medieval/fantasy interiors, portrait or square, no text/UI/people.
 
 ---
 
-## Missing Images
+## Existing images
 
-| Building | File Needed | Appears In | Priority |
+Core: `bank`, `blacksmith`, `guild`, `inn`, `shop`, `tavern`, `temple`,
+`house_interior_1/2/3`, `manor_interior_1`, `town_interior_hero`.
+
+Previously-missing roster (now generated): `alchemist`, `archives`, `barn`, `barracks`,
+`foundry`, `keep`, `library`, `market`, `warehouse`.
+
+Newly-added building types (generated + now wired into map gen + icons + legend):
+`apothecary`, `fletcher`, `harbormaster`, `jail`, `magetower`, `mill`, `shrine`,
+`stables`, `tailor`, `townhall`.
+
+> Coverage is enforced by `src/utils/buildingArt.test.js`: every building type that can be
+> *placed* must have both a map icon and an interior image, so no placed building falls
+> back to the placeholder.
+
+---
+
+## Missing images
+
+| Building | File needed | Appears in | Priority |
 |----------|-------------|------------|----------|
-| Alchemist | `alchemist.webp` | Village, Town, City | High |
-| Market | `market.webp` | City | High |
-| Archives | `archives.webp` | Town, City | Medium |
-| Library | `library.webp` | City | Medium |
-| Foundry | `foundry.webp` | City | Medium |
-| Warehouse | `warehouse.webp` | Town, City | Medium |
-| Keep | `keep.webp` | City (1 per city) | Medium |
-| Barn | `barn.webp` | Hamlet | Low |
-| Barracks | `barracks.webp` | Not currently placed | Low |
+| Workshop | `workshop.webp` | Quest building (e.g. Tinker-Row, Arcane Renaissance campaign) — injected via `injectQuestBuildings`, not in the normal roster | Medium |
+
+Until `workshop.webp` exists, a placed workshop shows the BuildingModal placeholder and
+renders with the fallback house icon on the town map.

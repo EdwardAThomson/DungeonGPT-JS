@@ -7,7 +7,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { generateTownMap } from '../utils/townMapGenerator';
-import { tileBackground, sampleTiles, wallVariant, buildingTile, POI_EMOJI } from '../utils/townTileArt';
+import { tileBackground, sampleTiles, wallVariant, buildingTile, BUILDING_TYPES, POI_EMOJI } from '../utils/townTileArt';
 
 const SIZES = ['hamlet', 'village', 'town', 'city'];
 const TILE = 28;
@@ -52,12 +52,9 @@ const TilesetTest = () => {
     { m: 6, label: 'corner SE' }, { m: 7, label: 'T-junction' }, { m: 15, label: 'cross' },
     { m: 1, label: 'endpoint' },
   ];
-  // Every building type the town generator can emit — so each roof colour is visible.
-  const buildings = [
-    'house', 'inn', 'tavern', 'shop', 'market', 'temple', 'bank', 'guild',
-    'manor', 'keep', 'barracks', 'blacksmith', 'foundry', 'barn', 'warehouse',
-    'archives', 'library', 'alchemist',
-  ];
+  // Every building type the renderer knows (single source of truth, so new types appear
+  // here automatically).
+  const buildings = BUILDING_TYPES;
 
   const heading = { fontSize: 14, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' };
 

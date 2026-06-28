@@ -18,6 +18,9 @@ const C = {
   snow: '#eef3f7', snowDark: '#d2dde6', snowLight: '#ffffff',
   dirt: '#b07b46', dirtDark: '#8f5f31', dirtLight: '#c89a64',
   water: '#3f7cc2', waterLight: '#5a93d6', foam: '#bcd8f5',
+  // shore sand — softer than the desert ground so coastlines don't read as a harsh
+  // yellow border (mirrors worldTileArt's toned-down beach sand).
+  beach: '#dccfac', beachDark: '#c6b78d', beachLight: '#ece1c2',
   soil: '#6f4a2a', soilDark: '#553820', crop: '#7fb04a', cropDark: '#5f8a34',
   stone: '#c2bba9', stoneDark: '#aaa292', mortar: '#8f8775',
   plank: '#8a5a32', plankGap: '#5d3a1c',
@@ -40,6 +43,17 @@ const ROOFS = {
   blacksmith: '#5a5550', foundry: '#4f4a45',                 // dark forge
   barn: '#8a5a32', warehouse: '#7a5230',                     // timber browns
   alchemist: '#7a5a9c',  // arcane purple
+  // new building types (generated art) — distinct roof colours so each reads apart
+  apothecary: '#5a8c5a',   // herbal green
+  fletcher: '#6f7a3a',     // bowyer olive
+  harbormaster: '#3f6f9c', // nautical blue
+  jail: '#4a4a4a',         // iron grey
+  magetower: '#6a4fae',    // arcane violet
+  mill: '#b08a4a',         // wheat tan
+  shrine: '#b59a3a',       // pale gold (smaller than a temple)
+  stables: '#8a6a3a',      // stable brown
+  tailor: '#9c6a8a',       // cloth mauve
+  townhall: '#9a8a5a',     // civic stone
 };
 
 // --- helpers -----------------------------------------------------------------
@@ -119,6 +133,25 @@ const dirt = (seed) => {
     marks += `<circle cx='${x}' cy='${y}' r='${(r() * 1.1 + 0.5).toFixed(1)}' fill='${c}'/>`;
   }
   return wrap(`<rect width='32' height='32' fill='${C.dirt}'/>${marks}`);
+};
+
+// shore sand: the walkable land/water transition for lakefront + coastal towns. Soft
+// sand base with a few pebbles and faint tide lines, deliberately calmer than the desert
+// ground tile so the coastline reads as a gentle beach rather than a bright border.
+const beach = (seed) => {
+  const r = rng(seed + 9);
+  let marks = '';
+  for (let i = 0; i < 7; i++) {
+    const x = (r() * 30 + 1).toFixed(1);
+    const y = (r() * 30 + 1).toFixed(1);
+    const c = r() > 0.5 ? C.beachDark : C.beachLight;
+    marks += `<circle cx='${x}' cy='${y}' r='${(r() * 0.9 + 0.4).toFixed(1)}' fill='${c}'/>`;
+  }
+  for (let i = 0; i < 2; i++) {
+    const y = 10 + i * 11 + Math.floor(r() * 3);
+    marks += `<path d='M0 ${y} q8 -2 16 0 t16 0' stroke='${C.beachDark}' stroke-width='1' fill='none' opacity='0.45'/>`;
+  }
+  return wrap(`<rect width='32' height='32' fill='${C.beach}'/>${marks}`);
 };
 
 const water = (seed) => {
@@ -257,6 +290,88 @@ const SHAPES = {
     `<circle cx='11' cy='1' r='1.5' fill='#aaaaaa' opacity='0.55'/>` +
     `<rect x='13' y='20' width='6' height='6' rx='0.5' fill='#e8923a'/>` +
     `<rect x='14.5' y='22' width='3' height='4' fill='#ffd27a'/>`,
+  // mill: a windmill — tapered tower, conical cap, four sails
+  mill: (r) =>
+    `<polygon points='11,27 13,12 19,12 21,27' fill='${shade(r, 0.85)}'/>` +
+    `<polygon points='12,12 16,7 20,12' fill='${r}'/>` +
+    `<rect x='14.5' y='21' width='3' height='6' fill='${shade(r, 0.5)}'/>` +
+    `<g stroke='${shade(r, 0.5)}' stroke-width='1.4' stroke-linecap='round'>` +
+    `<line x1='16' y1='13' x2='7' y2='6'/><line x1='16' y1='13' x2='25' y2='6'/>` +
+    `<line x1='16' y1='13' x2='7' y2='20'/><line x1='16' y1='13' x2='25' y2='20'/></g>` +
+    `<circle cx='16' cy='13' r='1.7' fill='${shade(r, 0.4)}'/>`,
+  // apothecary: a shopfront with an awning and a hanging green potion-bottle sign
+  apothecary: (r) =>
+    `<rect x='8' y='13' width='16' height='13' rx='1' fill='${shade(r, 0.82)}'/>` +
+    `<rect x='7' y='10' width='18' height='4' rx='1' fill='${r}'/>` +
+    `<rect x='7' y='13' width='18' height='1.6' fill='#ffffff' opacity='0.12'/>` +
+    `<rect x='10' y='16' width='4' height='4' fill='${shade(r, 1.15)}'/>` +
+    door(r, 16, 3) +
+    `<circle cx='22' cy='9' r='3' fill='#6fcf97'/><rect x='21.2' y='5.5' width='1.6' height='2' fill='#4a8c5a'/>`,
+  // fletcher: a craft cottage with a bow + arrow sign
+  fletcher: (r) =>
+    `<rect x='8' y='12' width='16' height='14' rx='1' fill='${shade(r, 0.82)}'/>` +
+    `<polygon points='6,13 16,7 26,13' fill='${r}'/>` +
+    door(r, 10, 3) +
+    `<path d='M21 9 q4 5 0 10' stroke='#caa15a' stroke-width='1.4' fill='none'/>` +
+    `<line x1='21' y1='9' x2='21' y2='19' stroke='#8a6a3a' stroke-width='0.8'/>` +
+    `<line x1='9' y1='22' x2='15' y2='22' stroke='#8a6a3a' stroke-width='1.2'/><polygon points='15,22 13,21 13,23' fill='#8a6a3a'/>`,
+  // harbormaster: a quayside office with a lookout tower, flag and an anchor motif
+  harbormaster: (r) =>
+    `<rect x='6' y='14' width='14' height='12' rx='1' fill='${shade(r, 0.82)}'/>` +
+    `<rect x='6' y='14' width='14' height='2' fill='#ffffff' opacity='0.14'/>` +
+    `<rect x='19' y='8' width='7' height='18' fill='${shade(r, 0.7)}'/>` +
+    `<rect x='19' y='8' width='7' height='2' fill='#ffffff' opacity='0.14'/>` +
+    `<rect x='21' y='3' width='1.4' height='5' fill='#555'/><polygon points='22.4,3 27,4.5 22.4,6' fill='#c0504d'/>` +
+    door(r, 11, 3) +
+    `<circle cx='12' cy='20' r='2.2' fill='none' stroke='#cfd8dc' stroke-width='1'/><line x1='12' y1='17.3' x2='12' y2='22.4' stroke='#cfd8dc' stroke-width='1'/>`,
+  // jail: a stout stone block with two barred windows
+  jail: (r) =>
+    `<rect x='6' y='11' width='20' height='15' rx='1' fill='${r}'/>` +
+    `<rect x='6' y='11' width='20' height='2.2' fill='#ffffff' opacity='0.1'/>` +
+    `<rect x='9' y='15' width='5' height='6' fill='#2b2b2e'/><rect x='18' y='15' width='5' height='6' fill='#2b2b2e'/>` +
+    `<g stroke='#8a8a8a' stroke-width='0.8'><line x1='10.2' y1='15' x2='10.2' y2='21'/><line x1='11.6' y1='15' x2='11.6' y2='21'/><line x1='13' y1='15' x2='13' y2='21'/><line x1='19.2' y1='15' x2='19.2' y2='21'/><line x1='20.6' y1='15' x2='20.6' y2='21'/><line x1='22' y1='15' x2='22' y2='21'/></g>` +
+    door(shade(r, 0.6), 14.5, 3),
+  // magetower: a slim tower with a pointed cap, a glowing orb finial and an arcane window
+  magetower: (r) =>
+    `<rect x='20' y='8' width='5' height='20' fill='#000000' opacity='0.13'/>` +
+    `<polygon points='11,9 16,1 21,9' fill='${shade(r, 0.8)}'/>` +
+    `<circle cx='16' cy='2.4' r='1.6' fill='#bfa3ff'/>` +
+    `<rect x='11.5' y='9' width='9' height='18' rx='1' fill='${r}'/>` +
+    `<rect x='11.5' y='9' width='9' height='2.2' fill='#ffffff' opacity='0.16'/>` +
+    `<circle cx='16' cy='15' r='2' fill='#bfa3ff' opacity='0.9'/>` +
+    `<rect x='14.5' y='21' width='3' height='6' fill='${shade(r, 0.5)}'/>`,
+  // shrine: a small post-and-beam shelter over an idol (smaller than a temple)
+  shrine: (r) =>
+    `<polygon points='9,16 16,10 23,16' fill='${r}'/>` +
+    `<rect x='8' y='15' width='16' height='2' fill='${shade(r, 0.7)}'/>` +
+    `<rect x='10' y='17' width='2' height='9' fill='${shade(r, 0.6)}'/>` +
+    `<rect x='20' y='17' width='2' height='9' fill='${shade(r, 0.6)}'/>` +
+    `<rect x='14.5' y='19' width='3' height='5' fill='${shade(r, 0.85)}'/>` +
+    `<circle cx='16' cy='20.5' r='1.2' fill='${shade(r, 0.5)}'/>`,
+  // stables: an open-fronted shelter with stall dividers and a fence rail
+  stables: (r) =>
+    `<rect x='5' y='12' width='22' height='14' rx='1' fill='${shade(r, 0.82)}'/>` +
+    `<rect x='4' y='10' width='24' height='4' fill='${r}'/>` +
+    `<rect x='9' y='16' width='1.6' height='10' fill='${shade(r, 0.5)}'/>` +
+    `<rect x='15.2' y='16' width='1.6' height='10' fill='${shade(r, 0.5)}'/>` +
+    `<rect x='21.4' y='16' width='1.6' height='10' fill='${shade(r, 0.5)}'/>` +
+    `<rect x='6' y='23' width='20' height='1.4' fill='${shade(r, 0.55)}'/>`,
+  // tailor: a shopfront with a draped-cloth window and a hanging spool sign
+  tailor: (r) =>
+    `<rect x='8' y='13' width='16' height='13' rx='1' fill='${shade(r, 0.82)}'/>` +
+    `<polygon points='6,14 16,7 26,14' fill='${r}'/>` +
+    door(r, 14.5, 3) +
+    `<rect x='10' y='16' width='5' height='6' fill='${shade(r, 1.15)}'/>` +
+    `<path d='M10 16 q2.5 3 5 0' stroke='#c98ab0' stroke-width='1' fill='none'/>` +
+    `<rect x='20' y='9' width='4' height='3' rx='0.5' fill='#d9c089'/><line x1='20' y1='10.5' x2='24' y2='10.5' stroke='#8a6a3a' stroke-width='0.6'/>`,
+  // townhall: a grand civic facade — big pediment, a clock, a flag and columns
+  townhall: (r) =>
+    `<rect x='5' y='13' width='22' height='13' fill='${shade(r, 1.05)}'/>` +
+    `<polygon points='4,13 16,5 28,13' fill='${r}'/>` +
+    `<rect x='15' y='2' width='2' height='5' fill='${shade(r, 0.6)}'/><polygon points='17,2.5 21,3.8 17,5' fill='#5a6fae'/>` +
+    `<circle cx='16' cy='10' r='2.2' fill='#f0e6c0'/><line x1='16' y1='10' x2='16' y2='8.4' stroke='#5a4a2a' stroke-width='0.7'/><line x1='16' y1='10' x2='17.2' y2='10' stroke='#5a4a2a' stroke-width='0.7'/>` +
+    `<rect x='8' y='16' width='2' height='8' fill='${shade(r, 0.68)}'/><rect x='12' y='16' width='2' height='8' fill='${shade(r, 0.68)}'/><rect x='18' y='16' width='2' height='8' fill='${shade(r, 0.68)}'/><rect x='22' y='16' width='2' height='8' fill='${shade(r, 0.68)}'/>` +
+    `<rect x='14.5' y='20' width='3' height='6' fill='${shade(r, 0.5)}'/>`,
   // temple: peaked roof topped with a cross
   temple: (r) =>
     `<rect x='9' y='13' width='14' height='13' rx='1' fill='${shade(r, 0.82)}'/>` +
@@ -373,7 +488,22 @@ const BUILDING_SHAPE = {
   alchemist: 'dome',
   shop: 'stall', market: 'stall',
   guild: 'banner', archives: 'banner', library: 'library',
+  // new building types — each has its own bespoke silhouette
+  apothecary: 'apothecary',
+  fletcher: 'fletcher',
+  harbormaster: 'harbormaster',
+  jail: 'jail',
+  magetower: 'magetower',
+  mill: 'mill',
+  shrine: 'shrine',
+  stables: 'stables',
+  tailor: 'tailor',
+  townhall: 'townhall',
 };
+
+// Canonical list of every building type the renderer knows (single source of truth for
+// galleries/legends so they never miss a type). Order = roughly civic → commerce → craft.
+export const BUILDING_TYPES = Object.keys(BUILDING_SHAPE);
 
 const building = (buildingType, ground = C.grass) => {
   const roof = ROOFS[buildingType] || ROOFS.house;
@@ -392,6 +522,7 @@ const _generate = (type, tile, mask, seed, theme) => {
   const groundTile = (s) => theme === 'desert' ? sand(s) : theme === 'snow' ? snow(s) : grass(s);
   switch (type) {
     case 'water': return water(seed);
+    case 'beach': return beach(seed);
     case 'bridge': return bridge();
     case 'farm_field': return field(seed);
     case 'town_square': return stone(seed, true);
@@ -457,6 +588,7 @@ export const sampleTiles = {
   snow: () => snow(variantSeed(1, 3)),
   dirt: () => dirt(variantSeed(2, 1)),
   water: () => water(variantSeed(3, 1)),
+  beach: () => beach(variantSeed(3, 2)),
   farm_field: () => field(variantSeed(4, 1)),
   town_square: () => stone(variantSeed(5, 1), true),
   bridge: () => bridge(),
