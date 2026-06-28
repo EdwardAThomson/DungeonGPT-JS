@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-DungeonGPT-JS is a React web app for creating fantasy RPG characters and playing AI-narrated campaigns. It is the production rewrite of a Python prototype, deployed at dungeongpt.xyz on Cloudflare Pages + Workers backed by Supabase. `ROADMAP.md` is the high-level status; `docs/OUTSTANDING_ISSUES.md` is the master backlog; per-system design docs live in `docs/`.
+DungeonGPT-JS is a React web app for creating fantasy RPG characters and playing AI-narrated campaigns. It is the production rewrite of a Python prototype, deployed at dungeongpt.xyz on Cloudflare Pages + Workers backed by Supabase. `ROADMAP.md` is the high-level status; `docs/OUTSTANDING_ISSUES.md` is the master backlog; `docs/README.md` is the document map (index of every design doc); per-system design docs live in `docs/`.
 
 ## Commands
 

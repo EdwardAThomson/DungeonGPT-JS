@@ -4,7 +4,7 @@
 >
 > **Source of idea:** Daulet Amirkhanov, "Architectural patterns for graph-enhanced RAG: Moving beyond vector search in production," VentureBeat, 17 May 2026. The article advocates pairing vector search with a graph DB (Neo4j) to handle multi-hop questions and stale-fact problems in enterprise data. This plan adapts the *pattern* (hybrid retrieval, structural truth, stale-edge mitigation) to DungeonGPT's constraints — single-player, on-device, IndexedDB — without taking on graph-DB infrastructure.
 >
-> **Prerequisite:** `LOCAL_RAG_PLAN.md` Phases 0–3 (shipped). This plan extends that system.
+> **Prerequisite:** `LOCAL_RAG_PLAN.md` Phases 0–3 (shipped). This plan extends that system. The original design record now lives at `docs/archive/LOCAL_RAG_PLAN.md` (archived after it shipped).
 
 ## Problem
 
