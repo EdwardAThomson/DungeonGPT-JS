@@ -11,7 +11,8 @@ describe('MapLegend', () => {
     expect(screen.getByText('Cave wall')).toBeTruthy();
     expect(screen.getByText('Boulder')).toBeTruthy(); // the 🪨 decoration is now keyed
     expect(screen.getByText('Exit')).toBeTruthy();
-    expect(screen.getByText('Point of interest')).toBeTruthy();
+    expect(screen.getByText('Encounter')).toBeTruthy();
+    expect(screen.getByText('Treasure')).toBeTruthy();
   });
 
   test('renders ruins legend', () => {

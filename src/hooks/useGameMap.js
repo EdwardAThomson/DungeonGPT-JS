@@ -3,6 +3,7 @@ import { generateMapData, getTile, findStartingTown, enrichWorldMap } from '../u
 import { generateTownMap } from '../utils/townMapGenerator';
 import { analyzeTownWater, getTownRoadEdges } from '../utils/townWater';
 import { generateSiteMap } from '../utils/siteMapGenerator';
+import { populateSite } from '../game/sitePopulator';
 import { populateTown } from '../utils/npcGenerator';
 import { injectQuestBuildings } from '../game/milestoneSpawner';
 import { createLogger } from '../utils/logger';
@@ -297,6 +298,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                     : ['Cavern', 'Hollow Deep', 'The Undervault', 'Echo Hollow', 'Gloomcave'];
                 const name = names[Math.abs(seed) % names.length];
                 siteMap = generateSiteMap(poiType, name, 'south', seed, { biome: tile.biome });
+                populateSite(siteMap, seed); // fill content slots with encounters + loot
                 setSiteMapsCache(prev => ({ ...prev, [key]: siteMap }));
                 logger.info('Generated new site map', { poiType, name, key });
             } else {
@@ -332,16 +334,30 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         setConversation([...conversation, { role: 'system', content: `You leave ${currentSiteMap.name} and return to the wilds.` }]);
     };
 
+    // Moves the party in-site and RETURNS the tile moved to (or null if the move was
+    // rejected), so the game loop can fire that tile's content / roll wandering monsters.
     const handleSiteTileClick = (clickedX, clickedY) => {
-        if (!sitePlayerPosition || !currentSiteMap || isLoading) return;
+        if (!sitePlayerPosition || !currentSiteMap || isLoading) return null;
         const distance = Math.abs(clickedX - sitePlayerPosition.x) + Math.abs(clickedY - sitePlayerPosition.y);
-        if (distance === 0) return;
-        if (distance > 5) { setError('You can move up to 5 tiles at a time.'); return; }
+        if (distance === 0) return null;
+        if (distance > 5) { setError('You can move up to 5 tiles at a time.'); return null; }
         const targetTile = currentSiteMap.mapData[clickedY] && currentSiteMap.mapData[clickedY][clickedX];
-        if (!targetTile) return;
-        if (!targetTile.walkable) { setError('You cannot move there.'); return; }
+        if (!targetTile) return null;
+        if (!targetTile.walkable) { setError('You cannot move there.'); return null; }
         setSiteError(null);
         setSitePlayerPosition({ x: clickedX, y: clickedY });
+        return targetTile;
+    };
+
+    // Mark a site content slot as consumed (after its encounter fires / loot is taken) so
+    // it doesn't re-trigger. Mutates the cached site tile (same ref) and re-renders.
+    const markSiteContentConsumed = (x, y) => {
+        setCurrentSiteMap(prev => {
+            if (!prev) return prev;
+            const tile = prev.mapData[y] && prev.mapData[y][x];
+            if (tile && tile.content) tile.content.consumed = true;
+            return { ...prev };
+        });
     };
 
     const handleEnterCurrentTown = (setConversation, conversation) => {
@@ -523,6 +539,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         siteError,
         handleLeaveSite,
         handleSiteTileClick,
+        markSiteContentConsumed,
 
         visitedBiomes,
         visitedTowns,

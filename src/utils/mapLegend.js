@@ -110,7 +110,8 @@ export function siteLegendGroups(theme = 'cave', biome = 'grassland') {
       heading: 'Features',
       items: [
         ...decos.map((d) => mark(d.emoji, d.label)),
-        mark('◆', 'Point of interest'),
+        mark('⚔️', 'Encounter'),
+        mark('💰', 'Treasure'),
       ],
     },
   ];

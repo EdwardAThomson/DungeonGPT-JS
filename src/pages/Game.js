@@ -16,6 +16,7 @@ import GameMainPanel from '../components/GameMainPanel';
 import GameModals from '../components/GameModals';
 import ModalShell from '../components/ModalShell';
 import { calculateMaxHP, shortRest, longRest } from '../utils/healthSystem';
+import { addGold, addItem, ITEM_CATALOG } from '../utils/inventorySystem';
 import { composeMovementNarrativePrompt } from '../game/promptComposer';
 import { composeLocalMovementNarrative, composeLocalAmbientNarrative } from '../game/localNarrator';
 import { generateMovementNarrative } from '../game/movementController';
@@ -278,6 +279,60 @@ const Game = () => {
       mapHook.setIsMapModalOpen(false);
       reopenMapAfterEncounterRef.current = true; // reopen once the encounter resolves
       openEncounterAction({ encounter: townEncounter });
+      setMovesSinceEncounter(0);
+    } else {
+      setMovesSinceEncounter(prev => prev + 1);
+    }
+  };
+
+  // --- Site Tile Click Wrapper (caves / ruins): fires room content + wandering monsters ---
+  const grantSiteLoot = (loot) => {
+    if (!loot) return;
+    setSelectedHeroes(prev => {
+      if (!prev || prev.length === 0) return prev;
+      const heroes = [...prev];
+      let hero = { ...heroes[0] };
+      hero = addGold(hero, loot.gold || 0);
+      let inv = hero.inventory || [];
+      (loot.items || []).forEach(k => { inv = addItem(inv, k, 1); });
+      hero.inventory = inv;
+      heroes[0] = hero;
+      return heroes;
+    });
+    const itemNames = (loot.items || []).map(k => (ITEM_CATALOG[k]?.name) || k);
+    const parts = [];
+    if (loot.gold) parts.push(`${loot.gold} gold`);
+    if (itemNames.length) parts.push(itemNames.join(', '));
+    interactionHook.setConversation(prev => [...prev, { role: 'system', content: `💰 You find ${parts.join(' and ')}.` }]);
+    (loot.items || []).forEach(k => checkMilestoneEvent({ type: 'item_acquired', itemId: k }, selectedHeroes));
+    setTimeout(() => performSave(), 500);
+  };
+
+  const handleSiteTileClick = (clickedX, clickedY) => {
+    const movedTile = mapHook.handleSiteTileClick(clickedX, clickedY);
+    if (!movedTile) return; // move rejected (blocked / too far)
+
+    // Fixed room set-piece takes priority over wandering rolls.
+    if (movedTile.content && !movedTile.content.consumed) {
+      mapHook.markSiteContentConsumed(clickedX, clickedY);
+      if (movedTile.content.kind === 'encounter') {
+        mapHook.setIsMapModalOpen(false);
+        reopenMapAfterEncounterRef.current = true;
+        openEncounterAction({ encounter: movedTile.content.encounter });
+      } else if (movedTile.content.kind === 'loot') {
+        grantSiteLoot(movedTile.content.loot);
+      }
+      return;
+    }
+
+    // Hybrid: a small per-move chance of wandering monsters in the corridors, using the
+    // same probabilistic model as the world map (immediate-tier only — no narrative pops).
+    const siteType = mapHook.currentSiteMap?.type || 'cave';
+    const wandering = checkForEncounter({ poi: siteType, biome: 'plains' }, false, settings, movesSinceEncounter);
+    if (wandering && wandering.encounterTier === 'immediate') {
+      mapHook.setIsMapModalOpen(false);
+      reopenMapAfterEncounterRef.current = true;
+      openEncounterAction({ encounter: wandering });
       setMovesSinceEncounter(0);
     } else {
       setMovesSinceEncounter(prev => prev + 1);
@@ -792,6 +847,7 @@ const Game = () => {
         currentTile={currentTile}
         hasAdventureStarted={hasAdventureStarted}
         handleTownTileClick={handleTownTileClick}
+        handleSiteTileClick={handleSiteTileClick}
         handleEncounterResolve={handleEncounterResolve}
         handleHeroUpdate={handleHeroUpdate}
         onQuestItemFound={(itemId, itemName) => {

@@ -37,7 +37,12 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite,
               }}
             >
               {tile.poi && SITE_POI[tile.poi]}
-              {tile.contentSlot && <span style={{ color: '#ffd34d', fontSize: TILE * 0.5, textShadow: '0 0 3px #000' }}>◆</span>}
+              {tile.content && (
+                <span style={{ position: 'absolute', fontSize: TILE * 0.55, opacity: tile.content.consumed ? 0.35 : 1, textShadow: '0 0 3px #000' }}>
+                  {tile.content.consumed ? '·' : tile.content.kind === 'encounter' ? '⚔️' : tile.content.kind === 'objective' ? '❗' : '💰'}
+                </span>
+              )}
+              {!tile.content && tile.contentSlot && <span style={{ color: '#ffd34d', fontSize: TILE * 0.5, textShadow: '0 0 3px #000' }}>◆</span>}
               {isPlayer && (firstHero
                 ? <img src={resolveProfilePicture(firstHero.profilePicture)} alt={firstHero.characterName} width={TILE - 6} height={TILE - 6} style={{ borderRadius: '50%', border: '2px solid #ffd34d', position: 'absolute' }} loading="lazy" />
                 : <span style={{ position: 'absolute', fontSize: TILE * 0.7 }}>⭐</span>)}

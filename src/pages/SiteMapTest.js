@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { generateSiteMap } from '../utils/siteMapGenerator';
+import { populateSite } from '../game/sitePopulator';
 import { tileBackground, SITE_POI } from '../utils/siteTileArt';
 import MapLegend from '../components/MapLegend';
 import { siteLegendGroups } from '../utils/mapLegend';
@@ -28,7 +29,7 @@ const SiteMapTest = () => {
   const [biome, setBiome] = useState('grassland');
   const [seed, setSeed] = useState(123);
 
-  const site = useMemo(() => generateSiteMap(type, type === 'cave' ? 'Hollow Deep' : 'Old Ruins', dir, seed, { biome }), [type, dir, biome, seed]);
+  const site = useMemo(() => populateSite(generateSiteMap(type, type === 'cave' ? 'Hollow Deep' : 'Old Ruins', dir, seed, { biome }), seed), [type, dir, biome, seed]);
   const { mapData, width, height, theme, entryPoint, contentSlots } = site;
 
   const stats = useMemo(() => {
@@ -94,7 +95,8 @@ const SiteMapTest = () => {
               fontSize: TILE * 0.6, lineHeight: 1,
             }}>
               {tile.poi && SITE_POI[tile.poi]}
-              {tile.contentSlot && <span style={{ color: '#ffd34d', fontSize: TILE * 0.5, textShadow: '0 0 3px #000' }}>◆</span>}
+              {tile.content && <span style={{ position: 'absolute', fontSize: TILE * 0.55, textShadow: '0 0 3px #000' }}>{tile.content.kind === 'encounter' ? '⚔️' : tile.content.kind === 'objective' ? '❗' : '💰'}</span>}
+              {!tile.content && tile.contentSlot && <span style={{ color: '#ffd34d', fontSize: TILE * 0.5, textShadow: '0 0 3px #000' }}>◆</span>}
               {isPlayer && <span style={{ position: 'absolute', fontSize: TILE * 0.7 }}>🧍</span>}
             </div>
           );
