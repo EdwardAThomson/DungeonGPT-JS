@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { generateMapData, getTile, findStartingTown, enrichWorldMap } from '../utils/mapGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
 import { analyzeTownWater, getTownRoadEdges } from '../utils/townWater';
+import { generateSiteMap } from '../utils/siteMapGenerator';
 import { populateTown } from '../utils/npcGenerator';
 import { injectQuestBuildings } from '../game/milestoneSpawner';
 import { createLogger } from '../utils/logger';
@@ -79,6 +80,14 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
     const [currentTownTile, setCurrentTownTile] = useState(subMapsData?.currentTownTile || null);
     const [isInsideTown, setIsInsideTown] = useState(subMapsData?.isInsideTown || false);
     const [townMapsCache, setTownMapsCache] = useState(subMapsData?.townMapsCache || initialTownMapsCache || {});
+
+    // Wilderness site sub-maps (caves / ruins) — parallel to the town sub-map system.
+    const [currentSiteMap, setCurrentSiteMap] = useState(subMapsData?.currentSiteMap || null);
+    const [sitePlayerPosition, setSitePlayerPosition] = useState(subMapsData?.sitePlayerPosition || null);
+    const [currentSiteTile, setCurrentSiteTile] = useState(subMapsData?.currentSiteTile || null);
+    const [isInsideSite, setIsInsideSite] = useState(subMapsData?.isInsideSite || false);
+    const [siteMapsCache, setSiteMapsCache] = useState(subMapsData?.siteMapsCache || {});
+    const [siteError, setSiteError] = useState(null);
 
     // On mount: sync currentTownMap with cache to ensure discoveredBuildings is up to date
     useEffect(() => {
@@ -272,7 +281,67 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             };
             setConversation([...conversation, enterMessage]);
             setIsMapModalOpen(true);
+        } else if (['cave_entrance', 'cave', 'ruins'].includes(encounter.poiType)) {
+            // Wilderness site (cave / ruin). Seed-deterministic + cached by type+coords,
+            // mirroring towns. The world tile's biome themes the ruin's open ground.
+            const tile = encounter.tile;
+            const poiType = encounter.poiType;
+            const key = `${poiType}_${tile.x},${tile.y}`;
+
+            let siteMap = siteMapsCache[key];
+            if (!siteMap) {
+                const rawSeed = worldSeed ? (parseInt(worldSeed) + ((tile.x || 0) * 1000) + ((tile.y || 0) * 10000)) : Math.floor(Math.random() * 1000000);
+                const seed = Number.isFinite(rawSeed) ? rawSeed : Math.floor(Math.random() * 1000000);
+                const names = poiType === 'ruins'
+                    ? ['Ancient Ruins', 'The Fallen Hold', 'Crumbled Watchtower', 'Forgotten Stones', 'The Old Keep']
+                    : ['Cavern', 'Hollow Deep', 'The Undervault', 'Echo Hollow', 'Gloomcave'];
+                const name = names[Math.abs(seed) % names.length];
+                siteMap = generateSiteMap(poiType, name, 'south', seed, { biome: tile.biome });
+                setSiteMapsCache(prev => ({ ...prev, [key]: siteMap }));
+                logger.info('Generated new site map', { poiType, name, key });
+            } else {
+                logger.debug('Loading cached site map', key);
+            }
+
+            setCurrentSiteMap(siteMap);
+            setCurrentSiteTile(tile);
+            setSitePlayerPosition({ x: siteMap.entryPoint.x, y: siteMap.entryPoint.y });
+            setCurrentMapLevel('site');
+            setIsInsideSite(true);
+            setSiteError(null);
+
+            setConversation([...conversation, { role: 'system', content: `You venture into ${siteMap.name}.` }]);
+            setIsMapModalOpen(true);
         }
+    };
+
+    const handleLeaveSite = (setConversation, conversation) => {
+        if (!currentSiteMap || !sitePlayerPosition) return;
+        const { entryPoint } = currentSiteMap;
+        const dist = Math.abs(sitePlayerPosition.x - entryPoint.x) + Math.abs(sitePlayerPosition.y - entryPoint.y);
+        if (dist > 1) {
+            setSiteError('You must be at the entrance (the lit exit) to leave.');
+            return;
+        }
+        setSiteError(null);
+        setCurrentMapLevel('world');
+        setCurrentSiteMap(null);
+        setSitePlayerPosition(null);
+        setCurrentSiteTile(null);
+        setIsInsideSite(false);
+        setConversation([...conversation, { role: 'system', content: `You leave ${currentSiteMap.name} and return to the wilds.` }]);
+    };
+
+    const handleSiteTileClick = (clickedX, clickedY) => {
+        if (!sitePlayerPosition || !currentSiteMap || isLoading) return;
+        const distance = Math.abs(clickedX - sitePlayerPosition.x) + Math.abs(clickedY - sitePlayerPosition.y);
+        if (distance === 0) return;
+        if (distance > 5) { setError('You can move up to 5 tiles at a time.'); return; }
+        const targetTile = currentSiteMap.mapData[clickedY] && currentSiteMap.mapData[clickedY][clickedX];
+        if (!targetTile) return;
+        if (!targetTile.walkable) { setError('You cannot move there.'); return; }
+        setSiteError(null);
+        setSitePlayerPosition({ x: clickedX, y: clickedY });
     };
 
     const handleEnterCurrentTown = (setConversation, conversation) => {
@@ -444,6 +513,16 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         handleEnterCurrentTown,
         handleLeaveTown,
         handleTownTileClick,
+
+        // wilderness sites (caves / ruins)
+        currentSiteMap,
+        sitePlayerPosition,
+        currentSiteTile,
+        isInsideSite,
+        siteMapsCache,
+        siteError,
+        handleLeaveSite,
+        handleSiteTileClick,
 
         visitedBiomes,
         visitedTowns,

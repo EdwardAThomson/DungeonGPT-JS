@@ -84,11 +84,15 @@ describe('worldMoveController', () => {
     expect(townEncounter.canEnter).toBe(true);
     expect(townEncounter.name).toBe('Briarwatch');
 
+    // Caves and ruins are explorable wilderness sites (Phase 2) — now enterable.
     const caveEncounter = buildPoiEncounter({
       poi: 'cave',
       poiType: 'cave'
     });
-    expect(caveEncounter.canEnter).toBe(false);
+    expect(caveEncounter.canEnter).toBe(true);
+
+    // A non-enterable POI (a mountain) stays canEnter: false.
+    expect(buildPoiEncounter({ poi: 'mountain', poiType: 'mountain' }).canEnter).toBe(false);
   });
 
   it('formats movement system messages for towns and biomes', () => {

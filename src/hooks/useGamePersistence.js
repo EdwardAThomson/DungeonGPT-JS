@@ -34,6 +34,11 @@ const useGamePersistence = ({
   const currentSummaryRef = useRef(interactionHook.currentSummary);
   const visitedBiomesRef = useRef(mapHook.visitedBiomes);
   const visitedTownsRef = useRef(mapHook.visitedTowns);
+  const currentSiteMapRef = useRef(mapHook.currentSiteMap);
+  const sitePlayerPositionRef = useRef(mapHook.sitePlayerPosition);
+  const currentSiteTileRef = useRef(mapHook.currentSiteTile);
+  const isInsideSiteRef = useRef(mapHook.isInsideSite);
+  const siteMapsCacheRef = useRef(mapHook.siteMapsCache);
   const lastSaveFingerprintRef = useRef(null);
 
   useEffect(() => {
@@ -56,6 +61,11 @@ const useGamePersistence = ({
     currentSummaryRef.current = interactionHook.currentSummary;
     visitedBiomesRef.current = mapHook.visitedBiomes;
     visitedTownsRef.current = mapHook.visitedTowns;
+    currentSiteMapRef.current = mapHook.currentSiteMap;
+    sitePlayerPositionRef.current = mapHook.sitePlayerPosition;
+    currentSiteTileRef.current = mapHook.currentSiteTile;
+    isInsideSiteRef.current = mapHook.isInsideSite;
+    siteMapsCacheRef.current = mapHook.siteMapsCache;
   }, [
     interactionHook.conversation,
     interactionHook.currentSummary,
@@ -73,6 +83,11 @@ const useGamePersistence = ({
     mapHook.currentMapLevel,
     mapHook.visitedBiomes,
     mapHook.visitedTowns,
+    mapHook.currentSiteMap,
+    mapHook.sitePlayerPosition,
+    mapHook.currentSiteTile,
+    mapHook.isInsideSite,
+    mapHook.siteMapsCache,
     hasAdventureStarted,
     selectedHeroes,
     movesSinceEncounter
@@ -106,7 +121,9 @@ const useGamePersistence = ({
       isInsideTown: isInsideTownRef.current,
       currentSummary: currentSummaryRef.current,
       settings: settingsRef.current,
-      selectedHeroes: selectedHeroesRef.current
+      selectedHeroes: selectedHeroesRef.current,
+      sitePlayerPosition: sitePlayerPositionRef.current,
+      isInsideSite: isInsideSiteRef.current
     });
 
     if (!isUnmount && fingerprint === lastSaveFingerprintRef.current) {
@@ -123,7 +140,12 @@ const useGamePersistence = ({
       townMapsCache: townMapsCacheRef.current,
       visitedBiomes: visitedBiomesRef.current,
       visitedTowns: visitedTownsRef.current,
-      movesSinceEncounter: movesSinceEncounterRef.current
+      movesSinceEncounter: movesSinceEncounterRef.current,
+      currentSiteMap: currentSiteMapRef.current,
+      sitePlayerPosition: sitePlayerPositionRef.current,
+      currentSiteTile: currentSiteTileRef.current,
+      isInsideSite: isInsideSiteRef.current,
+      siteMapsCache: siteMapsCacheRef.current
     });
 
     const result = await saveConversationToBackend(sessionIdRef.current, {

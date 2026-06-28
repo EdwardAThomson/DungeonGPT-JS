@@ -2,10 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import FocusTrap from 'focus-trap-react';
 import WorldMapDisplay from './WorldMapDisplay';
 import TownMapDisplay from './TownMapDisplay';
+import SiteMapDisplay from './SiteMapDisplay';
 import MapLegend from './MapLegend';
-import { worldLegendGroups, townLegendGroups } from '../utils/mapLegend';
+import { worldLegendGroups, townLegendGroups, siteLegendGroups } from '../utils/mapLegend';
 
-const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered, visibleMilestonePois, onQuestItemFound, onRest, onResurrect, party }) => {
+const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered, visibleMilestonePois, onQuestItemFound, onRest, onResurrect, party, siteMapData, sitePlayerPosition, onSiteTileClick, onLeaveSite, siteError }) => {
     const previousFocusRef = useRef(null);
     const modalRef = useRef(null);
     const [showLegend, setShowLegend] = useState(true);
@@ -43,7 +44,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                     aria-modal="true"
                     aria-labelledby="map-modal-title"
                 >
-                    <h2 id="map-modal-title">{mapLevel === 'town' ? (townMapData?.townName || 'Town Map') : 'World Map'}</h2>
+                    <h2 id="map-modal-title">{mapLevel === 'town' ? (townMapData?.townName || 'Town Map') : mapLevel === 'site' ? (siteMapData?.name || 'Site') : 'World Map'}</h2>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', justifyContent: 'center' }}>
                     <div style={{ minWidth: 0 }}>
                 {mapLevel === 'world' ? (
@@ -61,6 +62,16 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                             </div>
                         )}
                     </>
+                ) : mapLevel === 'site' ? (
+                    <SiteMapDisplay
+                        siteMapData={siteMapData}
+                        playerPosition={sitePlayerPosition}
+                        onTileClick={onSiteTileClick}
+                        onLeaveSite={onLeaveSite}
+                        showLeaveButton={false}
+                        firstHero={firstHero}
+                        siteError={siteError}
+                    />
                 ) : (
                     <TownMapDisplay
                         townMapData={townMapData}
@@ -81,7 +92,8 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                     {showLegend ? (
                         <MapLegend
                             title="Map Key"
-                            groups={mapLevel === 'town' ? townLegendGroups() : worldLegendGroups()}
+                            groups={mapLevel === 'town' ? townLegendGroups() : mapLevel === 'site' ? siteLegendGroups(siteMapData?.theme, currentTile?.biome) : worldLegendGroups()}
+                            columns={mapLevel === 'town' ? 2 : 1}
                             onMinimize={() => setShowLegend(false)}
                             style={{ maxHeight: '60vh', overflowY: 'auto', flex: '0 0 auto' }}
                         />
@@ -102,6 +114,11 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                         {mapLevel === 'town' && onLeaveTown && (
                             <button className="secondary-button" onClick={onLeaveTown} aria-label="Leave town">
                                 Leave Town
+                            </button>
+                        )}
+                        {mapLevel === 'site' && onLeaveSite && (
+                            <button className="secondary-button" onClick={onLeaveSite} aria-label="Leave site">
+                                Leave
                             </button>
                         )}
                         {mapLevel === 'world' && isOnTown && (

@@ -6,7 +6,9 @@ export const buildSaveFingerprint = ({
   isInsideTown,
   currentSummary,
   settings,
-  selectedHeroes
+  selectedHeroes,
+  sitePlayerPosition,
+  isInsideSite
 }) => {
   const heroes = selectedHeroes || [];
   return [
@@ -17,6 +19,9 @@ export const buildSaveFingerprint = ({
     isInsideTown,
     townPlayerPosition?.x,
     townPlayerPosition?.y,
+    isInsideSite,
+    sitePlayerPosition?.x,
+    sitePlayerPosition?.y,
     currentSummary?.length || 0,
     settings?.storyTitle || '',
     JSON.stringify(
@@ -39,7 +44,13 @@ export const buildSubMapsPayload = ({
   townMapsCache,
   visitedBiomes,
   visitedTowns,
-  movesSinceEncounter
+  movesSinceEncounter,
+  // wilderness sites (caves / ruins)
+  currentSiteMap,
+  sitePlayerPosition,
+  currentSiteTile,
+  isInsideSite,
+  siteMapsCache
 }) => ({
   currentTownMap,
   townPlayerPosition,
@@ -49,5 +60,10 @@ export const buildSubMapsPayload = ({
   townMapsCache,
   visitedBiomes: Array.from(visitedBiomes || []),
   visitedTowns: Array.from(visitedTowns || []),
-  movesSinceEncounter
+  movesSinceEncounter,
+  currentSiteMap: currentSiteMap || null,
+  sitePlayerPosition: sitePlayerPosition || null,
+  currentSiteTile: currentSiteTile || null,
+  isInsideSite: isInsideSite || false,
+  siteMapsCache: siteMapsCache || {}
 });

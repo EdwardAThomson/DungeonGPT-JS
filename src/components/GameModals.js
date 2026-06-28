@@ -132,6 +132,11 @@ const GameModals = ({
         onRest={onRest}
         onResurrect={onResurrect}
         party={party}
+        siteMapData={mapHook.currentSiteMap}
+        sitePlayerPosition={mapHook.sitePlayerPosition}
+        onSiteTileClick={mapHook.handleSiteTileClick}
+        onLeaveSite={() => mapHook.handleLeaveSite(interactionHook.setConversation, interactionHook.conversation)}
+        siteError={mapHook.siteError}
         />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>
