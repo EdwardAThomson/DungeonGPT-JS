@@ -1,11 +1,14 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import FocusTrap from 'focus-trap-react';
 import WorldMapDisplay from './WorldMapDisplay';
 import TownMapDisplay from './TownMapDisplay';
+import MapLegend from './MapLegend';
+import { worldLegendGroups, townLegendGroups } from '../utils/mapLegend';
 
 const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered, visibleMilestonePois, onQuestItemFound, onRest, onResurrect, party }) => {
     const previousFocusRef = useRef(null);
     const modalRef = useRef(null);
+    const [showLegend, setShowLegend] = useState(true);
 
     useEffect(() => {
         if (isOpen) {
@@ -41,6 +44,8 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                     aria-labelledby="map-modal-title"
                 >
                     <h2 id="map-modal-title">{mapLevel === 'town' ? (townMapData?.townName || 'Town Map') : 'World Map'}</h2>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', justifyContent: 'center' }}>
+                    <div style={{ minWidth: 0 }}>
                 {mapLevel === 'world' ? (
                     <>
                         <WorldMapDisplay
@@ -72,6 +77,26 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                         party={party}
                     />
                 )}
+                    </div>
+                    {showLegend ? (
+                        <MapLegend
+                            title="Map Key"
+                            groups={mapLevel === 'town' ? townLegendGroups() : worldLegendGroups()}
+                            onMinimize={() => setShowLegend(false)}
+                            style={{ maxHeight: '60vh', overflowY: 'auto', flex: '0 0 auto' }}
+                        />
+                    ) : (
+                        <button
+                            className="secondary-button"
+                            onClick={() => setShowLegend(true)}
+                            aria-label="Show map key"
+                            title="Show key"
+                            style={{ flex: '0 0 auto', alignSelf: 'flex-start', whiteSpace: 'nowrap' }}
+                        >
+                            🗺 Key
+                        </button>
+                    )}
+                </div>
                     {/* All actions in one horizontal row to save vertical space */}
                     <div className="map-modal-actions">
                         {mapLevel === 'town' && onLeaveTown && (
