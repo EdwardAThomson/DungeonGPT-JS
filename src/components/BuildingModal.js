@@ -26,8 +26,24 @@ const genderIcon = (gender) => {
 
 const RESURRECTION_COST_PER_LEVEL = 25;
 
+// Tab button styling for the building modal's section tabs (Visit | Wares).
+const tabBtnStyle = (active) => ({
+    flex: 1,
+    padding: '10px 12px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    letterSpacing: '1px',
+    fontFamily: 'var(--header-font)',
+    border: 'none',
+    borderBottom: `3px solid ${active ? 'var(--primary)' : 'var(--border)'}`,
+    background: active ? 'var(--primary)' : 'transparent',
+    color: active ? '#fff' : 'var(--text)',
+    borderRadius: '6px 6px 0 0',
+});
+
 const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, sideQuests, onAcceptSideQuest, onTurnInQuest, townName }) => {
     const [imageError, setImageError] = useState(false);
+    const [activeTab, setActiveTab] = useState('visit'); // building modal tabs: 'visit' | 'wares'
     const [tradeMessage, setTradeMessage] = useState(null); // { text, kind: 'buy' | 'sell' | 'error' }
     const [isHovered, setIsHovered] = useState(false);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -45,6 +61,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
     const canRest = REST_BUILDING_TYPES.includes(building.buildingType);
     const restType = building.buildingType === 'inn' ? 'long' : 'short';
     const isShop = SHOP_BUILDING_TYPES.includes(building.buildingType);
+    const shopTab = isShop && (onBuy || onSell); // shops get a Wares tab alongside Visit
     const shopStock = isShop ? getShopStock(building.buildingType) : [];
     // Aggregate identical items into one entry per key (non-stackable items like rope
     // produce multiple inventory entries sharing a key; separate rows would collide on the
@@ -139,6 +156,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                         border: '3px solid var(--primary)',
                         padding: '0',
                         overflow: 'hidden',
+                        maxHeight: '90vh',
                         display: 'flex',
                         flexDirection: 'column',
                         backgroundColor: 'var(--surface)',
@@ -254,7 +272,18 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                         </div>
                     )}
 
-                    <div style={{ padding: '0 25px 25px 25px' }}>
+                    <div style={{ padding: '0 25px 25px 25px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+                        {/* Section tabs — only shops need them today (Wares on its own tab so the
+                            modal stays compact and the Close button is always reachable). */}
+                        {shopTab && (
+                            <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                                <button type="button" onClick={() => setActiveTab('visit')} style={tabBtnStyle(activeTab === 'visit')}>Visit</button>
+                                <button type="button" onClick={() => setActiveTab('wares')} style={tabBtnStyle(activeTab === 'wares')}>Wares</button>
+                            </div>
+                        )}
+
+                        {(!shopTab || activeTab === 'visit') && (
+                          <>
                         {/* Inhabitants Section - enhanced for residential buildings */}
                         <div className="modal-section" style={{
                             backgroundColor: 'rgba(0,0,0,0.03)',
@@ -754,8 +783,11 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                             </div>
                         )}
 
-                        {/* Wares Section - shops, markets, blacksmiths, alchemists */}
-                        {isShop && (onBuy || onSell) && (
+                          </>
+                        )}
+
+                        {/* Wares Section - shops, markets, blacksmiths, alchemists (own tab) */}
+                        {shopTab && activeTab === 'wares' && (
                             <div className="modal-section" style={{
                                 backgroundColor: 'rgba(0,0,0,0.03)',
                                 padding: '20px',
