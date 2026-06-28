@@ -54,7 +54,10 @@ const GameModals = ({
   onQuestItemFound,
   onRest,
   onResurrect,
-  party
+  party,
+  sideQuests,
+  onAcceptSideQuest,
+  onTurnInQuest
 }) => {
   // Compute which milestone POIs are visible (active or completed, not locked)
   const visibleMilestonePois = useMemo(() => {
@@ -131,6 +134,9 @@ const GameModals = ({
         visibleMilestonePois={visibleMilestonePois}
         onQuestItemFound={onQuestItemFound}
         onRest={onRest}
+        sideQuests={sideQuests}
+        onAcceptSideQuest={onAcceptSideQuest}
+        onTurnInQuest={onTurnInQuest}
         onResurrect={onResurrect}
         party={party}
         siteMapData={mapHook.currentSiteMap}

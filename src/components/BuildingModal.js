@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { getHPStatus } from '../utils/healthSystem';
+import { getReadyTurnIns, getAvailableQuestsAt } from '../game/questEngine';
 
 const getAbilityModifier = (score) => Math.floor(((score || 10) - 10) / 2);
 
@@ -21,7 +22,7 @@ const genderIcon = (gender) => {
 
 const RESURRECTION_COST_PER_LEVEL = 25;
 
-const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, onRest, onResurrect, party }) => {
+const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, onRest, onResurrect, party, sideQuests, onAcceptSideQuest, onTurnInQuest, townName }) => {
     const [imageError, setImageError] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -419,6 +420,50 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                 </p>
                             </div>
                         )}
+
+                        {/* Turn-in Section - hand in completed quests (return-to-giver / courier) */}
+                        {onTurnInQuest && (() => {
+                            const ctx = { buildingType: building.buildingType, townName };
+                            const ready = getReadyTurnIns(sideQuests || [], ctx);
+                            if (ready.length === 0) return null;
+                            return (
+                                <div className="modal-section" style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '20px', borderRadius: '10px', border: '1px solid var(--state-success, #4caf50)', marginTop: '15px' }}>
+                                    <h4 style={{ borderBottom: '2px solid var(--state-success, #4caf50)', paddingBottom: '10px', margin: '0 0 15px 0', color: 'var(--state-success, #4caf50)', fontFamily: 'var(--header-font)' }}>
+                                        ✅ Completed Tasks
+                                    </h4>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {ready.map(q => (
+                                            <div key={q.id} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 14px' }}>
+                                                <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '8px' }}>{q.title}</div>
+                                                <button className="primary-button" onClick={() => onTurnInQuest(ctx)}>Turn In</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Quest-giver Section - rumours & tasks offered by THIS building's type */}
+                        {onAcceptSideQuest && (() => {
+                            const available = getAvailableQuestsAt(sideQuests || [], { buildingType: building.buildingType, townName });
+                            if (available.length === 0) return null;
+                            return (
+                                <div className="modal-section" style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '20px', borderRadius: '10px', border: '1px solid var(--border)', marginTop: '15px' }}>
+                                    <h4 style={{ borderBottom: '2px solid var(--primary)', paddingBottom: '10px', margin: '0 0 15px 0', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>
+                                        📜 Rumours &amp; Tasks
+                                    </h4>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                        {available.map(q => (
+                                            <div key={q.id} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 14px' }}>
+                                                <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>{q.title}</div>
+                                                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '10px' }}>"{q.giver?.hook || q.description}"</div>
+                                                <button className="primary-button" onClick={() => onAcceptSideQuest(q.id)}>Accept Quest</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })()}
 
                         {/* Rest Section - for inns and taverns */}
                         {canRest && onRest && !restResult && (

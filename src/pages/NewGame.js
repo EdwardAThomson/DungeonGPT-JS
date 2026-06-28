@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { generateMapData, findStartingTown } from "../utils/mapGenerator";
 import { generateTownMap } from "../utils/townMapGenerator";
 import { analyzeTownWater, getTownRoadEdges } from "../utils/townWater";
+import { selectSideQuests } from "../game/questEngine";
 import { populateTown } from "../utils/npcGenerator";
 import WorldMapDisplay from "../components/WorldMapDisplay";
 import OnboardingSteps from "../components/OnboardingSteps";
@@ -341,6 +342,25 @@ const NewGame = () => {
     const campaignTier = templateData?.tier || customTier || 1;
     const campaignLevelRange = templateData?.levelRange || (campaignTier === 1 ? [1, 2] : [3, 5]);
 
+    // Pick side quests that can be both STARTED and COMPLETED on this map: only quests whose
+    // giver building + objective site + turn-in building all exist. Building types are read
+    // from the pre-generated town maps; sites from the world tiles. Seeded off the world
+    // seed so a given world reproducibly offers the same side quests.
+    const flatTiles = [].concat(...mapData);
+    const availableSites = {
+      cave: flatTiles.some((t) => t.poi === 'cave_entrance'),
+      ruins: flatTiles.some((t) => t.poi === 'ruins'),
+    };
+    const availableBuildings = new Set();
+    Object.values(townMapsCache).forEach((tm) => {
+      (tm.mapData || []).forEach((row) => row.forEach((t) => {
+        if (t.type === 'building' && t.buildingType) availableBuildings.add(t.buildingType);
+      }));
+    });
+    let sqSeed = parseInt(seedToUse) || 1;
+    const sqRng = () => { sqSeed = (sqSeed * 9301 + 49297) % 233280; return sqSeed / 233280; };
+    const selectedSideQuests = selectSideQuests({ sites: availableSites, buildings: [...availableBuildings] }, 2, sqRng);
+
     const settingsData = {
       shortDescription: finalDescription,
       grimnessLevel,
@@ -360,7 +380,8 @@ const NewGame = () => {
       levelRange: campaignLevelRange,
       requiredBuildings: spawnResult.requiredBuildings,
       enemySpawns: spawnResult.enemySpawns,
-      itemSpawns: spawnResult.itemSpawns
+      itemSpawns: spawnResult.itemSpawns,
+      sideQuests: selectedSideQuests
     };
 
     // Generate a fresh game session ID for this new game

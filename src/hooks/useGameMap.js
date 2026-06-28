@@ -3,14 +3,14 @@ import { generateMapData, getTile, findStartingTown, enrichWorldMap } from '../u
 import { generateTownMap } from '../utils/townMapGenerator';
 import { analyzeTownWater, getTownRoadEdges } from '../utils/townWater';
 import { generateSiteMap } from '../utils/siteMapGenerator';
-import { populateSite } from '../game/sitePopulator';
+import { populateSite, injectSiteObjective } from '../game/sitePopulator';
 import { populateTown } from '../utils/npcGenerator';
 import { injectQuestBuildings } from '../game/milestoneSpawner';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-map');
 
-const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null, requiredBuildings = null, initialTownMapsCache = null, mapTheme = 'grassland') => {
+const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null, requiredBuildings = null, initialTownMapsCache = null, mapTheme = 'grassland', requiredSiteObjectives = null) => {
     // --- State Initialization --- //
 
     const [mapAndPosition] = useState(() => {
@@ -303,6 +303,16 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 logger.info('Generated new site map', { poiType, name, key });
             } else {
                 logger.debug('Loading cached site map', key);
+            }
+
+            // Inject an active quest objective for this site type (if picked up and not
+            // already present) — handles entering before vs. after taking the quest.
+            const normType = poiType === 'cave_entrance' ? 'cave' : poiType;
+            const siteObjective = requiredSiteObjectives && requiredSiteObjectives[normType];
+            if (siteObjective && (!siteMap.objective || siteMap.objective.milestoneId !== siteObjective.milestoneId)) {
+                injectSiteObjective(siteMap, siteObjective);
+                setSiteMapsCache(prev => ({ ...prev, [key]: siteMap }));
+                logger.info('Injected quest objective into site', { key, milestoneId: siteObjective.milestoneId });
             }
 
             setCurrentSiteMap(siteMap);

@@ -243,6 +243,7 @@ export const StorySettingsModalContent = ({
   worldSeed
 }) => {
   const [activeTab] = useState('story'); // always 'story' now; 'ai' branch retained but unused
+  const [expandedQuests, setExpandedQuests] = useState({});
   const { apiKeys, setApiKeys } = useContext(ApiKeysContext);
   const AVAILABLE_MODELS = getAvailableModels();
 
@@ -398,6 +399,41 @@ export const StorySettingsModalContent = ({
                   * Story settings are woven at the start and cannot be changed here.
                 </p>
               </div>
+
+              {/* Side Quests — accepted (active/completed) optional quests, as expandable stubs */}
+              {settings.sideQuests && settings.sideQuests.some(q => q.status !== 'available') && (
+                <div className="modal-section" style={{ marginTop: '20px' }}>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '1.05rem', color: 'var(--primary)', fontFamily: 'var(--header-font)', textTransform: 'uppercase', letterSpacing: '1px' }}>📜 Side Quests</h3>
+                  {settings.sideQuests.filter(q => q.status !== 'available').map(q => {
+                    const total = q.milestones.length;
+                    const done = q.milestones.filter(m => m.completed).length;
+                    const expanded = !!expandedQuests[q.id];
+                    return (
+                      <div key={q.id} style={{ border: '1px solid var(--border)', borderRadius: '8px', marginBottom: '8px', background: 'var(--bg)' }}>
+                        <button
+                          onClick={() => setExpandedQuests(p => ({ ...p, [q.id]: !p[q.id] }))}
+                          style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text)' }}
+                        >
+                          <span style={{ fontWeight: 700, textDecoration: q.status === 'completed' ? 'line-through' : 'none', opacity: q.status === 'completed' ? 0.7 : 1 }}>
+                            {q.status === 'completed' ? '✓ ' : ''}{q.title}
+                          </span>
+                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{done}/{total} {expanded ? '▲' : '▼'}</span>
+                        </button>
+                        {expanded && (
+                          <div style={{ padding: '0 14px 12px' }}>
+                            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: '0 0 8px' }}>{q.description}</p>
+                            {q.milestones.map(m => (
+                              <div key={m.id} style={{ fontSize: '0.95rem', color: m.completed ? 'var(--text-secondary)' : 'var(--text)', textDecoration: m.completed ? 'line-through' : 'none' }}>
+                                {m.completed ? '✓' : '•'} {m.text}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
             </>
           ) : (

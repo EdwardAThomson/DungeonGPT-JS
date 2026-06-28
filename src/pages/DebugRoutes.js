@@ -11,6 +11,7 @@ import WorldFixedMapTest from './WorldFixedMapTest';
 import LakeTest from './LakeTest';
 import TownWaterTest from './TownWaterTest';
 import SiteMapTest from './SiteMapTest';
+import QuestTest from './QuestTest';
 import TerrainStudio from './TerrainStudio';
 import TerrainStudioV2 from './TerrainStudioV2';
 import MilestoneTest from './MilestoneTest';
@@ -69,6 +70,7 @@ const debugSections = [
       { to: 'npc-test', label: 'NPC Test' },
       { to: 'seed-debug-test', label: 'Seed Debug Test' },
       { to: 'milestone-test', label: 'Milestone Test (Markers)' },
+      { to: 'quest-test', label: 'Quest Test (side quests)' },
       { to: 'campaign-milestone-test', label: 'Campaign Milestone Test' },
       { to: 'progression-test', label: 'Progression Test' },
       { to: 'item-icons', label: 'Item Icons Test' },
@@ -205,6 +207,7 @@ const DebugRoutes = () => {
           <Route path="npc-test" element={<NPCTest />} />
           <Route path="seed-debug-test" element={<SeedDebugTest />} />
           <Route path="milestone-test" element={<MilestoneTest />} />
+          <Route path="quest-test" element={<QuestTest />} />
           <Route path="campaign-milestone-test" element={<CampaignMilestoneTest />} />
           <Route path="progression-test" element={<ProgressionTest />} />
           <Route path="llm-debug" element={<LLMDebug />} />

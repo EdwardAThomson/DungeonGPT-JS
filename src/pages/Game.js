@@ -37,6 +37,7 @@ import {
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
 import { checkMilestoneCompletion, getMilestoneRewards } from '../game/milestoneEngine';
+import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, turnInQuest } from '../game/questEngine';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
@@ -156,7 +157,7 @@ const Game = () => {
   // Biome theme for lazily-generated town maps (Phase 2b). Falls back to the raw parsed
   // settings (loaded saves) and finally 'grassland' so older saves are unaffected.
   const mapTheme = settings?.theme || settingsObj?.theme || 'grassland';
-  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme);
+  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme, getActiveSiteObjectives(settings?.sideQuests));
 
   const interactionHook = useGameInteraction(
     loadedConversation,
@@ -218,10 +219,35 @@ const Game = () => {
 
   // --- Milestone Engine: deterministic completion check ---
   const checkMilestoneEvent = (event, currentParty) => {
+    const heroLevel = currentParty?.[0]?.level || 1;
+
+    // --- Side quests (optional parallel chains) — checked first + independently ---
+    const sideQuests = settings?.sideQuests;
+    if (sideQuests && sideQuests.length > 0) {
+      const { updatedSideQuests, completions } = checkSideQuestEvent(sideQuests, event, heroLevel);
+      if (completions.length > 0) {
+        setSettings(prev => ({ ...prev, sideQuests: updatedSideQuests }));
+        let party = currentParty;
+        completions.forEach(c => {
+          const stepRewards = c.rewards || { xp: 0, gold: 0, items: [] };
+          party = applyEncounterOutcomeToParty({ party, result: { rewards: stepRewards, heroIndex: 0 } }).updatedParty;
+          if (c.questCompleted && c.questRewards) {
+            party = applyEncounterOutcomeToParty({ party, result: { rewards: c.questRewards, heroIndex: 0 } }).updatedParty;
+          }
+          interactionHook.setConversation(prev => [...prev, {
+            role: 'system',
+            content: c.questCompleted ? `🎉 Side quest complete: ${c.title}!` : `✓ ${c.milestone.text}`
+          }]);
+        });
+        setSelectedHeroes(party);
+        setTimeout(() => performSave(), 500);
+      }
+    }
+
+    // --- Main campaign milestones ---
     const milestones = settings?.milestones;
     if (!milestones || milestones.length === 0) return;
 
-    const heroLevel = currentParty?.[0]?.level || 1;
     const result = checkMilestoneCompletion(milestones, event, heroLevel);
     if (!result) return;
 
@@ -367,6 +393,35 @@ const Game = () => {
     } else {
       setMovesSinceEncounter(prev => prev + 1);
     }
+  };
+
+  // Accept an offered side quest (from a building quest-giver). Activates it so its steps
+  // start tracking and any site it targets gets revealed/injected on entry.
+  const handleAcceptSideQuest = (questId) => {
+    const q = (settings?.sideQuests || []).find(x => x.id === questId);
+    if (!q || q.status !== 'available') return;
+    setSettings(prev => ({ ...prev, sideQuests: acceptSideQuest(prev.sideQuests || [], questId) }));
+    interactionHook.setConversation(prev => [...prev, { role: 'system', content: `📜 New quest: ${q.title} — ${q.description}` }]);
+    setTimeout(() => performSave(), 500);
+  };
+
+  // Hand in completed side-quest turn-ins at a building (return-to-giver / courier).
+  const handleTurnInQuest = (ctx) => {
+    const sideQuests = settings?.sideQuests;
+    if (!sideQuests || sideQuests.length === 0) return;
+    const { updatedSideQuests, completions } = turnInQuest(sideQuests, ctx);
+    if (completions.length === 0) return;
+    setSettings(prev => ({ ...prev, sideQuests: updatedSideQuests }));
+    let party = selectedHeroes;
+    completions.forEach(c => {
+      party = applyEncounterOutcomeToParty({ party, result: { rewards: c.rewards || { xp: 0, gold: 0, items: [] }, heroIndex: 0 } }).updatedParty;
+      if (c.questCompleted && c.questRewards) {
+        party = applyEncounterOutcomeToParty({ party, result: { rewards: c.questRewards, heroIndex: 0 } }).updatedParty;
+      }
+      interactionHook.setConversation(prev => [...prev, { role: 'system', content: c.questCompleted ? `🎉 Side quest complete: ${c.title}!` : `✓ ${c.milestone.text}` }]);
+    });
+    setSelectedHeroes(party);
+    setTimeout(() => performSave(), 500);
   };
 
   // Location is shown in the header bar, no need for chat reminders
@@ -925,6 +980,9 @@ const Game = () => {
           setSelectedHeroes(updatedHeroes);
           return { restType, healingResults };
         }}
+        sideQuests={settings?.sideQuests}
+        onAcceptSideQuest={handleAcceptSideQuest}
+        onTurnInQuest={handleTurnInQuest}
       />
 
       {/* Save Confirmation Modal */}

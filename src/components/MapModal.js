@@ -6,7 +6,7 @@ import SiteMapDisplay from './SiteMapDisplay';
 import MapLegend from './MapLegend';
 import { worldLegendGroups, townLegendGroups, siteLegendGroups } from '../utils/mapLegend';
 
-const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered, visibleMilestonePois, onQuestItemFound, onRest, onResurrect, party, siteMapData, sitePlayerPosition, onSiteTileClick, onLeaveSite, siteError }) => {
+const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered, visibleMilestonePois, onQuestItemFound, onRest, onResurrect, party, siteMapData, sitePlayerPosition, onSiteTileClick, onLeaveSite, siteError, sideQuests, onAcceptSideQuest, onTurnInQuest }) => {
     const previousFocusRef = useRef(null);
     const modalRef = useRef(null);
     const [showLegend, setShowLegend] = useState(true);
@@ -86,6 +86,9 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                         onRest={onRest}
                         onResurrect={onResurrect}
                         party={party}
+                        sideQuests={sideQuests}
+                        onAcceptSideQuest={onAcceptSideQuest}
+                        onTurnInQuest={onTurnInQuest}
                     />
                 )}
                     </div>
