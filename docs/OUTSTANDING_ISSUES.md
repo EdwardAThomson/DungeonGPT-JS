@@ -38,6 +38,7 @@ Source audits: roadmap survey (2026-04-19), auth verification (2026-04-19), docs
 | 10 | **9 missing building interior images.** Alchemist, Market, Archives, Library, Foundry, Warehouse, Keep, Barn, Barracks. | [MISSING_BUILDING_IMAGES.md](MISSING_BUILDING_IMAGES.md) | S-M (asset gen) | |
 | 11 | **Automated CF Worker deploy.** Frontend auto-deploys via Pages; Worker deploy is manual (`wrangler deploy`). Needs `.github/workflows/deploy.yml` + post-deploy smoke test. | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) §5 | S-M | |
 | 12 | **Rate limiting on Worker.** No throttling on `/api/ai`, `/api/db/*`, `/api/embed`. Any authed user can spam. | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) §5, [LOCAL_RAG_PLAN.md](LOCAL_RAG_PLAN.md) Q6 | S-M | |
+| 34 | **New Game / custom-game options are drop-down heavy.** Player feedback (SPC, Jun 2026): the new-game configuration screen is a long stack of dropdowns; consolidate into collapsible accordion sections for a cleaner setup flow. (Same feedback floated portrait-matches-race, out of scope now that the race selector is hidden / human-only.) | Feedback SPC 2026-06 | S-M (UI) | |
 
 ---
 
