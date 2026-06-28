@@ -35,10 +35,17 @@ const combatPool = (type) => {
 const LOOT = {
   cave: ['cave_mushrooms', 'raw_gems', 'glowing_fungi', 'exposed_minerals', 'healing_potion', 'spider_silk'],
   ruins: ['ancient_scroll', 'salvaged_goods', 'history_tome', 'ritual_dagger', 'pearl', 'enchanted_trinket'],
+  forest: ['healing_herbs', 'rare_flower', 'rare_herb', 'beast_hide', 'wolf_pelt', 'fairy_dust'],
+  hills: ['mountain_herbs', 'exposed_minerals', 'wolf_fang', 'beast_hide', 'rare_ore', 'healing_herbs'],
+  mountain: ['mountain_crystal', 'exposed_minerals', 'rare_ore', 'storm_crystal', 'bear_pelt'],
 };
 const HOARD_BONUS = {
   cave: ['greater_healing_potion', 'magic_weapon', 'raw_gems'],
   ruins: ['dark_tome', 'magic_item', 'ancient_scroll'],
+  // Beast country: Hide Armor is a wilderness-only sidegrade to shop-bought Studded Leather.
+  forest: ['hide_armor', 'nature_charm', 'fey_charm'],
+  hills: ['hide_armor', 'silver_dagger', 'mountain_crystal'],
+  mountain: ['storm_crystal', 'mountain_crystal', 'silver_dagger'],
 };
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj));

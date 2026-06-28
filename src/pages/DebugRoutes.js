@@ -12,6 +12,8 @@ import LakeTest from './LakeTest';
 import TownWaterTest from './TownWaterTest';
 import SiteMapTest from './SiteMapTest';
 import QuestTest from './QuestTest';
+import ShopTest from './ShopTest';
+import EquipmentTest from './EquipmentTest';
 import TerrainStudio from './TerrainStudio';
 import TerrainStudioV2 from './TerrainStudioV2';
 import MilestoneTest from './MilestoneTest';
@@ -73,6 +75,8 @@ const debugSections = [
       { to: 'quest-test', label: 'Quest Test (side quests)' },
       { to: 'campaign-milestone-test', label: 'Campaign Milestone Test' },
       { to: 'progression-test', label: 'Progression Test' },
+      { to: 'shop-test', label: 'Shop Test (buy/sell)' },
+      { to: 'equipment-test', label: 'Equipment Test (gear)' },
       { to: 'item-icons', label: 'Item Icons Test' },
       { to: 'building-search', label: 'Building Search Test' },
     ],
@@ -208,6 +212,8 @@ const DebugRoutes = () => {
           <Route path="seed-debug-test" element={<SeedDebugTest />} />
           <Route path="milestone-test" element={<MilestoneTest />} />
           <Route path="quest-test" element={<QuestTest />} />
+          <Route path="shop-test" element={<ShopTest />} />
+          <Route path="equipment-test" element={<EquipmentTest />} />
           <Route path="campaign-milestone-test" element={<CampaignMilestoneTest />} />
           <Route path="progression-test" element={<ProgressionTest />} />
           <Route path="llm-debug" element={<LLMDebug />} />

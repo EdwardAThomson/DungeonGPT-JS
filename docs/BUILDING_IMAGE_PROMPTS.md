@@ -51,7 +51,7 @@ Interior of a rustic fantasy barn: heavy wooden beams and a hayloft stacked with
 ### Barracks (`barracks.webp`) — Low
 Interior of a fantasy barracks: rows of simple wooden bunk beds with folded blankets, weapon racks of spears and shields, armour stands, a central table with a map and tankards, hanging lanterns. Painterly digital fantasy art, warm dramatic lighting, detailed medieval military interior, no text. Square composition.
 
-### Workshop (`workshop.webp`) — Medium (quest building, still missing)
+### Workshop (`workshop.webp`) — Medium (quest building)
 Interior of a fantasy artificer's workshop: a cluttered workbench strewn with gears, cogs, springs and half-built clockwork devices, tools hung on a pegboard, blueprints and schematics pinned to the wall, a partly-assembled brass automaton on a stand, jars of bolts, warm lantern light and faint steam. Painterly digital fantasy art, warm dramatic lighting, richly detailed medieval/steampunk interior, no text. Square composition. (Used by the Arcane Renaissance campaign's Tinker-Row workshop.)
 
 ---

@@ -98,7 +98,7 @@ export const ITEM_CATALOG = {
   // Uncommon items
   'greater_healing_potion': { name: 'Greater Healing Potion', rarity: 'uncommon', value: 150, effect: 'heal', amount: '4d4+4', icon: 'assets/icons/items/greater_healing_potion.webp' },
   'scroll_fireball': { name: 'Fire Scroll', rarity: 'uncommon', value: 200, effect: 'spell', spell: 'fireball', icon: 'assets/icons/items/scroll_fireball.webp' },
-  'silver_dagger': { name: 'Silver Dagger', rarity: 'uncommon', value: 100, type: 'weapon', icon: 'assets/icons/items/silver_dagger.webp' },
+  'silver_dagger': { name: 'Silver Dagger', rarity: 'uncommon', value: 100, type: 'weapon', bonus: '+1', icon: 'assets/icons/items/silver_dagger.webp' },
 
   // Rare items
   'magic_weapon': { name: 'Enchanted Blade', rarity: 'rare', value: 500, type: 'weapon', bonus: '+1', icon: 'assets/icons/items/magic_weapon.webp' },
@@ -106,10 +106,10 @@ export const ITEM_CATALOG = {
 
   // Very Rare
   'legendary_weapon': { name: 'Legendary Weapon', rarity: 'very_rare', value: 2500, type: 'weapon', bonus: '+2', icon: 'assets/icons/items/legendary_weapon.webp' },
-  'legendary_artifact': { name: 'Mythic Ancient Artifact', rarity: 'very_rare', value: 5000, type: 'artifact', icon: 'assets/icons/items/legendary_artifact.webp' },
-  'crown_of_sunfire': { name: 'Crown of Sunfire', rarity: 'very_rare', value: 7500, type: 'artifact', description: 'A radiant golden crown that blazes with inner fire. Said to grant its wearer dominion over light and shadow.', icon: `assets/icons/items/crown_of_sunfire.webp` },
-  'seal_of_binding': { name: 'Seal of Binding', rarity: 'very_rare', value: 6000, type: 'artifact', description: 'An ancient seal inscribed with eldritch wards. It can imprison entities from beyond the veil.', icon: `assets/icons/items/seal_of_binding.webp` },
-  'purified_heart_shard': { name: 'Purified Heart Shard', rarity: 'very_rare', value: 5000, type: 'artifact', description: 'A crystallized fragment of the Rot-Heart, cleansed of corruption. It pulses with faint, warm light.', icon: `assets/icons/items/purified_heart_shard.webp` },
+  'legendary_artifact': { name: 'Mythic Ancient Artifact', rarity: 'very_rare', value: 5000, type: 'artifact', bonus: '+2', icon: 'assets/icons/items/legendary_artifact.webp' },
+  'crown_of_sunfire': { name: 'Crown of Sunfire', rarity: 'very_rare', value: 7500, type: 'artifact', bonus: '+3', description: 'A radiant golden crown that blazes with inner fire. Said to grant its wearer dominion over light and shadow.', icon: `assets/icons/items/crown_of_sunfire.webp` },
+  'seal_of_binding': { name: 'Seal of Binding', rarity: 'very_rare', value: 6000, type: 'artifact', bonus: '+2', description: 'An ancient seal inscribed with eldritch wards. It can imprison entities from beyond the veil.', icon: `assets/icons/items/seal_of_binding.webp` },
+  'purified_heart_shard': { name: 'Purified Heart Shard', rarity: 'very_rare', value: 5000, type: 'artifact', bonus: '+2', description: 'A crystallized fragment of the Rot-Heart, cleansed of corruption. It pulses with faint, warm light.', icon: `assets/icons/items/purified_heart_shard.webp` },
   'magic_item': { name: 'Magic Item', rarity: 'uncommon', value: 200, icon: 'assets/icons/items/spell_scroll.webp' },
   'magic_scroll': { name: 'Enchanted Scroll', rarity: 'uncommon', value: 150, icon: 'assets/icons/items/spell_scroll.webp' },
 
@@ -121,22 +121,22 @@ export const ITEM_CATALOG = {
   'ancient_scroll': { name: 'Ancient Scroll', rarity: 'uncommon', value: 100, icon: 'assets/icons/items/ancient_scroll.webp' },
   'pearl': { name: 'Pearl', rarity: 'uncommon', value: 100, icon: 'assets/icons/items/pearl.webp' },
   'ectoplasm': { name: 'Ectoplasm', rarity: 'uncommon', value: 75, icon: 'assets/icons/items/ectoplasm.webp' },
-  'ritual_dagger': { name: 'Ritual Dagger', rarity: 'uncommon', value: 125, type: 'weapon', icon: 'assets/icons/items/ritual_dagger.webp' },
+  'ritual_dagger': { name: 'Ritual Dagger', rarity: 'uncommon', value: 125, type: 'weapon', bonus: '+1', icon: 'assets/icons/items/ritual_dagger.webp' },
   'dark_tome': { name: 'Dark Tome', rarity: 'rare', value: 300, icon: 'assets/icons/items/dark_tome.webp' },
   'spell_scroll': { name: 'Spell Scroll', rarity: 'uncommon', value: 50, icon: 'assets/icons/items/spell_scroll.webp' },
   'healing_herbs': { name: 'Healing Herbs', rarity: 'common', value: 20, stackable: true, icon: 'assets/icons/items/healing_herbs.webp' },
   'rare_flower': { name: 'Rare Flower', rarity: 'uncommon', value: 45, icon: 'assets/icons/items/rare_flower.webp' },
   'dryad_blessing': { name: 'Dryad\'s Blessing', rarity: 'rare', value: 0, type: 'blessing', icon: 'assets/icons/items/dryad_blessing.webp' },
   'fairy_dust': { name: 'Fairy Dust', rarity: 'uncommon', value: 100, icon: 'assets/icons/items/fairy_dust.webp' },
-  'fey_charm': { name: 'Fey Charm', rarity: 'rare', value: 250, type: 'charm', icon: 'assets/icons/items/fey_charm.webp' },
+  'fey_charm': { name: 'Fey Charm', rarity: 'rare', value: 250, type: 'charm', bonus: '+1', icon: 'assets/icons/items/fey_charm.webp' },
   'giant_feather': { name: 'Giant Eagle Feather', rarity: 'uncommon', value: 60, icon: 'assets/icons/items/giant_feather.webp' },
   'dragon_scale': { name: 'Dragon Scale', rarity: 'very_rare', value: 1000, icon: 'assets/icons/items/dragon_scale.webp' },
   'mountain_crystal': { name: 'Mountain Crystal', rarity: 'uncommon', value: 80, icon: 'assets/icons/items/mountain_crystal.webp' },
   'storm_crystal': { name: 'Storm Crystal', rarity: 'rare', value: 200, icon: 'assets/icons/items/storm_crystal.webp' },
   'magical_item': { name: 'Magical Artifact', rarity: 'rare', value: 150, icon: 'assets/icons/items/magical_item.webp' },
-  'artifact_trinket': { name: 'Ancient Trinket', rarity: 'uncommon', value: 45, icon: 'assets/icons/items/artifact_trinket.webp' },
-  'enchanted_trinket': { name: 'Enchanted Trinket', rarity: 'uncommon', value: 65, icon: 'assets/icons/items/enchanted_trinket.webp' },
-  'ghostly_trinket': { name: 'Ghostly Trinket', rarity: 'uncommon', value: 60, icon: 'assets/icons/items/ghostly_trinket.webp' },
+  'artifact_trinket': { name: 'Ancient Trinket', rarity: 'uncommon', value: 45, type: 'charm', bonus: '+1', icon: 'assets/icons/items/artifact_trinket.webp' },
+  'enchanted_trinket': { name: 'Enchanted Trinket', rarity: 'uncommon', value: 65, type: 'charm', bonus: '+1', icon: 'assets/icons/items/enchanted_trinket.webp' },
+  'ghostly_trinket': { name: 'Ghostly Trinket', rarity: 'uncommon', value: 60, type: 'charm', bonus: '+1', icon: 'assets/icons/items/ghostly_trinket.webp' },
   'history_tome': { name: 'Ancient History Tome', rarity: 'uncommon', value: 150, icon: 'assets/icons/items/history_tome.webp' },
   'forbidden_knowledge': { name: 'Forbidden Knowledge', rarity: 'rare', value: 300, icon: 'assets/icons/items/forbidden_knowledge.webp' },
   'spirit_essence': { name: 'Spirit Essence', rarity: 'rare', value: 120, icon: 'assets/icons/items/spirit_essence.webp' },
@@ -157,7 +157,7 @@ export const ITEM_CATALOG = {
   'elven_blessing': { name: 'Elven Blessing', rarity: 'rare', value: 0, type: 'blessing', icon: 'assets/icons/items/elven_blessing.webp' },
   'eagle_blessing': { name: 'Eagle\'s Blessing', rarity: 'rare', value: 0, type: 'blessing', icon: 'assets/icons/items/eagle_blessing.webp' },
   'druid_token': { name: 'Druid Token', rarity: 'uncommon', value: 50, icon: 'assets/icons/items/druid_token.webp' },
-  'nature_charm': { name: 'Nature Charm', rarity: 'uncommon', value: 75, icon: 'assets/icons/items/nature_charm.webp' },
+  'nature_charm': { name: 'Nature Charm', rarity: 'uncommon', value: 75, type: 'charm', bonus: '+1', icon: 'assets/icons/items/nature_charm.webp' },
   'ancient_gold': { name: 'Ancient Gold Coins', rarity: 'uncommon', value: 100, icon: 'assets/icons/items/ancient_gold.webp' },
   'pixie_gold': { name: 'Pixie Gold', rarity: 'uncommon', value: 50, icon: 'assets/icons/items/pixie_gold.webp' },
   'rare_gem': { name: 'Rare Gemstone', rarity: 'rare', value: 200, icon: 'assets/icons/items/rare_gem.webp' },
@@ -174,7 +174,7 @@ export const ITEM_CATALOG = {
   'ancient_artifact': { name: 'Ancient Artifact', rarity: 'rare', value: 400, icon: 'assets/icons/items/ancient_artifact.webp' },
   'enchanted_seed': { name: 'Enchanted Seed', rarity: 'uncommon', value: 35, icon: 'assets/icons/items/enchanted_seed.webp' },
   'enchanted_mushroom': { name: 'Enchanted Mushroom', rarity: 'uncommon', value: 30, icon: 'assets/icons/items/enchanted_mushroom.webp' },
-  'enchanted_staff': { name: 'Enchanted Staff', rarity: 'uncommon', value: 250, type: 'weapon', icon: 'assets/icons/items/enchanted_staff.webp' },
+  'enchanted_staff': { name: 'Enchanted Staff', rarity: 'uncommon', value: 250, type: 'weapon', bonus: '+1', icon: 'assets/icons/items/enchanted_staff.webp' },
   'mountain_view': { name: 'Memory of a View', rarity: 'common', value: 0, icon: 'assets/icons/items/mountain_view.webp' },
 
   // Environmental / natural loot (used by environmental & POI encounters)
@@ -208,8 +208,12 @@ export const ITEM_CATALOG = {
 
   // Encounter loot
   'rusty_dagger': { name: 'Rusty Dagger', rarity: 'common', value: 5, type: 'weapon', icon: 'assets/icons/items/rusty_dagger.webp' },
-  'shortsword': { name: 'Shortsword', rarity: 'common', value: 25, type: 'weapon', icon: 'assets/icons/items/shortsword.webp' },
-  'leather_armor': { name: 'Leather Armor', rarity: 'common', value: 30, type: 'armor', icon: 'assets/icons/items/leather_armor.webp' },
+  'shortsword': { name: 'Shortsword', rarity: 'common', value: 25, type: 'weapon', bonus: '+1', icon: 'assets/icons/items/shortsword.webp' },
+  'leather_armor': { name: 'Leather Armor', rarity: 'common', value: 30, type: 'armor', bonus: '+1 defense', icon: 'assets/icons/items/leather_armor.webp' },
+  'studded_leather': { name: 'Studded Leather', rarity: 'uncommon', value: 90, type: 'armor', bonus: '+2 defense', icon: 'assets/icons/items/hard_leather.webp' },
+  'hide_armor': { name: 'Hide Armor', rarity: 'uncommon', value: 80, type: 'armor', bonus: '+2 defense', icon: 'assets/icons/items/beast_hide.webp' },
+  'scale_mail': { name: 'Scale Mail', rarity: 'rare', value: 350, type: 'armor', bonus: '+3 defense', icon: 'assets/icons/items/dragon_scale.webp' },
+  'dragonscale_plate': { name: 'Dragonscale Plate', rarity: 'very_rare', value: 1500, type: 'armor', bonus: '+4 defense', icon: 'assets/icons/items/dragon_scale.webp' },
   'artifact_fragment': { name: 'Artifact Fragment', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/artifact_fragment.webp' },
   'inspiration': { name: 'Minstrel\'s Blessing', rarity: 'uncommon', value: 0, type: 'buff', icon: 'assets/icons/items/inspiration.webp' },
   'divine_blessing': { name: 'Divine Blessing', rarity: 'rare', value: 0, type: 'blessing', icon: 'assets/icons/items/divine_blessing.webp' },
@@ -220,7 +224,7 @@ export const ITEM_CATALOG = {
   'ale_mug': { name: 'Ale Mug', rarity: 'common', value: 2, icon: 'assets/icons/items/ale_mug.webp' },
   'bar_stool_leg': { name: 'Bar Stool Leg', rarity: 'common', value: 1, type: 'weapon', icon: 'assets/icons/items/bar_stool_leg.webp' },
   'stolen_goods': { name: 'Stolen Goods', rarity: 'uncommon', value: 35, icon: 'assets/icons/items/stolen_goods.webp' },
-  'poisoned_dagger': { name: 'Poisoned Dagger', rarity: 'uncommon', value: 75, type: 'weapon', icon: 'assets/icons/items/poisoned_dagger.webp' },
+  'poisoned_dagger': { name: 'Poisoned Dagger', rarity: 'uncommon', value: 75, type: 'weapon', bonus: '+1', icon: 'assets/icons/items/poisoned_dagger.webp' },
   'rare_ingredient': { name: 'Rare Ingredient', rarity: 'uncommon', value: 40, icon: 'assets/icons/items/rare_ingredient.webp' },
 
   // Encounter reward items

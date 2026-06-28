@@ -7,8 +7,9 @@ export const SHOP_STOCK = {
   shop: ['rations', 'torch', 'rope', 'healing_potion'],
   // Market: same staples plus a curative.
   market: ['rations', 'torch', 'rope', 'healing_potion', 'antidote'],
-  // Blacksmith: weapons and armour materials.
-  blacksmith: ['silver_dagger', 'magic_weapon', 'hard_leather', 'shortsword', 'leather_armor'],
+  // Blacksmith: weapons and armour (light -> heavy). Hide Armor is wilderness loot only
+  // (a sidegrade to Studded), and Dragonscale Plate is quest/loot-gated, so neither is sold.
+  blacksmith: ['shortsword', 'silver_dagger', 'magic_weapon', 'leather_armor', 'studded_leather', 'scale_mail'],
   // Alchemist: potions, cures and reagents.
   alchemist: ['healing_potion', 'greater_healing_potion', 'antidote', 'poison_vial']
 };

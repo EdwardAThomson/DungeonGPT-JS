@@ -46,8 +46,24 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
     const restType = building.buildingType === 'inn' ? 'long' : 'short';
     const isShop = SHOP_BUILDING_TYPES.includes(building.buildingType);
     const shopStock = isShop ? getShopStock(building.buildingType) : [];
+    // Aggregate identical items into one entry per key (non-stackable items like rope
+    // produce multiple inventory entries sharing a key; separate rows would collide on the
+    // React key and break reconciliation). `count` is the total units held of that key.
     const sellableInventory = isShop && firstHero
-        ? (firstHero.inventory || []).filter(item => item.key && ITEM_CATALOG[item.key] && isSellable(item.key))
+        ? Object.values(
+            (firstHero.inventory || [])
+                .filter(item => item.key && ITEM_CATALOG[item.key] && isSellable(item.key))
+                .reduce((acc, item) => {
+                    if (!acc[item.key]) acc[item.key] = { ...item, count: 0 };
+                    acc[item.key].count += item.quantity || 1;
+                    return acc;
+                }, {})
+          ).sort((a, b) => {
+              // Stable order: rows never jump as stacks deplete.
+              const an = a.name || ITEM_CATALOG[a.key]?.name || a.key;
+              const bn = b.name || ITEM_CATALOG[b.key]?.name || b.key;
+              return an.localeCompare(bn);
+          })
         : [];
 
     const handleBuy = (key) => {
@@ -864,7 +880,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                                 {sellableInventory.map(item => {
                                                     const price = sellPrice(item.key);
-                                                    const qty = item.quantity || 1;
+                                                    const qty = item.count || item.quantity || 1;
                                                     return (
                                                         <div key={`sell-${item.key}`} style={{
                                                             display: 'flex',
