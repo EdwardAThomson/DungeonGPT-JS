@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useMemo } from 'react';
 import { areRequirementsMet } from '../game/milestoneEngine';
+import { getRevealedSiteTypes } from '../game/questEngine';
 
 // Lazy load modal components for better performance
 const StorySettingsModalContent = lazy(() => import('./Modals').then(module => ({ default: module.StorySettingsModalContent })));
@@ -76,6 +77,13 @@ const GameModals = ({
     return visible;
   }, [settings?.milestones]);
 
+  // Which site types (cave/ruins) a quest has revealed — for hiding un-quested sites.
+  // null = no gating (old saves / campaigns with no side quests keep sites visible).
+  const revealedSiteTypes = useMemo(
+    () => (settings?.sideQuests?.length ? getRevealedSiteTypes(settings.sideQuests) : null),
+    [settings?.sideQuests]
+  );
+
   return (
     <>
       <Suspense fallback={<ModalLoadingFallback />}>
@@ -132,6 +140,7 @@ const GameModals = ({
         townError={mapHook.townError}
         markBuildingDiscovered={mapHook.markBuildingDiscovered}
         visibleMilestonePois={visibleMilestonePois}
+        revealedSiteTypes={revealedSiteTypes}
         onQuestItemFound={onQuestItemFound}
         onRest={onRest}
         sideQuests={sideQuests}

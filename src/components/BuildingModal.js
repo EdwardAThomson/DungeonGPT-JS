@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { getHPStatus } from '../utils/healthSystem';
-import { getReadyTurnIns, getAvailableQuestsAt } from '../game/questEngine';
+import { getReadyTurnIns, getAvailableQuestsAt, effectivePartyLevel } from '../game/questEngine';
 
 const getAbilityModifier = (score) => Math.floor(((score || 10) - 10) / 2);
 
@@ -445,7 +445,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
 
                         {/* Quest-giver Section - rumours & tasks offered by THIS building's type */}
                         {onAcceptSideQuest && (() => {
-                            const available = getAvailableQuestsAt(sideQuests || [], { buildingType: building.buildingType, townName });
+                            const available = getAvailableQuestsAt(sideQuests || [], { buildingType: building.buildingType, townName, level: effectivePartyLevel(party) });
                             if (available.length === 0) return null;
                             return (
                                 <div className="modal-section" style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '20px', borderRadius: '10px', border: '1px solid var(--border)', marginTop: '15px' }}>

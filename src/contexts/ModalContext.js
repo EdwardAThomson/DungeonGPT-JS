@@ -13,6 +13,7 @@ const MODAL_REGISTRY = {
   saveConfirmation: { layer: 0, group: 'info' },
   inventory:        { layer: 2, group: 'inventory' },
   building:         { layer: 2, group: 'child', parent: 'map' },
+  questOffer:       { layer: 1, group: 'info' },
 };
 
 // --- Conflict Rules ---

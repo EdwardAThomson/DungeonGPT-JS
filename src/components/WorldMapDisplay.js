@@ -99,7 +99,7 @@ const renderPathOverlay = (tile) => {
   );
 };
 
-const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visibleMilestonePois }) => {
+const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visibleMilestonePois, revealedSiteTypes }) => {
   if (!mapData || mapData.length === 0) {
     return <div>Loading map...</div>;
   }
@@ -132,13 +132,16 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
 
           // Hide milestone POIs (sprite + name) that aren't unlocked yet
           const isMilestoneHidden = tile.milestonePoi && visibleMilestonePois && !visibleMilestonePois.has(tile.poi);
+          // Secret sites: a cave/ruins isn't drawn until a quest has revealed its type.
+          const isSiteHidden = (tile.poi === 'cave_entrance' || tile.poi === 'ruins')
+            && revealedSiteTypes && !revealedSiteTypes[tile.poi === 'cave_entrance' ? 'cave' : 'ruins'];
 
           const beachShift = (tile.biome === 'beach' && tile.beachDirection !== undefined)
             ? BEACH_SHIFT[tile.beachDirection]
             : 'none';
 
           // POI sprite overlay (town/forest/mountain/hills/cave_entrance/ruins/milestone)
-          const poi = isMilestoneHidden ? null : poiSprite(tile);
+          const poi = (isMilestoneHidden || isSiteHidden) ? null : poiSprite(tile);
 
           // Collect a name label for this tile if applicable
           const labelText = tile.townName
@@ -164,7 +167,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
                 position: 'relative', // For overlays / player marker positioning
               }}
               onClick={() => onTileClick(tile.x, tile.y)}
-              title={`${tile.townName || tile.mountainName || `(${tile.x}, ${tile.y})`} - ${tile.biome}${tile.poi ? ` (${tile.poi})` : ''}${tile.townSize ? ` [${tile.townSize}]` : ''}${tile.isExplored ? ' (Explored)' : ''}`} // Tooltip
+              title={`${tile.townName || tile.mountainName || `(${tile.x}, ${tile.y})`} - ${tile.biome}${tile.poi && !isSiteHidden ? ` (${tile.poi})` : ''}${tile.townSize ? ` [${tile.townSize}]` : ''}${tile.isExplored ? ' (Explored)' : ''}`} // Tooltip
             >
               {/* Render river overlay (below POI) */}
               {renderRiverOverlay(tile)}

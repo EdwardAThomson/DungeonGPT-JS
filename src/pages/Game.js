@@ -37,7 +37,8 @@ import {
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
 import { checkMilestoneCompletion, getMilestoneRewards } from '../game/milestoneEngine';
-import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, turnInQuest } from '../game/questEngine';
+import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, turnInQuest, getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
+import { QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
@@ -58,6 +59,22 @@ const SaveConfirmationModal = () => {
       <button onClick={close} className="primary-button" style={{ padding: '10px 30px' }}>
         Continue
       </button>
+    </ModalShell>
+  );
+};
+
+const QuestOfferModal = () => {
+  const { data, close } = useModal('questOffer');
+  const quest = data?.quest;
+  return (
+    <ModalShell modalId="questOffer" ariaLabel="Quest Offer" style={{ maxWidth: '460px', textAlign: 'center' }}>
+      <h3 style={{ marginBottom: '10px', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>📜 A Rumour Reaches You</h3>
+      <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)', marginBottom: '12px' }}>"{quest?.giver?.hook || quest?.description}"</p>
+      <p style={{ fontWeight: 700, marginBottom: '18px', color: 'var(--text)' }}>{quest?.title}</p>
+      <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+        <button className="primary-button" onClick={() => { data?.onAccept?.(); close(); }}>Accept the Quest</button>
+        <button className="secondary-button" onClick={close}>Not now</button>
+      </div>
     </ModalShell>
   );
 };
@@ -116,6 +133,7 @@ const Game = () => {
   const { open: openInventory } = useModal('inventory');
   const { open: openSaveConfirmation } = useModal('saveConfirmation');
   const { open: openEncounterInfo, close: closeEncounterInfo } = useModal('encounterInfo');
+  const { open: openQuestOffer } = useModal('questOffer');
   const { open: openEncounterAction, close: closeEncounterAction, data: encounterActionData } = useModal('encounterAction');
 
   // --- Modal states not yet migrated ---
@@ -345,7 +363,10 @@ const Game = () => {
       if (ITEM_CATALOG[item.id]) {
         hero.inventory = addItem(hero.inventory || [], item.id, 1);
       } else {
-        hero.inventory = [...(hero.inventory || []), { key: item.id, name: item.name, type: 'quest_item', quantity: 1, rarity: 'rare', value: 0 }];
+        // quest item: borrow an existing item's icon (no new art) for inventory display
+        const iconFrom = QUEST_ITEM_ICON_FROM[item.id];
+        const icon = iconFrom && ITEM_CATALOG[iconFrom] ? ITEM_CATALOG[iconFrom].icon : undefined;
+        hero.inventory = [...(hero.inventory || []), { key: item.id, name: item.name, type: 'quest_item', quantity: 1, rarity: 'rare', value: 0, ...(icon ? { icon } : {}) }];
       }
       heroes[0] = hero;
       return heroes;
@@ -353,6 +374,16 @@ const Game = () => {
     interactionHook.setConversation(prev => [...prev, { role: 'system', content: `❗ You recover ${item.name}.` }]);
     checkMilestoneEvent({ type: 'item_acquired', itemId: item.id }, selectedHeroes);
     setTimeout(() => performSave(), 500);
+  };
+
+  // A cave/ruins tile is "hidden" until a quest reveals it (quest-gated, sticky). Until
+  // then it reads as plain ground — no entrance offered, no POI drawn.
+  const isSiteHidden = (tile) => {
+    if (!tile || (tile.poi !== 'cave_entrance' && tile.poi !== 'ruins')) return false;
+    const sq = settings?.sideQuests;
+    if (!sq || sq.length === 0) return false; // no quest system on this save -> sites stay visible
+    const revealed = getRevealedSiteTypes(sq);
+    return !revealed[tile.poi === 'cave_entrance' ? 'cave' : 'ruins'];
   };
 
   const handleSiteTileClick = (clickedX, clickedY) => {
@@ -403,6 +434,20 @@ const Game = () => {
     setSettings(prev => ({ ...prev, sideQuests: acceptSideQuest(prev.sideQuests || [], questId) }));
     interactionHook.setConversation(prev => [...prev, { role: 'system', content: `📜 New quest: ${q.title} — ${q.description}` }]);
     setTimeout(() => performSave(), 500);
+  };
+
+  // Exploration rumour: occasionally OFFER an available, map-valid side quest while
+  // travelling (every quest in sideQuests is already validated by selection, so its POI
+  // exists). Offer-based — the player chooses; accepting reveals its site.
+  const RUMOUR_CHANCE = 0.12;
+  const maybeOfferRumour = () => {
+    const sq = settings?.sideQuests;
+    if (!sq || sq.length === 0) return;
+    const available = sq.filter(q => q.status === 'available' && (q.minLevel || 1) <= effectivePartyLevel(selectedHeroes));
+    if (available.length === 0) return;
+    if (Math.random() >= RUMOUR_CHANCE) return;
+    const quest = available[Math.floor(Math.random() * available.length)];
+    openQuestOffer({ quest, onAccept: () => handleAcceptSideQuest(quest.id) });
   };
 
   // Hand in completed side-quest turn-ins at a building (return-to-giver / courier).
@@ -511,9 +556,11 @@ const Game = () => {
       trackTownVisit: mapHook.trackTownVisit
     });
 
-    // POI Check (for location Modal — towns, etc.)
+    // POI Check (for location Modal — towns, etc.). Secret sites (caves/ruins) don't offer
+    // an entrance until a quest has revealed them, so they read as plain ground until then.
     const poiEncounter = buildPoiEncounter(targetTile);
-    if (poiEncounter) {
+    const poiShown = poiEncounter && !isSiteHidden(targetTile);
+    if (poiShown) {
       mapHook.setIsMapModalOpen(false); // close map so the location modal is visible
       openEncounterInfo({
         encounter: poiEncounter,
@@ -594,6 +641,9 @@ const Game = () => {
     if (aiNarrativeEnabled) {
       appendLocalMovementNarrative({ tile: targetTile, coords: { x: clickedX, y: clickedY }, isNewArea });
     }
+
+    // On a quiet move (no POI prompt, no encounter), a rumour may offer a side quest.
+    if (!poiShown && !plannedEncounterFlow.openActionEncounter) maybeOfferRumour();
   };
 
   // --- Look-around: on-demand description of the CURRENT tile ---
@@ -987,6 +1037,7 @@ const Game = () => {
 
       {/* Save Confirmation Modal */}
       <SaveConfirmationModal />
+      <QuestOfferModal />
     </div>
   );
 };

@@ -69,18 +69,34 @@ export const isQuestEligible = (quest, availability = {}) => {
  * @param {() => number} rng - 0..1 RNG for a reproducible pick (default Math.random).
  */
 export const selectSideQuests = (availability = {}, count = 2, rng = Math.random, pool = SIDE_QUESTS) => {
+  const shuffle = (arr) => {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
   const eligible = pool.filter((q) => isQuestEligible(q, availability));
-  // seeded shuffle (Fisher-Yates) then take `count`
-  const shuffled = eligible.slice();
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled.slice(0, count).map((q) => ({
+  // Guarantee at least one low-tier (minLevel<=2) quest so early game has something to do,
+  // then fill the rest at random. Tiering then reveals higher quests as the party levels.
+  const low = shuffle(eligible.filter((q) => (q.minLevel || 1) <= 2));
+  const rest = shuffle(eligible.filter((q) => (q.minLevel || 1) > 2));
+  const ordered = low.length ? [low[0], ...shuffle([...low.slice(1), ...rest])] : shuffle(rest);
+  return ordered.slice(0, count).map((q) => ({
     ...q,
     milestones: q.milestones.map((m) => ({ ...m, completed: false, progress: 0 })),
     status: 'available',
   }));
+};
+
+/**
+ * Effective party level for quest gating: the lead hero's level plus a bonus for party
+ * size (a full party can take on quests above the lead's level — your call). Roughly
+ * +1 per two extra members.
+ */
+export const effectivePartyLevel = (party) => {
+  const heroes = (party || []).filter(Boolean);
+  if (heroes.length === 0) return 1;
+  const lead = Math.max(...heroes.map((h) => h.level || 1));
+  return lead + Math.floor(heroes.length / 2);
 };
 
 /** Move a side quest from 'available' to 'active' (accept it). Returns a new array. */
@@ -163,6 +179,7 @@ export const getAvailableQuestsAt = (sideQuests, ctx = {}) =>
     const buildings = Array.isArray(g.building) ? g.building : [g.building];
     if (!buildings.includes(ctx.buildingType)) return false;
     if (g.location && ctx.townName !== g.location) return false;
+    if (ctx.level != null && (q.minLevel || 1) > ctx.level) return false; // tiered reveal
     return true;
   });
 
@@ -180,6 +197,21 @@ export const getSideQuestProgress = (quest) => {
   const total = quest?.milestones?.length || 0;
   const done = (quest?.milestones || []).filter((m) => m.completed).length;
   return { done, total };
+};
+
+/**
+ * Site types revealed on the world map: a cave/ruins becomes visible (and stays — sticky)
+ * once a quest targeting it has been picked up (active) or finished (completed). Quests
+ * still merely 'available' don't reveal anything — sites stay secret until you take the quest.
+ * @returns {{ cave?: boolean, ruins?: boolean }}
+ */
+export const getRevealedSiteTypes = (sideQuests) => {
+  const revealed = {};
+  (sideQuests || []).forEach((q) => {
+    if (q.status === 'available') return;
+    q.milestones.forEach((m) => { if (m.site) revealed[m.site.type] = true; });
+  });
+  return revealed;
 };
 
 /**

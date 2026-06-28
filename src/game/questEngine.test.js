@@ -1,9 +1,10 @@
 import {
   acceptSideQuest, checkSideQuestEvent, turnInQuest, getReadyTurnIns, getAvailableQuestsAt,
   getActiveSideQuests, getAvailableSideQuests, getCompletedSideQuests,
-  getSideQuestProgress, getActiveSiteObjectives, selectSideQuests,
+  getSideQuestProgress, getActiveSiteObjectives, selectSideQuests, effectivePartyLevel,
 } from './questEngine';
-import { initialSideQuests } from '../data/sideQuests';
+import { initialSideQuests, QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
+import { ITEM_CATALOG } from '../utils/inventorySystem';
 
 const seededRng = (seed) => { let s = seed; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; };
 const accept = (id) => acceptSideQuest(initialSideQuests(), id);
@@ -31,12 +32,50 @@ describe('questEngine — basics', () => {
     // the wraith-lord quest is given at a temple/shrine, not an inn
     expect(getAvailableQuestsAt(sq, { buildingType: 'temple' }).map((q) => q.id)).toContain('ruin_menace');
     expect(getAvailableQuestsAt(sq, { buildingType: 'inn' }).map((q) => q.id)).not.toContain('ruin_menace');
-    // the relic quest is offered at a library, not at a blacksmith
+    // the relic quest is offered at a library; a warehouse offers nothing
     expect(getAvailableQuestsAt(sq, { buildingType: 'library' }).map((q) => q.id)).toContain('relic_hunt');
-    expect(getAvailableQuestsAt(sq, { buildingType: 'blacksmith' }).length).toBe(0);
+    expect(getAvailableQuestsAt(sq, { buildingType: 'warehouse' }).length).toBe(0);
     // accepted/active quests are no longer "available" to offer
     const accepted = acceptSideQuest(sq, 'ruin_menace');
     expect(getAvailableQuestsAt(accepted, { buildingType: 'temple' }).map((q) => q.id)).not.toContain('ruin_menace');
+  });
+
+  test('quests are level-tiered: a high-minLevel quest is hidden until the party is strong', () => {
+    const sq = initialSideQuests(); // ruin_menace is minLevel 4 (temple giver)
+    expect(getAvailableQuestsAt(sq, { buildingType: 'temple', level: 1 }).map((q) => q.id)).not.toContain('ruin_menace');
+    expect(getAvailableQuestsAt(sq, { buildingType: 'temple', level: 5 }).map((q) => q.id)).toContain('ruin_menace');
+    // with no level in ctx, no level gate is applied
+    expect(getAvailableQuestsAt(sq, { buildingType: 'temple' }).map((q) => q.id)).toContain('ruin_menace');
+  });
+
+  test('every quest find-item has an icon source (real catalog item or a borrowed icon — no new art)', () => {
+    const findIds = new Set();
+    initialSideQuests().forEach((q) => q.milestones.forEach((m) => {
+      if (m.site && m.site.objectiveType === 'item') findIds.add(m.site.id);
+    }));
+    expect(findIds.size).toBeGreaterThan(0);
+    findIds.forEach((id) => {
+      const borrowed = QUEST_ITEM_ICON_FROM[id];
+      // either it's already a catalog item, or it borrows an existing catalog item's icon
+      expect(Boolean(ITEM_CATALOG[id]) || Boolean(borrowed && ITEM_CATALOG[borrowed])).toBe(true);
+    });
+  });
+
+  test('effectivePartyLevel = lead level + party-size bonus', () => {
+    expect(effectivePartyLevel([{ level: 3 }])).toBe(3);                          // solo
+    expect(effectivePartyLevel([{ level: 3 }, { level: 2 }, { level: 1 }, { level: 2 }])).toBe(5); // lead 3 + 2
+    expect(effectivePartyLevel([])).toBe(1);
+  });
+
+  test('getRevealedSiteTypes: secret until taken, sticky after completion', () => {
+    const { getRevealedSiteTypes } = require('./questEngine');
+    expect(getRevealedSiteTypes(initialSideQuests())).toEqual({}); // none taken -> all secret
+    const active = acceptSideQuest(initialSideQuests(), 'ruin_menace');
+    expect(getRevealedSiteTypes(active).ruins).toBe(true);
+    expect(getRevealedSiteTypes(active).cave).toBeUndefined();
+    // sticky: still revealed once completed
+    const completed = active.map((q) => (q.id === 'ruin_menace' ? { ...q, status: 'completed' } : q));
+    expect(getRevealedSiteTypes(completed).ruins).toBe(true);
   });
 
   test('site objectives exposed only for active quests', () => {

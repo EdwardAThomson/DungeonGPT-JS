@@ -1,128 +1,139 @@
 // sideQuests.js
-// POOL of optional side quests. At new-game time the game SELECTS a few that fit the map
-// (questEngine.selectSideQuests). Each quest is a chain of steps:
-//   - an OBJECTIVE step (item / combat / location, optionally with `count`, optionally
-//     bound to a `site` cave/ruin), then
-//   - a TURN-IN step (return to the giver / deliver to a building) gated by `requires`.
-// status: 'available' -> 'active' -> 'completed'. Objective steps complete on game events;
-// turn-in steps complete when the player hands in at a matching building (questEngine).
+// POOL of optional side quests. At new-game time the game SELECTS a map-fitting few
+// (questEngine.selectSideQuests / isQuestEligible) and reveals each at its giver building
+// once the party is strong enough (minLevel vs effective party level). Each quest is a
+// chain: an objective step (item/combat/location, optionally `count`, optionally `site`)
+// then a turn-in step (return to giver, or courier to another building).
+//
+// Completability rules: specific item/boss/room objectives must be SITE-bound (injected);
+// overworld combat must be count-of-`any`; gather items should be ones that actually drop.
+// See docs/SIDE_QUEST_POOL.md.
 
-// Standard "return to an inn/tavern for your reward" turn-in step.
-const returnToInn = (qid, requires, text = 'Return to the inn to claim your reward') => ({
-  id: `${qid}_turnin`, type: 'turnin', text,
-  trigger: { turnIn: { building: ['inn', 'tavern'] } }, requires, completed: false,
-  rewards: { xp: 0, gold: 0, items: [] },
+// --- step builders -----------------------------------------------------------
+const turnIn = (qid, requires, building, text = 'Return to claim your reward') =>
+  ({ id: `${qid}_in`, type: 'turnin', text, trigger: { turnIn: { building } }, requires, completed: false, rewards: { xp: 0, gold: 0, items: [] } });
+const siteItem = (id, text, type, itemId, name, rewards) =>
+  ({ id, type: 'item', text, trigger: { item: itemId }, requires: [], completed: false, site: { type, objectiveType: 'item', id: itemId, name }, rewards });
+const siteCombat = (id, text, type, enemyId, name, rewards) =>
+  ({ id, type: 'combat', text, trigger: { enemy: enemyId }, requires: [], completed: false, site: { type, objectiveType: 'combat', id: enemyId, name }, rewards });
+const siteLoc = (id, text, type, locId, name, rewards) =>
+  ({ id, type: 'location', text, trigger: { location: locId }, requires: [], completed: false, site: { type, objectiveType: 'location', id: locId, name }, rewards });
+const gather = (id, text, itemId, count, rewards) =>
+  ({ id, type: 'item', text, trigger: { item: itemId, count }, requires: [], completed: false, rewards });
+const bounty = (id, text, count, rewards) =>
+  ({ id, type: 'combat', text, trigger: { enemy: 'any', count }, requires: [], completed: false, rewards });
+const Q = (id, title, minLevel, description, giverBuilding, hook, objective, turnInBuilding, turnInText, rewards) => ({
+  id, title, minLevel, description,
+  giver: { building: giverBuilding, hook },
+  status: 'available',
+  milestones: [objective, turnIn(id, [objective.id], turnInBuilding, turnInText)],
+  rewards,
+});
+// courier quest: a single turn-in (deliver) step, no separate objective
+const Courier = (id, title, minLevel, description, giverBuilding, hook, deliverTo, deliverText, rewards) => ({
+  id, title, minLevel, description,
+  giver: { building: giverBuilding, hook },
+  status: 'available',
+  milestones: [{ id: `${id}_deliver`, type: 'turnin', text: deliverText, trigger: { turnIn: { building: deliverTo } }, requires: [], completed: false, rewards: { xp: 0, gold: 0, items: [] } }],
+  rewards,
 });
 
+const INN = ['inn', 'tavern'];
+
 export const SIDE_QUESTS = [
-  // --- cave quests (objective in the cave, then report back) ---
-  {
-    id: 'lost_heirloom', title: 'The Lost Heirloom',
-    description: "A grieving villager's silver locket was lost in the cave. Recover it and return.",
-    giver: { building: ['inn', 'tavern'], hook: 'My family\'s locket is lost in the cave. Bring it back to me.' },
-    status: 'available',
-    milestones: [
-      { id: 'lh1', type: 'item', text: 'Recover the silver locket from the cave', trigger: { item: 'silver_locket' }, requires: [], completed: false, site: { type: 'cave', objectiveType: 'item', id: 'silver_locket', name: 'the Silver Locket' }, rewards: { xp: 60, gold: 0, items: [] } },
-      returnToInn('lost_heirloom', ['lh1'], 'Return the locket to its owner'),
-    ],
-    rewards: { xp: 60, gold: 120, items: [] },
-  },
-  {
-    id: 'cave_beast', title: 'The Beast Below',
-    description: 'A monstrous beast lairs in the cave and raids the farms. Slay it, then report back.',
-    giver: { building: ['tavern', 'shop'], hook: 'A beast in the cave takes our livestock by night. End it.' },
-    status: 'available',
-    milestones: [
-      { id: 'cb1', type: 'combat', text: 'Slay the beast lairing in the cave', trigger: { enemy: 'cave_tyrant' }, requires: [], completed: false, site: { type: 'cave', objectiveType: 'combat', id: 'cave_tyrant', name: 'the Cave Tyrant' }, rewards: { xp: 150, gold: 0, items: ['raw_gems'] } },
-      returnToInn('cave_beast', ['cb1']),
-    ],
-    rewards: { xp: 120, gold: 150, items: [] },
-  },
-  {
-    id: 'missing_miners', title: 'The Missing Miners',
-    description: 'Miners vanished in the deep galleries of the cave. Find how far they got and report back.',
-    giver: { building: ['mill', 'townhall'], hook: 'Our miners went into the deep gallery and never returned. Please look for them.' },
-    status: 'available',
-    milestones: [
-      { id: 'mm1', type: 'location', text: 'Reach the deep gallery in the cave', trigger: { location: 'deep_gallery' }, requires: [], completed: false, site: { type: 'cave', objectiveType: 'location', id: 'deep_gallery', name: 'the Deep Gallery' }, rewards: { xp: 70, gold: 0, items: [] } },
-      returnToInn('missing_miners', ['mm1']),
-    ],
-    rewards: { xp: 80, gold: 90, items: [] },
-  },
+  // --- tavern / inn ---
+  Q('lost_heirloom', 'The Lost Heirloom', 2, "A villager's silver locket was lost in the cave.", INN, 'My family\'s locket is lost in the cave. Bring it back to me.',
+    siteItem('lh1', 'Recover the silver locket from the cave', 'cave', 'silver_locket', 'the Silver Locket', { xp: 60, gold: 0, items: [] }), INN, 'Return the locket to its owner', { xp: 60, gold: 120, items: [] }),
+  Q('prove_mettle', 'Prove Your Mettle', 2, 'A captain wants seasoned blades.', INN, 'Show me you can fight — best three foes out in the wilds and come back.',
+    bounty('pm1', 'Defeat 3 foes in the wilds', 3, { xp: 60, gold: 0, items: [] }), INN, undefined, { xp: 80, gold: 120, items: [] }),
+  Q('bards_songbook', "The Bard's Lost Songbook", 2, 'A bard left her prized songbook in the ruins.', INN, 'My songbook is lost among the old ruins. I\'d pay dearly to sing from it again.',
+    siteItem('bs1', 'Recover the lost songbook from the ruins', 'ruins', 'lost_songbook', 'the Lost Songbook', { xp: 60, gold: 0, items: [] }), INN, 'Return the songbook to the bard', { xp: 50, gold: 110, items: [] }),
+  Q('singing_cavern', 'The Singing Cavern', 1, 'Travellers speak of a hollow that sings on the wind.', INN, 'They say a deep hollow in the cave sings on the wind. See it and tell me true.',
+    siteLoc('sc1', 'Reach the echoing hollow in the cave', 'cave', 'echo_hollow', 'the Echoing Hollow', { xp: 50, gold: 0, items: [] }), INN, 'Bring back the tale', { xp: 50, gold: 80, items: [] }),
+  Courier('sealed_letter', 'A Letter for the Magistrate', 1, 'Carry a sealed letter to the town hall.', INN, 'Carry this sealed letter to the magistrate at the town hall. Discreetly.',
+    'townhall', 'Deliver the sealed letter to the town hall', { xp: 50, gold: 100, items: [] }),
 
-  // --- ruins quests ---
-  {
-    id: 'ruin_menace', title: 'Menace in the Ruins',
-    description: 'A dark thing preys on travellers near the ruins. Put it to rest, then report back.',
-    giver: { building: ['temple', 'shrine'], hook: 'Travellers vanish near the old ruins. A dark thing dwells there. Will you face it?' },
-    status: 'available',
-    milestones: [
-      { id: 'rm1', type: 'combat', text: 'Defeat the wraith lord in the ruins', trigger: { enemy: 'wraith_lord' }, requires: [], completed: false, site: { type: 'ruins', objectiveType: 'combat', id: 'wraith_lord', name: 'the Wraith Lord' }, rewards: { xp: 200, gold: 0, items: ['dark_tome'] } },
-      returnToInn('ruin_menace', ['rm1']),
-    ],
-    rewards: { xp: 100, gold: 150, items: [] },
-  },
-  {
-    id: 'relic_hunt', title: "The Scholar's Relic",
-    description: 'A scholar seeks an ancient relic in the ruins. Retrieve it and bring it back.',
-    giver: { building: ['library', 'archives', 'magetower'], hook: 'An ancient relic rests in the ruins. Bring it to me and be well paid.' },
-    status: 'available',
-    milestones: [
-      { id: 'rh1', type: 'item', text: 'Retrieve the ancient relic from the ruins', trigger: { item: 'ancient_relic' }, requires: [], completed: false, site: { type: 'ruins', objectiveType: 'item', id: 'ancient_relic', name: 'the Ancient Relic' }, rewards: { xp: 80, gold: 0, items: [] } },
-      returnToInn('relic_hunt', ['rh1'], 'Bring the relic to the scholar'),
-    ],
-    rewards: { xp: 90, gold: 200, items: [] },
-  },
-  {
-    id: 'sealed_vault', title: 'The Sealed Vault',
-    description: 'Old maps speak of a sealed vault deep in the ruins. Find it, then report your discovery.',
-    giver: { building: ['library', 'archives'], hook: 'A sealed vault lies deep in the ruins, unreached in an age. Find it.' },
-    status: 'available',
-    milestones: [
-      { id: 'sv1', type: 'location', text: 'Find the sealed vault in the ruins', trigger: { location: 'sealed_vault' }, requires: [], completed: false, site: { type: 'ruins', objectiveType: 'location', id: 'sealed_vault', name: 'the Sealed Vault' }, rewards: { xp: 70, gold: 0, items: [] } },
-      returnToInn('sealed_vault', ['sv1']),
-    ],
-    rewards: { xp: 80, gold: 110, items: [] },
-  },
+  // --- tavern / shop ---
+  Q('cave_beast', 'The Beast Below', 3, 'A beast lairs in the cave and raids the farms.', ['tavern', 'shop'], 'A beast in the cave takes our livestock by night. End it.',
+    siteCombat('cb1', 'Slay the beast lairing in the cave', 'cave', 'cave_tyrant', 'the Cave Tyrant', { xp: 150, gold: 0, items: ['raw_gems'] }), ['tavern', 'shop'], undefined, { xp: 120, gold: 150, items: [] }),
+  Q('caravan_refund', 'Refund in Blood', 2, 'Bandits robbed a merchant caravan.', ['shop', 'market'], 'Bandits robbed my caravan. Make them pay and I\'ll see you compensated.',
+    bounty('cr1', 'Defeat 3 bandits in the wilds', 3, { xp: 70, gold: 0, items: [] }), ['shop', 'market'], undefined, { xp: 60, gold: 140, items: [] }),
+  Courier('overdue_delivery', 'Overdue Delivery', 1, 'A merchant needs goods carried across town.', ['shop', 'market'], 'These goods are overdue at the inn. Carry them over for me?',
+    INN, 'Deliver the goods to the inn', { xp: 30, gold: 80, items: [] }),
 
-  // --- gather (count) — no site, collect anywhere ---
-  {
-    id: 'alchemist_reagents', title: "Reagents for the Apothecary",
-    description: 'The apothecary needs spider silk for her tinctures. Gather three skeins and bring them in.',
-    giver: { building: ['inn', 'tavern'], hook: 'I need three skeins of spider silk for my brews. Gather them and I\'ll reward you.' },
-    status: 'available',
-    milestones: [
-      { id: 'ar1', type: 'item', text: 'Collect 3 skeins of spider silk', trigger: { item: 'spider_silk', count: 3 }, requires: [], completed: false, rewards: { xp: 40, gold: 0, items: [] } },
-      returnToInn('alchemist_reagents', ['ar1'], 'Bring the silk to the apothecary'),
-    ],
-    rewards: { xp: 40, gold: 90, items: [] },
-  },
+  // --- temple / shrine ---
+  Q('ruin_menace', 'Menace in the Ruins', 4, 'A dark thing preys on travellers near the ruins.', ['temple', 'shrine'], 'Travellers vanish near the old ruins. A dark thing dwells there. Will you face it?',
+    siteCombat('rm1', 'Defeat the wraith lord in the ruins', 'ruins', 'wraith_lord', 'the Wraith Lord', { xp: 200, gold: 0, items: ['dark_tome'] }), ['temple', 'shrine'], undefined, { xp: 100, gold: 150, items: [] }),
+  Q('consecrated_relic', 'Consecrated Relic', 3, 'A holy relic was lost when the temple-of-old fell to ruin.', ['temple', 'shrine'], 'A consecrated relic lies in the ruins. Restore it to us and be blessed.',
+    siteItem('co1', 'Retrieve the holy relic from the ruins', 'ruins', 'holy_relic', 'the Holy Relic', { xp: 90, gold: 0, items: [] }), ['temple', 'shrine'], 'Return the relic to the temple', { xp: 90, gold: 120, items: ['dryad_blessing'] }),
+  Q('tend_sick', 'Tend the Sick', 1, 'The temple needs healing reagents for the sick.', ['temple', 'shrine'], 'The sick need glowing cave mushrooms for poultices. Gather three.',
+    gather('ts1', 'Collect 3 glowing cave mushrooms', 'cave_mushrooms', 3, { xp: 40, gold: 0, items: [] }), ['temple', 'shrine'], 'Bring the mushrooms to the temple', { xp: 40, gold: 90, items: [] }),
+  Q('lay_to_rest', 'Lay the Dead to Rest', 2, 'Restless dead stir in a forgotten burial vault.', ['temple', 'shrine'], 'The dead are restless in the ruins\' burial vault. Find it so we may consecrate it.',
+    siteLoc('lr1', 'Reach the burial vault in the ruins', 'ruins', 'burial_vault', 'the Burial Vault', { xp: 70, gold: 0, items: [] }), ['temple', 'shrine'], 'Report the vault\'s location', { xp: 70, gold: 100, items: [] }),
 
-  // --- bounty (count any) — prove your mettle ---
-  {
-    id: 'prove_mettle', title: 'Prove Your Mettle',
-    description: 'The captain wants seasoned blades. Defeat three foes in the wilds, then report.',
-    giver: { building: ['tavern', 'inn'], hook: 'Show me you can fight — best three foes out in the wilds and come back.' },
-    status: 'available',
-    milestones: [
-      { id: 'pm1', type: 'combat', text: 'Defeat 3 foes in the wilds', trigger: { enemy: 'any', count: 3 }, requires: [], completed: false, rewards: { xp: 60, gold: 0, items: [] } },
-      returnToInn('prove_mettle', ['pm1']),
-    ],
-    rewards: { xp: 80, gold: 120, items: [] },
-  },
+  // --- library / archives / magetower ---
+  Q('relic_hunt', "The Scholar's Relic", 3, 'A scholar seeks an ancient relic in the ruins.', ['library', 'archives', 'magetower'], 'An ancient relic rests in the ruins. Bring it to me and be well paid.',
+    siteItem('rh1', 'Retrieve the ancient relic from the ruins', 'ruins', 'ancient_relic', 'the Ancient Relic', { xp: 80, gold: 0, items: [] }), ['library', 'archives'], 'Bring the relic to the scholar', { xp: 90, gold: 200, items: [] }),
+  Q('sealed_vault', 'The Sealed Vault', 2, 'Old maps speak of a sealed vault deep in the ruins.', ['library', 'archives'], 'A sealed vault lies deep in the ruins, unreached in an age. Find it.',
+    siteLoc('sv1', 'Find the sealed vault in the ruins', 'ruins', 'sealed_vault', 'the Sealed Vault', { xp: 70, gold: 0, items: [] }), ['library', 'archives'], 'Report your discovery', { xp: 80, gold: 110, items: [] }),
+  Q('lost_codex', 'The Lost Codex', 2, 'A codex of forgotten lore lies in the cave dark.', ['library', 'archives'], 'A lost codex lies somewhere in the cave. Recover it for the archive.',
+    siteItem('lc1', 'Recover the lost codex from the cave', 'cave', 'lost_codex', 'the Lost Codex', { xp: 80, gold: 0, items: [] }), ['library', 'archives'], 'Return the codex to the archive', { xp: 80, gold: 130, items: [] }),
+  Q('field_samples', 'Field Samples', 1, 'A naturalist wants raw mineral samples.', ['library', 'archives'], 'I need three raw gemstones for study. Gather them from the cave.',
+    gather('fs1', 'Collect 3 raw gemstones', 'raw_gems', 3, { xp: 40, gold: 0, items: [] }), ['library', 'archives'], 'Bring the samples in', { xp: 40, gold: 110, items: [] }),
+  Q('arcane_reagents', 'Arcane Reagents', 2, 'A mage needs luminous fungi for an experiment.', 'magetower', 'I require three glowing fungi from the deep places. Fetch them.',
+    gather('ar1', 'Collect 3 glowing cave fungi', 'glowing_fungi', 3, { xp: 50, gold: 0, items: [] }), 'magetower', 'Deliver the reagents', { xp: 50, gold: 130, items: [] }),
+  Q('unstable_rift', 'The Unstable Rift', 5, 'An arcane horror has clawed through into the ruins.', 'magetower', 'Something has torn through into the ruins. Destroy it before the rift widens.',
+    siteCombat('ur1', 'Destroy the arcane horror in the ruins', 'ruins', 'arcane_horror', 'the Arcane Horror', { xp: 250, gold: 0, items: ['magic_item'] }), 'magetower', undefined, { xp: 150, gold: 220, items: [] }),
 
-  // --- courier / delivery — hand in at the town hall ---
-  {
-    id: 'sealed_letter', title: 'A Letter for the Magistrate',
-    description: 'Carry a sealed letter to the town hall and deliver it to the magistrate.',
-    giver: { building: ['tavern', 'inn'], hook: 'Carry this sealed letter to the magistrate at the town hall. Discreetly.' },
-    status: 'available',
-    milestones: [
-      { id: 'sl1', type: 'turnin', text: 'Deliver the sealed letter to the town hall', trigger: { turnIn: { building: 'townhall' } }, requires: [], completed: false, rewards: { xp: 0, gold: 0, items: [] } },
-    ],
-    rewards: { xp: 50, gold: 100, items: [] },
-  },
+  // --- alchemist / apothecary ---
+  Q('alchemist_reagents', 'Reagents for the Apothecary', 1, 'The apothecary needs spider silk for tinctures.', ['alchemist', 'apothecary'], 'I need three skeins of spider silk for my brews. Gather them.',
+    gather('al1', 'Collect 3 skeins of spider silk', 'spider_silk', 3, { xp: 40, gold: 0, items: [] }), ['alchemist', 'apothecary'], 'Bring the silk to the apothecary', { xp: 40, gold: 90, items: [] }),
+  Q('antidote_ingredients', 'Antidote Ingredients', 1, 'An antidote calls for raw minerals.', ['alchemist', 'apothecary'], 'For the antidote I need three lumps of exposed minerals. Mind the dark.',
+    gather('an1', 'Collect 3 lumps of exposed minerals', 'exposed_minerals', 3, { xp: 40, gold: 0, items: [] }), ['alchemist', 'apothecary'], 'Bring the minerals in', { xp: 40, gold: 80, items: [] }),
+  Q('cursed_patient', 'The Cursed Patient', 2, 'A dying patient needs a cure-root from the cave.', ['alchemist', 'apothecary'], 'My patient fades. The cure-root grows only in the cave. Hurry!',
+    siteItem('cp1', 'Recover the cure-root from the cave', 'cave', 'cure_root', 'the Cure-Root', { xp: 80, gold: 0, items: [] }), ['alchemist', 'apothecary'], 'Bring the cure-root back', { xp: 80, gold: 140, items: ['greater_healing_potion'] }),
+
+  // --- blacksmith ---
+  Q('rare_ore', 'Rare Ore', 1, 'The smith needs ore from the deep cave.', 'blacksmith', 'Bring me three lumps of exposed minerals from the cave and I\'ll forge you something fine.',
+    gather('ro1', 'Collect 3 lumps of ore', 'exposed_minerals', 3, { xp: 40, gold: 0, items: [] }), 'blacksmith', 'Deliver the ore to the smith', { xp: 40, gold: 100, items: [] }),
+  Q('stolen_blade', 'The Stolen Blade', 2, 'A masterwork blade was looted and hidden in the ruins.', 'blacksmith', 'Thieves took my masterwork and hid it in the ruins. Recover it.',
+    siteItem('sb1', 'Recover the stolen blade from the ruins', 'ruins', 'stolen_blade', 'the Stolen Blade', { xp: 80, gold: 0, items: [] }), 'blacksmith', 'Return the blade to the smith', { xp: 80, gold: 120, items: ['silver_dagger'] }),
+
+  // --- mill / stables ---
+  Q('missing_miners', 'The Missing Miners', 2, 'Miners vanished in the deep galleries of the cave.', ['mill', 'townhall'], 'Our miners went into the deep gallery and never returned. Please look for them.',
+    siteLoc('mm1', 'Reach the deep gallery in the cave', 'cave', 'deep_gallery', 'the Deep Gallery', { xp: 70, gold: 0, items: [] }), ['mill', 'townhall'], undefined, { xp: 80, gold: 90, items: [] }),
+  Q('vermin_stores', 'Vermin in the Stores', 1, 'Pests are ruining the mill\'s grain.', 'mill', 'Vermin are at the grain. Cull a few and I\'ll make it worth your while.',
+    bounty('vs1', 'Cull 3 pests', 3, { xp: 40, gold: 0, items: [] }), 'mill', undefined, { xp: 40, gold: 70, items: [] }),
+  Q('spooked_mare', 'The Spooked Mare', 1, 'A bolted mare fled toward the cave mouth.', 'stables', 'My mare bolted toward the cave. Track her to the mouth and I\'ll know she\'s near.',
+    siteLoc('sm1', 'Reach the cave mouth where the mare fled', 'cave', 'cave_mouth', 'the Cave Mouth', { xp: 50, gold: 0, items: [] }), 'stables', 'Tell the hostler', { xp: 50, gold: 70, items: [] }),
+
+  // --- civic: town hall / bank / jail (town/city) ---
+  Q('clear_roads', 'Clear the Roads', 3, 'The magistrate posts a bounty on road-foes.', 'townhall', 'The roads are thick with foes. Cull five and claim the town\'s bounty.',
+    bounty('cl1', 'Defeat 5 foes on the roads', 5, { xp: 100, gold: 0, items: [] }), 'townhall', undefined, { xp: 100, gold: 200, items: [] }),
+  Q('stolen_ledger', 'The Stolen Ledger', 3, "The bank's ledger was stolen and hidden in the ruins.", 'bank', 'Our ledger was stolen and hidden in the ruins. Recover it — quietly.',
+    siteItem('le1', 'Recover the stolen ledger from the ruins', 'ruins', 'stolen_ledger', 'the Stolen Ledger', { xp: 90, gold: 0, items: [] }), 'bank', 'Return the ledger to the bank', { xp: 90, gold: 220, items: [] }),
+  Q('catch_cutpurse', 'Catch the Cutpurse', 3, 'A fugitive cutpurse hides in the cave.', 'jail', 'A cutpurse fled to the cave. Bring them to justice — alive or otherwise.',
+    siteCombat('cc1', 'Apprehend the fugitive in the cave', 'cave', 'fugitive', 'the Fugitive Cutpurse', { xp: 150, gold: 0, items: [] }), 'jail', 'Report to the jail', { xp: 100, gold: 160, items: [] }),
+
+  // --- harbormaster (coastal towns) ---
+  Q('lost_cargo', 'Lost Cargo', 2, 'Storm-lost cargo washed into a sea cave.', 'harbormaster', 'A storm drove cargo into the cave. Recover the crate for the harbour.',
+    siteItem('lo1', 'Recover the lost cargo from the cave', 'cave', 'lost_cargo', 'the Lost Cargo', { xp: 80, gold: 0, items: [] }), 'harbormaster', 'Return the cargo to the harbour', { xp: 80, gold: 150, items: [] }),
 ];
+
+// Quest "find" items aren't real catalog items (kept unique so random loot can't complete
+// a quest early). For inventory display they BORROW an existing item's icon — no new art.
+// Maps quest item id -> the ITEM_CATALOG id whose icon to reuse.
+export const QUEST_ITEM_ICON_FROM = {
+  silver_locket: 'enchanted_trinket',
+  lost_songbook: 'history_tome',
+  holy_relic: 'artifact_trinket',
+  ancient_relic: 'artifact_trinket',
+  lost_codex: 'history_tome',
+  stolen_ledger: 'history_tome',
+  cure_root: 'healing_herbs',
+  stolen_blade: 'silver_dagger',
+  lost_cargo: 'salvaged_goods',
+};
 
 // Fresh, mutable copy of the FULL pool (debug page; new games use selectSideQuests).
 export const initialSideQuests = () => SIDE_QUESTS.map((q) => ({

@@ -359,7 +359,10 @@ const NewGame = () => {
     });
     let sqSeed = parseInt(seedToUse) || 1;
     const sqRng = () => { sqSeed = (sqSeed * 9301 + 49297) % 233280; return sqSeed / 233280; };
-    const selectedSideQuests = selectSideQuests({ sites: availableSites, buildings: [...availableBuildings] }, 2, sqRng);
+    // Scale the number of side quests to the map (≈1 per town, 2–4).
+    const townCount = flatTiles.filter((t) => t.poi === 'town').length;
+    const sideQuestCount = Math.min(4, Math.max(2, townCount));
+    const selectedSideQuests = selectSideQuests({ sites: availableSites, buildings: [...availableBuildings] }, sideQuestCount, sqRng);
 
     const settingsData = {
       shortDescription: finalDescription,
