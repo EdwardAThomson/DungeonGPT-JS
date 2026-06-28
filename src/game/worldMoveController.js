@@ -53,12 +53,12 @@ export const trackAreaVisits = ({
 export const buildPoiEncounter = (targetTile) => {
   if (!targetTile.poi) return null;
   const poiType = targetTile.poiType || targetTile.poi;
-  const NICE_NAMES = { cave_entrance: 'a Cave', cave: 'a Cave', ruins: 'Ruins' };
+  const NICE_NAMES = { cave_entrance: 'a Cave', cave: 'a Cave', ruins: 'Ruins', forest: 'a Forest', hills: 'the Hills', mountain: 'the Mountains' };
   return {
     name: targetTile.townName || NICE_NAMES[poiType] || targetTile.poi,
     poiType,
     description: targetTile.descriptionSeed || `You have arrived at ${targetTile.poi}.`,
-    canEnter: ['town', 'city', 'village', 'hamlet', 'dungeon', 'cave_entrance', 'cave', 'ruins'].includes(poiType),
+    canEnter: ['town', 'city', 'village', 'hamlet', 'dungeon', 'cave_entrance', 'cave', 'ruins', 'forest', 'hills', 'mountain'].includes(poiType),
     tile: targetTile
   };
 };

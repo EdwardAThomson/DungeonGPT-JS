@@ -341,3 +341,87 @@
   font-style: italic;
   white-space: pre-wrap;
 }
+
+/* --- Hero equipment slots --- */
+.hero-equipment-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hero-equip-slot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+
+.hero-equip-slot-label {
+  flex: 0 0 90px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.hero-equip-slot-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hero-equip-item-name {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.hero-equip-bonus {
+  color: var(--state-highlight, var(--primary));
+  font-weight: bold;
+}
+
+.hero-equip-empty {
+  color: var(--text-secondary);
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.hero-equip-select {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border, var(--primary));
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.hero-equip-button {
+  background: none;
+  border: 1px solid var(--border, var(--primary));
+  color: var(--text-secondary);
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.hero-equip-button:hover {
+  color: var(--text);
+  border-color: var(--primary);
+}
+
+.hero-equip-summary {
+  margin: 10px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}

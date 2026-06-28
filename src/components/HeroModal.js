@@ -4,11 +4,34 @@ import { getLevelProgress, calculateLevel } from '../utils/progressionSystem';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
+import {
+    EQUIP_SLOTS,
+    equipItem,
+    unequipSlot,
+    getEquippedItem,
+    getEquippableItemsForSlot,
+    getEquippedBonuses,
+    parseBonus
+} from '../game/equipment';
+
+const SLOT_LABELS = { weapon: 'Weapon', armor: 'Armour', accessory: 'Accessory' };
 
 const HeroModal = () => {
-    const { data, close } = useModal('hero');
+    const { data, close, open } = useModal('hero');
     const hero = data?.hero;
+    const onHeroUpdate = data?.onHeroUpdate;
     if (!hero) return null;
+
+    // Equip/unequip produces a new hero. Propagate it to the party state via the
+    // caller's update callback, and refresh this modal's own view by re-opening
+    // it with the updated hero (keeps the callback wired up).
+    const applyHeroChange = (updatedHero) => {
+        if (updatedHero === hero) return;
+        if (onHeroUpdate) onHeroUpdate(updatedHero);
+        open({ ...data, hero: updatedHero });
+    };
+
+    const equipBonuses = getEquippedBonuses(hero);
 
     // Gender emoji - Male or Female only
     const getGenderEmoji = (gender) => {
@@ -54,6 +77,67 @@ const HeroModal = () => {
                             ))}
                         </div>
                     )}
+                </div>
+
+                <div className="modal-section">
+                    <h4>Equipment</h4>
+                    <div className="hero-equipment-slots">
+                        {EQUIP_SLOTS.map((slot) => {
+                            const equipped = getEquippedItem(hero, slot);
+                            const options = getEquippableItemsForSlot(hero, slot);
+                            return (
+                                <div key={slot} className="hero-equip-slot">
+                                    <span className="hero-equip-slot-label">{SLOT_LABELS[slot]}</span>
+                                    <div className="hero-equip-slot-body">
+                                        {equipped ? (
+                                            <>
+                                                <span className="hero-equip-item-name">
+                                                    {equipped.name || equipped.key}
+                                                    {equipped.bonus ? (
+                                                        <span className="hero-equip-bonus"> ({equipped.bonus})</span>
+                                                    ) : null}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    className="hero-equip-button"
+                                                    onClick={() => applyHeroChange(unequipSlot(hero, slot))}
+                                                >
+                                                    Unequip
+                                                </button>
+                                            </>
+                                        ) : options.length > 0 ? (
+                                            <select
+                                                className="hero-equip-select"
+                                                value=""
+                                                onChange={(e) => {
+                                                    if (e.target.value) {
+                                                        applyHeroChange(equipItem(hero, e.target.value));
+                                                    }
+                                                }}
+                                            >
+                                                <option value="">Equip...</option>
+                                                {options.map((item) => (
+                                                    <option key={item.key} value={item.key}>
+                                                        {item.name || item.key}
+                                                        {item.bonus ? ` (${item.bonus})` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <span className="hero-equip-empty">Empty</span>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {(equipBonuses.attack || equipBonuses.defense || equipBonuses.misc) ? (
+                        <p className="hero-equip-summary">
+                            {equipBonuses.attack ? `+${equipBonuses.attack} attack ` : ''}
+                            {equipBonuses.defense ? `${parseBonus(equipBonuses.defense) >= 0 ? '+' : ''}${equipBonuses.defense} armour soak ` : ''}
+                            {equipBonuses.misc ? `+${equipBonuses.misc} to checks` : ''}
+                        </p>
+                    ) : null}
                 </div>
 
                 {hero.heroBackground && (

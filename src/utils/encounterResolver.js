@@ -2,6 +2,14 @@ import { rollCheck } from './dice';
 import { calculateModifier, SKILLS } from './rules';
 import { DIFFICULTY_DC } from '../data/encounters';
 import { calculateDamage, shouldDealDamage, getDamageDescription } from './healthSystem';
+import { getEquippedBonuses } from '../game/equipment';
+
+// Stats whose checks count as physical/combat (attack-style), so a weapon's
+// attack bonus applies. Hostile encounters also count regardless of skill.
+const PHYSICAL_STATS = ['Strength', 'Dexterity'];
+
+const isCombatAction = (statName, encounter) =>
+  PHYSICAL_STATS.includes(statName) || shouldDealDamage(encounter);
 
 /**
  * Resolves an encounter based on player action and dice roll
@@ -29,7 +37,16 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
   const skill = action.skill;
   const statName = SKILLS[skill];
   const statValue = character.stats[statName] || 10;
-  const modifier = calculateModifier(statValue);
+  let modifier = calculateModifier(statValue);
+
+  // Apply equipped gear: a weapon's attack bonus boosts combat/physical checks,
+  // an accessory's misc bonus applies to every check. Old heroes without
+  // equipment get { attack: 0, defense: 0, misc: 0 } (no change).
+  const equipBonuses = getEquippedBonuses(character);
+  if (isCombatAction(statName, encounter)) {
+    modifier += equipBonuses.attack;
+  }
+  modifier += equipBonuses.misc;
 
   // 2. Roll the check
   const rollResult = rollCheck(modifier);
@@ -59,6 +76,8 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
 
   if (shouldDealDamage(encounter) && character.maxHP) {
     hpDamage = calculateDamage(outcomeTier, character.maxHP, encounter.difficulty);
+    // Armour soaks a flat amount of incoming damage (never below zero).
+    hpDamage = Math.max(0, hpDamage - equipBonuses.defense);
     damageDescription = getDamageDescription(hpDamage, character.maxHP);
   }
 

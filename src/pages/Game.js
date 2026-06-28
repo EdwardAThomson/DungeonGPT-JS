@@ -37,6 +37,7 @@ import {
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
 import { checkMilestoneCompletion, getMilestoneRewards } from '../game/milestoneEngine';
+import { buyItem, sellItem } from '../game/shopController';
 import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, turnInQuest, getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
 import { QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
@@ -927,7 +928,7 @@ const Game = () => {
         <PartySidebar
           selectedHeroes={selectedHeroes}
           onOpenCharacter={(hero) => {
-            openHero({ hero });
+            openHero({ hero, onHeroUpdate: handleHeroUpdate });
             setIsMobilePartySidebarOpen(false); // Close sidebar when opening modal
           }}
           className={isMobilePartySidebarOpen ? 'mobile-open' : ''}
@@ -1033,6 +1034,16 @@ const Game = () => {
         sideQuests={settings?.sideQuests}
         onAcceptSideQuest={handleAcceptSideQuest}
         onTurnInQuest={handleTurnInQuest}
+        onBuy={(itemKey) => {
+          const result = buyItem(selectedHeroes, itemKey);
+          if (result.ok) setSelectedHeroes(result.party);
+          return result;
+        }}
+        onSell={(itemKey) => {
+          const result = sellItem(selectedHeroes, itemKey);
+          if (result.ok) setSelectedHeroes(result.party);
+          return result;
+        }}
       />
 
       {/* Save Confirmation Modal */}

@@ -1,10 +1,12 @@
 // siteTileArt.js
-// Programmatic SVG tiles for wilderness site sub-maps (caves, ruins), matching the
-// data-URI approach of townTileArt / worldTileArt. Generic tile types ('wall','floor',
-// 'rubble','entrance') are themed by the site type: caves render dark rock + cave ground;
-// ruins render grey masonry + flagstone. Walls don't autotile into towers like town walls
-// — instead floor tiles get ambient-occlusion shadows where they meet rock, which reads
-// as carved space. Pure functions of (type, neighbour-mask, coord), so memoised.
+// Programmatic SVG tiles for wilderness site sub-maps (caves, ruins, forests, hills,
+// mountains), matching the data-URI approach of townTileArt / worldTileArt. Generic tile
+// types ('wall','floor','rubble','entrance') are themed by the site type: caves/mountains
+// render dark/grey rock; ruins render grey masonry + flagstone; forests render tree
+// thickets over leafy clearings; hills render rocky outcrops over grassy slopes. Walls
+// don't autotile into towers like town walls — instead floor tiles get ambient-occlusion
+// shadows where they meet a wall, which reads as carved/sheltered space. Pure functions of
+// (type, neighbour-mask, coord), so memoised.
 
 // --- palettes ----------------------------------------------------------------
 const THEMES = {
@@ -18,8 +20,30 @@ const THEMES = {
     floor: '#9a9082', floorDark: '#827a6d', floorLight: '#ada393',
     rubble: '#8a8275', accent: '#7faa5a', // overgrowth green
   },
+  // forest: tree thickets (wall) over shaded leafy clearings (floor); woodland palette.
+  forest: {
+    wall: '#2f5a34', wallDark: '#1f3d23', wallLight: '#43764a',
+    floor: '#6e8a4a', floorDark: '#566f3a', floorLight: '#88a35f',
+    rubble: '#7c6a48', accent: '#c9d66b', // leaf litter / dappled light
+  },
+  // hills: rocky outcrops (wall) over rolling grassy slopes (floor).
+  hills: {
+    wall: '#8a8174', wallDark: '#6c6458', wallLight: '#a39a8b',
+    floor: '#7fa055', floorDark: '#658043', floorLight: '#9bbb6f',
+    rubble: '#9a8f7d', accent: '#b7c98a', // scree / grass
+  },
+  // mountain: enclosed rocky passes carved from grey stone (cave-like but lighter).
+  mountain: {
+    wall: '#6e6a66', wallDark: '#514e4b', wallLight: '#8b8782',
+    floor: '#8a857e', floorDark: '#736e67', floorLight: '#9d978f',
+    rubble: '#7e7972', accent: '#bcd6e6', // crystal / snow glow
+  },
 };
 const themeOf = (t) => THEMES[t] || THEMES.cave;
+
+// Open-air sites (a structure placed on biome ground) draw a worn dirt path as their exit
+// and never an archway; enclosed sites (carved from rock) draw a lit archway.
+const isOpenAir = (theme) => theme === 'ruins' || theme === 'forest' || theme === 'hills';
 
 // --- helpers (shared conventions with townTileArt) ---------------------------
 const wrap = (inner) =>
@@ -43,10 +67,21 @@ const variantSeed = (x = 0, y = 0) => (((x * 73856093) ^ (y * 19349663)) >>> 0);
 const wall = (theme, mask) => {
   const c = themeOf(theme);
   let marks = `<rect width='32' height='32' fill='${c.wall}'/>`;
-  // a couple of static cracks/blocks for texture (theme-agnostic, no seed -> small cache)
+  // a couple of static blocks/cracks/clusters for texture (theme-keyed, no seed -> small cache)
   if (theme === 'ruins') {
     marks += `<path d='M0 11 H32 M0 22 H32 M11 0 V11 M22 11 V22 M16 22 V32' stroke='${c.wallDark}' stroke-width='1' opacity='0.6'/>`;
+  } else if (theme === 'forest') {
+    // overlapping canopy blobs read as a dense thicket of trees
+    marks += `<circle cx='9' cy='10' r='8' fill='${c.wallDark}' opacity='0.55'/>`;
+    marks += `<circle cx='23' cy='13' r='9' fill='${c.wallLight}' opacity='0.45'/>`;
+    marks += `<circle cx='15' cy='24' r='8' fill='${c.wallDark}' opacity='0.5'/>`;
+    marks += `<circle cx='26' cy='26' r='6' fill='${c.wallLight}' opacity='0.4'/>`;
+  } else if (theme === 'hills') {
+    // rounded rocky outcrop lumps
+    marks += `<path d='M2 30 q6 -16 14 -3 q4 -10 14 -1 V32 H2 Z' fill='${c.wallDark}' opacity='0.5'/>`;
+    marks += `<path d='M4 12 q5 -8 11 -1 M19 9 q5 -6 10 1' stroke='${c.wallLight}' stroke-width='1.4' fill='none' opacity='0.5'/>`;
   } else {
+    // cave + mountain: angular cracks in rock
     marks += `<path d='M6 5 l4 6 l-3 5 M24 7 l-4 7 M20 24 l5 4 M9 22 l3 6' stroke='${c.wallDark}' stroke-width='1.2' fill='none' opacity='0.55'/>`;
   }
   const lip = (d) => `<rect ${d} fill='${c.wallLight}' opacity='0.8'/>`;
@@ -103,10 +138,11 @@ const ground = (kind, seed, mask) => {
   return wrap(marks);
 };
 
-// The way back out to the world. Caves: a lit archway/stair carved in rock. Ruins: a worn
-// dirt path leaving the map (it sits on open ground, not in a wall).
+// The way back out to the world. Enclosed sites (cave / mountain): a lit archway carved in
+// rock. Open-air sites (ruins / forest / hills): a worn dirt path leaving the map (it sits
+// on open ground, not in a wall).
 const entrance = (theme) => {
-  if (theme === 'ruins') {
+  if (isOpenAir(theme)) {
     return wrap(
       `<rect width='32' height='32' fill='#b07b46'/>` +
       `<rect width='32' height='32' fill='#8f5f31' opacity='0.25'/>` +
@@ -143,6 +179,22 @@ export const SITE_DECORATIONS = {
     { key: 'statue', emoji: '🗿', label: 'Statue' },
     { key: 'overgrowth', emoji: '🌿', label: 'Overgrowth' },
   ],
+  forest: [
+    { key: 'tree', emoji: '🌲', label: 'Tree' },
+    { key: 'bush', emoji: '🌳', label: 'Bush' },
+    { key: 'flowers', emoji: '🌼', label: 'Flowers' },
+    { key: 'mushroom', emoji: '🍄', label: 'Mushrooms' },
+  ],
+  hills: [
+    { key: 'boulder', emoji: '🪨', label: 'Boulder' },
+    { key: 'bush', emoji: '🌳', label: 'Bush' },
+    { key: 'flowers', emoji: '🌼', label: 'Flowers' },
+  ],
+  mountain: [
+    { key: 'boulder', emoji: '🪨', label: 'Boulder' },
+    { key: 'crystal', emoji: '💎', label: 'Crystals' },
+    { key: 'snow', emoji: '❄️', label: 'Snow' },
+  ],
 };
 
 // Flat key->emoji map for the renderer (SiteMapTest / future SiteMapDisplay).
@@ -154,7 +206,8 @@ const _cache = new Map();
 
 /**
  * CSS background-image for a site tile. `neighbours` = { n,e,s,w } of neighbour tile
- * types. `theme` = 'cave' | 'ruins'. Tolerant of unknown types (falls back to floor).
+ * types. `theme` = 'cave' | 'ruins' | 'forest' | 'hills' | 'mountain' (unknown themes fall
+ * back to the cave palette). Tolerant of unknown tile types (falls back to floor).
  */
 export function tileBackground(tile, neighbours = {}, x = 0, y = 0, theme = 'cave') {
   const type = tile.type;
@@ -200,6 +253,18 @@ export const sampleSiteTiles = {
   ruins_floor: () => floor('ruins', variantSeed(3, 1), 0, false),
   ruins_rubble: () => floor('ruins', variantSeed(4, 1), 0, true),
   ruins_entrance: () => entrance('ruins'),
+  forest_wall: () => wall('forest', 6),
+  forest_floor: () => floor('forest', variantSeed(6, 1), 0, false),
+  forest_rubble: () => floor('forest', variantSeed(7, 1), 0, true),
+  forest_entrance: () => entrance('forest'),
+  hills_wall: () => wall('hills', 6),
+  hills_floor: () => floor('hills', variantSeed(8, 1), 0, false),
+  hills_rubble: () => floor('hills', variantSeed(9, 1), 0, true),
+  hills_entrance: () => entrance('hills'),
+  mountain_wall: () => wall('mountain', 6),
+  mountain_floor: () => floor('mountain', variantSeed(10, 1), 0, false),
+  mountain_rubble: () => floor('mountain', variantSeed(11, 1), 0, true),
+  mountain_entrance: () => entrance('mountain'),
   ground_grass: () => ground('grass', variantSeed(5, 1), 0),
   ground_sand: () => ground('sand', variantSeed(5, 2), 0),
   ground_snow: () => ground('snow', variantSeed(5, 3), 0),

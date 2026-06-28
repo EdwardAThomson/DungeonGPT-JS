@@ -21,9 +21,23 @@ describe('MapLegend', () => {
     expect(screen.getByText('Statue')).toBeTruthy();
   });
 
+  test('renders forest / hills / mountain legends with their own labels', () => {
+    const { rerender } = render(<MapLegend title="Key" groups={siteLegendGroups('forest')} />);
+    expect(screen.getByText('Trees')).toBeTruthy();
+    expect(screen.getByText('Clearing')).toBeTruthy();
+
+    rerender(<MapLegend title="Key" groups={siteLegendGroups('hills')} />);
+    expect(screen.getByText('Rocky outcrop')).toBeTruthy();
+
+    rerender(<MapLegend title="Key" groups={siteLegendGroups('mountain')} />);
+    expect(screen.getByText('Rock face')).toBeTruthy();
+  });
+
   test('world + town legends produce non-empty groups', () => {
     expect(worldLegendGroups().every((g) => g.items.length > 0)).toBe(true);
     expect(townLegendGroups().every((g) => g.items.length > 0)).toBe(true);
-    expect(siteLegendGroups('cave').every((g) => g.items.length > 0)).toBe(true);
+    ['cave', 'ruins', 'forest', 'hills', 'mountain'].forEach((theme) => {
+      expect(siteLegendGroups(theme).every((g) => g.items.length > 0)).toBe(true);
+    });
   });
 });

@@ -86,24 +86,31 @@ export function townLegendGroups() {
   ];
 }
 
-// --- wilderness site map (caves / ruins) -------------------------------------
+// --- wilderness site map (caves / ruins / forests / hills / mountains) --------
 // Terrain + decorations both derive from siteTileArt so the key matches the map exactly.
-// Ruins are open-air, so the legend shows the surrounding biome ground (themed by `biome`).
+// Open-air sites (ruins / forest / hills) sit on biome ground, so the legend shows the
+// surrounding ground swatch (themed by `biome`); enclosed sites (cave / mountain) don't.
+const SITE_OPEN_AIR = ['ruins', 'forest', 'hills'];
+const SITE_HEADING = { cave: 'Cave', ruins: 'Ruins', forest: 'Forest', hills: 'Hills', mountain: 'Mountain pass' };
+const SITE_WALL_LABEL = { cave: 'Cave wall', ruins: 'Ruined wall', forest: 'Trees', hills: 'Rocky outcrop', mountain: 'Rock face' };
+const SITE_FLOOR_LABEL = { forest: 'Clearing', hills: 'Slope' };
+
 export function siteLegendGroups(theme = 'cave', biome = 'grassland') {
-  const isCave = theme !== 'ruins';
+  const t = sampleSiteTiles[`${theme}_floor`] ? theme : 'cave';
+  const openAir = SITE_OPEN_AIR.includes(t);
   const s = sampleSiteTiles;
-  const decos = SITE_DECORATIONS[isCave ? 'cave' : 'ruins'] || [];
+  const decos = SITE_DECORATIONS[t] || [];
   const groundSwatch = biome === 'desert' ? s.ground_sand() : biome === 'snow' ? s.ground_snow() : s.ground_grass();
   const groundLabel = biome === 'desert' ? 'Desert sand' : biome === 'snow' ? 'Snow' : 'Field';
   return [
     {
-      heading: isCave ? 'Cave' : 'Ruins',
+      heading: SITE_HEADING[t] || 'Site',
       items: [
-        ...(isCave ? [] : [tile(groundSwatch, groundLabel)]),
-        tile(isCave ? s.cave_floor() : s.ruins_floor(), 'Floor'),
-        tile(isCave ? s.cave_wall() : s.ruins_wall(), isCave ? 'Cave wall' : 'Ruined wall'),
-        tile(isCave ? s.cave_rubble() : s.ruins_rubble(), 'Rubble'),
-        tile(isCave ? s.cave_entrance() : s.ruins_entrance(), 'Exit'),
+        ...(openAir ? [tile(groundSwatch, groundLabel)] : []),
+        tile(s[`${t}_floor`](), SITE_FLOOR_LABEL[t] || 'Floor'),
+        tile(s[`${t}_wall`](), SITE_WALL_LABEL[t] || 'Wall'),
+        tile(s[`${t}_rubble`](), 'Rubble'),
+        tile(s[`${t}_entrance`](), 'Exit'),
       ],
     },
     {

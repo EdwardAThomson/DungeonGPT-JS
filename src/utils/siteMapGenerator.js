@@ -2,11 +2,13 @@
 // Generic generator for explorable wilderness POI sub-maps, the wilderness analog of
 // townMapGenerator. One framework, two layout strategies themed per POI type:
 //
-//   - CAVE  (subtractive / enclosed): the whole tile is solid rock and rooms + corridors
-//     are CARVED out. You're underground, so rock surrounds everything.
-//   - RUINS (additive / open-air): the tile is open biome ground (a field / desert / snow)
-//     and a decrepit building (broken walls + rubble + flagstone floor) is PLACED on it,
-//     with open countryside all around — a ruin sitting in the landscape.
+//   - ORGANIC (subtractive / enclosed): the whole tile is solid rock and rooms + corridors
+//     are CARVED out, so rock surrounds everything. Used by CAVE (underground) and MOUNTAIN
+//     (semi-enclosed rocky passes).
+//   - STRUCTURED (additive / open-air): the tile is open biome ground (a field / desert /
+//     snow) and clusters (broken walls, tree stands, rocky outcrops) are PLACED on it, with
+//     open countryside all around. Used by RUINS (a ruin in the landscape), FOREST (tree
+//     clusters carved into clearings + paths) and HILLS (rolling ground + a few outcrops).
 //
 // Deterministic per (type, coord) via the seed, mirroring the town generator. Phase 1
 // produces layout + reserved `contentSlots`; a later populateSite() fills those with
@@ -34,6 +36,27 @@ const SITE_CONFIG = {
     buildingSize: [2, 3], // [min, max] HALF-extent
     rubbleChance: 0.14,   // ruins are rubble-strewn (inside the structure)
   },
+  forest: {
+    theme: 'forest',
+    style: 'structured',  // additive: place dense tree clusters on open ground
+    buildings: [3, 5],    // [min, max] tree thickets (more, smaller than ruins)
+    buildingSize: [1, 2], // [min, max] HALF-extent
+    rubbleChance: 0.10,   // leaf litter / bare earth inside a clearing
+  },
+  hills: {
+    theme: 'hills',
+    style: 'structured',  // additive: a few rocky outcrops on rolling ground (lots of room)
+    buildings: [2, 3],    // [min, max] outcrops
+    buildingSize: [2, 3], // [min, max] HALF-extent
+    rubbleChance: 0.08,   // scattered scree
+  },
+  mountain: {
+    theme: 'mountain',
+    style: 'organic',     // subtractive: carve rocky passes out of stone (semi-enclosed)
+    rooms: [4, 6],        // [min, max] room count
+    roomSize: [2, 3],     // [min, max] room HALF-extent
+    rubbleChance: 0.10,   // loose rock on the pass floor
+  },
 };
 
 export const siteThemeFor = (type) => (SITE_CONFIG[type === 'cave_entrance' ? 'cave' : type] || SITE_CONFIG.cave).theme;
@@ -57,7 +80,8 @@ const makeTile = (x, y, type, ground) => {
 };
 
 /**
- * @param {string} type - POI type ('cave' | 'cave_entrance' | 'ruins').
+ * @param {string} type - POI type ('cave' | 'cave_entrance' | 'ruins' | 'forest' | 'hills'
+ *   | 'mountain'). Unknown types fall back to the cave config.
  * @param {string} name - display name.
  * @param {string} entryDir - edge entered from ('north'|'east'|'south'|'west').
  * @param {number} seed - reproducible seed.
@@ -73,7 +97,10 @@ export function generateSiteMap(type, name, entryDir = 'south', seed = null, opt
   const rng = seed !== null ? seededRandom(seed) : Math.random;
   const ri = (a, b) => a + Math.floor(rng() * (b - a + 1));
   const groundKind = groundKindFor(opts.biome);
-  const decoKeys = (SITE_DECORATIONS[norm] || []).map((d) => d.key);
+  // Bias decorations by the world tile's biome: snow only appears on a snow-biome mountain.
+  let decoList = SITE_DECORATIONS[norm] || [];
+  if (norm === 'mountain' && opts.biome !== 'snow') decoList = decoList.filter((d) => d.key !== 'snow');
+  const decoKeys = decoList.map((d) => d.key);
 
   logger.debug(`[SITE] Generating ${norm} "${name}" (${cfg.style}) ${W}x${H} ground=${groundKind}`);
 

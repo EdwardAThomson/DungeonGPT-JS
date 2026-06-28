@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { getHPStatus } from '../utils/healthSystem';
 import { getReadyTurnIns, getAvailableQuestsAt, effectivePartyLevel } from '../game/questEngine';
+import { getShopStock } from '../data/shopStock';
+import { buyPrice, sellPrice, canAfford, isSellable } from '../game/shopController';
+import { ITEM_CATALOG } from '../utils/inventorySystem';
 
 const getAbilityModifier = (score) => Math.floor(((score || 10) - 10) / 2);
 
 const RESIDENTIAL_TYPES = ['house', 'manor', 'keep'];
 const REST_BUILDING_TYPES = ['inn', 'tavern'];
+const SHOP_BUILDING_TYPES = ['shop', 'market', 'blacksmith', 'alchemist'];
 
 const familyRoleLabel = (npc) => {
     if (npc.familyRole === 'head') return 'Head of Household';
@@ -22,8 +26,9 @@ const genderIcon = (gender) => {
 
 const RESURRECTION_COST_PER_LEVEL = 25;
 
-const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, onRest, onResurrect, party, sideQuests, onAcceptSideQuest, onTurnInQuest, townName }) => {
+const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, sideQuests, onAcceptSideQuest, onTurnInQuest, townName }) => {
     const [imageError, setImageError] = useState(false);
+    const [tradeMessage, setTradeMessage] = useState(null); // { text, kind: 'buy' | 'sell' | 'error' }
     const [isHovered, setIsHovered] = useState(false);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
     const [searchAttempts, setSearchAttempts] = useState(0);
@@ -39,6 +44,31 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
     const isTemple = building.buildingType === 'temple';
     const canRest = REST_BUILDING_TYPES.includes(building.buildingType);
     const restType = building.buildingType === 'inn' ? 'long' : 'short';
+    const isShop = SHOP_BUILDING_TYPES.includes(building.buildingType);
+    const shopStock = isShop ? getShopStock(building.buildingType) : [];
+    const sellableInventory = isShop && firstHero
+        ? (firstHero.inventory || []).filter(item => item.key && ITEM_CATALOG[item.key] && isSellable(item.key))
+        : [];
+
+    const handleBuy = (key) => {
+        if (!onBuy) return;
+        const result = onBuy(key);
+        if (result && result.ok) {
+            setTradeMessage({ text: `Bought ${ITEM_CATALOG[key]?.name || key} for ${buyPrice(key)} GP.`, kind: 'buy' });
+        } else {
+            setTradeMessage({ text: 'You cannot afford that.', kind: 'error' });
+        }
+    };
+
+    const handleSell = (key) => {
+        if (!onSell) return;
+        const result = onSell(key);
+        if (result && result.ok) {
+            setTradeMessage({ text: `Sold ${ITEM_CATALOG[key]?.name || key} for ${result.gold} GP.`, kind: 'sell' });
+        } else {
+            setTradeMessage({ text: 'That item cannot be sold here.', kind: 'error' });
+        }
+    };
     const partyNeedsHealing = party && party.some(h => h.currentHP < h.maxHP && !h.isDefeated);
     const defeatedHeroes = party ? party.filter(h => h.isDefeated || h.currentHP <= 0) : [];
     const totalGold = party ? party.reduce((sum, h) => sum + (h.gold || 0), 0) : 0;
@@ -705,6 +735,187 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                 <p style={{ margin: '6px 0 0 0', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                                     The ritual cost {resurrectionResult.goldCost} gold.
                                 </p>
+                            </div>
+                        )}
+
+                        {/* Wares Section - shops, markets, blacksmiths, alchemists */}
+                        {isShop && (onBuy || onSell) && (
+                            <div className="modal-section" style={{
+                                backgroundColor: 'rgba(0,0,0,0.03)',
+                                padding: '20px',
+                                borderRadius: '10px',
+                                border: '1px solid var(--border)',
+                                marginTop: '15px'
+                            }}>
+                                <div style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    borderBottom: '2px solid var(--primary)',
+                                    paddingBottom: '10px',
+                                    margin: '0 0 15px 0'
+                                }}>
+                                    <h4 style={{
+                                        margin: 0,
+                                        color: 'var(--primary)',
+                                        fontFamily: 'var(--header-font)'
+                                    }}>
+                                        Wares
+                                    </h4>
+                                    <span style={{
+                                        fontWeight: 'bold',
+                                        color: '#d4af37',
+                                        fontFamily: 'var(--body-font)'
+                                    }}>
+                                        Party Gold: {totalGold} GP
+                                    </span>
+                                </div>
+
+                                {tradeMessage && (
+                                    <div style={{
+                                        padding: '10px 12px',
+                                        marginBottom: '15px',
+                                        borderRadius: '8px',
+                                        fontFamily: 'var(--body-font)',
+                                        fontSize: '0.85rem',
+                                        backgroundColor: tradeMessage.kind === 'error'
+                                            ? 'rgba(200, 100, 50, 0.1)'
+                                            : 'rgba(39, 174, 96, 0.1)',
+                                        border: tradeMessage.kind === 'error'
+                                            ? '1px solid rgba(200, 100, 50, 0.3)'
+                                            : '1px solid rgba(39, 174, 96, 0.4)',
+                                        color: 'var(--text)'
+                                    }}>
+                                        {tradeMessage.text}
+                                    </div>
+                                )}
+
+                                {/* Buy list */}
+                                {onBuy && shopStock.length > 0 && (
+                                    <>
+                                        <h5 style={{
+                                            margin: '0 0 8px 0',
+                                            color: 'var(--text-secondary)',
+                                            fontFamily: 'var(--body-font)',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '1px',
+                                            fontSize: '0.75rem'
+                                        }}>
+                                            For Sale
+                                        </h5>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '15px' }}>
+                                            {shopStock.map(key => {
+                                                const item = ITEM_CATALOG[key];
+                                                if (!item) return null;
+                                                const price = buyPrice(key);
+                                                const affordable = canAfford(party, key);
+                                                return (
+                                                    <div key={`buy-${key}`} style={{
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        alignItems: 'center',
+                                                        padding: '8px 12px',
+                                                        background: 'rgba(0,0,0,0.03)',
+                                                        border: '1px solid var(--border)',
+                                                        borderRadius: '8px',
+                                                        fontFamily: 'var(--body-font)',
+                                                        fontSize: '0.9rem'
+                                                    }}>
+                                                        <span style={{ fontWeight: 'bold' }}>{item.name}</span>
+                                                        <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                            <span style={{ color: '#d4af37', fontWeight: 'bold', minWidth: '60px', textAlign: 'right' }}>
+                                                                {price} GP
+                                                            </span>
+                                                            <button
+                                                                className="primary-button"
+                                                                disabled={!affordable}
+                                                                onClick={() => handleBuy(key)}
+                                                                style={{
+                                                                    padding: '6px 14px',
+                                                                    fontWeight: 'bold',
+                                                                    cursor: affordable ? 'pointer' : 'not-allowed',
+                                                                    opacity: affordable ? 1 : 0.5
+                                                                }}
+                                                            >
+                                                                Buy
+                                                            </button>
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
+
+                                {/* Sell list */}
+                                {onSell && (
+                                    <>
+                                        <h5 style={{
+                                            margin: '0 0 8px 0',
+                                            color: 'var(--text-secondary)',
+                                            fontFamily: 'var(--body-font)',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: '1px',
+                                            fontSize: '0.75rem'
+                                        }}>
+                                            Sell Your Loot
+                                        </h5>
+                                        {sellableInventory.length > 0 ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                {sellableInventory.map(item => {
+                                                    const price = sellPrice(item.key);
+                                                    const qty = item.quantity || 1;
+                                                    return (
+                                                        <div key={`sell-${item.key}`} style={{
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center',
+                                                            padding: '8px 12px',
+                                                            background: 'rgba(0,0,0,0.03)',
+                                                            border: '1px solid var(--border)',
+                                                            borderRadius: '8px',
+                                                            fontFamily: 'var(--body-font)',
+                                                            fontSize: '0.9rem'
+                                                        }}>
+                                                            <span style={{ fontWeight: 'bold' }}>
+                                                                {item.name || ITEM_CATALOG[item.key]?.name || item.key}
+                                                                {qty > 1 && (
+                                                                    <span style={{ color: 'var(--text-secondary)', fontWeight: 'normal' }}> x{qty}</span>
+                                                                )}
+                                                            </span>
+                                                            <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                                <span style={{ color: '#d4af37', fontWeight: 'bold', minWidth: '60px', textAlign: 'right' }}>
+                                                                    {price} GP
+                                                                </span>
+                                                                <button
+                                                                    className="secondary-button"
+                                                                    onClick={() => handleSell(item.key)}
+                                                                    style={{
+                                                                        padding: '6px 14px',
+                                                                        fontWeight: 'bold',
+                                                                        cursor: 'pointer'
+                                                                    }}
+                                                                >
+                                                                    Sell
+                                                                </button>
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <p style={{
+                                                fontStyle: 'italic',
+                                                color: 'var(--text-secondary)',
+                                                fontFamily: 'var(--body-font)',
+                                                fontSize: '0.85rem',
+                                                margin: '4px 0 0 0'
+                                            }}>
+                                                You have nothing to sell.
+                                            </p>
+                                        )}
+                                    </>
+                                )}
                             </div>
                         )}
 

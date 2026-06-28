@@ -282,9 +282,11 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             };
             setConversation([...conversation, enterMessage]);
             setIsMapModalOpen(true);
-        } else if (['cave_entrance', 'cave', 'ruins'].includes(encounter.poiType)) {
-            // Wilderness site (cave / ruin). Seed-deterministic + cached by type+coords,
-            // mirroring towns. The world tile's biome themes the ruin's open ground.
+        } else if (['cave_entrance', 'cave', 'ruins', 'forest', 'hills', 'mountain'].includes(encounter.poiType)) {
+            // Wilderness site (cave / ruin / forest / hills / mountain). Seed-deterministic
+            // + cached by type+coords, mirroring towns. The world tile's biome themes the
+            // open-air ground (and the mountain's snow). Forest/hills/mountain are always
+            // explorable (not quest-gated) — only caves/ruins can be quest-gated elsewhere.
             const tile = encounter.tile;
             const poiType = encounter.poiType;
             const key = `${poiType}_${tile.x},${tile.y}`;
@@ -293,9 +295,13 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             if (!siteMap) {
                 const rawSeed = worldSeed ? (parseInt(worldSeed) + ((tile.x || 0) * 1000) + ((tile.y || 0) * 10000)) : Math.floor(Math.random() * 1000000);
                 const seed = Number.isFinite(rawSeed) ? rawSeed : Math.floor(Math.random() * 1000000);
-                const names = poiType === 'ruins'
-                    ? ['Ancient Ruins', 'The Fallen Hold', 'Crumbled Watchtower', 'Forgotten Stones', 'The Old Keep']
-                    : ['Cavern', 'Hollow Deep', 'The Undervault', 'Echo Hollow', 'Gloomcave'];
+                const SITE_NAMES = {
+                    ruins: ['Ancient Ruins', 'The Fallen Hold', 'Crumbled Watchtower', 'Forgotten Stones', 'The Old Keep'],
+                    forest: ['The Whispering Wood', 'Tanglewood', 'Elderpine Forest', 'The Shaded Grove', 'Mistwood'],
+                    hills: ['The Rolling Downs', 'Windswept Hills', 'The Green Barrows', 'Hawk Hills', 'Stonecrest Rise'],
+                    mountain: ['The Jagged Pass', 'Stonepeak', 'The Cragged Heights', 'Frostspire Pass', 'Granite Ridge'],
+                };
+                const names = SITE_NAMES[poiType] || ['Cavern', 'Hollow Deep', 'The Undervault', 'Echo Hollow', 'Gloomcave'];
                 const name = names[Math.abs(seed) % names.length];
                 siteMap = generateSiteMap(poiType, name, 'south', seed, { biome: tile.biome });
                 populateSite(siteMap, seed); // fill content slots with encounters + loot

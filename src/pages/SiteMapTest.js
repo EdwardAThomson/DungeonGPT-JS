@@ -5,11 +5,12 @@ import { tileBackground, SITE_POI } from '../utils/siteTileArt';
 import MapLegend from '../components/MapLegend';
 import { siteLegendGroups } from '../utils/mapLegend';
 
-// Debug harness for wilderness site sub-maps (caves, ruins). Preview the generated layout
-// before any in-game wiring. Content slots (reserved for encounters / loot / milestone
-// objectives in Phase 3) are marked with a diamond.
+// Debug harness for wilderness site sub-maps (caves, ruins, forests, hills, mountains).
+// Preview the generated layout + populated content. Content slots (reserved for encounters
+// / loot / milestone objectives) are marked with a diamond when not yet filled.
 
-const TYPES = ['cave', 'ruins'];
+const TYPES = ['cave', 'ruins', 'forest', 'hills', 'mountain'];
+const SITE_NAMES = { cave: 'Hollow Deep', ruins: 'Old Ruins', forest: 'Mistwood', hills: 'Windswept Hills', mountain: 'The Jagged Pass' };
 const DIRS = ['north', 'east', 'south', 'west'];
 const BIOMES = ['grassland', 'desert', 'snow'];
 const OBJECTIVES = ['none', 'item', 'combat', 'location'];
@@ -37,7 +38,7 @@ const SiteMapTest = () => {
   const [seed, setSeed] = useState(123);
 
   const site = useMemo(() => {
-    const s = populateSite(generateSiteMap(type, type === 'cave' ? 'Hollow Deep' : 'Old Ruins', dir, seed, { biome }), seed);
+    const s = populateSite(generateSiteMap(type, SITE_NAMES[type] || type, dir, seed, { biome }), seed);
     if (objective !== 'none') {
       injectSiteObjective(s, { objectiveType: objective, ...OBJ_SAMPLE[objective], milestoneId: 'demo' });
     }
@@ -55,11 +56,12 @@ const SiteMapTest = () => {
 
   return (
     <div>
-      <h2 style={{ marginTop: 0, fontFamily: 'var(--header-font)' }}>Site Map Test (caves / ruins)</h2>
+      <h2 style={{ marginTop: 0, fontFamily: 'var(--header-font)' }}>Site Map Test (caves / ruins / forests / hills / mountains)</h2>
       <p style={{ color: 'var(--text-muted,#888)', fontSize: 13 }}>
-        Generic rooms-and-corridors generator, themed per type (organic blobs for caves,
-        rectangular halls for ruins). ◆ marks a reserved content slot (encounter / loot /
-        milestone objective — populated in Phase 3). The lit archway is the exit.
+        Generic generator themed per type: organic carved passes for caves and mountains,
+        open-air clusters on biome ground for ruins, forests and hills. ◆ marks a reserved
+        content slot (encounter / loot / milestone objective). The exit is the lit archway
+        (enclosed sites) or worn dirt path (open-air sites).
       </p>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 20, marginBottom: 14, alignItems: 'flex-start' }}>
@@ -72,7 +74,7 @@ const SiteMapTest = () => {
           <div style={{ display: 'flex', gap: 6 }}>{DIRS.map((d) => <button key={d} style={btn(dir === d)} onClick={() => setDir(d)}>{d}</button>)}</div>
         </div>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted,#888)', marginBottom: 6 }}>Biome (ruins ground)</div>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted,#888)', marginBottom: 6 }}>Biome (open-air ground / mtn snow)</div>
           <div style={{ display: 'flex', gap: 6 }}>{BIOMES.map((b) => <button key={b} style={btn(biome === b)} onClick={() => setBiome(b)} disabled={type === 'cave'}>{b}</button>)}</div>
         </div>
         <div>

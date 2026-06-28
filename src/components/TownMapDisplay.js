@@ -22,7 +22,7 @@ const TILE = 34; // bigger than the original 30 but small enough that a 20x20 to
  * @param {string} townError - Error message to display in town map
  * @param {Function} markBuildingDiscovered - Callback to mark a building as seen
  */
-const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError, markBuildingDiscovered, onQuestItemFound, onRest, onResurrect, party, sideQuests, onAcceptSideQuest, onTurnInQuest }) => {
+const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError, markBuildingDiscovered, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, sideQuests, onAcceptSideQuest, onTurnInQuest }) => {
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [distanceWarning, setDistanceWarning] = useState(false);
 
@@ -188,6 +188,8 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           onQuestItemFound={onQuestItemFound}
           onRest={onRest}
           onResurrect={onResurrect}
+          onBuy={onBuy}
+          onSell={onSell}
           party={party}
           sideQuests={sideQuests}
           onAcceptSideQuest={onAcceptSideQuest}

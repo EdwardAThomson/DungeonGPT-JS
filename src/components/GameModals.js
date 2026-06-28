@@ -55,6 +55,8 @@ const GameModals = ({
   onQuestItemFound,
   onRest,
   onResurrect,
+  onBuy,
+  onSell,
   party,
   sideQuests,
   onAcceptSideQuest,
@@ -147,6 +149,8 @@ const GameModals = ({
         onAcceptSideQuest={onAcceptSideQuest}
         onTurnInQuest={onTurnInQuest}
         onResurrect={onResurrect}
+        onBuy={onBuy}
+        onSell={onSell}
         party={party}
         siteMapData={mapHook.currentSiteMap}
         sitePlayerPosition={mapHook.sitePlayerPosition}

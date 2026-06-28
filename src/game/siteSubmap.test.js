@@ -37,13 +37,15 @@ describe('site sub-map persistence + entry wiring', () => {
     expect(a).not.toBe(b);
   });
 
-  test('caves and ruins are now enterable from the world map', () => {
+  test('caves, ruins, forests, hills and mountains are enterable from the world map', () => {
     expect(buildPoiEncounter({ poi: 'cave_entrance' }).canEnter).toBe(true);
     expect(buildPoiEncounter({ poi: 'ruins' }).canEnter).toBe(true);
     // and get a friendly label, not the raw poi key
     expect(buildPoiEncounter({ poi: 'cave_entrance' }).name).toBe('a Cave');
     expect(buildPoiEncounter({ poi: 'ruins' }).name).toBe('Ruins');
-    // a plain forest tile is still not enterable
-    expect(buildPoiEncounter({ poi: 'forest' }).canEnter).toBe(false);
+    // forest / hills / mountain are now explorable POI sites too (always, not quest-gated)
+    expect(buildPoiEncounter({ poi: 'forest' }).canEnter).toBe(true);
+    expect(buildPoiEncounter({ poi: 'hills' }).canEnter).toBe(true);
+    expect(buildPoiEncounter({ poi: 'mountain' }).canEnter).toBe(true);
   });
 });
