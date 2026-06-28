@@ -24,7 +24,15 @@ YouTube Videos 🎥:
 *   **World Map:** Explore a procedurally generated world map with biomes, towns, and points of interest.
 *   **Encounter System:** Dynamic encounters with skill checks, rewards, and AI-narrated outcomes.
 *   **Inventory & Progression:** Track party inventory, gold, HP, and XP progression.
-*   **AI Models:** Currently runs on Cloudflare Workers AI (GPT-OSS, Llama, Gemma, and other open-weights models). Local development additionally supports OpenAI, Gemini, and Claude. Premium models via OpenRouter are planned.
+*   **Equipment:** Equip weapons, armour, and accessories that affect combat (attack, damage soak, all-round bonuses).
+*   **Shops & Economy:** Buy and sell at blacksmiths, markets, alchemists, and general stores so gold has a purpose.
+*   **Explorable Sites:** Enter caves, ruins, forests, hills, and mountains as procedurally generated sub-maps with encounters and loot.
+*   **Quests & Campaigns:** A deterministic campaign-milestone engine (mechanical and AI-judged narrative milestones) plus a pool of discoverable side-quests.
+*   **Towns:** Procedurally generated town maps with road-aware gates, lakefront/coastline water, and a civic layout (town square, keep, varied buildings).
+*   **Conversation Memory (RAG):** The AI recalls earlier story beats via on-device retrieval over embedded history.
+*   **Guest / Local-First Play:** Try the game without an account; heroes and saves live in the browser and sync to the cloud on sign-in.
+*   **Onboarding:** A guided tour and a 27-point-buy hero creator.
+*   **AI Models:** Runs on Cloudflare Workers AI with a curated 5-model lineup (GPT-OSS 120B/20B, Llama 4 Scout, Gemma 3 12B, Llama 3.1 8B Fast). Local development additionally supports OpenAI, Gemini, and Claude. Premium models via OpenRouter are planned.
 *   **User Authentication:** Secure sign-in via Octonion hub (centralized auth across games).
 *   **Persistent Sessions:** Characters and game sessions saved to Supabase PostgreSQL, accessed through CF Worker with row-level access enforcement.
 *   **Save/Load System:** Manual and auto-save functionality with save confirmation modals.
@@ -65,11 +73,19 @@ cf-worker/           # Cloudflare Workers backend (production)
 
 The following image shows the character creator interface of DungeonGPT:
 
-![Character Creation](./public/assets/screenshots/character_creator_updated.png)
+![Character Creation](./public/assets/screenshots/character_creator_updated.webp)
 
 The following image shows the chat interface of DungeonGPT:
 
-![Chat Interface](./public/assets/screenshots/chat_interface.png)
+![Chat Interface](./public/assets/screenshots/chat_interface.webp)
+
+Setting up an adventure, a combat encounter, and the saved-games screen:
+
+![Adventure Creator](./public/assets/screenshots/adventure_creator.webp)
+
+![Bandit Encounter](./public/assets/screenshots/bandit_encounter_modal.webp)
+
+![Saved Games](./public/assets/screenshots/saved_games.webp)
 
 
 ## Setup and Installation
@@ -131,6 +147,22 @@ This is a guide for deploying the app locally.
 
     *   This will open the application at `http://localhost:3000`
 
+6.  **Run the tests (optional):**
+
+    ```bash
+    npm test                 # Jest unit tests (watch mode)
+    npm run test:e2e         # Playwright end-to-end tests
+    ```
+
+7.  **Work on the Cloudflare Worker (optional):**
+
+    *   The production backend lives in `cf-worker/`. To run it locally or deploy:
+
+    ```bash
+    cd cf-worker && npx wrangler dev   # local worker on :8787
+    npm run deploy                     # build + deploy (run from repo root)
+    ```
+
 ### Production Deployment
 
 The app is deployed on:
@@ -166,6 +198,14 @@ For deployment instructions, see the deployment guides in `/docs`.
 *   ✅ **Feature-Based CSS** — Modular styling for maintainability
 *   ✅ **Procedural World Map** — Biomes, towns, mountains with exploration
 *   ✅ **Dynamic Encounters** — Skill checks, rewards, AI narration
+*   ✅ **Equipment & Items** — Equip gear that affects combat; expanded item catalogue
+*   ✅ **Shops & Economy** — Buy/sell at town merchants
+*   ✅ **Explorable Sites** — Caves, ruins, forests, hills, mountains as sub-maps with loot
+*   ✅ **Side-Quests** — Discoverable quests with givers, turn-ins, and rewards
+*   ✅ **Narrative Milestones** — AI-judged campaign quest outcomes
+*   ✅ **Conversation Memory (RAG)** — AI recalls earlier story via embedded history
+*   ✅ **Guest Mode** — Local-first play without an account, cloud sync on sign-in
+*   ✅ **Guided Onboarding** — Interactive tour + reworked hero creator
 *   ✅ **Town Discovery System** — Buildings discovered and remembered across sessions
 *   ✅ **How to Play Page** — Comprehensive guide for new players
 *   ✅ **E2E Testing** — Playwright tests for critical user flows
@@ -178,9 +218,9 @@ For deployment instructions, see the deployment guides in `/docs`.
 *   📈 **Monitoring** — Error tracking and performance metrics
 *   🎬 **Streaming AI Responses** — Real-time text generation for better UX
 *   🧪 **Expanded Testing** — Unit and integration tests for core game loops
-*   🗺️ **Dungeon Sub-Maps** — Procedurally generated caves and dungeons
-*   ⚔️ **Combat System** — Turn-based tactical combat encounters
-*   🎭 **NPC Interactions** — Persistent NPCs with memory and relationships
+*   🛠️ **Crafting & Alchemy** — Turn gathered materials into gear and potions (planned)
+*   ⚔️ **Tactical / Team Combat** — Turn-based, full-party combat (basic d20 encounter combat already ships)
+*   🎭 **Persistent NPCs** — NPCs with lasting memory and relationships (town NPC interactions already ship)
 
 ## License & Attribution
 

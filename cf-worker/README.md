@@ -5,7 +5,7 @@ This is the CloudFlare Workers backend for DungeonGPT, providing AI text generat
 ## Setup
 
 ```bash
-cd workers/backend
+cd cf-worker
 npm install
 ```
 
@@ -50,11 +50,15 @@ npm run deploy
 
 ## Available Models
 
+Source of truth: `cf-worker/src/services/models.ts` (`MODEL_REGISTRY`).
+
 | Model ID | Name | Tier | Max Tokens |
 |----------|------|------|------------|
-| `@cf/meta/llama-3.1-8b-instruct-fast` | Llama 3.1 8B Fast | fast | 2048 |
-| `@cf/google/gemma-3-12b-it` | Gemma 3 12B | balanced | 4096 |
-| `@cf/meta/llama-3.3-70b-instruct-fp8-fast` | Llama 3.3 70B | quality | 4096 |
+| `@cf/openai/gpt-oss-120b` (default) | GPT-OSS 120B | ultra | 4096 |
+| `@cf/openai/gpt-oss-20b` | GPT-OSS 20B | quality | 4096 |
+| `@cf/meta/llama-4-scout-17b-16e-instruct` | Llama 4 Scout 17B | quality | 4096 |
+| `@cf/google/gemma-3-12b-it` | Gemma 3 12B | quality | 4096 |
+| `@cf/meta/llama-3.1-8b-instruct-fast` | Llama 3.1 8B Fast | balanced | 2048 |
 
 ## API Reference
 
