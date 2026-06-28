@@ -43,13 +43,13 @@ export const INITIAL_STATS = {
 // priority abilities, so every template costs exactly POINT_BUY_BUDGET (27).
 export const heroTemplates = {
   Barbarian: {
-    race: "Half-Orc",
+    race: "Human",
     stats: { Strength: 15, Dexterity: 13, Constitution: 14, Intelligence: 8, Wisdom: 12, Charisma: 10 },
     alignment: "Chaotic Neutral",
     backgroundSnippet: "Hails from a remote tribe, fiercely protective and quick to anger.",
   },
   Bard: {
-    race: "Half-Elf",
+    race: "Human",
     stats: { Strength: 8, Dexterity: 14, Constitution: 13, Intelligence: 10, Wisdom: 12, Charisma: 15 },
     alignment: "Chaotic Good",
     backgroundSnippet: "A charismatic wanderer who collects stories and inspires others.",
@@ -61,13 +61,13 @@ export const heroTemplates = {
     backgroundSnippet: "Devoted servant of a deity, provides healing and guidance.",
   },
   Druid: {
-    race: "Elf",
+    race: "Human",
     stats: { Strength: 8, Dexterity: 13, Constitution: 14, Intelligence: 12, Wisdom: 15, Charisma: 10 },
     alignment: "True Neutral",
     backgroundSnippet: "Guardian of the wilds, draws power from nature itself.",
   },
   Fighter: {
-    race: "Dwarf",
+    race: "Human",
     stats: { Strength: 15, Dexterity: 13, Constitution: 14, Intelligence: 8, Wisdom: 12, Charisma: 10 },
     alignment: "Lawful Neutral",
     backgroundSnippet: "A disciplined warrior, master of arms and tactics.",
@@ -79,37 +79,37 @@ export const heroTemplates = {
     backgroundSnippet: "A practitioner of ancient martial arts, seeks inner harmony.",
   },
   Paladin: {
-    race: "Dragonkin",
+    race: "Human",
     stats: { Strength: 15, Dexterity: 10, Constitution: 13, Intelligence: 8, Wisdom: 12, Charisma: 14 },
     alignment: "Lawful Good",
     backgroundSnippet: "A holy warrior bound by an oath to uphold justice and righteousness.",
   },
   Ranger: {
-    race: "Elf",
+    race: "Human",
     stats: { Strength: 12, Dexterity: 15, Constitution: 13, Intelligence: 10, Wisdom: 14, Charisma: 8 },
     alignment: "Neutral Good",
     backgroundSnippet: "A skilled hunter and tracker, comfortable in the wilderness.",
   },
   Rogue: {
-    race: "Smallfolk",
+    race: "Human",
     stats: { Strength: 8, Dexterity: 15, Constitution: 14, Intelligence: 12, Wisdom: 10, Charisma: 13 },
     alignment: "Chaotic Neutral",
     backgroundSnippet: "Operates in the shadows, relies on stealth and cunning.",
   },
   Sorcerer: {
-    race: "Demonkin",
+    race: "Human",
     stats: { Strength: 8, Dexterity: 13, Constitution: 14, Intelligence: 12, Wisdom: 10, Charisma: 15 },
     alignment: "Chaotic Good",
     backgroundSnippet: "Wields innate magical power derived from an arcane bloodline.",
   },
   Warlock: {
-    race: "Demonkin",
+    race: "Human",
     stats: { Strength: 8, Dexterity: 13, Constitution: 14, Intelligence: 10, Wisdom: 12, Charisma: 15 },
     alignment: "Chaotic Neutral",
     backgroundSnippet: "Gained magical abilities through a pact with an otherworldly patron.",
   },
   Wizard: {
-    race: "Gnome",
+    race: "Human",
     stats: { Strength: 8, Dexterity: 13, Constitution: 14, Intelligence: 15, Wisdom: 12, Charisma: 10 },
     alignment: "Lawful Neutral",
     backgroundSnippet: "A dedicated scholar of the arcane arts, seeks knowledge and power.",

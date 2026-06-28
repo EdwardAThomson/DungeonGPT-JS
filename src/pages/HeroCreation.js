@@ -12,7 +12,6 @@ import PortraitPickerModal from "../components/PortraitPickerModal";
 import {
   heroGenders,
   heroClasses,
-  heroRaces,
   alignmentOptions,
   STAT_KEYS,
   INITIAL_STATS,
@@ -47,7 +46,9 @@ const HeroCreation = () => {
   const [heroName, setHeroName] = useState(heroToEdit?.heroName || "");
   const [selectedGender, setSelectedGender] = useState(heroToEdit?.heroGender || "");
   const [selectedProfilePicture, setSelectedProfilePicture] = useState(heroToEdit?.profilePicture || null);
-  const [selectedRace, setSelectedRace] = useState(heroToEdit?.heroRace || "");
+  // Race selector is hidden (human-only portraits); new heroes default to Human. Legacy
+  // heroes keep their saved race. setSelectedRace is still driven by the class template.
+  const [selectedRace, setSelectedRace] = useState(heroToEdit?.heroRace || "Human");
   const [selectedClass, setSelectedClass] = useState(heroToEdit?.heroClass || "");
   const [stats, setStats] = useState(heroToEdit?.stats || INITIAL_STATS);
   const [heroBackground, setHeroBackground] = useState(heroToEdit?.heroBackground || "");
@@ -79,7 +80,6 @@ const HeroCreation = () => {
     }
   };
 
-  const handleRaceChange = (e) => setSelectedRace(e.target.value);
   const handleClassChange = (e) => setSelectedClass(e.target.value);
   const handleAlignmentChange = (e) => setAlignment(e.target.value);
   const handleNameChange = (e) => setHeroName(e.target.value);
@@ -267,18 +267,11 @@ const HeroCreation = () => {
             </div>
           </div>
 
-          {/* Details Row (Race, Class, Level, Alignment) */}
+          {/* Details Row (Class, Level, Alignment) */}
+          {/* Race selector is hidden for now — we only have human portraits, so every hero is
+              created as Human. The heroRace field is kept on the data model (legacy saves keep
+              their race; restore this <select> to re-enable choosing a race). */}
           <div className="form-row">
-            {/* Race */}
-            <div className="form-item">
-              <label htmlFor="race">Race:</label>
-              <select id="race" value={selectedRace} onChange={handleRaceChange} required>
-                <option value="">Select Race</option>
-                {heroRaces.map((race) => (
-                  <option key={race} value={race}>{race}</option>
-                ))}
-              </select>
-            </div>
             {/* Class */}
             <div className="form-item">
               <label htmlFor="class">Class:</label>

@@ -9,7 +9,7 @@ const getAbilityModifier = (score) => Math.floor(((score || 10) - 10) / 2);
 
 const RESIDENTIAL_TYPES = ['house', 'manor', 'keep'];
 const REST_BUILDING_TYPES = ['inn', 'tavern'];
-const SHOP_BUILDING_TYPES = ['shop', 'market', 'blacksmith', 'alchemist'];
+const SHOP_BUILDING_TYPES = ['shop', 'market', 'blacksmith', 'alchemist', 'apothecary'];
 
 const familyRoleLabel = (npc) => {
     if (npc.familyRole === 'head') return 'Head of Household';
