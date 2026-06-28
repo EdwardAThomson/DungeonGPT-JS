@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ITEM_CATALOG, rollDice, removeItem } from '../utils/inventorySystem';
 import { applyHealing, getHPStatus } from '../utils/healthSystem';
+import { heroUid } from '../utils/partyUtils';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
 
@@ -12,7 +13,7 @@ const PartyInventoryModal = () => {
   const [useItemState, setUseItemState] = useState(null); // { itemKey } — hero picker
   const [useResults, setUseResults] = useState([]); // [{ heroName, itemName, rolled, healed, id }]
   const [usedItems, setUsedItems] = useState({}); // { itemKey: count } — local consumption tracker
-  const [hpAdjustments, setHpAdjustments] = useState({}); // { characterId: healedAmount }
+  const [hpAdjustments, setHpAdjustments] = useState({}); // { heroUid: healedAmount }
   const resultTimers = useRef([]);
 
   // Clear results and state when modal closes
@@ -62,7 +63,7 @@ const PartyInventoryModal = () => {
   const isHealingItem = (item) => item.effect === 'heal' && item.amount;
   const injuredHeroes = selectedHeroes
     .map(h => {
-      const adj = hpAdjustments[h.characterId] || 0;
+      const adj = hpAdjustments[heroUid(h)] || 0;
       return adj ? { ...h, currentHP: Math.min(h.maxHP, h.currentHP + adj) } : h;
     })
     .filter(h => h.currentHP < h.maxHP && !h.isDefeated);
@@ -89,16 +90,16 @@ const PartyInventoryModal = () => {
     const updatedOwner = { ...owner, inventory: updatedInventory };
 
     // If owner is the same as target, merge both changes
-    const finalHero = owner.characterId === target.characterId
+    const finalHero = heroUid(owner) === heroUid(target)
       ? { ...healed, inventory: updatedInventory }
       : healed;
 
     // Update the target hero (healed)
     if (onUseItem) {
-      onUseItem(target.characterId, itemKey, finalHero);
+      onUseItem(heroUid(target), itemKey, finalHero);
       // If owner is different from target, also update the owner's inventory
-      if (owner.characterId !== target.characterId) {
-        onUseItem(owner.characterId, itemKey, updatedOwner);
+      if (heroUid(owner) !== heroUid(target)) {
+        onUseItem(heroUid(owner), itemKey, updatedOwner);
       }
     }
 
@@ -106,7 +107,7 @@ const PartyInventoryModal = () => {
     setUsedItems(prev => ({ ...prev, [itemKey]: (prev[itemKey] || 0) + 1 }));
     setHpAdjustments(prev => ({
       ...prev,
-      [target.characterId]: (prev[target.characterId] || 0) + actualHeal
+      [heroUid(target)]: (prev[heroUid(target)] || 0) + actualHeal
     }));
 
     const resultId = Date.now();
@@ -363,10 +364,10 @@ const PartyInventoryModal = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {injuredHeroes.map((hero) => {
                 const hpStatus = getHPStatus(hero.currentHP, hero.maxHP);
-                const heroIndex = selectedHeroes.findIndex(h => h.characterId === hero.characterId);
+                const heroIndex = selectedHeroes.findIndex(h => heroUid(h) === heroUid(hero));
                 return (
                   <button
-                    key={hero.characterId}
+                    key={heroUid(hero)}
                     onClick={() => handleUsePotion(heroIndex)}
                     style={{
                       display: 'flex',

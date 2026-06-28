@@ -25,6 +25,7 @@ Source audits: roadmap survey (2026-04-19), auth verification (2026-04-19), docs
 | 5 | **Layered terrain generation.** Noise-based heightmaps with biome quantiser, rivers, erosion. Prototype at `src/experimental/mapGen/layeredGenerator.js` exists but not wired to production. | [TERRAIN_ROADMAP.md](TERRAIN_ROADMAP.md) | L | |
 | 6 | **Billing + usage accounting.** No credit ledger, no `ai_usage_events` table, no Lemon Squeezy (or alternative) integration. AI generation ungated beyond auth. | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) §5 | L | |
 | 7 | **OpenRouter premium tier.** Planned in README; not wired into `cf-worker/src/routes/ai.ts`. Depends on #6 (billing) for tier gating. | [CF_WORKER_GUIDE.md](CF_WORKER_GUIDE.md), [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) | M-L | |
+| 30 | **Admin dashboard — read/inspect the Supabase database.** *(Flagged HIGH PRIORITY.)* No way today to view player saves / heroes / conversations for support or debugging. Triggered by a player who lost a hero to the duplicate-hero bug and asked whether their character still exists in the DB — which we cannot currently confirm. Needs a read view over conversations/saves (auth-gated to an admin), at minimum read-only. | Session 2026-06-28 | M-L | Soon | 
 
 ---
 

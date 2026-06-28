@@ -24,7 +24,7 @@ const PartySidebar = ({ selectedHeroes = [], onOpenCharacter, className = '' }) 
           const level = hero.heroLevel || hero.characterLevel || 1;
           const race = hero.heroRace || hero.characterRace || '';
           const charClass = hero.heroClass || hero.characterClass || '';
-          const id = hero.heroId || hero.characterId || name;
+          const id = hero.heroId || name;
 
           const defeated = hero.currentHP === 0 || hero.isDefeated;
 

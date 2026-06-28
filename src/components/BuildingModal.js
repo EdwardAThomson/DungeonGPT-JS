@@ -544,7 +544,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                     <div style={{ marginBottom: '15px' }}>
                                         {party.filter(h => !h.isDefeated).map(hero => {
                                             const name = hero.heroName || hero.characterName || 'Unknown';
-                                            const id = hero.heroId || hero.characterId || name;
+                                            const id = hero.heroId || name;
                                             const hpStatus = getHPStatus(hero.currentHP, hero.maxHP);
                                             const pct = (hero.currentHP / hero.maxHP) * 100;
                                             return (
@@ -685,7 +685,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     {defeatedHeroes.map(hero => {
                                         const name = hero.heroName || hero.characterName || 'Unknown';
-                                        const id = hero.heroId || hero.characterId || name;
+                                        const id = hero.heroId || name;
                                         const level = hero.level || hero.heroLevel || hero.characterLevel || 1;
                                         const cost = RESURRECTION_COST_PER_LEVEL * level;
                                         const canAfford = totalGold >= cost;
@@ -694,7 +694,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                                 key={id}
                                                 disabled={!canAfford}
                                                 onClick={() => {
-                                                    const result = onResurrect(hero.characterId || hero.heroId, cost);
+                                                    const result = onResurrect(id, cost);
                                                     if (result) setResurrectionResult(result);
                                                 }}
                                                 style={{

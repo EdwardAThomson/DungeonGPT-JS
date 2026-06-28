@@ -17,6 +17,7 @@ import GameModals from '../components/GameModals';
 import ModalShell from '../components/ModalShell';
 import { calculateMaxHP, shortRest, longRest } from '../utils/healthSystem';
 import { addGold, addItem, ITEM_CATALOG } from '../utils/inventorySystem';
+import { replaceHeroInParty, normalizeParty, heroUid } from '../utils/partyUtils';
 import { composeMovementNarrativePrompt } from '../game/promptComposer';
 import { composeLocalMovementNarrative, composeLocalAmbientNarrative } from '../game/localNarrator';
 import { generateMovementNarrative } from '../game/movementController';
@@ -84,8 +85,9 @@ const Game = () => {
   const { state } = useLocation();
   const { selectedHeroes: stateHeroes, loadedConversation, worldSeed: stateSeed, gameSessionId: stateGameSessionId, generatedMap: stateGeneratedMap, townMapsCache: stateTownMapsCache } = state || { selectedHeroes: [], loadedConversation: null, worldSeed: null, gameSessionId: null, generatedMap: null, townMapsCache: null };
   const [selectedHeroes, setSelectedHeroes] = useState(() => {
-    // Initialize heroes with progression fields if missing
-    const heroes = loadedConversation?.selected_heroes || stateHeroes || [];
+    // Normalize first (de-dupe + migrate legacy characterId -> heroId), then backfill
+    // progression fields. normalizeParty repairs saves corrupted by the old hero-overwrite bug.
+    const heroes = normalizeParty(loadedConversation?.selected_heroes || stateHeroes || []);
     return heroes.map(hero => {
       if (hero.xp === undefined) {
         // Use healthSystem's calculateMaxHP for consistency
@@ -231,9 +233,9 @@ const Game = () => {
 
   // --- Hero HP Update Handler ---
   const handleHeroUpdate = (updatedHero) => {
-    setSelectedHeroes(prev => prev.map(h =>
-      h.characterId === updatedHero.characterId ? updatedHero : h
-    ));
+    // Match on heroId||characterId (never on a missing id) so a single-hero combat update
+    // replaces exactly that hero, not the whole party. See partyUtils for the bug history.
+    setSelectedHeroes(prev => replaceHeroInParty(prev, updatedHero));
   };
 
   // --- Milestone Engine: deterministic completion check ---
@@ -887,9 +889,7 @@ const Game = () => {
           onOpenInventory={() => openInventory({
             selectedHeroes,
             onUseItem: (heroId, itemKey, healedHero) => {
-              setSelectedHeroes(prev => prev.map(h =>
-                h.characterId === heroId ? healedHero : h
-              ));
+              setSelectedHeroes(prev => replaceHeroInParty(prev, healedHero));
             }
           })}
           onOpenHowToPlay={openHowToPlay}
@@ -1003,13 +1003,12 @@ const Game = () => {
 
           // Resurrect the hero at 50% HP
           const updatedHeroes = afterGold.map(h => {
-            const id = h.characterId || h.heroId;
-            if (id !== heroId) return h;
+            if (heroUid(h) !== heroId) return h;
             const halfHP = Math.max(1, Math.floor(h.maxHP * 0.5));
             return { ...h, currentHP: halfHP, isDefeated: false };
           });
 
-          const hero = updatedHeroes.find(h => (h.characterId || h.heroId) === heroId);
+          const hero = updatedHeroes.find(h => heroUid(h) === heroId);
           setSelectedHeroes(updatedHeroes);
           return {
             heroName: hero.heroName || hero.characterName || 'Unknown',
