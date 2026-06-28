@@ -308,19 +308,49 @@ const Game = () => {
     setTimeout(() => performSave(), 500);
   };
 
+  // Grant a milestone quest item found in a site, then fire the completion event. Quest
+  // items aren't always in ITEM_CATALOG, so fall back to a minimal quest_item entry.
+  const grantObjectiveItem = (item) => {
+    if (!item) return;
+    setSelectedHeroes(prev => {
+      if (!prev || prev.length === 0) return prev;
+      const heroes = [...prev];
+      const hero = { ...heroes[0] };
+      if (ITEM_CATALOG[item.id]) {
+        hero.inventory = addItem(hero.inventory || [], item.id, 1);
+      } else {
+        hero.inventory = [...(hero.inventory || []), { key: item.id, name: item.name, type: 'quest_item', quantity: 1, rarity: 'rare', value: 0 }];
+      }
+      heroes[0] = hero;
+      return heroes;
+    });
+    interactionHook.setConversation(prev => [...prev, { role: 'system', content: `❗ You recover ${item.name}.` }]);
+    checkMilestoneEvent({ type: 'item_acquired', itemId: item.id }, selectedHeroes);
+    setTimeout(() => performSave(), 500);
+  };
+
   const handleSiteTileClick = (clickedX, clickedY) => {
     const movedTile = mapHook.handleSiteTileClick(clickedX, clickedY);
     if (!movedTile) return; // move rejected (blocked / too far)
 
     // Fixed room set-piece takes priority over wandering rolls.
     if (movedTile.content && !movedTile.content.consumed) {
+      const c = movedTile.content;
       mapHook.markSiteContentConsumed(clickedX, clickedY);
-      if (movedTile.content.kind === 'encounter') {
+      if (c.kind === 'encounter' || (c.kind === 'objective' && c.objectiveType === 'combat')) {
+        // a normal mob or a milestone boss — both run through the combat flow; a boss
+        // carries enemyId so its defeat completes the milestone in handleEncounterResolve.
         mapHook.setIsMapModalOpen(false);
         reopenMapAfterEncounterRef.current = true;
-        openEncounterAction({ encounter: movedTile.content.encounter });
-      } else if (movedTile.content.kind === 'loot') {
-        grantSiteLoot(movedTile.content.loot);
+        openEncounterAction({ encounter: c.encounter });
+      } else if (c.kind === 'loot') {
+        grantSiteLoot(c.loot);
+      } else if (c.kind === 'objective' && c.objectiveType === 'item') {
+        grantObjectiveItem(c.item);
+      } else if (c.kind === 'objective' && c.objectiveType === 'location') {
+        interactionHook.setConversation(prev => [...prev, { role: 'system', content: `❗ You reach ${c.name}.` }]);
+        checkMilestoneEvent({ type: 'location_visited', locationId: c.locationId }, selectedHeroes);
+        setTimeout(() => performSave(), 500);
       }
       return;
     }

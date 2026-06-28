@@ -100,4 +100,59 @@ export function populateSite(site, seed) {
   return site;
 }
 
+// Build a milestone-boss encounter for a site objective, based on the type's combat pool
+// (so the encounter shape is valid) but flagged so completion fires on defeat.
+function makeBossEncounter(objective, type) {
+  const pool = combatPool(type);
+  const base = pool.length ? clone(pool[Math.floor(pool.length / 2)]) : {
+    icon: '👹',
+    image: '/assets/encounters/cave_entrance.webp',
+    suggestedActions: [{ label: 'Attack', skill: 'Athletics', description: 'Strike the foe down' }],
+    consequences: { criticalSuccess: '', success: '', failure: '', criticalFailure: '' },
+  };
+  return {
+    ...base,
+    name: objective.name,
+    enemyId: objective.id,           // -> enemy_defeated event on victory completes the milestone
+    isMilestoneBoss: true,
+    encounterTier: 'immediate',
+    poiType: type,
+    difficulty: 'hard',
+    multiRound: true,
+    description: objective.description || `${objective.name} stands between you and your goal.`,
+    rewards: { xp: 150, gold: '4d12', items: (base.rewards && base.rewards.items) || [] },
+  };
+}
+
+/**
+ * Place a campaign milestone objective into a site, on the deepest room (the climax),
+ * overriding whatever populateSite put there. Mirrors injectQuestBuildings for towns.
+ * @param {Object} site - a generated (ideally populated) site.
+ * @param {Object} objective - { objectiveType:'item'|'combat'|'location', id, name,
+ *   milestoneId, description? }. `id` is the milestone trigger id (itemId/enemyId/locationId).
+ * @returns {Object} the same site with the objective tile set + site.objective recorded.
+ */
+export function injectSiteObjective(site, objective) {
+  if (!site || !objective || !Array.isArray(site.contentSlots) || site.contentSlots.length === 0) return site;
+  const type = site.type === 'ruins' ? 'ruins' : 'cave';
+  const entry = site.entryPoint || { x: 0, y: 0 };
+  const dist = (p) => Math.abs(p.x - entry.x) + Math.abs(p.y - entry.y);
+  const slot = site.contentSlots.reduce((a, b) => (dist(b) > dist(a) ? b : a));
+  const tile = site.mapData[slot.y] && site.mapData[slot.y][slot.x];
+  if (!tile) return site;
+
+  const objectiveType = objective.objectiveType;
+  const common = { kind: 'objective', objectiveType, milestoneId: objective.milestoneId, consumed: false };
+  if (objectiveType === 'combat') {
+    tile.content = { ...common, encounter: makeBossEncounter(objective, type) };
+  } else if (objectiveType === 'item') {
+    tile.content = { ...common, item: { id: objective.id, name: objective.name } };
+  } else { // 'location' — reaching this room completes the milestone
+    tile.content = { ...common, locationId: objective.id, name: objective.name };
+  }
+  site.objective = { x: slot.x, y: slot.y, ...objective };
+  logger.info(`[SITE] Injected ${objectiveType} objective "${objective.name}" into "${site.name}"`);
+  return site;
+}
+
 export default populateSite;

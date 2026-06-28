@@ -1,4 +1,4 @@
-import { populateSite } from './sitePopulator';
+import { populateSite, injectSiteObjective } from './sitePopulator';
 import { generateSiteMap } from '../utils/siteMapGenerator';
 import { ITEM_CATALOG } from '../utils/inventorySystem';
 
@@ -46,6 +46,41 @@ describe('populateSite', () => {
     const dist = (p) => Math.abs(p.x - entry.x) + Math.abs(p.y - entry.y);
     const deepest = site.contentSlots.reduce((a, b) => (dist(b) > dist(a) ? b : a));
     expect(site.mapData[deepest.y][deepest.x].content.kind).toBe('loot');
+  });
+
+  describe('injectSiteObjective', () => {
+    const deepestTile = (site) => {
+      const entry = site.entryPoint;
+      const dist = (p) => Math.abs(p.x - entry.x) + Math.abs(p.y - entry.y);
+      const slot = site.contentSlots.reduce((a, b) => (dist(b) > dist(a) ? b : a));
+      return site.mapData[slot.y][slot.x];
+    };
+
+    test('item objective lands on the deepest room with the milestone id', () => {
+      const site = injectSiteObjective(make('cave', 3), { objectiveType: 'item', id: 'control_rod', name: 'the Control Rod', milestoneId: 'm1' });
+      const tile = deepestTile(site);
+      expect(tile.content.kind).toBe('objective');
+      expect(tile.content.objectiveType).toBe('item');
+      expect(tile.content.item.id).toBe('control_rod');
+      expect(site.objective.milestoneId).toBe('m1');
+    });
+
+    test('combat objective is a milestone boss carrying enemyId (so defeat completes it)', () => {
+      const site = injectSiteObjective(make('ruins', 4), { objectiveType: 'combat', id: 'cave_tyrant', name: 'the Cave Tyrant', milestoneId: 'm2' });
+      const tile = deepestTile(site);
+      expect(tile.content.objectiveType).toBe('combat');
+      expect(tile.content.encounter.enemyId).toBe('cave_tyrant');
+      expect(tile.content.encounter.isMilestoneBoss).toBe(true);
+      expect(tile.content.encounter.name).toBe('the Cave Tyrant');
+      expect(tile.content.encounter.suggestedActions.length).toBeGreaterThan(0); // valid encounter shape
+    });
+
+    test('location objective records the locationId for the reach-room trigger', () => {
+      const site = injectSiteObjective(make('cave', 5), { objectiveType: 'location', id: 'inner_sanctum', name: 'the Inner Sanctum', milestoneId: 'm3' });
+      const tile = deepestTile(site);
+      expect(tile.content.objectiveType).toBe('location');
+      expect(tile.content.locationId).toBe('inner_sanctum');
+    });
   });
 
   test('deterministic per seed, and idempotent', () => {

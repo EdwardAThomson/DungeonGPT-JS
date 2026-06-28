@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { generateSiteMap } from '../utils/siteMapGenerator';
-import { populateSite } from '../game/sitePopulator';
+import { populateSite, injectSiteObjective } from '../game/sitePopulator';
 import { tileBackground, SITE_POI } from '../utils/siteTileArt';
 import MapLegend from '../components/MapLegend';
 import { siteLegendGroups } from '../utils/mapLegend';
@@ -12,6 +12,12 @@ import { siteLegendGroups } from '../utils/mapLegend';
 const TYPES = ['cave', 'ruins'];
 const DIRS = ['north', 'east', 'south', 'west'];
 const BIOMES = ['grassland', 'desert', 'snow'];
+const OBJECTIVES = ['none', 'item', 'combat', 'location'];
+const OBJ_SAMPLE = {
+  item: { id: 'control_rod', name: 'the Control Rod' },
+  combat: { id: 'cave_tyrant', name: 'the Cave Tyrant' },
+  location: { id: 'inner_sanctum', name: 'the Inner Sanctum' },
+};
 const TILE = 26;
 
 const btn = (active) => ({
@@ -27,9 +33,16 @@ const SiteMapTest = () => {
   const [type, setType] = useState('cave');
   const [dir, setDir] = useState('south');
   const [biome, setBiome] = useState('grassland');
+  const [objective, setObjective] = useState('none');
   const [seed, setSeed] = useState(123);
 
-  const site = useMemo(() => populateSite(generateSiteMap(type, type === 'cave' ? 'Hollow Deep' : 'Old Ruins', dir, seed, { biome }), seed), [type, dir, biome, seed]);
+  const site = useMemo(() => {
+    const s = populateSite(generateSiteMap(type, type === 'cave' ? 'Hollow Deep' : 'Old Ruins', dir, seed, { biome }), seed);
+    if (objective !== 'none') {
+      injectSiteObjective(s, { objectiveType: objective, ...OBJ_SAMPLE[objective], milestoneId: 'demo' });
+    }
+    return s;
+  }, [type, dir, biome, objective, seed]);
   const { mapData, width, height, theme, entryPoint, contentSlots } = site;
 
   const stats = useMemo(() => {
@@ -61,6 +74,10 @@ const SiteMapTest = () => {
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted,#888)', marginBottom: 6 }}>Biome (ruins ground)</div>
           <div style={{ display: 'flex', gap: 6 }}>{BIOMES.map((b) => <button key={b} style={btn(biome === b)} onClick={() => setBiome(b)} disabled={type === 'cave'}>{b}</button>)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted,#888)', marginBottom: 6 }}>Milestone objective</div>
+          <div style={{ display: 'flex', gap: 6 }}>{OBJECTIVES.map((o) => <button key={o} style={btn(objective === o)} onClick={() => setObjective(o)}>{o}</button>)}</div>
         </div>
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted,#888)', marginBottom: 6 }}>Seed</div>
