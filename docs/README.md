@@ -26,6 +26,9 @@ deleted. When the code and a doc disagree, the code wins.
 - `FEATURE_COMPANIONS.md` — recruit/manage party companions
 - `FEATURE_INVENTORY_AND_GEAR.md` — ranged weapons/bows + inventory/equip UI + starter gear
 - `FEATURE_FAST_TRAVEL.md` — horses (land) + boats (water)
+- `FEATURE_HERO_RECOVERY.md` — downed-hero recovery / revival flow
+- `FEATURE_QUEST_GIVERS.md` — quest-giver NPCs handing out side-quests
+- `FEATURE_SIDEQUEST_BACKFILL.md` — backfilling the discoverable side-quest pool
 - `RAG_GRAPH_ENHANCEMENT_PLAN.md` — graph-enhanced RAG (proposed)
 - `TERRAIN_ROADMAP.md` — experimental layered/noise terrain (debug-only)
 - `GUEST_MODE_PLAN.md` — guest mode (core shipped; conversion-prompt follow-up open)
