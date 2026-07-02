@@ -91,7 +91,7 @@ export const ITEM_CATALOG = {
   // Common items
   'healing_potion': { name: 'Healing Potion', rarity: 'common', value: 50, effect: 'heal', amount: '2d4+2', icon: 'assets/icons/items/healing_potion.webp' },
   'antidote': { name: 'Antidote', rarity: 'common', value: 25, effect: 'cure_poison', icon: 'assets/icons/items/antidote.webp' },
-  'rations': { name: 'Trail Rations', rarity: 'common', value: 5, stackable: true, icon: 'assets/icons/items/rations.webp' },
+  'rations': { name: 'Trail Rations', rarity: 'common', value: 5, stackable: true, effect: 'heal', amount: '1d4', icon: 'assets/icons/items/rations.webp' },
   'torch': { name: 'Torch', rarity: 'common', value: 1, stackable: true, icon: 'assets/icons/items/torch.webp' },
   'rope': { name: 'Rope (50ft)', rarity: 'common', value: 10, icon: 'assets/icons/items/rope.webp' },
 
@@ -152,7 +152,7 @@ export const ITEM_CATALOG = {
   'rare_herb': { name: 'Rare Herb', rarity: 'uncommon', value: 40, icon: 'assets/icons/items/rare_herb.webp' },
   'mountain_herbs': { name: 'Mountain Herbs', rarity: 'common', value: 15, icon: 'assets/icons/items/mountain_herbs.webp' },
   'herbal_remedy': { name: 'Herbal Remedy', rarity: 'common', value: 15, effect: 'heal', amount: '1d4', icon: 'assets/icons/items/herbal_remedy.webp' },
-  'elven_rations': { name: 'Elven Waybread', rarity: 'uncommon', value: 20, stackable: true, icon: 'assets/icons/items/elven_rations.webp' },
+  'elven_rations': { name: 'Elven Waybread', rarity: 'uncommon', value: 20, stackable: true, effect: 'heal', amount: '2d4', icon: 'assets/icons/items/elven_rations.webp' },
   'natures_blessing': { name: 'Nature\'s Blessing', rarity: 'uncommon', value: 0, type: 'blessing', icon: 'assets/icons/items/natures_blessing.webp' },
   'elven_blessing': { name: 'Elven Blessing', rarity: 'rare', value: 0, type: 'blessing', icon: 'assets/icons/items/elven_blessing.webp' },
   'eagle_blessing': { name: 'Eagle\'s Blessing', rarity: 'rare', value: 0, type: 'blessing', icon: 'assets/icons/items/eagle_blessing.webp' },
@@ -221,7 +221,7 @@ export const ITEM_CATALOG = {
   'cursed_item': { name: 'Cursed Trinket', rarity: 'rare', value: 0, type: 'cursed', icon: 'assets/icons/items/cursed_item.webp' },
   'rare_ore': { name: 'Rare Ore', rarity: 'uncommon', value: 60, icon: 'assets/icons/items/rare_ore.webp' },
   'family_heirloom': { name: 'Family Heirloom', rarity: 'uncommon', value: 50, icon: 'assets/icons/items/family_heirloom.webp' },
-  'ale_mug': { name: 'Ale Mug', rarity: 'common', value: 2, icon: 'assets/icons/items/ale_mug.webp' },
+  'ale_mug': { name: 'Ale Mug', rarity: 'common', value: 2, effect: 'heal', amount: '1d4', icon: 'assets/icons/items/ale_mug.webp' },
   'bar_stool_leg': { name: 'Bar Stool Leg', rarity: 'common', value: 1, type: 'weapon', icon: 'assets/icons/items/bar_stool_leg.webp' },
   'stolen_goods': { name: 'Stolen Goods', rarity: 'uncommon', value: 35, icon: 'assets/icons/items/stolen_goods.webp' },
   'poisoned_dagger': { name: 'Poisoned Dagger', rarity: 'uncommon', value: 75, type: 'weapon', bonus: '+1', icon: 'assets/icons/items/poisoned_dagger.webp' },

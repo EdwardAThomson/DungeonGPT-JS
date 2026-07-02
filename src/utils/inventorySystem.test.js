@@ -4,8 +4,23 @@ import {
   processRewards,
   removeGold,
   rollDice,
-  rollItemDrop
+  rollItemDrop,
+  ITEM_CATALOG
 } from './inventorySystem';
+
+describe('food consumables restore HP (were no-ops)', () => {
+  // Same shape the "Use" flow keys on: effect 'heal' + a rollable amount.
+  const foods = ['rations', 'elven_rations', 'ale_mug'];
+
+  it.each(foods)('%s is an edible heal item', (key) => {
+    const item = ITEM_CATALOG[key];
+    expect(item).toBeDefined();
+    expect(item.effect).toBe('heal');
+    expect(item.amount).toBeTruthy();
+    const rolled = rollDice(item.amount);
+    expect(rolled).toBeGreaterThanOrEqual(1);
+  });
+});
 
 describe('inventorySystem', () => {
   afterEach(() => {
