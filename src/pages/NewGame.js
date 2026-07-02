@@ -731,7 +731,7 @@ const NewGame = () => {
             </button>
           </div>
         )}
-        <div className="settings-grid">
+        <div className="tone-dials">
           <SegmentedControl label="Grimness" id="grimness" value={grimnessLevel} options={grimnessOptions} onChange={changeTone('grimness', setGrimnessLevel)} />
           <SegmentedControl label="Darkness" id="darkness" value={darknessLevel} options={darknessOptions} onChange={changeTone('darkness', setDarknessLevel)} />
           <SegmentedControl label="Magic Level" id="magic" value={magicLevel} options={magicOptions} onChange={changeTone('magic', setMagicLevel)} />

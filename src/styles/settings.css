@@ -267,6 +267,46 @@
   opacity: 0.8;
 }
 
+/* Tone dials: stack each dial on its own full-width row (label left, the 4 pills in a flat
+   line to the right) instead of squeezing them into a multi-column grid where the pills wrap
+   2-and-2. On narrow screens the label moves above and the pills wrap top-to-bottom. */
+.tone-dials {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tone-dials .settings-group {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  align-items: center;
+  gap: 4px 14px;
+}
+
+.tone-dials .settings-group label {
+  grid-column: 1;
+  margin: 0;
+}
+
+.tone-dials .segmented-control {
+  grid-column: 2;
+}
+
+.tone-dials .segmented-hint {
+  grid-column: 2;
+}
+
+@media (max-width: 560px) {
+  .tone-dials .settings-group {
+    grid-template-columns: 1fr;
+  }
+  .tone-dials .settings-group label,
+  .tone-dials .segmented-control,
+  .tone-dials .segmented-hint {
+    grid-column: 1;
+  }
+}
+
 /* Header row above the tone chips: theme-default note + "reset to theme" link. */
 .tone-header {
   display: flex;
