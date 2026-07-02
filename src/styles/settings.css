@@ -223,6 +223,82 @@
   box-shadow: 0 0 0 3px var(--shadow);
 }
 
+/* Segmented control (chip row): a visible one-tap alternative to a dropdown for
+   small option sets. Used for the tone/style dials on the new-game screen. */
+.segmented-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.segmented-option {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background-color: var(--bg);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-family: var(--ui-font);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.segmented-option:hover:not(:disabled) {
+  border-color: var(--primary);
+  color: var(--text);
+}
+
+.segmented-option.selected {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: var(--bg);
+  font-weight: 700;
+}
+
+.segmented-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.segmented-hint {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+/* Header row above the tone chips: theme-default note + "reset to theme" link. */
+.tone-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.tone-header-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.tone-reset-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 0.82rem;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.tone-reset-link:disabled {
+  color: var(--text-secondary);
+  opacity: 0.5;
+  cursor: default;
+  text-decoration: none;
+}
+
 .settings-textarea {
   min-height: 100px;
   resize: vertical;

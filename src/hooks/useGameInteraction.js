@@ -11,6 +11,15 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-interaction');
 
+// Maps the player's "Narrative Style" (responseVerbosity) setting to a concrete instruction
+// appended to every DM narration prompt, so the choice actually shapes the output. Previously
+// this setting was saved but never used.
+const VERBOSITY_DIRECTIVE = {
+  Concise: 'Keep the narration tight and brisk: roughly one short paragraph (2-3 sentences). Favour momentum and clarity over lengthy description.',
+  Moderate: 'Keep the narration balanced: about two short paragraphs with a few vivid, well-chosen details.',
+  Descriptive: 'Write richly and atmospherically: three or more paragraphs with strong sensory detail, mood, and texture.'
+};
+
 // Format RAG results into a prompt block (appended at end for cache-friendliness)
 const formatRagContext = (results) => {
     if (!results || results.length === 0) return '';
@@ -256,7 +265,9 @@ const useGameInteraction = (
     };
 
     const generateResponse = async (model, prompt) => {
-        const fullPrompt = DM_PROTOCOL + prompt;
+        // Append the player's Narrative Style directive so it actually affects the narration.
+        const style = VERBOSITY_DIRECTIVE[settings?.responseVerbosity] || VERBOSITY_DIRECTIVE.Moderate;
+        const fullPrompt = `${DM_PROTOCOL}${prompt}\n\nStyle directive (shapes how you write; do not repeat it): ${style}`;
         setLastPrompt(fullPrompt);
         const resolved = resolveProviderAndModel(selectedProvider, model);
         return await llmService.generateUnified({

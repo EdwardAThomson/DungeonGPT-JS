@@ -10,6 +10,7 @@ import { selectSideQuests } from "../game/questEngine";
 import { populateTown } from "../utils/npcGenerator";
 import WorldMapDisplay from "../components/WorldMapDisplay";
 import OnboardingSteps from "../components/OnboardingSteps";
+import SegmentedControl from "../components/SegmentedControl";
 import { storyTemplates } from "../data/storyTemplates";
 import { spawnWorldMapEntities, injectQuestBuildings } from "../game/milestoneSpawner";
 import { getMilestoneLocationNames } from "../game/milestoneEngine";
@@ -96,6 +97,9 @@ const NewGame = () => {
   const [magicLevel, setMagicLevel] = useState(settings?.magicLevel || 'Low Magic'); // Default example
   const [technologyLevel, setTechnologyLevel] = useState(settings?.technologyLevel || 'Medieval'); // Default example
   const [responseVerbosity, setResponseVerbosity] = useState(settings?.responseVerbosity || 'Moderate'); // Default example
+  // Which tone dials the player has manually set. A theme change fills only the dials they
+  // haven't touched, so picking a theme gives coherent defaults without clobbering choices.
+  const [toneTouched, setToneTouched] = useState({});
   const [campaignGoal, setCampaignGoal] = useState(settings?.campaignGoal || '');
   const [milestones, setMilestones] = useState(() => {
     if (!settings?.milestones || settings.milestones.length === 0) return [];
@@ -145,6 +149,7 @@ const NewGame = () => {
     setMagicLevel(template.settings.magicLevel);
     setTechnologyLevel(template.settings.technologyLevel);
     setResponseVerbosity(template.settings.responseVerbosity);
+    setToneTouched({}); // a picked template is a fresh tone baseline
     setCampaignGoal(template.settings.campaignGoal || '');
     setMilestones(template.settings.milestones || []);
     setCustomNames(template.customNames || { towns: [], mountains: [] });
@@ -703,46 +708,37 @@ const NewGame = () => {
   );
 
   // Shared tone settings grid used by both Custom and Freeform tabs
-  const renderToneSettings = () => (
-    <div className="settings-grid">
-      <div className="settings-group">
-        <label htmlFor="grimness">Grimness</label>
-        <select id="grimness" value={grimnessLevel} onChange={(e) => setGrimnessLevel(e.target.value)} className="settings-select">
-          <option value="">Select...</option>
-          {grimnessOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
+  const renderToneSettings = ({ showThemeReset = false } = {}) => {
+    const themeName = THEME_DEFAULTS[customTheme]?.name;
+    const anyTouched = Object.keys(toneTouched).length > 0;
+    return (
+      <div>
+        {showThemeReset && (
+          <div className="tone-header">
+            <span className="tone-header-label">
+              Tone &amp; style{themeName ? ` — defaults from ${themeName}` : ''}. Tweak any; your picks stay.
+            </span>
+            <button
+              type="button"
+              className="tone-reset-link"
+              onClick={() => applyThemeDefaults(customTheme, { force: true })}
+              disabled={!anyTouched}
+              title={anyTouched ? "Restore this theme's tone defaults" : 'No manual changes to reset'}
+            >
+              Reset to theme
+            </button>
+          </div>
+        )}
+        <div className="settings-grid">
+          <SegmentedControl label="Grimness" id="grimness" value={grimnessLevel} options={grimnessOptions} onChange={changeTone('grimness', setGrimnessLevel)} />
+          <SegmentedControl label="Darkness" id="darkness" value={darknessLevel} options={darknessOptions} onChange={changeTone('darkness', setDarknessLevel)} />
+          <SegmentedControl label="Magic Level" id="magic" value={magicLevel} options={magicOptions} onChange={changeTone('magic', setMagicLevel)} />
+          <SegmentedControl label="Technology" id="tech" value={technologyLevel} options={technologyOptions} onChange={changeTone('tech', setTechnologyLevel)} />
+          <SegmentedControl label="Narrative Style" id="verbosity" value={responseVerbosity} options={verbosityOptions} onChange={changeTone('verbosity', setResponseVerbosity)} hint="How the AI Dungeon Master paces its narration." />
+        </div>
       </div>
-
-      <div className="settings-group">
-        <label htmlFor="darkness">Darkness</label>
-        <select id="darkness" value={darknessLevel} onChange={(e) => setDarknessLevel(e.target.value)} className="settings-select">
-          <option value="">Select...</option>
-          {darknessOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-      </div>
-
-      <div className="settings-group">
-        <label htmlFor="magic">Magic Level</label>
-        <select id="magic" value={magicLevel} onChange={(e) => setMagicLevel(e.target.value)} className="settings-select">
-          {magicOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-      </div>
-
-      <div className="settings-group">
-        <label htmlFor="tech">Technology</label>
-        <select id="tech" value={technologyLevel} onChange={(e) => setTechnologyLevel(e.target.value)} className="settings-select">
-          {technologyOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-      </div>
-
-      <div className="settings-group">
-        <label htmlFor="verbosity">Narrative Style</label>
-        <select id="verbosity" value={responseVerbosity} onChange={(e) => setResponseVerbosity(e.target.value)} className="settings-select">
-          {verbosityOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-      </div>
-    </div>
-  );
+    );
+  };
 
   // State for custom configurator
   const [customTheme, setCustomTheme] = useState('heroic-fantasy');
@@ -839,16 +835,35 @@ const NewGame = () => {
   };
 
   // Apply theme defaults when theme changes
-  const applyThemeDefaults = (theme) => {
+  // Apply a theme's tone defaults. By default this only fills dials the player hasn't
+  // manually set (sticky overrides win); `force` overrides everything and clears the
+  // touched-state (used by the "Reset to theme" link).
+  const applyThemeDefaults = (theme, { force = false } = {}) => {
     const defaults = THEME_DEFAULTS[theme];
-    if (defaults) {
-      setGrimnessLevel(defaults.grimnessLevel);
-      setDarknessLevel(defaults.darknessLevel);
-      setMagicLevel(defaults.magicLevel);
-      setTechnologyLevel(defaults.technologyLevel);
-      setResponseVerbosity(defaults.responseVerbosity);
-    }
+    if (!defaults) return;
+    if (force || !toneTouched.grimness) setGrimnessLevel(defaults.grimnessLevel);
+    if (force || !toneTouched.darkness) setDarknessLevel(defaults.darknessLevel);
+    if (force || !toneTouched.magic) setMagicLevel(defaults.magicLevel);
+    if (force || !toneTouched.tech) setTechnologyLevel(defaults.technologyLevel);
+    if (force || !toneTouched.verbosity) setResponseVerbosity(defaults.responseVerbosity);
+    if (force) setToneTouched({});
   };
+
+  // Wrap a tone setter so changing it marks that dial "touched" (theme changes then leave it).
+  const changeTone = (key, setter) => (val) => {
+    setter(val);
+    setToneTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+  };
+
+  // On a fresh new game, seed the tone dials from the default theme so the Custom tab opens
+  // with coherent defaults (Grimness/Darkness aren't blank) rather than nothing selected. Skips
+  // when tone was already loaded from a saved game, so it never clobbers restored settings.
+  useEffect(() => {
+    if (!grimnessLevel && !darknessLevel) {
+      applyThemeDefaults(customTheme, { force: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Validate Custom tab slots — returns error string or null if valid
   const validateCustomSlots = () => {
@@ -1167,7 +1182,7 @@ const NewGame = () => {
         </div>
       )}
 
-      {renderToneSettings()}
+      {renderToneSettings({ showThemeReset: true })}
     </div>
   );
 
