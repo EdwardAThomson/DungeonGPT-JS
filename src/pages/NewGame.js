@@ -10,6 +10,8 @@ import { selectSideQuests } from "../game/questEngine";
 import { populateTown } from "../utils/npcGenerator";
 import WorldMapDisplay from "../components/WorldMapDisplay";
 import OnboardingSteps from "../components/OnboardingSteps";
+import SegmentedControl from "../components/SegmentedControl";
+import RaritySelect from "../components/RaritySelect";
 import { storyTemplates } from "../data/storyTemplates";
 import { spawnWorldMapEntities, injectQuestBuildings } from "../game/milestoneSpawner";
 import { getMilestoneLocationNames } from "../game/milestoneEngine";
@@ -17,6 +19,7 @@ import { llmService } from "../services/llmService";
 import { createLogger } from "../utils/logger";
 import { QUEST_ENEMIES, getEnemiesByTierAndTheme } from "../data/questEnemies";
 import { QUEST_BUILDINGS, NPC_ROLES, SEARCHABLE_ITEMS, POI_TYPES, THEME_DEFAULTS, THEME_NAMES } from "../data/questPickerData";
+import { isPremium, isThemePremium, isTemplatePremium } from "../game/entitlements";
 
 const logger = createLogger('new-game');
 
@@ -25,12 +28,14 @@ const mergeLocationNames = (customNames, milestones) => {
     const milestoneNames = getMilestoneLocationNames(milestones);
     const towns = [...(customNames?.towns || [])];
     const mountains = [...(customNames?.mountains || [])];
+    // Town entries may be plain strings or { name, size } objects (size-tagged locations).
+    const nameOf = (entry) => (typeof entry === 'string' ? entry : entry?.name || '');
 
     for (const name of milestoneNames.towns) {
-        if (!towns.some(t => t.toLowerCase() === name.toLowerCase())) towns.push(name);
+        if (!towns.some(t => nameOf(t).toLowerCase() === name.toLowerCase())) towns.push(name);
     }
     for (const name of milestoneNames.mountains) {
-        if (!mountains.some(m => m.toLowerCase() === name.toLowerCase())) mountains.push(name);
+        if (!mountains.some(m => nameOf(m).toLowerCase() === name.toLowerCase())) mountains.push(name);
     }
 
     return { towns, mountains };
@@ -82,6 +87,10 @@ const NewGame = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // Premium entitlement (placeholder — false for free tier by default; honours the
+  // localStorage dev override in entitlements.js so premium content can be tested).
+  const premiumUnlocked = isPremium();
+
   // Clear any stale session ID when starting a new game
   useEffect(() => {
     localStorage.removeItem('activeGameSessionId');
@@ -96,6 +105,9 @@ const NewGame = () => {
   const [magicLevel, setMagicLevel] = useState(settings?.magicLevel || 'Low Magic'); // Default example
   const [technologyLevel, setTechnologyLevel] = useState(settings?.technologyLevel || 'Medieval'); // Default example
   const [responseVerbosity, setResponseVerbosity] = useState(settings?.responseVerbosity || 'Moderate'); // Default example
+  // Which tone dials the player has manually set. A theme change fills only the dials they
+  // haven't touched, so picking a theme gives coherent defaults without clobbering choices.
+  const [toneTouched, setToneTouched] = useState({});
   const [campaignGoal, setCampaignGoal] = useState(settings?.campaignGoal || '');
   const [milestones, setMilestones] = useState(() => {
     if (!settings?.milestones || settings.milestones.length === 0) return [];
@@ -145,6 +157,7 @@ const NewGame = () => {
     setMagicLevel(template.settings.magicLevel);
     setTechnologyLevel(template.settings.technologyLevel);
     setResponseVerbosity(template.settings.responseVerbosity);
+    setToneTouched({}); // a picked template is a fresh tone baseline
     setCampaignGoal(template.settings.campaignGoal || '');
     setMilestones(template.settings.milestones || []);
     setCustomNames(template.customNames || { towns: [], mountains: [] });
@@ -287,6 +300,19 @@ const NewGame = () => {
       return;
     }
     setFormError('');
+
+    // Premium backstop: no matter which path set it, a free user must never generate a
+    // sand/snow (premium) world map or start a premium adventure. This closes loopholes
+    // like a premium biome theme carried over from a previewed template into Custom/Freeform.
+    if (!premiumUnlocked) {
+      const selTpl = selectedTemplate && selectedTemplate !== 'custom' && selectedTemplate !== 'ai'
+        ? storyTemplates.find(t => t.id === selectedTemplate)
+        : null;
+      if (isThemePremium(worldTheme) || isTemplatePremium(selTpl)) {
+        setFormError('Desert and snow adventures are a Premium feature (coming soon). Choose a temperate setting to continue.');
+        return;
+      }
+    }
 
     // Auto-generate the world map if one wasn't built manually. Ready-Made
     // adventures skip the map step entirely, so this is the normal path for them.
@@ -434,6 +460,7 @@ const NewGame = () => {
     const t = previewTemplate;
     const ms = t.settings.milestones || [];
     const isSelected = selectedTemplate === t.id;
+    const isPremiumLocked = !premiumUnlocked && isTemplatePremium(t);
 
     return (
       <div className="modal-overlay" onClick={() => setPreviewTemplate(null)}>
@@ -574,7 +601,20 @@ const NewGame = () => {
                 borderRadius: '8px', color: 'var(--text)', cursor: 'pointer', fontSize: '0.9rem',
               }}
             >{isSelected ? 'Back' : 'Cancel'}</button>
-            {isSelected ? (
+            {isPremiumLocked ? (
+              <button
+                disabled
+                title="Premium unlock is coming soon"
+                style={{
+                  padding: '8px 24px',
+                  background: 'linear-gradient(135deg, #b8860b, #ffd700)',
+                  border: 'none', borderRadius: '8px', color: '#2b1d00',
+                  cursor: 'not-allowed', fontSize: '0.9rem', fontWeight: 'bold', opacity: 0.9,
+                }}
+              >
+                🔒 Unlock with Premium (coming soon)
+              </button>
+            ) : isSelected ? (
               <button
                 onClick={() => {
                   setPreviewTemplate(null);
@@ -614,22 +654,29 @@ const NewGame = () => {
 
   const renderTemplateCard = (template, isFirst = false) => {
     const isSelected = selectedTemplate === template.id;
-    const isLocked = template.comingSoon;
+    // Premium-locked = a paid adventure the current (free) user can't start yet.
+    const isPremiumLocked = !premiumUnlocked && isTemplatePremium(template);
+    const isLocked = template.comingSoon || isPremiumLocked;
     return (
       <div
         key={template.id}
         data-tour={isFirst ? 'first-adventure' : undefined}
-        onClick={isLocked ? undefined : () => applyTemplate(template)}
+        onClick={
+          template.comingSoon ? undefined
+            : isPremiumLocked
+              ? () => setFormError('This is a Premium adventure. Premium unlock is coming soon — pick a free adventure to begin.')
+              : () => applyTemplate(template)
+        }
         style={{
           background: 'var(--surface)',
           border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
           borderRadius: '12px',
           overflow: 'hidden',
-          cursor: isLocked ? 'default' : 'pointer',
+          cursor: template.comingSoon ? 'default' : 'pointer',
           transition: 'all 0.2s',
           boxShadow: isSelected ? '0 0 0 1px var(--primary), 0 4px 12px var(--shadow)' : 'none',
-          opacity: isLocked ? 0.5 : 1,
-          filter: isLocked ? 'grayscale(0.6)' : 'none',
+          opacity: isLocked ? (isPremiumLocked ? 0.75 : 0.5) : 1,
+          filter: isLocked ? 'grayscale(0.5)' : 'none',
         }}
       >
         {/* Card image */}
@@ -648,7 +695,14 @@ const NewGame = () => {
               padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
             }}>SELECTED</div>
           )}
-          {isLocked && (
+          {isPremiumLocked && (
+            <div style={{
+              position: 'absolute', top: 8, left: 8,
+              background: 'linear-gradient(135deg, #b8860b, #ffd700)', color: '#2b1d00',
+              padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
+            }}>🔒 PREMIUM</div>
+          )}
+          {template.comingSoon && (
             <div style={{
               position: 'absolute', bottom: 8, left: 0, right: 0, textAlign: 'center',
               fontSize: '0.7rem', fontWeight: 'bold', color: '#fff',
@@ -662,7 +716,7 @@ const NewGame = () => {
             <div style={{ fontSize: '0.9rem', fontWeight: 'bold', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
               {template.subtitle}
             </div>
-            {!isLocked && (
+            {!template.comingSoon && (
               <button
                 onClick={(e) => { e.stopPropagation(); setPreviewTemplate(template); }}
                 style={{
@@ -687,8 +741,14 @@ const NewGame = () => {
   };
 
   // Only the starter (tier 1) adventures are shown — higher-level chapters are
-  // hidden to keep the choice simple for new players.
+  // hidden to keep the choice simple for new players. Premium adventures (desert/snow
+  // biome quests) are split into their own section so free users can see, but not start,
+  // paid content.
   const starterTemplates = storyTemplates.filter((t) => t.tier === 1);
+  const freeStarterTemplates = starterTemplates.filter((t) => !isTemplatePremium(t));
+  const premiumStarterTemplates = starterTemplates.filter((t) => isTemplatePremium(t));
+
+  const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' };
 
   const renderTemplateTab = () => (
     <div className="form-section story-settings-section">
@@ -696,53 +756,68 @@ const NewGame = () => {
         Pick a starter adventure to begin. Click a card for details.
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-        {starterTemplates.map((t, i) => renderTemplateCard(t, i === 0))}
+      <div style={gridStyle}>
+        {freeStarterTemplates.map((t, i) => renderTemplateCard(t, i === 0))}
       </div>
+
+      {premiumStarterTemplates.length > 0 && (
+        <div style={{ marginTop: '28px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px',
+          }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
+              ✨ Premium Adventures
+            </h3>
+            <span style={{
+              background: 'linear-gradient(135deg, #b8860b, #ffd700)', color: '#2b1d00',
+              padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
+            }}>{premiumUnlocked ? 'UNLOCKED' : 'COMING SOON'}</span>
+          </div>
+          {!premiumUnlocked && (
+            <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+              Desert and snow campaigns are a Premium unlock (coming soon). Preview them below.
+            </p>
+          )}
+          <div style={gridStyle}>
+            {premiumStarterTemplates.map((t) => renderTemplateCard(t))}
+          </div>
+        </div>
+      )}
     </div>
   );
 
   // Shared tone settings grid used by both Custom and Freeform tabs
-  const renderToneSettings = () => (
-    <div className="settings-grid">
-      <div className="settings-group">
-        <label htmlFor="grimness">Grimness</label>
-        <select id="grimness" value={grimnessLevel} onChange={(e) => setGrimnessLevel(e.target.value)} className="settings-select">
-          <option value="">Select...</option>
-          {grimnessOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
+  const renderToneSettings = ({ showThemeReset = false } = {}) => {
+    const themeName = THEME_DEFAULTS[customTheme]?.name;
+    const anyTouched = Object.keys(toneTouched).length > 0;
+    return (
+      <div>
+        {showThemeReset && (
+          <div className="tone-header">
+            <span className="tone-header-label">
+              Tone &amp; style{themeName ? ` — defaults from ${themeName}` : ''}. Tweak any; your picks stay.
+            </span>
+            <button
+              type="button"
+              className="tone-reset-link"
+              onClick={() => applyThemeDefaults(customTheme, { force: true })}
+              disabled={!anyTouched}
+              title={anyTouched ? "Restore this theme's tone defaults" : 'No manual changes to reset'}
+            >
+              Reset to theme
+            </button>
+          </div>
+        )}
+        <div className="tone-dials">
+          <SegmentedControl label="Grimness" id="grimness" value={grimnessLevel} options={grimnessOptions} onChange={changeTone('grimness', setGrimnessLevel)} />
+          <SegmentedControl label="Darkness" id="darkness" value={darknessLevel} options={darknessOptions} onChange={changeTone('darkness', setDarknessLevel)} />
+          <SegmentedControl label="Magic Level" id="magic" value={magicLevel} options={magicOptions} onChange={changeTone('magic', setMagicLevel)} />
+          <SegmentedControl label="Technology" id="tech" value={technologyLevel} options={technologyOptions} onChange={changeTone('tech', setTechnologyLevel)} />
+          <SegmentedControl label="Narrative Style" id="verbosity" value={responseVerbosity} options={verbosityOptions} onChange={changeTone('verbosity', setResponseVerbosity)} hint="How the AI Dungeon Master paces its narration." />
+        </div>
       </div>
-
-      <div className="settings-group">
-        <label htmlFor="darkness">Darkness</label>
-        <select id="darkness" value={darknessLevel} onChange={(e) => setDarknessLevel(e.target.value)} className="settings-select">
-          <option value="">Select...</option>
-          {darknessOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-      </div>
-
-      <div className="settings-group">
-        <label htmlFor="magic">Magic Level</label>
-        <select id="magic" value={magicLevel} onChange={(e) => setMagicLevel(e.target.value)} className="settings-select">
-          {magicOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-      </div>
-
-      <div className="settings-group">
-        <label htmlFor="tech">Technology</label>
-        <select id="tech" value={technologyLevel} onChange={(e) => setTechnologyLevel(e.target.value)} className="settings-select">
-          {technologyOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-      </div>
-
-      <div className="settings-group">
-        <label htmlFor="verbosity">Narrative Style</label>
-        <select id="verbosity" value={responseVerbosity} onChange={(e) => setResponseVerbosity(e.target.value)} className="settings-select">
-          {verbosityOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-        </select>
-      </div>
-    </div>
-  );
+    );
+  };
 
   // State for custom configurator
   const [customTheme, setCustomTheme] = useState('heroic-fantasy');
@@ -839,16 +914,35 @@ const NewGame = () => {
   };
 
   // Apply theme defaults when theme changes
-  const applyThemeDefaults = (theme) => {
+  // Apply a theme's tone defaults. By default this only fills dials the player hasn't
+  // manually set (sticky overrides win); `force` overrides everything and clears the
+  // touched-state (used by the "Reset to theme" link).
+  const applyThemeDefaults = (theme, { force = false } = {}) => {
     const defaults = THEME_DEFAULTS[theme];
-    if (defaults) {
-      setGrimnessLevel(defaults.grimnessLevel);
-      setDarknessLevel(defaults.darknessLevel);
-      setMagicLevel(defaults.magicLevel);
-      setTechnologyLevel(defaults.technologyLevel);
-      setResponseVerbosity(defaults.responseVerbosity);
-    }
+    if (!defaults) return;
+    if (force || !toneTouched.grimness) setGrimnessLevel(defaults.grimnessLevel);
+    if (force || !toneTouched.darkness) setDarknessLevel(defaults.darknessLevel);
+    if (force || !toneTouched.magic) setMagicLevel(defaults.magicLevel);
+    if (force || !toneTouched.tech) setTechnologyLevel(defaults.technologyLevel);
+    if (force || !toneTouched.verbosity) setResponseVerbosity(defaults.responseVerbosity);
+    if (force) setToneTouched({});
   };
+
+  // Wrap a tone setter so changing it marks that dial "touched" (theme changes then leave it).
+  const changeTone = (key, setter) => (val) => {
+    setter(val);
+    setToneTouched((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+  };
+
+  // On a fresh new game, seed the tone dials from the default theme so the Custom tab opens
+  // with coherent defaults (Grimness/Darkness aren't blank) rather than nothing selected. Skips
+  // when tone was already loaded from a saved game, so it never clobbers restored settings.
+  useEffect(() => {
+    if (!grimnessLevel && !darknessLevel) {
+      applyThemeDefaults(customTheme, { force: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Validate Custom tab slots — returns error string or null if valid
   const validateCustomSlots = () => {
@@ -958,6 +1052,13 @@ const NewGame = () => {
             value={customTheme}
             onChange={(e) => {
               const theme = e.target.value;
+              // Premium backstop: never let a free user pick a premium (desert/snow) theme.
+              // These genre ids aren't premium today, but this keeps the seam airtight if a
+              // premium world-biome theme is ever surfaced in this picker.
+              if (!premiumUnlocked && isThemePremium(theme)) {
+                setFormError('That theme is a Premium feature (coming soon).');
+                return;
+              }
               setCustomTheme(theme);
               applyThemeDefaults(theme);
               setSlot4Enemy(''); // Reset enemy when theme changes
@@ -971,9 +1072,14 @@ const NewGame = () => {
             }}
             style={selectStyle}
           >
-            {Object.entries(THEME_DEFAULTS).map(([id, t]) => (
-              <option key={id} value={id}>{t.icon} {t.name}</option>
-            ))}
+            {Object.entries(THEME_DEFAULTS).map(([id, t]) => {
+              const locked = !premiumUnlocked && isThemePremium(id);
+              return (
+                <option key={id} value={id} disabled={locked}>
+                  {t.icon} {t.name}{locked ? ' 🔒 (Premium)' : ''}
+                </option>
+              );
+            })}
           </select>
         </div>
         <div style={{ flex: '0 0 140px' }}>
@@ -1005,12 +1111,14 @@ const NewGame = () => {
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 200px' }}>
             <label style={slotLabelStyle}>Item</label>
-            <select value={slot1Item} onChange={(e) => setSlot1Item(e.target.value)} style={selectStyle}>
-              <option value="">Select item...</option>
-              {SEARCHABLE_ITEMS.map(item => (
-                <option key={item.id} value={item.id}>{item.name} ({item.rarity})</option>
-              ))}
-            </select>
+            <RaritySelect
+              value={slot1Item}
+              onChange={setSlot1Item}
+              options={SEARCHABLE_ITEMS}
+              placeholder="Select item..."
+              ariaLabel="Quest item"
+              sortByRarity
+            />
           </div>
           <div style={{ flex: '1 1 180px' }}>
             <label style={slotLabelStyle}>Found in</label>
@@ -1167,7 +1275,7 @@ const NewGame = () => {
         </div>
       )}
 
-      {renderToneSettings()}
+      {renderToneSettings({ showThemeReset: true })}
     </div>
   );
 
@@ -1308,6 +1416,12 @@ const NewGame = () => {
               } else if (tab.id === 'freeform' && selectedTemplate && selectedTemplate !== 'ai' && selectedTemplate !== 'freeform') {
                 setSelectedTemplate('freeform');
               }
+              // Custom/Freeform have no biome picker, so a premium world theme here can only
+              // be a leftover from a previewed template. Drop it back to grassland for free
+              // users so they can't ride a premium (desert/snow) map into a custom tale.
+              if ((tab.id === 'custom' || tab.id === 'freeform') && !premiumUnlocked && isThemePremium(worldTheme)) {
+                setWorldTheme('grassland');
+              }
             }}
             style={{
               background: 'none',
@@ -1346,7 +1460,7 @@ const NewGame = () => {
         <div className="map-generation-controls">
           <div className="seed-input-group" style={{ marginBottom: '15px' }}>
             <label htmlFor="worldSeed" style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>World Seed:</label>
-            <div style={{ display: 'flex', alignItems: 'stretch', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: '10px', flexWrap: 'wrap' }}>
               <input
                 id="worldSeed"
                 type="number"
@@ -1363,22 +1477,28 @@ const NewGame = () => {
               >
                 🎲 Randomize
               </button>
+              {/* Generate sits flush with Randomize, same row + same height (align-items: stretch). */}
+              <button
+                onClick={() => {
+                  // Premium backstop: never build a sand/snow map for a free user.
+                  if (!premiumUnlocked && isThemePremium(worldTheme)) {
+                    setFormError('Desert and snow maps are a Premium feature (coming soon). Choose a temperate setting to continue.');
+                    return;
+                  }
+                  const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
+                  if (!worldSeed) setWorldSeed(seedToUse);
+                  const newMap = generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme);
+                  setGeneratedMap(newMap);
+                  setShowMapPreview(true);
+                }}
+                className="settings-submit-button generate-map-button"
+                type="button"
+                style={{ padding: '8px 16px', fontSize: '0.9rem', boxSizing: 'border-box', letterSpacing: 'normal', textTransform: 'none' }}
+              >
+                {generatedMap ? '🔄 Build Map from Seed' : '🗺️ Generate World Map'}
+              </button>
             </div>
           </div>
-          <button
-            onClick={() => {
-              const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
-              if (!worldSeed) setWorldSeed(seedToUse);
-              const newMap = generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme);
-              setGeneratedMap(newMap);
-              setShowMapPreview(true);
-            }}
-            className="generate-map-button"
-            type="button"
-            style={{ width: '100%', maxWidth: '300px' }}
-          >
-            {generatedMap ? '🔄 Build Map from Seed' : '🗺️ Generate World Map'}
-          </button>
 
           {generatedMap && (
             <span className="map-status">✓ Map generated!</span>

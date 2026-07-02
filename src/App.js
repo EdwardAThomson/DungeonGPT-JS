@@ -8,7 +8,7 @@ import AllHeroes from "./pages/AllHeroes";
 import HomePage from "./pages/HomePage";
 import NewGame from "./pages/NewGame";
 import HeroSelection from './pages/HeroSelection';
-import Game from './pages/Game';
+import GameResumeGate from './pages/GameResumeGate';
 import SavedConversations from './pages/SavedConversations';
 import CFWorkerDebug from './pages/CFWorkerDebug';
 import EncounterModalDebug from './pages/EncounterModalDebug';
@@ -199,7 +199,7 @@ const AppContent = () => {
                   The AI Dungeon Master is gated in-page for guests (see useAiAvailable). */}
               <Route path="/all-heroes" element={<AllHeroes />} />
               <Route path="/hero-selection" element={<HeroSelection />} />
-              <Route path="/game" element={<Game />} />
+              <Route path="/game" element={<GameResumeGate />} />
               <Route path="/saved-conversations" element={<SavedConversations />} />
 
               {/* Protected routes */}

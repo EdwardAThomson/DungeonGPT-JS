@@ -1,19 +1,41 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ITEM_CATALOG, rollDice, removeItem } from '../utils/inventorySystem';
+import { ITEM_CATALOG, rollDice, removeItem, getRarityColor } from '../utils/inventorySystem';
 import { applyHealing, getHPStatus } from '../utils/healthSystem';
 import { heroUid } from '../utils/partyUtils';
+import {
+  EQUIP_SLOTS,
+  getEquippedItem,
+  getEquippablePartyItems,
+  equipItemFromParty,
+  unequipSlot,
+  parseBonus
+} from '../game/equipment';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
+
+const SLOT_LABELS = { weapon: 'Weapon', armor: 'Armour', accessory: 'Accessory' };
+const STAT_FOR_SLOT = { weapon: 'attack', armor: 'armour soak', accessory: 'to checks' };
+// "+N stat" label for an equip bonus; accessories with no number still grant +1 to checks.
+const formatSlotBonus = (slot, bonusStr) => {
+  let n = parseBonus(bonusStr);
+  if (slot === 'accessory' && !n) n = 1;
+  if (!n) return null;
+  return `${n >= 0 ? '+' : ''}${n} ${STAT_FOR_SLOT[slot] || ''}`.trim();
+};
 
 const PartyInventoryModal = () => {
   const { isOpen, data, close } = useModal('inventory');
   const selectedHeroes = data?.selectedHeroes || [];
   const onUseItem = data?.onUseItem;
+  const onHeroUpdate = data?.onHeroUpdate;
   const [selectedImage, setSelectedImage] = useState(null);
   const [useItemState, setUseItemState] = useState(null); // { itemKey } — hero picker
   const [useResults, setUseResults] = useState([]); // [{ heroName, itemName, rolled, healed, id }]
-  const [usedItems, setUsedItems] = useState({}); // { itemKey: count } — local consumption tracker
-  const [hpAdjustments, setHpAdjustments] = useState({}); // { heroUid: healedAmount }
+  const [activeTab, setActiveTab] = useState('items'); // 'items' | 'loadout'
+  // Session-only hero edits (potion use / equip / unequip) layered over the opened
+  // snapshot so the UI updates instantly. Each edit is also persisted via the callbacks.
+  // Cleared when the modal closes.
+  const [overrides, setOverrides] = useState({}); // heroUid -> updated hero
   const resultTimers = useRef([]);
 
   // Clear results and state when modal closes
@@ -21,8 +43,8 @@ const PartyInventoryModal = () => {
     if (!isOpen) {
       setUseItemState(null);
       setUseResults([]);
-      setUsedItems({});
-      setHpAdjustments({});
+      setOverrides({});
+      setActiveTab('items');
       resultTimers.current.forEach(clearTimeout);
       resultTimers.current = [];
     }
@@ -30,8 +52,16 @@ const PartyInventoryModal = () => {
 
   if (!isOpen) return null;
 
-  const allItems = selectedHeroes.flatMap((hero) => hero.inventory || []);
-  const totalGold = selectedHeroes.reduce((sum, hero) => sum + (hero.gold || 0), 0);
+  // The party as currently shown: the snapshot with any local edits applied on top.
+  const party = selectedHeroes.map((h) => overrides[heroUid(h)] || h);
+  const applyHeroes = (heroes) => setOverrides((prev) => {
+    const next = { ...prev };
+    heroes.forEach((h) => { const id = heroUid(h); if (id) next[id] = h; });
+    return next;
+  });
+
+  const allItems = party.flatMap((hero) => hero.inventory || []);
+  const totalGold = party.reduce((sum, hero) => sum + (hero.gold || 0), 0);
 
   const itemMap = {};
   for (const item of allItems) {
@@ -52,8 +82,16 @@ const PartyInventoryModal = () => {
     }
   }
 
-  // Subtract locally consumed items from displayed quantities
-  for (const [key, count] of Object.entries(usedItems)) {
+  // Subtract items currently equipped by any hero so a worn item isn't also
+  // shown as available loot. Counts (not filtering by key) so spare copies of
+  // the same item still appear.
+  const equippedCounts = {};
+  for (const hero of party) {
+    for (const equippedKey of Object.values(hero.equipment || {})) {
+      if (equippedKey) equippedCounts[equippedKey] = (equippedCounts[equippedKey] || 0) + 1;
+    }
+  }
+  for (const [key, count] of Object.entries(equippedCounts)) {
     if (itemMap[key]) {
       itemMap[key].quantity -= count;
       if (itemMap[key].quantity <= 0) delete itemMap[key];
@@ -61,54 +99,38 @@ const PartyInventoryModal = () => {
   }
 
   const isHealingItem = (item) => item.effect === 'heal' && item.amount;
-  const injuredHeroes = selectedHeroes
-    .map(h => {
-      const adj = hpAdjustments[heroUid(h)] || 0;
-      return adj ? { ...h, currentHP: Math.min(h.maxHP, h.currentHP + adj) } : h;
-    })
-    .filter(h => h.currentHP < h.maxHP && !h.isDefeated);
+  const injuredHeroes = party.filter(h => h.currentHP < h.maxHP && !h.isDefeated);
 
   // Find which hero actually owns an item (first hero with it in inventory)
   const findItemOwner = (itemKey) => {
-    return selectedHeroes.find(h =>
+    return party.find(h =>
       (h.inventory || []).some(i => (typeof i === 'string' ? i : i.key) === itemKey)
     );
   };
 
   const handleUsePotion = (heroIndex) => {
     const { itemKey } = useItemState;
-    const target = selectedHeroes[heroIndex];
+    const target = party[heroIndex];
     const catalogEntry = ITEM_CATALOG[itemKey];
     const rolled = rollDice(catalogEntry.amount);
     const before = target.currentHP;
     const healed = applyHealing(target, rolled);
     const actualHeal = healed.currentHP - before;
 
-    // Remove item from the hero who owns it
+    // Remove one instance from whichever hero owns the item.
     const owner = findItemOwner(itemKey);
     const updatedInventory = removeItem(owner.inventory || [], itemKey, 1);
     const updatedOwner = { ...owner, inventory: updatedInventory };
+    const sameOwner = heroUid(owner) === heroUid(target);
+    // If owner and target are the same hero, merge the heal and the removal.
+    const finalTarget = sameOwner ? { ...healed, inventory: updatedInventory } : healed;
 
-    // If owner is the same as target, merge both changes
-    const finalHero = heroUid(owner) === heroUid(target)
-      ? { ...healed, inventory: updatedInventory }
-      : healed;
-
-    // Update the target hero (healed)
+    // Persist to the party state, and reflect it locally for instant UI updates.
     if (onUseItem) {
-      onUseItem(heroUid(target), itemKey, finalHero);
-      // If owner is different from target, also update the owner's inventory
-      if (heroUid(owner) !== heroUid(target)) {
-        onUseItem(heroUid(owner), itemKey, updatedOwner);
-      }
+      onUseItem(heroUid(target), itemKey, finalTarget);
+      if (!sameOwner) onUseItem(heroUid(owner), itemKey, updatedOwner);
     }
-
-    // Track locally for instant UI updates
-    setUsedItems(prev => ({ ...prev, [itemKey]: (prev[itemKey] || 0) + 1 }));
-    setHpAdjustments(prev => ({
-      ...prev,
-      [heroUid(target)]: (prev[heroUid(target)] || 0) + actualHeal
-    }));
+    applyHeroes(sameOwner ? [finalTarget] : [finalTarget, updatedOwner]);
 
     const resultId = Date.now();
     setUseResults(prev => [...prev, {
@@ -125,12 +147,20 @@ const PartyInventoryModal = () => {
     setUseItemState(null);
   };
 
-  const rarityColors = {
-    common: '#9d9d9d',
-    uncommon: '#1eff00',
-    rare: '#0070dd',
-    very_rare: '#a335ee',
-    legendary: '#ff8000'
+  // Equip an item onto a hero from the shared party pool. May move one instance
+  // between heroes, so persist every hero the operation changed.
+  const handleEquip = (targetUid, itemKey) => {
+    const changed = equipItemFromParty(party, targetUid, itemKey);
+    if (!changed.length) return;
+    applyHeroes(changed);
+    if (onHeroUpdate) changed.forEach((h) => onHeroUpdate(h));
+  };
+
+  const handleUnequip = (hero, slot) => {
+    const updated = unequipSlot(hero, slot);
+    if (updated === hero) return;
+    applyHeroes([updated]);
+    if (onHeroUpdate) onHeroUpdate(updated);
   };
 
   return (
@@ -212,6 +242,32 @@ const PartyInventoryModal = () => {
           <div style={{ fontSize: '24px', opacity: 0.7 }}>🔍</div>
         </div>
 
+        {/* Tabs: collected items vs per-hero loadout */}
+        <div className="inventory-tabs" role="tablist" aria-label="Inventory view" style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'items'}
+            className={activeTab === 'items' ? 'primary-button' : 'secondary-button'}
+            onClick={() => setActiveTab('items')}
+            style={{ flex: 1 }}
+          >
+            ⚔️ Items
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'loadout'}
+            className={activeTab === 'loadout' ? 'primary-button' : 'secondary-button'}
+            onClick={() => setActiveTab('loadout')}
+            style={{ flex: 1 }}
+          >
+            🛡️ Loadout
+          </button>
+        </div>
+
+        {activeTab === 'items' && (
+        <>
         <h3 style={{
           marginBottom: '12px',
           fontSize: '1.2rem',
@@ -234,7 +290,7 @@ const PartyInventoryModal = () => {
           border: '1px solid var(--border)',
           boxShadow: 'inset 0 4px 15px rgba(0,0,0,0.8)'
         }}>
-          {allItems.length === 0 ? (
+          {Object.keys(itemMap).length === 0 ? (
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -257,14 +313,14 @@ const PartyInventoryModal = () => {
                     padding: '10px 14px',
                     background: 'rgba(0,0,0,0.2)',
                     borderRadius: '6px',
-                    border: `1px solid ${rarityColors[item.rarity] || rarityColors.common}`,
+                    border: `1px solid ${getRarityColor(item.rarity)}`,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
                     cursor: item.icon ? 'pointer' : 'default',
                     transition: 'all 0.2s ease',
                     position: 'relative',
-                    boxShadow: `0 0 5px ${item.rarity !== 'common' ? (rarityColors[item.rarity] + '33') : 'rgba(0,0,0,0.5)'}`
+                    boxShadow: `0 0 5px ${item.rarity !== 'common' ? (getRarityColor(item.rarity) + '33') : 'rgba(0,0,0,0.5)'}`
                   }}
                   title={item.description || ''}
                   onClick={item.icon ? () => setSelectedImage({ src: `/${item.icon}`, name: item.name, description: item.description }) : undefined}
@@ -285,7 +341,7 @@ const PartyInventoryModal = () => {
                   )}
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{
-                      color: rarityColors[item.rarity] || rarityColors.common,
+                      color: getRarityColor(item.rarity),
                       fontWeight: '500',
                       fontSize: '0.95rem'
                     }}>
@@ -362,13 +418,16 @@ const PartyInventoryModal = () => {
               Use {ITEM_CATALOG[useItemState.itemKey]?.name} on...
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {injuredHeroes.map((hero) => {
+              {party.filter(h => !h.isDefeated).map((hero) => {
                 const hpStatus = getHPStatus(hero.currentHP, hero.maxHP);
-                const heroIndex = selectedHeroes.findIndex(h => heroUid(h) === heroUid(hero));
+                const heroIndex = party.findIndex(h => heroUid(h) === heroUid(hero));
+                const atFull = hero.currentHP >= hero.maxHP;
                 return (
                   <button
                     key={heroUid(hero)}
-                    onClick={() => handleUsePotion(heroIndex)}
+                    onClick={() => { if (!atFull) handleUsePotion(heroIndex); }}
+                    disabled={atFull}
+                    title={atFull ? 'Already at full health' : `Heal ${hero.characterName || hero.name}`}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -378,14 +437,15 @@ const PartyInventoryModal = () => {
                       border: '1px solid var(--border)',
                       borderRadius: '6px',
                       color: 'var(--text)',
-                      cursor: 'pointer',
+                      cursor: atFull ? 'not-allowed' : 'pointer',
+                      opacity: atFull ? 0.5 : 1,
                       fontFamily: 'var(--body-font)',
                       fontSize: '0.95rem'
                     }}
                   >
                     <span style={{ fontWeight: 'bold' }}>{hero.characterName || hero.name}</span>
                     <span style={{ color: hpStatus.color, fontSize: '0.85rem' }}>
-                      {hero.currentHP} / {hero.maxHP} HP
+                      {hero.currentHP} / {hero.maxHP} HP{atFull ? ' · Full' : ''}
                     </span>
                   </button>
                 );
@@ -428,6 +488,90 @@ const PartyInventoryModal = () => {
                 <span style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
                   (rolled {result.rolled})
                 </span>
+              </div>
+            ))}
+          </div>
+        )}
+        </>
+        )}
+
+        {activeTab === 'loadout' && (
+          <div className="loadout-view" style={{
+            background: 'var(--inventory-shelf-bg)',
+            borderRadius: '8px',
+            padding: '16px',
+            maxHeight: '45vh',
+            overflowY: 'auto',
+            border: '1px solid var(--border)',
+            boxShadow: 'inset 0 4px 15px rgba(0,0,0,0.8)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '14px'
+          }}>
+            {party.length === 0 ? (
+              <p style={{ color: 'var(--bg)', opacity: 0.6, fontStyle: 'italic', textAlign: 'center', margin: 0 }}>
+                No heroes in the party.
+              </p>
+            ) : party.map((hero) => (
+              <div key={heroUid(hero)} style={{
+                background: 'rgba(0,0,0,0.2)',
+                border: '1px solid var(--border)',
+                borderRadius: '8px',
+                padding: '12px 14px'
+              }}>
+                <div style={{ fontWeight: 'bold', color: 'var(--primary)', marginBottom: '8px', fontFamily: 'var(--header-font)' }}>
+                  {hero.characterName || hero.name}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {EQUIP_SLOTS.map((slot) => {
+                    const equipped = getEquippedItem(hero, slot);
+                    const options = getEquippablePartyItems(party, slot);
+                    return (
+                      <div key={slot} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ minWidth: '78px', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                          {SLOT_LABELS[slot]}
+                        </span>
+                        {equipped ? (
+                          <>
+                            <span style={{ flex: 1, fontSize: '0.92rem' }}>
+                              <span style={{ color: getRarityColor(equipped.rarity) }}>{equipped.name || equipped.key}</span>
+                              {formatSlotBonus(slot, equipped.bonus) ? (
+                                <span style={{ color: 'var(--text-secondary)' }}> ({formatSlotBonus(slot, equipped.bonus)})</span>
+                              ) : null}
+                            </span>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              style={{ padding: '4px 10px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                              onClick={() => handleUnequip(hero, slot)}
+                            >
+                              Unequip
+                            </button>
+                          </>
+                        ) : options.length > 0 ? (
+                          <select
+                            value=""
+                            onChange={(e) => { if (e.target.value) handleEquip(heroUid(hero), e.target.value); }}
+                            style={{ flex: 1, padding: '5px', borderRadius: '4px', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                          >
+                            <option value="">Equip…</option>
+                            {options.map((item) => (
+                              <option key={item.key} value={item.key}>
+                                {item.name || item.key}
+                                {formatSlotBonus(slot, item.bonus) ? ` (${formatSlotBonus(slot, item.bonus)})` : ''}
+                                {item.available > 1 ? ` ×${item.available}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span style={{ flex: 1, color: 'var(--text-secondary)', fontStyle: 'italic', fontSize: '0.85rem' }}>
+                            Empty
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             ))}
           </div>

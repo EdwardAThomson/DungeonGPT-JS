@@ -3,6 +3,7 @@ import { calculateModifier, SKILLS } from './rules';
 import { DIFFICULTY_DC } from '../data/encounters';
 import { calculateDamage, shouldDealDamage, getDamageDescription } from './healthSystem';
 import { getEquippedBonuses } from '../game/equipment';
+import { filterDropsByTier } from './inventorySystem';
 
 // Stats whose checks count as physical/combat (attack-style), so a weapon's
 // attack bonus applies. Hostile encounters also count regardless of skill.
@@ -82,7 +83,10 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
   }
 
   // 7. Apply rewards/penalties
-  const outcome = applyConsequences(outcomeTier, encounter.rewards, rollResult, encounter);
+  // Loot rarity is gated by campaign tier (falls back to party level for older saves
+  // that predate settings.tier). Prevents very_rare/legendary random drops at Tier 1.
+  const lootCtx = { tier: settings?.tier, level: character?.level };
+  const outcome = applyConsequences(outcomeTier, encounter.rewards, rollResult, encounter, lootCtx);
 
   return {
     narration: aiNarration,
@@ -117,7 +121,7 @@ export const clampPenaltyGold = (penalties, availableGold) => {
   return { ...penalties, goldLoss: clamped, messages };
 };
 
-const applyConsequences = (outcomeTier, rewards, rollResult, encounter) => {
+const applyConsequences = (outcomeTier, rewards, rollResult, encounter, lootCtx) => {
   const result = {
     rewards: null,
     penalties: null
@@ -125,12 +129,12 @@ const applyConsequences = (outcomeTier, rewards, rollResult, encounter) => {
 
   // Success tiers grant rewards
   if (outcomeTier === 'success' || outcomeTier === 'criticalSuccess') {
-    result.rewards = generateLoot(rewards, rollResult, outcomeTier, encounter);
+    result.rewards = generateLoot(rewards, rollResult, outcomeTier, encounter, lootCtx);
   }
 
   // Failure tiers may still get healing from healer encounters
   if ((outcomeTier === 'failure' || outcomeTier === 'criticalFailure') && encounter?.healingByTier) {
-    result.rewards = generateLoot(rewards, rollResult, outcomeTier, encounter);
+    result.rewards = generateLoot(rewards, rollResult, outcomeTier, encounter, lootCtx);
   }
 
   // Failure tiers may have penalties (context-aware)
@@ -220,7 +224,7 @@ const determinePenalties = (outcomeTier, encounter) => {
 /**
  * Generates loot based on rewards template and roll result
  */
-const generateLoot = (rewards, rollResult, outcomeTier, encounter) => {
+const generateLoot = (rewards, rollResult, outcomeTier, encounter, lootCtx = {}) => {
   if (!rewards) return null;
 
   // Positive rewards (XP / gold / items) are granted ONLY on success tiers. Failure tiers
@@ -256,6 +260,13 @@ const generateLoot = (rewards, rollResult, outcomeTier, encounter) => {
         loot.items.push(itemName);
       }
     }
+
+    // Gate high-rarity random drops by campaign tier / party level. Tier 1 (Lv 1-2)
+    // caps at `rare`, so very_rare/legendary rolls are dropped even if the roll hit.
+    loot.items = filterDropsByTier(loot.items, {
+      tier: lootCtx.tier,
+      level: lootCtx.level
+    });
   }
 
   // Healing rewards (from healer encounters)

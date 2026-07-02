@@ -126,6 +126,13 @@ export const THEME_NAMES = {
 // ============================================================
 // THEME DEFAULTS
 // Default tone settings per theme. Applied when user picks a theme.
+//
+// NOTE: these ids are campaign GENRES (tone presets), not world-biome themes. The
+// premium-gated content (sand/desert + snow world-gen) keys off the separate world-biome
+// `theme` ids ('desert', 'snow') listed in PREMIUM_THEMES (src/game/entitlements.js), which
+// are passed to the map generator — not these genre ids. None of the genres below are
+// premium today; keep premium theme ids in entitlements.js (single source of truth) rather
+// than scattering them here.
 // ============================================================
 export const THEME_DEFAULTS = {
     'heroic-fantasy': {

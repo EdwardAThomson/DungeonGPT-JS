@@ -1,7 +1,8 @@
 // Equipment system: let heroes equip a weapon / armour / accessory and have that
 // gear affect combat. Pure helpers only (no React, no I/O). Item definitions and
 // inventory shape come from inventorySystem (read-only here).
-import { ITEM_CATALOG } from '../utils/inventorySystem';
+import { ITEM_CATALOG, addItem, removeItem } from '../utils/inventorySystem';
+import { heroUid } from '../utils/partyUtils';
 
 // The three equip slots a hero can fill (one item each).
 export const EQUIP_SLOTS = ['weapon', 'armor', 'accessory'];
@@ -164,3 +165,129 @@ export const getEquippedItem = (hero, slot) => {
   const item = findInventoryItem(hero, key);
   return item ? { key, ...item } : null;
 };
+
+// --- Party-wide (pooled) equip ------------------------------------------------
+// Loot funnels to the lead hero, but any hero should be able to equip from the
+// shared party stock. These helpers pool equippable items across the party and,
+// on a cross-hero equip, MOVE one instance into the wearer, so the existing
+// per-hero bonus resolution (findInventoryItem) keeps working unchanged and no
+// item is ever duplicated (one instance out of the owner, one into the wearer).
+
+// How many instances of each item key the whole party currently has equipped.
+const countEquippedKeys = (party) => {
+  const counts = {};
+  for (const hero of party || []) {
+    for (const key of Object.values(hero?.equipment || {})) {
+      if (key) counts[key] = (counts[key] || 0) + 1;
+    }
+  }
+  return counts;
+};
+
+// Total instances of `key` a hero carries in inventory (quantity-aware, string-tolerant).
+const inventoryCount = (hero, key) =>
+  (hero?.inventory || []).reduce((n, entry) => {
+    const k = typeof entry === 'string' ? entry : entry?.key;
+    if (k !== key) return n;
+    return n + ((typeof entry === 'object' && entry && entry.quantity) || 1);
+  }, 0);
+
+// Instances of `key` this hero is currently wearing (0 or 1 in practice).
+const equippedOnHero = (hero, key) =>
+  Object.values(hero?.equipment || {}).filter((k) => k === key).length;
+
+// Whether a hero holds a free (unequipped) instance of `key` it could give up.
+const heroHasFreeInstance = (hero, key) => inventoryCount(hero, key) - equippedOnHero(hero, key) > 0;
+
+// Resolve an item key to a merged definition using any party member that carries it
+// (so inline-typed instances, not just catalog items, resolve their slot correctly).
+const resolvePartyItemDef = (party, key) => {
+  for (const hero of party || []) {
+    for (const entry of hero?.inventory || []) {
+      const k = typeof entry === 'string' ? entry : entry?.key;
+      if (k === key) return { key, ...(ITEM_CATALOG[key] || {}), ...(typeof entry === 'object' ? entry : {}) };
+    }
+  }
+  return { key, ...(ITEM_CATALOG[key] || {}) };
+};
+
+/**
+ * List every equippable item available to a slot across the WHOLE party, deduped by
+ * key. Each result carries an `available` count = total carried minus the instances
+ * already worn by any hero, so an equipped item never shows as available to equip.
+ * @param {Array} party
+ * @param {string} slot - one of EQUIP_SLOTS
+ * @returns {Array<Object>} merged item defs with an `available` count (> 0)
+ */
+export const getEquippablePartyItems = (party, slot) => {
+  const equipped = countEquippedKeys(party);
+  const byKey = new Map();
+  for (const hero of party || []) {
+    for (const entry of hero?.inventory || []) {
+      const key = typeof entry === 'string' ? entry : entry?.key;
+      if (!key || byKey.has(key)) continue;
+      const def = { ...(ITEM_CATALOG[key] || {}), ...(typeof entry === 'object' ? entry : {}) };
+      if (SLOT_FOR_TYPE[def.type] !== slot) continue;
+      byKey.set(key, def);
+    }
+  }
+  const items = [];
+  for (const [key, def] of byKey) {
+    let total = 0;
+    for (const hero of party || []) total += inventoryCount(hero, key);
+    const available = total - (equipped[key] || 0);
+    if (available > 0) items.push({ key, ...def, available });
+  }
+  return items;
+};
+
+/**
+ * Equip `itemKey` into the target hero's slot, drawing one instance from whichever
+ * hero holds a free copy (preferring the target, so no needless transfer). When the
+ * copy comes from another hero it is MOVED, never copied. Returns the heroes that
+ * changed: `[]` if nothing could be equipped, `[target]` if the target already had
+ * it, or `[owner, target]` when an instance was transferred. The caller applies each
+ * returned hero via the normal per-hero update path.
+ * @param {Array} party
+ * @param {string} targetUid - heroUid of the hero to equip onto
+ * @param {string} itemKey
+ * @returns {Array<Object>} changed heroes (0, 1, or 2)
+ */
+export const equipItemFromParty = (party, targetUid, itemKey) => {
+  if (!Array.isArray(party) || !targetUid || !itemKey) return [];
+  const target = party.find((h) => heroUid(h) === targetUid);
+  if (!target) return [];
+  const slot = SLOT_FOR_TYPE[resolvePartyItemDef(party, itemKey).type];
+  if (!slot) return []; // not an equippable type
+
+  // Prefer the target if it already holds a free copy; otherwise the first party
+  // member (in order) that does. If every copy is worn, there is nothing to equip.
+  const owner = heroHasFreeInstance(target, itemKey)
+    ? target
+    : party.find((h) => heroHasFreeInstance(h, itemKey));
+  if (!owner) return [];
+
+  const equipOn = (hero) => ({
+    ...hero,
+    equipment: { ...(hero.equipment || {}), [slot]: itemKey }
+  });
+
+  // Target already carries it, so just fill the slot (no inventory change, no dup).
+  if (heroUid(owner) === targetUid) return [equipOn(target)];
+
+  // Cross-hero: move exactly one instance owner -> target, then equip on target.
+  const updatedOwner = { ...owner, inventory: removeItem(owner.inventory || [], itemKey, 1) };
+  const updatedTarget = equipOn({ ...target, inventory: addItem(target.inventory || [], itemKey, 1) });
+  return [updatedOwner, updatedTarget];
+};
+
+/**
+ * Whether a hero may sell/trade away an instance of `key` right now: true only if
+ * they carry more copies than they have equipped. Guards the shop/trade paths so a
+ * worn item can't be sold out from under the wearer (which would silently drop its
+ * bonus). Non-equippable items are always sellable.
+ * @param {Object} hero
+ * @param {string} key
+ * @returns {boolean}
+ */
+export const canSellItem = (hero, key) => inventoryCount(hero, key) - equippedOnHero(hero, key) > 0;

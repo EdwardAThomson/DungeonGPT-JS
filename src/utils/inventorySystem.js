@@ -91,7 +91,7 @@ export const ITEM_CATALOG = {
   // Common items
   'healing_potion': { name: 'Healing Potion', rarity: 'common', value: 50, effect: 'heal', amount: '2d4+2', icon: 'assets/icons/items/healing_potion.webp' },
   'antidote': { name: 'Antidote', rarity: 'common', value: 25, effect: 'cure_poison', icon: 'assets/icons/items/antidote.webp' },
-  'rations': { name: 'Trail Rations', rarity: 'common', value: 5, stackable: true, icon: 'assets/icons/items/rations.webp' },
+  'rations': { name: 'Trail Rations', rarity: 'common', value: 5, stackable: true, effect: 'heal', amount: '1d4', icon: 'assets/icons/items/rations.webp' },
   'torch': { name: 'Torch', rarity: 'common', value: 1, stackable: true, icon: 'assets/icons/items/torch.webp' },
   'rope': { name: 'Rope (50ft)', rarity: 'common', value: 10, icon: 'assets/icons/items/rope.webp' },
 
@@ -105,7 +105,7 @@ export const ITEM_CATALOG = {
   'ring_protection': { name: 'Protective Ring', rarity: 'rare', value: 750, type: 'ring', bonus: '+1 defense', icon: 'assets/icons/items/ring_protection.webp' },
 
   // Very Rare
-  'legendary_weapon': { name: 'Legendary Weapon', rarity: 'very_rare', value: 2500, type: 'weapon', bonus: '+2', icon: 'assets/icons/items/legendary_weapon.webp' },
+  'legendary_weapon': { name: 'Legendary Weapon', rarity: 'legendary', value: 2500, type: 'weapon', bonus: '+2', icon: 'assets/icons/items/legendary_weapon.webp' },
   'legendary_artifact': { name: 'Mythic Ancient Artifact', rarity: 'very_rare', value: 5000, type: 'artifact', bonus: '+2', icon: 'assets/icons/items/legendary_artifact.webp' },
   'crown_of_sunfire': { name: 'Crown of Sunfire', rarity: 'very_rare', value: 7500, type: 'artifact', bonus: '+3', description: 'A radiant golden crown that blazes with inner fire. Said to grant its wearer dominion over light and shadow.', icon: `assets/icons/items/crown_of_sunfire.webp` },
   'seal_of_binding': { name: 'Seal of Binding', rarity: 'very_rare', value: 6000, type: 'artifact', bonus: '+2', description: 'An ancient seal inscribed with eldritch wards. It can imprison entities from beyond the veil.', icon: `assets/icons/items/seal_of_binding.webp` },
@@ -152,7 +152,7 @@ export const ITEM_CATALOG = {
   'rare_herb': { name: 'Rare Herb', rarity: 'uncommon', value: 40, icon: 'assets/icons/items/rare_herb.webp' },
   'mountain_herbs': { name: 'Mountain Herbs', rarity: 'common', value: 15, icon: 'assets/icons/items/mountain_herbs.webp' },
   'herbal_remedy': { name: 'Herbal Remedy', rarity: 'common', value: 15, effect: 'heal', amount: '1d4', icon: 'assets/icons/items/herbal_remedy.webp' },
-  'elven_rations': { name: 'Elven Waybread', rarity: 'uncommon', value: 20, stackable: true, icon: 'assets/icons/items/elven_rations.webp' },
+  'elven_rations': { name: 'Elven Waybread', rarity: 'uncommon', value: 20, stackable: true, effect: 'heal', amount: '2d4', icon: 'assets/icons/items/elven_rations.webp' },
   'natures_blessing': { name: 'Nature\'s Blessing', rarity: 'uncommon', value: 0, type: 'blessing', icon: 'assets/icons/items/natures_blessing.webp' },
   'elven_blessing': { name: 'Elven Blessing', rarity: 'rare', value: 0, type: 'blessing', icon: 'assets/icons/items/elven_blessing.webp' },
   'eagle_blessing': { name: 'Eagle\'s Blessing', rarity: 'rare', value: 0, type: 'blessing', icon: 'assets/icons/items/eagle_blessing.webp' },
@@ -221,7 +221,7 @@ export const ITEM_CATALOG = {
   'cursed_item': { name: 'Cursed Trinket', rarity: 'rare', value: 0, type: 'cursed', icon: 'assets/icons/items/cursed_item.webp' },
   'rare_ore': { name: 'Rare Ore', rarity: 'uncommon', value: 60, icon: 'assets/icons/items/rare_ore.webp' },
   'family_heirloom': { name: 'Family Heirloom', rarity: 'uncommon', value: 50, icon: 'assets/icons/items/family_heirloom.webp' },
-  'ale_mug': { name: 'Ale Mug', rarity: 'common', value: 2, icon: 'assets/icons/items/ale_mug.webp' },
+  'ale_mug': { name: 'Ale Mug', rarity: 'common', value: 2, effect: 'heal', amount: '1d4', icon: 'assets/icons/items/ale_mug.webp' },
   'bar_stool_leg': { name: 'Bar Stool Leg', rarity: 'common', value: 1, type: 'weapon', icon: 'assets/icons/items/bar_stool_leg.webp' },
   'stolen_goods': { name: 'Stolen Goods', rarity: 'uncommon', value: 35, icon: 'assets/icons/items/stolen_goods.webp' },
   'poisoned_dagger': { name: 'Poisoned Dagger', rarity: 'uncommon', value: 75, type: 'weapon', bonus: '+1', icon: 'assets/icons/items/poisoned_dagger.webp' },
@@ -232,6 +232,80 @@ export const ITEM_CATALOG = {
   'medicine_kit': { name: 'Medicine Kit', rarity: 'uncommon', value: 45, effect: 'heal', amount: '2d4', icon: 'assets/icons/items/medicine_kit.webp' },
   'uncovered_ruins': { name: 'Ruins Map Fragment', rarity: 'uncommon', value: 50, type: 'quest_item', icon: 'assets/icons/items/uncovered_ruins.webp' },
   'map_fragment': { name: 'Map Fragment', rarity: 'uncommon', value: 25, icon: 'assets/icons/items/map_fragment.webp' }
+};
+
+// --- Rarity-by-tier loot gating ---------------------------------------------
+// High-rarity loot must not drop during low-tier play. Rarities are ranked; each
+// campaign tier has a maximum allowed rank. This is applied to RANDOM drops only
+// (encounter/POI loot rolled by encounterResolver). Hand-authored template/milestone
+// rewards are honored as explicit design and are NOT clamped here.
+//
+// PREMIUM HOOK: very_rare (and legendary) are also intended to become a premium
+// entitlement later. When an entitlements system exists (e.g. src/utils/entitlements.js
+// exposing something like `userTier`/`hasEntitlement('premium_loot')`), gate very_rare
+// here by lowering `maxRarityRankForTier` to `rare` for non-entitled users (or filter in
+// `filterDropsByTier`). No entitlement system exists yet, so only the level/tier gate is
+// wired up now.
+
+export const RARITY_RANK = {
+  common: 0,
+  uncommon: 1,
+  rare: 2,
+  very_rare: 3,
+  legendary: 4
+};
+
+/**
+ * Resolve a campaign tier from an available signal. Prefers an explicit tier
+ * (settings.tier / template tier); otherwise derives it from party level
+ * (Tier 1 = Lv 1-2, Tier 2 = Lv 3-4, ...). Defaults to Tier 1.
+ * @param {{ tier?: number, level?: number }} ctx
+ * @returns {number} Tier (>= 1)
+ */
+export const resolveTier = ({ tier, level } = {}) => {
+  if (tier != null && !Number.isNaN(Number(tier))) return Math.max(1, Number(tier));
+  if (level != null && !Number.isNaN(Number(level))) {
+    return Math.max(1, Math.ceil(Number(level) / 2));
+  }
+  return 1;
+};
+
+/**
+ * Maximum rarity RANK a given tier may receive from random drops.
+ * Tier 1 (Lv 1-2) caps at `rare`; Tier 2 unlocks `very_rare`; Tier 3+ unlocks all.
+ * @param {number} tier
+ * @returns {number} Max allowed rank (see RARITY_RANK)
+ */
+export const maxRarityRankForTier = (tier) => {
+  const t = resolveTier({ tier });
+  if (t <= 1) return RARITY_RANK.rare; // Tier 1: common..rare only
+  if (t === 2) return RARITY_RANK.very_rare; // Tier 2: adds very_rare
+  return RARITY_RANK.legendary; // Tier 3+: everything
+};
+
+/**
+ * Whether a catalog item may be granted as a random drop at the given tier/level.
+ * Unknown item keys are allowed (fail-open, consistent with renderer fallbacks).
+ * @param {string} itemKey - ITEM_CATALOG key
+ * @param {{ tier?: number, level?: number }} ctx
+ * @returns {boolean}
+ */
+export const isItemAllowedForTier = (itemKey, ctx = {}) => {
+  const item = ITEM_CATALOG[itemKey];
+  if (!item) return true;
+  const rank = RARITY_RANK[item.rarity] ?? RARITY_RANK.common;
+  return rank <= maxRarityRankForTier(resolveTier(ctx));
+};
+
+/**
+ * Filter a list of catalog keys down to those allowed to drop at the given tier/level.
+ * @param {string[]} itemKeys
+ * @param {{ tier?: number, level?: number }} ctx
+ * @returns {string[]}
+ */
+export const filterDropsByTier = (itemKeys, ctx = {}) => {
+  if (!Array.isArray(itemKeys)) return [];
+  return itemKeys.filter((key) => isItemAllowedForTier(key, ctx));
 };
 
 /**

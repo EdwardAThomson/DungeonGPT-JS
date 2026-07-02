@@ -21,6 +21,8 @@ import { replaceHeroInParty, normalizeParty, heroUid } from '../utils/partyUtils
 import { composeMovementNarrativePrompt } from '../game/promptComposer';
 import { composeLocalMovementNarrative, composeLocalAmbientNarrative } from '../game/localNarrator';
 import { generateMovementNarrative } from '../game/movementController';
+import { buildSaveName } from '../game/saveController';
+import { conversationsApi } from '../services/conversationsApi';
 import {
   applyWorldMapMove,
   buildPendingNarrativeTile,
@@ -49,15 +51,90 @@ const logger = createLogger('game');
 
 const SaveConfirmationModal = () => {
   const { data, close } = useModal('saveConfirmation');
+  const [root, setRoot] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [renamed, setRenamed] = useState(false);
+
+  useEffect(() => {
+    if (data) {
+      setRoot(data.root || '');
+      setDisplayName(data.title || '');
+      setRenamed(false);
+    }
+  }, [data]);
+
+  const applyRename = async () => {
+    const clean = root.trim();
+    if (!clean || !data?.onRename) return;
+    await data.onRename(clean);
+    setDisplayName(buildSaveName(clean));
+    setRenamed(true);
+  };
+
+  const status = data?.status || 'saved';
+  const isSuccess = status === 'saved' || status === 'nochange';
+  let heading, headingColor, blurb;
+  if (status === 'error') {
+    heading = '⚠ Save failed';
+    headingColor = 'var(--state-error, #d9534f)';
+    blurb = 'Your game could not be saved to this browser. Storage may be blocked (a private window?) or full. Try again, or free up space.';
+  } else if (status === 'skipped') {
+    heading = 'Nothing to save yet';
+    headingColor = 'var(--text)';
+    blurb = 'Begin your adventure before saving.';
+  } else if (status === 'nochange') {
+    heading = '✓ Already saved';
+    headingColor = 'var(--state-success)';
+    blurb = 'No new changes since your last save. Your progress is safe as:';
+  } else {
+    heading = '✓ Game Saved!';
+    headingColor = 'var(--state-success)';
+    blurb = 'Your progress has been saved as:';
+  }
+
   return (
-    <ModalShell modalId="saveConfirmation" ariaLabel="Save Confirmation" style={{ maxWidth: '400px', textAlign: 'center' }}>
-      <h3 style={{ marginBottom: '15px', color: 'var(--state-success)' }}>✓ Game Saved!</h3>
+    <ModalShell modalId="saveConfirmation" ariaLabel="Save Confirmation" style={{ maxWidth: '420px', textAlign: 'center' }}>
+      <h3 style={{ marginBottom: '15px', color: headingColor }}>{heading}</h3>
       <p style={{ marginBottom: '10px', color: 'var(--text)' }}>
-        Your progress has been saved as:
+        {blurb}
       </p>
-      <p style={{ marginBottom: '20px', fontWeight: 'bold', color: 'var(--primary)' }}>
-        {data?.title}
-      </p>
+
+      {isSuccess && (
+        <>
+          <p style={{ marginBottom: '8px', fontWeight: 'bold', color: 'var(--primary)' }}>
+            {displayName}
+          </p>
+          <p style={{ marginBottom: '18px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+            {data?.signedIn
+              ? '☁️ Saved to your account (syncs across your devices)'
+              : '💾 Saved on this device (this browser)'}
+          </p>
+
+          <div style={{ textAlign: 'left', marginBottom: '20px' }}>
+            <label htmlFor="save-root-name" style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              Campaign name
+            </label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                id="save-root-name"
+                type="text"
+                value={root}
+                onChange={(e) => { setRoot(e.target.value); setRenamed(false); }}
+                maxLength={60}
+                placeholder="Adventure"
+                style={{ flex: 1, padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)' }}
+              />
+              <button onClick={applyRename} className="secondary-button" disabled={!root.trim()} style={{ whiteSpace: 'nowrap' }}>
+                Rename
+              </button>
+            </div>
+            <p style={{ fontSize: '0.78rem', opacity: 0.7, marginTop: '6px' }}>
+              The date and time are added automatically. {renamed ? '✓ Renamed.' : ''}
+            </p>
+          </div>
+        </>
+      )}
+
       <button onClick={close} className="primary-button" style={{ padding: '10px 30px' }}>
         Continue
       </button>
@@ -81,9 +158,17 @@ const QuestOfferModal = () => {
   );
 };
 
-const Game = () => {
+const Game = ({ resumeConversation = null }) => {
   const { state } = useLocation();
-  const { selectedHeroes: stateHeroes, loadedConversation, worldSeed: stateSeed, gameSessionId: stateGameSessionId, generatedMap: stateGeneratedMap, townMapsCache: stateTownMapsCache } = state || { selectedHeroes: [], loadedConversation: null, worldSeed: null, gameSessionId: null, generatedMap: null, townMapsCache: null };
+  // On a hard reload BrowserRouter restores location.state, but that is the STALE starting
+  // snapshot (initial heroes / generated map / seed from when the game began). When the
+  // resume gate hands us a saved row, that row is authoritative, so ignore the stale router
+  // state entirely and hydrate only from resumeConversation. This mirrors the Saved Games
+  // "Load Game" path (which carries just loadedConversation). Reading the stale generatedMap
+  // here would silently revert map/position progress made since the game began.
+  const effectiveState = resumeConversation ? null : state;
+  const { selectedHeroes: stateHeroes, loadedConversation: stateLoadedConversation, worldSeed: stateSeed, gameSessionId: stateGameSessionId, generatedMap: stateGeneratedMap, townMapsCache: stateTownMapsCache } = effectiveState || { selectedHeroes: [], loadedConversation: null, worldSeed: null, gameSessionId: null, generatedMap: null, townMapsCache: null };
+  const loadedConversation = resumeConversation || stateLoadedConversation;
   const [selectedHeroes, setSelectedHeroes] = useState(() => {
     // Normalize first (de-dupe + migrate legacy characterId -> heroId), then backfill
     // progression fields. normalizeParty repairs saves corrupted by the old hero-overwrite bug.
@@ -152,6 +237,9 @@ const Game = () => {
   const [pendingLookEncounter, setPendingLookEncounter] = useState(null);
   // Bumped on each guest/local Look-around so repeated looks at the same tile vary.
   const lookNonceRef = useRef(0);
+  // Rolling window of recently-shown local movement lines, so templated biome prose
+  // doesn't repeat back to back or too soon (passed to composeLocalMovementNarrative).
+  const recentNarrationRef = useRef([]);
   const [aiNarrativeEnabled, setAiNarrativeEnabled] = useState(true);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [isMobilePartySidebarOpen, setIsMobilePartySidebarOpen] = useState(false);
@@ -495,6 +583,7 @@ const Game = () => {
   // path — no /api/ai call, no RAG embed (matches guest play today). The signed-in AI
   // path is untouched. (Phase B3a of TIERED_NARRATION_PLAN.md.)
   const appendLocalMovementNarrative = ({ tile, coords, isNewArea, heroes }) => {
+    const recent = recentNarrationRef.current;
     const text = composeLocalMovementNarrative({
       tile,
       coords,
@@ -502,8 +591,11 @@ const Game = () => {
       worldMap: mapHook.worldMap,
       settings,
       selectedHeroes: heroes || selectedHeroes,
-      isNewArea
+      isNewArea,
+      recent
     });
+    // Keep the avoid-window bounded (the composer appends the lines it just used).
+    if (recent.length > 8) recent.splice(0, recent.length - 8);
     if (!text || !text.trim()) return;
     interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
   };
@@ -895,18 +987,34 @@ const Game = () => {
             selectedHeroes,
             onUseItem: (heroId, itemKey, healedHero) => {
               setSelectedHeroes(prev => replaceHeroInParty(prev, healedHero));
-            }
+            },
+            onHeroUpdate: handleHeroUpdate
           })}
           onOpenHowToPlay={openHowToPlay}
           onLookAround={handleLookAround}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
           onManualSave={async () => {
-            const timestamp = new Date();
-            const title = `Adventure - ${timestamp.toLocaleDateString()} ${timestamp.toLocaleTimeString()}`;
-            const success = await performSave();
-            if (success !== false) {
-              openSaveConfirmation({ title });
-            }
+            const currentRoot = (settings?.saveName || '').trim();
+            const title = buildSaveName(currentRoot);
+            // performSave reports what actually happened so the confirmation is honest:
+            // 'saved' | 'nochange' | 'skipped' | 'error'.
+            const status = await performSave();
+            openSaveConfirmation({
+              status,
+              title,
+              signedIn: !!user, // drives the "where did it save" indicator
+              root: settings?.saveName || '',
+              // Change the campaign root name: keep it for future saves (settings) and
+              // update the just-saved row's name immediately.
+              onRename: async (newRoot) => {
+                setSettings(prev => ({ ...prev, saveName: newRoot }));
+                try {
+                  await conversationsApi.updateName(sessionId, newRoot);
+                } catch (e) {
+                  logger.error('Failed to rename save', e);
+                }
+              }
+            });
           }}
           canManualSave={!!sessionId}
           hasAdventureStarted={hasAdventureStarted}

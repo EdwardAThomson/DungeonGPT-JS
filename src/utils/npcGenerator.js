@@ -737,6 +737,19 @@ export const populateTown = (townMapData, seed) => {
         } else if (b.type === 'shrine') {
             const priest = addNPC("Priest", b, b);
             priest.job = `${priest.title} of ${b.name}`;
+        } else if (b.type === 'barracks') {
+            // Militia hall / garrison: a ranking officer plus a guard or two on duty.
+            const captain = addNPC("Guard", b, b, { title: rng.pick(["Captain", "Sergeant", "Lieutenant"]) });
+            captain.job = `Commander of ${b.name}`;
+            const guardCount = rng.pick([1, 2]);
+            for (let i = 0; i < guardCount; i++) {
+                const guard = addNPC("Guard", b, b, { title: rng.pick(["Sentry", "Watchman", "Man-at-arms"]) });
+                guard.job = `Guard at ${b.name}`;
+            }
+        } else if (b.type === 'workshop') {
+            // Tinker's / artificer's workshop (a crafts-person, reusing the smith archetype).
+            const tinker = addNPC("Blacksmith", b, b, { title: "Tinker" });
+            tinker.job = `Proprietor of ${b.name}`;
         }
     });
 

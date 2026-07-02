@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { conversationsApi } from '../services/conversationsApi';
+import { buildSaveName } from '../game/saveController';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-session');
@@ -68,10 +69,13 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
         try {
             logger.debug('Starting save operation');
             // Adjust URL to your backend endpoint
+            // Derive the display name from the player-editable root (game_settings.saveName)
+            // so a renamed campaign keeps its name across saves; only the timestamp refreshes.
+            const saveRoot = gameState?.gameSettings?.saveName;
             const result = await conversationsApi.save({
                 sessionId: currentSessionId,
                 timestamp: new Date().toISOString(),
-                conversationName: `Adventure - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`,
+                conversationName: buildSaveName(saveRoot),
                 ...gameState // spread the rest of the game state
             });
             logger.debug('Conversation saved successfully', result);

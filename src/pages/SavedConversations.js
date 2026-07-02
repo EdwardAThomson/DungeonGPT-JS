@@ -1,6 +1,7 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { conversationsApi } from '../services/conversationsApi';
+import { buildSaveName, parseSaveRoot } from '../game/saveController';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { useAuth } from '../contexts/AuthContext';
@@ -76,13 +77,15 @@ const SavedConversations = () => {
     }
   };
 
-  const updateConversationName = async (sessionId, conversationName) => {
+  // `root` is the editable base name; the store re-derives the display name as
+  // "<root> - <date> <time>" and persists the root so future saves keep it.
+  const updateConversationName = async (sessionId, root) => {
     try {
-      await conversationsApi.updateName(sessionId, conversationName);
-      // Update local state
+      const updated = await conversationsApi.updateName(sessionId, root);
+      const displayName = updated?.conversation_name || buildSaveName(root);
       setConversations(conversations.map(conv =>
         conv.sessionId === sessionId
-          ? { ...conv, conversation_name: conversationName }
+          ? { ...conv, conversation_name: displayName }
           : conv
       ));
       setEditingName(null);
@@ -212,7 +215,9 @@ const SavedConversations = () => {
                           type="text"
                           value={newName}
                           onChange={(e) => setNewName(e.target.value)}
-                          placeholder="Enter new name"
+                          placeholder="Campaign name"
+                          title="The date and time are added automatically"
+                          maxLength={60}
                           autoFocus
                           style={{ flex: 1 }}
                         />
@@ -237,7 +242,7 @@ const SavedConversations = () => {
                       <h3
                         onClick={() => {
                           setEditingName(conversation.sessionId);
-                          setNewName(conversation.conversation_name || 'Untitled Adventure');
+                          setNewName(settings?.saveName || parseSaveRoot(conversation.conversation_name));
                         }}
                         className="conversation-title"
                         title="Click to edit name"

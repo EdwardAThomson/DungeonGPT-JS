@@ -77,3 +77,56 @@ describe('resolveEncounter with equipment', () => {
     expect(emptyEquip.hpDamage).toBe(noEquip.hpDamage);
   });
 });
+
+describe('resolveEncounter loot rarity gating by tier', () => {
+  // Non-hostile skill encounter with guaranteed-drop loot: one rare-and-below item and
+  // one very_rare item, both at 100% chance so only the rarity gate can remove them.
+  const makeLootEncounter = () => ({
+    name: 'Hidden Cache',
+    difficulty: 'easy',
+    suggestedActions: [
+      { label: 'Search', description: 'search the cache', skill: 'Perception' }
+    ],
+    consequences: {
+      criticalSuccess: 'You find treasure.',
+      success: 'You find treasure.',
+      failure: 'Nothing here.',
+      criticalFailure: 'A trap!'
+    },
+    rewards: {
+      xp: 10,
+      gold: '0',
+      items: ['healing_potion:100%', 'legendary_artifact:100%'] // rare-safe + very_rare
+    }
+  });
+
+  const looter = () => ({ characterId: 'h1', stats: { Wisdom: 10 }, maxHP: 100, inventory: [] });
+
+  beforeEach(() => {
+    // 0.99 -> d20 lands high (success), and every 100% item-chance roll passes.
+    jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('Tier 1 drops the rare-safe item but never the very_rare one', async () => {
+    const result = await resolveEncounter(makeLootEncounter(), 'Search', looter(), { tier: 1 });
+    expect(result.rewards.items).toContain('healing_potion');
+    expect(result.rewards.items).not.toContain('legendary_artifact');
+  });
+
+  it('Tier 2 allows the very_rare drop through', async () => {
+    const result = await resolveEncounter(makeLootEncounter(), 'Search', looter(), { tier: 2 });
+    expect(result.rewards.items).toContain('healing_potion');
+    expect(result.rewards.items).toContain('legendary_artifact');
+  });
+
+  it('falls back to party level when settings.tier is absent (old saves)', async () => {
+    // Level 2 -> Tier 1, so very_rare is still gated even with no settings.tier.
+    const lowLevel = { ...looter(), level: 2 };
+    const result = await resolveEncounter(makeLootEncounter(), 'Search', lowLevel, {});
+    expect(result.rewards.items).not.toContain('legendary_artifact');
+  });
+});

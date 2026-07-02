@@ -1,4 +1,42 @@
-import { buildSaveFingerprint, buildSubMapsPayload } from './saveController';
+import { buildSaveFingerprint, buildSubMapsPayload, buildSaveName, parseSaveRoot, DEFAULT_SAVE_ROOT } from './saveController';
+
+describe('buildSaveName', () => {
+  const date = new Date('2026-07-02T14:30:00');
+
+  it('formats "<root> - <date> <time>"', () => {
+    const name = buildSaveName('Goblin Campaign', date);
+    expect(name.startsWith('Goblin Campaign - ')).toBe(true);
+    expect(name).toContain(date.toLocaleDateString());
+    expect(name).toContain(date.toLocaleTimeString());
+  });
+
+  it('falls back to the default root when empty or blank', () => {
+    expect(buildSaveName('', date).startsWith(`${DEFAULT_SAVE_ROOT} - `)).toBe(true);
+    expect(buildSaveName('   ', date).startsWith(`${DEFAULT_SAVE_ROOT} - `)).toBe(true);
+    expect(buildSaveName(undefined, date).startsWith(`${DEFAULT_SAVE_ROOT} - `)).toBe(true);
+  });
+
+  it('trims the root', () => {
+    expect(buildSaveName('  My Saga  ', date).startsWith('My Saga - ')).toBe(true);
+  });
+});
+
+describe('parseSaveRoot', () => {
+  it('recovers the root from a full save name (round-trips buildSaveName)', () => {
+    const date = new Date('2026-07-02T14:30:00');
+    expect(parseSaveRoot(buildSaveName('Goblin Campaign', date))).toBe('Goblin Campaign');
+    expect(parseSaveRoot(buildSaveName('Adventure', date))).toBe('Adventure');
+  });
+
+  it('returns the default for empty input', () => {
+    expect(parseSaveRoot('')).toBe(DEFAULT_SAVE_ROOT);
+    expect(parseSaveRoot(null)).toBe(DEFAULT_SAVE_ROOT);
+  });
+
+  it('returns the whole string when there is no timestamp suffix', () => {
+    expect(parseSaveRoot('Just A Name')).toBe('Just A Name');
+  });
+});
 
 describe('saveController', () => {
   it('produces stable fingerprint for identical inputs', () => {

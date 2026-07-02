@@ -34,12 +34,13 @@ const ROOFS = {
   manor: '#8a5273',      // noble plum
   keep: '#6b6f76',       // slate (tall tower)
   barracks: '#566069',   // darker military slate
-  inn: '#b5762d', tavern: '#a05a36',  // amber / brown
+  inn: '#b5762d', tavern: '#b3672f',  // amber / warm ale-brown
   shop: '#3f7d6e',       // teal
   market: '#cf8a3a',     // market orange
   temple: '#c9b04a',     // temple gold
   bank: '#bdb39a',       // pale stone
-  guild: '#5a6fae', archives: '#4f63a0', library: '#4f63a0', // blues
+  guild: '#5a6fae', library: '#4f63a0', // guild + library blues
+  archives: '#6a5a3a', // records/scrolls umber (kept off the blues so it reads apart from the guild)
   blacksmith: '#5a5550', foundry: '#4f4a45',                 // dark forge
   barn: '#8a5a32', warehouse: '#7a5230',                     // timber browns
   alchemist: '#7a5a9c',  // arcane purple
@@ -435,6 +436,22 @@ const SHAPES = {
     `<rect x='19' y='8' width='3' height='3' fill='${shade(r, 1.1)}'/>` +
     `<rect x='22' y='2' width='2.6' height='4' fill='${shade(r, 0.55)}'/>` +
     `<rect x='3' y='17' width='4' height='3' rx='0.5' fill='${shade(r, 1.05)}'/>`,
+  // tavern: timber-framed alehouse with exposed cross-beams, warm lit windows, and a
+  // hanging green sign board with a mug — clearly a public house, not a plain cottage.
+  tavern: (r) =>
+    `<rect x='5' y='11' width='22' height='15' rx='1.5' fill='${r}'/>` +
+    `<rect x='5' y='11' width='22' height='2.2' fill='#ffffff' opacity='0.14'/>` +
+    `<rect x='5' y='18.4' width='22' height='1.6' fill='${shade(r, 0.6)}'/>` +
+    `<rect x='9.6' y='13' width='1.3' height='13' fill='${shade(r, 0.6)}'/>` +
+    `<rect x='21' y='13' width='1.3' height='13' fill='${shade(r, 0.6)}'/>` +
+    `<rect x='22' y='5' width='3' height='6' fill='${shade(r, 0.55)}'/>` +
+    `<rect x='12.4' y='14.2' width='3' height='3' rx='0.4' fill='#ffd27a'/>` +
+    `<rect x='16.6' y='14.2' width='3' height='3' rx='0.4' fill='#ffd27a'/>` +
+    `<rect x='2.4' y='12.6' width='5' height='1' fill='${shade(r, 0.5)}'/>` +
+    `<rect x='3' y='13.6' width='4.4' height='4.4' rx='0.6' fill='#3f6f4a'/>` +
+    `<rect x='4.5' y='14.6' width='1.6' height='2.4' rx='0.3' fill='#f2ead6'/>` +
+    `<rect x='4.3' y='14.4' width='2' height='0.7' rx='0.3' fill='#f2ead6'/>` +
+    door(r, 13, 5),
   // alchemist: domed roof with a finial + a door
   dome: (r) =>
     `<rect x='10' y='16' width='12' height='10' rx='1' fill='${shade(r, 0.82)}'/>` +
@@ -466,6 +483,18 @@ const SHAPES = {
     `<polygon points='12,9 16,7.2 16,11 12,11' fill='#f2ead6'/>` +
     `<polygon points='20,9 16,7.2 16,11 20,11' fill='#e0d6bd'/>` +
     `<rect x='15.6' y='7.2' width='0.8' height='3.8' fill='${shade(r, 0.5)}'/>` +
+    door(r, 14, 4),
+  // archives: records house — a row of scroll cubbies across the facade, no flag (that's
+  // the guild's mark), so it no longer shares the guild's banner silhouette.
+  archives: (r) =>
+    `<rect x='7' y='12' width='18' height='15' rx='1' fill='${r}'/>` +
+    `<rect x='7' y='12' width='18' height='2.2' fill='#ffffff' opacity='0.14'/>` +
+    `<rect x='9' y='15.4' width='3.6' height='3.6' rx='0.4' fill='${shade(r, 0.5)}'/>` +
+    `<rect x='14.2' y='15.4' width='3.6' height='3.6' rx='0.4' fill='${shade(r, 0.5)}'/>` +
+    `<rect x='19.4' y='15.4' width='3.6' height='3.6' rx='0.4' fill='${shade(r, 0.5)}'/>` +
+    `<rect x='10.3' y='16.1' width='1.2' height='2.2' rx='0.6' fill='#f2ead6'/>` +
+    `<rect x='15.5' y='16.1' width='1.2' height='2.2' rx='0.6' fill='#f2ead6'/>` +
+    `<rect x='20.7' y='16.1' width='1.2' height='2.2' rx='0.6' fill='#f2ead6'/>` +
     door(r, 14, 4),
   // warehouse: flat-roofed storage with twin bay doors and a stacked crate
   warehouse: (r) =>
@@ -504,7 +533,7 @@ const SHAPES = {
 
 const BUILDING_SHAPE = {
   house: 'gable',
-  inn: 'inn', tavern: 'hall',
+  inn: 'inn', tavern: 'tavern',
   barn: 'barn', warehouse: 'warehouse',
   blacksmith: 'smithy', foundry: 'foundry',
   temple: 'temple',
@@ -512,7 +541,7 @@ const BUILDING_SHAPE = {
   manor: 'manor', keep: 'tower', barracks: 'fortified',
   alchemist: 'dome',
   shop: 'stall', market: 'stall',
-  guild: 'banner', archives: 'banner', library: 'library',
+  guild: 'banner', archives: 'archives', library: 'library',
   // new building types — each has its own bespoke silhouette
   apothecary: 'apothecary',
   fletcher: 'fletcher',

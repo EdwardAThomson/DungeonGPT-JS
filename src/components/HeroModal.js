@@ -2,6 +2,7 @@ import React from 'react';
 import { calculateMaxHP, getHPStatus } from '../utils/healthSystem';
 import { getLevelProgress, calculateLevel } from '../utils/progressionSystem';
 import { resolveProfilePicture } from '../utils/assetHelper';
+import { getRarityColor } from '../utils/inventorySystem';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
 import {
@@ -15,6 +16,19 @@ import {
 } from '../game/equipment';
 
 const SLOT_LABELS = { weapon: 'Weapon', armor: 'Armour', accessory: 'Accessory' };
+
+// Which character stat each slot's bonus actually modifies (the bonus string
+// itself only carries a number, so the affected stat comes from the slot).
+const STAT_FOR_SLOT = { weapon: 'attack', armor: 'armour soak', accessory: 'to checks' };
+
+// Format an item's bonus as "+N <stat>" for a given slot, e.g. "+1 attack".
+// Accessories with no explicit bonus still grant the default +1 to checks.
+const formatSlotBonus = (slot, bonusStr) => {
+    let n = parseBonus(bonusStr);
+    if (slot === 'accessory' && !n) n = 1;
+    if (!n) return null;
+    return `${n >= 0 ? '+' : ''}${n} ${STAT_FOR_SLOT[slot] || ''}`.trim();
+};
 
 const HeroModal = () => {
     const { data, close, open } = useModal('hero');
@@ -92,9 +106,9 @@ const HeroModal = () => {
                                         {equipped ? (
                                             <>
                                                 <span className="hero-equip-item-name">
-                                                    {equipped.name || equipped.key}
-                                                    {equipped.bonus ? (
-                                                        <span className="hero-equip-bonus"> ({equipped.bonus})</span>
+                                                    <span style={{ color: getRarityColor(equipped.rarity) }}>{equipped.name || equipped.key}</span>
+                                                    {formatSlotBonus(slot, equipped.bonus) ? (
+                                                        <span className="hero-equip-bonus"> ({formatSlotBonus(slot, equipped.bonus)})</span>
                                                     ) : null}
                                                 </span>
                                                 <button
@@ -119,7 +133,7 @@ const HeroModal = () => {
                                                 {options.map((item) => (
                                                     <option key={item.key} value={item.key}>
                                                         {item.name || item.key}
-                                                        {item.bonus ? ` (${item.bonus})` : ''}
+                                                        {formatSlotBonus(slot, item.bonus) ? ` (${formatSlotBonus(slot, item.bonus)})` : ''}
                                                     </option>
                                                 ))}
                                             </select>

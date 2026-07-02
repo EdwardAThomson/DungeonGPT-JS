@@ -108,4 +108,26 @@ describe('shopController.sellItem', () => {
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('not_in_inventory');
   });
+
+  it('refuses to sell an item the lead hero has equipped', () => {
+    const party = makeParty(0, [{ key: 'magic_weapon' }]);
+    party[0].equipment = { weapon: 'magic_weapon' };
+    const result = sellItem(party, 'magic_weapon');
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('equipped');
+    expect(result.party).toBe(party);
+    expect(party[0].inventory).toHaveLength(1);
+  });
+
+  it('still sells a spare copy while another is equipped', () => {
+    const party = makeParty(0, [{ key: 'magic_weapon' }, { key: 'magic_weapon' }]);
+    party[0].equipment = { weapon: 'magic_weapon' };
+    const result = sellItem(party, 'magic_weapon');
+
+    expect(result.ok).toBe(true);
+    expect(result.gold).toBe(sellPrice('magic_weapon'));
+    // one copy remains for the equipped reference to resolve against
+    expect(result.party[0].inventory.filter((i) => i.key === 'magic_weapon')).toHaveLength(1);
+  });
 });

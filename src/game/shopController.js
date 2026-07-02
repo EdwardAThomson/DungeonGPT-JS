@@ -4,6 +4,7 @@
 // Reuses addGold / addItem / removeItem / ITEM_CATALOG from inventorySystem (read-only).
 
 import { addGold, addItem, removeItem, ITEM_CATALOG } from '../utils/inventorySystem';
+import { canSellItem } from './equipment';
 
 /**
  * Buy price for an item key.
@@ -117,6 +118,11 @@ export const sellItem = (party, key) => {
   const inventory = lead.inventory || [];
   if (!inventory.some((i) => i.key === key)) {
     return { party, ok: false, gold: 0, reason: 'not_in_inventory' };
+  }
+  // A worn item can't be sold out from under its wearer (that would silently drop its
+  // bonus). Spare, unequipped copies of the same item stay sellable.
+  if (!canSellItem(lead, key)) {
+    return { party, ok: false, gold: 0, reason: 'equipped' };
   }
 
   const price = sellPrice(key);
