@@ -244,6 +244,7 @@ export const getMilestoneNpcsForTown = (milestones, townName) => {
             id: m.spawn.id,
             name: m.spawn.name,
             role: m.spawn.role || 'Villager',
+            gender: m.spawn.gender || null,
             personality: m.spawn.personality || null,
             milestoneId: m.id,
             location: loc,

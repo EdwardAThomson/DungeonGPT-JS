@@ -585,6 +585,7 @@ export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
         const role = ROLES[spec.role] ? spec.role : 'Guard';
         const npc = addNPC(role, b, b);
         npc.name = spec.name;
+        if (spec.gender) npc.gender = spec.gender; // keep the icon/pronoun consistent with the authored name
         // The authored name usually leads with an honorific ("Captain Marta",
         // "Keeper Najwa"); use it as the title so display/labels stay consistent.
         if (spec.name.includes(' ')) npc.title = spec.name.split(' ')[0];
