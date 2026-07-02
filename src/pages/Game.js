@@ -621,11 +621,44 @@ const Game = ({ resumeConversation = null }) => {
     interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
   };
 
+  // Open the location modal for a POI tile (arrival, or re-opened by clicking the tile
+  // you stand on). Offers the Enter button and, when an active milestone boss lairs
+  // here, the Confront action.
+  const openPoiLocationModal = (tile, milestones) => {
+    const poiEncounter = tile ? buildPoiEncounter(tile) : null;
+    if (!poiEncounter || isSiteHidden(tile)) return false;
+    const boss = getMilestoneBossForTile(milestones || settings?.milestones || [], tile);
+    mapHook.setIsMapModalOpen(false); // close map so the location modal is visible
+    openEncounterInfo({
+      encounter: poiEncounter,
+      boss,
+      onFight: boss ? () => {
+        mapHook.setIsMapModalOpen(false);
+        reopenMapAfterEncounterRef.current = true;
+        // enemyId rides on the encounter so handleEncounterResolve fires
+        // enemy_defeated with the right id and the milestone completes.
+        openEncounterAction({ encounter: { ...boss.encounter, enemyId: boss.enemyId } });
+      } : null,
+      onEnterLocation: () => mapHook.handleEnterLocation(poiEncounter, interactionHook.setConversation, interactionHook.conversation),
+      onViewMap: () => mapHook.setIsMapModalOpen(true)
+    });
+    return true;
+  };
+
   // --- Map Movement Handler (Smart narration: local line per move, AI on demand) ---
   const handleMoveOnWorldMap = async (clickedX, clickedY) => {
     if (!hasAdventureStarted || interactionHook.isLoading) return;
 
     if (!isAdjacentWorldMove(mapHook.playerPosition, clickedX, clickedY)) {
+      // Clicking the tile you're STANDING ON re-opens its location modal — needed when
+      // a random encounter interrupted the arrival and auto-closed the Enter offer
+      // (modal conflict rule), which otherwise left the location unenterable.
+      const { x, y } = mapHook.playerPosition;
+      if (clickedX === x && clickedY === y) {
+        const tile = getTile(mapHook.worldMap, x, y);
+        openPoiLocationModal(tile);
+        return; // same-tile click is never a move; no "adjacent only" nag
+      }
       // Append to the conversation (a positioned log entry) rather than the sticky error
       // banner, which always shows the latest message regardless of where it happened.
       interactionHook.setConversation(prev => [...prev, {
@@ -675,26 +708,9 @@ const Game = ({ resumeConversation = null }) => {
     // POI Check (for location Modal — towns, etc.). Secret sites (caves/ruins) don't offer
     // an entrance until a quest has revealed them, so they read as plain ground until then.
     // If an ACTIVE milestone boss lairs on this tile (stamped enemy, or a combat milestone
-    // authored at this milestone POI's location), the modal offers the fight.
-    const poiEncounter = buildPoiEncounter(targetTile);
-    const poiShown = poiEncounter && !isSiteHidden(targetTile);
-    if (poiShown) {
-      const boss = getMilestoneBossForTile(effectiveMilestones, targetTile);
-      mapHook.setIsMapModalOpen(false); // close map so the location modal is visible
-      openEncounterInfo({
-        encounter: poiEncounter,
-        boss,
-        onFight: boss ? () => {
-          mapHook.setIsMapModalOpen(false);
-          reopenMapAfterEncounterRef.current = true;
-          // enemyId rides on the encounter so handleEncounterResolve fires
-          // enemy_defeated with the right id and the milestone completes.
-          openEncounterAction({ encounter: { ...boss.encounter, enemyId: boss.enemyId } });
-        } : null,
-        onEnterLocation: () => mapHook.handleEnterLocation(poiEncounter, interactionHook.setConversation, interactionHook.conversation),
-        onViewMap: () => mapHook.setIsMapModalOpen(true)
-      });
-    }
+    // authored at this milestone POI's location), the modal offers the fight. If a random
+    // encounter interrupts this modal, clicking the tile you stand on re-opens it.
+    const poiShown = openPoiLocationModal(targetTile, effectiveMilestones);
 
     // --- Random Encounter Check (Phase 2.4: Two-Tier System) ---
     const isFirstVisitToTile = !wasExplored;
