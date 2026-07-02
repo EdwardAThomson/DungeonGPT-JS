@@ -65,6 +65,16 @@ Rather than letting the AI freely decide if a narrative goal is met, we constrai
 - AI-powered conversation with structured function call outputs
 - Hybrid: AI conversation with a skill check gate (e.g., must pass a Persuasion check during the conversation)
 
+> **Shipped 2026-07-02 — the `talk` type (see `MILESTONE_NPC_GROUNDING_PLAN.md`).** A fourth
+> mechanical type covers the "meet/warn an NPC" case deterministically: `type: 'talk'` with
+> `trigger: { npc: '<spawn.id>', action: 'talk' }` completes on an `npc_talked` event, fired
+> by a "💬 Talk" button on the authored NPC (placed into its quest building by
+> `populateTown` via `getMilestoneNpcsForTown`), with a building-level "Ask for …" fallback.
+> The AI `[COMPLETE_MILESTONE]` marker is now guarded (`findMarkerMilestoneIndex`) to
+> `narrative`/legacy-untyped milestones only. Milestone boss fights launch from the POI
+> arrival modal via `getMilestoneBossForTile` (a "⚔️ Confront" action). Existing saves keep
+> their snapshotted `narrative` milestones and still complete via the marker.
+
 ---
 
 ## Data Structure
@@ -85,7 +95,7 @@ Rather than letting the AI freely decide if a narrative goal is met, we constrai
   id: 1,
   text: 'Find the hidden map in the archives of Oakhaven',
   location: 'Oakhaven',
-  type: 'item',                // 'item' | 'combat' | 'location' | 'narrative'
+  type: 'item',                // 'item' | 'combat' | 'location' | 'talk' | 'narrative'
   requires: [],                // IDs of milestones that must be completed first
   trigger: {
     item: 'hidden_map',        // what to check for
