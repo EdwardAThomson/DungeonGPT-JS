@@ -17,8 +17,9 @@ const logger = createLogger('map-generator');
  * @param {Object|Array} customNames - Optional names: { towns: [...], mountains: [...] } or legacy array of town names
  * @param {string} theme - Optional biome theme for the whole map. Defaults to 'grassland'
  *   (base biome 'plains' — byte-identical to historical behaviour). 'desert' bases land
- *   tiles on the 'desert' biome instead. Themed-region maps (Phase 2b): the whole map IS
- *   one biome theme; water/beach/coast/lake/POI logic is otherwise unchanged.
+ *   tiles on the 'desert' biome instead; 'snow' bases them on the 'snow' biome. Themed-
+ *   region maps (Phase 2b/2c): the whole map IS one biome theme; water/beach/coast/lake/POI
+ *   logic is otherwise unchanged.
  * @returns {Array} 2D array of map tiles
  */
 export const generateMapData = (width = 10, height = 10, seed = null, customNames = {}, theme = 'grassland') => {
@@ -33,8 +34,8 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   // existing behaviour and tests stay byte-identical; a themed map (e.g. desert) bases
   // its land tiles on the theme biome instead. Water/beach/lake placement still keys off
   // this land biome so themed maps keep their coasts and (oasis-like) lakes.
-  const landBiome = theme === 'desert' ? 'desert' : 'plains';
-  const landDescription = landBiome === 'desert' ? 'Open desert' : 'Open fields';
+  const landBiome = theme === 'desert' ? 'desert' : theme === 'snow' ? 'snow' : 'plains';
+  const landDescription = landBiome === 'desert' ? 'Open desert' : landBiome === 'snow' ? 'Frozen tundra' : 'Open fields';
 
   const mapData = [];
   const townsList = []; // Keep track of all towns

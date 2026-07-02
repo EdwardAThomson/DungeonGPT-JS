@@ -304,6 +304,110 @@ export const storyTemplates = [
     },
 
     // ============================================================
+    // FROZEN FRONTIER (Phase 2c — snow biome themed adventure)
+    // ============================================================
+    // Like the desert template, the top-level `theme` is the campaign GENRE (reused for
+    // grouping), while `settings.theme` is the world BIOME theme ('snow') that drives the
+    // map/town/narration. Snow is a premium biome (PREMIUM_THEMES), so this is a premium
+    // adventure; `premium: true` is also set explicitly for clarity.
+    {
+        id: 'frozen-frontier-t1',
+        theme: 'heroic-fantasy',
+        tier: 1,
+        levelRange: [1, 2],
+        // Premium content: snow world-gen + its quest are a paid unlock. Gating derives from
+        // settings.theme ('snow' in PREMIUM_THEMES) too, but the explicit flag keeps intent
+        // obvious. See src/game/entitlements.js.
+        premium: true,
+        name: 'Frozen Frontier',
+        subtitle: 'The Deepening Frost',
+        icon: '❄️',
+        description: 'An unnatural winter is strangling a frontier village. Cross the frozen wilds, find the source of the killing cold, and end it before the snows swallow everyone.',
+        customNames: { towns: [{ name: 'Hearthmere', size: 'village' }, 'Frosthollow', 'Icemoor', 'Winterreach'], mountains: ['The Rimefang Peaks'] }, // "the village of Hearthmere"
+        settings: {
+            theme: 'snow',
+            shortDescription: 'The village of Hearthmere is freezing to death. The pass has iced over out of season, the sun barely rises, and something cold and patient stalks the drifts at night. The elders beg for someone to brave the frozen wilds and find what is smothering the frontier in endless winter.',
+            campaignGoal: 'Discover the source of the unnatural winter and destroy the frost-cursed wraith bleeding the cold into the frontier.',
+            milestones: [
+                {
+                    id: 1,
+                    text: 'Recover the frozen survey ledger from the Hearthmere trading post',
+                    location: 'Hearthmere',
+                    type: 'item',
+                    requires: [],
+                    trigger: { item: 'map_fragment', action: 'acquire' },
+                    spawn: { type: 'item', id: 'map_fragment', name: 'Frostbound Ledger', location: 'Hearthmere' },
+                    building: { type: 'warehouse', name: 'The Hearthmere Trading Post', location: 'Hearthmere' },
+                    rewards: { xp: 25, gold: '1d6', items: [] },
+                    minLevel: null
+                },
+                {
+                    id: 2,
+                    text: 'Win the trust of the pathfinder at Frosthollow',
+                    location: 'Frosthollow',
+                    type: 'narrative',
+                    requires: [],
+                    trigger: null,
+                    spawn: { type: 'npc', id: 'frost_warden', name: 'Warden Sigrun', location: 'Frosthollow', role: 'Guard', personality: 'weathered, taciturn, knows every drift and crevasse of the frozen pass' },
+                    building: { type: 'inn', name: 'The Frosthollow Lodge', location: 'Frosthollow' },
+                    rewards: { xp: 25, gold: '1d6', items: ['rations'] },
+                    minLevel: null
+                },
+                {
+                    id: 3,
+                    text: 'Climb to the wraith\'s lair among the Rimefang Peaks',
+                    location: 'The Rimefang Peaks',
+                    type: 'location',
+                    requires: [1, 2],
+                    trigger: { location: 'glacier_hollow', action: 'visit' },
+                    spawn: { type: 'poi', id: 'glacier_hollow', name: 'The Glacier Hollow', location: 'The Rimefang Peaks' },
+                    building: null,
+                    rewards: { xp: 50, gold: '1d10', items: [] },
+                    minLevel: null
+                },
+                {
+                    id: 4,
+                    text: 'Destroy the Hoarfrost Wraith',
+                    location: 'The Rimefang Peaks',
+                    type: 'combat',
+                    requires: [3],
+                    trigger: { enemy: 'hoarfrost_wraith', action: 'defeat' },
+                    spawn: { type: 'enemy', id: 'hoarfrost_wraith', name: 'The Hoarfrost Wraith', location: 'The Rimefang Peaks' },
+                    building: null,
+                    encounter: {
+                        name: 'The Hoarfrost Wraith',
+                        icon: '🥶',
+                        image: '/assets/icons/items/ritual_dagger.webp',
+                        encounterTier: 'boss',
+                        difficulty: 'medium',
+                        multiRound: true,
+                        enemyHP: 32,
+                        suggestedActions: [
+                            { label: 'Fight', skill: 'Athletics', description: 'Shatter the wraith\'s frozen core with steel' },
+                            { label: 'Endure the Cold', skill: 'Survival', description: 'Use the warden\'s lore to weather the killing frost' },
+                            { label: 'Break the Curse', skill: 'Arcana', description: 'Unravel the frost-ward binding the endless winter' }
+                        ],
+                        consequences: {
+                            criticalSuccess: 'The wraith\'s ward cracks apart and it dissolves into harmless snow. Warmth creeps back into the air almost at once.',
+                            success: 'After a bitter fight in the blowing snow, the wraith is destroyed. The unnatural cold begins to lift.',
+                            failure: 'A blast of killing frost rimes your armor and numbs your limbs, but you hold your ground.',
+                            criticalFailure: 'The blizzard closes over you. You stagger back down the pass, frostbitten and gasping, the winter unbroken.'
+                        },
+                        rewards: { xp: 75, gold: '2d10', items: ['storm_crystal'] }
+                    },
+                    rewards: { xp: 50, gold: '1d10', items: [] },
+                    minLevel: 2
+                }
+            ],
+            grimnessLevel: 'Bleak',
+            darknessLevel: 'Grey',
+            magicLevel: 'Low Magic',
+            technologyLevel: 'Medieval',
+            responseVerbosity: 'Descriptive'
+        }
+    },
+
+    // ============================================================
     // GRIMDARK SURVIVAL
     // ============================================================
     {
