@@ -4,6 +4,27 @@ Status: DESIGN ONLY, no implementation. Author: planning pass, 2026-07.
 Related docs: `CAMPAIGN_MILESTONE_SYSTEM.md`, `FEATURE_QUEST_GIVERS.md`,
 `FEATURE_SIDEQUEST_BACKFILL.md`, `docs/OUTSTANDING_ISSUES.md`.
 
+## Decisions (2026-07-03)
+
+- **Phased: BOTH shapes, linked save first.** Phase 1 ships Option A (New Expedition:
+  a new LINKED save with a fresh world and the carried party) as the quick win. The
+  end goal is **same-world sequels**: re-author the higher-tier campaigns to take
+  place in the SAME world/geography as their tier-1 predecessors (same town names,
+  e.g. heroic-fantasy-t2 reworked to use Willowdale/Briarwood/... + a new region
+  instead of Eldoria/Silverton), so "Chapter 2" can spawn into the existing world.
+  This dissolves Option B's core objection (locations that don't exist) by authoring
+  them to exist. Remaining same-world engineering to design in a follow-up: injecting
+  the sequel's quest buildings into already-cached towns (a targeted additive
+  mutation, NOT regeneration) and placing new milestone POIs on the live map at
+  campaign start.
+- **Never destroy a world.** Whatever ships, a completed campaign's world/save stays
+  intact and playable; "replace the world in the same save" is rejected.
+- **Party carry: everything, healed.** Levels, XP, gear, and gold carry; the party
+  starts the next chapter at full HP.
+- **Story carry: deferred** until the same-world rework lands (same world makes the
+  question largely moot — journal and RAG index simply continue). For Phase 1 linked
+  saves, default to the distilled prologue unless decided otherwise.
+
 ## 1. Problem
 
 "I completed the goblin quest in one save, but there is no way to pick up the next
