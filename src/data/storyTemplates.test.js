@@ -98,6 +98,26 @@ describe('storyTemplates — structural integrity', () => {
       });
   });
 
+  it("every 'talk' milestone carries an npc trigger matching its authored NPC spawn", () => {
+    playable.forEach((t) => {
+      (t.settings?.milestones || [])
+        .filter((m) => m.type === 'talk')
+        .forEach((m) => {
+          expect(m.trigger?.npc).toBeTruthy();
+          expect(m.spawn?.type).toBe('npc');
+          expect(m.spawn?.id).toBe(m.trigger.npc); // Talk button fires spawn.id as npcId
+        });
+    });
+  });
+
+  it('heroic-fantasy-t1 milestone #2 is a deterministic talk milestone (Option C)', () => {
+    const t = storyTemplates.find((x) => x.id === 'heroic-fantasy-t1');
+    const m2 = t.settings.milestones.find((m) => m.id === 2);
+    expect(m2.type).toBe('talk');
+    expect(m2.trigger).toEqual({ npc: 'militia_captain', action: 'talk' });
+    expect(m2.spawn.id).toBe('militia_captain');
+  });
+
   it('every combat milestone carries a well-formed inline encounter', () => {
     playable.forEach((t) => {
       (t.settings?.milestones || [])

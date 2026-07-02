@@ -18,8 +18,8 @@ import ModalShell from '../components/ModalShell';
 import { calculateMaxHP, shortRest, longRest } from '../utils/healthSystem';
 import { addGold, addItem, ITEM_CATALOG } from '../utils/inventorySystem';
 import { replaceHeroInParty, normalizeParty, heroUid } from '../utils/partyUtils';
-import { composeMovementNarrativePrompt } from '../game/promptComposer';
-import { composeLocalMovementNarrative, composeLocalAmbientNarrative } from '../game/localNarrator';
+import { composeMovementNarrativePrompt, composeNpcMeetingPrompt } from '../game/promptComposer';
+import { composeLocalMovementNarrative, composeLocalAmbientNarrative, composeNpcMeeting } from '../game/localNarrator';
 import { generateMovementNarrative } from '../game/movementController';
 import { buildSaveName } from '../game/saveController';
 import { conversationsApi } from '../services/conversationsApi';
@@ -39,7 +39,7 @@ import {
   formatEncounterRewardLog
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
-import { checkMilestoneCompletion, getMilestoneRewards } from '../game/milestoneEngine';
+import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile } from '../game/milestoneEngine';
 import { buyItem, sellItem } from '../game/shopController';
 import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, turnInQuest, getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
 import { QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
@@ -266,7 +266,7 @@ const Game = ({ resumeConversation = null }) => {
   // Biome theme for lazily-generated town maps (Phase 2b). Falls back to the raw parsed
   // settings (loaded saves) and finally 'grassland' so older saves are unaffected.
   const mapTheme = settings?.theme || settingsObj?.theme || 'grassland';
-  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme, getActiveSiteObjectives(settings?.sideQuests));
+  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme, getActiveSiteObjectives(settings?.sideQuests), settings?.milestones);
 
   const interactionHook = useGameInteraction(
     loadedConversation,
@@ -335,7 +335,13 @@ const Game = ({ resumeConversation = null }) => {
     if (sideQuests && sideQuests.length > 0) {
       const { updatedSideQuests, completions } = checkSideQuestEvent(sideQuests, event, heroLevel);
       if (completions.length > 0) {
-        setSettings(prev => ({ ...prev, sideQuests: updatedSideQuests }));
+        // Recompute against prev INSIDE the updater: `updatedSideQuests` above came from a
+        // snapshot, and writing it wholesale would revert any side-quest change that landed
+        // since (a second event in the same handler, an accept during an AI generation).
+        setSettings(prev => ({
+          ...prev,
+          sideQuests: checkSideQuestEvent(prev.sideQuests || [], event, heroLevel).updatedSideQuests
+        }));
         let party = currentParty;
         completions.forEach(c => {
           const stepRewards = c.rewards || { xp: 0, gold: 0, items: [] };
@@ -355,14 +361,29 @@ const Game = ({ resumeConversation = null }) => {
 
     // --- Main campaign milestones ---
     const milestones = settings?.milestones;
-    if (!milestones || milestones.length === 0) return;
+    if (!milestones || milestones.length === 0) return null;
 
     const result = checkMilestoneCompletion(milestones, event, heroLevel);
-    if (!result) return;
+    if (!result) return null;
 
     if (result.type === 'completed') {
       logger.info(`[MILESTONE] Completed: #${result.milestoneId} — ${result.milestone.text}`);
-      setSettings(prev => ({ ...prev, milestones: result.updatedMilestones }));
+      // Mark the completion BY ID against prev — result.updatedMilestones was computed from
+      // a snapshot, and writing it wholesale reverted sibling completions when two events
+      // fired before a re-render (the "I had to redo milestones" bug). Legacy saves whose
+      // milestones lack ids fall back to the computed array.
+      setSettings(prev => {
+        const prevMs = prev.milestones || [];
+        const hasIds = prevMs.every(m => m && typeof m === 'object' && m.id != null);
+        return {
+          ...prev,
+          milestones: hasIds
+            ? prevMs.map(m => (m.id === result.milestoneId ? { ...m, completed: true } : m))
+            : result.updatedMilestones
+        };
+      });
+      // Persist promptly — milestone completions previously waited up to 30s for autosave.
+      setTimeout(() => performSave(), 500);
 
       // Apply milestone rewards to lead hero
       const rewards = getMilestoneRewards(result.milestone);
@@ -397,6 +418,10 @@ const Game = ({ resumeConversation = null }) => {
     } else if (result.type === 'level_blocked') {
       logger.debug(`[MILESTONE] Level blocked: #${result.milestoneId} — needs Lv.${result.requiredLevel}, have Lv.${result.currentLevel}`);
     }
+    // Callers can chain on the result (e.g. a location completion unlocking a boss
+    // fight on the same arrival) — setSettings above is async, so this is the only
+    // way to see updatedMilestones synchronously.
+    return result;
   };
 
   // --- Town Tile Click Wrapper (adds encounter checks) ---
@@ -547,7 +572,9 @@ const Game = ({ resumeConversation = null }) => {
     if (!sideQuests || sideQuests.length === 0) return;
     const { updatedSideQuests, completions } = turnInQuest(sideQuests, ctx);
     if (completions.length === 0) return;
-    setSettings(prev => ({ ...prev, sideQuests: updatedSideQuests }));
+    // Recompute against prev inside the updater (see checkMilestoneEvent) so this write
+    // can't revert side-quest changes that landed since the snapshot.
+    setSettings(prev => ({ ...prev, sideQuests: turnInQuest(prev.sideQuests || [], ctx).updatedSideQuests }));
     let party = selectedHeroes;
     completions.forEach(c => {
       party = applyEncounterOutcomeToParty({ party, result: { rewards: c.rewards || { xp: 0, gold: 0, items: [] }, heroIndex: 0 } }).updatedParty;
@@ -617,11 +644,44 @@ const Game = ({ resumeConversation = null }) => {
     interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
   };
 
+  // Open the location modal for a POI tile (arrival, or re-opened by clicking the tile
+  // you stand on). Offers the Enter button and, when an active milestone boss lairs
+  // here, the Confront action.
+  const openPoiLocationModal = (tile, milestones) => {
+    const poiEncounter = tile ? buildPoiEncounter(tile) : null;
+    if (!poiEncounter || isSiteHidden(tile)) return false;
+    const boss = getMilestoneBossForTile(milestones || settings?.milestones || [], tile);
+    mapHook.setIsMapModalOpen(false); // close map so the location modal is visible
+    openEncounterInfo({
+      encounter: poiEncounter,
+      boss,
+      onFight: boss ? () => {
+        mapHook.setIsMapModalOpen(false);
+        reopenMapAfterEncounterRef.current = true;
+        // enemyId rides on the encounter so handleEncounterResolve fires
+        // enemy_defeated with the right id and the milestone completes.
+        openEncounterAction({ encounter: { ...boss.encounter, enemyId: boss.enemyId } });
+      } : null,
+      onEnterLocation: () => mapHook.handleEnterLocation(poiEncounter, interactionHook.setConversation, interactionHook.conversation),
+      onViewMap: () => mapHook.setIsMapModalOpen(true)
+    });
+    return true;
+  };
+
   // --- Map Movement Handler (Smart narration: local line per move, AI on demand) ---
   const handleMoveOnWorldMap = async (clickedX, clickedY) => {
     if (!hasAdventureStarted || interactionHook.isLoading) return;
 
     if (!isAdjacentWorldMove(mapHook.playerPosition, clickedX, clickedY)) {
+      // Clicking the tile you're STANDING ON re-opens its location modal — needed when
+      // a random encounter interrupted the arrival and auto-closed the Enter offer
+      // (modal conflict rule), which otherwise left the location unenterable.
+      const { x, y } = mapHook.playerPosition;
+      if (clickedX === x && clickedY === y) {
+        const tile = getTile(mapHook.worldMap, x, y);
+        openPoiLocationModal(tile);
+        return; // same-tile click is never a move; no "adjacent only" nag
+      }
       // Append to the conversation (a positioned log entry) rather than the sticky error
       // banner, which always shows the latest message regardless of where it happened.
       interactionHook.setConversation(prev => [...prev, {
@@ -656,26 +716,24 @@ const Game = ({ resumeConversation = null }) => {
       trackTownVisit: mapHook.trackTownVisit
     });
 
-    // POI Check (for location Modal — towns, etc.). Secret sites (caves/ruins) don't offer
-    // an entrance until a quest has revealed them, so they read as plain ground until then.
-    const poiEncounter = buildPoiEncounter(targetTile);
-    const poiShown = poiEncounter && !isSiteHidden(targetTile);
-    if (poiShown) {
-      mapHook.setIsMapModalOpen(false); // close map so the location modal is visible
-      openEncounterInfo({
-        encounter: poiEncounter,
-        onEnterLocation: () => mapHook.handleEnterLocation(poiEncounter, interactionHook.setConversation, interactionHook.conversation),
-        onViewMap: () => mapHook.setIsMapModalOpen(true)
-      });
-    }
-
-    // Milestone check: location_visited
+    // Milestone check: location_visited. Fired BEFORE the POI modal so a location
+    // completion (e.g. finding the Goblin Hideout) unlocks its boss fight on the
+    // same arrival — the returned updatedMilestones are the fresh state.
+    let effectiveMilestones = settings?.milestones || [];
     if (targetTile.poi || targetTile.townName) {
       const locationId = targetTile.poi || targetTile.townName?.toLowerCase().replace(/\s+/g, '_');
       if (locationId) {
-        checkMilestoneEvent({ type: 'location_visited', locationId }, selectedHeroes);
+        const locResult = checkMilestoneEvent({ type: 'location_visited', locationId }, selectedHeroes);
+        if (locResult?.updatedMilestones) effectiveMilestones = locResult.updatedMilestones;
       }
     }
+
+    // POI Check (for location Modal — towns, etc.). Secret sites (caves/ruins) don't offer
+    // an entrance until a quest has revealed them, so they read as plain ground until then.
+    // If an ACTIVE milestone boss lairs on this tile (stamped enemy, or a combat milestone
+    // authored at this milestone POI's location), the modal offers the fight. If a random
+    // encounter interrupts this modal, clicking the tile you stand on re-opens it.
+    const poiShown = openPoiLocationModal(targetTile, effectiveMilestones);
 
     // --- Random Encounter Check (Phase 2.4: Two-Tier System) ---
     const isFirstVisitToTile = !wasExplored;
@@ -691,7 +749,11 @@ const Game = ({ resumeConversation = null }) => {
     const plannedEncounterFlow = planWorldTileEncounterFlow({
       randomEncounter,
       targetTile,
-      aiNarrativeEnabled,
+      // Narrative-tier (non-hostile) encounters are woven into Look-around AI narration,
+      // where the player acts by TYPING a follow-up. Guests can't type, so for them that
+      // path is a dead end (a treasure hook with no way to claim it). Route guests to the
+      // interactive fallback modal instead, same as when narration is toggled off.
+      aiNarrativeEnabled: aiNarrativeEnabled && aiAvailable,
       pendingNarrativeTile: buildPendingNarrativeTile({
         targetTile,
         clickedX,
@@ -825,6 +887,89 @@ const Game = ({ resumeConversation = null }) => {
       });
     } catch (error) {
       logger.error('Look-around AI error', error);
+      interactionHook.setError(error.message);
+      interactionHook.setProgressStatus(null);
+    } finally {
+      interactionHook.setIsLoading(false);
+    }
+  };
+
+  // --- Talk to a milestone NPC (deterministic 'talk' milestones) ---
+  // Fired by the building "Talk" button (npc = the placed NPC) or its building-level
+  // "Ask for..." fallback (npc = null). Fires npc_talked — checkMilestoneEvent
+  // completes the milestone, applies rewards, and posts the "Milestone Achieved"
+  // system message — then adds a meeting beat so the click isn't mute: one AI
+  // narration when signed in (same programmatic path as Look-around), a local
+  // templated line for guests.
+  const handleTalkToNpc = async (npcId, npc = null) => {
+    if (!npcId || interactionHook.isLoading) return;
+    const milestones = settings?.milestones || [];
+    const milestone = milestones.find(m =>
+      m.type === 'talk' && !m.completed && m.trigger?.npc === npcId
+    );
+    if (!milestone) return; // already completed / not active — no-op (button shouldn't render)
+
+    checkMilestoneEvent({ type: 'npc_talked', npcId }, selectedHeroes);
+    setTimeout(() => performSave(), 500);
+
+    // Meeting beat — canonical identity from the milestone; the placed NPC fills gaps.
+    const name = milestone.spawn?.name || npc?.name || 'the contact';
+    const role = milestone.spawn?.role || npc?.job || npc?.title || null;
+    const personality = milestone.spawn?.personality || npc?.personality || null;
+    const buildingName = milestone.building?.name || null;
+    const townName = mapHook.currentTownTile?.townName || milestone.location || null;
+
+    // No-AI path (guests, or master toggle off): deterministic templated line.
+    if (!aiAvailable || !aiNarrativeEnabled) {
+      const text = composeNpcMeeting({ name, role, building: buildingName, townName, personality, worldSeed });
+      if (text) interactionHook.setConversation(prev => [...prev, { role: 'ai', content: text }]);
+      return;
+    }
+
+    const resolvedModel = resolveProviderAndModel(selectedProvider, selectedModel);
+    interactionHook.setIsLoading(true);
+
+    const { fullPrompt } = composeNpcMeetingPrompt({
+      npc: { name, role, personality },
+      buildingName,
+      townName,
+      milestoneText: milestone.text,
+      settings,
+      selectedHeroes,
+      currentSummary: interactionHook.currentSummary
+    });
+    interactionHook.setLastPrompt(fullPrompt);
+
+    try {
+      let aiResponse = await generateMovementNarrative({
+        provider: resolvedModel.provider,
+        model: resolvedModel.model,
+        prompt: fullPrompt,
+        onProgress: (p) => interactionHook.setProgressStatus(p)
+      });
+      interactionHook.setProgressStatus(null);
+      // The engine already completed this milestone; strip any stray completion
+      // markers so they never render in the log.
+      aiResponse = (aiResponse || '')
+        .replace(/\[COMPLETE_MILESTONE:[\s\S]*?\]/gi, '')
+        .replace(/\[COMPLETE_CAMPAIGN\]/gi, '')
+        .trim();
+      if (!aiResponse) {
+        logger.warn('Empty NPC-meeting AI response, skipping');
+        return;
+      }
+      const aiMessage = { role: 'ai', content: aiResponse };
+      interactionHook.setConversation(prev => {
+        const updated = [...prev, aiMessage];
+        // Fire-and-forget: embed for RAG so later turns recall the meeting
+        if (sessionId) {
+          embedAndStore(sessionId, aiResponse, { msgIndex: updated.length - 1 })
+            .catch(err => logger.warn('RAG embed failed (npc meeting):', err));
+        }
+        return updated;
+      });
+    } catch (error) {
+      logger.error('NPC meeting AI error', error);
       interactionHook.setError(error.message);
       interactionHook.setProgressStatus(null);
     } finally {
@@ -1146,6 +1291,7 @@ const Game = ({ resumeConversation = null }) => {
         sideQuests={settings?.sideQuests}
         onAcceptSideQuest={handleAcceptSideQuest}
         onTurnInQuest={handleTurnInQuest}
+        onTalkToNpc={handleTalkToNpc}
         onBuy={(itemKey) => {
           const result = buyItem(selectedHeroes, itemKey);
           if (result.ok) setSelectedHeroes(result.party);

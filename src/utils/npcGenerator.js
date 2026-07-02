@@ -509,9 +509,13 @@ export const generateNPC = (options = {}) => {
  * scanning the town map data and generating NPCs for employment buildings.
  * @param {Object} townMapData Output from generateTownMap
  * @param {string|number} seed Seed for deterministic generation
+ * @param {Array} milestoneNpcs Optional canonical/authored NPCs to place in this
+ *   town (from getMilestoneNpcsForTown). Each entry: { id, name, role, personality,
+ *   building: { type, name }|null, ... }. When one targets a service building, the
+ *   canonical NPC REPLACES the procedural staff for that building.
  * @returns {Array} List of generated NPCs with location data
  */
-export const populateTown = (townMapData, seed) => {
+export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
     const rng = new SeededRNG(seed);
     const npcs = [];
     const { mapData, width, height, townSize, townName } = townMapData;
@@ -550,6 +554,46 @@ export const populateTown = (townMapData, seed) => {
             homeCoords: home ? { x: home.x, y: home.y } : null
         };
         npcs.push(npc);
+        return npc;
+    };
+
+    // --- Canonical (milestone-authored) NPC placement ---
+    // Match an authored NPC to a service building, then place it INSTEAD of the
+    // procedural staff. Matching is by building NAME first (injectQuestBuildings
+    // renames the quest building to the authored name, so the name is the reliable
+    // key), then falls back to building type. Each authored NPC is placed at most once.
+    const authoredNpcs = Array.isArray(milestoneNpcs) ? milestoneNpcs : [];
+    const placedAuthoredIds = new Set();
+
+    const matchAuthoredNpc = (b) => {
+        if (authoredNpcs.length === 0) return null;
+        const byName = authoredNpcs.find((n) =>
+            !placedAuthoredIds.has(n.id) &&
+            n.building?.name && b.name &&
+            n.building.name.toLowerCase() === b.name.toLowerCase()
+        );
+        if (byName) return byName;
+        return authoredNpcs.find((n) =>
+            !placedAuthoredIds.has(n.id) &&
+            n.building?.type && n.building.type === b.type
+        ) || null;
+    };
+
+    // Place a canonical NPC in building `b`, forcing its authored identity. The
+    // NPC's personality is preserved on the object so it can reach the AI prompt.
+    const addAuthoredNPC = (b, spec) => {
+        const role = ROLES[spec.role] ? spec.role : 'Guard';
+        const npc = addNPC(role, b, b);
+        npc.name = spec.name;
+        if (spec.gender) npc.gender = spec.gender; // keep the icon/pronoun consistent with the authored name
+        // The authored name usually leads with an honorific ("Captain Marta",
+        // "Keeper Najwa"); use it as the title so display/labels stay consistent.
+        if (spec.name.includes(' ')) npc.title = spec.name.split(' ')[0];
+        if (spec.personality) npc.personality = spec.personality;
+        npc.milestoneNpcId = spec.id;
+        npc.milestoneId = spec.milestoneId;
+        npc.job = `${npc.title || spec.role} at ${b.name || b.type}`;
+        placedAuthoredIds.add(spec.id);
         return npc;
     };
 
@@ -609,6 +653,13 @@ export const populateTown = (townMapData, seed) => {
 
     // 3. SERVICE BUILDINGS (Inns, Shops, Temples, Blacksmiths)
     serviceBuildings.forEach(b => {
+        // Milestone-authored NPC (e.g. Captain Marta at the Briarwood Militia Hall)
+        // REPLACES the procedural staffing for this building.
+        const authored = matchAuthoredNpc(b);
+        if (authored) {
+            addAuthoredNPC(b, authored);
+            return;
+        }
         if (b.type === 'tavern' || b.type === 'inn') {
             const keeper = addNPC("Tavern Keeper", b, b, { title: "Owner" });
             keeper.job = `Owner of ${b.name}`;

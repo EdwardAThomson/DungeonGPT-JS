@@ -16,7 +16,15 @@ const formatCampaignMilestones = (milestones) => {
   if (active.length > 0) {
     text += '\nActive Milestones: ' + active.map(m => {
       const typeTag = m.type ? ` [${m.type}]` : '';
-      return `${m.text}${typeTag}`;
+      let line = `${m.text}${typeTag}`;
+      // Ground authored NPC objectives with the canonical name + venue.
+      if (m.spawn?.type === 'npc' && m.spawn.name) {
+        const who = m.spawn.role ? `${m.spawn.name} (${m.spawn.role})` : m.spawn.name;
+        const where = m.building?.name || m.spawn.location;
+        line += ` — speak with ${who}${where ? ` at ${where}` : ''}`;
+        if (m.spawn.personality) line += `; ${m.spawn.personality}`;
+      }
+      return line;
     }).join('; ');
   }
   if (completed.length > 0) {
@@ -110,6 +118,42 @@ export const composeMovementNarrativePrompt = ({
   const gameContext = `Setting: ${settings.shortDescription}.${themeInfo} Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
   const recentContext = includeRecentContext ? buildRecentAiContext(conversation) : '';
   const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary}${recentContext}\n\n${movementDescription}${ragContext}`;
+
+  return {
+    prompt,
+    fullPrompt: DM_PROTOCOL + prompt
+  };
+};
+
+/**
+ * Prompt for the scripted meeting with a milestone NPC (the building "Talk" button on
+ * 'talk' milestones). The engine has ALREADY completed the milestone deterministically
+ * by the time this runs — the AI only narrates the meeting, so the prompt frames the
+ * encounter as happening now and forbids completion markers.
+ */
+export const composeNpcMeetingPrompt = ({
+  npc = {},
+  buildingName = null,
+  townName = null,
+  milestoneText = null,
+  settings = {},
+  selectedHeroes = [],
+  currentSummary = ''
+}) => {
+  const partyInfo = formatPartyInfo(selectedHeroes);
+  const name = npc.name || 'the contact';
+  const who = npc.role ? `${name} (${npc.role})` : name;
+  const where = buildingName
+    ? `at ${buildingName}${townName ? ` in ${townName}` : ''}`
+    : (townName ? `in ${townName}` : 'here');
+  const personaInfo = npc.personality ? ` ${name} is ${npc.personality}.` : '';
+  const objectiveInfo = milestoneText
+    ? ` This meeting fulfils the objective "${milestoneText}"; the game engine has already marked it complete, so do NOT emit any completion marker.`
+    : '';
+  const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
+  const gameContext = `Setting: ${settings.shortDescription || 'Fantasy Realm'}. Mood: ${settings.grimnessLevel || 'Normal'}.${goalInfo}\nParty: ${partyInfo}.`;
+  const task = `The party seeks out ${who} ${where}.${personaInfo}${objectiveInfo} Narrate the meeting: how ${name} receives the party, what is said about the matter at hand, and what direction ${name} offers for what comes next. Use ${name}'s exact name and do not invent other named officials. Keep it to 1-2 short paragraphs.`;
+  const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary || 'The tale unfolds.'}\n\n${task}`;
 
   return {
     prompt,

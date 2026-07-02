@@ -14,7 +14,7 @@ import SegmentedControl from "../components/SegmentedControl";
 import RaritySelect from "../components/RaritySelect";
 import { storyTemplates } from "../data/storyTemplates";
 import { spawnWorldMapEntities, injectQuestBuildings } from "../game/milestoneSpawner";
-import { getMilestoneLocationNames } from "../game/milestoneEngine";
+import { getMilestoneLocationNames, getMilestoneNpcsForTown } from "../game/milestoneEngine";
 import { llmService } from "../services/llmService";
 import { createLogger } from "../utils/logger";
 import { QUEST_ENEMIES, getEnemiesByTierAndTheme } from "../data/questEnemies";
@@ -351,8 +351,8 @@ const NewGame = () => {
             injectQuestBuildings(townMapData, spawnResult.requiredBuildings[tile.townName]);
           }
 
-          // Populate town with NPCs
-          const npcs = populateTown(townMapData, seed);
+          // Populate town with NPCs (canonical milestone NPCs replace procedural staff)
+          const npcs = populateTown(townMapData, seed, getMilestoneNpcsForTown(milestones, tile.townName));
           townMapData.npcs = npcs;
 
           townMapsCache[tile.townName] = townMapData;

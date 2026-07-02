@@ -45,6 +45,11 @@ export const buildSaveFingerprint = ({
     sitePlayerPosition?.y,
     currentSummary?.length || 0,
     settings?.storyTitle || '',
+    // Quest progress MUST be fingerprinted: without these, a milestone or side-quest
+    // change with no other state change was skipped as "no change" and never saved.
+    (settings?.milestones || []).map(m => (m && typeof m === 'object' && m.completed ? '1' : '0')).join(''),
+    JSON.stringify(settings?.sideQuests || []),
+    settings?.campaignComplete ? '1' : '0',
     JSON.stringify(
       heroes.map((hero) => ({
         hp: hero.currentHP,

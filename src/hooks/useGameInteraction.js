@@ -3,7 +3,7 @@ import { getTile } from '../utils/mapGenerator';
 import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
 import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver';
-import { areRequirementsMet } from '../game/milestoneEngine';
+import { areRequirementsMet, findMarkerMilestoneIndex } from '../game/milestoneEngine';
 import { formatPartyInfo } from '../game/promptComposer';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
 import { composeIntro } from '../game/introComposer';
@@ -71,7 +71,16 @@ const formatMilestonePromptText = (milestoneStatus) => {
         text += '\nActive Milestones: ' + active.map(m => {
             const typeTag = m.type ? ` [${m.type}]` : '';
             const levelTag = m.minLevel ? ` (Lv.${m.minLevel}+)` : '';
-            return `${m.text}${typeTag}${levelTag}`;
+            let line = `${m.text}${typeTag}${levelTag}`;
+            // Ground authored NPC objectives: name the canonical figure + venue so the
+            // model reuses them instead of inventing a name ("Jorik", "the mayor").
+            if (m.spawn?.type === 'npc' && m.spawn.name) {
+                const who = m.spawn.role ? `${m.spawn.name} (${m.spawn.role})` : m.spawn.name;
+                const where = m.building?.name || m.spawn.location;
+                line += ` — speak with ${who}${where ? ` at ${where}` : ''}`;
+                if (m.spawn.personality) line += `; ${m.spawn.personality}`;
+            }
+            return line;
         }).join('; ');
     }
     if (completed.length > 0) {
@@ -165,6 +174,45 @@ const findNearbyLandmarks = (worldMap, px, py, maxDist = 12) => {
     return landmarks.slice(0, 4);
 };
 
+// Surface the NPCs actually present in the town so the DM narrates and names the
+// real placed people (e.g. Captain Marta) rather than inventing names. Token-conscious:
+// the current building's occupants (with the milestone NPC's personality) plus a short
+// town roster, capped. Reads townMapData.npcs written by populateTown.
+const formatTownNpcs = (townMap, pos) => {
+    const npcs = townMap?.npcs;
+    if (!Array.isArray(npcs) || npcs.length === 0) return '';
+
+    const label = (n) => {
+        const role = n.job || n.title || n.role || 'townsfolk';
+        return `${n.name} (${role})`;
+    };
+
+    let out = '';
+
+    // Occupants of the building the party is standing on.
+    if (pos) {
+        const here = npcs.filter(n => n.location?.x === pos.x && n.location?.y === pos.y);
+        if (here.length > 0) {
+            out += ` Present here: ${here.map(n => {
+                let s = label(n);
+                if (n.personality) s += ` — ${n.personality}`;
+                return s;
+            }).join('; ')}.`;
+        }
+    }
+
+    // A short town roster, milestone NPCs first, capped to stay token-light.
+    const roster = [...npcs]
+        .sort((a, b) => (b.milestoneNpcId ? 1 : 0) - (a.milestoneNpcId ? 1 : 0))
+        .slice(0, 6);
+    if (roster.length > 0) {
+        out += ` Notable townsfolk: ${roster.map(label).join('; ')}.`;
+        out += ' Use these exact names for the people the party meets; do not invent names or officials for anyone listed here.';
+    }
+
+    return out;
+};
+
 // Build rich location context based on whether player is inside a town, at a town edge, or on the world map
 const buildLocationContext = (worldTile, worldPos, locationCtx, worldMap) => {
     const { isInsideTown, currentTownTile, currentTownMap, townPlayerPosition } = locationCtx;
@@ -209,6 +257,9 @@ const buildLocationContext = (worldTile, worldPos, locationCtx, worldMap) => {
                 info += ` Nearby: ${buildings.join(', ')}.`;
             }
         }
+
+        // Name the NPCs actually placed in this town (occupants here + short roster).
+        info += formatTownNpcs(currentTownMap, townPlayerPosition);
 
         return info;
     }
@@ -450,21 +501,35 @@ const useGameInteraction = (
                 const milestoneText = milestoneMatch[1].replace(/\s+/g, ' ').trim();
                 logger.info(`Milestone complete signaled: ${milestoneText}`);
 
-                // Find and mark milestone as complete
-                const normalized = normalizeMilestones(settings.milestones);
-                const milestoneIndex = normalized.findIndex(m =>
-                    m.text.toLowerCase().includes(milestoneText.toLowerCase()) ||
-                    milestoneText.toLowerCase().includes(m.text.toLowerCase())
-                );
+                // Find and mark milestone as complete. Guarded: the AI marker may only
+                // complete 'narrative' (or legacy untyped) milestones — mechanical types
+                // (item/combat/location/talk) are engine-detected and a stray marker must
+                // not complete them. Old saves' narrative milestones still work here.
+                //
+                // IMPORTANT: this runs seconds after the generation started, so `settings`
+                // here is a stale capture. Recompute against prev INSIDE the functional
+                // update — a `{ ...settings }` spread would silently revert every settings
+                // change made during the generation (accepted side quests, engine-completed
+                // milestones, renames). That stale-spread bug ate a player's side quest.
+                const matched = normalizeMilestones(settings.milestones)[
+                    findMarkerMilestoneIndex(normalizeMilestones(settings.milestones), milestoneText)
+                ];
 
-                if (milestoneIndex !== -1) {
-                    normalized[milestoneIndex].completed = true;
-                    setSettings({ ...settings, milestones: normalized });
+                if (matched) {
+                    setSettings(prev => {
+                        const prevNormalized = normalizeMilestones(prev.milestones);
+                        const idx = findMarkerMilestoneIndex(prevNormalized, milestoneText);
+                        if (idx === -1) return prev; // already completed meanwhile — no-op
+                        return {
+                            ...prev,
+                            milestones: prevNormalized.map((m, i) => (i === idx ? { ...m, completed: true } : m))
+                        };
+                    });
 
                     // Add celebration message to conversation
                     const celebrationMsg = {
                         role: 'system',
-                        content: `🎉 Milestone Achieved! 🎉\n${normalized[milestoneIndex].text}`
+                        content: `🎉 Milestone Achieved! 🎉\n${matched.text}`
                     };
                     setConversation(prev => [...prev, celebrationMsg]);
                 }
@@ -478,8 +543,8 @@ const useGameInteraction = (
             if (campaignMatch) {
                 logger.info('Campaign complete signaled');
 
-                // Mark campaign as complete
-                setSettings({ ...settings, campaignComplete: true });
+                // Mark campaign as complete (functional — `settings` is a stale capture here)
+                setSettings(prev => ({ ...prev, campaignComplete: true }));
 
                 // Add epic completion message
                 const completionMsg = {

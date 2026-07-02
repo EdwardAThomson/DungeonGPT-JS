@@ -57,6 +57,7 @@ export const getCampaignProgress = (milestones) => {
  *   { type: 'item_acquired', itemId: 'treasure_map' }
  *   { type: 'enemy_defeated', enemyId: 'shadow_overlord' }
  *   { type: 'location_visited', locationId: 'shadow_fortress' }
+ *   { type: 'npc_talked', npcId: 'militia_captain' }
  *
  * @param {Array} milestones - All milestones in the campaign
  * @param {Object} event - The game event to check
@@ -153,6 +154,98 @@ export const completeNarrativeMilestone = (milestones, milestoneId) => {
 };
 
 /**
+ * Has the quest item hidden in a building already been claimed? True when the
+ * milestone that item belongs to is completed. Buildings keep their questItemId
+ * stamped in the cached town map forever, so the search UI gates on this instead.
+ * @param {Array} milestones - All campaign milestones
+ * @param {string} itemId - The building's questItemId
+ * @returns {boolean}
+ */
+export const isMilestoneItemClaimed = (milestones, itemId) => {
+    if (!Array.isArray(milestones) || !itemId) return false;
+    return milestones.some(m =>
+        m.completed &&
+        (m.trigger?.item === itemId || (m.spawn?.type === 'item' && m.spawn?.id === itemId))
+    );
+};
+
+/**
+ * Find the milestone boss fight waiting on a world tile, if any.
+ *
+ * Two ways a tile hosts a boss:
+ *  1. The spawner stamped the enemy directly (`tile.milestoneEnemy`, e.g. the tile
+ *     findLocationOnMap resolved for the enemy's authored location).
+ *  2. The tile is a spawned milestone POI (e.g. the Goblin Hideout) and an ACTIVE
+ *     combat milestone is authored at the same location — the boss lairs in its POI.
+ *
+ * Only returns a fight while the combat milestone is active (not completed,
+ * prerequisites met), so e.g. the chieftain only appears once the hideout is found.
+ *
+ * @param {Array} milestones - All campaign milestones
+ * @param {Object} tile - The world tile the party arrived at
+ * @returns {Object|null} { enemyId, name, encounter } or null
+ */
+export const getMilestoneBossForTile = (milestones, tile) => {
+    if (!Array.isArray(milestones) || !tile) return null;
+
+    // 1) Tile stamped with the enemy directly.
+    if (tile.milestoneEnemy) {
+        const encounter = getMilestoneEncounter(milestones, tile.milestoneEnemy);
+        if (encounter) {
+            return { enemyId: tile.milestoneEnemy, name: tile.milestoneEnemyName || encounter.name, encounter };
+        }
+    }
+
+    // 2) Milestone POI tile: match an active combat milestone at the same authored location.
+    if (tile.milestonePoi && tile.poi) {
+        const owner = milestones.find(m => m.spawn?.type === 'poi' && m.spawn.id === tile.poi);
+        const loc = owner?.spawn?.location || owner?.location;
+        if (loc) {
+            const combat = milestones.find(m =>
+                m.type === 'combat' && !m.completed && m.trigger?.enemy && m.encounter &&
+                (m.location === loc || m.spawn?.location === loc) &&
+                areRequirementsMet(m, milestones)
+            );
+            if (combat) {
+                return {
+                    enemyId: combat.trigger.enemy,
+                    name: combat.spawn?.name || combat.encounter.name,
+                    encounter: { ...combat.encounter, milestoneId: combat.id, isMilestoneBoss: true }
+                };
+            }
+        }
+    }
+
+    return null;
+};
+
+/**
+ * Find the milestone an AI [COMPLETE_MILESTONE: <text>] marker refers to.
+ *
+ * Fuzzy text match (either string contains the other), restricted to milestones the
+ * AI is allowed to complete: `type: 'narrative'`, or legacy untyped milestones (old
+ * saves stored milestones as bare strings, normalized without a type). Mechanical
+ * types (item / combat / location / talk) are engine-detected and must never be
+ * completed by a stray marker.
+ *
+ * @param {Array} milestones - Normalized milestone objects ({ text, type?, completed? })
+ * @param {string} markerText - The text captured from the marker
+ * @returns {number} Index into `milestones`, or -1 if no eligible match
+ */
+export const findMarkerMilestoneIndex = (milestones, markerText) => {
+    if (!Array.isArray(milestones) || !markerText) return -1;
+    const needle = String(markerText).toLowerCase().trim();
+    if (!needle) return -1;
+    return milestones.findIndex(m => {
+        if (!m || m.completed) return false;
+        if (m.type && m.type !== 'narrative') return false;
+        const text = (m.text || '').toLowerCase();
+        if (!text) return false;
+        return text.includes(needle) || needle.includes(text);
+    });
+};
+
+/**
  * Apply milestone rewards to a hero using the same pattern as encounterController
  * @param {Object} milestone - The completed milestone
  * @returns {Object} Processed rewards { xp, gold, items }
@@ -217,6 +310,45 @@ export const getSpawnRequirements = (milestones) => {
 };
 
 /**
+ * Get the authored (canonical) NPCs a campaign wants placed in a given town.
+ *
+ * Reads every milestone whose `spawn.type === 'npc'` and returns those whose NPC
+ * (or associated quest building) is located in `townName`. Each entry pairs the
+ * spawn's identity with its building so town generation can bind the NPC to the
+ * right building and the prompt/journal can name who and where.
+ *
+ * @param {Array} milestones - All campaign milestones (from settings.milestones)
+ * @param {string} townName - The town being generated
+ * @returns {Array<Object>} [{ id, name, role, personality, milestoneId, location, building }]
+ *   `building` is `{ type, name }` or null.
+ */
+export const getMilestoneNpcsForTown = (milestones, townName) => {
+    if (!Array.isArray(milestones) || !townName) return [];
+    const target = String(townName).toLowerCase();
+    const result = [];
+
+    for (const m of milestones) {
+        if (m.spawn?.type !== 'npc' || !m.spawn.name) continue;
+        // The NPC lives where the spawn (or its quest building) says it does.
+        const loc = m.spawn.location || m.building?.location;
+        if (!loc || String(loc).toLowerCase() !== target) continue;
+
+        result.push({
+            id: m.spawn.id,
+            name: m.spawn.name,
+            role: m.spawn.role || 'Villager',
+            gender: m.spawn.gender || null,
+            personality: m.spawn.personality || null,
+            milestoneId: m.id,
+            location: loc,
+            building: m.building ? { type: m.building.type, name: m.building.name } : null
+        });
+    }
+
+    return result;
+};
+
+/**
  * Extract location names from milestones, categorized as town or mountain.
  * Used to inject campaign-required names into the map generator so milestone
  * locations actually appear on the generated map.
@@ -259,6 +391,8 @@ const doesEventMatchTrigger = (milestone, event) => {
             return event.type === 'enemy_defeated' && event.enemyId === trigger.enemy;
         case 'location':
             return event.type === 'location_visited' && event.locationId === trigger.location;
+        case 'talk':
+            return event.type === 'npc_talked' && event.npcId === trigger.npc;
         default:
             return false;
     }

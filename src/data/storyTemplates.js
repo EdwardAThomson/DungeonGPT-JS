@@ -45,12 +45,16 @@ export const storyTemplates = [
                 },
                 {
                     id: 2,
-                    text: 'Warn the militia captain at Briarwood',
+                    text: 'Meet the militia captain at Briarwood',
                     location: 'Briarwood',
-                    type: 'narrative',
+                    // 'talk' = mechanical NPC-talk milestone: the engine completes it when the
+                    // party talks to the authored NPC (Talk button fires npc_talked). Old saves
+                    // carry the previous type:'narrative' copy of this milestone in their
+                    // settings and keep completing via the AI marker — unaffected.
+                    type: 'talk',
                     requires: [],
-                    trigger: null,
-                    spawn: { type: 'npc', id: 'militia_captain', name: 'Captain Marta', location: 'Briarwood', role: 'Guard', personality: 'gruff, practical, protective of her people' },
+                    trigger: { npc: 'militia_captain', action: 'talk' },
+                    spawn: { type: 'npc', id: 'militia_captain', name: 'Captain Ulric', location: 'Briarwood', role: 'Guard', gender: 'Male', personality: 'gruff, practical, protective of his people' },
                     building: { type: 'barracks', name: 'Briarwood Militia Hall', location: 'Briarwood' },
                     rewards: { xp: 25, gold: '1d6', items: ['rations'] },
                     minLevel: null
