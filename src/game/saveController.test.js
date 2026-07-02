@@ -38,6 +38,51 @@ describe('parseSaveRoot', () => {
   });
 });
 
+describe('buildSaveFingerprint — quest progress must change the fingerprint', () => {
+  const base = {
+    conversation: [{ role: 'user', content: 'hello' }],
+    playerPosition: { x: 2, y: 4 },
+    currentMapLevel: 'world',
+    isInsideTown: false,
+    currentSummary: 'Summary',
+    selectedHeroes: [{ currentHP: 10, gold: 5, xp: 20, inventory: [] }],
+    settings: {
+      storyTitle: 'Run',
+      milestones: [{ id: 1, text: 'Find the map', completed: false }, { id: 2, text: 'Meet the captain', completed: false }],
+      sideQuests: [{ id: 'sq1', status: 'available' }]
+    }
+  };
+
+  it('changes when a milestone completes (regression: was skipped as "no change")', () => {
+    const before = buildSaveFingerprint(base);
+    const after = buildSaveFingerprint({
+      ...base,
+      settings: { ...base.settings, milestones: base.settings.milestones.map(m => (m.id === 1 ? { ...m, completed: true } : m)) }
+    });
+    expect(after).not.toBe(before);
+  });
+
+  it('changes when a side quest changes state', () => {
+    const before = buildSaveFingerprint(base);
+    const after = buildSaveFingerprint({
+      ...base,
+      settings: { ...base.settings, sideQuests: [{ id: 'sq1', status: 'active' }] }
+    });
+    expect(after).not.toBe(before);
+  });
+
+  it('changes when the campaign completes', () => {
+    const before = buildSaveFingerprint(base);
+    const after = buildSaveFingerprint({ ...base, settings: { ...base.settings, campaignComplete: true } });
+    expect(after).not.toBe(before);
+  });
+
+  it('tolerates missing quest fields (old saves)', () => {
+    const noQuests = buildSaveFingerprint({ ...base, settings: { storyTitle: 'Run' } });
+    expect(typeof noQuests).toBe('string');
+  });
+});
+
 describe('saveController', () => {
   it('produces stable fingerprint for identical inputs', () => {
     const input = {

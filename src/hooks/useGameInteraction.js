@@ -505,17 +505,31 @@ const useGameInteraction = (
                 // complete 'narrative' (or legacy untyped) milestones — mechanical types
                 // (item/combat/location/talk) are engine-detected and a stray marker must
                 // not complete them. Old saves' narrative milestones still work here.
-                const normalized = normalizeMilestones(settings.milestones);
-                const milestoneIndex = findMarkerMilestoneIndex(normalized, milestoneText);
+                //
+                // IMPORTANT: this runs seconds after the generation started, so `settings`
+                // here is a stale capture. Recompute against prev INSIDE the functional
+                // update — a `{ ...settings }` spread would silently revert every settings
+                // change made during the generation (accepted side quests, engine-completed
+                // milestones, renames). That stale-spread bug ate a player's side quest.
+                const matched = normalizeMilestones(settings.milestones)[
+                    findMarkerMilestoneIndex(normalizeMilestones(settings.milestones), milestoneText)
+                ];
 
-                if (milestoneIndex !== -1) {
-                    normalized[milestoneIndex].completed = true;
-                    setSettings({ ...settings, milestones: normalized });
+                if (matched) {
+                    setSettings(prev => {
+                        const prevNormalized = normalizeMilestones(prev.milestones);
+                        const idx = findMarkerMilestoneIndex(prevNormalized, milestoneText);
+                        if (idx === -1) return prev; // already completed meanwhile — no-op
+                        return {
+                            ...prev,
+                            milestones: prevNormalized.map((m, i) => (i === idx ? { ...m, completed: true } : m))
+                        };
+                    });
 
                     // Add celebration message to conversation
                     const celebrationMsg = {
                         role: 'system',
-                        content: `🎉 Milestone Achieved! 🎉\n${normalized[milestoneIndex].text}`
+                        content: `🎉 Milestone Achieved! 🎉\n${matched.text}`
                     };
                     setConversation(prev => [...prev, celebrationMsg]);
                 }
@@ -529,8 +543,8 @@ const useGameInteraction = (
             if (campaignMatch) {
                 logger.info('Campaign complete signaled');
 
-                // Mark campaign as complete
-                setSettings({ ...settings, campaignComplete: true });
+                // Mark campaign as complete (functional — `settings` is a stale capture here)
+                setSettings(prev => ({ ...prev, campaignComplete: true }));
 
                 // Add epic completion message
                 const completionMsg = {

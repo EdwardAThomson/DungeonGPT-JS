@@ -335,7 +335,13 @@ const Game = ({ resumeConversation = null }) => {
     if (sideQuests && sideQuests.length > 0) {
       const { updatedSideQuests, completions } = checkSideQuestEvent(sideQuests, event, heroLevel);
       if (completions.length > 0) {
-        setSettings(prev => ({ ...prev, sideQuests: updatedSideQuests }));
+        // Recompute against prev INSIDE the updater: `updatedSideQuests` above came from a
+        // snapshot, and writing it wholesale would revert any side-quest change that landed
+        // since (a second event in the same handler, an accept during an AI generation).
+        setSettings(prev => ({
+          ...prev,
+          sideQuests: checkSideQuestEvent(prev.sideQuests || [], event, heroLevel).updatedSideQuests
+        }));
         let party = currentParty;
         completions.forEach(c => {
           const stepRewards = c.rewards || { xp: 0, gold: 0, items: [] };
@@ -362,7 +368,22 @@ const Game = ({ resumeConversation = null }) => {
 
     if (result.type === 'completed') {
       logger.info(`[MILESTONE] Completed: #${result.milestoneId} — ${result.milestone.text}`);
-      setSettings(prev => ({ ...prev, milestones: result.updatedMilestones }));
+      // Mark the completion BY ID against prev — result.updatedMilestones was computed from
+      // a snapshot, and writing it wholesale reverted sibling completions when two events
+      // fired before a re-render (the "I had to redo milestones" bug). Legacy saves whose
+      // milestones lack ids fall back to the computed array.
+      setSettings(prev => {
+        const prevMs = prev.milestones || [];
+        const hasIds = prevMs.every(m => m && typeof m === 'object' && m.id != null);
+        return {
+          ...prev,
+          milestones: hasIds
+            ? prevMs.map(m => (m.id === result.milestoneId ? { ...m, completed: true } : m))
+            : result.updatedMilestones
+        };
+      });
+      // Persist promptly — milestone completions previously waited up to 30s for autosave.
+      setTimeout(() => performSave(), 500);
 
       // Apply milestone rewards to lead hero
       const rewards = getMilestoneRewards(result.milestone);
@@ -551,7 +572,9 @@ const Game = ({ resumeConversation = null }) => {
     if (!sideQuests || sideQuests.length === 0) return;
     const { updatedSideQuests, completions } = turnInQuest(sideQuests, ctx);
     if (completions.length === 0) return;
-    setSettings(prev => ({ ...prev, sideQuests: updatedSideQuests }));
+    // Recompute against prev inside the updater (see checkMilestoneEvent) so this write
+    // can't revert side-quest changes that landed since the snapshot.
+    setSettings(prev => ({ ...prev, sideQuests: turnInQuest(prev.sideQuests || [], ctx).updatedSideQuests }));
     let party = selectedHeroes;
     completions.forEach(c => {
       party = applyEncounterOutcomeToParty({ party, result: { rewards: c.rewards || { xp: 0, gold: 0, items: [] }, heroIndex: 0 } }).updatedParty;
