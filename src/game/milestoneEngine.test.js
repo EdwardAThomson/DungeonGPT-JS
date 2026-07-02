@@ -3,7 +3,8 @@ import {
   checkMilestoneCompletion,
   completeNarrativeMilestone,
   findMarkerMilestoneIndex,
-  getMilestoneBossForTile
+  getMilestoneBossForTile,
+  isMilestoneItemClaimed
 } from './milestoneEngine';
 
 // Mirrors the heroic-fantasy-t1 milestone #2 shape (authored NPC + quest building).
@@ -214,5 +215,35 @@ describe('getMilestoneBossForTile (milestone boss fights on world tiles)', () =>
     expect(getMilestoneBossForTile(campaign(), { poi: 'mountain' })).toBeNull();
     expect(getMilestoneBossForTile(campaign(), null)).toBeNull();
     expect(getMilestoneBossForTile(null, hideoutTile)).toBeNull();
+  });
+});
+
+describe('isMilestoneItemClaimed (quest-item search gating)', () => {
+  const ms = (completed) => ([{
+    id: 1,
+    text: 'Find the goblin scout\'s map',
+    type: 'item',
+    completed,
+    trigger: { item: 'map_fragment', action: 'acquire' },
+    spawn: { type: 'item', id: 'map_fragment', name: 'Goblin Scout\'s Map' }
+  }]);
+
+  it('is false while the item milestone is incomplete (search still offered)', () => {
+    expect(isMilestoneItemClaimed(ms(false), 'map_fragment')).toBe(false);
+  });
+
+  it('is true once the item milestone completes (search hidden)', () => {
+    expect(isMilestoneItemClaimed(ms(true), 'map_fragment')).toBe(true);
+  });
+
+  it('matches via spawn id even when trigger is absent', () => {
+    const spawnOnly = [{ id: 1, completed: true, spawn: { type: 'item', id: 'map_fragment' } }];
+    expect(isMilestoneItemClaimed(spawnOnly, 'map_fragment')).toBe(true);
+  });
+
+  it('is false for other items and tolerates bad input', () => {
+    expect(isMilestoneItemClaimed(ms(true), 'other_item')).toBe(false);
+    expect(isMilestoneItemClaimed(null, 'map_fragment')).toBe(false);
+    expect(isMilestoneItemClaimed(ms(true), null)).toBe(false);
   });
 });

@@ -154,6 +154,22 @@ export const completeNarrativeMilestone = (milestones, milestoneId) => {
 };
 
 /**
+ * Has the quest item hidden in a building already been claimed? True when the
+ * milestone that item belongs to is completed. Buildings keep their questItemId
+ * stamped in the cached town map forever, so the search UI gates on this instead.
+ * @param {Array} milestones - All campaign milestones
+ * @param {string} itemId - The building's questItemId
+ * @returns {boolean}
+ */
+export const isMilestoneItemClaimed = (milestones, itemId) => {
+    if (!Array.isArray(milestones) || !itemId) return false;
+    return milestones.some(m =>
+        m.completed &&
+        (m.trigger?.item === itemId || (m.spawn?.type === 'item' && m.spawn?.id === itemId))
+    );
+};
+
+/**
  * Find the milestone boss fight waiting on a world tile, if any.
  *
  * Two ways a tile hosts a boss:
