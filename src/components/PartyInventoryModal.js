@@ -60,6 +60,22 @@ const PartyInventoryModal = () => {
     }
   }
 
+  // Subtract items currently equipped by any hero so a worn item isn't also
+  // shown as available loot. Counts (not filtering by key) so spare copies of
+  // the same item still appear.
+  const equippedCounts = {};
+  for (const hero of selectedHeroes) {
+    for (const equippedKey of Object.values(hero.equipment || {})) {
+      if (equippedKey) equippedCounts[equippedKey] = (equippedCounts[equippedKey] || 0) + 1;
+    }
+  }
+  for (const [key, count] of Object.entries(equippedCounts)) {
+    if (itemMap[key]) {
+      itemMap[key].quantity -= count;
+      if (itemMap[key].quantity <= 0) delete itemMap[key];
+    }
+  }
+
   const isHealingItem = (item) => item.effect === 'heal' && item.amount;
   const injuredHeroes = selectedHeroes
     .map(h => {
@@ -234,7 +250,7 @@ const PartyInventoryModal = () => {
           border: '1px solid var(--border)',
           boxShadow: 'inset 0 4px 15px rgba(0,0,0,0.8)'
         }}>
-          {allItems.length === 0 ? (
+          {Object.keys(itemMap).length === 0 ? (
             <div style={{
               display: 'flex',
               flexDirection: 'column',

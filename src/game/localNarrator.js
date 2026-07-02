@@ -91,20 +91,25 @@ const TEMPLATES = {
       'The party crests a low rise into open grassland that rolls away in every direction.',
       'Wide fields of windblown grass stretch out before the party, broken only by the odd lonely tree.',
       'The land opens into gentle plains, the horizon a long pale line under an enormous sky.',
-      'Tall grass whispers around the party as they step out onto the open flatlands.'
+      'Tall grass whispers around the party as they step out onto the open flatlands.',
+      'A lark bursts up singing as the party wades out into the open flatland.',
+      'The party leaves the last of the cover behind, and grassland spreads to every edge of sight.'
     ],
     revisit: [
       'Familiar grassland spreads around the party again, the wind never quite still.',
       'The party moves on across more open fields, the grass tugging at their boots.',
       'More rolling plains, the same restless grass bending in the breeze.',
       'The open country goes on, one field much like the last under the wide sky.',
-      'The party tramps on through the grass, the horizon no nearer than before.'
+      'The party tramps on through the grass, the horizon no nearer than before.',
+      'The grass parts and closes behind the party, mile after unhurried mile.'
     ],
     ambient: [
       'A hawk wheels somewhere high overhead.',
       'Insects drone in the warm, swaying grass.',
       'The wind carries the dry, green smell of summer hay.',
-      'Cloud shadows drift slowly across the open ground.'
+      'Cloud shadows drift slowly across the open ground.',
+      'A lone tree stands far off, bent by years of one-way wind.',
+      'Grasshoppers spring away from the party in little clattering arcs.'
     ]
   },
   desert: {
@@ -112,20 +117,25 @@ const TEMPLATES = {
       'The party trudges out onto cracked, sun-baked sand where heat shimmers off every dune.',
       'A sea of windswept dunes opens ahead, the sun hammering down without mercy.',
       'The ground turns to scorching sand, and a dry wind throws grit against the party.',
-      'Endless desert stretches before the party, pale and merciless under a white sun.'
+      'Endless desert stretches before the party, pale and merciless under a white sun.',
+      'Heat rolls up off the sand in waves as the party steps out into the open waste.',
+      'The last scrub gives way to bare dune, and the sun bears down like a weight.'
     ],
     revisit: [
       'More burning sand, the dunes blurring together in the haze.',
       'The party pushes on across the parched desert, throats already dry.',
       'Another stretch of shadeless sand, the heat pressing down like a hand.',
       'The dunes roll on without end, every crest the same as the last.',
-      'The party trudges deeper into the waste, sand grinding in every seam.'
+      'The party trudges deeper into the waste, sand grinding in every seam.',
+      'The sun wheels overhead and still the sand runs on to the horizon.'
     ],
     ambient: [
       'Sand hisses across the dunes on a hot, gritty wind.',
       'The air ripples with heat, distorting the horizon.',
       'Nothing moves but the slow march of the dunes.',
-      'A vulture turns lazily in the blinding sky.'
+      'A vulture turns lazily in the blinding sky.',
+      'Bleached bones jut from a dune, half-scoured by the wind.',
+      'The wind dies, and the silence of the waste presses close.'
     ]
   },
   snow: {
@@ -133,20 +143,25 @@ const TEMPLATES = {
       'The party crunches out onto a frozen waste where snow swallows every sound.',
       'A bitter wind cuts across an unbroken field of white as the party presses on.',
       'Snow lies deep and silent here, the cold biting at every exposed inch of skin.',
-      'The land turns to ice and drifting snow, breath clouding in the frigid air.'
+      'The land turns to ice and drifting snow, breath clouding in the frigid air.',
+      'The party wades into knee-deep drifts, each step a small cold labour.',
+      'A pale glare of snow opens ahead, so bright it aches to look at.'
     ],
     revisit: [
       'More frozen ground, the snow squeaking underfoot.',
       'The party trudges on through the cold, fingers numb in the wind.',
       'Another white expanse, the chill working deeper into their bones.',
       'The snow stretches on, every drift the twin of the last.',
-      'The party presses deeper into the cold, breath freezing on their scarves.'
+      'The party presses deeper into the cold, breath freezing on their scarves.',
+      'The white goes on and on, and the cold never once relents.'
     ],
     ambient: [
       'Fine snow sifts down from a low grey sky.',
       'The cold is so complete it seems to hum in the silence.',
       'Wind moans across the drifts and dies away.',
-      'Frost glitters where a thin sun breaks through.'
+      'Frost glitters where a thin sun breaks through.',
+      'A single line of animal tracks crosses the snow and vanishes.',
+      'Ice cracks somewhere with a sound like a snapped branch.'
     ]
   },
   water: {
@@ -154,18 +169,23 @@ const TEMPLATES = {
       'The party halts at the water\'s edge, dark waves lapping cold against the shore.',
       'Open water spreads ahead, restless and grey to the far horizon.',
       'The ground gives way to a broad expanse of water, its surface broken by slow swells.',
-      'A wide stretch of water bars the way, gulls crying somewhere out over the swell.'
+      'A wide stretch of water bars the way, gulls crying somewhere out over the swell.',
+      'The land runs out at a cold grey shore where the water stretches beyond sight.',
+      'Wind comes off the open water in gusts, carrying the smell of deep cold.'
     ],
     revisit: [
       'The water laps at the shore again, cold and patient.',
       'The party skirts the edge of the water once more, spray on the wind.',
-      'Familiar waves roll in, hissing back over wet stones.'
+      'Familiar waves roll in, hissing back over wet stones.',
+      'The same grey swell heaves and settles along the shore.'
     ],
     ambient: [
       'Salt spray drifts on the breeze.',
       'Waves break and draw back in a slow, endless rhythm.',
       'Sunlight scatters in bright shards across the water.',
-      'Somewhere a gull calls and is answered.'
+      'Somewhere a gull calls and is answered.',
+      'A dark shape rolls once beneath the surface and is gone.',
+      'The water heaves in a long slow swell that never quite breaks.'
     ]
   },
   beach: {
@@ -173,18 +193,23 @@ const TEMPLATES = {
       'The party steps out onto pale sand where the tide draws long lines along the shore.',
       'A ribbon of sandy beach opens up, the surf hissing in and out a few paces away.',
       'Soft sand shifts underfoot as the party reaches the open shoreline.',
-      'The shore stretches away in both directions, strewn with weed and bleached driftwood.'
+      'The shore stretches away in both directions, strewn with weed and bleached driftwood.',
+      'The party comes down onto a wide beach where the sand is packed hard and wet by the tide.',
+      'Waves fold onto the sand ahead, leaving a bright lace of foam behind.'
     ],
     revisit: [
       'More sand and surf, the tide tracing the same old lines.',
       'The party walks on along the beach, footprints filling with seawater.',
-      'Another stretch of shoreline, gulls scattering ahead of them.'
+      'Another stretch of shoreline, gulls scattering ahead of them.',
+      'The shore curves on, the surf keeping its slow steady time.'
     ],
     ambient: [
       'The surf hisses up the sand and slides back.',
       'A briny wind tugs at hair and cloaks.',
       'Tiny crabs scuttle for cover among the weed.',
-      'Driftwood lies half-buried where the tide left it.'
+      'Driftwood lies half-buried where the tide left it.',
+      'A broken shell gleams wet where the last wave withdrew.',
+      'Seabirds pick along the tide-line, quick and wary.'
     ]
   },
   woodland: {
@@ -192,20 +217,25 @@ const TEMPLATES = {
       'The party passes beneath a canopy of crowding trees, the light going green and dim.',
       'Dense woodland closes in around the party, the air cool and heavy with leaf-mould.',
       'Trees rise tall on every side as the party threads into the forest shade.',
-      'The path narrows into thick woods where branches knit overhead.'
+      'The path narrows into thick woods where branches knit overhead.',
+      'The party ducks under low boughs into a wood where the daylight comes apart into green.',
+      'The trees close ranks around the party, and the noise of the open land falls away.'
     ],
     revisit: [
       'More close-grown trees, the same hush settling over the party.',
       'The party moves deeper among the trunks, twigs snapping underfoot.',
       'Familiar woodland shadow folds around them again.',
       'The trees crowd on, the green gloom unbroken ahead.',
-      'The party threads further into the woods, roots catching at their boots.'
+      'The party threads further into the woods, roots catching at their boots.',
+      'Another stand of close timber, the light no stronger than before.'
     ],
     ambient: [
       'Birdsong filters down through the leaves.',
       'Something small rustles away through the undergrowth.',
       'Shafts of light fall through the canopy in dusty bars.',
-      'The damp smell of bark and rotting leaves hangs in the air.'
+      'The damp smell of bark and rotting leaves hangs in the air.',
+      'A branch creaks overhead, though there is barely a breeze.',
+      'Mushrooms cluster pale on a fallen, moss-furred log.'
     ]
   },
   swamp: {
@@ -213,18 +243,23 @@ const TEMPLATES = {
       'The party wades into a sodden marsh where every step sucks at their boots.',
       'Stagnant water and reeking mud spread out beneath a tangle of dead trees.',
       'The ground turns to bog, mist curling low over black, still water.',
-      'A fetid swamp opens before the party, alive with the drone of insects.'
+      'A fetid swamp opens before the party, alive with the drone of insects.',
+      'The firm ground fails, and the party sinks ankle-deep into cold black mud.',
+      'A reek of rot rolls up as the party pushes into the standing water and reeds.'
     ],
     revisit: [
       'More black water and clinging mud, the stench no kinder than before.',
       'The party slogs on through the mire, midges thick around their heads.',
-      'Another stretch of bog, the reeds whispering wetly.'
+      'Another stretch of bog, the reeds whispering wetly.',
+      'The mire drags on, every step won back from the sucking mud.'
     ],
     ambient: [
       'Bubbles rise and burst in the dark water.',
       'Clouds of midges hang in the heavy air.',
       'Something unseen slips beneath the surface.',
-      'A low mist drifts between the dead trees.'
+      'A low mist drifts between the dead trees.',
+      'A frog stops mid-croak, and the silence leans in.',
+      'Pale gas glimmers for a moment over the still water.'
     ]
   },
   mountain: {
@@ -232,20 +267,25 @@ const TEMPLATES = {
       'The party climbs onto bare, rocky ground where stone teeth claw at the sky.',
       'Steep slopes of broken rock rise around the party as the air grows thin and cold.',
       'The way turns to a hard scramble over scree, peaks looming grey above.',
-      'Jagged mountains hem the party in, the wind keening between the crags.'
+      'Jagged mountains hem the party in, the wind keening between the crags.',
+      'The trail steepens to a ladder of rock, and the party climbs with hands as much as feet.',
+      'Grey peaks close overhead, and the air turns thin and knife-sharp with cold.'
     ],
     revisit: [
       'More loose rock and steep ground, the climb no gentler than before.',
       'The party picks its way on across the stony heights.',
       'Familiar crags rise around them, cold wind pouring down the slopes.',
       'The broken rock goes on, the path picking endlessly up and over.',
-      'The party scrambles higher, scree shifting away beneath their boots.'
+      'The party scrambles higher, scree shifting away beneath their boots.',
+      'Another ridge, another cold saddle of stone to cross.'
     ],
     ambient: [
       'Loose stones clatter away down the slope.',
       'The thin wind whistles between the rocks.',
       'An eagle drifts on the updrafts far above.',
-      'Snow clings in the high shaded clefts.'
+      'Snow clings in the high shaded clefts.',
+      'A distant rockfall rumbles and fades among the peaks.',
+      'The party\'s breath comes short in the thin, cold air.'
     ]
   },
   hills: {
@@ -253,20 +293,25 @@ const TEMPLATES = {
       'The party climbs into rolling hill country, the land rising and falling in long green waves.',
       'Low hills spread out ahead, their crests catching the light and their hollows in shade.',
       'The ground swells into grassy hills that hide the horizon at every rise.',
-      'The party crests one hill only to find another rolling away beyond it.'
+      'The party crests one hill only to find another rolling away beyond it.',
+      'The path bends up into a country of green humps and shadowed dells.',
+      'The party toils up onto a broad ridge and the land unfolds in slow swells below.'
     ],
     revisit: [
       'More rolling hills, the climbs and descents blurring together.',
       'The party tops another rise and starts down the far side.',
       'Familiar green slopes rise and fall around them.',
       'The hills go on, each crest hiding another fold of land beyond.',
-      'The party labours up yet another slope, legs aching from the last.'
+      'The party labours up yet another slope, legs aching from the last.',
+      'Up and down the party goes, the hills passing them from one to the next.'
     ],
     ambient: [
       'Wind combs through the long hilltop grass.',
       'Sheep tracks wind away over the nearest crest.',
       'A skylark sings, unseen, somewhere above.',
-      'Cloud shadow slides over the folded land.'
+      'Cloud shadow slides over the folded land.',
+      'A tumbled drystone wall runs off along a distant ridge.',
+      'The bleat of sheep drifts up from a hidden hollow.'
     ]
   },
   ruins: {
@@ -274,18 +319,23 @@ const TEMPLATES = {
       'The party comes upon crumbling ruins, broken walls jutting from the earth like old bones.',
       'Toppled columns and shattered stone mark some long-dead place the party now enters.',
       'Ancient ruins sprawl ahead, half-swallowed by creeping vine and drifted soil.',
-      'The party steps among fallen archways and weathered carvings worn past reading.'
+      'The party steps among fallen archways and weathered carvings worn past reading.',
+      'Roofless halls open around the party, the sky showing through where beams once ran.',
+      'The party threads between leaning walls, every stone furred with lichen and age.'
     ],
     revisit: [
       'The familiar ruins loom again, silent and patient in their decay.',
       'The party picks back through the broken stones they passed before.',
-      'More tumbled walls, the same heavy stillness hanging over them.'
+      'More tumbled walls, the same heavy stillness hanging over them.',
+      'The old stones stand as they left them, indifferent and grey.'
     ],
     ambient: [
       'Wind sighs through empty window-holes.',
       'Lizards bask and dart along the warm fallen stone.',
       'Faded carvings hint at some forgotten purpose.',
-      'Dust lies thick in the shadow of the old walls.'
+      'Dust lies thick in the shadow of the old walls.',
+      'A fallen keystone lies where it dropped a hundred years ago.',
+      'Ivy has pried a doorway apart, stone by patient stone.'
     ]
   },
   cave: {
@@ -293,24 +343,44 @@ const TEMPLATES = {
       'The party reaches a dark cave mouth that breathes cold, damp air into the daylight.',
       'A jagged opening yawns in the rock ahead, swallowing all light a few paces in.',
       'The way leads to a cave entrance, its throat black and silent before the party.',
-      'A low, dark cavern mouth gapes in the hillside as the party draws near.'
+      'A low, dark cavern mouth gapes in the hillside as the party draws near.',
+      'The rock splits open ahead into a black slot the daylight cannot follow.',
+      'The party halts at a cave mouth, cold and dark, that seems to swallow sound as well as light.'
     ],
     revisit: [
       'The cave mouth waits as before, dark and exhaling cold.',
       'The party returns to the familiar black opening in the rock.',
-      'The same damp breath of the cave meets them again.'
+      'The same damp breath of the cave meets them again.',
+      'The dark entrance gapes as it did before, patient and cold.'
     ],
     ambient: [
       'Water drips somewhere deep in the dark.',
       'Cold, stale air seeps out of the opening.',
       'The sounds of the world seem to stop at the cave mouth.',
-      'Pale roots dangle over the dark entrance.'
+      'Pale roots dangle over the dark entrance.',
+      'An echo answers from somewhere far back in the black.',
+      'The stone underfoot is slick and cold with old damp.'
     ]
   }
 };
 
 const fallbackPool = TEMPLATES.plains;
 const poolFor = (key) => TEMPLATES[key] || fallbackPool;
+
+// Pick a line from `set`, starting at the rng-chosen index and skipping any line
+// in `recent` (the recently-shown lines) so movement prose doesn't repeat back to
+// back or too soon. With an empty `recent` this is exactly the old
+// `set[floor(rng()*len)]`, so determinism per (worldSeed, coords) is preserved.
+const pickLine = (set, rng, recent = []) => {
+  if (!set || !set.length) return undefined;
+  const start = Math.floor(rng() * set.length);
+  if (!recent.length) return set[start];
+  for (let n = 0; n < set.length; n++) {
+    const cand = set[(start + n) % set.length];
+    if (!recent.includes(cand)) return cand;
+  }
+  return set[start]; // whole pool used recently — accept a repeat rather than nothing
+};
 
 // --- Neighbour landmark clause ---------------------------------------------------
 // Mirror the AI path's "surrounding terrain" context (promptBuilder.getSurroundingTerrain)
@@ -405,6 +475,9 @@ const buildPartyClause = (selectedHeroes = [], rng) => {
  * @param {Object} [args.settings] - Game settings (theme reserved for future use).
  * @param {Array} [args.selectedHeroes] - Party, for a coarse wounded-state clause.
  * @param {boolean} [args.isNewArea] - First visit to this biome/town -> richer arrival.
+ * @param {string[]} [args.recent] - Recently-shown lines to avoid (anti-repetition). The
+ *   composer skips these when picking, then appends the lines it used. Callers pass a
+ *   mutable, trimmed rolling window; with the default (empty) it stays deterministic.
  * @returns {string} Markdown prose (uses *italics* / **bold**, never _underscores_).
  */
 export const composeLocalMovementNarrative = ({
@@ -414,7 +487,8 @@ export const composeLocalMovementNarrative = ({
   worldMap = null,
   settings = {}, // eslint-disable-line no-unused-vars
   selectedHeroes = [],
-  isNewArea = true
+  isNewArea = true,
+  recent = []
 } = {}) => {
   if (!tile) return '';
   const x = coords.x != null ? coords.x : tile.x;
@@ -439,13 +513,13 @@ export const composeLocalMovementNarrative = ({
       `**${tile.townName}** comes into view again, a known face in the wilds.`
     ];
     const set = isNewArea ? townOpenings : revisitOpenings;
-    opening = set[Math.floor(rng() * set.length)];
+    opening = pickLine(set, rng, recent);
   } else {
     const set = isNewArea ? pool.arrival : pool.revisit;
-    opening = set[Math.floor(rng() * set.length)];
+    opening = pickLine(set, rng, recent);
   }
 
-  const ambient = pool.ambient[Math.floor(rng() * pool.ambient.length)];
+  const ambient = pickLine(pool.ambient, rng, recent);
   const neighbourClause = buildNeighbourClause({ x, y }, worldMap, rng);
   const partyClause = buildPartyClause(selectedHeroes, rng);
 
@@ -458,6 +532,11 @@ export const composeLocalMovementNarrative = ({
   if (neighbourClause) tail.push(neighbourClause);
   if (tail.length) sentences.push(`*${tail.join(' ')}*`);
   if (partyClause) sentences.push(partyClause);
+
+  // Record the picked opening + ambient so the next few moves avoid them. Harmless
+  // when `recent` is the default throwaway array (keeps the pure/deterministic path).
+  if (opening) recent.push(opening);
+  if (ambient) recent.push(ambient);
 
   return sentences.join(' ');
 };

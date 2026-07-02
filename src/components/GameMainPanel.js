@@ -53,6 +53,9 @@ const GameMainPanel = ({
             <button onClick={onOpenMap} className="view-map-button" data-tour="open-map" aria-label={townName ? `View ${townName} map` : 'View world map'}>
               <span aria-hidden="true">🗺️</span> {townName ? `${townName} Map` : 'Map'}
             </button>
+            <button onClick={onOpenSettings} className="view-settings-button" aria-label="Open journal">
+              <span aria-hidden="true">📖</span> Journal
+            </button>
             {hasAdventureStarted && (
               <button onClick={onLookAround} className="look-around-button" disabled={isLoading} aria-label="Look around the current location">
                 <span aria-hidden="true">🔍</span> Look around
@@ -63,9 +66,6 @@ const GameMainPanel = ({
             </button>
             <button onClick={onOpenHowToPlay} className="how-to-play-button" aria-label="Open how to play guide">
               <span aria-hidden="true">📜</span> How to Play
-            </button>
-            <button onClick={onOpenSettings} className="view-settings-button" aria-label="Open journal">
-              <span aria-hidden="true">📖</span> Journal
             </button>
             <button onClick={onManualSave} className="manual-save-button" disabled={!canManualSave} aria-label="Save game manually">
               <span aria-hidden="true">💾</span> Save

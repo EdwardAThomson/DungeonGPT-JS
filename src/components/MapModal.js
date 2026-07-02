@@ -10,6 +10,13 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
     const previousFocusRef = useRef(null);
     const modalRef = useRef(null);
     const [showLegend, setShowLegend] = useState(true);
+    // While inside a town the player can flip to the world map for milestone planning.
+    // `mapTab` only matters when mapLevel === 'town'; reset to the town view on entering one.
+    const [mapTab, setMapTab] = useState('town');
+    useEffect(() => {
+        if (mapLevel === 'town') setMapTab('town');
+    }, [mapLevel]);
+    const viewLevel = mapLevel === 'town' ? mapTab : mapLevel;
 
     useEffect(() => {
         if (isOpen) {
@@ -44,26 +51,53 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                     aria-modal="true"
                     aria-labelledby="map-modal-title"
                 >
-                    <h2 id="map-modal-title">{mapLevel === 'town' ? (townMapData?.townName || 'Town Map') : mapLevel === 'site' ? (siteMapData?.name || 'Site') : 'World Map'}</h2>
+                    <h2 id="map-modal-title">{viewLevel === 'town' ? (townMapData?.townName || 'Town Map') : viewLevel === 'site' ? (siteMapData?.name || 'Site') : 'World Map'}</h2>
+                {mapLevel === 'town' && (
+                    <div className="map-view-tabs" role="tablist" aria-label="Map view" style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 10 }}>
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={mapTab === 'town'}
+                            className={mapTab === 'town' ? 'primary-button' : 'secondary-button'}
+                            onClick={() => setMapTab('town')}
+                        >
+                            🏘️ {townMapData?.townName || 'Town'}
+                        </button>
+                        <button
+                            type="button"
+                            role="tab"
+                            aria-selected={mapTab === 'world'}
+                            className={mapTab === 'world' ? 'primary-button' : 'secondary-button'}
+                            onClick={() => setMapTab('world')}
+                        >
+                            🗺️ World
+                        </button>
+                    </div>
+                )}
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', justifyContent: 'center' }}>
                     <div style={{ minWidth: 0 }}>
-                {mapLevel === 'world' ? (
+                {viewLevel === 'world' ? (
                     <>
                         <WorldMapDisplay
                             mapData={mapData}
                             playerPosition={playerPosition}
-                            onTileClick={onTileClick}
+                            onTileClick={mapLevel === 'world' ? onTileClick : undefined}
                             firstHero={firstHero}
                             visibleMilestonePois={visibleMilestonePois}
                             revealedSiteTypes={revealedSiteTypes}
                         />
-                        {townError && (
+                        {mapLevel === 'town' && (
+                            <p className="map-planning-hint" style={{ textAlign: 'center', opacity: 0.75, fontSize: '0.85rem', margin: '8px 0 0' }}>
+                                Planning view — leave town to travel the world map.
+                            </p>
+                        )}
+                        {mapLevel === 'world' && townError && (
                             <div className="message system error" style={{ margin: '10px auto', display: 'block' }}>
                                 {townError}
                             </div>
                         )}
                     </>
-                ) : mapLevel === 'site' ? (
+                ) : viewLevel === 'site' ? (
                     <SiteMapDisplay
                         siteMapData={siteMapData}
                         playerPosition={sitePlayerPosition}
@@ -98,8 +132,8 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                     {showLegend ? (
                         <MapLegend
                             title="Map Key"
-                            groups={mapLevel === 'town' ? townLegendGroups() : mapLevel === 'site' ? siteLegendGroups(siteMapData?.theme, currentTile?.biome) : worldLegendGroups()}
-                            columns={mapLevel === 'town' ? 2 : 1}
+                            groups={viewLevel === 'town' ? townLegendGroups() : viewLevel === 'site' ? siteLegendGroups(siteMapData?.theme, currentTile?.biome) : worldLegendGroups()}
+                            columns={viewLevel === 'town' ? 2 : 1}
                             onMinimize={() => setShowLegend(false)}
                             style={{ maxHeight: '60vh', overflowY: 'auto', flex: '0 0 auto' }}
                         />

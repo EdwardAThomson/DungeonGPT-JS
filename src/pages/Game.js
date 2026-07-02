@@ -152,6 +152,9 @@ const Game = () => {
   const [pendingLookEncounter, setPendingLookEncounter] = useState(null);
   // Bumped on each guest/local Look-around so repeated looks at the same tile vary.
   const lookNonceRef = useRef(0);
+  // Rolling window of recently-shown local movement lines, so templated biome prose
+  // doesn't repeat back to back or too soon (passed to composeLocalMovementNarrative).
+  const recentNarrationRef = useRef([]);
   const [aiNarrativeEnabled, setAiNarrativeEnabled] = useState(true);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [isMobilePartySidebarOpen, setIsMobilePartySidebarOpen] = useState(false);
@@ -495,6 +498,7 @@ const Game = () => {
   // path — no /api/ai call, no RAG embed (matches guest play today). The signed-in AI
   // path is untouched. (Phase B3a of TIERED_NARRATION_PLAN.md.)
   const appendLocalMovementNarrative = ({ tile, coords, isNewArea, heroes }) => {
+    const recent = recentNarrationRef.current;
     const text = composeLocalMovementNarrative({
       tile,
       coords,
@@ -502,8 +506,11 @@ const Game = () => {
       worldMap: mapHook.worldMap,
       settings,
       selectedHeroes: heroes || selectedHeroes,
-      isNewArea
+      isNewArea,
+      recent
     });
+    // Keep the avoid-window bounded (the composer appends the lines it just used).
+    if (recent.length > 8) recent.splice(0, recent.length - 8);
     if (!text || !text.trim()) return;
     interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
   };
