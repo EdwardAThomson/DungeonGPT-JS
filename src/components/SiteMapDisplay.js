@@ -39,7 +39,13 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite,
               {tile.poi && SITE_POI[tile.poi]}
               {tile.content && (
                 <span style={{ position: 'absolute', fontSize: TILE * 0.55, opacity: tile.content.consumed ? 0.35 : 1, textShadow: '0 0 3px #000' }}>
-                  {tile.content.consumed ? '·' : tile.content.kind === 'encounter' ? '⚔️' : tile.content.kind === 'objective' ? '❗' : '💰'}
+                  {tile.content.consumed ? '·'
+                    : tile.content.kind === 'encounter' ? '⚔️'
+                    : tile.content.kind === 'objective' ? '❗'
+                    // loot: harvestable nodes (e.g. crystal deposits) carry `display`, a
+                    // SITE_POI key, so the node LOOKS like the thing you harvest; plain
+                    // loot (and older saves without the field) falls back to 💰.
+                    : (SITE_POI[tile.content.display] || '💰')}
                 </span>
               )}
               {!tile.content && tile.contentSlot && <span style={{ color: '#ffd34d', fontSize: TILE * 0.5, textShadow: '0 0 3px #000' }}>◆</span>}
