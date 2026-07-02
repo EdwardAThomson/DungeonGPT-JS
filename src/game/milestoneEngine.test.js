@@ -1,0 +1,249 @@
+import {
+  getMilestoneNpcsForTown,
+  checkMilestoneCompletion,
+  completeNarrativeMilestone,
+  findMarkerMilestoneIndex,
+  getMilestoneBossForTile,
+  isMilestoneItemClaimed
+} from './milestoneEngine';
+
+// Mirrors the heroic-fantasy-t1 milestone #2 shape (authored NPC + quest building).
+const milestones = [
+  {
+    id: 1,
+    text: 'Find the goblin scout\'s map in the Willowdale tavern',
+    location: 'Willowdale',
+    type: 'item',
+    spawn: { type: 'item', id: 'map_fragment', name: 'Goblin Scout\'s Map', location: 'Willowdale' },
+    building: { type: 'tavern', name: 'The Crooked Pint', location: 'Willowdale' }
+  },
+  {
+    id: 2,
+    text: 'Meet the militia captain at Briarwood',
+    location: 'Briarwood',
+    type: 'narrative',
+    spawn: { type: 'npc', id: 'militia_captain', name: 'Captain Marta', location: 'Briarwood', role: 'Guard', personality: 'gruff, practical, protective of her people' },
+    building: { type: 'barracks', name: 'Briarwood Militia Hall', location: 'Briarwood' }
+  },
+  {
+    id: 3,
+    text: 'Track the goblins to their hideout',
+    location: 'Greenridge Hills',
+    type: 'location',
+    spawn: { type: 'poi', id: 'goblin_hideout', name: 'Goblin Hideout', location: 'Greenridge Hills' },
+    building: null
+  }
+];
+
+describe('getMilestoneNpcsForTown', () => {
+  it('returns the authored NPC (with building + personality) for its town', () => {
+    const npcs = getMilestoneNpcsForTown(milestones, 'Briarwood');
+    expect(npcs).toHaveLength(1);
+    expect(npcs[0]).toMatchObject({
+      id: 'militia_captain',
+      name: 'Captain Marta',
+      role: 'Guard',
+      personality: 'gruff, practical, protective of her people',
+      milestoneId: 2,
+      location: 'Briarwood',
+      building: { type: 'barracks', name: 'Briarwood Militia Hall' }
+    });
+  });
+
+  it('is case-insensitive on the town name', () => {
+    expect(getMilestoneNpcsForTown(milestones, 'briarwood')).toHaveLength(1);
+  });
+
+  it('ignores non-npc spawns (items, POIs)', () => {
+    expect(getMilestoneNpcsForTown(milestones, 'Willowdale')).toEqual([]);
+    expect(getMilestoneNpcsForTown(milestones, 'Greenridge Hills')).toEqual([]);
+  });
+
+  it('returns [] for towns with no authored NPC and tolerates bad input', () => {
+    expect(getMilestoneNpcsForTown(milestones, 'Nowhere')).toEqual([]);
+    expect(getMilestoneNpcsForTown(null, 'Briarwood')).toEqual([]);
+    expect(getMilestoneNpcsForTown(milestones, null)).toEqual([]);
+  });
+
+  it('falls back to the building location when the spawn omits location', () => {
+    const ms = [{
+      id: 9,
+      type: 'narrative',
+      spawn: { type: 'npc', id: 'x', name: 'Someone' },
+      building: { type: 'inn', name: 'The Rest', location: 'Farhaven' }
+    }];
+    const npcs = getMilestoneNpcsForTown(ms, 'Farhaven');
+    expect(npcs).toHaveLength(1);
+    expect(npcs[0].name).toBe('Someone');
+    expect(npcs[0].role).toBe('Villager'); // default when role unspecified
+  });
+});
+
+describe("'talk' milestones (deterministic NPC-talk completion)", () => {
+  // Mirrors the heroic-fantasy-t1 milestone #2 shape after the Option C change.
+  const talkMilestones = [
+    {
+      id: 1,
+      text: 'Find the goblin scout\'s map',
+      type: 'item',
+      completed: false,
+      requires: [],
+      trigger: { item: 'map_fragment', action: 'acquire' }
+    },
+    {
+      id: 2,
+      text: 'Meet the militia captain at Briarwood',
+      type: 'talk',
+      completed: false,
+      requires: [],
+      trigger: { npc: 'militia_captain', action: 'talk' },
+      spawn: { type: 'npc', id: 'militia_captain', name: 'Captain Ulric', role: 'Guard' },
+      building: { type: 'barracks', name: 'Briarwood Militia Hall', location: 'Briarwood' },
+      rewards: { xp: 25, gold: '1d6', items: ['rations'] }
+    }
+  ];
+
+  it('completes on npc_talked with the matching npcId', () => {
+    const result = checkMilestoneCompletion(talkMilestones, { type: 'npc_talked', npcId: 'militia_captain' });
+    expect(result).toMatchObject({ type: 'completed', milestoneId: 2 });
+    expect(result.updatedMilestones.find(m => m.id === 2).completed).toBe(true);
+  });
+
+  it('ignores npc_talked with the wrong npcId', () => {
+    expect(checkMilestoneCompletion(talkMilestones, { type: 'npc_talked', npcId: 'someone_else' })).toBeNull();
+  });
+
+  it('ignores other event types for a talk milestone', () => {
+    expect(checkMilestoneCompletion(talkMilestones, { type: 'location_visited', locationId: 'militia_captain' })).toBeNull();
+    expect(checkMilestoneCompletion(talkMilestones, { type: 'item_acquired', itemId: 'militia_captain' })).toBeNull();
+  });
+
+  it('reports blocked when prerequisites are unmet', () => {
+    const gated = talkMilestones.map(m => (m.id === 2 ? { ...m, requires: [1] } : m));
+    const result = checkMilestoneCompletion(gated, { type: 'npc_talked', npcId: 'militia_captain' });
+    expect(result).toMatchObject({ type: 'blocked', milestoneId: 2 });
+  });
+
+  it('does not re-complete an already completed talk milestone', () => {
+    const done = talkMilestones.map(m => (m.id === 2 ? { ...m, completed: true } : m));
+    expect(checkMilestoneCompletion(done, { type: 'npc_talked', npcId: 'militia_captain' })).toBeNull();
+  });
+
+  it('completeNarrativeMilestone still refuses non-narrative milestones', () => {
+    expect(completeNarrativeMilestone(talkMilestones, 2)).toBeNull(); // 'talk'
+    expect(completeNarrativeMilestone(talkMilestones, 1)).toBeNull(); // 'item'
+  });
+});
+
+describe('findMarkerMilestoneIndex (AI [COMPLETE_MILESTONE] guard)', () => {
+  const ms = [
+    { id: 1, text: 'Meet the militia captain at Briarwood', type: 'talk', completed: false },
+    { id: 2, text: 'Convince the elders to evacuate the valley', type: 'narrative', completed: false },
+    { id: 3, text: 'An old string milestone', completed: false } // legacy: no type
+  ];
+
+  it('matches narrative milestones by fuzzy text (either direction)', () => {
+    expect(findMarkerMilestoneIndex(ms, 'Convince the elders to evacuate the valley')).toBe(1);
+    expect(findMarkerMilestoneIndex(ms, 'convince the elders')).toBe(1); // marker is a substring
+    expect(findMarkerMilestoneIndex(ms, 'The party managed to convince the elders to evacuate the valley at last')).toBe(1);
+  });
+
+  it("never matches mechanical milestones ('talk' here) even on exact text", () => {
+    expect(findMarkerMilestoneIndex(ms, 'Meet the militia captain at Briarwood')).toBe(-1);
+  });
+
+  it('still matches legacy untyped milestones (old string saves)', () => {
+    expect(findMarkerMilestoneIndex(ms, 'An old string milestone')).toBe(2);
+  });
+
+  it('skips completed milestones', () => {
+    const done = ms.map(m => (m.id === 2 ? { ...m, completed: true } : m));
+    expect(findMarkerMilestoneIndex(done, 'convince the elders')).toBe(-1);
+  });
+
+  it('tolerates bad input', () => {
+    expect(findMarkerMilestoneIndex(null, 'x')).toBe(-1);
+    expect(findMarkerMilestoneIndex(ms, '')).toBe(-1);
+    expect(findMarkerMilestoneIndex(ms, '   ')).toBe(-1);
+    expect(findMarkerMilestoneIndex([{ id: 9, completed: false }], 'anything')).toBe(-1); // no text
+  });
+});
+
+describe('getMilestoneBossForTile (milestone boss fights on world tiles)', () => {
+  // Mirrors heroic-fantasy-t1 milestones 3 (hideout POI) + 4 (chieftain boss).
+  const bossEncounter = {
+    name: 'Goblin Chieftain',
+    encounterTier: 'boss',
+    enemyHP: 30,
+    suggestedActions: [{ label: 'Fight', skill: 'Athletics' }],
+    consequences: { success: 'ok' },
+    rewards: { xp: 75 }
+  };
+  const campaign = (overrides = {}) => ([
+    { id: 3, text: 'Track the goblins to their hideout', location: 'Greenridge Hills', type: 'location', completed: true, requires: [], trigger: { location: 'goblin_hideout', action: 'visit' }, spawn: { type: 'poi', id: 'goblin_hideout', name: 'Goblin Hideout', location: 'Greenridge Hills' } },
+    { id: 4, text: 'Defeat the Goblin Chieftain', location: 'Greenridge Hills', type: 'combat', completed: false, requires: [3], trigger: { enemy: 'goblin_chieftain', action: 'defeat' }, spawn: { type: 'enemy', id: 'goblin_chieftain', name: 'Goblin Chieftain', location: 'Greenridge Hills' }, encounter: bossEncounter, ...overrides }
+  ]);
+
+  const hideoutTile = { poi: 'goblin_hideout', poiName: 'Goblin Hideout', milestonePoi: true };
+
+  it('offers the boss on the milestone POI tile once prerequisites are met', () => {
+    const boss = getMilestoneBossForTile(campaign(), hideoutTile);
+    expect(boss).toBeTruthy();
+    expect(boss.enemyId).toBe('goblin_chieftain');
+    expect(boss.name).toBe('Goblin Chieftain');
+    expect(boss.encounter).toMatchObject({ enemyHP: 30, isMilestoneBoss: true, milestoneId: 4 });
+  });
+
+  it('offers the boss on a tile stamped with milestoneEnemy directly', () => {
+    const tile = { milestoneEnemy: 'goblin_chieftain', milestoneEnemyName: 'Goblin Chieftain' };
+    const boss = getMilestoneBossForTile(campaign(), tile);
+    expect(boss).toBeTruthy();
+    expect(boss.encounter.isMilestoneBoss).toBe(true);
+  });
+
+  it('withholds the boss while prerequisites are unmet', () => {
+    const locked = campaign().map(m => (m.id === 3 ? { ...m, completed: false } : m));
+    expect(getMilestoneBossForTile(locked, hideoutTile)).toBeNull();
+  });
+
+  it('withholds the boss once the combat milestone is completed', () => {
+    const done = campaign({ completed: true });
+    expect(getMilestoneBossForTile(done, hideoutTile)).toBeNull();
+  });
+
+  it('returns null for plain tiles and bad input', () => {
+    expect(getMilestoneBossForTile(campaign(), { poi: 'mountain' })).toBeNull();
+    expect(getMilestoneBossForTile(campaign(), null)).toBeNull();
+    expect(getMilestoneBossForTile(null, hideoutTile)).toBeNull();
+  });
+});
+
+describe('isMilestoneItemClaimed (quest-item search gating)', () => {
+  const ms = (completed) => ([{
+    id: 1,
+    text: 'Find the goblin scout\'s map',
+    type: 'item',
+    completed,
+    trigger: { item: 'map_fragment', action: 'acquire' },
+    spawn: { type: 'item', id: 'map_fragment', name: 'Goblin Scout\'s Map' }
+  }]);
+
+  it('is false while the item milestone is incomplete (search still offered)', () => {
+    expect(isMilestoneItemClaimed(ms(false), 'map_fragment')).toBe(false);
+  });
+
+  it('is true once the item milestone completes (search hidden)', () => {
+    expect(isMilestoneItemClaimed(ms(true), 'map_fragment')).toBe(true);
+  });
+
+  it('matches via spawn id even when trigger is absent', () => {
+    const spawnOnly = [{ id: 1, completed: true, spawn: { type: 'item', id: 'map_fragment' } }];
+    expect(isMilestoneItemClaimed(spawnOnly, 'map_fragment')).toBe(true);
+  });
+
+  it('is false for other items and tolerates bad input', () => {
+    expect(isMilestoneItemClaimed(ms(true), 'other_item')).toBe(false);
+    expect(isMilestoneItemClaimed(null, 'map_fragment')).toBe(false);
+    expect(isMilestoneItemClaimed(ms(true), null)).toBe(false);
+  });
+});

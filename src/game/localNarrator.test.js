@@ -1,4 +1,4 @@
-import { composeLocalMovementNarrative, composeLocalAmbientNarrative, __test__ } from './localNarrator';
+import { composeLocalMovementNarrative, composeLocalAmbientNarrative, composeNpcMeeting, __test__ } from './localNarrator';
 
 const plainsTile = { biome: 'plains', poi: null, x: 3, y: 4, descriptionSeed: 'Open fields' };
 const desertTile = { biome: 'desert', poi: null, x: 3, y: 4, descriptionSeed: 'Open desert' };
@@ -220,5 +220,54 @@ describe('composeLocalAmbientNarrative (Look-around, no-AI path)', () => {
   it('returns an empty string for a missing tile', () => {
     expect(composeLocalAmbientNarrative({ tile: null })).toBe('');
     expect(composeLocalAmbientNarrative({})).toBe('');
+  });
+});
+
+describe('composeNpcMeeting', () => {
+  const ulric = {
+    name: 'Captain Ulric',
+    role: 'Guard',
+    building: 'Briarwood Militia Hall',
+    townName: 'Briarwood',
+    personality: 'gruff, practical, protective of his people',
+    worldSeed: 12345
+  };
+
+  it('is deterministic for the same seed + npc', () => {
+    const a = composeNpcMeeting(ulric);
+    const b = composeNpcMeeting(ulric);
+    expect(a).toBe(b);
+    expect(a.length).toBeGreaterThan(0);
+  });
+
+  it('names the NPC in bold and mentions the building', () => {
+    const text = composeNpcMeeting(ulric);
+    expect(text).toContain('**Captain Ulric**');
+    expect(text).toContain('Briarwood Militia Hall');
+  });
+
+  it('renders the personality as an italic asterisk clause (never underscores)', () => {
+    const text = composeNpcMeeting(ulric);
+    expect(text).toContain('*Gruff, practical, protective of his people.*');
+    expect(text).not.toMatch(/_[^_\s][^_]*_/);
+  });
+
+  it('never doubles the article on building names that already start with "The"', () => {
+    const text = composeNpcMeeting({ ...ulric, building: 'The Crooked Pint' });
+    expect(text).toContain('The Crooked Pint');
+    expect(text).not.toMatch(/the The/);
+  });
+
+  it('falls back to the town name, then a generic hall, when no building is given', () => {
+    const noBuilding = composeNpcMeeting({ ...ulric, building: null });
+    expect(noBuilding).toContain('Briarwood');
+    const bare = composeNpcMeeting({ name: 'Someone', worldSeed: 1 });
+    expect(bare).toContain('**Someone**');
+    expect(bare.length).toBeGreaterThan(0);
+  });
+
+  it('returns an empty string without a name', () => {
+    expect(composeNpcMeeting({})).toBe('');
+    expect(composeNpcMeeting()).toBe('');
   });
 });

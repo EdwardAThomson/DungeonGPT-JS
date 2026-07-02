@@ -44,3 +44,63 @@ describe('populateTown staffing coverage', () => {
       .toEqual(b.map((n) => `${n.location.buildingType}:${n.name}:${n.job}`));
   });
 });
+
+describe('populateTown canonical (milestone) NPC placement', () => {
+  // The authored NPC as returned by getMilestoneNpcsForTown.
+  const marta = {
+    id: 'militia_captain',
+    name: 'Captain Marta',
+    role: 'Guard',
+    personality: 'gruff, practical, protective of her people',
+    milestoneId: 2,
+    location: 'Briarwood',
+    building: { type: 'barracks', name: 'Briarwood Militia Hall' }
+  };
+
+  // A town whose barracks has been renamed to the authored building name (as
+  // injectQuestBuildings does), plus a second, ordinary barracks.
+  const town = {
+    townName: 'Briarwood',
+    townSize: 'town',
+    width: 2,
+    height: 1,
+    mapData: [[
+      { type: 'building', buildingType: 'barracks', buildingName: 'Briarwood Militia Hall', x: 0, y: 0 },
+      { type: 'building', buildingType: 'barracks', buildingName: 'The Old Watchtower', x: 1, y: 0 }
+    ]]
+  };
+
+  it('places the canonical NPC in the authored building and skips procedural staffing there', () => {
+    const npcs = populateTown(town, 555, [marta]);
+    const inHall = npcs.filter((n) => n.location?.x === 0 && n.location?.y === 0);
+    // Only the canonical NPC staffs the authored building (procedural captain + guards suppressed).
+    expect(inHall).toHaveLength(1);
+    expect(inHall[0].name).toBe('Captain Marta');
+    expect(inHall[0].title).toBe('Captain');
+    expect(inHall[0].personality).toBe('gruff, practical, protective of her people');
+    expect(inHall[0].milestoneNpcId).toBe('militia_captain');
+  });
+
+  it('leaves other barracks with their procedural staff', () => {
+    const npcs = populateTown(town, 555, [marta]);
+    const inWatchtower = npcs.filter((n) => n.location?.x === 1 && n.location?.y === 0);
+    expect(inWatchtower.length).toBeGreaterThan(0);
+    expect(inWatchtower.every((n) => n.name !== 'Captain Marta')).toBe(true);
+    expect(inWatchtower.some((n) => /commander/i.test(n.job || ''))).toBe(true);
+  });
+
+  it('does not place a duplicate captain (only one Captain Marta total)', () => {
+    const npcs = populateTown(town, 555, [marta]);
+    expect(npcs.filter((n) => n.name === 'Captain Marta')).toHaveLength(1);
+  });
+
+  it('leaves towns with no milestone NPCs unchanged (procedural captain remains)', () => {
+    const withMilestone = populateTown(makeTown(['barracks']), 321, []);
+    const without = populateTown(makeTown(['barracks']), 321);
+    // No canonical NPC when none supplied; identical to the no-arg call.
+    expect(withMilestone.some((n) => n.milestoneNpcId)).toBe(false);
+    expect(withMilestone.map((n) => `${n.name}:${n.job}`))
+      .toEqual(without.map((n) => `${n.name}:${n.job}`));
+    expect(withMilestone.some((n) => /commander/i.test(n.job || ''))).toBe(true);
+  });
+});

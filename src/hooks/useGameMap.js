@@ -6,11 +6,12 @@ import { generateSiteMap } from '../utils/siteMapGenerator';
 import { populateSite, injectSiteObjective } from '../game/sitePopulator';
 import { populateTown } from '../utils/npcGenerator';
 import { injectQuestBuildings } from '../game/milestoneSpawner';
+import { getMilestoneNpcsForTown } from '../game/milestoneEngine';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-map');
 
-const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null, requiredBuildings = null, initialTownMapsCache = null, mapTheme = 'grassland', requiredSiteObjectives = null) => {
+const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null, requiredBuildings = null, initialTownMapsCache = null, mapTheme = 'grassland', requiredSiteObjectives = null, milestones = null) => {
     // --- State Initialization --- //
 
     const [mapAndPosition] = useState(() => {
@@ -225,7 +226,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 }
 
                 // POPULATE TOWN
-                const npcs = populateTown(newTownMap, seed);
+                const npcs = populateTown(newTownMap, seed, getMilestoneNpcsForTown(milestones, townName));
                 newTownMap.npcs = npcs;
 
                 setCurrentTownMap(newTownMap);
@@ -261,7 +262,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
 
                 // POPULATE TOWN WITH NPCs
                 logger.debug('Populating town with NPCs');
-                const npcs = populateTown(townMapData, seed);
+                const npcs = populateTown(townMapData, seed, getMilestoneNpcsForTown(milestones, townName));
                 townMapData.npcs = npcs;
 
                 setTownMapsCache(prev => ({ ...prev, [townName]: townMapData }));
@@ -443,7 +444,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
 
             // POPULATE TOWN WITH NPCs
             logger.debug('Populating town with NPCs');
-            const npcs = populateTown(townMapData, seed);
+            const npcs = populateTown(townMapData, seed, getMilestoneNpcsForTown(milestones, townName));
             townMapData.npcs = npcs;
 
             setTownMapsCache(prev => ({ ...prev, [townName]: townMapData }));

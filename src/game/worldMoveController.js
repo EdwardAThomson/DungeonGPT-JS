@@ -50,14 +50,21 @@ export const trackAreaVisits = ({
   }
 };
 
+// Never show a raw underscored id to the player ("goblin_hideout" -> "Goblin Hideout").
+const titleCaseId = (id) => String(id).split(/[_\s]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
 export const buildPoiEncounter = (targetTile) => {
   if (!targetTile.poi) return null;
   const poiType = targetTile.poiType || targetTile.poi;
   const NICE_NAMES = { cave_entrance: 'a Cave', cave: 'a Cave', ruins: 'Ruins', forest: 'a Forest', hills: 'the Hills', mountain: 'the Mountains' };
+  // Milestone POIs carry their authored display name on the tile (poiName); the raw poi id
+  // is only ever a last resort and gets title-cased so it never renders underscored.
+  const displayName = targetTile.townName || targetTile.poiName || NICE_NAMES[poiType] || titleCaseId(targetTile.poi);
   return {
-    name: targetTile.townName || NICE_NAMES[poiType] || targetTile.poi,
+    name: displayName,
     poiType,
-    description: targetTile.descriptionSeed || `You have arrived at ${targetTile.poi}.`,
+    isMilestonePoi: !!targetTile.milestonePoi,
+    description: targetTile.descriptionSeed || `You have arrived at ${displayName}.`,
     canEnter: ['town', 'city', 'village', 'hamlet', 'dungeon', 'cave_entrance', 'cave', 'ruins', 'forest', 'hills', 'mountain'].includes(poiType),
     tile: targetTile
   };

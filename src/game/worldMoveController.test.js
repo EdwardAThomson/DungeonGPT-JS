@@ -100,6 +100,22 @@ describe('worldMoveController', () => {
     expect(buildPoiEncounter({ poi: 'signpost', poiType: 'signpost' }).canEnter).toBe(false);
   });
 
+  it('names milestone POIs from poiName and never shows raw underscored ids', () => {
+    // Spawned milestone POI carries its authored display name.
+    const hideout = buildPoiEncounter({
+      poi: 'goblin_hideout',
+      poiName: 'Goblin Hideout',
+      milestonePoi: true
+    });
+    expect(hideout.name).toBe('Goblin Hideout');
+    expect(hideout.isMilestonePoi).toBe(true);
+    expect(hideout.description).not.toContain('goblin_hideout');
+
+    // Even with no poiName, a raw id is title-cased — never rendered underscored.
+    const bare = buildPoiEncounter({ poi: 'goblin_hideout' });
+    expect(bare.name).toBe('Goblin Hideout');
+  });
+
   it('formats movement system messages for towns and biomes', () => {
     const townMessage = buildMovementSystemMessage({
       targetTile: { poi: 'town', townName: 'Riverside', townSize: 'village' },

@@ -8,6 +8,8 @@ const EncounterModal = () => {
     const encounter = data?.encounter;
     const onEnterLocation = data?.onEnterLocation;
     const onViewMap = data?.onViewMap;
+    const boss = data?.boss; // { enemyId, name } — an active milestone boss lairs here
+    const onFight = data?.onFight;
 
     if (!encounter) return null;
 
@@ -30,7 +32,7 @@ const EncounterModal = () => {
         <ModalShell modalId="encounterInfo" className="encounter-modal-content" ariaLabel="Encounter" style={{ padding: '20px 24px' }}>
                     <h2 style={{ marginTop: '0', marginBottom: '2px', paddingBottom: '6px' }}>{encounter.name}</h2>
                     <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--state-muted-strong)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '10px' }}>
-                        Random Encounter
+                        {encounter.isMilestonePoi ? 'Quest Location' : 'Random Encounter'}
                     </div>
                     {encounter.image && (
                         <ClickableImage
@@ -50,6 +52,18 @@ const EncounterModal = () => {
                         {encounter.description}
                     </p>
                     <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                        {boss && onFight && (
+                            <button
+                                className="primary-button"
+                                onClick={() => {
+                                    close();
+                                    onFight();
+                                }}
+                                aria-label={`Confront ${boss.name}`}
+                            >
+                                ⚔️ Confront {boss.name}
+                            </button>
+                        )}
                         {encounter.canEnter && (
                             <button
                                 className="primary-button"
