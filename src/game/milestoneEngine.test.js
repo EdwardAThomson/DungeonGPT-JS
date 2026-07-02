@@ -4,7 +4,8 @@ import {
   completeNarrativeMilestone,
   findMarkerMilestoneIndex,
   getMilestoneBossForTile,
-  isMilestoneItemClaimed
+  isMilestoneItemClaimed,
+  getMilestoneItemForTile
 } from './milestoneEngine';
 
 // Mirrors the heroic-fantasy-t1 milestone #2 shape (authored NPC + quest building).
@@ -245,5 +246,54 @@ describe('isMilestoneItemClaimed (quest-item search gating)', () => {
     expect(isMilestoneItemClaimed(ms(true), 'other_item')).toBe(false);
     expect(isMilestoneItemClaimed(null, 'map_fragment')).toBe(false);
     expect(isMilestoneItemClaimed(ms(true), null)).toBe(false);
+  });
+});
+
+describe('getMilestoneItemForTile (wilderness item milestones)', () => {
+  // Mirrors grimdark-survival-t1 milestone #1 ("Gather healing herbs from the Grey Moors").
+  const herbs = (overrides = {}) => ({
+    id: 1,
+    text: 'Gather healing herbs from the Grey Moors for the village healer',
+    location: 'Grey Moors',
+    type: 'item',
+    completed: false,
+    requires: [],
+    trigger: { item: 'healing_herbs', action: 'acquire' },
+    spawn: { type: 'item', id: 'healing_herbs', name: 'Moorland Herbs', location: 'Grey Moors' },
+    building: null,
+    ...overrides
+  });
+  const moorTile = { poi: 'mountain', mountainName: 'Grey Moors' };
+
+  it('offers the gather on a tile of the authored mountain range', () => {
+    const g = getMilestoneItemForTile([herbs()], moorTile);
+    expect(g).toEqual({ itemId: 'healing_herbs', name: 'Moorland Herbs', milestoneId: 1 });
+  });
+
+  it('matches case-insensitively and via poiName/townName too', () => {
+    expect(getMilestoneItemForTile([herbs()], { mountainName: 'grey moors' })).toBeTruthy();
+    expect(getMilestoneItemForTile([herbs()], { poiName: 'Grey Moors' })).toBeTruthy();
+  });
+
+  it('withholds once completed, when requirements are unmet, or elsewhere', () => {
+    expect(getMilestoneItemForTile([herbs({ completed: true })], moorTile)).toBeNull();
+    const gated = [herbs({ requires: [9] }), { id: 9, type: 'location', completed: false }];
+    expect(getMilestoneItemForTile(gated, moorTile)).toBeNull();
+    expect(getMilestoneItemForTile([herbs()], { mountainName: 'Cinder Mountains' })).toBeNull();
+  });
+
+  it('excludes town-building item milestones (those use the building search)', () => {
+    const townItem = herbs({
+      location: 'Willowdale',
+      spawn: { type: 'item', id: 'map_fragment', name: 'Map', location: 'Willowdale' },
+      building: { type: 'tavern', name: 'The Crooked Pint', location: 'Willowdale' }
+    });
+    expect(getMilestoneItemForTile([townItem], { townName: 'Willowdale' })).toBeNull();
+  });
+
+  it('tolerates bad input and unnamed tiles', () => {
+    expect(getMilestoneItemForTile(null, moorTile)).toBeNull();
+    expect(getMilestoneItemForTile([herbs()], null)).toBeNull();
+    expect(getMilestoneItemForTile([herbs()], { poi: 'mountain' })).toBeNull();
   });
 });

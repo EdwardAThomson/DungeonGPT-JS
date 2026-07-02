@@ -39,7 +39,7 @@ import {
   formatEncounterRewardLog
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
-import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile } from '../game/milestoneEngine';
+import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile } from '../game/milestoneEngine';
 import { buyItem, sellItem } from '../game/shopController';
 import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, turnInQuest, getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
 import { QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
@@ -650,11 +650,17 @@ const Game = ({ resumeConversation = null }) => {
   const openPoiLocationModal = (tile, milestones) => {
     const poiEncounter = tile ? buildPoiEncounter(tile) : null;
     if (!poiEncounter || isSiteHidden(tile)) return false;
-    const boss = getMilestoneBossForTile(milestones || settings?.milestones || [], tile);
+    const ms = milestones || settings?.milestones || [];
+    const boss = getMilestoneBossForTile(ms, tile);
+    // Wilderness item milestone at this location (e.g. herbs in the Grey Moors) —
+    // offers a Gather action; grantObjectiveItem fires item_acquired and completes it.
+    const gather = getMilestoneItemForTile(ms, tile);
     mapHook.setIsMapModalOpen(false); // close map so the location modal is visible
     openEncounterInfo({
       encounter: poiEncounter,
       boss,
+      gather,
+      onGather: gather ? () => grantObjectiveItem({ id: gather.itemId, name: gather.name }) : null,
       onFight: boss ? () => {
         mapHook.setIsMapModalOpen(false);
         reopenMapAfterEncounterRef.current = true;
@@ -1294,7 +1300,12 @@ const Game = ({ resumeConversation = null }) => {
         onTalkToNpc={handleTalkToNpc}
         onBuy={(itemKey) => {
           const result = buyItem(selectedHeroes, itemKey);
-          if (result.ok) setSelectedHeroes(result.party);
+          if (result.ok) {
+            setSelectedHeroes(result.party);
+            // Buying IS acquiring: without this, purchasing a quest item (e.g. healing
+            // herbs at the apothecary) silently failed to progress its item milestone.
+            checkMilestoneEvent({ type: 'item_acquired', itemId: itemKey }, result.party);
+          }
           return result;
         }}
         onSell={(itemKey) => {
