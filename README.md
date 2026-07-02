@@ -16,7 +16,7 @@ YouTube Videos 🎥:
 
 ## Features
 
-*   **Character Creation:** Detailed form to define character stats, class, race, background, alignment, and profile picture.
+*   **Character Creation:** Detailed form to define character stats, class, background, alignment, and profile picture. (Heroes are currently Human-only while portrait art is limited; the race field is retained on the data model for legacy saves.)
 *   **Character Management:** View all created characters, edit existing characters.
 *   **Game Setup:** Configure settings for a new game session (description, rules, world seed).
 *   **Hero Selection:** Choose created characters to form a party for the game.
@@ -175,7 +175,7 @@ For deployment instructions, see the deployment guides in `/docs`.
 
 ## Usage
 
-1.  **Create a hero** using the "Hero Creator" form with detailed stats, class, race, and background
+1.  **Create a hero** using the "Hero Creator" form with detailed stats, class, and background
 2.  **View and manage** your heroes under "All Heroes"
 3.  **Start a new game** by going to "New Game", configuring settings, and selecting your party
 4.  **Explore the world** with a procedurally generated map featuring biomes, towns, and encounters
