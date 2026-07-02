@@ -234,6 +234,80 @@ export const ITEM_CATALOG = {
   'map_fragment': { name: 'Map Fragment', rarity: 'uncommon', value: 25, icon: 'assets/icons/items/map_fragment.webp' }
 };
 
+// --- Rarity-by-tier loot gating ---------------------------------------------
+// High-rarity loot must not drop during low-tier play. Rarities are ranked; each
+// campaign tier has a maximum allowed rank. This is applied to RANDOM drops only
+// (encounter/POI loot rolled by encounterResolver). Hand-authored template/milestone
+// rewards are honored as explicit design and are NOT clamped here.
+//
+// PREMIUM HOOK: very_rare (and legendary) are also intended to become a premium
+// entitlement later. When an entitlements system exists (e.g. src/utils/entitlements.js
+// exposing something like `userTier`/`hasEntitlement('premium_loot')`), gate very_rare
+// here by lowering `maxRarityRankForTier` to `rare` for non-entitled users (or filter in
+// `filterDropsByTier`). No entitlement system exists yet, so only the level/tier gate is
+// wired up now.
+
+export const RARITY_RANK = {
+  common: 0,
+  uncommon: 1,
+  rare: 2,
+  very_rare: 3,
+  legendary: 4
+};
+
+/**
+ * Resolve a campaign tier from an available signal. Prefers an explicit tier
+ * (settings.tier / template tier); otherwise derives it from party level
+ * (Tier 1 = Lv 1-2, Tier 2 = Lv 3-4, ...). Defaults to Tier 1.
+ * @param {{ tier?: number, level?: number }} ctx
+ * @returns {number} Tier (>= 1)
+ */
+export const resolveTier = ({ tier, level } = {}) => {
+  if (tier != null && !Number.isNaN(Number(tier))) return Math.max(1, Number(tier));
+  if (level != null && !Number.isNaN(Number(level))) {
+    return Math.max(1, Math.ceil(Number(level) / 2));
+  }
+  return 1;
+};
+
+/**
+ * Maximum rarity RANK a given tier may receive from random drops.
+ * Tier 1 (Lv 1-2) caps at `rare`; Tier 2 unlocks `very_rare`; Tier 3+ unlocks all.
+ * @param {number} tier
+ * @returns {number} Max allowed rank (see RARITY_RANK)
+ */
+export const maxRarityRankForTier = (tier) => {
+  const t = resolveTier({ tier });
+  if (t <= 1) return RARITY_RANK.rare; // Tier 1: common..rare only
+  if (t === 2) return RARITY_RANK.very_rare; // Tier 2: adds very_rare
+  return RARITY_RANK.legendary; // Tier 3+: everything
+};
+
+/**
+ * Whether a catalog item may be granted as a random drop at the given tier/level.
+ * Unknown item keys are allowed (fail-open, consistent with renderer fallbacks).
+ * @param {string} itemKey - ITEM_CATALOG key
+ * @param {{ tier?: number, level?: number }} ctx
+ * @returns {boolean}
+ */
+export const isItemAllowedForTier = (itemKey, ctx = {}) => {
+  const item = ITEM_CATALOG[itemKey];
+  if (!item) return true;
+  const rank = RARITY_RANK[item.rarity] ?? RARITY_RANK.common;
+  return rank <= maxRarityRankForTier(resolveTier(ctx));
+};
+
+/**
+ * Filter a list of catalog keys down to those allowed to drop at the given tier/level.
+ * @param {string[]} itemKeys
+ * @param {{ tier?: number, level?: number }} ctx
+ * @returns {string[]}
+ */
+export const filterDropsByTier = (itemKeys, ctx = {}) => {
+  if (!Array.isArray(itemKeys)) return [];
+  return itemKeys.filter((key) => isItemAllowedForTier(key, ctx));
+};
+
 /**
  * Add item to inventory
  * @param {Array} inventory - Current inventory

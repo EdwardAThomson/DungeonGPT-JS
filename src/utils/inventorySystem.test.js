@@ -5,7 +5,12 @@ import {
   removeGold,
   rollDice,
   rollItemDrop,
-  ITEM_CATALOG
+  ITEM_CATALOG,
+  resolveTier,
+  maxRarityRankForTier,
+  isItemAllowedForTier,
+  filterDropsByTier,
+  RARITY_RANK
 } from './inventorySystem';
 
 describe('food consumables restore HP (were no-ops)', () => {
@@ -90,5 +95,64 @@ describe('inventorySystem', () => {
     ];
 
     expect(getInventoryValue(inventory)).toBe(40);
+  });
+});
+
+describe('rarity-by-tier loot gating', () => {
+  it('resolveTier prefers explicit tier, falls back to level, defaults to 1', () => {
+    expect(resolveTier({ tier: 2 })).toBe(2);
+    expect(resolveTier({ tier: 2, level: 1 })).toBe(2); // explicit tier wins
+    // Level -> tier: Lv 1-2 = T1, Lv 3-4 = T2, Lv 5-6 = T3
+    expect(resolveTier({ level: 1 })).toBe(1);
+    expect(resolveTier({ level: 2 })).toBe(1);
+    expect(resolveTier({ level: 3 })).toBe(2);
+    expect(resolveTier({ level: 4 })).toBe(2);
+    expect(resolveTier({ level: 5 })).toBe(3);
+    expect(resolveTier({})).toBe(1);
+    expect(resolveTier()).toBe(1);
+  });
+
+  it('maxRarityRankForTier caps Tier 1 at rare and opens up higher tiers', () => {
+    expect(maxRarityRankForTier(1)).toBe(RARITY_RANK.rare);
+    expect(maxRarityRankForTier(2)).toBe(RARITY_RANK.very_rare);
+    expect(maxRarityRankForTier(3)).toBe(RARITY_RANK.legendary);
+  });
+
+  it('Tier 1 blocks very_rare and legendary but allows common..rare', () => {
+    const t1 = { tier: 1 };
+    // Allowed at Tier 1
+    expect(isItemAllowedForTier('healing_potion', t1)).toBe(true); // common
+    expect(isItemAllowedForTier('silver_dagger', t1)).toBe(true);  // uncommon
+    expect(isItemAllowedForTier('magic_weapon', t1)).toBe(true);   // rare
+    // Blocked at Tier 1
+    expect(isItemAllowedForTier('legendary_weapon', t1)).toBe(false);   // very_rare
+    expect(isItemAllowedForTier('legendary_artifact', t1)).toBe(false); // very_rare
+    expect(isItemAllowedForTier('dragonscale_plate', t1)).toBe(false);  // very_rare
+    expect(isItemAllowedForTier('dragon_egg', t1)).toBe(false);         // legendary
+  });
+
+  it('low party level (no explicit tier) also blocks very_rare/legendary', () => {
+    const lowLevel = { level: 2 }; // -> Tier 1
+    expect(isItemAllowedForTier('legendary_artifact', lowLevel)).toBe(false);
+    expect(isItemAllowedForTier('dragon_egg', lowLevel)).toBe(false);
+    expect(isItemAllowedForTier('magic_weapon', lowLevel)).toBe(true);
+  });
+
+  it('Tier 2 allows very_rare; Tier 3+ allows legendary', () => {
+    expect(isItemAllowedForTier('legendary_artifact', { tier: 2 })).toBe(true); // very_rare
+    expect(isItemAllowedForTier('dragon_egg', { tier: 2 })).toBe(false);        // legendary still gated
+    expect(isItemAllowedForTier('dragon_egg', { tier: 3 })).toBe(true);         // legendary ok
+  });
+
+  it('unknown item keys fail open (not blocked)', () => {
+    expect(isItemAllowedForTier('not_a_real_item', { tier: 1 })).toBe(true);
+  });
+
+  it('filterDropsByTier strips gated rarities at Tier 1 and preserves order', () => {
+    const rolled = ['healing_potion', 'legendary_artifact', 'magic_weapon', 'dragon_egg'];
+    expect(filterDropsByTier(rolled, { tier: 1 })).toEqual(['healing_potion', 'magic_weapon']);
+    // Same list at Tier 3 keeps everything.
+    expect(filterDropsByTier(rolled, { tier: 3 })).toEqual(rolled);
+    expect(filterDropsByTier(undefined, { tier: 1 })).toEqual([]);
   });
 });
