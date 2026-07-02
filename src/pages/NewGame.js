@@ -26,12 +26,14 @@ const mergeLocationNames = (customNames, milestones) => {
     const milestoneNames = getMilestoneLocationNames(milestones);
     const towns = [...(customNames?.towns || [])];
     const mountains = [...(customNames?.mountains || [])];
+    // Town entries may be plain strings or { name, size } objects (size-tagged locations).
+    const nameOf = (entry) => (typeof entry === 'string' ? entry : entry?.name || '');
 
     for (const name of milestoneNames.towns) {
-        if (!towns.some(t => t.toLowerCase() === name.toLowerCase())) towns.push(name);
+        if (!towns.some(t => nameOf(t).toLowerCase() === name.toLowerCase())) towns.push(name);
     }
     for (const name of milestoneNames.mountains) {
-        if (!mountains.some(m => m.toLowerCase() === name.toLowerCase())) mountains.push(name);
+        if (!mountains.some(m => nameOf(m).toLowerCase() === name.toLowerCase())) mountains.push(name);
     }
 
     return { towns, mountains };

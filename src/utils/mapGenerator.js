@@ -420,43 +420,56 @@ function assignTownSizesAndNames(mapData, townsList, rng, customNames = []) {
     tile.townSize = shuffledSizes[index % shuffledSizes.length];
   });
 
-  // 2. Sort towns by importance (City > Town > Village > Hamlet)
-  const sortedTowns = [...townsList].sort((a, b) => {
-    const sizeA = mapData[a.y][a.x].townSize;
-    const sizeB = mapData[b.y][b.x].townSize;
-    return sizeOrder[sizeA] - sizeOrder[sizeB];
-  });
-
-  // 3. Assign NAMES based on sorted importance
-  const remainingCustomNames = [...customNames];
-
-  sortedTowns.forEach((town) => {
+  const sizeDescriptions = {
+    hamlet: 'A small hamlet',
+    village: 'A quiet village',
+    town: 'A bustling town',
+    city: 'A grand city'
+  };
+  const setName = (town, name) => {
     const tile = mapData[town.y][town.x];
-    const biome = tile.biome || 'plains';
-    const size = tile.townSize;
+    tile.townName = name;
+    tile.descriptionSeed = sizeDescriptions[tile.townSize] || 'A settlement';
+    logger.debug(`[ASSIGN_TOWNS] ${tile.townName} (${tile.townSize}) at (${town.x}, ${town.y})`);
+  };
 
-    let townName;
-    if (remainingCustomNames.length > 0) {
-      // Use the next custom name in order (Capital first)
-      townName = remainingCustomNames.shift();
-    } else {
-      // Fallback to random generator
-      townName = generateTownName(size, biome, rng);
+  // Normalize custom names: each entry is a plain string OR { name, size }. A declared size
+  // pins that settlement's size (so "the village of Ashford" renders as a village) instead of
+  // the first-listed name always landing on the biggest settlement by array order.
+  const normalized = [...customNames]
+    .map((c) => (typeof c === 'string' ? { name: c } : { name: c?.name, size: c?.size }))
+    .filter((c) => c.name);
+  const declared = normalized.filter((c) => sizeOrder[c.size] !== undefined);
+  const plainNames = normalized.filter((c) => sizeOrder[c.size] === undefined).map((c) => c.name);
+
+  const available = [...townsList];
+
+  // Pass 1: honor declared sizes. Prefer a tile already of that size (keeps the overall size
+  // mix, so e.g. a city still exists elsewhere); otherwise take the least-important remaining
+  // tile and force its size to match.
+  for (const { name, size } of declared) {
+    let idx = available.findIndex((t) => mapData[t.y][t.x].townSize === size);
+    if (idx === -1) {
+      let rank = -1;
+      available.forEach((t, i) => {
+        const r = sizeOrder[mapData[t.y][t.x].townSize];
+        if (r > rank) { rank = r; idx = i; }
+      });
+      if (idx === -1) break; // no tiles left to name
+      mapData[available[idx].y][available[idx].x].townSize = size;
     }
+    const [town] = available.splice(idx, 1);
+    setName(town, name);
+  }
 
-    tile.townName = townName;
-
-    // Update description seed based on size
-    const sizeDescriptions = {
-      hamlet: 'A small hamlet',
-      village: 'A quiet village',
-      town: 'A bustling town',
-      city: 'A grand city'
-    };
-    tile.descriptionSeed = sizeDescriptions[size] || 'A settlement';
-
-    logger.debug(`[ASSIGN_TOWNS] ${tile.townName} (${size}) at (${town.x}, ${town.y})`);
-  });
+  // Pass 2: remaining tiles get plain names by importance (biggest first), then the random
+  // generator for any left over. With no declared sizes this reproduces the original order.
+  available.sort((a, b) => sizeOrder[mapData[a.y][a.x].townSize] - sizeOrder[mapData[b.y][b.x].townSize]);
+  for (const town of available) {
+    const tile = mapData[town.y][town.x];
+    const name = plainNames.length > 0 ? plainNames.shift() : generateTownName(tile.townSize, tile.biome || 'plains', rng);
+    setName(town, name);
+  }
 }
 
 // Harmonize mountain names across the map using flood-fill connected components.

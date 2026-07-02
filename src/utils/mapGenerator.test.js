@@ -328,3 +328,39 @@ describe('generateMapData', () => {
     });
   });
 });
+
+describe('generateMapData — size-tagged custom town names', () => {
+  const townsOf = (map) => map.flat().filter((t) => t.townName);
+  const find = (map, name) => map.flat().find((t) => t.townName === name);
+
+  it('renders a { name, size } entry at the declared size (the village of Ashford)', () => {
+    const map = generateMapData(10, 10, 12345, {
+      towns: [{ name: 'Ashford', size: 'village' }, 'Mudhollow', 'Grimstead', 'Duskwell'],
+      mountains: []
+    });
+    const ashford = find(map, 'Ashford');
+    expect(ashford).toBeTruthy();
+    expect(ashford.townSize).toBe('village');
+    // the plain names are still placed
+    ['Mudhollow', 'Grimstead', 'Duskwell'].forEach((n) => expect(find(map, n)).toBeTruthy());
+    // a city still exists (declaring Ashford a village doesn't remove the campaign's city)
+    expect(townsOf(map).some((t) => t.townSize === 'city')).toBe(true);
+  });
+
+  it('honors the declared size across multiple seeds', () => {
+    for (const seed of [1, 77, 9001, 33333]) {
+      const map = generateMapData(10, 10, seed, {
+        towns: [{ name: 'Ashford', size: 'village' }, 'Aye', 'Bee', 'Cee'],
+        mountains: []
+      });
+      const ashford = find(map, 'Ashford');
+      expect(ashford).toBeTruthy();
+      expect(ashford.townSize).toBe('village');
+    }
+  });
+
+  it('plain-string custom names still work (backwards compatible)', () => {
+    const map = generateMapData(10, 10, 4242, { towns: ['Alpha', 'Beta', 'Gamma', 'Delta'], mountains: [] });
+    ['Alpha', 'Beta', 'Gamma', 'Delta'].forEach((n) => expect(find(map, n)).toBeTruthy());
+  });
+});

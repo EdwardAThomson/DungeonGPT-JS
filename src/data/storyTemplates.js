@@ -310,7 +310,7 @@ export const storyTemplates = [
         subtitle: 'The Blighted Village',
         icon: '💀',
         description: 'A creeping blight is killing the crops and sickening the livestock. Find the source before Ashford starves.',
-        customNames: { towns: ['Ashford', 'Mudhollow', 'Grimstead', 'Duskwell'], mountains: ['Grey Moors'] },
+        customNames: { towns: [{ name: 'Ashford', size: 'village' }, 'Mudhollow', 'Grimstead', 'Duskwell'], mountains: ['Grey Moors'] }, // "the village of Ashford"
         settings: {
             shortDescription: 'The village of Ashford is dying. Crops blacken overnight, livestock collapse in the fields, and a foul smell rises from the old well. Someone must find the source of the blight before winter comes.',
             campaignGoal: 'Find and destroy the source of the blight threatening Ashford.',
@@ -587,7 +587,7 @@ export const storyTemplates = [
         subtitle: 'Herald of the Old Gods',
         icon: '🔮',
         description: 'A world of booming industry, discovery, and the dangerous fusion of magic and machine.',
-        customNames: { towns: ['Novaris', 'Aether-Gate', 'Steam-Wharf', 'Cog-Hill'], mountains: ['Ironpeak Range'] },
+        customNames: { towns: [{ name: 'Novaris', size: 'city' }, 'Aether-Gate', 'Steam-Wharf', 'Cog-Hill'], mountains: ['Ironpeak Range'] }, // "the city of Novaris"
         settings: {
             shortDescription: 'The discovery of Aether-Steam has transformed the city of Novaris. Alchemists and engineers work side-by-side, but the old gods are not pleased with the noise of progress.',
             campaignGoal: 'Uncover the conspiracy behind the Aether-Steam accidents and prevent the awakening of the Old Gods.',
@@ -773,7 +773,7 @@ export const storyTemplates = [
         subtitle: 'The Great Dreamer',
         icon: '🐙',
         description: 'Mystery and dread in a world where gods are uncaring and knowledge is a burden.',
-        customNames: { towns: ['Blackwood', 'Whisper-Cove', 'Mourn-Peak', 'Abyssal-Rest'], mountains: ['Mourn-Peak Heights'] },
+        customNames: { towns: [{ name: 'Blackwood', size: 'town' }, 'Whisper-Cove', 'Mourn-Peak', 'Abyssal-Rest'], mountains: ['Mourn-Peak Heights'] }, // "the town of Blackwood"
         settings: {
             shortDescription: 'In the mist-shrouded town of Blackwood, the stars have aligned. Unspeakable entities stir in the depths, and those who seek the truth often lose their minds before they find it.',
             campaignGoal: 'Seal the Abyssal Breach and prevent the Great Dreamer from awakening.',
