@@ -691,7 +691,11 @@ const Game = ({ resumeConversation = null }) => {
     const plannedEncounterFlow = planWorldTileEncounterFlow({
       randomEncounter,
       targetTile,
-      aiNarrativeEnabled,
+      // Narrative-tier (non-hostile) encounters are woven into Look-around AI narration,
+      // where the player acts by TYPING a follow-up. Guests can't type, so for them that
+      // path is a dead end (a treasure hook with no way to claim it). Route guests to the
+      // interactive fallback modal instead, same as when narration is toggled off.
+      aiNarrativeEnabled: aiNarrativeEnabled && aiAvailable,
       pendingNarrativeTile: buildPendingNarrativeTile({
         targetTile,
         clickedX,

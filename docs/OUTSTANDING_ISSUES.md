@@ -55,6 +55,9 @@ Source audits: roadmap survey (2026-04-19), auth verification (2026-04-19), docs
 | 19 | **Ops runbook.** No `docs/ops_runbook.md` for incidents, rollback, webhook replay. | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) §5 | S | |
 | 20 | **Backup restore drill.** Supabase provides backups; documented restore test not recorded. | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) §5 | S | |
 | 21 | **Smoke-test-on-deploy.** Playwright runs on PR/push but not gated against post-deploy production. | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) §5 | S | |
+| 35 | **Narrative-tier encounter hooks have no visible affordance (signed-in).** Non-hostile encounters (e.g. Hidden Cache treasure) never open the action modal: the hook is woven into Look-around AI narration and relies on the player *typing* a follow-up ("I dig it out"), which nothing teaches. Their `rewards` are only rollable via the modal flow, so an un-acted hook forfeits them silently. Consider action chips under the narration, or opening the modal after the AI beat. (Guests now get the fallback modal — fixed 2026-07-02.) | Playtest 2026-07-02 (hills treasure) | S-M (design + UI) | |
+| 36 | **Parked Look-around encounter silently discarded on next move.** `pendingLookEncounter` is cleared when the player moves without Looking around, so a rolled narrative encounter (and its rewards) vanishes with no trace. Consider persisting it for N moves or surfacing a hint ("something glints nearby"). | Playtest 2026-07-02 | XS-S | |
+| 37 | **Encounter presentation note: narrative-tier hooks show no encounter image.** All 46 encounter images exist and every catalog entry has an `image:` field, but images only render in the action modal, text-woven hooks are image-less by design. If hooks gain an affordance (#35), consider showing the image alongside. | Playtest 2026-07-02 | XS (note) | |
 
 ---
 
