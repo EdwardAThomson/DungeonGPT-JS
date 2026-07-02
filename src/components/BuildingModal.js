@@ -4,6 +4,7 @@ import { getReadyTurnIns, getAvailableQuestsAt, effectivePartyLevel } from '../g
 import { getShopStock } from '../data/shopStock';
 import { buyPrice, sellPrice, canAfford, isSellable } from '../game/shopController';
 import { ITEM_CATALOG, getRarityColor } from '../utils/inventorySystem';
+import { areRequirementsMet } from '../game/milestoneEngine';
 
 const getAbilityModifier = (score) => Math.floor(((score || 10) - 10) / 2);
 
@@ -26,6 +27,18 @@ const genderIcon = (gender) => {
 
 const RESURRECTION_COST_PER_LEVEL = 25;
 
+// Active deterministic NPC-talk milestones (type 'talk'): not completed, prerequisites
+// met, and carrying an npc trigger. These drive the "Talk" button on the matching NPC
+// row (and the building-level fallback when the NPC was never placed).
+const getActiveTalkMilestones = (milestones) => {
+    if (!Array.isArray(milestones)) return [];
+    return milestones.filter(m =>
+        m && typeof m === 'object' &&
+        m.type === 'talk' && !m.completed && m.trigger?.npc &&
+        areRequirementsMet(m, milestones)
+    );
+};
+
 // Tab button styling for the building modal's section tabs (Visit | Wares).
 const tabBtnStyle = (active) => ({
     flex: 1,
@@ -41,7 +54,7 @@ const tabBtnStyle = (active) => ({
     borderRadius: '6px 6px 0 0',
 });
 
-const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, sideQuests, onAcceptSideQuest, onTurnInQuest, townName }) => {
+const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, sideQuests, onAcceptSideQuest, onTurnInQuest, townName, milestones, onTalkToNpc }) => {
     const [imageError, setImageError] = useState(false);
     const [activeTab, setActiveTab] = useState('visit'); // building modal tabs: 'visit' | 'wares'
     const [tradeMessage, setTradeMessage] = useState(null); // { text, kind: 'buy' | 'sell' | 'error' }
@@ -154,6 +167,34 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
             uniqueNpcs.push(npc);
         }
     }
+
+    // --- Deterministic NPC-talk milestones ('talk' type) ---
+    // A placed NPC carrying a milestoneNpcId that matches an active talk milestone gets
+    // a "Talk" button. If this building IS the milestone's authored building but the
+    // canonical NPC was never placed (old cached towns / placement miss), offer a
+    // building-level "Ask for..." fallback that fires the same npc_talked event.
+    const activeTalkMilestones = onTalkToNpc ? getActiveTalkMilestones(milestones) : [];
+    const talkMilestoneForNpc = (npc) =>
+        npc?.milestoneNpcId
+            ? activeTalkMilestones.find(m => m.trigger.npc === npc.milestoneNpcId)
+            : null;
+
+    const buildingMatchesTalkMilestone = (m) => {
+        const b = m.building;
+        if (!b) return false;
+        // Wrong town → no fallback (every town can have a barracks/tavern of the same type).
+        if (b.location && townName &&
+            String(b.location).toLowerCase() !== String(townName).toLowerCase()) return false;
+        if (b.name && building.buildingName) {
+            return b.name.toLowerCase() === String(building.buildingName).toLowerCase();
+        }
+        return !!b.type && b.type === building.buildingType;
+    };
+
+    const fallbackTalkMilestones = activeTalkMilestones.filter(m =>
+        buildingMatchesTalkMilestone(m) &&
+        !uniqueNpcs.some(n => n.milestoneNpcId === m.trigger.npc)
+    );
 
     return (
         <>
@@ -333,15 +374,33 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                                     <span style={{ fontWeight: 'bold', color: 'var(--text)' }}>
                                                         {genderIcon(npc.gender)} {npc.name}
                                                     </span>
-                                                    <span style={{
-                                                        fontSize: '12px',
-                                                        color: 'var(--text-secondary)',
-                                                        backgroundColor: 'var(--border)',
-                                                        padding: '4px 12px',
-                                                        borderRadius: '6px',
-                                                        fontWeight: '500'
-                                                    }}>
-                                                        {npc.job || npc.title || 'Resident'}
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        {(() => {
+                                                            // Talk button for the milestone NPC (active 'talk'
+                                                            // milestone only — hides once completed).
+                                                            const talkMs = talkMilestoneForNpc(npc);
+                                                            if (!talkMs) return null;
+                                                            return (
+                                                                <button
+                                                                    className="primary-button"
+                                                                    onClick={() => onTalkToNpc(npc.milestoneNpcId, npc)}
+                                                                    style={{ padding: '4px 12px', fontWeight: 'bold', fontSize: '12px' }}
+                                                                    title={talkMs.text}
+                                                                >
+                                                                    💬 Talk
+                                                                </button>
+                                                            );
+                                                        })()}
+                                                        <span style={{
+                                                            fontSize: '12px',
+                                                            color: 'var(--text-secondary)',
+                                                            backgroundColor: 'var(--border)',
+                                                            padding: '4px 12px',
+                                                            borderRadius: '6px',
+                                                            fontWeight: '500'
+                                                        }}>
+                                                            {npc.job || npc.title || 'Resident'}
+                                                        </span>
                                                     </span>
                                                 </div>
                                                 {/* Extra details for residential buildings */}
@@ -403,6 +462,42 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                 </p>
                             )}
                         </div>
+
+                        {/* Milestone talk fallback — this is the milestone's authored building but
+                            the canonical NPC isn't among the placed occupants (older cached towns).
+                            Asking for them fires the same npc_talked event as the Talk button. */}
+                        {fallbackTalkMilestones.length > 0 && (
+                            <div className="modal-section" style={{
+                                backgroundColor: 'rgba(0,0,0,0.03)',
+                                padding: '20px',
+                                borderRadius: '10px',
+                                border: '2px solid var(--accent, var(--primary))',
+                                marginTop: '15px'
+                            }}>
+                                <h4 style={{
+                                    borderBottom: '2px solid var(--accent, var(--primary))',
+                                    paddingBottom: '10px',
+                                    margin: '0 0 15px 0',
+                                    color: 'var(--accent, var(--primary))',
+                                    fontFamily: 'var(--header-font)'
+                                }}>
+                                    Seek Someone Out
+                                </h4>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    {fallbackTalkMilestones.map(m => (
+                                        <button
+                                            key={m.id}
+                                            className="primary-button"
+                                            onClick={() => onTalkToNpc(m.trigger.npc, null)}
+                                            title={m.text}
+                                            style={{ width: '100%', padding: '12px', fontWeight: 'bold', letterSpacing: '1px' }}
+                                        >
+                                            💬 Ask for {m.spawn?.name || `the ${m.spawn?.role || 'contact'}`}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Quest Item Search Section */}
                         {building.questItemId && !itemFound && (

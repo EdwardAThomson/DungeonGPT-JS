@@ -57,6 +57,7 @@ export const getCampaignProgress = (milestones) => {
  *   { type: 'item_acquired', itemId: 'treasure_map' }
  *   { type: 'enemy_defeated', enemyId: 'shadow_overlord' }
  *   { type: 'location_visited', locationId: 'shadow_fortress' }
+ *   { type: 'npc_talked', npcId: 'militia_captain' }
  *
  * @param {Array} milestones - All milestones in the campaign
  * @param {Object} event - The game event to check
@@ -150,6 +151,32 @@ export const completeNarrativeMilestone = (milestones, milestoneId) => {
         campaignComplete,
         updatedMilestones
     };
+};
+
+/**
+ * Find the milestone an AI [COMPLETE_MILESTONE: <text>] marker refers to.
+ *
+ * Fuzzy text match (either string contains the other), restricted to milestones the
+ * AI is allowed to complete: `type: 'narrative'`, or legacy untyped milestones (old
+ * saves stored milestones as bare strings, normalized without a type). Mechanical
+ * types (item / combat / location / talk) are engine-detected and must never be
+ * completed by a stray marker.
+ *
+ * @param {Array} milestones - Normalized milestone objects ({ text, type?, completed? })
+ * @param {string} markerText - The text captured from the marker
+ * @returns {number} Index into `milestones`, or -1 if no eligible match
+ */
+export const findMarkerMilestoneIndex = (milestones, markerText) => {
+    if (!Array.isArray(milestones) || !markerText) return -1;
+    const needle = String(markerText).toLowerCase().trim();
+    if (!needle) return -1;
+    return milestones.findIndex(m => {
+        if (!m || m.completed) return false;
+        if (m.type && m.type !== 'narrative') return false;
+        const text = (m.text || '').toLowerCase();
+        if (!text) return false;
+        return text.includes(needle) || needle.includes(text);
+    });
 };
 
 /**
@@ -298,6 +325,8 @@ const doesEventMatchTrigger = (milestone, event) => {
             return event.type === 'enemy_defeated' && event.enemyId === trigger.enemy;
         case 'location':
             return event.type === 'location_visited' && event.locationId === trigger.location;
+        case 'talk':
+            return event.type === 'npc_talked' && event.npcId === trigger.npc;
         default:
             return false;
     }

@@ -3,7 +3,7 @@ import { getTile } from '../utils/mapGenerator';
 import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
 import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver';
-import { areRequirementsMet } from '../game/milestoneEngine';
+import { areRequirementsMet, findMarkerMilestoneIndex } from '../game/milestoneEngine';
 import { formatPartyInfo } from '../game/promptComposer';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
 import { composeIntro } from '../game/introComposer';
@@ -501,12 +501,12 @@ const useGameInteraction = (
                 const milestoneText = milestoneMatch[1].replace(/\s+/g, ' ').trim();
                 logger.info(`Milestone complete signaled: ${milestoneText}`);
 
-                // Find and mark milestone as complete
+                // Find and mark milestone as complete. Guarded: the AI marker may only
+                // complete 'narrative' (or legacy untyped) milestones — mechanical types
+                // (item/combat/location/talk) are engine-detected and a stray marker must
+                // not complete them. Old saves' narrative milestones still work here.
                 const normalized = normalizeMilestones(settings.milestones);
-                const milestoneIndex = normalized.findIndex(m =>
-                    m.text.toLowerCase().includes(milestoneText.toLowerCase()) ||
-                    milestoneText.toLowerCase().includes(m.text.toLowerCase())
-                );
+                const milestoneIndex = findMarkerMilestoneIndex(normalized, milestoneText);
 
                 if (milestoneIndex !== -1) {
                     normalized[milestoneIndex].completed = true;

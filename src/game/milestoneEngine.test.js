@@ -1,4 +1,9 @@
-import { getMilestoneNpcsForTown } from './milestoneEngine';
+import {
+  getMilestoneNpcsForTown,
+  checkMilestoneCompletion,
+  completeNarrativeMilestone,
+  findMarkerMilestoneIndex
+} from './milestoneEngine';
 
 // Mirrors the heroic-fantasy-t1 milestone #2 shape (authored NPC + quest building).
 const milestones = [
@@ -69,5 +74,95 @@ describe('getMilestoneNpcsForTown', () => {
     expect(npcs).toHaveLength(1);
     expect(npcs[0].name).toBe('Someone');
     expect(npcs[0].role).toBe('Villager'); // default when role unspecified
+  });
+});
+
+describe("'talk' milestones (deterministic NPC-talk completion)", () => {
+  // Mirrors the heroic-fantasy-t1 milestone #2 shape after the Option C change.
+  const talkMilestones = [
+    {
+      id: 1,
+      text: 'Find the goblin scout\'s map',
+      type: 'item',
+      completed: false,
+      requires: [],
+      trigger: { item: 'map_fragment', action: 'acquire' }
+    },
+    {
+      id: 2,
+      text: 'Meet the militia captain at Briarwood',
+      type: 'talk',
+      completed: false,
+      requires: [],
+      trigger: { npc: 'militia_captain', action: 'talk' },
+      spawn: { type: 'npc', id: 'militia_captain', name: 'Captain Ulric', role: 'Guard' },
+      building: { type: 'barracks', name: 'Briarwood Militia Hall', location: 'Briarwood' },
+      rewards: { xp: 25, gold: '1d6', items: ['rations'] }
+    }
+  ];
+
+  it('completes on npc_talked with the matching npcId', () => {
+    const result = checkMilestoneCompletion(talkMilestones, { type: 'npc_talked', npcId: 'militia_captain' });
+    expect(result).toMatchObject({ type: 'completed', milestoneId: 2 });
+    expect(result.updatedMilestones.find(m => m.id === 2).completed).toBe(true);
+  });
+
+  it('ignores npc_talked with the wrong npcId', () => {
+    expect(checkMilestoneCompletion(talkMilestones, { type: 'npc_talked', npcId: 'someone_else' })).toBeNull();
+  });
+
+  it('ignores other event types for a talk milestone', () => {
+    expect(checkMilestoneCompletion(talkMilestones, { type: 'location_visited', locationId: 'militia_captain' })).toBeNull();
+    expect(checkMilestoneCompletion(talkMilestones, { type: 'item_acquired', itemId: 'militia_captain' })).toBeNull();
+  });
+
+  it('reports blocked when prerequisites are unmet', () => {
+    const gated = talkMilestones.map(m => (m.id === 2 ? { ...m, requires: [1] } : m));
+    const result = checkMilestoneCompletion(gated, { type: 'npc_talked', npcId: 'militia_captain' });
+    expect(result).toMatchObject({ type: 'blocked', milestoneId: 2 });
+  });
+
+  it('does not re-complete an already completed talk milestone', () => {
+    const done = talkMilestones.map(m => (m.id === 2 ? { ...m, completed: true } : m));
+    expect(checkMilestoneCompletion(done, { type: 'npc_talked', npcId: 'militia_captain' })).toBeNull();
+  });
+
+  it('completeNarrativeMilestone still refuses non-narrative milestones', () => {
+    expect(completeNarrativeMilestone(talkMilestones, 2)).toBeNull(); // 'talk'
+    expect(completeNarrativeMilestone(talkMilestones, 1)).toBeNull(); // 'item'
+  });
+});
+
+describe('findMarkerMilestoneIndex (AI [COMPLETE_MILESTONE] guard)', () => {
+  const ms = [
+    { id: 1, text: 'Meet the militia captain at Briarwood', type: 'talk', completed: false },
+    { id: 2, text: 'Convince the elders to evacuate the valley', type: 'narrative', completed: false },
+    { id: 3, text: 'An old string milestone', completed: false } // legacy: no type
+  ];
+
+  it('matches narrative milestones by fuzzy text (either direction)', () => {
+    expect(findMarkerMilestoneIndex(ms, 'Convince the elders to evacuate the valley')).toBe(1);
+    expect(findMarkerMilestoneIndex(ms, 'convince the elders')).toBe(1); // marker is a substring
+    expect(findMarkerMilestoneIndex(ms, 'The party managed to convince the elders to evacuate the valley at last')).toBe(1);
+  });
+
+  it("never matches mechanical milestones ('talk' here) even on exact text", () => {
+    expect(findMarkerMilestoneIndex(ms, 'Meet the militia captain at Briarwood')).toBe(-1);
+  });
+
+  it('still matches legacy untyped milestones (old string saves)', () => {
+    expect(findMarkerMilestoneIndex(ms, 'An old string milestone')).toBe(2);
+  });
+
+  it('skips completed milestones', () => {
+    const done = ms.map(m => (m.id === 2 ? { ...m, completed: true } : m));
+    expect(findMarkerMilestoneIndex(done, 'convince the elders')).toBe(-1);
+  });
+
+  it('tolerates bad input', () => {
+    expect(findMarkerMilestoneIndex(null, 'x')).toBe(-1);
+    expect(findMarkerMilestoneIndex(ms, '')).toBe(-1);
+    expect(findMarkerMilestoneIndex(ms, '   ')).toBe(-1);
+    expect(findMarkerMilestoneIndex([{ id: 9, completed: false }], 'anything')).toBe(-1); // no text
   });
 });

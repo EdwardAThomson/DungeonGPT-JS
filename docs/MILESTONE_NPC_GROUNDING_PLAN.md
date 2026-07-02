@@ -3,7 +3,7 @@
 Design memo for fixing the "militia captain" immersion problem in the campaign
 milestone system. This is a design plan only. No source is changed by this doc.
 
-Status: decisions made 2026-07-02 — implementing Option B (see below)
+Status: Option B shipped; Option C decided + implemented 2026-07-02 (see Decisions)
 Scope: `heroic-fantasy-t1` milestone #2 is the worked example, but the fix is
 generic to every `type: 'narrative'` milestone that defines a `spawn.type: 'npc'`.
 
@@ -20,6 +20,29 @@ generic to every `type: 'narrative'` milestone that defines a `spawn.type: 'npc'
   barracks keep their procedural staff.
 - Save impact accepted as **going-forward-only** for cached town NPCs; prompt +
   journal grounding are retroactive.
+- **Option C decided 2026-07-02: implemented as an npc-talk trigger with a NEW
+  milestone type `'talk'`** (answering open question #2 — narrative stays purely
+  AI-judged; deterministic completion gets its own mechanical type):
+  - `type: 'talk'` + `trigger: { npc: '<spawn.id>', action: 'talk' }` is
+    engine-detected via a new `{ type: 'npc_talked', npcId }` event
+    (`doesEventMatchTrigger` in `milestoneEngine.js`). `heroic-fantasy-t1`
+    milestone #2 converted from `narrative`/`trigger: null` to `talk`.
+  - Completion trigger point (open question #4): an explicit **"💬 Talk" button**
+    in `BuildingModal` on the NPC row carrying the matching `milestoneNpcId`, plus
+    a building-level "Ask for <name>" fallback when the milestone's authored
+    building matches the current one but the canonical NPC was never placed (old
+    cached towns). Both fire `onTalkToNpc` → `Game.js checkMilestoneEvent`, which
+    applies rewards and posts the achievement message; a meeting beat follows (one
+    AI narration when signed in, a deterministic `composeNpcMeeting` line for
+    guests).
+  - The AI `[COMPLETE_MILESTONE]` marker path is now **guarded to
+    `type: 'narrative'`** (or legacy untyped) milestones
+    (`findMarkerMilestoneIndex` in `milestoneEngine.js`), so a stray marker can
+    never complete a mechanical milestone.
+  - **Old saves are unaffected:** milestones are copied into game settings at
+    creation and persisted in saves, so existing games keep their `narrative`
+    milestone #2 and continue completing via the AI marker; only new games get
+    `'talk'`.
 
 ---
 

@@ -592,5 +592,56 @@ export const composeLocalAmbientNarrative = ({
   return sentences.join(' ');
 };
 
+// --- NPC meeting composer ---------------------------------------------------------
+// Local, templated beat for talking to a milestone NPC (the building "Talk" button)
+// on the no-AI (guest) path, so the click isn't mute. Deterministic per
+// (worldSeed, npc name) like the other composers; markdown-friendly (*italics* /
+// **bold** only, matching introComposer/SafeMarkdownMessage conventions).
+const NPC_MEETING_OPENERS = [
+  '{who} looks up as the party enters {where} and beckons them closer.',
+  'The party finds {who} within {where}, already sizing them up.',
+  '{who} sets aside their work as the party steps into {where}.',
+  'Inside {where}, {who} greets the party with a curt nod.'
+];
+
+const NPC_MEETING_CLOSERS = [
+  'Introductions made, the party lays out what brings them here, and is heard out in full.',
+  'The party states their business plainly, and it is taken in with a measuring look.',
+  'What the party has come to say is listened to, word for word.'
+];
+
+export const composeNpcMeeting = ({
+  name,
+  role = null,
+  building = null,
+  townName = null,
+  personality = null,
+  worldSeed = null
+} = {}) => {
+  if (!name) return '';
+  const rng = mulberry32(hashSeed([worldSeed == null ? 'noseed' : worldSeed, 'npc-meeting', name]));
+
+  const who = role ? `**${name}**, the ${String(role).toLowerCase()}` : `**${name}**`;
+  // "the Briarwood Militia Hall" (but never "the The Crooked Pint"); fall back to the
+  // town name, then a generic hall, so the sentence always reads whole.
+  const where = building
+    ? (/^the\s/i.test(building) ? building : `the ${building}`)
+    : (townName || 'the hall');
+
+  const opener = NPC_MEETING_OPENERS[Math.floor(rng() * NPC_MEETING_OPENERS.length)]
+    .replace('{who}', who)
+    .replace('{where}', where);
+  const closer = NPC_MEETING_CLOSERS[Math.floor(rng() * NPC_MEETING_CLOSERS.length)];
+
+  const sentences = [opener.charAt(0).toUpperCase() + opener.slice(1)];
+  if (personality) {
+    const trait = personality.charAt(0).toUpperCase() + personality.slice(1);
+    sentences.push(`*${trait}.*`);
+  }
+  sentences.push(closer);
+
+  return sentences.join(' ');
+};
+
 // Exported for unit testing of the deterministic core.
 export const __test__ = { hashSeed, mulberry32, resolveTerrainKey };

@@ -18,8 +18,8 @@ import ModalShell from '../components/ModalShell';
 import { calculateMaxHP, shortRest, longRest } from '../utils/healthSystem';
 import { addGold, addItem, ITEM_CATALOG } from '../utils/inventorySystem';
 import { replaceHeroInParty, normalizeParty, heroUid } from '../utils/partyUtils';
-import { composeMovementNarrativePrompt } from '../game/promptComposer';
-import { composeLocalMovementNarrative, composeLocalAmbientNarrative } from '../game/localNarrator';
+import { composeMovementNarrativePrompt, composeNpcMeetingPrompt } from '../game/promptComposer';
+import { composeLocalMovementNarrative, composeLocalAmbientNarrative, composeNpcMeeting } from '../game/localNarrator';
 import { generateMovementNarrative } from '../game/movementController';
 import { buildSaveName } from '../game/saveController';
 import { conversationsApi } from '../services/conversationsApi';
@@ -832,6 +832,89 @@ const Game = ({ resumeConversation = null }) => {
     }
   };
 
+  // --- Talk to a milestone NPC (deterministic 'talk' milestones) ---
+  // Fired by the building "Talk" button (npc = the placed NPC) or its building-level
+  // "Ask for..." fallback (npc = null). Fires npc_talked — checkMilestoneEvent
+  // completes the milestone, applies rewards, and posts the "Milestone Achieved"
+  // system message — then adds a meeting beat so the click isn't mute: one AI
+  // narration when signed in (same programmatic path as Look-around), a local
+  // templated line for guests.
+  const handleTalkToNpc = async (npcId, npc = null) => {
+    if (!npcId || interactionHook.isLoading) return;
+    const milestones = settings?.milestones || [];
+    const milestone = milestones.find(m =>
+      m.type === 'talk' && !m.completed && m.trigger?.npc === npcId
+    );
+    if (!milestone) return; // already completed / not active — no-op (button shouldn't render)
+
+    checkMilestoneEvent({ type: 'npc_talked', npcId }, selectedHeroes);
+    setTimeout(() => performSave(), 500);
+
+    // Meeting beat — canonical identity from the milestone; the placed NPC fills gaps.
+    const name = milestone.spawn?.name || npc?.name || 'the contact';
+    const role = milestone.spawn?.role || npc?.job || npc?.title || null;
+    const personality = milestone.spawn?.personality || npc?.personality || null;
+    const buildingName = milestone.building?.name || null;
+    const townName = mapHook.currentTownTile?.townName || milestone.location || null;
+
+    // No-AI path (guests, or master toggle off): deterministic templated line.
+    if (!aiAvailable || !aiNarrativeEnabled) {
+      const text = composeNpcMeeting({ name, role, building: buildingName, townName, personality, worldSeed });
+      if (text) interactionHook.setConversation(prev => [...prev, { role: 'ai', content: text }]);
+      return;
+    }
+
+    const resolvedModel = resolveProviderAndModel(selectedProvider, selectedModel);
+    interactionHook.setIsLoading(true);
+
+    const { fullPrompt } = composeNpcMeetingPrompt({
+      npc: { name, role, personality },
+      buildingName,
+      townName,
+      milestoneText: milestone.text,
+      settings,
+      selectedHeroes,
+      currentSummary: interactionHook.currentSummary
+    });
+    interactionHook.setLastPrompt(fullPrompt);
+
+    try {
+      let aiResponse = await generateMovementNarrative({
+        provider: resolvedModel.provider,
+        model: resolvedModel.model,
+        prompt: fullPrompt,
+        onProgress: (p) => interactionHook.setProgressStatus(p)
+      });
+      interactionHook.setProgressStatus(null);
+      // The engine already completed this milestone; strip any stray completion
+      // markers so they never render in the log.
+      aiResponse = (aiResponse || '')
+        .replace(/\[COMPLETE_MILESTONE:[\s\S]*?\]/gi, '')
+        .replace(/\[COMPLETE_CAMPAIGN\]/gi, '')
+        .trim();
+      if (!aiResponse) {
+        logger.warn('Empty NPC-meeting AI response, skipping');
+        return;
+      }
+      const aiMessage = { role: 'ai', content: aiResponse };
+      interactionHook.setConversation(prev => {
+        const updated = [...prev, aiMessage];
+        // Fire-and-forget: embed for RAG so later turns recall the meeting
+        if (sessionId) {
+          embedAndStore(sessionId, aiResponse, { msgIndex: updated.length - 1 })
+            .catch(err => logger.warn('RAG embed failed (npc meeting):', err));
+        }
+        return updated;
+      });
+    } catch (error) {
+      logger.error('NPC meeting AI error', error);
+      interactionHook.setError(error.message);
+      interactionHook.setProgressStatus(null);
+    } finally {
+      interactionHook.setIsLoading(false);
+    }
+  };
+
   const handleEncounterResolve = (result) => {
     logger.info('Encounter resolved', result);
 
@@ -1146,6 +1229,7 @@ const Game = ({ resumeConversation = null }) => {
         sideQuests={settings?.sideQuests}
         onAcceptSideQuest={handleAcceptSideQuest}
         onTurnInQuest={handleTurnInQuest}
+        onTalkToNpc={handleTalkToNpc}
         onBuy={(itemKey) => {
           const result = buyItem(selectedHeroes, itemKey);
           if (result.ok) setSelectedHeroes(result.party);
