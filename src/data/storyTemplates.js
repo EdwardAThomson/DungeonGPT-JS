@@ -45,7 +45,7 @@ export const storyTemplates = [
                 },
                 {
                     id: 2,
-                    text: 'Warn the militia captain at Briarwood',
+                    text: 'Meet the militia captain at Briarwood',
                     location: 'Briarwood',
                     type: 'narrative',
                     requires: [],

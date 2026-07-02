@@ -16,7 +16,15 @@ const formatCampaignMilestones = (milestones) => {
   if (active.length > 0) {
     text += '\nActive Milestones: ' + active.map(m => {
       const typeTag = m.type ? ` [${m.type}]` : '';
-      return `${m.text}${typeTag}`;
+      let line = `${m.text}${typeTag}`;
+      // Ground authored NPC objectives with the canonical name + venue.
+      if (m.spawn?.type === 'npc' && m.spawn.name) {
+        const who = m.spawn.role ? `${m.spawn.name} (${m.spawn.role})` : m.spawn.name;
+        const where = m.building?.name || m.spawn.location;
+        line += ` — speak with ${who}${where ? ` at ${where}` : ''}`;
+        if (m.spawn.personality) line += `; ${m.spawn.personality}`;
+      }
+      return line;
     }).join('; ');
   }
   if (completed.length > 0) {

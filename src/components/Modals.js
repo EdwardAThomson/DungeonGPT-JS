@@ -375,6 +375,28 @@ export const StorySettingsModalContent = ({
                                   )}
                                   {isCurrent && <span style={{ marginRight: '6px' }}>🎯</span>}
                                   {m.text}
+                                  {(() => {
+                                    // For milestones that name an authored NPC and/or building, show
+                                    // the who/where so the player knows the objective target. Most
+                                    // milestones have no spawn/building data — render nothing then.
+                                    const who = m.spawn?.type === 'npc' ? m.spawn.name : null;
+                                    const where = m.building?.name || (m.spawn?.type === 'npc' ? m.spawn.location : null);
+                                    const sub = [who, where].filter(Boolean).join(' · ');
+                                    if (!sub) return null;
+                                    return (
+                                      <span style={{
+                                        display: 'block',
+                                        fontSize: '0.85rem',
+                                        fontWeight: 'normal',
+                                        color: 'var(--text-secondary)',
+                                        opacity: 0.85,
+                                        marginTop: '2px',
+                                        textDecoration: 'none'
+                                      }}>
+                                        {sub}
+                                      </span>
+                                    );
+                                  })()}
                                 </span>
                               </div>
                             );

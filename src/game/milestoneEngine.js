@@ -217,6 +217,44 @@ export const getSpawnRequirements = (milestones) => {
 };
 
 /**
+ * Get the authored (canonical) NPCs a campaign wants placed in a given town.
+ *
+ * Reads every milestone whose `spawn.type === 'npc'` and returns those whose NPC
+ * (or associated quest building) is located in `townName`. Each entry pairs the
+ * spawn's identity with its building so town generation can bind the NPC to the
+ * right building and the prompt/journal can name who and where.
+ *
+ * @param {Array} milestones - All campaign milestones (from settings.milestones)
+ * @param {string} townName - The town being generated
+ * @returns {Array<Object>} [{ id, name, role, personality, milestoneId, location, building }]
+ *   `building` is `{ type, name }` or null.
+ */
+export const getMilestoneNpcsForTown = (milestones, townName) => {
+    if (!Array.isArray(milestones) || !townName) return [];
+    const target = String(townName).toLowerCase();
+    const result = [];
+
+    for (const m of milestones) {
+        if (m.spawn?.type !== 'npc' || !m.spawn.name) continue;
+        // The NPC lives where the spawn (or its quest building) says it does.
+        const loc = m.spawn.location || m.building?.location;
+        if (!loc || String(loc).toLowerCase() !== target) continue;
+
+        result.push({
+            id: m.spawn.id,
+            name: m.spawn.name,
+            role: m.spawn.role || 'Villager',
+            personality: m.spawn.personality || null,
+            milestoneId: m.id,
+            location: loc,
+            building: m.building ? { type: m.building.type, name: m.building.name } : null
+        });
+    }
+
+    return result;
+};
+
+/**
  * Extract location names from milestones, categorized as town or mountain.
  * Used to inject campaign-required names into the map generator so milestone
  * locations actually appear on the generated map.

@@ -266,7 +266,7 @@ const Game = ({ resumeConversation = null }) => {
   // Biome theme for lazily-generated town maps (Phase 2b). Falls back to the raw parsed
   // settings (loaded saves) and finally 'grassland' so older saves are unaffected.
   const mapTheme = settings?.theme || settingsObj?.theme || 'grassland';
-  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme, getActiveSiteObjectives(settings?.sideQuests));
+  const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme, getActiveSiteObjectives(settings?.sideQuests), settings?.milestones);
 
   const interactionHook = useGameInteraction(
     loadedConversation,
