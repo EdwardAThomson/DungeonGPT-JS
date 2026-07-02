@@ -2,6 +2,7 @@ import React from 'react';
 import { calculateMaxHP, getHPStatus } from '../utils/healthSystem';
 import { getLevelProgress, calculateLevel } from '../utils/progressionSystem';
 import { resolveProfilePicture } from '../utils/assetHelper';
+import { getRarityColor } from '../utils/inventorySystem';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
 import {
@@ -105,7 +106,7 @@ const HeroModal = () => {
                                         {equipped ? (
                                             <>
                                                 <span className="hero-equip-item-name">
-                                                    {equipped.name || equipped.key}
+                                                    <span style={{ color: getRarityColor(equipped.rarity) }}>{equipped.name || equipped.key}</span>
                                                     {formatSlotBonus(slot, equipped.bonus) ? (
                                                         <span className="hero-equip-bonus"> ({formatSlotBonus(slot, equipped.bonus)})</span>
                                                     ) : null}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ITEM_CATALOG, rollDice, removeItem } from '../utils/inventorySystem';
+import { ITEM_CATALOG, rollDice, removeItem, getRarityColor } from '../utils/inventorySystem';
 import { applyHealing, getHPStatus } from '../utils/healthSystem';
 import { heroUid } from '../utils/partyUtils';
 import {
@@ -163,14 +163,6 @@ const PartyInventoryModal = () => {
     if (onHeroUpdate) onHeroUpdate(updated);
   };
 
-  const rarityColors = {
-    common: '#9d9d9d',
-    uncommon: '#1eff00',
-    rare: '#0070dd',
-    very_rare: '#a335ee',
-    legendary: '#ff8000'
-  };
-
   return (
     <ModalShell modalId="inventory" ariaLabel="Party Inventory" style={{
           maxWidth: '600px',
@@ -321,14 +313,14 @@ const PartyInventoryModal = () => {
                     padding: '10px 14px',
                     background: 'rgba(0,0,0,0.2)',
                     borderRadius: '6px',
-                    border: `1px solid ${rarityColors[item.rarity] || rarityColors.common}`,
+                    border: `1px solid ${getRarityColor(item.rarity)}`,
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
                     cursor: item.icon ? 'pointer' : 'default',
                     transition: 'all 0.2s ease',
                     position: 'relative',
-                    boxShadow: `0 0 5px ${item.rarity !== 'common' ? (rarityColors[item.rarity] + '33') : 'rgba(0,0,0,0.5)'}`
+                    boxShadow: `0 0 5px ${item.rarity !== 'common' ? (getRarityColor(item.rarity) + '33') : 'rgba(0,0,0,0.5)'}`
                   }}
                   title={item.description || ''}
                   onClick={item.icon ? () => setSelectedImage({ src: `/${item.icon}`, name: item.name, description: item.description }) : undefined}
@@ -349,7 +341,7 @@ const PartyInventoryModal = () => {
                   )}
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
                     <span style={{
-                      color: rarityColors[item.rarity] || rarityColors.common,
+                      color: getRarityColor(item.rarity),
                       fontWeight: '500',
                       fontSize: '0.95rem'
                     }}>
@@ -541,8 +533,8 @@ const PartyInventoryModal = () => {
                         </span>
                         {equipped ? (
                           <>
-                            <span style={{ flex: 1, color: 'var(--text)', fontSize: '0.92rem' }}>
-                              {equipped.name || equipped.key}
+                            <span style={{ flex: 1, fontSize: '0.92rem' }}>
+                              <span style={{ color: getRarityColor(equipped.rarity) }}>{equipped.name || equipped.key}</span>
                               {formatSlotBonus(slot, equipped.bonus) ? (
                                 <span style={{ color: 'var(--text-secondary)' }}> ({formatSlotBonus(slot, equipped.bonus)})</span>
                               ) : null}

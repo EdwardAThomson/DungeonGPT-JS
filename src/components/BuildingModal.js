@@ -3,7 +3,7 @@ import { getHPStatus } from '../utils/healthSystem';
 import { getReadyTurnIns, getAvailableQuestsAt, effectivePartyLevel } from '../game/questEngine';
 import { getShopStock } from '../data/shopStock';
 import { buyPrice, sellPrice, canAfford, isSellable } from '../game/shopController';
-import { ITEM_CATALOG } from '../utils/inventorySystem';
+import { ITEM_CATALOG, getRarityColor } from '../utils/inventorySystem';
 
 const getAbilityModifier = (score) => Math.floor(((score || 10) - 10) / 2);
 
@@ -880,7 +880,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                                         fontFamily: 'var(--body-font)',
                                                         fontSize: '0.9rem'
                                                     }}>
-                                                        <span style={{ fontWeight: 'bold' }}>{item.name}</span>
+                                                        <span style={{ fontWeight: 'bold', color: getRarityColor(item.rarity) }}>{item.name}</span>
                                                         <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                             <span style={{ color: '#d4af37', fontWeight: 'bold', minWidth: '60px', textAlign: 'right' }}>
                                                                 {price} GP
@@ -936,7 +936,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                                             fontFamily: 'var(--body-font)',
                                                             fontSize: '0.9rem'
                                                         }}>
-                                                            <span style={{ fontWeight: 'bold' }}>
+                                                            <span style={{ fontWeight: 'bold', color: getRarityColor(ITEM_CATALOG[item.key]?.rarity || item.rarity) }}>
                                                                 {item.name || ITEM_CATALOG[item.key]?.name || item.key}
                                                                 {qty > 1 && (
                                                                     <span style={{ color: 'var(--text-secondary)', fontWeight: 'normal' }}> x{qty}</span>
