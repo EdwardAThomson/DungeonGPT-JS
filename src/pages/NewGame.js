@@ -11,6 +11,7 @@ import { populateTown } from "../utils/npcGenerator";
 import WorldMapDisplay from "../components/WorldMapDisplay";
 import OnboardingSteps from "../components/OnboardingSteps";
 import SegmentedControl from "../components/SegmentedControl";
+import RaritySelect from "../components/RaritySelect";
 import { storyTemplates } from "../data/storyTemplates";
 import { spawnWorldMapEntities, injectQuestBuildings } from "../game/milestoneSpawner";
 import { getMilestoneLocationNames } from "../game/milestoneEngine";
@@ -1110,12 +1111,13 @@ const NewGame = () => {
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 200px' }}>
             <label style={slotLabelStyle}>Item</label>
-            <select value={slot1Item} onChange={(e) => setSlot1Item(e.target.value)} style={selectStyle}>
-              <option value="">Select item...</option>
-              {SEARCHABLE_ITEMS.map(item => (
-                <option key={item.id} value={item.id}>{item.name} ({item.rarity})</option>
-              ))}
-            </select>
+            <RaritySelect
+              value={slot1Item}
+              onChange={setSlot1Item}
+              options={SEARCHABLE_ITEMS}
+              placeholder="Select item..."
+              ariaLabel="Quest item"
+            />
           </div>
           <div style={{ flex: '1 1 180px' }}>
             <label style={slotLabelStyle}>Found in</label>
