@@ -66,6 +66,13 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
     // Aggregate identical items into one entry per key (non-stackable items like rope
     // produce multiple inventory entries sharing a key; separate rows would collide on the
     // React key and break reconciliation). `count` is the total units held of that key.
+    // Copies of each key the lead hero is currently wearing (those can't be sold).
+    const equippedKeyCounts = {};
+    if (isShop && firstHero) {
+        Object.values(firstHero.equipment || {}).forEach((k) => {
+            if (k) equippedKeyCounts[k] = (equippedKeyCounts[k] || 0) + 1;
+        });
+    }
     const sellableInventory = isShop && firstHero
         ? Object.values(
             (firstHero.inventory || [])
@@ -75,7 +82,11 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                     acc[item.key].count += item.quantity || 1;
                     return acc;
                 }, {})
-          ).sort((a, b) => {
+          )
+          // Drop equipped copies from the sellable count; hide keys with no free copy.
+          .map(row => ({ ...row, count: row.count - (equippedKeyCounts[row.key] || 0) }))
+          .filter(row => row.count > 0)
+          .sort((a, b) => {
               // Stable order: rows never jump as stacks deplete.
               const an = a.name || ITEM_CATALOG[a.key]?.name || a.key;
               const bn = b.name || ITEM_CATALOG[b.key]?.name || b.key;

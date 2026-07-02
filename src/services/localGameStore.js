@@ -6,6 +6,7 @@
 // the cloud on sign-in (see LocalGameSync, Phase B2).
 
 import { createLogger } from '../utils/logger';
+import { buildSaveName, DEFAULT_SAVE_ROOT } from '../game/saveController';
 
 const logger = createLogger('local-game-store');
 const DB_NAME = 'dungeongpt-games';
@@ -95,10 +96,20 @@ export const localGameStore = {
     return row;
   },
 
-  async updateName(sessionId, conversationName) {
+  // `root` is the player-editable base name. We persist it in game_settings.saveName so it
+  // survives future saves (which re-derive the display name), and refresh the display name
+  // off the row's last-saved time so the timestamp still reflects real progress.
+  async updateName(sessionId, root) {
     const row = await _get(sessionId);
     if (!row) return null;
-    row.conversation_name = conversationName;
+    const cleanRoot = (typeof root === 'string' && root.trim()) || DEFAULT_SAVE_ROOT;
+    let settings = row.game_settings;
+    if (typeof settings === 'string') {
+      try { settings = JSON.parse(settings); } catch (e) { settings = {}; }
+    }
+    row.game_settings = { ...(settings || {}), saveName: cleanRoot };
+    const when = row.updated_at ? new Date(row.updated_at) : new Date();
+    row.conversation_name = buildSaveName(cleanRoot, when);
     row.updated_at = new Date().toISOString();
     await _put(row);
     return row;

@@ -6,6 +6,9 @@ import {
   getEquippedItem,
   getEquippableItemsForSlot,
   getSlotForItem,
+  getEquippablePartyItems,
+  equipItemFromParty,
+  canSellItem,
   SLOT_FOR_TYPE,
   EQUIP_SLOTS
 } from './equipment';
@@ -156,5 +159,114 @@ describe('getEquippableItemsForSlot', () => {
 
   it('exposes exactly the three documented slots', () => {
     expect(EQUIP_SLOTS).toEqual(['weapon', 'armor', 'accessory']);
+  });
+});
+
+describe('getEquippablePartyItems (pooled)', () => {
+  const heroA = { characterId: 'A', inventory: [{ key: 'magic_weapon' }, { key: 'leather_armor' }] };
+  const heroB = { characterId: 'B', inventory: [{ key: 'legendary_weapon' }, { key: 'ring_protection' }] };
+
+  it('pools items for a slot across every hero in the party', () => {
+    const weapons = getEquippablePartyItems([heroA, heroB], 'weapon').map((i) => i.key).sort();
+    expect(weapons).toEqual(['legendary_weapon', 'magic_weapon']);
+  });
+
+  it('reports how many copies are available', () => {
+    const party = [{ characterId: 'A', inventory: [{ key: 'magic_weapon' }, { key: 'magic_weapon' }] }];
+    const [weapon] = getEquippablePartyItems(party, 'weapon');
+    expect(weapon.key).toBe('magic_weapon');
+    expect(weapon.available).toBe(2);
+  });
+
+  it('excludes an item that is fully equipped, but keeps a spare copy', () => {
+    const oneCopyWorn = [{ characterId: 'A', inventory: [{ key: 'magic_weapon' }], equipment: { weapon: 'magic_weapon' } }];
+    expect(getEquippablePartyItems(oneCopyWorn, 'weapon')).toEqual([]);
+
+    const spareLeft = [{ characterId: 'A', inventory: [{ key: 'magic_weapon' }, { key: 'magic_weapon' }], equipment: { weapon: 'magic_weapon' } }];
+    const [weapon] = getEquippablePartyItems(spareLeft, 'weapon');
+    expect(weapon.available).toBe(1);
+  });
+
+  it('only returns items whose type maps to the requested slot', () => {
+    const armor = getEquippablePartyItems([heroA, heroB], 'armor').map((i) => i.key);
+    expect(armor).toEqual(['leather_armor']);
+    const accessories = getEquippablePartyItems([heroA, heroB], 'accessory').map((i) => i.key);
+    expect(accessories).toEqual(['ring_protection']);
+  });
+});
+
+describe('equipItemFromParty (pooled equip + no duplication)', () => {
+  it('fills the slot without transfer when the target already carries the item', () => {
+    const target = { characterId: 'A', inventory: [{ key: 'magic_weapon' }] };
+    const changed = equipItemFromParty([target], 'A', 'magic_weapon');
+    expect(changed).toHaveLength(1);
+    expect(changed[0].characterId).toBe('A');
+    expect(changed[0].equipment.weapon).toBe('magic_weapon');
+    // inventory is unchanged — no copy made
+    expect(changed[0].inventory).toEqual([{ key: 'magic_weapon' }]);
+  });
+
+  it('moves exactly one instance from another hero (owner loses it, wearer gains it)', () => {
+    const owner = { characterId: 'A', inventory: [{ key: 'magic_weapon' }] };
+    const wearer = { characterId: 'B', inventory: [] };
+    const changed = equipItemFromParty([owner, wearer], 'B', 'magic_weapon');
+    expect(changed).toHaveLength(2);
+    const updatedOwner = changed.find((h) => h.characterId === 'A');
+    const updatedWearer = changed.find((h) => h.characterId === 'B');
+    // owner no longer carries it; wearer now carries AND wears it
+    expect(updatedOwner.inventory.some((i) => i.key === 'magic_weapon')).toBe(false);
+    expect(updatedWearer.inventory.filter((i) => i.key === 'magic_weapon')).toHaveLength(1);
+    expect(updatedWearer.equipment.weapon).toBe('magic_weapon');
+    // the bonus resolves on the wearer (item is in the wearer's own inventory)
+    expect(getEquippedBonuses(updatedWearer).attack).toBe(1);
+  });
+
+  it('conserves the total number of copies (no duplication) on transfer', () => {
+    const owner = { characterId: 'A', inventory: [{ key: 'magic_weapon' }, { key: 'magic_weapon' }] };
+    const wearer = { characterId: 'B', inventory: [] };
+    const changed = equipItemFromParty([owner, wearer], 'B', 'magic_weapon');
+    const totalAfter = changed.reduce((n, h) => n + h.inventory.filter((i) => i.key === 'magic_weapon').length, 0);
+    expect(totalAfter).toBe(2); // 2 before, 2 after
+  });
+
+  it('returns [] when every copy is already worn (no strange blocking, just a no-op)', () => {
+    const owner = { characterId: 'A', inventory: [{ key: 'magic_weapon' }], equipment: { weapon: 'magic_weapon' } };
+    const wearer = { characterId: 'B', inventory: [] };
+    expect(equipItemFromParty([owner, wearer], 'B', 'magic_weapon')).toEqual([]);
+  });
+
+  it('returns [] for a non-equippable item or an unknown target', () => {
+    const party = [{ characterId: 'A', inventory: [{ key: 'healing_potion' }] }];
+    expect(equipItemFromParty(party, 'A', 'healing_potion')).toEqual([]);
+    expect(equipItemFromParty(party, 'nobody', 'healing_potion')).toEqual([]);
+  });
+
+  it('preserves the target\'s other equipped slots', () => {
+    const target = { characterId: 'A', inventory: [{ key: 'magic_weapon' }, { key: 'leather_armor' }], equipment: { armor: 'leather_armor' } };
+    const [updated] = equipItemFromParty([target], 'A', 'magic_weapon');
+    expect(updated.equipment.armor).toBe('leather_armor');
+    expect(updated.equipment.weapon).toBe('magic_weapon');
+  });
+});
+
+describe('canSellItem (equipped items are locked)', () => {
+  it('allows selling an item that is carried but not equipped', () => {
+    const hero = { characterId: 'A', inventory: [{ key: 'magic_weapon' }] };
+    expect(canSellItem(hero, 'magic_weapon')).toBe(true);
+  });
+
+  it('blocks selling the only copy while it is equipped', () => {
+    const hero = { characterId: 'A', inventory: [{ key: 'magic_weapon' }], equipment: { weapon: 'magic_weapon' } };
+    expect(canSellItem(hero, 'magic_weapon')).toBe(false);
+  });
+
+  it('allows selling a spare while another copy is equipped', () => {
+    const hero = { characterId: 'A', inventory: [{ key: 'magic_weapon' }, { key: 'magic_weapon' }], equipment: { weapon: 'magic_weapon' } };
+    expect(canSellItem(hero, 'magic_weapon')).toBe(true);
+  });
+
+  it('always allows selling a non-equippable item', () => {
+    const hero = { characterId: 'A', inventory: [{ key: 'healing_potion' }] };
+    expect(canSellItem(hero, 'healing_potion')).toBe(true);
   });
 });

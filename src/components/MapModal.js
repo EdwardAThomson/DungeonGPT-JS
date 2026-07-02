@@ -74,8 +74,8 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                         </button>
                     </div>
                 )}
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', justifyContent: 'center' }}>
-                    <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', justifyContent: 'center', flexWrap: 'wrap', width: '100%' }}>
+                    <div style={{ flex: '0 0 auto' }}>
                 {viewLevel === 'world' ? (
                     <>
                         <WorldMapDisplay
@@ -88,7 +88,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                         />
                         {mapLevel === 'town' && (
                             <p className="map-planning-hint" style={{ textAlign: 'center', opacity: 0.75, fontSize: '0.85rem', margin: '8px 0 0' }}>
-                                Planning view — leave town to travel the world map.
+                                Planning view. Leave town to travel the world map.
                             </p>
                         )}
                         {mapLevel === 'world' && townError && (

@@ -379,7 +379,7 @@ const pickLine = (set, rng, recent = []) => {
     const cand = set[(start + n) % set.length];
     if (!recent.includes(cand)) return cand;
   }
-  return set[start]; // whole pool used recently — accept a repeat rather than nothing
+  return set[start]; // whole pool used recently; accept a repeat rather than nothing
 };
 
 // --- Neighbour landmark clause ---------------------------------------------------

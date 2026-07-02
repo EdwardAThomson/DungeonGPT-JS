@@ -93,24 +93,29 @@ const useGamePersistence = ({
     movesSinceEncounter
   ]);
 
+  // Returns a status the caller can act on:
+  //   'saved'    - state was written to the store
+  //   'nochange' - nothing changed since the last save (already up to date)
+  //   'skipped'  - nothing to save yet (no session / adventure not started / no data)
+  //   'error'    - the write was attempted and failed
   const performSave = useCallback(async (isUnmount = false) => {
-    if (!sessionIdRef.current) return;
+    if (!sessionIdRef.current) return 'skipped';
 
     if (!hasAdventureStartedRef.current) {
       if (isUnmount) logger.debug('Skipping unmount save - adventure not started');
-      return;
+      return 'skipped';
     }
 
     const convo = conversationRef.current;
     if (!convo || convo.length === 0) {
       if (isUnmount) logger.debug('Skipping unmount save - no conversation data');
-      return;
+      return 'skipped';
     }
 
     const currentSettings = settingsRef.current;
     if (loadedConversation?.game_settings && (!currentSettings || Object.keys(currentSettings).length === 0)) {
       logger.debug('Skipping save - settings not yet restored from loaded conversation');
-      return;
+      return 'skipped';
     }
 
     const fingerprint = buildSaveFingerprint({
@@ -128,7 +133,7 @@ const useGamePersistence = ({
 
     if (!isUnmount && fingerprint === lastSaveFingerprintRef.current) {
       logger.debug('No changes detected, skipping auto-save');
-      return;
+      return 'nochange';
     }
 
     const sub_maps = buildSubMapsPayload({
@@ -148,7 +153,7 @@ const useGamePersistence = ({
       siteMapsCache: siteMapsCacheRef.current
     });
 
-    const result = await saveConversationToBackend(sessionIdRef.current, {
+    const ok = await saveConversationToBackend(sessionIdRef.current, {
       conversation: conversationRef.current,
       provider: selectedProviderRef.current,
       model: selectedModelRef.current,
@@ -161,8 +166,13 @@ const useGamePersistence = ({
       sub_maps
     });
 
-    lastSaveFingerprintRef.current = fingerprint;
-    return result;
+    // Only remember the fingerprint on a successful write, so a failed save is retried
+    // by the next auto-save instead of being masked as "no change".
+    if (ok) {
+      lastSaveFingerprintRef.current = fingerprint;
+      return 'saved';
+    }
+    return 'error';
   }, [loadedConversation?.game_settings, logger, saveConversationToBackend]);
 
   useEffect(() => {
