@@ -1363,7 +1363,7 @@ const NewGame = () => {
         <div className="map-generation-controls">
           <div className="seed-input-group" style={{ marginBottom: '15px' }}>
             <label htmlFor="worldSeed" style={{ fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>World Seed:</label>
-            <div style={{ display: 'flex', alignItems: 'stretch', gap: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'stretch', gap: '10px', flexWrap: 'wrap' }}>
               <input
                 id="worldSeed"
                 type="number"
@@ -1380,22 +1380,23 @@ const NewGame = () => {
               >
                 🎲 Randomize
               </button>
+              {/* Generate sits flush with Randomize, same row + same height (align-items: stretch). */}
+              <button
+                onClick={() => {
+                  const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
+                  if (!worldSeed) setWorldSeed(seedToUse);
+                  const newMap = generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme);
+                  setGeneratedMap(newMap);
+                  setShowMapPreview(true);
+                }}
+                className="settings-submit-button generate-map-button"
+                type="button"
+                style={{ padding: '8px 16px', fontSize: '0.9rem', boxSizing: 'border-box', letterSpacing: 'normal', textTransform: 'none' }}
+              >
+                {generatedMap ? '🔄 Build Map from Seed' : '🗺️ Generate World Map'}
+              </button>
             </div>
           </div>
-          <button
-            onClick={() => {
-              const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
-              if (!worldSeed) setWorldSeed(seedToUse);
-              const newMap = generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme);
-              setGeneratedMap(newMap);
-              setShowMapPreview(true);
-            }}
-            className="generate-map-button"
-            type="button"
-            style={{ width: '100%', maxWidth: '300px' }}
-          >
-            {generatedMap ? '🔄 Build Map from Seed' : '🗺️ Generate World Map'}
-          </button>
 
           {generatedMap && (
             <span className="map-status">✓ Map generated!</span>
