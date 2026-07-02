@@ -2,7 +2,8 @@ import {
   getMilestoneNpcsForTown,
   checkMilestoneCompletion,
   completeNarrativeMilestone,
-  findMarkerMilestoneIndex
+  findMarkerMilestoneIndex,
+  getMilestoneBossForTile
 } from './milestoneEngine';
 
 // Mirrors the heroic-fantasy-t1 milestone #2 shape (authored NPC + quest building).
@@ -164,5 +165,54 @@ describe('findMarkerMilestoneIndex (AI [COMPLETE_MILESTONE] guard)', () => {
     expect(findMarkerMilestoneIndex(ms, '')).toBe(-1);
     expect(findMarkerMilestoneIndex(ms, '   ')).toBe(-1);
     expect(findMarkerMilestoneIndex([{ id: 9, completed: false }], 'anything')).toBe(-1); // no text
+  });
+});
+
+describe('getMilestoneBossForTile (milestone boss fights on world tiles)', () => {
+  // Mirrors heroic-fantasy-t1 milestones 3 (hideout POI) + 4 (chieftain boss).
+  const bossEncounter = {
+    name: 'Goblin Chieftain',
+    encounterTier: 'boss',
+    enemyHP: 30,
+    suggestedActions: [{ label: 'Fight', skill: 'Athletics' }],
+    consequences: { success: 'ok' },
+    rewards: { xp: 75 }
+  };
+  const campaign = (overrides = {}) => ([
+    { id: 3, text: 'Track the goblins to their hideout', location: 'Greenridge Hills', type: 'location', completed: true, requires: [], trigger: { location: 'goblin_hideout', action: 'visit' }, spawn: { type: 'poi', id: 'goblin_hideout', name: 'Goblin Hideout', location: 'Greenridge Hills' } },
+    { id: 4, text: 'Defeat the Goblin Chieftain', location: 'Greenridge Hills', type: 'combat', completed: false, requires: [3], trigger: { enemy: 'goblin_chieftain', action: 'defeat' }, spawn: { type: 'enemy', id: 'goblin_chieftain', name: 'Goblin Chieftain', location: 'Greenridge Hills' }, encounter: bossEncounter, ...overrides }
+  ]);
+
+  const hideoutTile = { poi: 'goblin_hideout', poiName: 'Goblin Hideout', milestonePoi: true };
+
+  it('offers the boss on the milestone POI tile once prerequisites are met', () => {
+    const boss = getMilestoneBossForTile(campaign(), hideoutTile);
+    expect(boss).toBeTruthy();
+    expect(boss.enemyId).toBe('goblin_chieftain');
+    expect(boss.name).toBe('Goblin Chieftain');
+    expect(boss.encounter).toMatchObject({ enemyHP: 30, isMilestoneBoss: true, milestoneId: 4 });
+  });
+
+  it('offers the boss on a tile stamped with milestoneEnemy directly', () => {
+    const tile = { milestoneEnemy: 'goblin_chieftain', milestoneEnemyName: 'Goblin Chieftain' };
+    const boss = getMilestoneBossForTile(campaign(), tile);
+    expect(boss).toBeTruthy();
+    expect(boss.encounter.isMilestoneBoss).toBe(true);
+  });
+
+  it('withholds the boss while prerequisites are unmet', () => {
+    const locked = campaign().map(m => (m.id === 3 ? { ...m, completed: false } : m));
+    expect(getMilestoneBossForTile(locked, hideoutTile)).toBeNull();
+  });
+
+  it('withholds the boss once the combat milestone is completed', () => {
+    const done = campaign({ completed: true });
+    expect(getMilestoneBossForTile(done, hideoutTile)).toBeNull();
+  });
+
+  it('returns null for plain tiles and bad input', () => {
+    expect(getMilestoneBossForTile(campaign(), { poi: 'mountain' })).toBeNull();
+    expect(getMilestoneBossForTile(campaign(), null)).toBeNull();
+    expect(getMilestoneBossForTile(null, hideoutTile)).toBeNull();
   });
 });

@@ -39,7 +39,7 @@ import {
   formatEncounterRewardLog
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
-import { checkMilestoneCompletion, getMilestoneRewards } from '../game/milestoneEngine';
+import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile } from '../game/milestoneEngine';
 import { buyItem, sellItem } from '../game/shopController';
 import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, turnInQuest, getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
 import { QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
@@ -355,10 +355,10 @@ const Game = ({ resumeConversation = null }) => {
 
     // --- Main campaign milestones ---
     const milestones = settings?.milestones;
-    if (!milestones || milestones.length === 0) return;
+    if (!milestones || milestones.length === 0) return null;
 
     const result = checkMilestoneCompletion(milestones, event, heroLevel);
-    if (!result) return;
+    if (!result) return null;
 
     if (result.type === 'completed') {
       logger.info(`[MILESTONE] Completed: #${result.milestoneId} — ${result.milestone.text}`);
@@ -397,6 +397,10 @@ const Game = ({ resumeConversation = null }) => {
     } else if (result.type === 'level_blocked') {
       logger.debug(`[MILESTONE] Level blocked: #${result.milestoneId} — needs Lv.${result.requiredLevel}, have Lv.${result.currentLevel}`);
     }
+    // Callers can chain on the result (e.g. a location completion unlocking a boss
+    // fight on the same arrival) — setSettings above is async, so this is the only
+    // way to see updatedMilestones synchronously.
+    return result;
   };
 
   // --- Town Tile Click Wrapper (adds encounter checks) ---
@@ -656,25 +660,40 @@ const Game = ({ resumeConversation = null }) => {
       trackTownVisit: mapHook.trackTownVisit
     });
 
-    // POI Check (for location Modal — towns, etc.). Secret sites (caves/ruins) don't offer
-    // an entrance until a quest has revealed them, so they read as plain ground until then.
-    const poiEncounter = buildPoiEncounter(targetTile);
-    const poiShown = poiEncounter && !isSiteHidden(targetTile);
-    if (poiShown) {
-      mapHook.setIsMapModalOpen(false); // close map so the location modal is visible
-      openEncounterInfo({
-        encounter: poiEncounter,
-        onEnterLocation: () => mapHook.handleEnterLocation(poiEncounter, interactionHook.setConversation, interactionHook.conversation),
-        onViewMap: () => mapHook.setIsMapModalOpen(true)
-      });
-    }
-
-    // Milestone check: location_visited
+    // Milestone check: location_visited. Fired BEFORE the POI modal so a location
+    // completion (e.g. finding the Goblin Hideout) unlocks its boss fight on the
+    // same arrival — the returned updatedMilestones are the fresh state.
+    let effectiveMilestones = settings?.milestones || [];
     if (targetTile.poi || targetTile.townName) {
       const locationId = targetTile.poi || targetTile.townName?.toLowerCase().replace(/\s+/g, '_');
       if (locationId) {
-        checkMilestoneEvent({ type: 'location_visited', locationId }, selectedHeroes);
+        const locResult = checkMilestoneEvent({ type: 'location_visited', locationId }, selectedHeroes);
+        if (locResult?.updatedMilestones) effectiveMilestones = locResult.updatedMilestones;
       }
+    }
+
+    // POI Check (for location Modal — towns, etc.). Secret sites (caves/ruins) don't offer
+    // an entrance until a quest has revealed them, so they read as plain ground until then.
+    // If an ACTIVE milestone boss lairs on this tile (stamped enemy, or a combat milestone
+    // authored at this milestone POI's location), the modal offers the fight.
+    const poiEncounter = buildPoiEncounter(targetTile);
+    const poiShown = poiEncounter && !isSiteHidden(targetTile);
+    if (poiShown) {
+      const boss = getMilestoneBossForTile(effectiveMilestones, targetTile);
+      mapHook.setIsMapModalOpen(false); // close map so the location modal is visible
+      openEncounterInfo({
+        encounter: poiEncounter,
+        boss,
+        onFight: boss ? () => {
+          mapHook.setIsMapModalOpen(false);
+          reopenMapAfterEncounterRef.current = true;
+          // enemyId rides on the encounter so handleEncounterResolve fires
+          // enemy_defeated with the right id and the milestone completes.
+          openEncounterAction({ encounter: { ...boss.encounter, enemyId: boss.enemyId } });
+        } : null,
+        onEnterLocation: () => mapHook.handleEnterLocation(poiEncounter, interactionHook.setConversation, interactionHook.conversation),
+        onViewMap: () => mapHook.setIsMapModalOpen(true)
+      });
     }
 
     // --- Random Encounter Check (Phase 2.4: Two-Tier System) ---

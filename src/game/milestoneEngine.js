@@ -154,6 +154,56 @@ export const completeNarrativeMilestone = (milestones, milestoneId) => {
 };
 
 /**
+ * Find the milestone boss fight waiting on a world tile, if any.
+ *
+ * Two ways a tile hosts a boss:
+ *  1. The spawner stamped the enemy directly (`tile.milestoneEnemy`, e.g. the tile
+ *     findLocationOnMap resolved for the enemy's authored location).
+ *  2. The tile is a spawned milestone POI (e.g. the Goblin Hideout) and an ACTIVE
+ *     combat milestone is authored at the same location — the boss lairs in its POI.
+ *
+ * Only returns a fight while the combat milestone is active (not completed,
+ * prerequisites met), so e.g. the chieftain only appears once the hideout is found.
+ *
+ * @param {Array} milestones - All campaign milestones
+ * @param {Object} tile - The world tile the party arrived at
+ * @returns {Object|null} { enemyId, name, encounter } or null
+ */
+export const getMilestoneBossForTile = (milestones, tile) => {
+    if (!Array.isArray(milestones) || !tile) return null;
+
+    // 1) Tile stamped with the enemy directly.
+    if (tile.milestoneEnemy) {
+        const encounter = getMilestoneEncounter(milestones, tile.milestoneEnemy);
+        if (encounter) {
+            return { enemyId: tile.milestoneEnemy, name: tile.milestoneEnemyName || encounter.name, encounter };
+        }
+    }
+
+    // 2) Milestone POI tile: match an active combat milestone at the same authored location.
+    if (tile.milestonePoi && tile.poi) {
+        const owner = milestones.find(m => m.spawn?.type === 'poi' && m.spawn.id === tile.poi);
+        const loc = owner?.spawn?.location || owner?.location;
+        if (loc) {
+            const combat = milestones.find(m =>
+                m.type === 'combat' && !m.completed && m.trigger?.enemy && m.encounter &&
+                (m.location === loc || m.spawn?.location === loc) &&
+                areRequirementsMet(m, milestones)
+            );
+            if (combat) {
+                return {
+                    enemyId: combat.trigger.enemy,
+                    name: combat.spawn?.name || combat.encounter.name,
+                    encounter: { ...combat.encounter, milestoneId: combat.id, isMilestoneBoss: true }
+                };
+            }
+        }
+    }
+
+    return null;
+};
+
+/**
  * Find the milestone an AI [COMPLETE_MILESTONE: <text>] marker refers to.
  *
  * Fuzzy text match (either string contains the other), restricted to milestones the
