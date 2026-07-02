@@ -18,6 +18,7 @@ import { llmService } from "../services/llmService";
 import { createLogger } from "../utils/logger";
 import { QUEST_ENEMIES, getEnemiesByTierAndTheme } from "../data/questEnemies";
 import { QUEST_BUILDINGS, NPC_ROLES, SEARCHABLE_ITEMS, POI_TYPES, THEME_DEFAULTS, THEME_NAMES } from "../data/questPickerData";
+import { isPremium, isThemePremium, isTemplatePremium } from "../game/entitlements";
 
 const logger = createLogger('new-game');
 
@@ -84,6 +85,10 @@ const NewGame = () => {
   const { settings, setSettings, selectedProvider, selectedModel } = useContext(SettingsContext);
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Premium entitlement (placeholder — false for free tier by default; honours the
+  // localStorage dev override in entitlements.js so premium content can be tested).
+  const premiumUnlocked = isPremium();
 
   // Clear any stale session ID when starting a new game
   useEffect(() => {
@@ -295,6 +300,19 @@ const NewGame = () => {
     }
     setFormError('');
 
+    // Premium backstop: no matter which path set it, a free user must never generate a
+    // sand/snow (premium) world map or start a premium adventure. This closes loopholes
+    // like a premium biome theme carried over from a previewed template into Custom/Freeform.
+    if (!premiumUnlocked) {
+      const selTpl = selectedTemplate && selectedTemplate !== 'custom' && selectedTemplate !== 'ai'
+        ? storyTemplates.find(t => t.id === selectedTemplate)
+        : null;
+      if (isThemePremium(worldTheme) || isTemplatePremium(selTpl)) {
+        setFormError('Desert and snow adventures are a Premium feature (coming soon). Choose a temperate setting to continue.');
+        return;
+      }
+    }
+
     // Auto-generate the world map if one wasn't built manually. Ready-Made
     // adventures skip the map step entirely, so this is the normal path for them.
     const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
@@ -441,6 +459,7 @@ const NewGame = () => {
     const t = previewTemplate;
     const ms = t.settings.milestones || [];
     const isSelected = selectedTemplate === t.id;
+    const isPremiumLocked = !premiumUnlocked && isTemplatePremium(t);
 
     return (
       <div className="modal-overlay" onClick={() => setPreviewTemplate(null)}>
@@ -581,7 +600,20 @@ const NewGame = () => {
                 borderRadius: '8px', color: 'var(--text)', cursor: 'pointer', fontSize: '0.9rem',
               }}
             >{isSelected ? 'Back' : 'Cancel'}</button>
-            {isSelected ? (
+            {isPremiumLocked ? (
+              <button
+                disabled
+                title="Premium unlock is coming soon"
+                style={{
+                  padding: '8px 24px',
+                  background: 'linear-gradient(135deg, #b8860b, #ffd700)',
+                  border: 'none', borderRadius: '8px', color: '#2b1d00',
+                  cursor: 'not-allowed', fontSize: '0.9rem', fontWeight: 'bold', opacity: 0.9,
+                }}
+              >
+                🔒 Unlock with Premium (coming soon)
+              </button>
+            ) : isSelected ? (
               <button
                 onClick={() => {
                   setPreviewTemplate(null);
@@ -621,22 +653,29 @@ const NewGame = () => {
 
   const renderTemplateCard = (template, isFirst = false) => {
     const isSelected = selectedTemplate === template.id;
-    const isLocked = template.comingSoon;
+    // Premium-locked = a paid adventure the current (free) user can't start yet.
+    const isPremiumLocked = !premiumUnlocked && isTemplatePremium(template);
+    const isLocked = template.comingSoon || isPremiumLocked;
     return (
       <div
         key={template.id}
         data-tour={isFirst ? 'first-adventure' : undefined}
-        onClick={isLocked ? undefined : () => applyTemplate(template)}
+        onClick={
+          template.comingSoon ? undefined
+            : isPremiumLocked
+              ? () => setFormError('This is a Premium adventure. Premium unlock is coming soon — pick a free adventure to begin.')
+              : () => applyTemplate(template)
+        }
         style={{
           background: 'var(--surface)',
           border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
           borderRadius: '12px',
           overflow: 'hidden',
-          cursor: isLocked ? 'default' : 'pointer',
+          cursor: template.comingSoon ? 'default' : 'pointer',
           transition: 'all 0.2s',
           boxShadow: isSelected ? '0 0 0 1px var(--primary), 0 4px 12px var(--shadow)' : 'none',
-          opacity: isLocked ? 0.5 : 1,
-          filter: isLocked ? 'grayscale(0.6)' : 'none',
+          opacity: isLocked ? (isPremiumLocked ? 0.75 : 0.5) : 1,
+          filter: isLocked ? 'grayscale(0.5)' : 'none',
         }}
       >
         {/* Card image */}
@@ -655,7 +694,14 @@ const NewGame = () => {
               padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
             }}>SELECTED</div>
           )}
-          {isLocked && (
+          {isPremiumLocked && (
+            <div style={{
+              position: 'absolute', top: 8, left: 8,
+              background: 'linear-gradient(135deg, #b8860b, #ffd700)', color: '#2b1d00',
+              padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
+            }}>🔒 PREMIUM</div>
+          )}
+          {template.comingSoon && (
             <div style={{
               position: 'absolute', bottom: 8, left: 0, right: 0, textAlign: 'center',
               fontSize: '0.7rem', fontWeight: 'bold', color: '#fff',
@@ -669,7 +715,7 @@ const NewGame = () => {
             <div style={{ fontSize: '0.9rem', fontWeight: 'bold', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
               {template.subtitle}
             </div>
-            {!isLocked && (
+            {!template.comingSoon && (
               <button
                 onClick={(e) => { e.stopPropagation(); setPreviewTemplate(template); }}
                 style={{
@@ -694,8 +740,14 @@ const NewGame = () => {
   };
 
   // Only the starter (tier 1) adventures are shown — higher-level chapters are
-  // hidden to keep the choice simple for new players.
+  // hidden to keep the choice simple for new players. Premium adventures (desert/snow
+  // biome quests) are split into their own section so free users can see, but not start,
+  // paid content.
   const starterTemplates = storyTemplates.filter((t) => t.tier === 1);
+  const freeStarterTemplates = starterTemplates.filter((t) => !isTemplatePremium(t));
+  const premiumStarterTemplates = starterTemplates.filter((t) => isTemplatePremium(t));
+
+  const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' };
 
   const renderTemplateTab = () => (
     <div className="form-section story-settings-section">
@@ -703,9 +755,33 @@ const NewGame = () => {
         Pick a starter adventure to begin. Click a card for details.
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
-        {starterTemplates.map((t, i) => renderTemplateCard(t, i === 0))}
+      <div style={gridStyle}>
+        {freeStarterTemplates.map((t, i) => renderTemplateCard(t, i === 0))}
       </div>
+
+      {premiumStarterTemplates.length > 0 && (
+        <div style={{ marginTop: '28px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px',
+          }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
+              ✨ Premium Adventures
+            </h3>
+            <span style={{
+              background: 'linear-gradient(135deg, #b8860b, #ffd700)', color: '#2b1d00',
+              padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
+            }}>{premiumUnlocked ? 'UNLOCKED' : 'COMING SOON'}</span>
+          </div>
+          {!premiumUnlocked && (
+            <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+              Desert and snow campaigns are a Premium unlock (coming soon). Preview them below.
+            </p>
+          )}
+          <div style={gridStyle}>
+            {premiumStarterTemplates.map((t) => renderTemplateCard(t))}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -975,6 +1051,13 @@ const NewGame = () => {
             value={customTheme}
             onChange={(e) => {
               const theme = e.target.value;
+              // Premium backstop: never let a free user pick a premium (desert/snow) theme.
+              // These genre ids aren't premium today, but this keeps the seam airtight if a
+              // premium world-biome theme is ever surfaced in this picker.
+              if (!premiumUnlocked && isThemePremium(theme)) {
+                setFormError('That theme is a Premium feature (coming soon).');
+                return;
+              }
               setCustomTheme(theme);
               applyThemeDefaults(theme);
               setSlot4Enemy(''); // Reset enemy when theme changes
@@ -988,9 +1071,14 @@ const NewGame = () => {
             }}
             style={selectStyle}
           >
-            {Object.entries(THEME_DEFAULTS).map(([id, t]) => (
-              <option key={id} value={id}>{t.icon} {t.name}</option>
-            ))}
+            {Object.entries(THEME_DEFAULTS).map(([id, t]) => {
+              const locked = !premiumUnlocked && isThemePremium(id);
+              return (
+                <option key={id} value={id} disabled={locked}>
+                  {t.icon} {t.name}{locked ? ' 🔒 (Premium)' : ''}
+                </option>
+              );
+            })}
           </select>
         </div>
         <div style={{ flex: '0 0 140px' }}>
@@ -1325,6 +1413,12 @@ const NewGame = () => {
               } else if (tab.id === 'freeform' && selectedTemplate && selectedTemplate !== 'ai' && selectedTemplate !== 'freeform') {
                 setSelectedTemplate('freeform');
               }
+              // Custom/Freeform have no biome picker, so a premium world theme here can only
+              // be a leftover from a previewed template. Drop it back to grassland for free
+              // users so they can't ride a premium (desert/snow) map into a custom tale.
+              if ((tab.id === 'custom' || tab.id === 'freeform') && !premiumUnlocked && isThemePremium(worldTheme)) {
+                setWorldTheme('grassland');
+              }
             }}
             style={{
               background: 'none',
@@ -1383,6 +1477,11 @@ const NewGame = () => {
               {/* Generate sits flush with Randomize, same row + same height (align-items: stretch). */}
               <button
                 onClick={() => {
+                  // Premium backstop: never build a sand/snow map for a free user.
+                  if (!premiumUnlocked && isThemePremium(worldTheme)) {
+                    setFormError('Desert and snow maps are a Premium feature (coming soon). Choose a temperate setting to continue.');
+                    return;
+                  }
                   const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
                   if (!worldSeed) setWorldSeed(seedToUse);
                   const newMap = generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme);

@@ -210,6 +210,11 @@ export const storyTemplates = [
         theme: 'heroic-fantasy',
         tier: 1,
         levelRange: [1, 2],
+        // Premium content: desert (sand) world-gen + its quest are a paid unlock.
+        // Gating derives from settings.theme ('desert' in PREMIUM_THEMES) too, but the
+        // explicit flag keeps intent obvious and covers premium templates that ever ship
+        // without a premium biome theme. See src/game/entitlements.js.
+        premium: true,
         name: 'Desert Expedition',
         subtitle: 'The Sunscorched Road',
         icon: '🏜️',
