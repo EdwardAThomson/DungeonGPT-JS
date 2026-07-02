@@ -426,13 +426,16 @@ const PartyInventoryModal = () => {
               Use {ITEM_CATALOG[useItemState.itemKey]?.name} on...
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {injuredHeroes.map((hero) => {
+              {party.filter(h => !h.isDefeated).map((hero) => {
                 const hpStatus = getHPStatus(hero.currentHP, hero.maxHP);
                 const heroIndex = party.findIndex(h => heroUid(h) === heroUid(hero));
+                const atFull = hero.currentHP >= hero.maxHP;
                 return (
                   <button
                     key={heroUid(hero)}
-                    onClick={() => handleUsePotion(heroIndex)}
+                    onClick={() => { if (!atFull) handleUsePotion(heroIndex); }}
+                    disabled={atFull}
+                    title={atFull ? 'Already at full health' : `Heal ${hero.characterName || hero.name}`}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -442,14 +445,15 @@ const PartyInventoryModal = () => {
                       border: '1px solid var(--border)',
                       borderRadius: '6px',
                       color: 'var(--text)',
-                      cursor: 'pointer',
+                      cursor: atFull ? 'not-allowed' : 'pointer',
+                      opacity: atFull ? 0.5 : 1,
                       fontFamily: 'var(--body-font)',
                       fontSize: '0.95rem'
                     }}
                   >
                     <span style={{ fontWeight: 'bold' }}>{hero.characterName || hero.name}</span>
                     <span style={{ color: hpStatus.color, fontSize: '0.85rem' }}>
-                      {hero.currentHP} / {hero.maxHP} HP
+                      {hero.currentHP} / {hero.maxHP} HP{atFull ? ' · Full' : ''}
                     </span>
                   </button>
                 );

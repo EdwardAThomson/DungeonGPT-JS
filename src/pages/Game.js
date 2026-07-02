@@ -101,8 +101,13 @@ const SaveConfirmationModal = () => {
 
       {isSuccess && (
         <>
-          <p style={{ marginBottom: '18px', fontWeight: 'bold', color: 'var(--primary)' }}>
+          <p style={{ marginBottom: '8px', fontWeight: 'bold', color: 'var(--primary)' }}>
             {displayName}
+          </p>
+          <p style={{ marginBottom: '18px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+            {data?.signedIn
+              ? '☁️ Saved to your account (syncs across your devices)'
+              : '💾 Saved on this device (this browser)'}
           </p>
 
           <div style={{ textAlign: 'left', marginBottom: '20px' }}>
@@ -997,6 +1002,7 @@ const Game = ({ resumeConversation = null }) => {
             openSaveConfirmation({
               status,
               title,
+              signedIn: !!user, // drives the "where did it save" indicator
               root: settings?.saveName || '',
               // Change the campaign root name: keep it for future saves (settings) and
               // update the just-saved row's name immediately.
