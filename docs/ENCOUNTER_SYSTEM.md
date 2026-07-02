@@ -112,6 +112,14 @@ Expanded encounter content to 40+ templates across eight category files:
 
 Each POI type has a dedicated encounter table in `encounterTables.js` with `poiEncounterTables` and `poiEncounterChance` configs. POI encounters use the narrative tier by default, letting the AI weave discoveries into movement descriptions.
 
+Narrative-tier delivery (2026-07-02): non-hostile encounters are parked for the Look-around
+button and woven into the AI narration, where the player acts by typing a follow-up. Because
+guests can't type free-text (and the master narration toggle may be off), those paths route
+to the interactive action modal instead (`planWorldTileEncounterFlow` receives
+`aiNarrativeEnabled && aiAvailable`), so rewards stay reachable for everyone. Known gaps are
+tracked as issues #35–#37 (no visible affordance for signed-in hooks; parked encounters
+discarded on the next move; hooks show no image).
+
 ---
 
 ## Phase 4: Progression and Inventory (Partially Shipped)

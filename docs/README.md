@@ -7,6 +7,7 @@ deleted. When the code and a doc disagree, the code wins.
 ## Planning & status
 - `OUTSTANDING_ISSUES.md` — master backlog
 - `../ROADMAP.md` — high-level project status
+- `LICENSING_OPTIONS.md` — licensing decision memo (decided: stay Apache-2.0; premium via engineering)
 
 ## Architecture & deployment
 - `DEPLOYMENT_ARCHITECTURE.md` — current prod stack (CF Pages + Worker + Supabase)
@@ -15,6 +16,7 @@ deleted. When the code and a doc disagree, the code wins.
 
 ## System references (shipped, live systems)
 - `CAMPAIGN_MILESTONE_SYSTEM.md` — milestone/campaign engine
+- `MILESTONE_NPC_GROUNDING_PLAN.md` — authored-NPC grounding + `talk` milestones (Options B+C shipped 2026-07-02)
 - `ENCOUNTER_SYSTEM.md` — encounter system
 - `EQUIPMENT_ITEMS.md` — equipment stat model, item ladder, deferred work
 - `TIERED_NARRATION_PLAN.md` — "smart-by-default" narration tiers (localNarrator)
