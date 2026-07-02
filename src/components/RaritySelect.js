@@ -1,33 +1,33 @@
-import React, { useEffect, useId, useRef, useState } from "react";
-import { getRarityColor } from "../utils/inventorySystem";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import { getRarityColor, RARITY_RANK } from "../utils/inventorySystem";
+
+// Names render in a uniform neutral grey; the rarity tag carries the rarity color.
+const NAME_COLOR = "#c9c9c9";
 
 /**
- * RaritySelect — accessible custom dropdown/listbox that renders each option's
- * label in its WoW-style rarity color.
- *
- * Native <select><option> text color is not reliably honoured by browsers
- * (especially on the closed control and across platforms), so we replace the
- * native control with a styled button + role="listbox" popup that we fully own.
+ * RaritySelect — accessible custom dropdown/listbox for item options where the rarity is
+ * color-coded. Native <select><option> text color isn't reliably honoured by browsers, so
+ * we own the popup. Each option shows its name in grey with a rarity-colored "(rarity)" tag.
  *
  * Props:
- *   value        — currently selected option id ('' for none)
- *   onChange     — (id: string) => void, called with the selected option id
- *                  (note: passes the raw id, NOT a synthetic event)
- *   options      — [{ id, name, rarity, icon }] (icon optional, rarity optional
- *                  → falls back to 'common')
- *   placeholder  — text shown when nothing is selected
- *   ariaLabel    — accessible label for the control
+ *   value        — selected option id ('' for none)
+ *   onChange     — (id) => void (raw id, not an event)
+ *   options      — [{ id, name, rarity }] (rarity optional → 'common')
+ *   placeholder  — text when nothing selected
+ *   ariaLabel    — accessible label
  *   style        — extra style merged onto the trigger button
- *   showRarityTag — when true, append "(rarity)" after the option name
+ *   showRarityTag — append "(rarity)" after the name (default true)
+ *   sortByRarity — order options by rarity (then name), low → high (default false)
  */
 export default function RaritySelect({
   value,
   onChange,
-  options = [],
+  options: rawOptions = [],
   placeholder = "Select...",
   ariaLabel,
   style,
   showRarityTag = true,
+  sortByRarity = false,
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -35,16 +35,23 @@ export default function RaritySelect({
   const listRef = useRef(null);
   const listboxId = useId();
 
+  // Optionally group options by rarity (then name) so the list reads low → high rarity.
+  const options = useMemo(() => {
+    if (!sortByRarity) return rawOptions;
+    return [...rawOptions].sort((a, b) => {
+      const ra = RARITY_RANK[a?.rarity ?? "common"] ?? 0;
+      const rb = RARITY_RANK[b?.rarity ?? "common"] ?? 0;
+      return ra - rb || String(a?.name || "").localeCompare(String(b?.name || ""));
+    });
+  }, [rawOptions, sortByRarity]);
+
   const selected = options.find((o) => o.id === value) || null;
-  const selectedRarity = selected?.rarity || "common";
 
   // Close on outside click.
   useEffect(() => {
     if (!open) return undefined;
     const handleClick = (e) => {
-      if (rootRef.current && !rootRef.current.contains(e.target)) {
-        setOpen(false);
-      }
+      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false);
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
@@ -52,10 +59,7 @@ export default function RaritySelect({
 
   // When opening, point the active highlight at the current selection.
   useEffect(() => {
-    if (open) {
-      const idx = options.findIndex((o) => o.id === value);
-      setActiveIndex(idx);
-    }
+    if (open) setActiveIndex(options.findIndex((o) => o.id === value));
   }, [open, options, value]);
 
   // Keep the active option scrolled into view.
@@ -75,46 +79,28 @@ export default function RaritySelect({
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        if (!open) {
-          setOpen(true);
-        } else {
-          setActiveIndex((i) => Math.min(options.length - 1, i + 1));
-        }
+        if (!open) setOpen(true);
+        else setActiveIndex((i) => Math.min(options.length - 1, i + 1));
         break;
       case "ArrowUp":
         e.preventDefault();
-        if (!open) {
-          setOpen(true);
-        } else {
-          setActiveIndex((i) => Math.max(0, i - 1));
-        }
+        if (!open) setOpen(true);
+        else setActiveIndex((i) => Math.max(0, i - 1));
         break;
       case "Enter":
       case " ":
         e.preventDefault();
-        if (!open) {
-          setOpen(true);
-        } else if (activeIndex >= 0) {
-          commit(activeIndex);
-        }
+        if (!open) setOpen(true);
+        else if (activeIndex >= 0) commit(activeIndex);
         break;
       case "Escape":
-        if (open) {
-          e.preventDefault();
-          setOpen(false);
-        }
+        if (open) { e.preventDefault(); setOpen(false); }
         break;
       case "Home":
-        if (open) {
-          e.preventDefault();
-          setActiveIndex(0);
-        }
+        if (open) { e.preventDefault(); setActiveIndex(0); }
         break;
       case "End":
-        if (open) {
-          e.preventDefault();
-          setActiveIndex(options.length - 1);
-        }
+        if (open) { e.preventDefault(); setActiveIndex(options.length - 1); }
         break;
       case "Tab":
         setOpen(false);
@@ -144,13 +130,18 @@ export default function RaritySelect({
     ...style,
   };
 
-  // Note: option.icon is an image PATH (e.g. "assets/icons/items/x.webp"), not an emoji,
-  // so it must never be concatenated as text. This picker shows the item name + rarity tag,
-  // colored by rarity (the original native select couldn't show icons either).
-  const renderLabel = (opt) => {
-    const tag = showRarityTag ? ` (${opt.rarity || "common"})` : "";
-    return `${opt.name}${tag}`;
-  };
+  // Name in neutral grey; rarity tag in its rarity color. option.icon is a file PATH, not
+  // an emoji, so it is never concatenated as text.
+  const renderLabel = (opt) => (
+    <>
+      <span style={{ color: NAME_COLOR }}>{opt.name}</span>
+      {showRarityTag && (
+        <span style={{ color: getRarityColor(opt.rarity || "common") }}>
+          {" "}({opt.rarity || "common"})
+        </span>
+      )}
+    </>
+  );
 
   return (
     <div ref={rootRef} style={{ position: "relative", width: "100%" }}>
@@ -168,14 +159,12 @@ export default function RaritySelect({
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            color: selected ? getRarityColor(selectedRarity) : "var(--text-secondary)",
+            color: selected ? NAME_COLOR : "var(--text-secondary)",
           }}
         >
           {selected ? renderLabel(selected) : placeholder}
         </span>
-        <span aria-hidden="true" style={{ color: "var(--text-secondary)", fontSize: "0.7rem" }}>
-          ▾
-        </span>
+        <span aria-hidden="true" style={{ color: "var(--text-secondary)", fontSize: "0.7rem" }}>▾</span>
       </button>
 
       {open && (
@@ -205,7 +194,6 @@ export default function RaritySelect({
           {options.map((opt, idx) => {
             const isSelected = opt.id === value;
             const isActive = idx === activeIndex;
-            const color = getRarityColor(opt.rarity || "common");
             return (
               <li
                 key={opt.id}
@@ -219,23 +207,14 @@ export default function RaritySelect({
                   borderRadius: "4px",
                   cursor: "pointer",
                   fontSize: "0.8rem",
-                  color,
                   background: isActive ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
                   fontWeight: isSelected ? 700 : 400,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}
               >
-                <span
-                  style={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {renderLabel(opt)}
-                </span>
+                {renderLabel(opt)}
               </li>
             );
           })}

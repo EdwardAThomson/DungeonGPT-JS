@@ -1117,6 +1117,7 @@ const NewGame = () => {
               options={SEARCHABLE_ITEMS}
               placeholder="Select item..."
               ariaLabel="Quest item"
+              sortByRarity
             />
           </div>
           <div style={{ flex: '1 1 180px' }}>
