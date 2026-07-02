@@ -29,7 +29,7 @@ const Features = () => {
               </p>
               <ul>
                 <li><strong>12 Classic Classes:</strong> Each with unique abilities and playstyles</li>
-                <li><strong>9 Playable Races:</strong> Human, Elf, Dwarf, Smallfolk, Dragonkin, Gnome, Half-Elf, Half-Orc, and Demonkin</li>
+                <li><strong>Quick Start Templates:</strong> Apply a class template to fill in stats, alignment, and a backstory in one click</li>
                 <li><strong>Customizable Stats:</strong> Distribute points across Strength, Dexterity, Constitution, Intelligence, Wisdom, and Charisma</li>
                 <li><strong>Background & Personality:</strong> Define your character's backstory, traits, and motivations</li>
                 <li><strong>Equipment & Skills:</strong> Start with class-appropriate gear and abilities</li>
@@ -63,7 +63,7 @@ const Features = () => {
                 <li><strong>Story Templates:</strong> Choose from pre-made scenarios or create your own</li>
                 <li><strong>Tone Settings:</strong> From lighthearted Noble adventures to dark Grimdark campaigns</li>
                 <li><strong>Custom Locations:</strong> Name towns, mountains, and landmarks that will appear on your map</li>
-                <li><strong>Quest Milestones:</strong> Set specific goals and objectives for your adventure</li>
+                <li><strong>Quest Milestones:</strong> Each adventure tracks objectives such as meeting key NPCs, gathering items, reaching locations, and confronting bosses</li>
                 <li><strong>Party Selection:</strong> Choose which heroes will join the adventure</li>
                 <li><strong>AI Model Selection:</strong> Pick from multiple AI models for different storytelling styles</li>
               </ul>
@@ -91,6 +91,7 @@ const Features = () => {
               <ul>
                 <li><strong>HP Tracking:</strong> Monitor your health during adventures</li>
                 <li><strong>Inventory:</strong> Collect items, gold, and equipment</li>
+                <li><strong>Loadout:</strong> Equip gear on each hero from the party inventory's Loadout tab</li>
                 <li><strong>Party Members:</strong> View stats for all heroes in your party</li>
                 <li><strong>Progression:</strong> Gain experience and level up through your journey</li>
               </ul>
@@ -163,8 +164,8 @@ const Features = () => {
           <div className="faq-item">
             <h3>What AI models are available?</h3>
             <p>
-              We support multiple AI providers via CloudFlare Workers
-              (Llama, DeepSeek, Mistral, and more). Exploring how to support models such
+              We run a curated set of open-weights models on Cloudflare Workers AI
+              (GPT-OSS, Llama, and Gemma). Exploring how to support models such
               as OpenAI GPT-5+, Google Gemini, Anthropic Claude.
             </p>
           </div>
@@ -173,15 +174,16 @@ const Features = () => {
             <h3>Is my progress saved automatically?</h3>
             <p>
               Yes! Your game state is automatically saved after each action. You can also
-              manually save and load games from the Saved Games menu.
+              save manually while playing, and load or rename games from the Saved Games page.
             </p>
           </div>
 
           <div className="faq-item">
             <h3>Do I need an account?</h3>
             <p>
-              You can create characters and plan adventures without an account, but signing
-              up allows you to save your progress across devices and access cloud features.
+              You can play as a guest: create heroes, start adventures, and explore with
+              your progress saved in this browser. Signing in unlocks the AI Dungeon Master
+              (free-text actions and AI narration) and syncs your heroes and saves across devices.
             </p>
           </div>
         </section>
