@@ -1,0 +1,468 @@
+// progressionLint.test.js — the unified progression lint (#46).
+// Design: docs/T3_CAMPAIGNS_PLAN.md Part II §16 (guards a-f), riding the balance-sim
+// harness (balanceSim.js, §4/§4.4) for everything that rolls dice.
+//
+// Every guard reads LIVE game data (storyTemplates, sideQuests, shopStock,
+// sitePopulator pools as ACTUALLY rolled, encounter tables, ITEM_CATALOG,
+// XP_THRESHOLDS), so new content is linted the moment it is authored.
+//
+// KNOWN_GAPS pins the failures that are TRUE TODAY BY DESIGN DEBT (#44/#45/#47/#50
+// and the deadly-t2 tuning). For a pinned entry the guard asserts the CURRENT
+// (broken) value instead of the healthy band, so:
+//   - a REGRESSION (things get worse) fails the pin, and
+//   - a SILENT FIX (things get better) ALSO fails the pin — update/remove the pin
+//     and, where noted, flip the guard to enforcing.
+// The suite as a whole passes.
+
+import { storyTemplates } from '../data/storyTemplates';
+import { SIDE_QUESTS, QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
+import { SHOP_STOCK } from '../data/shopStock';
+import { encounterTemplates } from '../data/encounters';
+import { populateSite, LOOT, HOARD_BONUS } from './sitePopulator';
+import { describeItemSources } from './questHints';
+import { effectivePartyLevel } from './questEngine';
+import {
+  ITEM_CATALOG,
+  isItemAllowedForTier
+} from '../utils/inventorySystem';
+import { XP_THRESHOLDS } from '../utils/progressionSystem';
+import { SLOT_FOR_TYPE, parseBonus } from './equipment';
+import {
+  buildSimHero,
+  simulateEncounter,
+  auditWorldXpBudget,
+  equippableCatalogEntries
+} from './balanceSim';
+
+jest.setTimeout(120000);
+
+// ---------------------------------------------------------------------------------
+// Sim configuration: deterministic seed; 3000 trials keeps the whole suite fast
+// while holding win rates stable to well under ±2pp per seed.
+const TRIALS = 3000;
+const SEED = 1;
+const LEVELING_SEED = 7;
+
+// ---------------------------------------------------------------------------------
+// KNOWN_GAPS — the pinned design-debt ledger. Backlog refs in comments.
+const KNOWN_GAPS = {
+  // (a) #45/#50: Lv 6-7 have NO playable campaign (t3 is comingSoon). Remove levels
+  // from this list as t3 content ships.
+  bandsWithoutCampaigns: [6, 7],
+
+  // (a) §13.3: party size trivializes minLevel — 4 heroes at Lv 1 have effective
+  // level 3 and are offered 28 of the 30 side quests on day one. Intentional today;
+  // pinned so a gating change is noticed.
+  questsOfferedToLevel1PartyOf4: 28,
+
+  // (b) #44/#49: gear with no live source at any REACHABLE tier (max playable tier
+  // is 2 today; legendary rarity unlocks at t3, which has no playable template).
+  // hide_armor / ring_protection / dragonscale_plate got sources in #49 and are
+  // deliberately NOT pinned — the guard reads their live sources.
+  //   - artifact_trinket (+1 charm): NEW finding by this lint — it exists only as an
+  //     icon-borrow source (QUEST_ITEM_ICON_FROM); no drop, shop, pool, or reward.
+  unobtainableGear: ['artifact_trinket', 'legendary_weapon'],
+
+  // (b) #44: bonus rungs that exist in the catalog but cannot be obtained.
+  // weapon +2 = legendary_weapon only (see above). Fix = give the rung a source.
+  unobtainableSlotRungs: { weapon: [2], armor: [], accessory: [] },
+
+  // (c) boss win-rate pins, measured at TRIALS/SEED with the live rules
+  // (2026-07-03). Healthy bands: mid 30-90%, best >= 50%, none >= 10%.
+  //   - The three deadly-DC-25 t2 bosses are ~1% mid / ~3% best (retry lotteries).
+  //   - Rot-Heart (hard DC 20) sits below band at intended level.
+  //   - ALL bosses fail "best >= 50%": the obtainable weapon ladder tops out at +1
+  //     (#44), so best-obtainable gear barely beats mid. t1 best == mid at +4.
+  bossBalance: {
+    'Goblin Chieftain': { best: [0.40, 0.53] },
+    'Sandstorm Cult Leader': { best: [0.40, 0.53] },
+    'The Hoarfrost Wraith': { best: [0.40, 0.53] },
+    'Blightspawn': { best: [0.40, 0.53] },
+    'Rogue Automaton': { best: [0.40, 0.53] },
+    'The Hooded Priest': { best: [0.40, 0.53] },
+    'Shadow Overlord': { none: [0, 0.04], mid: [0, 0.04], best: [0.005, 0.06] },
+    'The Rot-Heart': { none: [0.02, 0.09], mid: [0.10, 0.21], best: [0.20, 0.32] },
+    'Herald of the Old Gods': { none: [0, 0.04], mid: [0, 0.04], best: [0.005, 0.06] },
+    'The Great Dreamer': { none: [0, 0.04], mid: [0, 0.04], best: [0.005, 0.06] }
+  },
+
+  // (d) Part I §2: no t2 world's authored XP reaches the t3 entry threshold
+  // (Lv 5 = 6,500 XP). Totals today are ~2,600-3,200.
+  worldsBelowXpBudget: [
+    'heroic-fantasy-t2',
+    'grimdark-survival-t2',
+    'arcane-renaissance-t2',
+    'eldritch-horror-t2'
+  ],
+
+  // (f) NEW finding by this lint: 'gemstone' is rewarded by two encounter templates
+  // (wildernessEncounters.js buried treasure, baseEncounters.js) but has no
+  // ITEM_CATALOG entry — players receive a nameless zero-value item. Fix: add a
+  // catalog entry or rename the drops to raw_gems / rare_gem, then drop this pin.
+  unknownRewardItems: ['gemstone'],
+
+  // (e) #47: leveling moves win rates by 0.0pp (no level term in the dice). While
+  // this pin stands, the guard asserts FLATNESS; when #47 ships a leveling-power
+  // mechanic, delete this flag and the guard flips to enforcing
+  // winRate(L+1) - winRate(L) >= EPSILON.
+  levelingPowerIsFlat: true
+};
+
+const EPSILON = 0.02; // 2pp — guard (e) improvement threshold
+const HEALTHY = {
+  mid: [0.30, 0.90],
+  best: [0.50, 1.0],
+  none: [0.10, 1.0],
+  maxKoRate: 0.25,
+  maxStalemateRate: 0.45
+};
+
+// ---------------------------------------------------------------------------------
+// Shared live-data derivations
+const playableTemplates = storyTemplates.filter((t) => !t.comingSoon);
+const maxReachableTier = Math.max(...playableTemplates.map((t) => t.tier || 1));
+
+const bossEntries = playableTemplates
+  .map((template) => ({
+    template,
+    milestone: (template.settings?.milestones || []).find((m) => m.encounter)
+  }))
+  .filter((e) => e.milestone);
+
+const intendedLevel = ({ template, milestone }) =>
+  milestone.minLevel || (template.levelRange ? template.levelRange[0] : 1);
+
+// --- site loot, as ACTUALLY rolled -------------------------------------------------
+// Measure what populateSite really hands out per site type by running the LIVE
+// populator over synthetic sites across many seeds (deterministic LCG inside).
+// This models coercion bugs and their fixes automatically (#49): if a pool is dead,
+// its items simply never show up here.
+const syntheticSite = (type) => {
+  const size = 8;
+  const mapData = Array.from({ length: size }, (_, y) =>
+    Array.from({ length: size }, (_, x) => ({ x, y, type: 'floor', walkable: true }))
+  );
+  const contentSlots = [
+    { x: 2, y: 2 }, { x: 5, y: 2 }, { x: 2, y: 5 },
+    { x: 5, y: 5 }, { x: 7, y: 7 }, { x: 4, y: 7 }
+  ];
+  contentSlots.forEach(({ x, y }) => { mapData[y][x].contentSlot = true; });
+  return { type, name: `sim-${type}`, mapData, contentSlots, entryPoint: { x: 0, y: 0 } };
+};
+
+const measureSiteItems = (type, seeds = 80) => {
+  const items = new Set();
+  for (let s = 1; s <= seeds; s++) {
+    const site = populateSite(syntheticSite(type), s * 131);
+    site.mapData.forEach((row) => row.forEach((tile) => {
+      if (tile.content?.kind === 'loot') {
+        (tile.content.loot?.items || []).forEach((i) => items.add(i));
+      }
+    }));
+  }
+  return items;
+};
+
+const siteTypes = Object.keys(LOOT);
+const measuredSiteItems = {}; // type -> Set of item keys actually rolled
+siteTypes.forEach((type) => { measuredSiteItems[type] = measureSiteItems(type); });
+const anySiteItem = new Set(siteTypes.flatMap((t) => [...measuredSiteItems[t]]));
+
+// --- encounter drops (tier-aware) ---------------------------------------------------
+const stripChance = (s) => String(s).split(':')[0];
+
+const randomEncounterDropKeys = new Set(
+  Object.values(encounterTemplates).flatMap((e) => (e.rewards?.items || []).map(stripChance))
+);
+
+// Authored boss-encounter drops still pass through the resolver's tier gate at their
+// template's tier (generateLoot -> filterDropsByTier).
+const bossDropKeys = new Set(
+  bossEntries.flatMap(({ template, milestone }) =>
+    (milestone.encounter.rewards?.items || [])
+      .map(stripChance)
+      .filter((key) => isItemAllowedForTier(key, { tier: template.tier }))
+  )
+);
+
+// Hand-authored milestone / side-quest rewards are explicit design (not tier-clamped).
+const authoredRewardKeys = new Set([
+  ...playableTemplates.flatMap((t) =>
+    (t.settings?.milestones || []).flatMap((m) => (m.rewards?.items || []).map(stripChance))
+  ),
+  ...SIDE_QUESTS.flatMap((q) => [
+    ...(q.rewards?.items || []).map(stripChance),
+    ...q.milestones.flatMap((m) => (m.rewards?.items || []).map(stripChance))
+  ])
+]);
+
+const shopKeys = new Set(Object.values(SHOP_STOCK).flat());
+
+/** All live sources of an item, at the reachable tiers. */
+const sourcesOf = (key) => {
+  const sources = [];
+  if (shopKeys.has(key)) sources.push('shop');
+  if (randomEncounterDropKeys.has(key) && isItemAllowedForTier(key, { tier: maxReachableTier })) {
+    sources.push('encounter-drop');
+  }
+  if (bossDropKeys.has(key)) sources.push('boss-drop');
+  if (anySiteItem.has(key)) sources.push('site-loot'); // granted ungated (Game.js grantSiteLoot)
+  if (authoredRewardKeys.has(key)) sources.push('authored-reward');
+  return sources;
+};
+
+// --- sims (computed once in beforeAll, asserted synchronously in the guards) -------
+const simCache = new Map(); // `${bossName}|L${level}|${loadout}` -> result
+const simKey = (name, level, loadout) => `${name}|L${level}|${loadout}`;
+
+const runSim = async (entry, level, loadout, seed = SEED) => {
+  const { template, milestone } = entry;
+  const hero = buildSimHero({ level, loadout, tier: template.tier });
+  return simulateEncounter(milestone.encounter, hero, {
+    trials: TRIALS,
+    seed,
+    settings: { tier: template.tier }
+  });
+};
+
+const xpAudits = new Map(); // templateId -> audit result
+
+beforeAll(async () => {
+  for (const entry of bossEntries) {
+    const level = intendedLevel(entry);
+    for (const loadout of ['none', 'mid', 'best']) {
+      simCache.set(
+        simKey(entry.milestone.encounter.name, level, loadout),
+        await runSim(entry, level, loadout)
+      );
+    }
+    // Guard (e): mid loadout at every level in the template's band (own seed so the
+    // per-level comparison shares an identical dice stream).
+    const [lo, hi] = entry.template.levelRange;
+    for (let L = lo; L <= hi; L++) {
+      simCache.set(
+        simKey(entry.milestone.encounter.name, L, 'mid-leveling'),
+        await runSim(entry, L, 'mid', LEVELING_SEED)
+      );
+    }
+  }
+  for (const template of playableTemplates) {
+    xpAudits.set(
+      template.id,
+      await auditWorldXpBudget(template, { sideQuests: SIDE_QUESTS, trials: TRIALS, seed: SEED })
+    );
+  }
+});
+
+// ===================================================================================
+describe('guard (a): every level band 1-7 has serving content', () => {
+  const MIN_QUESTS_PER_BAND = 3;
+
+  test.each([1, 2, 3, 4, 5, 6, 7])('level %i has a playable campaign (or is a pinned gap)', (level) => {
+    const covering = playableTemplates.filter(
+      (t) => t.levelRange && t.levelRange[0] <= level && level <= t.levelRange[1]
+    );
+    if (KNOWN_GAPS.bandsWithoutCampaigns.includes(level)) {
+      // PINNED (#45/#50): shipping a campaign for this band must update the pin.
+      expect(covering.length).toBe(0);
+    } else {
+      expect(covering.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  test.each([1, 2, 3, 4, 5, 6, 7])(`level %i has >= ${MIN_QUESTS_PER_BAND} side quests in reach`, (level) => {
+    const quests = SIDE_QUESTS.filter((q) => (q.minLevel || 1) <= level);
+    expect(quests.length).toBeGreaterThanOrEqual(MIN_QUESTS_PER_BAND);
+  });
+
+  test('party-size skew: quests offered to a 4-hero level-1 party (pinned, §13.3)', () => {
+    const party = Array.from({ length: 4 }, () => buildSimHero({ level: 1, loadout: 'none' }));
+    const effLevel = effectivePartyLevel(party);
+    expect(effLevel).toBe(3); // lead 1 + floor(4/2)
+    const offered = SIDE_QUESTS.filter((q) => (q.minLevel || 1) <= effLevel);
+    expect(offered.length).toBe(KNOWN_GAPS.questsOfferedToLevel1PartyOf4);
+  });
+});
+
+// ===================================================================================
+describe('guard (b): gear obtainability', () => {
+  const equippables = equippableCatalogEntries();
+
+  test('every equippable has a live source at a reachable tier (gaps pinned, #44)', () => {
+    const dead = equippables
+      .filter(([key]) => sourcesOf(key).length === 0)
+      .map(([key]) => key)
+      .sort();
+    // Exact pin: an item gaining a source (fix) or losing one (regression) both land here.
+    expect(dead).toEqual([...KNOWN_GAPS.unobtainableGear].sort());
+  });
+
+  test('every bonus rung that exists per slot is obtainable (gaps pinned, #44)', () => {
+    const gaps = { weapon: [], armor: [], accessory: [] };
+    const bySlot = { weapon: [], armor: [], accessory: [] };
+    for (const [key, def, slot] of equippables) {
+      const bonus = slot === 'accessory' ? (parseBonus(def.bonus) || 1) : parseBonus(def.bonus);
+      bySlot[slot].push({ key, bonus });
+    }
+    for (const slot of Object.keys(bySlot)) {
+      const rungs = [...new Set(bySlot[slot].map((i) => i.bonus))].sort((a, b) => a - b);
+      for (const rung of rungs) {
+        const obtainable = bySlot[slot].some(
+          (i) => i.bonus === rung && sourcesOf(i.key).length > 0
+        );
+        if (!obtainable) gaps[slot].push(rung);
+      }
+    }
+    expect(gaps).toEqual(KNOWN_GAPS.unobtainableSlotRungs);
+  });
+
+  test('describeItemSources never names a site type that does not actually roll the item (#49)', () => {
+    const mismatches = [];
+    for (const [key] of equippables) {
+      const staticTypes = siteTypes.filter(
+        (t) => (LOOT[t] || []).includes(key) || (HOARD_BONUS[t] || []).includes(key)
+      );
+      for (const type of staticTypes) {
+        if (!measuredSiteItems[type].has(key)) mismatches.push(`${key} @ ${type}`);
+      }
+    }
+    // #49 fixed the dead-pool coercion; any regression (a hinted pool going dead
+    // again) shows up here as a lie in the journal's derived hints.
+    expect(mismatches).toEqual([]);
+  });
+
+  test('sanity: the hint text derivation has sources for the gather-quest items', () => {
+    const gatherTargets = SIDE_QUESTS.flatMap((q) =>
+      q.milestones.filter((m) => m.trigger?.item && m.trigger?.count).map((m) => m.trigger.item)
+    );
+    for (const item of new Set(gatherTargets)) {
+      expect(describeItemSources(item)).not.toBe('');
+    }
+  });
+});
+
+// ===================================================================================
+describe('guard (c): every authored boss sims inside its win band', () => {
+  const inRange = (value, [lo, hi]) => value >= lo && value <= hi;
+
+  test('all 10 playable templates author exactly one boss encounter', () => {
+    expect(bossEntries.length).toBe(playableTemplates.length);
+  });
+
+  describe.each(bossEntries.map((e) => [e.milestone.encounter.name, e]))('%s', (name, entry) => {
+    const level = intendedLevel(entry);
+
+    test.each(['none', 'mid', 'best'])('win rate at intended level, %s loadout', (loadout) => {
+      const result = simCache.get(simKey(name, level, loadout));
+      expect(result).toBeDefined();
+      const pin = KNOWN_GAPS.bossBalance[name]?.[loadout];
+      if (pin) {
+        // PINNED: current (unhealthy) value. A rebalance OR a regression must
+        // update this pin (deadly-t2 decision / #44 gear rungs).
+        expect(inRange(result.winRate, pin)).toBe(true);
+      } else {
+        expect(inRange(result.winRate, HEALTHY[loadout])).toBe(true);
+      }
+    });
+
+    test('KO risk and stalemate stay inside band (mid loadout)', () => {
+      const result = simCache.get(simKey(name, level, 'mid'));
+      expect(result.koRate).toBeLessThanOrEqual(HEALTHY.maxKoRate);
+      expect(result.stalemateRate).toBeLessThanOrEqual(HEALTHY.maxStalemateRate);
+    });
+  });
+});
+
+// ===================================================================================
+describe('guard (d): world XP budget reaches the next tier entry', () => {
+  // Entry level of tier N+1 = the lowest levelRange floor authored for that tier
+  // (comingSoon templates count: they ARE the declared target).
+  const nextTierEntryXp = (tier) => {
+    const nextTier = storyTemplates.filter((t) => (t.tier || 1) === tier + 1);
+    if (nextTier.length === 0) return null;
+    const entryLevel = Math.min(...nextTier.map((t) => (t.levelRange ? t.levelRange[0] : 1)));
+    return { entryLevel, xp: XP_THRESHOLDS[entryLevel - 1] };
+  };
+
+  test.each(playableTemplates.map((t) => [t.id, t]))('%s', (id, template) => {
+    const target = nextTierEntryXp(template.tier || 1);
+    if (!target) return; // no authored sequel tier — nothing to reach
+    const audit = xpAudits.get(id);
+    expect(audit).toBeDefined();
+    if (KNOWN_GAPS.worldsBelowXpBudget.includes(id)) {
+      // PINNED (Part I §2 / #50): t2 worlds cannot pay their way to Lv 5. Content
+      // or XP changes that close the gap must remove the pin.
+      expect(audit.totalXp).toBeLessThan(target.xp);
+      expect(audit.totalXp).toBeGreaterThan(target.xp * 0.25); // regression floor
+    } else {
+      expect(audit.totalXp).toBeGreaterThanOrEqual(target.xp);
+    }
+  });
+});
+
+// ===================================================================================
+describe('guard (e): leveling improves boss outcomes above epsilon', () => {
+  test.each(bossEntries.map((e) => [e.milestone.encounter.name, e]))(
+    'leveling delta across the band: %s',
+    (name, entry) => {
+      const [lo, hi] = entry.template.levelRange;
+      const deltas = [];
+      for (let L = lo; L < hi; L++) {
+        const at = simCache.get(simKey(name, L, 'mid-leveling'));
+        const next = simCache.get(simKey(name, L + 1, 'mid-leveling'));
+        deltas.push(next.winRate - at.winRate);
+      }
+      expect(deltas.length).toBeGreaterThan(0);
+      if (KNOWN_GAPS.levelingPowerIsFlat) {
+        // PINNED (#47): there is no level term in the dice, so every delta is ~0.
+        // When a leveling-power mechanic ships, delete the pin — the else branch
+        // then enforces that leveling can never silently go flat again.
+        deltas.forEach((d) => expect(Math.abs(d)).toBeLessThan(EPSILON));
+      } else {
+        deltas.forEach((d) => expect(d).toBeGreaterThanOrEqual(EPSILON));
+      }
+    }
+  );
+});
+
+// ===================================================================================
+describe('guard (f): reward integrity', () => {
+  test('every rewards.items key across templates/quests/encounters exists in ITEM_CATALOG', () => {
+    const unknown = new Set();
+    const check = (key) => { if (!ITEM_CATALOG[stripChance(key)]) unknown.add(stripChance(key)); };
+
+    playableTemplates.forEach((t) =>
+      (t.settings?.milestones || []).forEach((m) => {
+        (m.rewards?.items || []).forEach(check);
+        (m.encounter?.rewards?.items || []).forEach(check);
+      })
+    );
+    SIDE_QUESTS.forEach((q) => {
+      (q.rewards?.items || []).forEach(check);
+      q.milestones.forEach((m) => (m.rewards?.items || []).forEach(check));
+    });
+    Object.values(encounterTemplates).forEach((e) => (e.rewards?.items || []).forEach(check));
+
+    // Exact pin: fixing a pinned key or introducing a new unknown key both land here.
+    expect([...unknown].sort()).toEqual([...KNOWN_GAPS.unknownRewardItems].sort());
+  });
+
+  test('every side-quest gather target actually drops somewhere', () => {
+    const gatherTargets = new Set(
+      SIDE_QUESTS.flatMap((q) =>
+        q.milestones.filter((m) => m.trigger?.item && m.trigger?.count).map((m) => m.trigger.item)
+      )
+    );
+    const dead = [...gatherTargets].filter(
+      (item) =>
+        !randomEncounterDropKeys.has(item) && !anySiteItem.has(item) && !shopKeys.has(item)
+    );
+    expect(dead).toEqual([]);
+  });
+
+  test('quest find-item icon borrows point at real catalog entries', () => {
+    Object.values(QUEST_ITEM_ICON_FROM).forEach((key) => {
+      expect(ITEM_CATALOG[key]).toBeDefined();
+    });
+  });
+});

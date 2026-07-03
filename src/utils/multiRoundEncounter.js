@@ -70,14 +70,18 @@ export const getRoundActions = (roundState) => {
 
 /**
  * Resolve a single round of combat
+ * @param {() => number} rng - optional 0..1 random source, forwarded to
+ *   resolveEncounter's loot/penalty rolls (defaults to Math.random — no behavior
+ *   change when omitted). Used by the balance-sim harness for seeded runs.
  */
-export const resolveRound = async (roundState, playerAction) => {
+export const resolveRound = async (roundState, playerAction, rng = Math.random) => {
   const result = await resolveEncounter(
     roundState.encounter,
     playerAction,
     roundState.character,
     roundState.settings,
-    roundState.llmConfig
+    roundState.llmConfig,
+    rng
   );
   
   // Update state based on outcome
