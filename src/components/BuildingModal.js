@@ -4,7 +4,7 @@ import { getReadyTurnIns, getAvailableQuestsAt, effectivePartyLevel } from '../g
 import { getShopStock } from '../data/shopStock';
 import { buyPrice, sellPrice, canAfford, isSellable } from '../game/shopController';
 import { ITEM_CATALOG, getRarityColor } from '../utils/inventorySystem';
-import { areRequirementsMet, isMilestoneItemClaimed } from '../game/milestoneEngine';
+import { areRequirementsMet, isQuestItemSearchable } from '../game/milestoneEngine';
 
 const getAbilityModifier = (score) => Math.floor(((score || 10) - 10) / 2);
 
@@ -499,9 +499,12 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                             </div>
                         )}
 
-                        {/* Quest Item Search Section — hidden once its milestone is complete
-                            (questItemId stays stamped in the cached town map forever). */}
-                        {building.questItemId && !itemFound && !isMilestoneItemClaimed(milestones, building.questItemId) && (
+                        {/* Quest Item Search Section — offered only while the stamp matches a
+                            CURRENT, uncompleted item milestone. questItemId stays stamped in the
+                            cached town map forever, and with in-save continuation a save outlives
+                            the campaign that stamped it: completed-milestone stamps AND stale
+                            previous-campaign stamps are both hidden (isQuestItemSearchable). */}
+                        {building.questItemId && !itemFound && isQuestItemSearchable(milestones, building.questItemId) && (
                             <div className="modal-section" style={{
                                 backgroundColor: 'rgba(0,0,0,0.03)',
                                 padding: '20px',

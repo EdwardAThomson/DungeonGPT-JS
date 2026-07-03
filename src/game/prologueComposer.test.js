@@ -1,78 +1,43 @@
-import { composePrologue, truncateSummaryText, SUMMARY_MAX_CHARS } from './prologueComposer';
+import { composeChapterPrologue } from './prologueComposer';
+import { specFromTemplate } from './campaignLauncher';
+import { storyTemplates } from '../data/storyTemplates';
 
-const baseArgs = () => ({
-  previousSummary: 'The party found the map fragment in Willowdale. They met Captain Ulric in Briarwood. They stormed the Goblin Hideout and slew the Goblin Chieftain.',
-  previousSettings: {
-    templateName: 'Heroic Fantasy — The Goblin Threat',
-    campaignGoal: 'End the goblin threat',
-  },
-  party: [
-    { heroName: 'Vanya', characterClass: 'Warrior', currentHP: 24, maxHP: 24 },
-    { heroName: 'Orin', characterClass: 'Mage', currentHP: 14, maxHP: 14 },
-  ],
-  spec: {
-    shortDescription: 'The kingdom of Eldoria calls for heroes.',
-    campaignGoal: 'Recover the Crown of Sunfire',
-    milestones: [{ text: 'Find the hidden map in the Great Archives at Oakhaven' }],
-  },
-  chapter: 2,
-});
+const t2Spec = () => specFromTemplate(storyTemplates.find((t) => t.id === 'heroic-fantasy-t2'));
 
-describe('composePrologue', () => {
-  it('is deterministic: same inputs produce byte-identical prose', () => {
-    expect(composePrologue(baseArgs())).toBe(composePrologue(baseArgs()));
+const party = [
+  { heroName: 'Vanya', characterName: 'Vanya', characterClass: 'Warrior', level: 3 },
+  { heroName: 'Orin', characterName: 'Orin', characterClass: 'Mage', level: 2 },
+];
+
+describe('composeChapterPrologue (in-save chapter divider)', () => {
+  it('opens with the chapter header including the campaign subtitle', () => {
+    const text = composeChapterPrologue({ spec: t2Spec(), chapter: 2, party });
+    expect(text.startsWith('**Chapter 2: Crown of Sunfire**')).toBe(true);
   });
 
-  it('carries the distilled previous story, the party and the new campaign intro', () => {
-    const text = composePrologue(baseArgs());
+  it('carries the new campaign opening: description, goal and first steps', () => {
+    const spec = t2Spec();
+    const text = composeChapterPrologue({ spec, chapter: 2, party });
+    expect(text).toContain(spec.shortDescription);
+    expect(text).toContain(`**Goal:** ${spec.campaignGoal}`);
+    expect(text).toContain(`**First steps:** ${spec.milestones[0].text}`);
+  });
+
+  it('has NO "story so far" recap: the ongoing journal IS the story', () => {
+    const text = composeChapterPrologue({ spec: t2Spec(), chapter: 2, party });
+    expect(text).not.toMatch(/story so far/i);
+  });
+
+  it('is deterministic: same inputs, byte-identical prose', () => {
+    const a = composeChapterPrologue({ spec: t2Spec(), chapter: 3, party });
+    const b = composeChapterPrologue({ spec: t2Spec(), chapter: 3, party });
+    expect(a).toBe(b);
+    expect(a).toContain('**Chapter 3');
+  });
+
+  it('degrades gracefully with minimal inputs', () => {
+    const text = composeChapterPrologue({});
     expect(text).toContain('**Chapter 2**');
-    expect(text).toContain('**The story so far:**');
-    expect(text).toContain('Goblin Chieftain');
-    expect(text).toContain('Vanya (Warrior)');
-    expect(text).toContain('*Heroic Fantasy — The Goblin Threat*');
-    expect(text).toContain('The kingdom of Eldoria calls for heroes.');
-    expect(text).toContain('**Goal:** Recover the Crown of Sunfire');
-    expect(text).toContain('**First steps:** Find the hidden map');
-  });
-
-  it('omits the story-so-far line when the old save has no summary', () => {
-    const text = composePrologue({ ...baseArgs(), previousSummary: '' });
-    expect(text).not.toContain('The story so far');
-    expect(text).toContain('**Chapter 2**');
-  });
-
-  it('tolerates missing everything (old/partial saves)', () => {
-    const text = composePrologue({});
-    expect(typeof text).toBe('string');
-    expect(text).toContain('**Chapter 2**');
-    expect(text).toContain('their last adventure');
-  });
-
-  it('never leaks prompt markers', () => {
-    const text = composePrologue(baseArgs());
-    expect(text).not.toMatch(/\[TASK\]|\[STRICT|COMPLETE_MILESTONE|COMPLETE_CAMPAIGN/);
-  });
-});
-
-describe('truncateSummaryText', () => {
-  it('returns short summaries unchanged (whitespace collapsed)', () => {
-    expect(truncateSummaryText('A short  tale.\nIndeed.')).toBe('A short tale. Indeed.');
-  });
-
-  it('truncates long summaries at a sentence boundary within the budget', () => {
-    const sentence = 'The heroes marched onward through the vale. ';
-    const long = sentence.repeat(40); // ~1800 chars
-    const out = truncateSummaryText(long);
-    expect(out.length).toBeLessThanOrEqual(SUMMARY_MAX_CHARS);
-    expect(out.endsWith('.')).toBe(true);
-    // deterministic
-    expect(truncateSummaryText(long)).toBe(out);
-  });
-
-  it('falls back to a word boundary with an ellipsis for one giant sentence', () => {
-    const long = `The heroes ${'walked and '.repeat(200)}rested`;
-    const out = truncateSummaryText(long);
-    expect(out.length).toBeLessThanOrEqual(SUMMARY_MAX_CHARS + 1);
-    expect(out.endsWith('…')).toBe(true);
+    expect(text).toContain('The party');
   });
 });

@@ -1,4 +1,4 @@
-// Tests for the extracted campaign-start pipeline (quest chaining Phase 1).
+// Tests for the extracted NEW-GAME campaign-start pipeline.
 // The parity suite replicates the ORIGINAL NewGame.handleSubmit pipeline inline and
 // asserts launchCampaign produces byte-identical results for the same seed, so the
 // refactor cannot silently change what New Game generates.
@@ -8,7 +8,6 @@ import {
   specFromTemplate,
   mergeLocationNames,
   resolveMilestoneCoords,
-  carryParty,
   mintGameSessionId,
 } from './campaignLauncher';
 import { storyTemplates } from '../data/storyTemplates';
@@ -139,7 +138,7 @@ describe('launchCampaign parity with the NewGame pipeline', () => {
     expect(a.settings).toEqual(b.settings);
   });
 
-  it('mints distinct game session ids per launch (fresh RAG index per chapter)', () => {
+  it('mints distinct game session ids per launch', () => {
     const a = mintGameSessionId();
     const b = mintGameSessionId();
     expect(a).toMatch(/^game-\d+-/);
@@ -170,109 +169,13 @@ describe('premium backstop', () => {
   });
 });
 
-describe('carryParty invariants (party carries everything, healed)', () => {
-  const sourceParty = () => ([
-    {
-      heroId: 'h1',
-      heroName: 'Vanya',
-      characterClass: 'Warrior',
-      level: 3,
-      xp: 350,
-      gold: 77,
-      maxHP: 24,
-      currentHP: 3,
-      isDefeated: false,
-      stats: { Strength: 14, Constitution: 12 },
-      inventory: [{ key: 'sword', name: 'Sword', quantity: 1 }, { key: 'potion', name: 'Potion', quantity: 2 }],
-      equipment: { weapon: { key: 'sword', name: 'Sword' } },
-    },
-    {
-      heroId: 'h2',
-      heroName: 'Orin',
-      characterClass: 'Mage',
-      level: 2,
-      xp: 180,
-      gold: 12,
-      maxHP: 14,
-      currentHP: 0,
-      isDefeated: true,
-      stats: { Intelligence: 16, Constitution: 10 },
-      inventory: [],
-      equipment: {},
-    },
-  ]);
-
-  it('heals everyone to full and clears defeat', () => {
-    const carried = carryParty(sourceParty());
-    expect(carried).toHaveLength(2);
-    carried.forEach((hero) => {
-      expect(hero.currentHP).toBe(hero.maxHP);
-      expect(hero.maxHP).toBeGreaterThan(0);
-      expect(hero.isDefeated).toBe(false);
-    });
-  });
-
-  it('conserves XP, level, gold, inventory and equipment exactly', () => {
-    const source = sourceParty();
-    const carried = carryParty(source);
-    carried.forEach((hero, i) => {
-      expect(hero.xp).toBe(source[i].xp);
-      expect(hero.level).toBe(source[i].level);
-      expect(hero.gold).toBe(source[i].gold);
-      expect(hero.inventory).toEqual(source[i].inventory);
-      expect(hero.equipment).toEqual(source[i].equipment);
-    });
-  });
-
-  it('shares no object references with the source save and never mutates it', () => {
-    const source = sourceParty();
-    const snapshot = JSON.parse(JSON.stringify(source));
-    const carried = carryParty(source);
-
-    expect(carried[0]).not.toBe(source[0]);
-    expect(carried[0].inventory).not.toBe(source[0].inventory);
-    expect(carried[0].equipment).not.toBe(source[0].equipment);
-
-    // mutating the copy leaves the source untouched
-    carried[0].inventory.push({ key: 'loot', quantity: 1 });
-    carried[0].gold = 9999;
-    expect(source).toEqual(snapshot);
-
-    // the source's wounded/defeated state was not healed in place
-    expect(source[0].currentHP).toBe(3);
-    expect(source[1].isDefeated).toBe(true);
-  });
-
-  it('computes maxHP for heroes missing it (schema backfill)', () => {
-    const carried = carryParty([{ heroId: 'h3', heroName: 'New', characterClass: 'Rogue', level: 2 }]);
-    expect(carried[0].maxHP).toBeGreaterThan(0);
-    expect(carried[0].currentHP).toBe(carried[0].maxHP);
-  });
-});
-
-describe('chain fields (additive settings)', () => {
-  const template = () => storyTemplates.find((t) => t.id === 'heroic-fantasy-t2');
-
-  it('stamps chain, completedCampaigns and saveName when chaining', () => {
-    const launch = launchCampaign(specFromTemplate(template()), {
-      seed: SEED,
-      chainFrom: {
-        parentSaveId: 'game-123-abc',
-        chapter: 2,
-        completedCampaigns: ['heroic-fantasy-t1'],
-        saveName: 'Adventure — Chapter 2',
-      },
-    });
-    expect(launch.settings.chain).toEqual({ parentSaveId: 'game-123-abc', chapter: 2 });
-    expect(launch.settings.completedCampaigns).toEqual(['heroic-fantasy-t1']);
-    expect(launch.settings.saveName).toBe('Adventure — Chapter 2');
-  });
-
-  it('adds NO chain fields on a plain new game (back-compat)', () => {
-    const launch = launchCampaign(specFromTemplate(template()), { seed: SEED });
+describe('back-compat: a plain new game carries no chain fields', () => {
+  it('adds no chain/completedCampaigns/saveName to fresh settings', () => {
+    const template = storyTemplates.find((t) => t.id === 'heroic-fantasy-t2');
+    const launch = launchCampaign(specFromTemplate(template), { seed: SEED });
     expect(launch.settings.chain).toBeUndefined();
     expect(launch.settings.completedCampaigns).toBeUndefined();
+    expect(launch.settings.currentChapter).toBeUndefined();
     expect(launch.settings.saveName).toBeUndefined();
-    expect(launch.party).toBeNull();
   });
 });

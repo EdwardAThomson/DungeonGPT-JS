@@ -170,6 +170,74 @@ export const isMilestoneItemClaimed = (milestones, itemId) => {
 };
 
 /**
+ * Should a building's quest-item search affordance render for this stamped item id?
+ *
+ * Buildings keep their `questItemId` stamped in the cached town map forever, and
+ * with in-save continuation a save can outlive the campaign that stamped it. The
+ * search is offered ONLY while the stamp matches an item milestone in the CURRENT
+ * campaign that is not yet completed:
+ *   - matches a current, uncompleted item milestone -> searchable
+ *   - matches a current, completed milestone        -> claimed, hidden
+ *   - matches nothing current (a completed previous campaign's stamp) -> stale
+ *     history, hidden; never resurface "Search for the Goblin Scout's Map" in
+ *     Chapter 2.
+ *
+ * @param {Array} milestones - CURRENT campaign milestones (settings.milestones)
+ * @param {string} itemId - the building's stamped questItemId
+ * @returns {boolean}
+ */
+export const isQuestItemSearchable = (milestones, itemId) => {
+    if (!Array.isArray(milestones) || !itemId) return false;
+    return milestones.some(m =>
+        !m.completed &&
+        (m.trigger?.item === itemId || (m.spawn?.type === 'item' && m.spawn?.id === itemId))
+    );
+};
+
+/**
+ * Which milestone POIs should the world map show?
+ *
+ * Two rules:
+ *  1. CURRENT campaign POIs stay hidden until their milestone's prerequisites are
+ *     met (the classic reveal: you find the hideout only after tracking it).
+ *  2. POIs stamped on the map that the CURRENT milestones do not reference are
+ *     history from a completed previous campaign (in-save continuation): they are
+ *     permanently visible landmarks in a persistent world and must never vanish.
+ *
+ * Returns null when nothing needs filtering (no current POI milestones and no
+ * stamped history); callers treat null as "show everything".
+ *
+ * @param {Array} milestones - CURRENT campaign milestones
+ * @param {Array} worldMap - the live world map (for stamped-history detection)
+ * @returns {Set<string>|null} visible poi ids, or null for no filtering
+ */
+export const computeVisibleMilestonePois = (milestones, worldMap) => {
+    const ms = Array.isArray(milestones) ? milestones : [];
+    const currentPoiMilestones = ms.filter(m => m.spawn?.type === 'poi');
+    if (currentPoiMilestones.length === 0) return null; // nothing to gate: show all
+
+    const visible = new Set();
+    for (const m of currentPoiMilestones) {
+        if (m.completed || areRequirementsMet(m, ms)) visible.add(m.spawn.id);
+    }
+
+    // Preserve history: any milestone POI already stamped on the map whose id the
+    // current campaign doesn't reference belongs to a completed prior chapter.
+    const referenced = new Set(currentPoiMilestones.map(m => m.spawn.id));
+    if (Array.isArray(worldMap)) {
+        for (const row of worldMap) {
+            for (const tile of row || []) {
+                if (tile?.milestonePoi && tile.poi && !referenced.has(tile.poi)) {
+                    visible.add(tile.poi);
+                }
+            }
+        }
+    }
+
+    return visible;
+};
+
+/**
  * Find the milestone item gatherable on a world tile, if any.
  *
  * Covers item milestones authored at WILDERNESS locations (building: null) — e.g.

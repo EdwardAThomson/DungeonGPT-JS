@@ -6,12 +6,9 @@ import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { useAuth } from '../contexts/AuthContext';
 import { hasHadAccount } from '../services/accountFlag';
-import { isEligibleForChaining, startChainedCampaign } from '../game/campaignChain';
 
 // Lazy load the details modal for better performance
 const SavedGameDetailsModal = lazy(() => import('../components/SavedGameDetailsModal'));
-// Quest chaining Phase 1: "Continue your legend" picker for completed saves
-const ContinueLegendPicker = lazy(() => import('../components/ContinueLegendPicker'));
 
 const logger = createLogger('saved-conversations');
 
@@ -24,11 +21,6 @@ const SavedConversations = () => {
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
-  // Quest chaining: which completed save the "Continue your legend" picker is open
-  // for ({ conversation, settings, heroes } or null), plus launch status.
-  const [legendSource, setLegendSource] = useState(null);
-  const [legendLaunching, setLegendLaunching] = useState(false);
-  const [legendError, setLegendError] = useState(null);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -116,50 +108,6 @@ const SavedConversations = () => {
       });
     } catch (err) {
       setError(err.message);
-    }
-  };
-
-  // Launch the next chapter from a completed save (retroactive: works for saves
-  // finished before chaining existed). Fetches the FULL row first because the list
-  // endpoint may omit the summary; the picker itself only needed settings + heroes.
-  const handleContinueLegend = async (template) => {
-    if (!legendSource || legendLaunching) return;
-    setLegendLaunching(true);
-    setLegendError(null);
-    try {
-      const sessionId = legendSource.conversation.sessionId;
-      const full = await conversationsApi.getById(sessionId);
-      const src = full || legendSource.conversation;
-      let srcSettings = src.game_settings;
-      if (typeof srcSettings === 'string') {
-        try { srcSettings = JSON.parse(srcSettings); } catch (e) { srcSettings = legendSource.settings; }
-      }
-      let srcHeroes = src.selected_heroes;
-      if (typeof srcHeroes === 'string') {
-        try { srcHeroes = JSON.parse(srcHeroes); } catch (e) { srcHeroes = legendSource.heroes; }
-      }
-      const row = await startChainedCampaign({
-        template,
-        parent: {
-          sessionId,
-          settings: srcSettings || legendSource.settings || {},
-          heroes: srcHeroes || legendSource.heroes || [],
-          summary: src.summary || '',
-          conversationName: src.conversation_name || null
-        },
-        provider: src.provider || null,
-        model: src.model || null
-      });
-      navigate('/game', {
-        state: {
-          loadedConversation: row,
-          selectedHeroes: row.selected_heroes || []
-        }
-      });
-    } catch (err) {
-      logger.error('Failed to start next chapter', err);
-      setLegendError(err?.message || 'Failed to start the next chapter. Please try again.');
-      setLegendLaunching(false);
     }
   };
 
@@ -303,23 +251,24 @@ const SavedConversations = () => {
                         {conversation.conversation_name || 'Untitled Adventure'}
                       </h3>
                     )}
-                    {/* Quest-chaining badges: chapter link, completion, continued marker.
-                        All additive settings fields; old saves without them render nothing. */}
-                    {(settings?.chain?.chapter || settings?.campaignComplete || settings?.continuedInSessionId) && (
+                    {/* Quest-chaining badges (all additive settings fields; old saves
+                        without them render nothing). currentChapter is the in-save chain
+                        record; chain.chapter tolerates saves made by the retired
+                        linked-save build. A completed save continues IN the save: load
+                        it and use the Journal's "Continue your legend". */}
+                    {((settings?.currentChapter || settings?.chain?.chapter) > 1 || settings?.campaignComplete) && (
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '0 0 8px 0' }}>
-                        {settings?.chain?.chapter && (
+                        {(settings?.currentChapter || settings?.chain?.chapter) > 1 && (
                           <span style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 'bold', background: 'var(--primary-tint-10, rgba(100,100,255,0.15))', color: 'var(--primary)', border: '1px solid var(--primary)' }}>
-                            📖 Chapter {settings.chain.chapter}
+                            📖 Chapter {settings?.currentChapter || settings?.chain?.chapter}
                           </span>
                         )}
                         {settings?.campaignComplete && (
-                          <span style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 'bold', background: 'var(--success-tint-20, rgba(80,180,80,0.2))', color: 'var(--state-success, #4caf50)', border: '1px solid var(--state-success, #4caf50)' }}>
-                            🏆 Campaign complete
-                          </span>
-                        )}
-                        {settings?.continuedInSessionId && (
-                          <span style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 'bold', color: 'var(--text-secondary)', border: '1px solid var(--border)' }}>
-                            ➡️ Continued in a new chapter
+                          <span
+                            title="Load this game and open the Journal to continue your legend in the same world"
+                            style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 'bold', background: 'var(--success-tint-20, rgba(80,180,80,0.2))', color: 'var(--state-success, #4caf50)', border: '1px solid var(--state-success, #4caf50)' }}
+                          >
+                            🏆 Campaign complete: load to continue your legend
                           </span>
                         )}
                       </div>
@@ -347,19 +296,6 @@ const SavedConversations = () => {
                   >
                     Load Game
                   </button>
-                  {isEligibleForChaining(settings) && (
-                    <button
-                      onClick={() => {
-                        setLegendError(null);
-                        setLegendSource({ conversation, settings, heroes });
-                      }}
-                      className="primary-button"
-                      title="Take this party into the next campaign (a new linked save)"
-                      style={{ padding: '10px 20px', fontSize: '0.9rem' }}
-                    >
-                      ⚔️ Continue your legend
-                    </button>
-                  )}
                   <button
                     onClick={() => {
                       setSelectedConversation(conversation);
@@ -384,23 +320,6 @@ const SavedConversations = () => {
             );
           })}
         </div>
-      )}
-
-      {legendSource && (
-        <Suspense fallback={<div style={{ textAlign: 'center', padding: '20px' }}>Loading...</div>}>
-          <ContinueLegendPicker
-            isOpen={!!legendSource}
-            onClose={() => {
-              setLegendSource(null);
-              setLegendError(null);
-            }}
-            settings={legendSource.settings}
-            party={legendSource.heroes}
-            onPick={handleContinueLegend}
-            launching={legendLaunching}
-            error={legendError}
-          />
-        </Suspense>
       )}
 
       <Suspense fallback={<div style={{ textAlign: 'center', padding: '20px' }}>Loading details...</div>}>

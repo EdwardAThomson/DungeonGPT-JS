@@ -538,6 +538,10 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         currentTownTile,
         isInsideTown,
         townMapsCache,
+        // Exposed for in-save campaign continuation ONLY: retro-injection replaces
+        // the cache with a copy-on-write clone (targeted additive mutation, never a
+        // regeneration). Do not use this to regenerate or rebuild cached towns.
+        setTownMapsCache,
         isMapModalOpen,
         setIsMapModalOpen,
         townError,

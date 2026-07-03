@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import HeroContext from "../contexts/HeroContext";
 import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -103,6 +103,18 @@ const NewGame = () => {
     setCustomNames(template.customNames || { towns: [], mountains: [] });
     setWorldTheme(template.settings.theme || 'grassland');
   };
+
+  // Preselect a template when handed one via navigation state (the "Continue your
+  // legend" picker's "Start as a New Game" path for geography-incompatible
+  // campaigns). One-shot on mount; the player can still change their pick.
+  const { state: navState } = useLocation();
+  useEffect(() => {
+    const preselectId = navState?.preselectTemplateId;
+    if (!preselectId) return;
+    const template = storyTemplates.find((t) => t.id === preselectId && !t.comingSoon);
+    if (template) applyTemplate(template);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAiGenerateStory = async () => {
     setIsAiGenerating(true);

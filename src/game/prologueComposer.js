@@ -1,65 +1,37 @@
 // prologueComposer.js
-// Deterministic local prologue for chained campaigns ("Continue your legend").
-// Distills the previous save's rolling summary + the new campaign's intro into the
-// opening message of the new chapter's conversation. Sibling of introComposer.js
-// and localNarrator.js, and follows their conventions:
+// Deterministic chapter-divider prologue for in-save campaign continuation
+// ("Continue your legend"). The next campaign begins INSIDE the same save — same
+// world, same journal — so no "story so far" recap is needed: the journal above
+// this message IS the story. This just marks the chapter break and opens the new
+// campaign. Sibling of introComposer.js and localNarrator.js, and follows their
+// conventions:
 //   - Markdown uses *italics* and **bold** only (SafeMarkdownMessage supports `*`).
 //   - Fully deterministic: same inputs, byte-identical prose. No Math.random(),
-//     no Date.now(), no AI call. Signed-in players get AI narration organically on
-//     their first action; guests keep this as their opening text.
+//     no Date.now(), no AI call.
 
 import { formatPartyInfo } from './promptComposer';
 
-export const SUMMARY_MAX_CHARS = 600;
-
-// Truncate a rolling summary sensibly: collapse whitespace, then cut at the last
-// sentence boundary inside the budget (falling back to a word boundary + ellipsis
-// when the text is one giant sentence).
-export const truncateSummaryText = (text, maxChars = SUMMARY_MAX_CHARS) => {
-  const clean = (text || '').replace(/\s+/g, ' ').trim();
-  if (clean.length <= maxChars) return clean;
-  const slice = clean.slice(0, maxChars);
-  const lastSentenceEnd = Math.max(
-    slice.lastIndexOf('. '),
-    slice.lastIndexOf('! '),
-    slice.lastIndexOf('? ')
-  );
-  if (lastSentenceEnd > maxChars * 0.4) return slice.slice(0, lastSentenceEnd + 1);
-  const lastSpace = slice.lastIndexOf(' ');
-  return `${slice.slice(0, lastSpace > 0 ? lastSpace : maxChars).trimEnd()}…`;
-};
-
 /**
- * Compose the Chapter-n prologue for a chained save.
+ * Compose the Chapter-n divider appended to the ONGOING conversation when the
+ * player continues the next campaign in the same save.
  *
  * @param {object} args
- * @param {string} [args.previousSummary] - the completed save's rolling summary
- * @param {object} [args.previousSettings] - the completed save's game_settings
- * @param {Array}  [args.party] - the carried party (already healed copies)
  * @param {object} [args.spec] - the NEW campaign's launch spec (specFromTemplate)
- * @param {number} [args.chapter] - chapter number of the NEW save (2, 3, ...)
+ * @param {number} [args.chapter] - chapter number of the new campaign (2, 3, ...)
+ * @param {Array}  [args.party] - the party (already healed)
  * @returns {string} deterministic markdown prologue
  */
-export const composePrologue = ({
-  previousSummary = '',
-  previousSettings = {},
-  party = [],
-  spec = {},
-  chapter = 2,
-} = {}) => {
+export const composeChapterPrologue = ({ spec = {}, chapter = 2, party = [] } = {}) => {
   const partyLine = formatPartyInfo(party) || 'The party';
-  const prevName = previousSettings?.templateName
-    || previousSettings?.campaignGoal
-    || 'their last adventure';
+  // "Heroic Fantasy — Crown of Sunfire" -> "Crown of Sunfire" for the header.
+  const label = spec.templateName || '';
+  const title = label.includes('—') ? label.split('—').pop().trim() : label;
 
   const lines = [];
-  lines.push(`**Chapter ${chapter}**`);
-
-  const distilled = truncateSummaryText(previousSummary);
-  if (distilled) lines.push(`**The story so far:** ${distilled}`);
+  lines.push(`**Chapter ${chapter}${title ? `: ${title}` : ''}**`);
 
   lines.push(
-    `With the deeds of *${prevName}* behind them, ${partyLine} rest, resupply, and set out for new lands, their legend travelling ahead of them.`
+    `Their last deeds done, ${partyLine} rest, resupply, and take to familiar roads once more; new trouble stirs in these same lands.`
   );
 
   if (spec.shortDescription) lines.push(spec.shortDescription);

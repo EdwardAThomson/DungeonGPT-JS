@@ -310,7 +310,7 @@ export const StorySettingsModalContent = ({
                   {(settings.templateName || settings.campaignGoal) && (
                     <div style={{ margin: '0 0 16px 0', padding: '14px 16px', background: 'var(--primary-tint-10)', border: '1px solid var(--primary)', borderRadius: '8px', textAlign: 'center' }}>
                       <p style={{ margin: '0 0 6px 0', fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>
-                        Quest{settings.chain?.chapter ? ` · Chapter ${settings.chain.chapter}` : ''}
+                        Quest{(settings.currentChapter || settings.chain?.chapter) > 1 ? ` · Chapter ${settings.currentChapter || settings.chain.chapter}` : ''}
                       </p>
                       {settings.templateName && (
                         <p style={{ margin: '0 0 8px 0', color: 'var(--primary)', fontWeight: '700', fontSize: '1.3rem', fontFamily: 'var(--header-font)', lineHeight: '1.3' }}>{settings.templateName}</p>
@@ -324,9 +324,9 @@ export const StorySettingsModalContent = ({
                     <div style={{ margin: '0 0 18px 0', padding: '12px', background: 'var(--success-tint-20)', borderLeft: '4px solid var(--state-success)', borderRadius: '6px', textAlign: 'center' }}>
                       <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--state-success)' }}>🏆 CAMPAIGN COMPLETE 🏆</div>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Victory Achieved!</div>
-                      {/* Quest chaining Phase 1: retroactive CTA. Any completed save
-                          (including ones finished before chaining existed) can start
-                          the next chapter with the same party. */}
+                      {/* Quest chaining: retroactive CTA. Any completed save (including
+                          ones finished before chaining existed) can continue the next
+                          campaign IN THIS SAVE, same world and journal. */}
                       {onContinueLegend && (
                         <button
                           onClick={onContinueLegend}

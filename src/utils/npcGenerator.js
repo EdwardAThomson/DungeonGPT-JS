@@ -967,4 +967,80 @@ export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
     return npcs;
 };
 
+/**
+ * Add ONE milestone-authored NPC to an ALREADY-POPULATED town map (in-save
+ * continuation retro-injection). Standalone sibling of populateTown's internal
+ * addAuthoredNPC: same authored-identity forcing, but it targets an existing
+ * roster instead of building one.
+ *
+ * Building match is by authored name first (injectQuestBuildings renames the quest
+ * building, so the name is the reliable key), then by type. If that building
+ * already houses an NPC from a PRIOR campaign (any npc carrying a milestoneNpcId),
+ * the new authored NPC REPLACES it at the same post (same person, next chapter;
+ * prevents duplicate quest-givers in shared venues); otherwise it is added
+ * alongside the procedural staff.
+ *
+ * Mutates townMapData.npcs (callers pass a clone; see retroInjectQuestContent).
+ *
+ * @param {Object} townMapData - cached town map (with .mapData and .npcs)
+ * @param {Object} spec - authored NPC spec from getMilestoneNpcsForTown
+ * @param {number} seed - deterministic generation seed
+ * @returns {Object|null} the placed NPC, or null if no matching building exists
+ */
+export const addAuthoredNpcToTown = (townMapData, spec, seed) => {
+    if (!townMapData?.mapData || !spec) return null;
+
+    // Locate the target building tile: authored name first, then type.
+    let target = null;
+    const wantName = spec.building?.name ? spec.building.name.toLowerCase() : null;
+    const wantType = spec.building?.type || null;
+    for (const match of ['name', 'type']) {
+        for (let y = 0; y < townMapData.mapData.length && !target; y++) {
+            for (let x = 0; x < townMapData.mapData[y].length && !target; x++) {
+                const tile = townMapData.mapData[y][x];
+                if (tile.type !== 'building') continue;
+                if (match === 'name' && wantName && (tile.buildingName || '').toLowerCase() === wantName) {
+                    target = { x, y, tile };
+                } else if (match === 'type' && wantType && tile.buildingType === wantType) {
+                    target = { x, y, tile };
+                }
+            }
+        }
+        if (target) break;
+    }
+    if (!target) return null;
+
+    const role = ROLES[spec.role] ? spec.role : 'Guard';
+    const npc = generateNPC({ seed, role, noEvil: true });
+    npc.name = spec.name;
+    if (spec.gender) npc.gender = spec.gender;
+    if (spec.name.includes(' ')) npc.title = spec.name.split(' ')[0];
+    if (spec.personality) npc.personality = spec.personality;
+    npc.milestoneNpcId = spec.id;
+    npc.milestoneId = spec.milestoneId;
+    const buildingLabel = target.tile.buildingName || target.tile.buildingType;
+    npc.job = `${npc.title || spec.role} at ${buildingLabel}`;
+    npc.location = {
+        x: target.x,
+        y: target.y,
+        buildingName: buildingLabel,
+        buildingType: target.tile.buildingType,
+        homeCoords: { x: target.x, y: target.y }
+    };
+
+    const roster = townMapData.npcs || [];
+    // Prior campaign's authored NPC at this same building? Replace in place.
+    const priorIdx = roster.findIndex((n) =>
+        n.milestoneNpcId && n.milestoneNpcId !== spec.id &&
+        n.location && n.location.x === target.x && n.location.y === target.y
+    );
+    if (priorIdx >= 0) {
+        roster[priorIdx] = npc;
+    } else {
+        roster.push(npc);
+    }
+    townMapData.npcs = roster;
+    return npc;
+};
+
 export default generateNPC;

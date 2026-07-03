@@ -140,6 +140,50 @@ describe('storyTemplates — structural integrity', () => {
     expect(m2.spawn.id).toBe('militia_captain');
   });
 
+  // Same-world sequel invariants (QUEST_CHAINING_PLAN): heroic-fantasy-t2 is
+  // re-authored onto t1's geography so a completed t1 save can continue it
+  // in-save. If either template's geography drifts, in-save continuation of the
+  // flagship chain silently breaks, so lock it down here.
+  describe('heroic-fantasy-t2 is a same-world sequel to t1', () => {
+    const hf1 = storyTemplates.find((x) => x.id === 'heroic-fantasy-t1');
+    const hf2 = storyTemplates.find((x) => x.id === 'heroic-fantasy-t2');
+    const nameOf = (e) => (typeof e === 'string' ? e : e.name);
+
+    it('reuses t1 customNames exactly (towns, sizes and mountains)', () => {
+      expect(hf2.customNames).toEqual(hf1.customNames);
+    });
+
+    it('authors every milestone at a location that exists in the shared geography', () => {
+      const known = [
+        ...hf1.customNames.towns.map(nameOf),
+        ...hf1.customNames.mountains,
+      ];
+      hf2.settings.milestones.forEach((m) => {
+        expect(known).toContain(m.location);
+        if (m.spawn?.location) expect(known).toContain(m.spawn.location);
+        if (m.building?.location) expect(known).toContain(m.building.location);
+      });
+    });
+
+    it('avoids t1 quest venues so cached-town retro-injection never collides', () => {
+      const t1Venues = hf1.settings.milestones
+        .filter((m) => m.building)
+        .map((m) => `${m.building.location}:${m.building.type}`);
+      hf2.settings.milestones
+        .filter((m) => m.building)
+        .forEach((m) => {
+          expect(t1Venues).not.toContain(`${m.building.location}:${m.building.type}`);
+        });
+    });
+
+    it('carries no remnants of the retired Eldoria geography anywhere in its text', () => {
+      const blob = JSON.stringify(hf2);
+      ['Eldoria', 'Oakhaven', 'Silverton', 'Cinder Mountains', 'Silver Guard'].forEach((old) => {
+        expect(blob).not.toContain(old);
+      });
+    });
+  });
+
   it('every combat milestone carries a well-formed inline encounter', () => {
     playable.forEach((t) => {
       (t.settings?.milestones || [])

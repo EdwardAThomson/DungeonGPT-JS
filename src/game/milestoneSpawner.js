@@ -2,9 +2,16 @@
 // Places milestone-required entities onto the world map and prepares
 // building requirements for lazy town generation.
 //
-// Called after generateMapData() in NewGame.js, before resolveMilestoneCoords().
+// Two consumers:
+//  - campaignLauncher (new game): spawnWorldMapEntities mutates the freshly
+//    generated map before it is ever persisted.
+//  - campaignChain (in-save continuation): spawnCampaignIntoWorld /
+//    retroInjectQuestContent stamp the NEXT campaign's content ADDITIVELY onto the
+//    live world map and the cached town maps (copy-on-write: the caller's
+//    originals are never mutated; nothing existing is removed or regenerated).
 
-import { getSpawnRequirements } from './milestoneEngine';
+import { getSpawnRequirements, getMilestoneNpcsForTown } from './milestoneEngine';
+import { addAuthoredNpcToTown } from '../utils/npcGenerator';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('milestone-spawner');
@@ -13,7 +20,7 @@ const logger = createLogger('milestone-spawner');
  * Find a map tile matching a location name (town or mountain).
  * Returns { x, y } or null.
  */
-const findLocationOnMap = (mapData, locationName) => {
+export const findLocationOnMap = (mapData, locationName) => {
     if (!locationName || !mapData) return null;
     const target = locationName.toLowerCase();
 
@@ -269,4 +276,82 @@ export const injectQuestBuildings = (townMapData, requiredBuildings) => {
     }
 
     return townMapData;
+};
+
+// --- In-save continuation (same-world sequels) --------------------------------
+
+/**
+ * Spawn the NEXT campaign's entities onto an EXISTING world map, copy-on-write.
+ *
+ * The live map is deep-copied and spawnWorldMapEntities runs against the copy, so
+ * the caller can hand the result to setWorldMap while the original state object
+ * stays untouched (React state discipline + the never-mutate-a-loaded-map rule).
+ * Everything already on the map survives; occupied target tiles fall back to the
+ * existing adjacent-placement logic and misses are logged, never fatal.
+ *
+ * @param {Array} worldMap - the live (persisted) world map
+ * @param {Array} milestones - the NEW campaign's milestones
+ * @returns {{ mapData, spawnResult }} mapData is the new map copy
+ */
+export const spawnCampaignIntoWorld = (worldMap, milestones) => {
+    const mapData = JSON.parse(JSON.stringify(worldMap));
+    const spawnResult = spawnWorldMapEntities(mapData, milestones);
+    return { mapData, spawnResult };
+};
+
+/**
+ * Retro-inject the NEXT campaign's quest buildings and milestone NPCs into towns
+ * that are ALREADY CACHED in the save (a targeted additive mutation, never a
+ * regeneration; see QUEST_CHAINING_PLAN). Towns not yet cached need nothing here:
+ * the lazy first-visit path reads the updated settings (requiredBuildings +
+ * milestones) and injects at generation time as usual.
+ *
+ * Copy-on-write: returns a NEW cache object; only towns that actually receive a
+ * building or NPC are cloned, every other town keeps its exact stored object.
+ *
+ * NPC rule (shared-building conflict): if the target building already houses an
+ * NPC from a PRIOR campaign (any milestoneNpcId not in the new campaign), the new
+ * authored NPC REPLACES it (narratively the same contact promoted into the new
+ * chapter, e.g. Captain Ulric becoming Marshal Ulric), so shared venues never
+ * accumulate duplicate quest-givers.
+ *
+ * @param {Object} args
+ * @param {Object} args.townMapsCache - the save's cached town maps (name-keyed)
+ * @param {Object} args.requiredBuildings - new campaign's per-town building reqs
+ * @param {Array} args.milestones - the NEW campaign's milestones
+ * @param {number|string} args.worldSeed - save's world seed (deterministic NPCs)
+ * @returns {Object} new townMapsCache
+ */
+export const retroInjectQuestContent = ({ townMapsCache, requiredBuildings, milestones, worldSeed }) => {
+    const cache = { ...(townMapsCache || {}) };
+    const reqs = requiredBuildings || {};
+
+    for (const townName of Object.keys(cache)) {
+        const buildings = reqs[townName] || [];
+        const npcs = getMilestoneNpcsForTown(milestones || [], townName);
+        if (buildings.length === 0 && npcs.length === 0) continue;
+
+        const townClone = JSON.parse(JSON.stringify(cache[townName]));
+
+        if (buildings.length > 0) {
+            injectQuestBuildings(townClone, buildings);
+            logger.info(`[RETRO] Injected ${buildings.length} quest building(s) into cached town "${townName}"`);
+        }
+
+        for (const spec of npcs) {
+            // Skip if this exact authored NPC is already in the roster (idempotence).
+            if ((townClone.npcs || []).some((n) => n.milestoneNpcId === spec.id)) continue;
+            const seed = (parseInt(worldSeed) || 1) + (spec.milestoneId || 0) * 977 + String(townName).length * 31;
+            const placed = addAuthoredNpcToTown(townClone, spec, seed);
+            if (placed) {
+                logger.info(`[RETRO] Placed milestone NPC "${spec.name}" in cached town "${townName}"`);
+            } else {
+                logger.warn(`[RETRO] Could not place milestone NPC "${spec.name}" in cached town "${townName}" (no matching building)`);
+            }
+        }
+
+        cache[townName] = townClone;
+    }
+
+    return cache;
 };

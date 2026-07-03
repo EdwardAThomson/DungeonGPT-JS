@@ -123,6 +123,14 @@ export const storyTemplates = [
             responseVerbosity: 'Descriptive'
         }
     },
+    // SAME-WORLD SEQUEL (QUEST_CHAINING_PLAN decision, 2026-07): re-authored onto
+    // heroic-fantasy-t1's geography EXACTLY (Willowdale / Briarwood / Thornfield /
+    // Millhaven + Greenridge Hills) so a completed Goblin Threat save can continue
+    // this campaign IN the same world (in-save continuation). Venue/NPC choices
+    // deliberately avoid t1's quest buildings (t1 used Willowdale's tavern and
+    // Briarwood's barracks) so retro-injection into cached towns never collides.
+    // Story beats and the balance-validated boss block are unchanged from the
+    // original Eldoria authoring.
     {
         id: 'heroic-fantasy-t2',
         theme: 'heroic-fantasy',
@@ -131,44 +139,44 @@ export const storyTemplates = [
         name: 'Heroic Fantasy',
         subtitle: 'Crown of Sunfire',
         icon: '⚔️',
-        description: 'A classic tale of heroes, magic, and clear conflicts between good and evil.',
-        customNames: { towns: ['Eldoria', 'Sunfire', 'Oakhaven', 'Silverton'], mountains: ['Cinder Mountains'] },
+        description: 'The lost Crown of Sunfire resurfaces in the same lands your heroes saved from the goblins. Unite the shattered provinces and cast down the Shadow Overlord.',
+        customNames: { towns: ['Willowdale', 'Briarwood', 'Thornfield', 'Millhaven'], mountains: ['Greenridge Hills'] },
         settings: {
-            shortDescription: 'In the kingdom of Eldoria, light-hearted adventurers set out to recover the lost Crown of Sunfire and unite the shattered provinces against a rising darkness.',
-            campaignGoal: 'Recover the Crown of Sunfire and defeat the Shadow Overlord to restore peace to Eldoria.',
+            shortDescription: 'The lost Crown of Sunfire, the old realm\'s symbol of unity, has resurfaced in the lands around Willowdale. A Shadow Overlord gathers power in the deep Greenridge Hills, and the shattered provinces must be united before the darkness swallows them.',
+            campaignGoal: 'Recover the Crown of Sunfire and defeat the Shadow Overlord to restore peace to the realm.',
             milestones: [
                 {
                     id: 1,
-                    text: 'Find the hidden map in the archives of Oakhaven',
-                    location: 'Oakhaven',
+                    text: 'Find the hidden map in the archives of Millhaven',
+                    location: 'Millhaven',
                     type: 'item',
                     requires: [],
                     trigger: { item: 'treasure_map', action: 'acquire' },
-                    spawn: { type: 'item', id: 'treasure_map', name: 'Hidden Map', location: 'Oakhaven' },
-                    building: { type: 'archives', name: 'The Great Archives', location: 'Oakhaven' },
+                    spawn: { type: 'item', id: 'treasure_map', name: 'Hidden Map', location: 'Millhaven' },
+                    building: { type: 'archives', name: 'The Great Archives', location: 'Millhaven' },
                     rewards: { xp: 100, gold: '2d10', items: [] },
                     minLevel: null
                 },
                 {
                     id: 2,
-                    text: 'Convince the Silver Guard to join the resistance',
-                    location: 'Silverton',
+                    text: 'Convince the Thornfield Guard to join the resistance',
+                    location: 'Thornfield',
                     type: 'narrative',
                     requires: [],
                     trigger: null,
-                    spawn: { type: 'npc', id: 'silver_guard_captain', name: 'Captain Aldric', location: 'Silverton', role: 'Guard', personality: 'proud, honorable, skeptical of outsiders' },
-                    building: { type: 'barracks', name: 'Silver Guard Barracks', location: 'Silverton' },
+                    spawn: { type: 'npc', id: 'thornfield_guard_captain', name: 'Captain Aldric', location: 'Thornfield', role: 'Guard', personality: 'proud, honorable, skeptical of outsiders' },
+                    building: { type: 'barracks', name: 'Thornfield Guard Barracks', location: 'Thornfield' },
                     rewards: { xp: 150, gold: '1d20', items: ['quest_key'] },
                     minLevel: null
                 },
                 {
                     id: 3,
-                    text: 'Breach the Shadow Fortress in the Cinder Mountains',
-                    location: 'Cinder Mountains',
+                    text: 'Breach the Shadow Fortress in the Greenridge Hills',
+                    location: 'Greenridge Hills',
                     type: 'location',
                     requires: [1, 2],
                     trigger: { location: 'shadow_fortress', action: 'visit' },
-                    spawn: { type: 'poi', id: 'shadow_fortress', name: 'Shadow Fortress', location: 'Cinder Mountains' },
+                    spawn: { type: 'poi', id: 'shadow_fortress', name: 'Shadow Fortress', location: 'Greenridge Hills' },
                     building: null,
                     rewards: { xp: 200, gold: '3d20', items: [] },
                     minLevel: 3
@@ -176,11 +184,11 @@ export const storyTemplates = [
                 {
                     id: 4,
                     text: 'Defeat the Shadow Overlord',
-                    location: 'Cinder Mountains',
+                    location: 'Greenridge Hills',
                     type: 'combat',
                     requires: [3],
                     trigger: { enemy: 'shadow_overlord', action: 'defeat' },
-                    spawn: { type: 'enemy', id: 'shadow_overlord', name: 'Shadow Overlord', location: 'Cinder Mountains' },
+                    spawn: { type: 'enemy', id: 'shadow_overlord', name: 'Shadow Overlord', location: 'Greenridge Hills' },
                     building: null,
                     encounter: {
                         name: 'Shadow Overlord',
@@ -198,7 +206,7 @@ export const storyTemplates = [
                         suggestedActions: [
                             { label: 'Fight', skill: 'Athletics', description: 'Engage the Overlord in direct combat' },
                             { label: 'Use the Map', skill: 'Investigation', description: 'Exploit weaknesses revealed by the hidden map' },
-                            { label: 'Rally the Guard', skill: 'Persuasion', description: 'Command the Silver Guard to flank' }
+                            { label: 'Rally the Guard', skill: 'Persuasion', description: 'Command the Thornfield Guard to flank' }
                         ],
                         consequences: {
                             criticalSuccess: 'The Overlord falls with a thunderous crash, the Crown of Sunfire clattering free.',

@@ -1,16 +1,19 @@
 // campaignLauncher.js
-// The campaign-start pipeline, extracted from NewGame's handleSubmit so it can be
-// reused by the quest-chaining flow ("Continue your legend" / Chapter 2) and tested
-// in isolation. Given a campaign spec (from a story template or the New Game form)
-// it: merges milestone location names into customNames, generates the world map,
-// spawns milestone entities, pre-generates every town map (quest buildings + NPCs
-// baked in), picks map-valid side quests, and assembles the game_settings snapshot.
+// The NEW-GAME campaign-start pipeline, extracted from NewGame's handleSubmit so
+// it is testable in isolation. Given a campaign spec (from a story template or
+// the New Game form) it: merges milestone location names into customNames,
+// generates the world map, spawns milestone entities, pre-generates every town
+// map (quest buildings + NPCs baked in), picks map-valid side quests, and
+// assembles the game_settings snapshot.
+//
+// In-save continuation ("Continue your legend") does NOT use this pipeline; it
+// spawns additively into the existing world instead (see campaignChain.js).
 //
 // Pure-ish: deterministic given a seed (map/town/NPC/side-quest generation are all
 // seeded); the only non-deterministic pieces are the fallback random seed and the
 // minted gameSessionId, both overridable via options for tests.
 //
-// See docs/QUEST_CHAINING_PLAN.md (Phase 1/2) for the design.
+// See docs/QUEST_CHAINING_PLAN.md for the design.
 
 import { generateMapData } from '../utils/mapGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
@@ -20,8 +23,6 @@ import { populateTown } from '../utils/npcGenerator';
 import { spawnWorldMapEntities, injectQuestBuildings } from './milestoneSpawner';
 import { getMilestoneLocationNames, getMilestoneNpcsForTown } from './milestoneEngine';
 import { isPremium, isThemePremium, isTemplatePremium } from './entitlements';
-import { normalizeParty } from '../utils/partyUtils';
-import { calculateMaxHP } from '../utils/healthSystem';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('campaign-launcher');
@@ -107,18 +108,6 @@ export const specFromTemplate = (template) => ({
     premium: isTemplatePremium(template),
 });
 
-// Deep-copy a party out of a completed save for the next chapter: EVERYTHING carries
-// (XP, level, gold, inventory, equipment) and everyone arrives HEALED (full HP,
-// defeat cleared), since a new expedition implies rest. Never mutates the source
-// heroes; the copy shares no object references with the old save.
-export const carryParty = (heroes) => {
-    const copied = JSON.parse(JSON.stringify(heroes || []));
-    return normalizeParty(copied).map((hero) => {
-        const maxHP = hero.maxHP || calculateMaxHP(hero);
-        return { ...hero, maxHP, currentHP: maxHP, isDefeated: false };
-    });
-};
-
 /**
  * Run the full campaign-start pipeline.
  *
@@ -129,19 +118,13 @@ export const carryParty = (heroes) => {
  * @param {object} [options]
  * @param {number|string} [options.seed] - world seed (random when omitted)
  * @param {Array} [options.mapData] - pre-generated map (New Game's manual preview)
- * @param {Array} [options.party] - heroes carried from a completed save; returned
- *   deep-copied + healed via carryParty
- * @param {object} [options.chainFrom] - additive chain record for a linked sequel:
- *   { parentSaveId, chapter, completedCampaigns, saveName }
  * @param {string} [options.gameSessionId] - session id override (tests)
- * @returns {{ settings, mapData, townMapsCache, worldSeed, gameSessionId, party }}
+ * @returns {{ settings, mapData, townMapsCache, worldSeed, gameSessionId }}
  */
 export const launchCampaign = (spec, options = {}) => {
     const {
         seed = null,
         mapData: providedMap = null,
-        party = null,
-        chainFrom = null,
         gameSessionId = null,
     } = options;
 
@@ -241,20 +224,11 @@ export const launchCampaign = (spec, options = {}) => {
     // Additive: template id enables clean chain records (completedCampaigns) later.
     if (spec.templateId) settings.templateId = spec.templateId;
 
-    // Additive chain fields (linked "Chapter n" saves). Old saves without `chain`
-    // behave identically; every consumer tolerates absence.
-    if (chainFrom) {
-        settings.chain = { parentSaveId: chainFrom.parentSaveId, chapter: chainFrom.chapter };
-        if (chainFrom.completedCampaigns) settings.completedCampaigns = chainFrom.completedCampaigns;
-        if (chainFrom.saveName) settings.saveName = chainFrom.saveName;
-    }
-
     return {
         settings,
         mapData,
         townMapsCache,
         worldSeed: seedToUse,
         gameSessionId: gameSessionId || mintGameSessionId(),
-        party: party ? carryParty(party) : null,
     };
 };

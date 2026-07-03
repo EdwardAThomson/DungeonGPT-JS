@@ -1,46 +1,36 @@
 // campaignChain.js
-// Quest chaining Phase 1 (docs/QUEST_CHAINING_PLAN.md): "New Expedition" linked
-// saves. When a campaign is complete, the player picks the next campaign and we
-// create a NEW save (fresh world via the shared launchCampaign pipeline, carried
-// party healed via carryParty, deterministic local prologue) linked back to the
-// completed one. The completed save is NEVER destroyed; at most it gains an
-// additive `continuedInSessionId` stamp (best-effort).
+// Quest chaining: IN-SAVE continuation (docs/QUEST_CHAINING_PLAN.md, superseding
+// the Phase-1 linked-save design). When a campaign is complete, the player picks
+// the next campaign and continues it INSIDE THE SAME SAVE: same world map, same
+// cached towns, same explored fog, same journal and RAG memories (same
+// sessionId). The new campaign's content is spawned ADDITIVELY into the existing
+// world; nothing is regenerated or removed. A player who wants a different world
+// simply starts a normal New Game.
 //
-// The fresh RAG index comes free: the new save has a new gameSessionId, and the
-// RAG store is keyed by sessionId (ragEngine getBySession), so no old-world
-// vectors are ever retrieved into the new chapter.
+// A template can continue in-save only if its geography is compatible: every
+// authored location (customNames towns/mountains plus milestone locations) must
+// resolve on the CURRENT world map. Incompatible templates are offered as a New
+// Game instead ("new map = new game").
 
 import { storyTemplates } from '../data/storyTemplates';
+import { SIDE_QUESTS } from '../data/sideQuests';
 import { canUseTemplate } from './entitlements';
-import { launchCampaign, specFromTemplate } from './campaignLauncher';
-import { composePrologue } from './prologueComposer';
-import { buildSaveName, buildSubMapsPayload, parseSaveRoot, DEFAULT_SAVE_ROOT } from './saveController';
-import { findStartingTown } from '../utils/mapGenerator';
-import { mapPayloadToRow } from '../services/localGameStore';
-import { conversationsApi } from '../services/conversationsApi';
+import { specFromTemplate, mergeLocationNames, resolveMilestoneCoords } from './campaignLauncher';
+import { spawnCampaignIntoWorld, retroInjectQuestContent, findLocationOnMap } from './milestoneSpawner';
+import { selectSideQuests } from './questEngine';
+import { composeChapterPrologue } from './prologueComposer';
+import { calculateMaxHP } from '../utils/healthSystem';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('campaign-chain');
 
-// A save may chain into a next chapter once its campaign is complete. Tolerant of
-// missing/old settings (old saves without the flag simply are not eligible).
-export const isEligibleForChaining = (settings) => !!(settings && settings.campaignComplete);
+// Eligibility to continue is simply settings.campaignComplete: the Journal's
+// CAMPAIGN COMPLETE banner (Modals.js) gates the CTA on it directly.
 
-// "Adventure — Chapter 2" -> "Adventure" (also tolerates a plain hyphen).
-const CHAPTER_SUFFIX_REGEX = /\s*[—-]\s*Chapter\s+\d+\s*$/i;
-
-// Recover the chain's base save-name root from the parent save, stripping any
-// existing chapter suffix so Chapter 3 does not become "... — Chapter 2 — Chapter 3".
-export const chainRootName = (parentSettings, parentConversationName = null) => {
-  const raw = (typeof parentSettings?.saveName === 'string' && parentSettings.saveName.trim())
-    || (parentConversationName ? parseSaveRoot(parentConversationName) : '')
-    || DEFAULT_SAVE_ROOT;
-  return raw.replace(CHAPTER_SUFFIX_REGEX, '').trim() || DEFAULT_SAVE_ROOT;
-};
-
-// Which template did this save play? Prefer the additive settings.templateId (stamped
-// by launchCampaign going forward); fall back to matching the stored templateName
-// label against the catalog (old saves), else keep the label so the record survives.
+// Which template did this save play? Prefer the additive settings.templateId
+// (stamped by launchCampaign going forward); fall back to matching the stored
+// templateName label against the catalog (old saves), else keep the label so the
+// record survives.
 export const resolveCompletedTemplateId = (settings) => {
   if (settings?.templateId) return settings.templateId;
   const label = settings?.templateName;
@@ -60,16 +50,40 @@ export const getPartyLevel = (party) => {
   return Math.max(...party.map((h) => h?.level || h?.heroLevel || 1));
 };
 
+// Every location the template's map generation would need: authored customNames
+// merged with milestone location names (exactly what a fresh launch would inject).
+const templateLocationNames = (template) => {
+  const merged = mergeLocationNames(
+    template.customNames || { towns: [], mountains: [] },
+    template.settings?.milestones || []
+  );
+  const nameOf = (entry) => (typeof entry === 'string' ? entry : entry?.name || '');
+  return [...merged.towns.map(nameOf), ...merged.mountains.map(nameOf)].filter(Boolean);
+};
+
+/**
+ * Data-driven geography compatibility: can this template's campaign be spawned
+ * into the CURRENT world? True only when every authored location resolves on the
+ * live map (via the same name matching the spawner uses).
+ */
+export const isTemplateCompatibleWithWorld = (template, worldMap) => {
+  if (!template || !Array.isArray(worldMap) || worldMap.length === 0) return false;
+  return templateLocationNames(template).every(
+    (name) => !!findLocationOnMap(worldMap, name)
+  );
+};
+
 /**
  * The picker's catalog: which campaigns can come NEXT after this save.
  * Same-genre next tier first ("recommended"), then everything else sorted by level
- * fit; comingSoon stubs and already-played campaigns are excluded; premium templates
- * are listed but flagged locked for free users (the existing entitlements gate).
- * Under-levelled picks warn, they never block.
+ * fit; comingSoon stubs and already-played campaigns are excluded; premium
+ * templates are listed but flagged locked for free users. Under-levelled picks
+ * warn, they never block. Each option carries `compatible`: whether it can
+ * continue IN THIS SAVE's world (all locations resolve) or needs a new adventure.
  *
- * @returns {Array<{ template, recommended, sameGenre, premiumLocked, underLeveled }>}
+ * @returns {Array<{ template, recommended, sameGenre, premiumLocked, underLeveled, compatible }>}
  */
-export const getNextCampaignOptions = ({ settings, party } = {}) => {
+export const getNextCampaignOptions = ({ settings, party, worldMap = null } = {}) => {
   const currentId = resolveCompletedTemplateId(settings);
   const currentTemplate = storyTemplates.find((t) => t.id === currentId) || null;
   const genre = currentTemplate?.theme || null;
@@ -89,10 +103,12 @@ export const getNextCampaignOptions = ({ settings, party } = {}) => {
       sameGenre: !!genre && template.theme === genre,
       premiumLocked: !canUseTemplate(template),
       underLeveled: !!(template.levelRange && partyLevel < template.levelRange[0]),
+      compatible: isTemplateCompatibleWithWorld(template, worldMap),
     }));
 
   const score = (o) =>
     (o.recommended ? 0 : 100)
+    + (o.compatible ? 0 : 50)
     + (fits(o.template) ? 0 : 10)
     + (o.sameGenre ? 0 : 5)
     + (o.template.tier || 0);
@@ -100,154 +116,160 @@ export const getNextCampaignOptions = ({ settings, party } = {}) => {
   return options;
 };
 
-// Fallback starting position when findStartingTown throws (mirrors NewGame's preview
-// fallback): any town, else the map origin.
-const resolveStartingPosition = (mapData) => {
-  try {
-    return findStartingTown(mapData);
-  } catch (e) {
-    for (let y = 0; y < mapData.length; y++) {
-      for (let x = 0; x < mapData[y].length; x++) {
-        if (mapData[y][x].poi === 'town') return { x, y };
-      }
-    }
-    return { x: 0, y: 0 };
-  }
+// Heal the party in place for the next chapter, per the standing "everything,
+// healed" decision: full HP, defeat cleared, NOTHING else changes (same save,
+// same hero objects' progression). Returns new hero objects (React state
+// discipline), never mutates the input.
+export const healPartyForNextChapter = (party) =>
+  (party || []).map((hero) => {
+    const maxHP = hero.maxHP || calculateMaxHP(hero);
+    return { ...hero, maxHP, currentHP: maxHP, isDefeated: false };
+  });
+
+// Additional side quests for the new chapter: appropriate to the new tier
+// (startable within its level range), excluding every quest id already in the
+// save (any status, including completed), map-valid, and APPENDED by the caller;
+// existing quests keep their state untouched.
+const selectContinuationSideQuests = ({ mapData, townMapsCache, existingSideQuests, levelRange, worldSeed, chapter }) => {
+  const flatTiles = [].concat(...mapData);
+  const availableSites = {
+    cave: flatTiles.some((t) => t.poi === 'cave_entrance'),
+    ruins: flatTiles.some((t) => t.poi === 'ruins'),
+  };
+  const availableBuildings = new Set();
+  Object.values(townMapsCache || {}).forEach((tm) => {
+    (tm.mapData || []).forEach((row) => row.forEach((t) => {
+      if (t.type === 'building' && t.buildingType) availableBuildings.add(t.buildingType);
+    }));
+  });
+
+  const existingIds = new Set((existingSideQuests || []).map((q) => q.id));
+  const maxLevel = (levelRange && levelRange[1]) || 99;
+  const pool = SIDE_QUESTS.filter(
+    (q) => !existingIds.has(q.id) && (q.minLevel || 1) <= maxLevel
+  );
+
+  // Seeded off worldSeed + chapter so a given continuation reproducibly offers
+  // the same quests (mirrors the launcher's seeded pick).
+  let sqSeed = ((parseInt(worldSeed) || 1) + chapter * 104729) % 233280 || 1;
+  const sqRng = () => { sqSeed = (sqSeed * 9301 + 49297) % 233280; return sqSeed / 233280; };
+
+  return selectSideQuests({ sites: availableSites, buildings: [...availableBuildings] }, 2, sqRng, pool);
 };
 
 /**
- * Build the complete NEW linked save for the next chapter. Pure-ish (seeded pipeline;
- * session id + timestamps are minted here) and does NOT touch the store.
+ * Build everything the in-save continuation needs, copy-on-write. Pure given its
+ * inputs; nothing here touches React state or the store. The caller (Game.js)
+ * applies the pieces: setWorldMap(mapData), setTownMapsCache(townMapsCache),
+ * setSettings(prev => applyContinuationToSettings(prev, continuation)), heals the
+ * party, appends the prologue to the conversation, and saves.
  *
  * @param {object} args
- * @param {object} args.template - the next story template (from getNextCampaignOptions)
- * @param {object} args.parent - the completed save:
- *   { sessionId, settings, heroes, summary, conversationName }
- * @param {string} [args.provider] - carried provider (kept on the new row)
- * @param {string} [args.model] - carried model
- * @returns {{ payload, row, prologue }} payload is store-shaped (conversationsApi.save);
- *   row mirrors the persisted row so callers can navigate into it immediately.
+ * @param {object} args.template - the next story template (compatible with this world)
+ * @param {Array}  args.worldMap - the live world map (NOT mutated)
+ * @param {Object} args.townMapsCache - the live cached town maps (NOT mutated)
+ * @param {number|string} args.worldSeed - the save's world seed
+ * @param {Array}  [args.existingSideQuests] - settings.sideQuests (for exclusion)
+ * @param {Array}  [args.party] - current party (prologue flavor only)
+ * @param {number} [args.chapter] - the NEW chapter number (defaults to 2)
+ * @returns {{ spec, mapData, townMapsCache, spawnResult, milestones, sideQuestsToAdd, prologue, chapter }}
  */
-export const buildChainedSaveRow = ({ template, parent, provider = null, model = null }) => {
-  const parentSettings = parent?.settings || {};
-  const chapter = ((parentSettings.chain && parentSettings.chain.chapter) || 1) + 1;
-  const root = chainRootName(parentSettings, parent?.conversationName);
-  const saveRoot = `${root} — Chapter ${chapter}`;
-  const completedCampaigns = [
-    ...(parentSettings.completedCampaigns || []),
-    resolveCompletedTemplateId(parentSettings),
-  ].filter(Boolean);
-
-  const spec = specFromTemplate(template);
-  const launch = launchCampaign(spec, {
-    party: parent?.heroes || [],
-    chainFrom: {
-      parentSaveId: parent?.sessionId || null,
-      chapter,
-      completedCampaigns,
-      saveName: saveRoot,
-    },
-  });
-
-  // Starting position, with the tile marked explored (mirrors useGameMap's
-  // fresh-map branch, which this pre-built save bypasses on load).
-  const playerPosition = resolveStartingPosition(launch.mapData);
-  if (launch.mapData[playerPosition.y]?.[playerPosition.x]) {
-    launch.mapData[playerPosition.y][playerPosition.x].isExplored = true;
+export const buildInSaveContinuation = ({
+  template,
+  worldMap,
+  townMapsCache,
+  worldSeed,
+  existingSideQuests = [],
+  party = [],
+  chapter = 2,
+}) => {
+  // Premium backstop: every path that can start a campaign must hold this gate.
+  if (!canUseTemplate(template)) {
+    throw new Error('This is a Premium adventure. Premium unlock is coming soon; pick a free adventure to continue.');
+  }
+  if (!isTemplateCompatibleWithWorld(template, worldMap)) {
+    throw new Error(`"${template.name}" is set in different lands and cannot continue in this world. Start it as a new adventure instead.`);
   }
 
-  const prologue = composePrologue({
-    previousSummary: parent?.summary || '',
-    previousSettings: parentSettings,
-    party: launch.party,
-    spec,
+  const spec = specFromTemplate(template);
+
+  // Additive world spawn (copy-on-write; occupied tiles fall back to adjacent
+  // placement; misses are logged by the spawner, never fatal).
+  const { mapData, spawnResult } = spawnCampaignIntoWorld(worldMap, spec.milestones);
+
+  // Resolve the new milestones' coordinates against the live map.
+  const milestones = resolveMilestoneCoords(spec.milestones, mapData);
+
+  // Retro-inject quest buildings + milestone NPCs into ALREADY-CACHED towns.
+  // Uncached towns get theirs free at first-visit generation (the lazy path reads
+  // the updated settings).
+  const newTownMapsCache = retroInjectQuestContent({
+    townMapsCache,
+    requiredBuildings: spawnResult.requiredBuildings,
+    milestones: spec.milestones,
+    worldSeed,
+  });
+
+  const sideQuestsToAdd = selectContinuationSideQuests({
+    mapData,
+    townMapsCache: newTownMapsCache,
+    existingSideQuests,
+    levelRange: spec.levelRange,
+    worldSeed,
     chapter,
   });
 
-  const sub_maps = buildSubMapsPayload({
-    currentTownMap: null,
-    townPlayerPosition: null,
-    currentTownTile: null,
-    isInsideTown: false,
-    currentMapLevel: 'world',
-    townMapsCache: launch.townMapsCache,
-    visitedBiomes: [],
-    visitedTowns: [],
-    movesSinceEncounter: 0,
-    currentSiteMap: null,
-    sitePlayerPosition: null,
-    currentSiteTile: null,
-    isInsideSite: false,
-    siteMapsCache: {},
-  });
+  const prologue = composeChapterPrologue({ spec, chapter, party });
 
-  // Same payload shape useGamePersistence sends, so both backends (CF Worker and
-  // the guest IndexedDB store) treat this exactly like a normal save.
-  const payload = {
-    sessionId: launch.gameSessionId,
-    timestamp: new Date().toISOString(),
-    conversationName: buildSaveName(saveRoot),
-    conversation: [{ role: 'ai', content: prologue }],
-    provider,
-    model,
-    gameSettings: launch.settings,
-    selectedHeroes: launch.party,
-    currentSummary: '',
-    worldMap: launch.mapData,
-    playerPosition,
-    hasAdventureStarted: true,
-    sub_maps,
-  };
+  logger.info(`[CHAIN] Built in-save continuation for "${spec.templateName}" (chapter ${chapter})`);
 
-  return { payload, row: mapPayloadToRow(payload), prologue };
-};
-
-// Best-effort additive stamp on the completed save so Saved Games can badge it as
-// continued. Read-modify-write of the full row; any failure is swallowed because the
-// parent save must never be put at risk by the chaining flow.
-const stampParentContinued = async (parentSessionId, childSessionId) => {
-  const parentRow = await conversationsApi.getById(parentSessionId);
-  if (!parentRow) return;
-  let settings = parentRow.game_settings;
-  if (typeof settings === 'string') {
-    try { settings = JSON.parse(settings); } catch (e) { settings = null; }
-  }
-  if (!settings || typeof settings !== 'object') return; // unreadable: do not risk a rewrite
-  await conversationsApi.save({
-    sessionId: parentSessionId,
-    timestamp: parentRow.timestamp,
-    conversationName: parentRow.conversation_name,
-    conversation: parentRow.conversation_data || [],
-    provider: parentRow.provider || null,
-    model: parentRow.model || null,
-    gameSettings: { ...settings, continuedInSessionId: childSessionId },
-    selectedHeroes: parentRow.selected_heroes || null,
-    currentSummary: parentRow.summary || null,
-    worldMap: parentRow.world_map || null,
-    playerPosition: parentRow.player_position || null,
-    sub_maps: parentRow.sub_maps || null,
-  });
+  return { spec, mapData, townMapsCache: newTownMapsCache, spawnResult, milestones, sideQuestsToAdd, prologue, chapter };
 };
 
 /**
- * Create and persist the next chapter's save, then hand back the row for
- * navigation. The parent save is untouched except the optional additive
- * `continuedInSessionId` stamp (best-effort, never blocks the chain).
+ * Apply an in-save continuation to the save's settings. PURE and designed for a
+ * functional setSettings updater, so completedCampaigns/currentChapter always
+ * derive from the freshest previous state. All fields are additive or replace
+ * campaign-scoped fields only; world-scoped fields (theme, worldSeed, mapVersion,
+ * saveName) are untouched.
  */
-export const startChainedCampaign = async ({ template, parent, provider = null, model = null }) => {
-  const { payload, row } = buildChainedSaveRow({ template, parent, provider, model });
+export const applyContinuationToSettings = (prevSettings, continuation) => {
+  const prev = prevSettings || {};
+  const { spec, spawnResult, milestones, sideQuestsToAdd } = continuation;
 
-  await conversationsApi.save(payload);
+  // Merge per-town building requirements so towns not yet generated still get
+  // EVERY campaign's buildings at first visit (old entries are kept: they are
+  // already baked into cached towns and remain valid history).
+  const requiredBuildings = { ...(prev.requiredBuildings || {}) };
+  Object.entries(spawnResult.requiredBuildings || {}).forEach(([town, reqs]) => {
+    requiredBuildings[town] = [...(requiredBuildings[town] || []), ...reqs];
+  });
 
-  try {
-    localStorage.setItem('activeGameSessionId', row.sessionId);
-  } catch (e) { /* storage may be blocked; the navigation state still carries the row */ }
-
-  try {
-    if (parent?.sessionId) await stampParentContinued(parent.sessionId, row.sessionId);
-  } catch (e) {
-    logger.warn('Could not stamp parent save as continued (non-fatal):', e);
-  }
-
-  return row;
+  return {
+    ...prev,
+    // The new campaign's identity + content (campaign-scoped, replaced)
+    shortDescription: spec.shortDescription,
+    grimnessLevel: spec.grimnessLevel,
+    darknessLevel: spec.darknessLevel,
+    magicLevel: spec.magicLevel,
+    technologyLevel: spec.technologyLevel,
+    responseVerbosity: spec.responseVerbosity,
+    campaignGoal: spec.campaignGoal || (milestones.length > 0 ? milestones[milestones.length - 1].text : ''),
+    templateName: spec.templateName,
+    templateId: spec.templateId || prev.templateId,
+    tier: spec.tier,
+    levelRange: spec.levelRange || (spec.tier === 1 ? [1, 2] : [3, 5]),
+    milestones,
+    campaignComplete: false,
+    // Spawn tables: enemy/item spawns are campaign-scoped (replaced); building
+    // requirements accumulate (see above).
+    requiredBuildings,
+    enemySpawns: spawnResult.enemySpawns,
+    itemSpawns: spawnResult.itemSpawns,
+    // Side quests APPEND; existing quests keep their state.
+    sideQuests: [...(prev.sideQuests || []), ...sideQuestsToAdd],
+    // Chain record (additive)
+    completedCampaigns: [...(prev.completedCampaigns || []), resolveCompletedTemplateId(prev)].filter(Boolean),
+    currentChapter: (prev.currentChapter || 1) + 1,
+  };
 };

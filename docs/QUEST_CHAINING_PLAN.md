@@ -1,10 +1,50 @@
 # Quest Chaining Within a Save (Design Plan)
 
-Status: DESIGN ONLY, no implementation. Author: planning pass, 2026-07.
+Status: IMPLEMENTED as in-save continuation (2026-07 rework; see Decisions below).
 Related docs: `CAMPAIGN_MILESTONE_SYSTEM.md`, `FEATURE_QUEST_GIVERS.md`,
 `FEATURE_SIDEQUEST_BACKFILL.md`, `docs/OUTSTANDING_ISSUES.md`.
 
-## Decisions (2026-07-03)
+## Decisions (2026-07-04, rework: SUPERSEDES the linked-save Phase 1)
+
+The maintainer overruled the shipped Phase-1 linked-save design ("Chapter 2" as a
+new save with a fresh world). The binding design is:
+
+- **Same-save continuation.** On campaign completion the player continues the next
+  campaign INSIDE THE SAME SAVE: same world map, same cached towns, same explored
+  fog, same party (healed in place), same sessionId. The new campaign's content
+  (POIs, boss stamps, quest buildings, milestone NPCs, side quests) is spawned
+  ADDITIVELY into the existing world: `spawnCampaignIntoWorld` stamps the live map
+  copy-on-write, and `retroInjectQuestContent` performs the targeted additive
+  mutation of already-cached towns (never a regeneration; towns not yet cached get
+  their content free at first-visit generation from the updated settings). Nothing
+  existing is removed; completed campaigns' POIs remain permanently visible
+  landmarks (`computeVisibleMilestonePois`) and their stale quest-item stamps are
+  gated off (`isQuestItemSearchable`).
+- **Journal and memories continue.** The ongoing conversation gains a
+  chapter-divider prologue (`composeChapterPrologue`: "**Chapter N**" + the new
+  campaign's opening; no "story so far" recap, the journal IS the story), and the
+  RAG index continues naturally on the same sessionId.
+- **New map = new game.** There is no linked-save machinery. A template can
+  continue in-save only if its geography is compatible: every authored location
+  (customNames + milestone locations) resolves on the current world map
+  (`isTemplateCompatibleWithWorld`). Incompatible templates are offered in the
+  picker under "Requires a new adventure" and hand off to a normal New Game (with
+  the template preselected). The `chain{}` schema, `buildChainedSaveRow`,
+  `startChainedCampaign` and the parent `continuedInSessionId` stamp are removed;
+  `completedCampaigns` and `currentChapter` (additive settings fields) carry the
+  chain record.
+- **Same-world sequels are authored, not retargeted.** heroic-fantasy-t2 ("Crown
+  of Sunfire") is re-authored onto t1's Willowdale geography (identical
+  customNames; venues chosen to avoid t1's quest buildings), giving the flagship
+  chain t1 -> t2 -> t3 a full in-save path. The private heroic-fantasy-t3 uses t1
+  geography exclusively.
+- **Never destroy a world.** Unchanged: the world is never regenerated or replaced;
+  every mutation is additive and copy-on-write.
+- **Party carry: everything, healed.** Unchanged: levels, XP, gear, and gold stay
+  as they are (same save); the party starts the next chapter at full HP with
+  defeat cleared, and nothing else about the heroes changes.
+
+## Decisions (2026-07-03, superseded)
 
 - **Phased: BOTH shapes, linked save first.** Phase 1 ships Option A (New Expedition:
   a new LINKED save with a fresh world and the carried party) as the quick win. The
@@ -17,6 +57,8 @@ Related docs: `CAMPAIGN_MILESTONE_SYSTEM.md`, `FEATURE_QUEST_GIVERS.md`,
   the sequel's quest buildings into already-cached towns (a targeted additive
   mutation, NOT regeneration) and placing new milestone POIs on the live map at
   campaign start.
+  *(Superseded 2026-07-04: the linked-save Phase 1 was reverted in favor of
+  shipping the same-world/same-save end state directly.)*
 - **Never destroy a world.** Whatever ships, a completed campaign's world/save stays
   intact and playable; "replace the world in the same save" is rejected.
 - **Party carry: everything, healed.** Levels, XP, gear, and gold carry; the party
@@ -24,6 +66,7 @@ Related docs: `CAMPAIGN_MILESTONE_SYSTEM.md`, `FEATURE_QUEST_GIVERS.md`,
 - **Story carry: deferred** until the same-world rework lands (same world makes the
   question largely moot — journal and RAG index simply continue). For Phase 1 linked
   saves, default to the distilled prologue unless decided otherwise.
+  *(Resolved 2026-07-04: journal and RAG memories continue in the same save.)*
 
 ## 1. Problem
 
