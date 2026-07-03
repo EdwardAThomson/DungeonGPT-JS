@@ -1056,3 +1056,24 @@ export const storyTemplates = [
         comingSoon: true,
     }
 ];
+
+// --- Local premium templates (the MECHANISM is public; the content is not) --------
+// Premium campaigns (t3+) are authored in the private content repo and will reach
+// players via the server channel (#40). For local playtesting, a gitignored
+// src/data/premiumTemplates.local.js (shape: premiumTemplates.local.example.js) is
+// merged in at bundle time: entries whose id matches a public template REPLACE it
+// (a comingSoon stub becomes playable locally), new ids append. require.context
+// tolerates the file being absent under webpack and is undefined under Jest, so
+// tests and the progression lint always run against PUBLIC data only.
+export const mergeLocalTemplates = (templates, locals) => {
+    (locals || []).forEach((tpl) => {
+        if (!tpl?.id) return;
+        const i = templates.findIndex((t) => t.id === tpl.id);
+        if (i >= 0) templates[i] = tpl; else templates.push(tpl);
+    });
+    return templates;
+};
+if (typeof require.context === 'function') {
+    const ctx = require.context('.', false, /^\.\/premiumTemplates\.local\.js$/);
+    ctx.keys().forEach((k) => mergeLocalTemplates(storyTemplates, ctx(k).premiumTemplates));
+}
