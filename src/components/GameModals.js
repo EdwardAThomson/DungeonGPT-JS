@@ -31,6 +31,7 @@ const ModalLoadingFallback = () => (
 const GameModals = ({
   isSettingsModalOpen,
   setIsSettingsModalOpen,
+  onContinueLegend,
   settings,
   setSettings,
   selectedProvider,
@@ -93,6 +94,7 @@ const GameModals = ({
         <StorySettingsModalContent
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
+        onContinueLegend={onContinueLegend}
         settings={settings}
         setSettings={setSettings}
         selectedProvider={selectedProvider}

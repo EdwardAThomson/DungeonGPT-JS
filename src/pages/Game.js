@@ -44,6 +44,8 @@ import { resolveProviderAndModel } from '../llm/modelResolver';
 import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile } from '../game/milestoneEngine';
 import { buyItem, sellItem } from '../game/shopController';
 import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, turnInQuest, getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
+import { startChainedCampaign } from '../game/campaignChain';
+import ContinueLegendPicker from '../components/ContinueLegendPicker';
 import { QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
 import { createLogger } from '../utils/logger';
@@ -326,6 +328,56 @@ const Game = ({ resumeConversation = null }) => {
       advanceTour();
     }
   }, [tourActive, hasAdventureStarted, tourStep, advanceTour]);
+
+  // --- Quest chaining (Phase 1): "Continue your legend" ---
+  // The picker creates a NEW linked save (fresh world, carried party) via
+  // startChainedCampaign; this completed world stays saved and playable.
+  const [legendPicker, setLegendPicker] = useState({ open: false, celebrate: false });
+  const [legendLaunching, setLegendLaunching] = useState(false);
+  const [legendError, setLegendError] = useState(null);
+  // Auto-celebrate ONLY when the campaign completes during this session. Saves that
+  // were already complete at load get the CTA through the Journal banner and the
+  // Saved Games row instead of an auto-modal (retroactive, non-intrusive).
+  const campaignWasCompleteAtLoad = !!settingsObj?.campaignComplete;
+  const celebrationFiredRef = useRef(false);
+  useEffect(() => {
+    if (campaignWasCompleteAtLoad || celebrationFiredRef.current) return;
+    if (settings?.campaignComplete) {
+      celebrationFiredRef.current = true;
+      // Let the CAMPAIGN COMPLETE chat message land before the celebration modal.
+      const timer = setTimeout(() => setLegendPicker({ open: true, celebrate: true }), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [settings?.campaignComplete, campaignWasCompleteAtLoad]);
+
+  const handleContinueLegend = async (template) => {
+    if (legendLaunching) return;
+    setLegendLaunching(true);
+    setLegendError(null);
+    try {
+      // Flush the current save first so the carried party reflects the latest state.
+      await performSave();
+      await startChainedCampaign({
+        template,
+        parent: {
+          sessionId,
+          settings,
+          heroes: selectedHeroes,
+          summary: interactionHook.currentSummary,
+          conversationName: loadedConversation?.conversation_name || null
+        },
+        provider: selectedProvider,
+        model: selectedModel
+      });
+      // Hard navigation: /game only remounts cleanly from a fresh document; the
+      // resume gate then hydrates the new chapter from activeGameSessionId.
+      window.location.assign('/game');
+    } catch (err) {
+      logger.error('Failed to start next chapter', err);
+      setLegendError(err?.message || 'Failed to start the next chapter. Please try again.');
+      setLegendLaunching(false);
+    }
+  };
 
   // --- Hero HP Update Handler ---
   const handleHeroUpdate = (updatedHero) => {
@@ -1291,6 +1343,10 @@ const Game = ({ resumeConversation = null }) => {
       <GameModals
         isSettingsModalOpen={isSettingsModalOpen}
         setIsSettingsModalOpen={setIsSettingsModalOpen}
+        onContinueLegend={() => {
+          setIsSettingsModalOpen(false);
+          setLegendPicker({ open: true, celebrate: false });
+        }}
         settings={settings}
         setSettings={setSettings}
         selectedProvider={selectedProvider}
@@ -1380,6 +1436,18 @@ const Game = ({ resumeConversation = null }) => {
       {/* Save Confirmation Modal */}
       <SaveConfirmationModal />
       <QuestOfferModal />
+
+      {/* Quest chaining: campaign-complete celebration + next-campaign picker */}
+      <ContinueLegendPicker
+        isOpen={legendPicker.open}
+        celebrate={legendPicker.celebrate}
+        onClose={() => setLegendPicker({ open: false, celebrate: false })}
+        settings={settings}
+        party={selectedHeroes}
+        onPick={handleContinueLegend}
+        launching={legendLaunching}
+        error={legendError}
+      />
     </div>
   );
 };

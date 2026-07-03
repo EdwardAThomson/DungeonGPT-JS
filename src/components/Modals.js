@@ -236,7 +236,7 @@ export const AISettingsModalContent = ({
 
 // --- Story Settings Modal (for Game Page) --- //
 export const StorySettingsModalContent = ({
-  isOpen, onClose, settings, setSettings,
+  isOpen, onClose, onContinueLegend, settings, setSettings,
   selectedProvider, setSelectedProvider,
   selectedModel, setSelectedModel,
   assistantProvider, setAssistantProvider,
@@ -309,7 +309,9 @@ export const StorySettingsModalContent = ({
                   {/* Quest box (moved up): adventure name + goal */}
                   {(settings.templateName || settings.campaignGoal) && (
                     <div style={{ margin: '0 0 16px 0', padding: '14px 16px', background: 'var(--primary-tint-10)', border: '1px solid var(--primary)', borderRadius: '8px', textAlign: 'center' }}>
-                      <p style={{ margin: '0 0 6px 0', fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>Quest</p>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1.5px' }}>
+                        Quest{settings.chain?.chapter ? ` · Chapter ${settings.chain.chapter}` : ''}
+                      </p>
                       {settings.templateName && (
                         <p style={{ margin: '0 0 8px 0', color: 'var(--primary)', fontWeight: '700', fontSize: '1.3rem', fontFamily: 'var(--header-font)', lineHeight: '1.3' }}>{settings.templateName}</p>
                       )}
@@ -322,6 +324,18 @@ export const StorySettingsModalContent = ({
                     <div style={{ margin: '0 0 18px 0', padding: '12px', background: 'var(--success-tint-20)', borderLeft: '4px solid var(--state-success)', borderRadius: '6px', textAlign: 'center' }}>
                       <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--state-success)' }}>🏆 CAMPAIGN COMPLETE 🏆</div>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Victory Achieved!</div>
+                      {/* Quest chaining Phase 1: retroactive CTA. Any completed save
+                          (including ones finished before chaining existed) can start
+                          the next chapter with the same party. */}
+                      {onContinueLegend && (
+                        <button
+                          onClick={onContinueLegend}
+                          className="primary-button"
+                          style={{ marginTop: '10px', padding: '8px 22px', fontWeight: 'bold' }}
+                        >
+                          ⚔️ Continue your legend
+                        </button>
+                      )}
                     </div>
                   )}
                   <div style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', padding: '14px 16px', margin: '0 0 16px 0' }}>

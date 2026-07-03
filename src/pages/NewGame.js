@@ -4,17 +4,12 @@ import HeroContext from "../contexts/HeroContext";
 import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from "../contexts/AuthContext";
 import { generateMapData, findStartingTown } from "../utils/mapGenerator";
-import { generateTownMap } from "../utils/townMapGenerator";
-import { analyzeTownWater, getTownRoadEdges } from "../utils/townWater";
-import { selectSideQuests } from "../game/questEngine";
-import { populateTown } from "../utils/npcGenerator";
 import WorldMapDisplay from "../components/WorldMapDisplay";
 import OnboardingSteps from "../components/OnboardingSteps";
 import SegmentedControl from "../components/SegmentedControl";
 import RaritySelect from "../components/RaritySelect";
 import { storyTemplates } from "../data/storyTemplates";
-import { spawnWorldMapEntities, injectQuestBuildings } from "../game/milestoneSpawner";
-import { getMilestoneLocationNames, getMilestoneNpcsForTown } from "../game/milestoneEngine";
+import { launchCampaign, mergeLocationNames } from "../game/campaignLauncher";
 import { llmService } from "../services/llmService";
 import { createLogger } from "../utils/logger";
 import { QUEST_ENEMIES, getEnemiesByTierAndTheme } from "../data/questEnemies";
@@ -22,61 +17,6 @@ import { QUEST_BUILDINGS, NPC_ROLES, SEARCHABLE_ITEMS, POI_TYPES, THEME_DEFAULTS
 import { isPremium, isThemePremium, isTemplatePremium } from "../game/entitlements";
 
 const logger = createLogger('new-game');
-
-// Merge milestone location names into customNames so the map generator places them
-const mergeLocationNames = (customNames, milestones) => {
-    const milestoneNames = getMilestoneLocationNames(milestones);
-    const towns = [...(customNames?.towns || [])];
-    const mountains = [...(customNames?.mountains || [])];
-    // Town entries may be plain strings or { name, size } objects (size-tagged locations).
-    const nameOf = (entry) => (typeof entry === 'string' ? entry : entry?.name || '');
-
-    for (const name of milestoneNames.towns) {
-        if (!towns.some(t => nameOf(t).toLowerCase() === name.toLowerCase())) towns.push(name);
-    }
-    for (const name of milestoneNames.mountains) {
-        if (!mountains.some(m => nameOf(m).toLowerCase() === name.toLowerCase())) mountains.push(name);
-    }
-
-    return { towns, mountains };
-};
-
-// Resolve milestone location names to map coordinates by matching town and mountain names
-const resolveMilestoneCoords = (milestones, mapData) => {
-  if (!milestones || !mapData) return milestones;
-
-  // Build a lookup of named locations -> coordinates from the map
-  const locationLookup = {};
-  for (let y = 0; y < mapData.length; y++) {
-    for (let x = 0; x < mapData[y].length; x++) {
-      const tile = mapData[y][x];
-      if (tile.poi === 'town' && tile.townName) {
-        locationLookup[tile.townName.toLowerCase()] = { x, y };
-      }
-      // For mountains, store the first tile found for each range name
-      if (tile.poi === 'mountain' && tile.mountainName) {
-        const key = tile.mountainName.toLowerCase();
-        if (!locationLookup[key]) {
-          locationLookup[key] = { x, y };
-        }
-      }
-    }
-  }
-
-  return milestones
-    .filter(m => m.text && m.text.trim())
-    .map(m => {
-      const resolved = { ...m };
-      if (m.location) {
-        const coords = locationLookup[m.location.toLowerCase()];
-        if (coords) {
-          resolved.mapX = coords.x;
-          resolved.mapY = coords.y;
-        }
-      }
-      return resolved;
-    });
-};
 
 const NewGame = () => {
 
@@ -314,111 +254,58 @@ const NewGame = () => {
       }
     }
 
-    // Auto-generate the world map if one wasn't built manually. Ready-Made
-    // adventures skip the map step entirely, so this is the normal path for them.
-    const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
-    const mapData = generatedMap || generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme);
-
     const templateName = templateLabel
       || (selectedTemplate === 'ai' ? 'AI Generated World'
         : selectedTemplate === 'custom' || !selectedTemplate ? 'Custom Tale'
           : storyTemplates.find(t => t.id === selectedTemplate)?.name || 'Unknown Template');
 
-    // Derive campaignGoal from the final milestone if not explicitly set
-    const derivedGoal = campaignGoal || (milestones.length > 0
-      ? milestones[milestones.length - 1].text
-      : '');
-
     // For custom tab, use the auto-generated description if it was just set
     const finalDescription = shortDescription.trim() ||
       `A custom ${(THEME_DEFAULTS[customTheme]?.name || 'fantasy').toLowerCase()} adventure.`;
-
-    // Spawn milestone entities onto the world map before resolving coords
-    const spawnResult = spawnWorldMapEntities(mapData, milestones);
-
-    // Pre-generate all town maps so saves are never affected by generator changes
-    const townMapsCache = {};
-    for (let y = 0; y < mapData.length; y++) {
-      for (let x = 0; x < mapData[y].length; x++) {
-        const tile = mapData[y][x];
-        if (tile.poi === 'town' && tile.townName) {
-          const townSize = tile.townSize || tile.poiType || 'village';
-          const seed = parseInt(seedToUse) + (x * 1000) + (y * 10000);
-          const townMapData = generateTownMap(townSize, tile.townName, getTownRoadEdges(mapData, x, y), seed, tile.hasRiver, tile.riverDirection, worldTheme, analyzeTownWater(mapData, x, y));
-
-          // Inject quest buildings if needed
-          if (spawnResult.requiredBuildings?.[tile.townName]) {
-            injectQuestBuildings(townMapData, spawnResult.requiredBuildings[tile.townName]);
-          }
-
-          // Populate town with NPCs (canonical milestone NPCs replace procedural staff)
-          const npcs = populateTown(townMapData, seed, getMilestoneNpcsForTown(milestones, tile.townName));
-          townMapData.npcs = npcs;
-
-          townMapsCache[tile.townName] = townMapData;
-          logger.debug(`Pre-generated town map: ${tile.townName} (${townSize})`);
-        }
-      }
-    }
 
     // Resolve tier and level range from template or custom settings
     const templateData = selectedTemplate && selectedTemplate !== 'custom' && selectedTemplate !== 'ai'
       ? storyTemplates.find(t => t.id === selectedTemplate)
       : null;
-    const campaignTier = templateData?.tier || customTier || 1;
-    const campaignLevelRange = templateData?.levelRange || (campaignTier === 1 ? [1, 2] : [3, 5]);
 
-    // Pick side quests that can be both STARTED and COMPLETED on this map: only quests whose
-    // giver building + objective site + turn-in building all exist. Building types are read
-    // from the pre-generated town maps; sites from the world tiles. Seeded off the world
-    // seed so a given world reproducibly offers the same side quests.
-    const flatTiles = [].concat(...mapData);
-    const availableSites = {
-      cave: flatTiles.some((t) => t.poi === 'cave_entrance'),
-      ruins: flatTiles.some((t) => t.poi === 'ruins'),
-    };
-    const availableBuildings = new Set();
-    Object.values(townMapsCache).forEach((tm) => {
-      (tm.mapData || []).forEach((row) => row.forEach((t) => {
-        if (t.type === 'building' && t.buildingType) availableBuildings.add(t.buildingType);
-      }));
-    });
-    let sqSeed = parseInt(seedToUse) || 1;
-    const sqRng = () => { sqSeed = (sqSeed * 9301 + 49297) % 233280; return sqSeed / 233280; };
-    // Scale the number of side quests to the map (≈1 per town, 2–4).
-    const townCount = flatTiles.filter((t) => t.poi === 'town').length;
-    const sideQuestCount = Math.min(4, Math.max(2, townCount));
-    const selectedSideQuests = selectSideQuests({ sites: availableSites, buildings: [...availableBuildings] }, sideQuestCount, sqRng);
+    // Run the shared campaign-start pipeline (map gen, milestone spawning, town
+    // pre-generation, side-quest selection, settings snapshot). Shared with the
+    // quest-chaining flow; see src/game/campaignLauncher.js.
+    let launch;
+    try {
+      launch = launchCampaign({
+        templateId: templateData?.id || null,
+        templateName,
+        shortDescription: finalDescription,
+        grimnessLevel,
+        darknessLevel,
+        magicLevel,
+        technologyLevel,
+        responseVerbosity,
+        campaignGoal,
+        milestones,
+        customNames,
+        worldTheme,
+        tier: templateData?.tier || customTier || 1,
+        levelRange: templateData?.levelRange || null,
+        premium: isTemplatePremium(templateData),
+      }, {
+        // Keep the manual preview map (Custom/Freeform) when one was built;
+        // Ready-Made adventures generate here.
+        seed: worldSeed || null,
+        mapData: generatedMap || null,
+      });
+    } catch (err) {
+      logger.error('Campaign launch failed:', err);
+      setFormError(err.message);
+      return;
+    }
 
-    const settingsData = {
-      shortDescription: finalDescription,
-      grimnessLevel,
-      darknessLevel,
-      magicLevel,
-      technologyLevel,
-      responseVerbosity,
-      campaignGoal: derivedGoal,
-      milestones: resolveMilestoneCoords(milestones, mapData),
-      worldSeed: seedToUse,
-      // Biome theme + map-format version travel with the save (the map itself is a bare
-      // 2D array, so version/theme live on game_settings — see WORLD_BIOME_PLAN / CLAUDE.md).
-      theme: worldTheme,
-      mapVersion: 2,
-      templateName,
-      tier: campaignTier,
-      levelRange: campaignLevelRange,
-      requiredBuildings: spawnResult.requiredBuildings,
-      enemySpawns: spawnResult.enemySpawns,
-      itemSpawns: spawnResult.itemSpawns,
-      sideQuests: selectedSideQuests
-    };
+    // Fresh game session ID for this new game
+    localStorage.setItem('activeGameSessionId', launch.gameSessionId);
 
-    // Generate a fresh game session ID for this new game
-    const gameSessionId = `game-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    localStorage.setItem('activeGameSessionId', gameSessionId);
-
-    setSettings(settingsData);
-    navigate('/hero-selection', { state: { heroes, generatedMap: mapData, worldSeed: seedToUse, gameSessionId, townMapsCache } });
+    setSettings(launch.settings);
+    navigate('/hero-selection', { state: { heroes, generatedMap: launch.mapData, worldSeed: launch.worldSeed, gameSessionId: launch.gameSessionId, townMapsCache: launch.townMapsCache } });
   };
 
   // Tab state
