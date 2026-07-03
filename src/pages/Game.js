@@ -548,7 +548,13 @@ const Game = ({ resumeConversation = null }) => {
     const q = (settings?.sideQuests || []).find(x => x.id === questId);
     if (!q || q.status !== 'available') return;
     setSettings(prev => ({ ...prev, sideQuests: acceptSideQuest(prev.sideQuests || [], questId) }));
-    interactionHook.setConversation(prev => [...prev, { role: 'system', content: `📜 New quest: ${q.title} — ${q.description}` }]);
+    // Accepting a site-bound quest reveals its site type on the world map (sticky) — but
+    // the player was never TOLD, which made "recover X from the cave" read as a mystery.
+    const siteTypes = [...new Set((q.milestones || []).filter(m => m.site).map(m => m.site.type))];
+    const revealNote = siteTypes.length > 0
+      ? `\n🗺️ ${siteTypes.map(t => (t === 'ruins' ? 'Ruins have' : `A ${t} has`)).join(' and ')} been revealed on your world map.`
+      : '';
+    interactionHook.setConversation(prev => [...prev, { role: 'system', content: `📜 New quest: ${q.title} — ${q.description}${revealNote}` }]);
     setTimeout(() => performSave(), 500);
   };
 

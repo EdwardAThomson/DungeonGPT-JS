@@ -36,15 +36,16 @@ const combatPool = (type) => {
 };
 
 // Themed loot item keys (catalog keys from inventorySystem). Kept modest; the hoard slot
-// adds a chance at something rarer.
-const LOOT = {
+// adds a chance at something rarer. Exported for questHints' derived "where do I find
+// this item?" text (read-only consumer).
+export const LOOT = {
   cave: ['cave_mushrooms', 'raw_gems', 'glowing_fungi', 'exposed_minerals', 'healing_potion', 'spider_silk'],
   ruins: ['ancient_scroll', 'salvaged_goods', 'history_tome', 'ritual_dagger', 'pearl', 'enchanted_trinket'],
   forest: ['healing_herbs', 'rare_flower', 'rare_herb', 'beast_hide', 'wolf_pelt', 'fairy_dust'],
   hills: ['mountain_herbs', 'exposed_minerals', 'wolf_fang', 'beast_hide', 'rare_ore', 'healing_herbs'],
   mountain: ['mountain_crystal', 'exposed_minerals', 'rare_ore', 'storm_crystal', 'bear_pelt'],
 };
-const HOARD_BONUS = {
+export const HOARD_BONUS = {
   cave: ['greater_healing_potion', 'magic_weapon', 'raw_gems'],
   ruins: ['dark_tome', 'magic_item', 'ancient_scroll'],
   // Beast country: Hide Armor is a wilderness-only sidegrade to shop-bought Studded Leather.
