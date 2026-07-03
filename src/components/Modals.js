@@ -177,8 +177,19 @@ export const AiEngineSettings = ({
           <div style={{ fontSize: '0.72rem', fontWeight: 400, marginTop: '2px' }}>Stronger models · Members — coming soon</div>
         </button>
       </div>
-      {renderPicker('Narrative DM', 'game', selectedProvider, selectedModel, setSelectedModel)}
-      {renderPicker('OOC Assistant', 'assistant', assistantProvider || selectedProvider, assistantModel || selectedModel, setAssistantModel)}
+      {/* Production shows NO provider/model dropdowns (maintainer decision: too many
+          choices — the pool IS the choice). The free pool runs on managed cf-workers
+          models; Premium (#7) adds the OpenRouter pool later. Dev keeps the pickers. */}
+      {SHOW_PROVIDER_CHOICE ? (
+        <>
+          {renderPicker('Narrative DM', 'game', selectedProvider, selectedModel, setSelectedModel)}
+          {renderPicker('OOC Assistant', 'assistant', assistantProvider || selectedProvider, assistantModel || selectedModel, setAssistantModel)}
+        </>
+      ) : (
+        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 4px' }}>
+          The Dungeon Master runs on the free pool automatically — no setup needed.
+        </p>
+      )}
       {showActiveStatus && (
         <div style={{ marginTop: '20px', background: 'var(--surface)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
