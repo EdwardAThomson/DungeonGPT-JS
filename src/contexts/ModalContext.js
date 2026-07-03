@@ -6,12 +6,16 @@ const MODAL_REGISTRY = {
   map:              { layer: 0, group: 'navigation' },
   encounterInfo:    { layer: 0, group: 'navigation' },
   encounterAction:  { layer: 1, group: 'encounter' },
-  settings:         { layer: 0, group: 'info' },
+  // #52: the tabbed Adventure Book hub (Journal / Side Quests / Codex / Party / AI).
+  // It absorbed the old `settings` (Journal) and `inventory` (Party Inventory)
+  // modals. Navigation group on purpose: encounters auto-close it (the encounter
+  // group closes 'navigation'), preserving the FocusTrap conflict semantics the
+  // old modals relied on.
+  adventureBook:    { layer: 0, group: 'navigation' },
   howToPlay:        { layer: 0, group: 'info' },
   hero:             { layer: 0, group: 'info' },
   dice:             { layer: 0, group: 'info' },
   saveConfirmation: { layer: 0, group: 'info' },
-  inventory:        { layer: 2, group: 'inventory' },
   building:         { layer: 2, group: 'child', parent: 'map' },
   questOffer:       { layer: 1, group: 'info' },
 };

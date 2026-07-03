@@ -42,6 +42,7 @@ import {
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
 import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile } from '../game/milestoneEngine';
+import { recordItemDiscoveries, recordEnemyDiscovery, seedCodexFromParty, getBestiaryEntries, findBestiaryMatch, slugify as slugifyCodexKey } from '../game/codexEngine';
 import { buyItem, sellItem } from '../game/shopController';
 import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, turnInQuest, getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
 import { buildInSaveContinuation, applyContinuationToSettings, healPartyForNextChapter } from '../game/campaignChain';
@@ -222,14 +223,15 @@ const Game = ({ resumeConversation = null }) => {
   const { open: openHowToPlay } = useModal('howToPlay');
   const { open: openHero } = useModal('hero');
   const { open: openDice } = useModal('dice');
-  const { open: openInventory } = useModal('inventory');
   const { open: openSaveConfirmation } = useModal('saveConfirmation');
   const { open: openEncounterInfo, close: closeEncounterInfo } = useModal('encounterInfo');
   const { open: openQuestOffer } = useModal('questOffer');
   const { open: openEncounterAction, close: closeEncounterAction, data: encounterActionData } = useModal('encounterAction');
+  // #52: the Adventure Book hub (Journal / Side Quests / Codex / Party / AI). It
+  // replaced the boolean-state Journal (settings) modal and the Party Inventory
+  // modal; both the Journal and Inventory header buttons open it at their tab.
+  const { open: openAdventureBook, close: closeAdventureBook } = useModal('adventureBook');
 
-  // --- Modal states not yet migrated ---
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [movesSinceEncounter, setMovesSinceEncounter] = useState(
     subMapsObj?.movesSinceEncounter || 0
   );
@@ -414,6 +416,75 @@ const Game = ({ resumeConversation = null }) => {
     setSelectedHeroes(prev => replaceHeroInParty(prev, updatedHero));
   };
 
+  // --- Codex (#51): discovery recording -------------------------------------
+  // settings.codex = { items: [keys], enemies: [keys] } — additive, persisted with
+  // the save (guests included). Items are recorded at the acquisition chokepoints
+  // (site loot, objective grants, purchases, encounter/milestone/side-quest
+  // rewards); enemies when an encounter resolves in handleEncounterResolve.
+  // First discoveries get one "📚 New codex entry" system line PER GRANT (bulk
+  // loot announces once); announcedCodexRef stops re-announcements when several
+  // grants land before settings re-renders.
+  const announcedCodexRef = useRef(new Set());
+
+  const recordItemsInCodex = (itemKeys) => {
+    const keys = (itemKeys || []).map(k => slugifyCodexKey(k)).filter(Boolean);
+    if (keys.length === 0) return;
+    setSettings(prev => {
+      const { codex } = recordItemDiscoveries(prev?.codex, keys);
+      return codex === prev?.codex ? prev : { ...prev, codex };
+    });
+    // Announce only entries that exist as codex cards (catalog items), were not
+    // already discovered, and haven't been announced this session — quest items
+    // are tracked silently. Checked against the current settings snapshot; the
+    // announcedCodexRef guard covers grants racing within one render.
+    const { added } = recordItemDiscoveries(settings?.codex, keys);
+    const toAnnounce = added.filter(k => ITEM_CATALOG[k] && !announcedCodexRef.current.has(`item:${k}`));
+    if (toAnnounce.length === 0) return;
+    toAnnounce.forEach(k => announcedCodexRef.current.add(`item:${k}`));
+    const names = toAnnounce.map(k => ITEM_CATALOG[k].name);
+    interactionHook.setConversation(prev => [...prev, {
+      role: 'system',
+      content: names.length === 1
+        ? `📚 New codex entry: ${names[0]}`
+        : `📚 New codex entries: ${names.join(', ')}`
+    }]);
+  };
+
+  const recordEnemyInCodex = (encounter) => {
+    if (!encounter) return;
+    // Only creatures with a bestiary card count: non-hostile narrative encounters
+    // (merchants, strangers, shrines) resolve through the same modal for guests
+    // and must not mint phantom "new codex entry" announcements.
+    const entry = findBestiaryMatch(getBestiaryEntries(settings?.milestones), encounter);
+    if (!entry) return;
+    setSettings(prev => {
+      const { codex } = recordEnemyDiscovery(prev?.codex, encounter);
+      return codex === prev?.codex ? prev : { ...prev, codex };
+    });
+    const { added } = recordEnemyDiscovery(settings?.codex, encounter);
+    const tag = `enemy:${entry.id}`;
+    if (added.length === 0 || announcedCodexRef.current.has(tag)) return;
+    announcedCodexRef.current.add(tag);
+    interactionHook.setConversation(prev => [...prev, {
+      role: 'system',
+      content: `📚 New codex entry: ${entry.name}`
+    }]);
+  };
+
+  // Codex back-compat seeding + safety net: anything the party currently carries
+  // counts as discovered. Old saves (no settings.codex) get their codex stamped on
+  // load from inventory/equipment; any item that slipped in through an unhooked
+  // path is captured on the next render. Silent (no fanfare) and cheap — the seed
+  // returns the same object when there is nothing new, so this write no-ops.
+  useEffect(() => {
+    setSettings(prev => {
+      if (!prev) return prev;
+      const seeded = seedCodexFromParty(prev.codex, selectedHeroes);
+      return seeded === prev.codex ? prev : { ...prev, codex: seeded };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedHeroes, settings?.codex]);
+
   // --- Milestone Engine: deterministic completion check ---
   const checkMilestoneEvent = (event, currentParty) => {
     const heroLevel = currentParty?.[0]?.level || 1;
@@ -437,6 +508,8 @@ const Game = ({ resumeConversation = null }) => {
           if (c.questCompleted && c.questRewards) {
             party = applyEncounterOutcomeToParty({ party, result: { rewards: c.questRewards, heroIndex: 0 } }).updatedParty;
           }
+          // Codex (#51): reward items entering the party's hands are discoveries.
+          recordItemsInCodex([...(stepRewards.items || []), ...((c.questCompleted && c.questRewards?.items) || [])]);
           interactionHook.setConversation(prev => [...prev, {
             role: 'system',
             content: c.questCompleted ? `🎉 Side quest complete: ${c.title}!` : `✓ ${c.milestone.text}`
@@ -475,6 +548,7 @@ const Game = ({ resumeConversation = null }) => {
 
       // Apply milestone rewards to lead hero
       const rewards = getMilestoneRewards(result.milestone);
+      if (rewards.items.length > 0) recordItemsInCodex(rewards.items); // codex (#51)
       if (rewards.xp > 0 || rewards.gold > 0 || rewards.items.length > 0) {
         const rewardResult = applyEncounterOutcomeToParty({
           party: currentParty,
@@ -552,6 +626,7 @@ const Game = ({ resumeConversation = null }) => {
     if (loot.gold) parts.push(`${loot.gold} gold`);
     if (itemNames.length) parts.push(itemNames.join(', '));
     interactionHook.setConversation(prev => [...prev, { role: 'system', content: `💰 You find ${parts.join(' and ')}.` }]);
+    recordItemsInCodex(loot.items); // codex (#51): looted items are discoveries
     (loot.items || []).forEach(k => checkMilestoneEvent({ type: 'item_acquired', itemId: k }, selectedHeroes));
     setTimeout(() => performSave(), 500);
   };
@@ -576,6 +651,7 @@ const Game = ({ resumeConversation = null }) => {
       return heroes;
     });
     interactionHook.setConversation(prev => [...prev, { role: 'system', content: `❗ You recover ${item.name}.` }]);
+    recordItemsInCodex([item.id]); // codex (#51): catalog items announce; quest items track silently
     checkMilestoneEvent({ type: 'item_acquired', itemId: item.id }, selectedHeroes);
     setTimeout(() => performSave(), 500);
   };
@@ -675,6 +751,8 @@ const Game = ({ resumeConversation = null }) => {
       if (c.questCompleted && c.questRewards) {
         party = applyEncounterOutcomeToParty({ party, result: { rewards: c.questRewards, heroIndex: 0 } }).updatedParty;
       }
+      // Codex (#51): turn-in reward items are discoveries.
+      recordItemsInCodex([...((c.rewards?.items) || []), ...((c.questCompleted && c.questRewards?.items) || [])]);
       interactionHook.setConversation(prev => [...prev, { role: 'system', content: c.questCompleted ? `🎉 Side quest complete: ${c.title}!` : `✓ ${c.milestone.text}` }]);
     });
     setSelectedHeroes(party);
@@ -1145,6 +1223,13 @@ const Game = ({ resumeConversation = null }) => {
     // Milestone checks after encounter resolution
     const activeEncounter = encounterActionData?.encounter;
     const encounterName = activeEncounter?.name || 'Encounter';
+
+    // Codex (#51): facing an enemy discovers it — the encounter RESOLVED (win,
+    // loss, or flight), so the party has met the creature either way.
+    recordEnemyInCodex(activeEncounter);
+    // Reward items entering the inventory are item discoveries.
+    if (result?.rewards?.items?.length > 0) recordItemsInCodex(result.rewards.items);
+
     if (result?.outcome === 'victory' || result?.outcome === 'success') {
       // Check enemy_defeated milestone
       const enemyId = activeEncounter?.enemyId || activeEncounter?.name?.toLowerCase().replace(/\s+/g, '_');
@@ -1273,16 +1358,13 @@ const Game = ({ resumeConversation = null }) => {
             mapHook.setIsMapModalOpen(true);
             if (tourActive && tourStep?.id === 'open-map') advanceTour();
           }}
-          onOpenInventory={() => openInventory({
-            selectedHeroes,
-            onUseItem: (heroId, itemKey, healedHero) => {
-              setSelectedHeroes(prev => replaceHeroInParty(prev, healedHero));
-            },
-            onHeroUpdate: handleHeroUpdate
-          })}
+          onOpenInventory={() => openAdventureBook({ tab: 'party' })}
           onOpenHowToPlay={openHowToPlay}
           onLookAround={handleLookAround}
-          onOpenSettings={() => setIsSettingsModalOpen(true)}
+          // No pinned tab: the Journal button opens the book at the remembered
+          // last tab (#52); first open defaults to Campaign. The Inventory button
+          // above pins the Party tab because its intent is unambiguous.
+          onOpenSettings={() => openAdventureBook()}
           onManualSave={async () => {
             const currentRoot = (settings?.saveName || '').trim();
             const title = buildSaveName(currentRoot);
@@ -1369,14 +1451,11 @@ const Game = ({ resumeConversation = null }) => {
       </div>
 
       <GameModals
-        isSettingsModalOpen={isSettingsModalOpen}
-        setIsSettingsModalOpen={setIsSettingsModalOpen}
         onContinueLegend={() => {
-          setIsSettingsModalOpen(false);
+          closeAdventureBook();
           setLegendPicker({ open: true, celebrate: false });
         }}
         settings={settings}
-        setSettings={setSettings}
         selectedProvider={selectedProvider}
         setSelectedProvider={setSelectedProvider}
         selectedModel={selectedModel}
@@ -1385,7 +1464,6 @@ const Game = ({ resumeConversation = null }) => {
         setAssistantProvider={setAssistantProvider}
         assistantModel={assistantModel}
         setAssistantModel={setAssistantModel}
-        worldSeed={worldSeed}
         selectedHeroes={selectedHeroes}
         mapHook={mapHook}
         handleMoveOnWorldMap={handleMoveOnWorldMap}
@@ -1396,7 +1474,11 @@ const Game = ({ resumeConversation = null }) => {
         handleSiteTileClick={handleSiteTileClick}
         handleEncounterResolve={handleEncounterResolve}
         handleHeroUpdate={handleHeroUpdate}
+        onUseItem={(heroId, itemKey, healedHero) => {
+          setSelectedHeroes(prev => replaceHeroInParty(prev, healedHero));
+        }}
         onQuestItemFound={(itemId, itemName) => {
+          recordItemsInCodex([itemId]); // codex (#51)
           checkMilestoneEvent({ type: 'item_acquired', itemId }, selectedHeroes);
         }}
         party={selectedHeroes}
@@ -1448,6 +1530,7 @@ const Game = ({ resumeConversation = null }) => {
           const result = buyItem(selectedHeroes, itemKey);
           if (result.ok) {
             setSelectedHeroes(result.party);
+            recordItemsInCodex([itemKey]); // codex (#51): bought items are discoveries
             // Buying IS acquiring: without this, purchasing a quest item (e.g. healing
             // herbs at the apothecary) silently failed to progress its item milestone.
             checkMilestoneEvent({ type: 'item_acquired', itemId: itemKey }, result.party);
