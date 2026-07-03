@@ -262,6 +262,19 @@ If a milestone says "find the map in the archives", the archives must exist as a
 - The item/NPC is then placed inside that building
 - When the player visits the building, they can interact with the item/NPC
 
+> **Shipped 2026-07-03: item milestones no longer require a building.** An item milestone can
+> also be authored at a named wilderness location (mountain range or POI) with no `building`.
+> `getMilestoneItemForTile(milestones, tile)` matches the active, prerequisite-met,
+> building-less item milestone to the tile's named location (`mountainName`/`poiName`/
+> `townName`), and the POI arrival modal then offers a "🌿 Gather <item>" action (the item
+> mirror of the boss "⚔️ Confront"), routed through `grantObjectiveItem` so `item_acquired`
+> fires and the milestone completes. Buying the quest item from a shop also fires
+> `item_acquired`, so purchasing counts as acquiring. The Journal shows the item and where to
+> find it. The Gather action is derived at runtime from milestone state (not stamped into the
+> save), so previously stuck saves self-repair on load. A template lint test in
+> `src/data/storyTemplates.test.js` fails CI if any authored item milestone is collectible
+> neither via a town building nor a named wilderness location.
+
 ```javascript
 // Item milestone — needs a building to house the item
 {
