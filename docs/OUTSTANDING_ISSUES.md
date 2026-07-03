@@ -21,12 +21,13 @@ Source audits: roadmap survey (2026-04-19), auth verification (2026-04-19), docs
 | # | Issue | Source | Size | Decision |
 |---|---|---|---|---|
 | 3 | **Team encounter system (Lead + Support).** Full party combat for multi-hero parties. Design complete, zero code. Now the core of the combat-depth program (#43, [T3_CAMPAIGNS_PLAN.md](T3_CAMPAIGNS_PLAN.md) §7). | [ENCOUNTER_SYSTEM.md](ENCOUNTER_SYSTEM.md) Phase 5 | L | |
-| 4 | **Narrative milestones.** Mechanical types (item/combat/location) shipped; conversation-gated quest outcomes not built. | [CAMPAIGN_MILESTONE_SYSTEM.md](CAMPAIGN_MILESTONE_SYSTEM.md) Phase 4 | L | |
 | 5 | **Layered terrain generation.** Noise-based heightmaps with biome quantiser, rivers, erosion. Prototype at `src/experimental/mapGen/layeredGenerator.js` exists but not wired to production. | [TERRAIN_ROADMAP.md](TERRAIN_ROADMAP.md) | L | |
 | 6 | **Billing + usage accounting.** No credit ledger, no `ai_usage_events` table, no Lemon Squeezy (or alternative) integration. AI generation ungated beyond auth. | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) §5 | L | |
 | 7 | **OpenRouter premium tier.** Planned in README; not wired into `cf-worker/src/routes/ai.ts`. Depends on #6 (billing) for tier gating. | [CF_WORKER_GUIDE.md](CF_WORKER_GUIDE.md), [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) | M-L | |
 | 30 | **Admin dashboard — read/inspect the Supabase database.** *(Flagged HIGH PRIORITY.)* No way today to view player saves / heroes / conversations for support or debugging. Triggered by a player who lost a hero to the duplicate-hero bug and asked whether their character still exists in the DB — which we cannot currently confirm. Needs a read view over conversations/saves (auth-gated to an admin), at minimum read-only. | Session 2026-06-28 | M-L | Soon | 
-| 43 | **Combat-depth program: bosses hit back + party boss fights.** Implement #3 (Lead + Support) for multi-round boss fights and add explicit boss damage profiles on encounter data, replacing `shouldDealDamage` keyword matching; includes the flat-vs-percent enemy-damage decision. Step 2 of [T3_CAMPAIGNS_PLAN.md](T3_CAMPAIGNS_PLAN.md) §9. | Design session 2026-07-03 | L | |
+| 43 | ~~**Combat-depth program: bosses hit back + party boss fights.**~~ **SHIPPED 2026-07-03.** Lead + Support (Phase 5) is live for multi-round fights (support bonus in the roll, lead KO auto-swap, crit-fail splash, party XP split); enemy damage is FLAT per outcome with HP-scaled `maxRounds` (enemy HP is a real knob); all 10 template bosses carry explicit `dealsDamage`/`damage` profiles (keyword matching deprecated, kept as old-data fallback); the three deadly t2 bosses retuned to sim-validated `dc` 19-20. All boss pins in `progressionLint.test.js` healed (bands: t1 solo / t2+ 3-hero mid-gear). Shipped note in [ENCOUNTER_SYSTEM.md](ENCOUNTER_SYSTEM.md) Phase 5; #3 shipped with it. | Design session 2026-07-03 | L | Done |
+
+> ~~#4: Narrative milestones — conversation-gated quest outcomes not built.~~ — **SHIPPED (verified 2026-07-03 audit).** Both halves now exist end-to-end: AI-judged `type: 'narrative'` milestones complete via the `[COMPLETE_MILESTONE]` marker in `useGameInteraction.js` (guarded so a stray marker can never complete a mechanical milestone; 5 narrative milestones live in `storyTemplates.js`), and the 2026-07-02 milestone NPC-grounding work added a deterministic **`talk` mechanical type** (`npc_talked` events, Option C) with authored, placed NPCs (Captain Marta / Ulric) — the conversation-gated outcome the row asked for. Design record: [MILESTONE_NPC_GROUNDING_PLAN.md](MILESTONE_NPC_GROUNDING_PLAN.md).
 
 ---
 
@@ -34,18 +35,23 @@ Source audits: roadmap survey (2026-04-19), auth verification (2026-04-19), docs
 
 | # | Issue | Source | Size | Decision |
 |---|---|---|---|---|
-| 8 | **AI loot narration.** Encounter rewards applied silently ("+50 XP, +12 gold" text). Phase 4 deferred. AI should narrate discovery. | [ENCOUNTER_SYSTEM.md](ENCOUNTER_SYSTEM.md) Phase 4 | M | |
+| 8 | **AI loot narration.** Encounter rewards applied silently ("+50 XP, +12 gold" text). Phase 4 deferred. AI should narrate discovery. *(Re-scoped 2026-07-03 audit: combat narration is deliberately zero-LLM — see the #33 note — so this must be a post-encounter beat, either an AI call after resolution or a richer local template, not in-combat AI narration.)* | [ENCOUNTER_SYSTEM.md](ENCOUNTER_SYSTEM.md) Phase 4 | M | |
 | 9 | **AI image tiles for world map.** Phase 1: 7 easy tiles (features + towns, no edge-matching). Prompts written in [IMAGE_GENERATION_PROMPTS.md](IMAGE_GENERATION_PROMPTS.md); generation not run. | [TERRAIN_ROADMAP.md](TERRAIN_ROADMAP.md) | M (generation + wiring) | |
-| 10 | **9 missing building interior images.** Alchemist, Market, Archives, Library, Foundry, Warehouse, Keep, Barn, Barracks. | [MISSING_BUILDING_IMAGES.md](MISSING_BUILDING_IMAGES.md) | S-M (asset gen) | |
 | 11 | **Automated CF Worker deploy.** Frontend auto-deploys via Pages; Worker deploy is manual (`wrangler deploy`). Needs `.github/workflows/deploy.yml` + post-deploy smoke test. | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) §5 | S-M | |
 | 12 | **Rate limiting on Worker.** No throttling on `/api/ai`, `/api/db/*`, `/api/embed`. Any authed user can spam. | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) §5, [LOCAL_RAG_PLAN.md](LOCAL_RAG_PLAN.md) Q6 | S-M | |
 | 44 | **Gear-ladder expansion.** Fill the empty very_rare weapon rung and thin armor ladder (no legendary armor), add the t3 legendary shelf, shift the top end from quest artifacts to findable loot; bonuses sim-tuned, depends on #43 making defense matter. [T3_CAMPAIGNS_PLAN.md](T3_CAMPAIGNS_PLAN.md) §5. | Design session 2026-07-03 | S-M + icon art | |
 | 45 | **XP economy / content expansion.** Worlds pay ~1,700-3,200 XP vs 6,500 for Lv 5: expand the 30-quest side-quest pool (only 2-4 picked per world), backfill quests into in-progress saves, same-world sequels, and decide the t3 entry range. [T3_CAMPAIGNS_PLAN.md](T3_CAMPAIGNS_PLAN.md) §2.1, [FEATURE_SIDEQUEST_BACKFILL.md](FEATURE_SIDEQUEST_BACKFILL.md), [QUEST_CHAINING_PLAN.md](QUEST_CHAINING_PLAN.md) | Design session 2026-07-03 | M | |
-| 46 | **Balance-sim harness.** Pure-JS Monte-Carlo over the real resolver (`balanceSim.js` + test guard with KNOWN_UNBALANCED baseline), extended from day one to model party size, Lead/Support bonuses, boss damage profiles, and an XP-budget audit per world. Build first; step 1 of [T3_CAMPAIGNS_PLAN.md](T3_CAMPAIGNS_PLAN.md) §4/§9. Now also carries the progression-lint guards (band coverage, gear obtainability, leveling-power delta) per §16. | Design session 2026-07-03 | M | |
-| 47 | **Leveling grants zero combat power.** Measured win-rate delta per level = 0.0pp (sim of the real resolver): stats are frozen at creation (point-buy cap 15; the ASI system in `progressionSystem.js:126-139` is consumed only by the debug page `ProgressionTest.js`), and the check modifier (`encounterResolver.js:39-50`) has no level term. Level buys only maxHP (which 9/10 bosses never touch) and content gates, while DCs stay static, so the game never gets easier with level and grinding can't beat a DC wall. Decide and ship a leveling-power mechanic (apply ASI at Lv 4, or a proficiency-style +1 per 2 levels), sim-tuned together with the DC ladder (#43/#46). [T3_CAMPAIGNS_PLAN.md](T3_CAMPAIGNS_PLAN.md) §11. | Progression audit 2026-07-03 | M | |
-| 48 | **Level-up can LOWER max HP.** `awardXP` recalculates maxHP via `progressionSystem.calculateMaxHP(character.characterClass, …)` but heroes store the class as `heroClass` (`HeroCreation.js:121`), so every class levels as a d8; and that formula disagrees with the creation-time `healthSystem.calculateMaxHP` (10 + Con×5, cap 30). Verified: a Con-14 hero goes 20 maxHP at Lv 1 → **17** at Lv 2 → 24 at Lv 3. Fix: unify on one maxHP formula and the field name. [T3_CAMPAIGNS_PLAN.md](T3_CAMPAIGNS_PLAN.md) §11.3. | Progression audit 2026-07-03 | S | |
-| 49 | **Unobtainable gear, dead site-loot pools, wrong quest hints.** `legendary_weapon` (the only +2 weapon; its sole drop is tier-gated to nonexistent t3), `dragonscale_plate`, `hide_armor`, and `ring_protection` have NO live source (no shop, no reachable drop, no reward). Cause of two of them: `sitePopulator.js:128` coerces forest/hills/mountain sites to 'cave', so their themed `LOOT`/`HOARD_BONUS` pools never roll, and `questHints.describeItemSources` (which reads those pools) tells players sources that don't exist. Also: the 25g shortsword, 100-125g daggers, and 500g Enchanted Blade are ALL +1 (a flat price ladder). Repair before/with #44; lint guard in #46. [T3_CAMPAIGNS_PLAN.md](T3_CAMPAIGNS_PLAN.md) §12. | Progression audit 2026-07-03 | S-M | |
 | 50 | **Mid/top band content coverage.** Desert-expedition and frozen-frontier genres dead-end at t1 (no t2 sequel, stranding parties at Lv 2-3); only 8/30 side quests have `minLevel ≥ 3` (and `effectivePartyLevel` = lead + party/2 lets a 4-hero Lv-1 party see 28/30 on day one); random encounters have no level/tier input so nothing new appears after Lv 2; bands Lv 6-7 have zero campaigns, quests, bosses, or gear. Overlaps #45 (may merge at prioritization). [T3_CAMPAIGNS_PLAN.md](T3_CAMPAIGNS_PLAN.md) §13.3-15. | Progression audit 2026-07-03 | M-L | |
+> ~~#10: 9 missing building interior images (Alchemist, Market, Archives, Library, Foundry, Warehouse, Keep, Barn, Barracks).~~ — **SHIPPED 2026-06-28** (equipment-items pass + towns/buildings pass). All nine exist in `public/assets/buildings/`, plus ten newly-added building types (apothecary, fletcher, harbormaster, jail, magetower, mill, shrine, stables, tailor, townhall). Coverage is now enforced by `src/utils/buildingArt.test.js` (every placeable building must have an icon + interior image). [MISSING_BUILDING_IMAGES.md](MISSING_BUILDING_IMAGES.md) already records this.
+
+> ~~#46: Balance-sim harness.~~ — **SHIPPED 2026-07-03** (`75bbdc6`). `src/game/balanceSim.js` + `balanceSim.test.js` (Monte-Carlo over the real resolver, KNOWN_UNBALANCED guard, Lead/Support + boss-profile modeling) and the six-guard progression lint (`src/game/progressionLint.test.js`).
+
+> ~~#47: Leveling grants zero combat power.~~ — **SHIPPED 2026-07-03** (`fb7515f`, decision in `2fa4d09`): Option A, a level term of +1 per 2 levels (capped +3) on every check in `encounterResolver.js`, derived from level so it applies retroactively to existing saves. The ASI-at-Lv-4 modal was considered and **deferred** as a possible later layer, not part of this row.
+
+> ~~#48: Level-up can LOWER max HP.~~ — **FIXED 2026-07-03** (`17f33bc`). `progressionSystem.js` now resolves `heroClass` (with `characterClass` fallback via `resolveClass`), unifies the maxHP formula, and clamps recalculated maxHP with `Math.max(recalc, current)` so older already-lowered saves heal forward.
+
+> ~~#49: Unobtainable gear, dead site-loot pools, wrong quest hints.~~ — **FIXED 2026-07-03** (`b9a23a4`). `sitePopulator.js` no longer coerces forest/hills/mountain sites to 'cave' for loot (`LOOT[site.type]` used directly; only combat templates legitimately borrow cave/ruins mobs); themed pools + `HOARD_BONUS` now roll, gear made obtainable, and the obtainability lint guard landed with #46. Loot rarity is additionally tier/level-gated in `encounterResolver.js`.
+
 > ~~#41/#42: Journal side-quest tab + objective clarity.~~ — **SHIPPED 2026-07-03.** Journal has 📜 Campaign | 🗺️ Side Quests tabs; quest cards sort ready→active→completed with per-step progress and derived how/where hints (questHints.js), plus the accept-time site-reveal toast. Design record: [SIDEQUEST_UX_PLAN.md](SIDEQUEST_UX_PLAN.md).
 
 > ~~#34: New Game custom-game options are drop-down heavy; player suggested collapsible accordion sections.~~ — **RESOLVED 2026-07-02 (Skip the accordion).** The real complaint ("a lot of drop-downs" / overload) was addressed by replacing the 5 tone dials (Grimness/Darkness/Magic/Tech/Narrative Style) with segmented **chip rows** (every option visible, one tap) plus sticky theme defaults + a "reset to theme" link. An accordion was evaluated and rejected: it would hide the main quest-builder behind clicks and broke the live preview. The quest-slot pickers keep dropdowns (many options each, where a dropdown is the right control). No further work planned. (The same feedback floated portrait-matches-race, already out of scope: race selector is hidden / human-only.)
@@ -56,9 +62,6 @@ Source audits: roadmap survey (2026-04-19), auth verification (2026-04-19), docs
 
 | # | Issue | Source | Size | Decision |
 |---|---|---|---|---|
-| 13 | **Narrative encounter engagement detection.** Movement-triggered narrative encounters use fragile keyword matching ("approach", "investigate"). Design open. | [ENCOUNTER_SYSTEM.md](ENCOUNTER_SYSTEM.md) Phase 2.4 Q1 | S | |
-| 14 | **Immediate vs narrative encounter prompt suppression.** When immediate encounter fires, suppress AI movement prompt fully or show brief transition? Decision pending. | [ENCOUNTER_SYSTEM.md](ENCOUNTER_SYSTEM.md) Phase 2.4 Q2 | XS (decision) | |
-| 15 | **4 missing quest item icons.** `medical_journal`, `medicine_kit`, `uncovered_ruins`, `nature_blessing` — in registry, no icons. | [items_list.md](items_list.md), [entity_audit.md](entity_audit.md) | XS (asset gen) | |
 | 16 | **Structured logging + request correlation IDs.** Worker uses `console.error`; no request-ID middleware, no log aggregation verified. | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) §5 | S | |
 | 17 | **RAG index cleanup on save delete.** IndexedDB bloat is a slow problem; worth adding when convenient. | [LOCAL_RAG_PLAN.md](LOCAL_RAG_PLAN.md) Q5 | XS | |
 | 18 | **Embedding model migration strategy.** If CF Workers AI embedding model changes, old vectors become incompatible. Need versioning or forced re-index plan. | [LOCAL_RAG_PLAN.md](LOCAL_RAG_PLAN.md) Q7 | S (design) | |
@@ -68,8 +71,14 @@ Source audits: roadmap survey (2026-04-19), auth verification (2026-04-19), docs
 | 35 | **Narrative-tier encounter hooks have no visible affordance (signed-in).** Non-hostile encounters (e.g. Hidden Cache treasure) never open the action modal: the hook is woven into Look-around AI narration and relies on the player *typing* a follow-up ("I dig it out"), which nothing teaches. Their `rewards` are only rollable via the modal flow, so an un-acted hook forfeits them silently. Consider action chips under the narration, or opening the modal after the AI beat. (Guests now get the fallback modal — fixed 2026-07-02.) | Playtest 2026-07-02 (hills treasure) | S-M (design + UI) | |
 | 36 | **Parked Look-around encounter silently discarded on next move.** `pendingLookEncounter` is cleared when the player moves without Looking around, so a rolled narrative encounter (and its rewards) vanishes with no trace. Consider persisting it for N moves or surfacing a hint ("something glints nearby"). | Playtest 2026-07-02 | XS-S | |
 | 37 | **Encounter presentation note: narrative-tier hooks show no encounter image.** All 46 encounter images exist and every catalog entry has an `image:` field, but images only render in the action modal, text-woven hooks are image-less by design. If hooks gain an affordance (#35), consider showing the image alongside. | Playtest 2026-07-02 | XS (note) | |
-| 39 | **Server-side entitlements (prerequisite for charging money).** `isPremium()` is a client-side localStorage placeholder — one console line unlocks everything. Design: user tier in Supabase (or an auth-JWT claim once billing exists); CF Worker enforces tier on premium endpoints (OpenRouter models, premium content #40) and exposes the tier to the client (e.g. `/api/me/entitlements` or with auth responses); swap the body of `src/game/entitlements.js isPremium()` to read it — every existing gate then just works, client gating stays as UX only. Blocked on the current `cf-worker/` WIP landing first. | [LICENSING_OPTIONS.md](LICENSING_OPTIONS.md) decision 2026-07-02 | M | Soon |
-| 40 | **Server-delivered premium content channel.** Future premium campaigns/music must NOT ship in the public repo or client bundle (anything bundled is public regardless of license). Design: story templates are pure JSON — store premium ones Worker/Supabase-side; a catalog endpoint lists premium entries as locked stubs (name/icon/description for the storefront) and serves full template data only to entitled users (#39); music via gated R2/CDN URLs. The already-published desert/snow campaigns stay gated in-product as-is (JSON is irrevocably Apache — treat as free marketing). Needed before the NEXT premium campaign is authored. | [LICENSING_OPTIONS.md](LICENSING_OPTIONS.md) decision 2026-07-02 | M | |
+| 39 | **Server-side entitlements (prerequisite for charging money).** `isPremium()` is a client-side localStorage placeholder — one console line unlocks everything. Design: user tier in Supabase (or an auth-JWT claim once billing exists); CF Worker enforces tier on premium endpoints (OpenRouter models, premium content #40) and exposes the tier to the client (e.g. `/api/me/entitlements` or with auth responses); swap the body of `src/game/entitlements.js isPremium()` to read it — every existing gate then just works, client gating stays as UX only. Blocked on the current `cf-worker/` WIP landing first. *(Audit 2026-07-03: that WIP is the Supabase→Hetzner-Postgres migration via Hyperdrive, in flight uncommitted in `cf-worker/`; tier storage should land in the data Postgres, not Supabase.)* | [LICENSING_OPTIONS.md](LICENSING_OPTIONS.md) decision 2026-07-02 | M | Soon |
+| 40 | **Server-delivered premium content channel.** Future premium campaigns/music must NOT ship in the public repo or client bundle (anything bundled is public regardless of license). Design: story templates are pure JSON — store premium ones Worker/Supabase-side (post-migration: data Postgres); a catalog endpoint lists premium entries as locked stubs (name/icon/description for the storefront) and serves full template data only to entitled users (#39); music via gated R2/CDN URLs. The already-published desert/snow campaigns stay gated in-product as-is (JSON is irrevocably Apache — treat as free marketing). Needed before the NEXT premium campaign is authored. | [LICENSING_OPTIONS.md](LICENSING_OPTIONS.md) decision 2026-07-02 | M | |
+
+> ~~#13: Narrative encounter engagement detection (fragile "approach"/"investigate" keyword matching).~~ — **SUPERSEDED (verified 2026-07-03 audit).** The keyword matching no longer exists. Encounter delivery was redesigned into two tiers ([TIERED_NARRATION_PLAN.md](TIERED_NARRATION_PLAN.md) B3b): immediate-tier opens the action modal; narrative-tier is parked as `pendingLookEncounter` and consumed by the Look-around prompt. The *remaining* engagement gap (no affordance to act on a woven hook, hook lost on move) is exactly #35-#37 — track it there.
+
+> ~~#14: Immediate vs narrative encounter prompt suppression (decision pending).~~ — **DECIDED & SHIPPED (verified 2026-07-03 audit).** Movement no longer auto-fires AI narration at all (B3b "smart" narration: local templated lines per move; AI only on Look-around / free-text). When an immediate encounter fires, the flow returns early and local narration resumes after resolution (`Game.js` `flowType === 'immediate'`), so the old question is moot.
+
+> ~~#15: 4 missing quest item icons (`medical_journal`, `medicine_kit`, `uncovered_ruins`, `nature_blessing`).~~ — **SHIPPED by 2026-06-28** (equipment-items pass `9782920`). All four exist in `public/assets/icons/items/`.
 
 ---
 
@@ -83,10 +92,9 @@ Raw notes captured during a play session. Three items already fixed: hero cards 
 
 > ~~#24 Character selection process not obvious~~ — **fixed 2026-06-21.** Hero Selection now has a clear instruction line, a live "Party: N of 4 selected" counter, a per-card Add / "✓ In party" pill (with hover state and a dimmed "Party full" state at the 4-hero limit), and the cards are keyboard-operable buttons (role/tabindex/aria-pressed, Enter/Space, focus ring).
 
-| # | Issue | Source | Size | Decision |
-|---|---|---|---|---|
-| 25 | **Map discoverability.** Accessing the map is not obvious; consider clearer affordance or making it visible at all times. Open design question. | Playtest (Henry) | S | |
-| 26 | **Missing `workshop` building interior image** ("the place where I should search" had no picture). Extends #10 (missing building images), which does not currently list `workshop`. | Playtest (Henry) | XS-S (asset gen) | |
+> ~~#25 Map discoverability~~ — **addressed 2026-06-21** (guided-tour commit `bc317d4`) and verified 2026-07-03: the onboarding tour has an explicit `open-map` step spotlighting the always-visible header Map button ("Open the map and click a tile to move. It stays open as you explore"), the map stays open while travelling, and it auto-reopens after encounters (`reopenMapAfterEncounterRef`). The "visible at all times" (minimap) alternative was not built; reopen as a new row if playtests still show confusion.
+
+> ~~#26 Missing `workshop` building interior image~~ — **SHIPPED 2026-06-28** (buildings pass `85a027f`/`9782920`): `public/assets/buildings/workshop.webp` exists, and `buildingArt.test.js` now enforces icon+interior coverage for every placeable building type, so this class of bug can't silently recur. All Henry playtest items are now closed.
 
 ---
 
@@ -110,20 +118,28 @@ Surfaced while positioning DungeonGPT against group-2 ("real mechanics") AI-GM c
 
 ---
 
-## Recommended prioritization (my take — subject to your call)
+## Parallelization map (audit 2026-07-03)
 
-**Do soon:**
-- #2 (OTP email template) — 5 minutes, removes user confusion
-- #1 (Supabase schema) — data loss risk; affects every save/load
+*(Replaces the stale "Recommended prioritization" section, which referenced already-resolved rows.)* Groups the remaining open items into clusters by file/system ownership, the same wave model used for #46-#49. Items in different clusters can run as parallel agent-sized packages; items inside a "serialize" cluster must land in order. Numbering caveat: **#30 is used twice** in this doc (admin dashboard, and no-death-saves in the combat table) — do not renumber; qualify references as "#30 (admin)" vs "#30 (combat)".
 
-**Next wave:**
-- #12 (rate limiting) — cheap guardrail before scale
-- #11 (auto deploy) — reduces friction, quick win
-- #15 (quest icons) + #10 (building images) — polish, parallelizable asset work
+**A. Combat core — SERIALIZE (owns `encounterResolver.js`, `EncounterActionModal.js`, encounter data, `balanceSim.js`):**
+- #43 (in progress) → #44 (gear-ladder tuning; needs #43 so defense matters) → t3 authoring parts of #45/#50.
+- #27, #28, #29, #30 (combat), and the remainder of #33 are all reshaped by #43's outcome (boss damage profiles, multi-round fights); re-triage them after #43 lands rather than starting any now.
 
-**Hold for dedicated sprints:**
-- #3 (team encounters), #4 (narrative milestones), #5 (layered terrain) — each is a multi-week feature
-- #6 (billing) + #7 (OpenRouter) — launch-gating; do together when ready to monetize
+**B. Content / data-only — PARALLEL-SAFE (owns `src/data/` quests/templates; no engine files):**
+- #45 side-quest pool expansion + backfill, #50 mid-band quests/sequels/random-encounter tiers (the two may merge). Data authoring can start now; the t3 entry-range and DC-ladder *decisions* wait on cluster A. The #46 lint guards keep this cluster honest.
+- #9 world-map AI tiles (asset generation + `worldTileArt` wiring) — fully independent.
 
-**Back-burner until needed:**
-- #8 (loot narration), #13, #14, #16–#21 — all small but not urgent
+**C. Worker / backend — BLOCKED on the Hyperdrive migration WIP (uncommitted in `cf-worker/`) landing:**
+- #39 entitlements → #40 premium content channel → #6 billing → #7 OpenRouter (strict chain; #40 needed before the next premium campaign is authored).
+- #12 rate limiting, #16 structured logging, #30 (admin) dashboard — each independent of the other two, but all touch the worker/DB layer, so start only after the migration lands (or they get built twice).
+
+**D. Encounter-UX package — PARALLEL to everything else (owns `Game.js` encounter flow + modal):**
+- #35 + #36 + #37 as one package (#37 explicitly depends on #35's affordance; #36 shares the `pendingLookEncounter` lifecycle). #8 (loot narration) also lives in this surface and can ride along or follow.
+- Caveat: if #35's fix opens the action modal, it touches `EncounterActionModal.js`, which cluster A (#43) is actively rewriting — sequence that specific piece after #43 lands, or scope #35 to chips-under-narration only.
+
+**E. Ops / infra — PARALLEL-SAFE, each independent:**
+- #11 auto-deploy, #19 runbook, #20 restore drill, #21 smoke-on-deploy, #17 RAG cleanup, #18 embedding migration design, #1 (Supabase dashboard template edit, 5 min, no code).
+
+**F. Big bets — own tracks, not scheduled:**
+- #3 (absorbed into #43), #5 layered terrain (map-gen only; safe alongside all clusters but not with other world-gen changes), #31 battlemaps, #32 multiplayer.
