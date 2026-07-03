@@ -8,7 +8,7 @@ import '../styles/premium.css';
  * production builds). Its future home is a public /premium route in App.js once
  * billing ships; promoting it should just be moving the route.
  *
- * Content source of truth: docs/PREMIUM_ACCOUNTS_PLAN.md ("Tier ladder").
+ * Content source of truth: docs/private/PREMIUM_ACCOUNTS_PLAN.md (local, gitignored) ("Tier ladder").
  * Launch scope is Free + Members: Members is the purchasable highlight;
  * Premium and Elite render as roadmap-only (dimmed, not purchasable) because
  * they are backed by unbuilt content (ships, housing, bigger maps).

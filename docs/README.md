@@ -8,6 +8,7 @@ deleted. When the code and a doc disagree, the code wins.
 - `OUTSTANDING_ISSUES.md` — master backlog
 - `../ROADMAP.md` — high-level project status
 - `LICENSING_OPTIONS.md` — licensing decision memo (decided: stay Apache-2.0; premium via engineering)
+- Business-sensitive plans (pricing/monetization strategy) live in `docs/private/` — gitignored, local only
 
 ## Architecture & deployment
 - `DEPLOYMENT_ARCHITECTURE.md` — current prod stack (CF Pages + Worker + Supabase)

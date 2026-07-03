@@ -78,6 +78,8 @@ cf-worker/migrations/
 
 # Local-only archive of stale docs (preserved on disk, not tracked)
 docs/archive/
+# Business-sensitive planning docs (pricing, monetization strategy) — local only
+docs/private/
 
 # Special docs
 docs/deployment_*.md
