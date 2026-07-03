@@ -801,7 +801,7 @@ export const storyTemplates = [
                             failure: 'The Herald\'s power surges. Reality cracks around you as ancient forces stir.',
                             criticalFailure: 'The Herald nearly completes the awakening. You flee as the mountain splits open.'
                         },
-                        rewards: { xp: 450, gold: '4d20', items: ['enchanted_staff'] }
+                        rewards: { xp: 450, gold: '4d20', items: ['stormbound_ring'] } // #44 follow-up: t2 finale pays a very_rare (was an uncommon staff)
                     },
                     rewards: { xp: 250, gold: '3d20', items: [] },
                     minLevel: 4
