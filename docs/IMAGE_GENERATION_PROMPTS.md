@@ -156,3 +156,44 @@ To generate all template cards:
 ```javascript
 const outputPath = path.join(__dirname, `../public/assets/templates/${item.key}.png`);
 ```
+
+## Generation queue (2026-07-03 — wave 3 additions)
+
+Style base for item icons: *"Painterly digital fantasy art with rich [material] textures,
+dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal
+background (#2c2c2c). Professional 2D game asset."* Boss art follows the existing
+`bosses/` portrait conventions. Placeholders are marked `TODO(#44 icon art)` /
+`TODO(t3 boss art)` in code; drop the finished file in and delete the TODO.
+
+### Item icons (`public/assets/icons/items/`)
+| File | Subject | Priority |
+|---|---|---|
+| `hunters_longbow.webp` | Masterwork yew longbow, sinew string, leather grip [wood] | HIGH (worst placeholder: borrows a sword) |
+| `runic_greatsword.webp` | Two-handed dark-steel greatsword, glowing blue dwarven war-runes [metal] | HIGH (shares the legendary sword icon) |
+| `stormbound_ring.webp` | Sky-iron ring crackling with miniature captive lightning [metal] | medium |
+| `blade_of_the_shattered_throne.webp` | Regal longsword reforged from a broken obsidian throne, gold filigree [obsidian/gold] | low (t3, unobtainable yet) |
+| `aegis_of_dawn.webp` | Ornate plate cuirass glowing with sunrise light along its edges [gilded steel] | low (t3) |
+| `heart_of_the_last_winter.webp` | Heart-shaped shard of unmelting blue ice, frost mist coiling off it [ice] | low (t3) |
+| `clockwork_god_core.webp` | Spherical brass-and-crystal mechanical heart, visible gears, golden inner glow [brass] | low (t3) |
+| `crown_of_the_drowned_city.webp` | Coral-crusted diadem with pearls and seaweed, faint abyssal glow [coral] | low (t3) |
+
+### Template cards (`public/assets/templates/`, 16:9 cinematic per existing card conventions)
+| File | Subject | Priority |
+|---|---|---|
+| `desert-expedition-t1.webp` | Caravan crossing endless golden dunes toward a half-buried ruin, heat shimmer, harsh noon light | HIGH (premium card renders bare gradient today) |
+| `frozen-frontier-t1.webp` | Fur-cloaked adventurers approaching a palisade village in deep snow, aurora overhead, blue dusk | HIGH (premium card renders bare gradient today) |
+
+### Boss portraits (`public/assets/encounters/bosses/`)
+| File | Subject | Priority |
+|---|---|---|
+| `hoarfrost_wraith.webp` | Spectral figure of jagged ice and frozen mist, hollow glacial eyes, snowstorm swirling through its body | medium (live premium boss; placeholder reuses shadow_stalker) |
+| `ash_titan.webp` | Colossal humanoid of cracked volcanic rock and smouldering ash, magma veins, looming through smoke | low (t3 quest enemy; placeholder reuses rune_golem) |
+| `deathless_king.webp` | Skeletal monarch on a black throne, tattered regal robes, cold blue crown-fire, grimdark | low (t3; placeholder reuses lich) |
+
+Already wired from the unused library (no generation needed): elder_wyrm→leyline_dragon,
+aether_ascendant→psionic_devourer, sleeper_beneath→void_leviathan; and the 2026-07-03
+boss-portrait repair — 9 of 10 template bosses had shipped pointing at a dagger ITEM icon;
+now: shadow_overlord/blightspawn/rot_heart/rogue_automaton/old_god_herald/great_dreamer use
+their own portraits, Sandstorm Cult Leader→cult_leader, Hooded Priest→worm_that_walks,
+Hoarfrost Wraith→shadow_stalker (bespoke queued above). Guard: src/data/artIntegrity.test.js
+now fails CI on any declared-but-missing art path.

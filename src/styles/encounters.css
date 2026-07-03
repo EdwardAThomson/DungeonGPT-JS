@@ -632,3 +632,57 @@
 .summary-hp-section h4 {
   margin-bottom: 5px;
 }
+/* --- Narrative-hook action chips (#35/#37) ---------------------------------
+ * Rendered under the Look-around narration message that carried a narrative-tier
+ * encounter hook. Pills echo the SegmentedControl chip look (settings.css); the
+ * optional image is a modest preview; the action modal shows the full art. */
+.narrative-hook-chips {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.narrative-hook-image {
+  display: block;
+  max-height: 90px;
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+  object-fit: cover;
+}
+
+.narrative-hook-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.narrative-hook-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--primary);
+  background-color: var(--bg);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-family: var(--ui-font);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.narrative-hook-chip:hover {
+  background-color: var(--primary);
+  color: var(--bg);
+}
+
+.narrative-hook-chip-ignore {
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.narrative-hook-chip-ignore:hover {
+  background-color: var(--surface);
+  border-color: var(--text-secondary);
+  color: var(--text);
+}

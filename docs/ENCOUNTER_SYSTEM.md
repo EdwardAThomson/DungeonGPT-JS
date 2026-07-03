@@ -116,9 +116,17 @@ Narrative-tier delivery (2026-07-02): non-hostile encounters are parked for the 
 button and woven into the AI narration, where the player acts by typing a follow-up. Because
 guests can't type free-text (and the master narration toggle may be off), those paths route
 to the interactive action modal instead (`planWorldTileEncounterFlow` receives
-`aiNarrativeEnabled && aiAvailable`), so rewards stay reachable for everyone. Known gaps are
-tracked as issues #35–#37 (no visible affordance for signed-in hooks; parked encounters
-discarded on the next move; hooks show no image).
+`aiNarrativeEnabled && aiAvailable`), so rewards stay reachable for everyone.
+
+Encounter-UX package (#35–#37, shipped 2026-07-03): signed-in hooks now have a visible
+affordance. After a Look-around narration consumes the parked hook, its `suggestedActions`
+render as tappable chips (plus Ignore) under that narration message
+(`src/components/NarrativeHookChips.js`), with a small encounter-image preview (#37);
+tapping any action opens the real action modal (skill rolls + rewards). Chip state is
+transient in `Game.js` (keyed by message object identity), so saved conversations reload
+chip-free. A parked `pendingLookEncounter` persists for `NARRATIVE_HOOK_PERSIST_MOVES` (3)
+world moves (#36, `ageNarrativeHook` in `encounterController.js`): one subtle reminder line
+on the first move away, then silent expiry; a failed Look-around re-parks the hook.
 
 ---
 

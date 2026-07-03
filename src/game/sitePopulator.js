@@ -45,16 +45,24 @@ export const LOOT = {
   hills: ['mountain_herbs', 'exposed_minerals', 'wolf_fang', 'beast_hide', 'rare_ore', 'healing_herbs'],
   mountain: ['mountain_crystal', 'exposed_minerals', 'rare_ore', 'storm_crystal', 'bear_pelt'],
 };
+// NOTE (#44/#49): site loot is granted UNGATED (Game.js grantSiteLoot skips
+// filterDropsByTier), so hoard pools must stay at rarity <= rare. very_rare items
+// (runic_greatsword, stormbound_ring) are placed via encounter drop tables instead,
+// which DO pass the rarity-per-tier gate.
 export const HOARD_BONUS = {
   cave: ['greater_healing_potion', 'magic_weapon', 'raw_gems'],
   // ring_protection (rare accessory): its ONLY acquisition path — a deep-vault prize
   // fits ruins (ancient enchanted wares) and hoards are one slot per site, so it stays
   // suitably scarce. Rare is within the Tier 1 rarity cap, so no tier gate needed.
-  ruins: ['dark_tome', 'magic_item', 'ancient_scroll', 'ring_protection'],
-  // Beast country: Hide Armor is a wilderness-only sidegrade to shop-bought Studded Leather.
-  forest: ['hide_armor', 'nature_charm', 'fey_charm'],
+  // artifact_trinket (#44): previously catalog-only (lint finding); an ancient trinket
+  // belongs in ruin vaults.
+  ruins: ['dark_tome', 'magic_item', 'ancient_scroll', 'ring_protection', 'artifact_trinket'],
+  // Beast country: Hide Armor is a wilderness-only sidegrade to shop-bought Studded
+  // Leather; the Hunter's Longbow (#44) is the ranger-flavored weapon prize.
+  forest: ['hide_armor', 'nature_charm', 'fey_charm', 'hunters_longbow'],
   hills: ['hide_armor', 'silver_dagger', 'mountain_crystal'],
-  mountain: ['storm_crystal', 'mountain_crystal', 'silver_dagger'],
+  // wardstone_pendant (#44): rare +1 charm cut from mountain stone — deep-hoard prize.
+  mountain: ['storm_crystal', 'mountain_crystal', 'silver_dagger', 'wardstone_pendant'],
 };
 
 // Harvestable crystal deposits (issue #38): the 💎 tiles the generator scatters are no

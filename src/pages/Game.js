@@ -33,6 +33,7 @@ import {
   trackAreaVisits
 } from '../game/worldMoveController';
 import {
+  ageNarrativeHook,
   applyEncounterOutcomeToParty,
   applyTeamEncounterOutcomeToParty,
   planWorldTileEncounterFlow,
@@ -236,6 +237,12 @@ const Game = ({ resumeConversation = null }) => {
   // move is parked here so an on-demand Look-around can still weave it into the AI
   // description (movement itself no longer auto-narrates it).
   const [pendingLookEncounter, setPendingLookEncounter] = useState(null);
+  // #35/#37: once a Look-around narration consumes a parked hook, the encounter's
+  // suggestedActions are offered as tappable chips (plus a small image) under that
+  // narration message. TRANSIENT ONLY: keyed by message object identity, never
+  // written into the saved conversation, so reloaded saves never show stale chips.
+  // Shape: { message, encounter, hookMoves }, aged/expired like the parked hook.
+  const [lookHookChips, setLookHookChips] = useState(null);
   // Bumped on each guest/local Look-around so repeated looks at the same tile vary.
   const lookNonceRef = useRef(0);
   // Rolling window of recently-shown local movement lines, so templated biome prose
@@ -799,12 +806,27 @@ const Game = ({ resumeConversation = null }) => {
     }
 
     // A narrative-tier encounter on this tile is parked for the Look-around button
-    // (movement no longer auto-narrates). Cleared otherwise so it doesn't leak to a
-    // later tile.
+    // (movement no longer auto-narrates). A parked hook now survives up to
+    // NARRATIVE_HOOK_PERSIST_MOVES further moves (#36): the first move away gets a
+    // subtle reminder line, then it expires silently so stale hooks don't teleport.
     if (plannedEncounterFlow.flowType === 'narrative_context') {
-      setPendingLookEncounter(plannedEncounterFlow.narrativeEncounter || null);
-    } else {
-      setPendingLookEncounter(null);
+      setPendingLookEncounter(
+        plannedEncounterFlow.narrativeEncounter
+          ? { ...plannedEncounterFlow.narrativeEncounter, hookMoves: 0 }
+          : null
+      );
+    } else if (pendingLookEncounter) {
+      const { hookState, reminderText } = ageNarrativeHook(pendingLookEncounter, { remind: true });
+      setPendingLookEncounter(hookState);
+      if (reminderText) {
+        interactionHook.setConversation(prev => [...prev, { role: 'system', content: reminderText }]);
+      }
+    }
+
+    // Offered action chips (#35) age on the same window, with no reminder; the chips
+    // themselves are the visible affordance; they just quietly go away.
+    if (lookHookChips) {
+      setLookHookChips(ageNarrativeHook(lookHookChips).hookState);
     }
 
     // Smart narration (B3b): every move — guest OR signed-in — appends a short local
@@ -886,9 +908,19 @@ const Game = ({ resumeConversation = null }) => {
       interactionHook.setProgressStatus(null);
       if (!aiResponse || !aiResponse.trim()) {
         logger.warn('Empty look-around AI response, skipping');
+        // The hook wasn't delivered, so re-park it: it must not be silently lost (#36).
+        if (narrativeEncounter) setPendingLookEncounter(narrativeEncounter);
         return;
       }
       const aiMessage = { role: 'ai', content: aiResponse };
+      // #35: the narration above wove the hook in, so surface the encounter's
+      // suggestedActions as chips under THIS message so acting on it is one tap
+      // (the modal flow rolls skills and pays rewards, which typed-only hooks
+      // previously left unreachable). Keyed by the message object itself: the ref
+      // only lives in this session's state, so saved conversations reload chip-free.
+      if (narrativeEncounter?.encounter) {
+        setLookHookChips({ message: aiMessage, encounter: narrativeEncounter.encounter, hookMoves: 0 });
+      }
       interactionHook.setConversation(prev => {
         const updated = [...prev, aiMessage];
         // Fire-and-forget: embed for RAG
@@ -902,10 +934,24 @@ const Game = ({ resumeConversation = null }) => {
       logger.error('Look-around AI error', error);
       interactionHook.setError(error.message);
       interactionHook.setProgressStatus(null);
+      // Generation failed, so re-park the hook: it must not be silently lost (#36).
+      if (narrativeEncounter) setPendingLookEncounter(narrativeEncounter);
     } finally {
       interactionHook.setIsLoading(false);
     }
   };
+
+  // --- Narrative-hook chips (#35): engage or dismiss a woven Look-around hook ---
+  // Tapping any suggested action opens the REAL encounter action modal (skill
+  // rolls + rewards); Ignore just clears the chips. Either way the chips are
+  // one-shot: they disappear from the message as soon as the player decides.
+  const handleHookChipAction = () => {
+    const encounter = lookHookChips?.encounter;
+    setLookHookChips(null);
+    if (encounter) openEncounterAction({ encounter });
+  };
+
+  const handleHookChipIgnore = () => setLookHookChips(null);
 
   // --- Talk to a milestone NPC (deterministic 'talk' milestones) ---
   // Fired by the building "Talk" button (npc = the placed NPC) or its building-level
@@ -1200,6 +1246,9 @@ const Game = ({ resumeConversation = null }) => {
           aiAvailable={aiAvailable}
           isMapLoaded={!!mapHook.worldMap}
           lastPrompt={interactionHook.lastPrompt}
+          hookChips={lookHookChips}
+          onHookChipAction={handleHookChipAction}
+          onHookChipIgnore={handleHookChipIgnore}
         />
 
         <PartySidebar

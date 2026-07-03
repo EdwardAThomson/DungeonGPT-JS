@@ -47,7 +47,9 @@ export const MOUNTAIN_ENCOUNTERS = {
     // is where dragon-scale armour comes from, and this deadly encounter is the hardest
     // non-boss fight in the game. encounterResolver's filterDropsByTier strips very_rare
     // below Tier 2, so it cannot drop during Tier 1 play even if the 20% roll hits.
-    rewards: { xp: 200, gold: '20d20', items: ['dragon_scale:80%', 'dragon_gold:90%', 'legendary_artifact:25%', 'dragon_egg:5%', 'dragonscale_plate:20%'] },
+    // runic_greatsword (#44): second drop path for the obtainable +2 weapon (very_rare,
+    // same tier gate) — a hero's blade from the bottom of a dragon hoard.
+    rewards: { xp: 200, gold: '20d20', items: ['dragon_scale:80%', 'dragon_gold:90%', 'legendary_artifact:25%', 'dragon_egg:5%', 'dragonscale_plate:20%', 'runic_greatsword:15%'] },
     consequences: {
       criticalSuccess: 'You slay or outsmart the dragon and claim its hoard!',
       success: 'You survive the encounter and escape with some treasure.',

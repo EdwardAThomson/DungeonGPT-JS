@@ -118,6 +118,48 @@ export const SIDE_QUESTS = [
   // --- harbormaster (coastal towns) ---
   Q('lost_cargo', 'Lost Cargo', 2, 'Storm-lost cargo washed into a sea cave.', 'harbormaster', 'A storm drove cargo into the cave. Recover the crate for the harbour.',
     siteItem('lo1', 'Recover the lost cargo from the cave', 'cave', 'lost_cargo', 'the Lost Cargo', { xp: 80, gold: 0, items: [] }), 'harbormaster', 'Return the cargo to the harbour', { xp: 80, gold: 150, items: [] }),
+
+  // =========================================================================
+  // Mid/top-band expansion (#45/#50): quests reserved for levelled parties.
+  // XP curve: minLevel 3-4 ~250-340 total, minLevel 5 ~440-450, minLevel 6-7
+  // ~500-560 (objective step + turn-in reward; see docs/T3_CAMPAIGNS_PLAN.md §2.1).
+  // Completability rules still apply: sites are cave/ruins only, overworld
+  // combat is count-of-any, gather targets all have live drop sources.
+  // =========================================================================
+
+  // --- minLevel 3 ---
+  Q('wolfpack_cull', 'Thin the Wolfpack', 3, 'Beasts grown bold are stalking the pastures.', ['stables', 'mill'], 'Something has the beasts of the wilds emboldened — they take a horse a week. Drive off four and the purse is yours.',
+    bounty('wpc1', 'Drive off 4 beasts stalking the pastures', 4, { xp: 110, gold: 0, items: [] }), ['stables', 'mill'], undefined, { xp: 140, gold: 180, items: [] }),
+  Q('guild_waystation', "The Guild's Lost Waystation", 3, 'A trade-guild waystation in the ruins went silent a generation ago.', 'guild', 'Our charter names a waystation in the old ruins, abandoned in my grandmother\'s day. Find what remains of it and the guild will owe you.',
+    siteLoc('gws1', "Find the guild's lost waystation in the ruins", 'ruins', 'guild_waystation', 'the Lost Waystation', { xp: 120, gold: 0, items: [] }), 'guild', 'Report back to the guild', { xp: 140, gold: 200, items: [] }),
+  Courier('requisition_orders', 'Requisition for the Forge', 3, 'The magistrate\'s iron requisition must reach the smith — and the roads are watched.', 'townhall', 'These requisition orders must reach the blacksmith unopened. Word is the war-bands pay well for town seals, so go armed.',
+    'blacksmith', 'Deliver the requisition orders to the blacksmith', { xp: 180, gold: 190, items: [] }),
+
+  // --- minLevel 4 ---
+  Q('broodmother', 'The Broodmother', 4, 'A giant spider broods in the cave, and her young are spreading.', ['alchemist', 'apothecary'], 'The silk I buy comes from that cave, but nothing has come out of it in weeks. A broodmother has claimed it. Kill her before the valley crawls.',
+    siteCombat('bro1', 'Slay the broodmother nesting in the cave', 'cave', 'cave_broodmother', 'the Cave Broodmother', { xp: 190, gold: 0, items: ['spider_silk'] }), ['alchemist', 'apothecary'], undefined, { xp: 130, gold: 220, items: ['antidote'] }),
+  Q('sunken_bell', 'The Sunken Bell', 4, 'The temple-of-old\'s great bell lies somewhere in the ruins.', ['temple', 'shrine'], 'When the old temple fell, its consecrated bell fell with it. Raise it from the ruins and its voice will bless this town again.',
+    siteItem('bell1', 'Recover the temple bell from the ruins', 'ruins', 'sunken_bell', 'the Sunken Bell', { xp: 150, gold: 0, items: [] }), ['temple', 'shrine'], 'Bring the bell to the temple', { xp: 170, gold: 240, items: [] }),
+  Q('storm_crystals', 'Storm-Charged Crystals', 4, 'A mage needs crystals that hold the mountain\'s lightning.', 'magetower', 'Ordinary crystal won\'t do — I need three storm crystals, charged where the peaks meet the sky. Dangerous country. Priced accordingly.',
+    gather('stc1', 'Collect 3 storm crystals', 'storm_crystal', 3, { xp: 150, gold: 0, items: [] }), 'magetower', 'Deliver the storm crystals', { xp: 170, gold: 280, items: [] }),
+
+  // --- minLevel 5 ---
+  Q('bandit_warcamp', 'Break the Warcamp', 5, 'A warband has grown from nuisance to army. The magistrate wants it broken.', 'townhall', 'This is no longer banditry, it is a warcamp. Scatter five of their raiders in the field and their nerve will break with them.',
+    bounty('bwc1', "Scatter 5 of the warband's raiders", 5, { xp: 220, gold: 0, items: [] }), 'townhall', undefined, { xp: 230, gold: 400, items: [] }),
+  Q('vault_of_kings', 'Regalia of the Old Kings', 5, 'The old kings\' regalia lies in a vault deep beneath the ruins.', 'bank', 'Before the crown fell, its regalia was sealed in a vault beneath what is now ruin. The bank holds the deed — recover it and the finder\'s share is princely.',
+    siteItem('vok1', 'Recover the royal regalia from the deep ruins', 'ruins', 'kings_regalia', 'the Regalia of the Old Kings', { xp: 210, gold: 0, items: [] }), 'bank', 'Deliver the regalia to the bank', { xp: 230, gold: 420, items: [] }),
+  Q('deep_horror', 'The Horror Below', 5, 'Miners talk of something old waking in the deepest gallery.', INN, 'The deep gallery has gone wrong. Lamps gutter, tools vanish, and old Marta swears the dark looked back at her. Whatever woke down there — end it.',
+    siteCombat('dho1', 'Destroy the horror in the deep gallery of the cave', 'cave', 'gallery_horror', 'the Horror of the Deep Gallery', { xp: 260, gold: 0, items: [] }), INN, undefined, { xp: 180, gold: 320, items: ['rare_gem'] }),
+
+  // --- minLevel 6 ---
+  Q('wyrm_tribute', "The Wyrm's Tribute", 6, 'For years the town paid tribute to a wyrm. The lord wants it back.', 'keep', 'My predecessors bought peace with a chest of gold a year, carried to the cave and never seen again. The wyrm is gone or sleeping. Bring my treasury home.',
+    siteItem('wyt1', "Recover the tribute chest from the wyrm's hoard in the cave", 'cave', 'tribute_chest', 'the Tribute Chest', { xp: 250, gold: 0, items: [] }), 'keep', 'Return the tribute to the keep', { xp: 250, gold: 500, items: [] }),
+  Q('cleanse_dark_roads', 'Cleanse the Dark Roads', 6, 'The temple calls doughty souls to purge the encroaching darkness.', ['temple', 'shrine'], 'What walks the roads now is not banditry but darkness given teeth. The temple sanctifies this charge: destroy six of them, and be named a defender of the faith.',
+    bounty('cdr1', 'Destroy 6 of the encroaching darkness', 6, { xp: 250, gold: 0, items: [] }), ['temple', 'shrine'], undefined, { xp: 270, gold: 450, items: [] }),
+
+  // --- minLevel 7 ---
+  Q('sealed_gate', 'The Sealed Gate', 7, 'Beneath the ruins stands a gate the ancients sealed — and its keeper still watches.', 'magetower', 'Every ward I cast frays toward the ruins. The ancients sealed a gate down there and set a keeper on it; the keeper has outlived its purpose and now feeds the seal with stolen life. Destroy it, and bring me what it guards.',
+    siteCombat('sgt1', 'Defeat the Gatekeeper beyond the sealed gate in the ruins', 'ruins', 'gatekeeper', 'the Gatekeeper of the Sealed Ways', { xp: 320, gold: 0, items: ['forbidden_knowledge'] }), 'magetower', undefined, { xp: 240, gold: 500, items: ['runic_greatsword'] }),
 ];
 
 // Quest "find" items aren't real catalog items (kept unique so random loot can't complete
@@ -133,6 +175,9 @@ export const QUEST_ITEM_ICON_FROM = {
   cure_root: 'healing_herbs',
   stolen_blade: 'silver_dagger',
   lost_cargo: 'salvaged_goods',
+  sunken_bell: 'artifact_trinket',
+  kings_regalia: 'legendary_artifact',
+  tribute_chest: 'ancient_gold',
 };
 
 // Fresh, mutable copy of the FULL pool (debug page; new games use selectSideQuests).

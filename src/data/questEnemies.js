@@ -2,9 +2,16 @@
 // Each enemy is a complete encounter definition that can be referenced by ID.
 // Organized by tier so the campaign configurator can filter by level range.
 //
-// Tier 1 (Lv 1-2): HP 20-40, rewards 25-75 XP
-// Tier 2 (Lv 3-4): HP 100-200, rewards 100-350 XP
-// Tier 3 (Lv 5+):  HP 250-400, rewards 300-500 XP
+// Tier 1 (Lv 1-2): HP 20-40, rewards 40-75 XP, medium DC
+// Tier 2 (Lv 3-4): HP 150-300, rewards 350-500 XP, hard/deadly
+// Tier 3 (Lv 5-7): HP 250-400, rewards 400-500 XP, deadly with pinned DC
+//
+// Every entry carries a #43 explicit damage profile (`dealsDamage: true` +
+// per-outcome `damage` dice, same schema as the storyTemplates.js bosses) so
+// none fall back to the deprecated name-keyword damage matching. Deadly
+// entries also pin an explicit `dc` (19-20): the default deadly DC 25 is a
+// ~1% lottery, and 19-20 is the sim-validated healthy band now that the
+// level term (#47) is in the resolver.
 
 export const QUEST_ENEMIES = {
     // ============================================================
@@ -20,6 +27,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 30,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Fight', skill: 'Athletics', description: 'Charge the chieftain head-on' },
             { label: 'Outflank', skill: 'Stealth', description: 'Approach from a blind spot' },
@@ -44,6 +53,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 25,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Hack at the writhing mass' },
             { label: 'Use Herbs', skill: 'Medicine', description: 'Apply herbs to burn the blight' },
@@ -68,6 +79,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 35,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Smash', skill: 'Athletics', description: 'Attack its joints and gears' },
             { label: 'Use Control Rod', skill: 'Arcana', description: 'Override its commands' },
@@ -92,6 +105,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 30,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Attack', skill: 'Athletics', description: 'Strike before they complete the ritual' },
             { label: 'Disrupt Ritual', skill: 'Arcana', description: 'Break the summoning circle' },
@@ -116,6 +131,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 35,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Duel', skill: 'Athletics', description: 'Challenge the bandit king to single combat' },
             { label: 'Ambush', skill: 'Stealth', description: 'Turn their own tactics against them' },
@@ -140,6 +157,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 20,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Attack the writhing mass of vermin' },
             { label: 'Use Fire', skill: 'Survival', description: 'Torch the nest' },
@@ -164,6 +183,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 30,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Smash', skill: 'Athletics', description: 'Crush its mechanical legs' },
             { label: 'Short Circuit', skill: 'Arcana', description: 'Overload its arcane core' },
@@ -181,13 +202,15 @@ export const QUEST_ENEMIES = {
     rune_golem: {
         name: 'Rune Golem',
         icon: '🗿',
-        image: '/assets/encounters/bosses/rune_golem.webp',
+        image: '/assets/encounters/bosses/rune_golem.webp', // TODO(t3 boss art): ash_titan.webp — placeholder reuses rune_golem
         tier: 1,
         theme: 'arcane-renaissance',
         encounterTier: 'boss',
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 40,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Batter its stone frame' },
             { label: 'Erase Runes', skill: 'Arcana', description: 'Disrupt the binding glyphs' },
@@ -212,6 +235,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 25,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Attack', skill: 'Athletics', description: 'Strike the fish-like abomination' },
             { label: 'Ward', skill: 'Religion', description: 'Use a protective ward to weaken it' },
@@ -237,6 +262,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 40,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Charge', skill: 'Athletics', description: 'Meet the warchief head-on' },
             { label: 'Shield Wall', skill: 'Athletics', description: 'Hold the line and wait for an opening' },
@@ -261,6 +288,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 35,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Fight', skill: 'Athletics', description: 'Attack the troll directly' },
             { label: 'Use Fire', skill: 'Survival', description: 'Trolls fear flame — use it' },
@@ -286,6 +315,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 25,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Cut through her dark magic with steel' },
             { label: 'Resist Curse', skill: 'Religion', description: 'Ward against her hexes' },
@@ -310,6 +341,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 30,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Attack the undead creature' },
             { label: 'Burn Remains', skill: 'Survival', description: 'Use fire to stop its regeneration' },
@@ -335,6 +368,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 25,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Rush', skill: 'Athletics', description: 'Close distance before they throw another vial' },
             { label: 'Deflect', skill: 'Acrobatics', description: 'Dodge the volatile concoctions' },
@@ -360,6 +395,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 20,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Slash at the shifting shadow' },
             { label: 'Light', skill: 'Arcana', description: 'Flood the area with magical light' },
@@ -384,6 +421,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'medium',
         multiRound: true,
         enemyHP: 35,
+        dealsDamage: true,
+        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Hack at the writhing humanoid form' },
             { label: 'Burn', skill: 'Survival', description: 'Set fire to the swarm' },
@@ -409,8 +448,11 @@ export const QUEST_ENEMIES = {
         theme: 'heroic-fantasy',
         encounterTier: 'boss',
         difficulty: 'deadly',
+        dc: 20, // #43 retune: deadly's default DC 25 is a ~1% lottery; pinned into the sim-validated band
         multiRound: true,
         enemyHP: 250,
+        dealsDamage: true,
+        damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d6' },
         suggestedActions: [
             { label: 'Fight', skill: 'Athletics', description: 'Engage the Overlord in direct combat' },
             { label: 'Exploit Weakness', skill: 'Investigation', description: 'Use gathered intelligence to find a weakness' },
@@ -435,6 +477,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'hard',
         multiRound: true,
         enemyHP: 150,
+        dealsDamage: true,
+        damage: { criticalFailure: '4d6+4', failure: '2d6+2', success: '1d4' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Attack the pulsing core directly' },
             { label: 'Apply Antidote', skill: 'Medicine', description: 'Use a serum to weaken it' },
@@ -457,8 +501,11 @@ export const QUEST_ENEMIES = {
         theme: 'arcane-renaissance',
         encounterTier: 'boss',
         difficulty: 'deadly',
+        dc: 19, // #43 retune: deadly's default DC 25 is a ~1% lottery; pinned into the sim-validated band
         multiRound: true,
         enemyHP: 200,
+        dealsDamage: true,
+        damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d4' },
         suggestedActions: [
             { label: 'Attack', skill: 'Athletics', description: 'Strike at the warped construct' },
             { label: 'Disrupt Magic', skill: 'Arcana', description: 'Counter its eldritch machinery' },
@@ -481,8 +528,11 @@ export const QUEST_ENEMIES = {
         theme: 'eldritch-horror',
         encounterTier: 'boss',
         difficulty: 'deadly',
+        dc: 19, // #43 retune: deadly's default DC 25 is a ~1% lottery; pinned into the sim-validated band
         multiRound: true,
         enemyHP: 300,
+        dealsDamage: true,
+        damage: { criticalFailure: '4d8+4', failure: '2d6+2', success: '1d6' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Attack the physical form' },
             { label: 'Seal the Rift', skill: 'Arcana', description: 'Close the portal sustaining it' },
@@ -507,6 +557,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'hard',
         multiRound: true,
         enemyHP: 180,
+        dealsDamage: true,
+        damage: { criticalFailure: '4d6+4', failure: '2d6+2', success: '1d4' },
         suggestedActions: [
             { label: 'Duel', skill: 'Athletics', description: 'Face the warlord in honorable combat' },
             { label: 'Sabotage', skill: 'Stealth', description: 'Undermine their defenses first' },
@@ -524,13 +576,16 @@ export const QUEST_ENEMIES = {
     lich: {
         name: 'The Bone Tyrant',
         icon: '💀',
-        image: '/assets/encounters/bosses/lich.webp',
+        image: '/assets/encounters/bosses/lich.webp', // TODO(t3 boss art): deathless_king.webp — placeholder reuses lich
         tier: 2,
         theme: 'grimdark-survival',
         encounterTier: 'boss',
         difficulty: 'deadly',
+        dc: 20, // #43 retune: deadly's default DC 25 is a ~1% lottery; pinned into the sim-validated band
         multiRound: true,
         enemyHP: 200,
+        dealsDamage: true,
+        damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d4' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Shatter its undead form' },
             { label: 'Destroy Phylactery', skill: 'Investigation', description: 'Find and destroy its soul vessel' },
@@ -554,8 +609,11 @@ export const QUEST_ENEMIES = {
         theme: 'heroic-fantasy',
         encounterTier: 'boss',
         difficulty: 'deadly',
+        dc: 20, // #43 retune: deadly's default DC 25 is a ~1% lottery; pinned into the sim-validated band
         multiRound: true,
         enemyHP: 200,
+        dealsDamage: true,
+        damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d4' },
         suggestedActions: [
             { label: 'Charge', skill: 'Athletics', description: 'Rush the wyrm before it takes flight' },
             { label: 'Aim for the Underbelly', skill: 'Investigation', description: 'Target its vulnerable scales' },
@@ -580,6 +638,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'hard',
         multiRound: true,
         enemyHP: 160,
+        dealsDamage: true,
+        damage: { criticalFailure: '4d6+4', failure: '2d6+2', success: '1d4' },
         suggestedActions: [
             { label: 'Duel', skill: 'Athletics', description: 'Match blade against corrupted blade' },
             { label: 'Break the Curse', skill: 'Religion', description: 'Appeal to the paladin\'s buried honor' },
@@ -603,8 +663,11 @@ export const QUEST_ENEMIES = {
         theme: 'grimdark-survival',
         encounterTier: 'boss',
         difficulty: 'deadly',
+        dc: 20, // #43 retune: deadly's default DC 25 is a ~1% lottery; pinned into the sim-validated band
         multiRound: true,
         enemyHP: 180,
+        dealsDamage: true,
+        damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d4' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Attack through the cloud of flies' },
             { label: 'Purify', skill: 'Medicine', description: 'Use a potent antidote to weaken its aura' },
@@ -629,6 +692,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'hard',
         multiRound: true,
         enemyHP: 170,
+        dealsDamage: true,
+        damage: { criticalFailure: '4d6+4', failure: '2d6+2', success: '1d4' },
         suggestedActions: [
             { label: 'Fight', skill: 'Athletics', description: 'Stand your ground against the beast' },
             { label: 'Use Silver', skill: 'Arcana', description: 'Apply a silver weapon or talisman' },
@@ -654,6 +719,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'hard',
         multiRound: true,
         enemyHP: 180,
+        dealsDamage: true,
+        damage: { criticalFailure: '4d6+4', failure: '2d6+2', success: '1d4' },
         suggestedActions: [
             { label: 'Attack', skill: 'Athletics', description: 'Strike at its massive legs' },
             { label: 'Sever Power Lines', skill: 'Arcana', description: 'Cut the ley-line conduits feeding it' },
@@ -676,8 +743,11 @@ export const QUEST_ENEMIES = {
         theme: 'eldritch-horror',
         encounterTier: 'boss',
         difficulty: 'deadly',
+        dc: 20, // #43 retune: deadly's default DC 25 is a ~1% lottery; pinned into the sim-validated band
         multiRound: true,
         enemyHP: 250,
+        dealsDamage: true,
+        damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d6' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Attack its manifested tentacles' },
             { label: 'Banish', skill: 'Arcana', description: 'Chant the words of banishment' },
@@ -700,8 +770,11 @@ export const QUEST_ENEMIES = {
         theme: 'arcane-renaissance',
         encounterTier: 'boss',
         difficulty: 'deadly',
+        dc: 20, // #43 retune: deadly's default DC 25 is a ~1% lottery; pinned into the sim-validated band
         multiRound: true,
         enemyHP: 220,
+        dealsDamage: true,
+        damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d4' },
         suggestedActions: [
             { label: 'Attack', skill: 'Athletics', description: 'Assault the crystalline dragon' },
             { label: 'Drain Power', skill: 'Arcana', description: 'Siphon energy from its leyline bond' },
@@ -726,6 +799,8 @@ export const QUEST_ENEMIES = {
         difficulty: 'hard',
         multiRound: true,
         enemyHP: 160,
+        dealsDamage: true,
+        damage: { criticalFailure: '4d6+4', failure: '2d6+2', success: '1d4' },
         suggestedActions: [
             { label: 'Attack', skill: 'Athletics', description: 'Strike before it seizes your mind' },
             { label: 'Mental Fortress', skill: 'Insight', description: 'Steel your will against its psychic assault' },
@@ -738,6 +813,146 @@ export const QUEST_ENEMIES = {
             criticalFailure: 'It seizes control of your arm. For a heartbeat, you turn your weapon on an ally.'
         },
         rewards: { xp: 400, gold: '4d20', items: ['spell_scroll'] }
+    },
+
+    // ============================================================
+    // TIER 3 — World-shaking threats (Lv 5-7, #50 top-band content)
+    // Fought by levelled parties with the +2/+3 level term (#47), so
+    // DCs pin at 19-20 and damage runs a step above the t2 profiles.
+    // ============================================================
+    elder_wyrm: {
+        name: 'The Elder Wyrm',
+        icon: '🐉',
+        image: '/assets/encounters/bosses/leyline_dragon.webp',
+        tier: 3,
+        theme: 'heroic-fantasy',
+        encounterTier: 'boss',
+        difficulty: 'deadly',
+        dc: 20, // #43-style pin: sim-validated band for a levelled 3-hero party
+        multiRound: true,
+        enemyHP: 350,
+        dealsDamage: true,
+        damage: { criticalFailure: '6d6+6', failure: '3d6+3', success: '1d6' },
+        suggestedActions: [
+            { label: 'Charge', skill: 'Athletics', description: 'Close in beneath the wyrm\'s wings' },
+            { label: 'Find the Old Wound', skill: 'Investigation', description: 'Strike where an ancient lance once pierced' },
+            { label: 'Defy the Terror', skill: 'Intimidation', description: 'Hold the line against its dragonfear' }
+        ],
+        consequences: {
+            criticalSuccess: 'Your blade drives into the old wound. The Elder Wyrm falls like a mountainside coming down.',
+            success: 'Scale by scale you wear the ancient down, until at last it crashes to earth, broken.',
+            failure: 'A sweep of its tail scatters the party like kindling. The sky fills with flame.',
+            criticalFailure: 'The wyrm\'s fire turns the field to glass. You crawl from the ashes barely alive.'
+        },
+        rewards: { xp: 500, gold: '6d20', items: ['dragon_scale'] }
+    },
+
+    ash_titan: {
+        name: 'The Ash Titan',
+        icon: '🌋',
+        image: '/assets/encounters/bosses/rune_golem.webp',
+        tier: 3,
+        theme: 'heroic-fantasy',
+        encounterTier: 'boss',
+        difficulty: 'deadly',
+        dc: 20, // #43-style pin: sim-validated band for a levelled 3-hero party
+        multiRound: true,
+        enemyHP: 320,
+        dealsDamage: true,
+        damage: { criticalFailure: '6d6+6', failure: '2d8+2', success: '1d6' },
+        suggestedActions: [
+            { label: 'Strike the Joints', skill: 'Athletics', description: 'Hammer the molten seams in its stone hide' },
+            { label: 'Quench It', skill: 'Survival', description: 'Drive it toward water to crust its fire' },
+            { label: 'Read the Runes', skill: 'Arcana', description: 'Unbind the words of making carved into its chest' }
+        ],
+        consequences: {
+            criticalSuccess: 'The binding rune cracks. The titan halts mid-stride and crumbles into a hill of cooling ash.',
+            success: 'Quenched and battered, the titan collapses, its inner fire guttering out.',
+            failure: 'A fist like a falling tower slams down. The ground opens in burning fissures.',
+            criticalFailure: 'The titan erupts. Ash blots the sun as you drag your wounded clear.'
+        },
+        rewards: { xp: 450, gold: '6d20', items: ['magic_weapon'] }
+    },
+
+    deathless_king: {
+        name: 'The Deathless King',
+        icon: '👑',
+        image: '/assets/encounters/bosses/lich.webp',
+        tier: 3,
+        theme: 'grimdark-survival',
+        encounterTier: 'boss',
+        difficulty: 'deadly',
+        dc: 20, // #43-style pin: sim-validated band for a levelled 3-hero party
+        multiRound: true,
+        enemyHP: 300,
+        dealsDamage: true,
+        damage: { criticalFailure: '5d8+5', failure: '2d8+2', success: '1d6' },
+        suggestedActions: [
+            { label: 'Strike', skill: 'Athletics', description: 'Shatter the corpse-king\'s ancient armor' },
+            { label: 'Break the Crown', skill: 'Investigation', description: 'The crown, not the king, refuses to die' },
+            { label: 'Consecrate', skill: 'Religion', description: 'Turn hallowed words against ten centuries of death' }
+        ],
+        consequences: {
+            criticalSuccess: 'The crown splits under your blow. Ten centuries catch up with the king in a single breath.',
+            success: 'The Deathless King sinks to one knee, then to dust, his long unlife finally spent.',
+            failure: 'His blade passes through your guard as if it were mist. The cold of the grave follows it.',
+            criticalFailure: 'The king speaks your name. Your dead rise around him, wearing familiar faces.'
+        },
+        rewards: { xp: 450, gold: '5d20', items: ['legendary_artifact'] }
+    },
+
+    aether_ascendant: {
+        name: 'The Aether Ascendant',
+        icon: '⚡',
+        image: '/assets/encounters/bosses/psionic_devourer.webp',
+        tier: 3,
+        theme: 'arcane-renaissance',
+        encounterTier: 'boss',
+        difficulty: 'deadly',
+        dc: 19, // #43-style pin: sim-validated band for a levelled 3-hero party
+        multiRound: true,
+        enemyHP: 280,
+        dealsDamage: true,
+        damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d6' },
+        suggestedActions: [
+            { label: 'Attack', skill: 'Athletics', description: 'Strike the mage before the transformation completes' },
+            { label: 'Ground the Aether', skill: 'Arcana', description: 'Bleed the stolen leyline power into the earth' },
+            { label: 'Appeal to Reason', skill: 'Persuasion', description: 'Somewhere in the light, a person remains' }
+        ],
+        consequences: {
+            criticalSuccess: 'The grounded aether roars out of them in a pillar of light, leaving only a trembling scholar.',
+            success: 'The ascension collapses. The would-be god falls back into a mortal body, defeated.',
+            failure: 'Raw aether arcs across the chamber. Your very shadow burns.',
+            criticalFailure: 'For a heartbeat they finish becoming. What you see in that moment will never leave you.'
+        },
+        rewards: { xp: 400, gold: '5d20', items: ['ancient_artifact'] }
+    },
+
+    sleeper_beneath: {
+        name: 'The Sleeper Beneath',
+        icon: '🌊',
+        image: '/assets/encounters/bosses/void_leviathan.webp',
+        tier: 3,
+        theme: 'eldritch-horror',
+        encounterTier: 'boss',
+        difficulty: 'deadly',
+        dc: 19, // #43-style pin: biggest t3 HP pool, so the DC gives it back
+        multiRound: true,
+        enemyHP: 400,
+        dealsDamage: true,
+        damage: { criticalFailure: '5d8+5', failure: '2d6+2', success: '1d6' },
+        suggestedActions: [
+            { label: 'Strike', skill: 'Athletics', description: 'Attack the vast shape while it is still waking' },
+            { label: 'Complete the Rite', skill: 'Arcana', description: 'Finish the sealing rite the ancients left undone' },
+            { label: 'Refuse the Dream', skill: 'Insight', description: 'It wakes through your mind first — deny it' }
+        ],
+        consequences: {
+            criticalSuccess: 'The final syllable of the rite lands. The Sleeper sinks back into depths that close over it like stone.',
+            success: 'Wounded and unfinished, the Sleeper recoils into its abyss. The world forgets it was ever waking.',
+            failure: 'One eye opens. Every drop of water for a mile shivers, and so do you.',
+            criticalFailure: 'It dreams you for a moment. You return to yourself somewhere else, hands bloody, allies screaming.'
+        },
+        rewards: { xp: 500, gold: '6d20', items: ['forbidden_knowledge'] }
     },
 };
 

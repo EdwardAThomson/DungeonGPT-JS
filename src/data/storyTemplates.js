@@ -185,7 +185,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'Shadow Overlord',
                         icon: '👑',
-                        image: '/assets/icons/items/ritual_dagger.webp',
+                        image: '/assets/encounters/bosses/shadow_overlord.webp',
                         encounterTier: 'boss',
                         difficulty: 'deadly',
                         // #43 DC retune: deadly's DC 25 was a ~1% lottery; sim-validated at DC 20
@@ -293,7 +293,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'Sandstorm Cult Leader',
                         icon: '🌪️',
-                        image: '/assets/icons/items/ritual_dagger.webp',
+                        image: '/assets/encounters/bosses/cult_leader.webp',
                         encounterTier: 'boss',
                         difficulty: 'medium',
                         multiRound: true,
@@ -399,7 +399,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'The Hoarfrost Wraith',
                         icon: '🥶',
-                        image: '/assets/icons/items/ritual_dagger.webp',
+                        image: '/assets/encounters/bosses/shadow_stalker.webp',
                         encounterTier: 'boss',
                         difficulty: 'medium',
                         multiRound: true,
@@ -496,7 +496,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'Blightspawn',
                         icon: '🦠',
-                        image: '/assets/icons/items/ritual_dagger.webp',
+                        image: '/assets/encounters/bosses/blightspawn.webp',
                         encounterTier: 'boss',
                         difficulty: 'medium',
                         multiRound: true,
@@ -589,7 +589,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'The Rot-Heart',
                         icon: '🫀',
-                        image: '/assets/icons/items/ritual_dagger.webp',
+                        image: '/assets/encounters/bosses/rot_heart.webp',
                         encounterTier: 'boss',
                         difficulty: 'hard',
                         multiRound: true,
@@ -687,7 +687,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'Rogue Automaton',
                         icon: '🤖',
-                        image: '/assets/icons/items/ritual_dagger.webp',
+                        image: '/assets/encounters/bosses/rogue_automaton.webp',
                         encounterTier: 'boss',
                         difficulty: 'medium',
                         multiRound: true,
@@ -780,7 +780,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'Herald of the Old Gods',
                         icon: '⚙️',
-                        image: '/assets/icons/items/ritual_dagger.webp',
+                        image: '/assets/encounters/bosses/old_god_herald.webp',
                         encounterTier: 'boss',
                         difficulty: 'deadly',
                         // #43 DC retune: fought at Lv 4 (one level-bonus rung below the Lv 5
@@ -801,7 +801,7 @@ export const storyTemplates = [
                             failure: 'The Herald\'s power surges. Reality cracks around you as ancient forces stir.',
                             criticalFailure: 'The Herald nearly completes the awakening. You flee as the mountain splits open.'
                         },
-                        rewards: { xp: 450, gold: '4d20', items: ['enchanted_staff'] }
+                        rewards: { xp: 450, gold: '4d20', items: ['stormbound_ring'] } // #44 follow-up: t2 finale pays a very_rare (was an uncommon staff)
                     },
                     rewards: { xp: 250, gold: '3d20', items: [] },
                     minLevel: 4
@@ -880,7 +880,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'The Hooded Priest',
                         icon: '🕯️',
-                        image: '/assets/icons/items/ritual_dagger.webp',
+                        image: '/assets/encounters/bosses/worm_that_walks.webp',
                         encounterTier: 'boss',
                         difficulty: 'medium',
                         multiRound: true,
@@ -973,7 +973,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'The Great Dreamer',
                         icon: '🐙',
-                        image: '/assets/icons/items/ritual_dagger.webp',
+                        image: '/assets/encounters/bosses/great_dreamer.webp',
                         encounterTier: 'boss',
                         difficulty: 'deadly',
                         // #43 DC retune: the biggest HP pool (300) already makes this the longest

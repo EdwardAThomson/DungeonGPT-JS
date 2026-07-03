@@ -102,14 +102,39 @@ export const ITEM_CATALOG = {
 
   // Rare items
   'magic_weapon': { name: 'Enchanted Blade', rarity: 'rare', value: 500, type: 'weapon', bonus: '+1', icon: 'assets/icons/items/magic_weapon.webp' },
+  // TODO(#44 icon art): hunters_longbow.webp — placeholder borrows the Enchanted Blade icon.
+  'hunters_longbow': { name: 'Hunter\'s Longbow', rarity: 'rare', value: 450, type: 'weapon', bonus: '+1', description: 'A masterwork yew longbow strung with sinew. Favored by rangers who strike from the treeline.', icon: 'assets/icons/items/magic_weapon.webp' },
   'ring_protection': { name: 'Protective Ring', rarity: 'rare', value: 750, type: 'ring', bonus: '+1 defense', icon: 'assets/icons/items/ring_protection.webp' },
+  'wardstone_pendant': { name: 'Wardstone Pendant', rarity: 'rare', value: 600, type: 'charm', bonus: '+1', description: 'A sliver of rune-cut mountain stone on a leather cord. It hums faintly when danger is near.', icon: 'assets/icons/items/gemstone.webp' },
 
   // Very Rare
   'legendary_weapon': { name: 'Legendary Weapon', rarity: 'legendary', value: 2500, type: 'weapon', bonus: '+2', icon: 'assets/icons/items/legendary_weapon.webp' },
+  // #44: the obtainable +2 weapon rung (very_rare, so tier-2 drops can carry it; the
+  // legendary_weapon above stays t3-gated). TODO(#44 icon art): runic_greatsword.webp —
+  // placeholder borrows the Legendary Weapon icon.
+  'runic_greatsword': { name: 'Runic Greatsword', rarity: 'very_rare', value: 1500, type: 'weapon', bonus: '+2', description: 'A two-handed blade etched with dwarven war-runes that flare blue mid-swing.', icon: 'assets/icons/items/legendary_weapon.webp' },
+  // #44: a FINDABLE very_rare accessory (the other +2/+3 artifacts are bespoke quest
+  // rewards). TODO(#44 icon art): stormbound_ring.webp — placeholder borrows the
+  // Protective Ring icon.
+  'stormbound_ring': { name: 'Stormbound Ring', rarity: 'very_rare', value: 3500, type: 'ring', bonus: '+2', description: 'A band of sky-iron that crackles with a captive storm. Lightning answers its wearer\'s call.', icon: 'assets/icons/items/ring_protection.webp' },
   'legendary_artifact': { name: 'Mythic Ancient Artifact', rarity: 'very_rare', value: 5000, type: 'artifact', bonus: '+2', icon: 'assets/icons/items/legendary_artifact.webp' },
   'crown_of_sunfire': { name: 'Crown of Sunfire', rarity: 'very_rare', value: 7500, type: 'artifact', bonus: '+3', description: 'A radiant golden crown that blazes with inner fire. Said to grant its wearer dominion over light and shadow.', icon: `assets/icons/items/crown_of_sunfire.webp` },
   'seal_of_binding': { name: 'Seal of Binding', rarity: 'very_rare', value: 6000, type: 'artifact', bonus: '+2', description: 'An ancient seal inscribed with eldritch wards. It can imprison entities from beyond the veil.', icon: `assets/icons/items/seal_of_binding.webp` },
   'purified_heart_shard': { name: 'Purified Heart Shard', rarity: 'very_rare', value: 5000, type: 'artifact', bonus: '+2', description: 'A crystallized fragment of the Rot-Heart, cleansed of corruption. It pulses with faint, warm light.', icon: `assets/icons/items/purified_heart_shard.webp` },
+
+  // --- Tier-3 legendary shelf (#44 / T3_CAMPAIGNS_PLAN §5.3) ------------------------
+  // Bespoke finale/milestone rewards for the t3 campaigns. Legendary rarity is
+  // tier-gated to t3+ (maxRarityRankForTier), and no playable t3 exists yet, so these
+  // are UNOBTAINABLE BY DESIGN today — pinned in progressionLint KNOWN_GAPS
+  // (unobtainableGear) exactly like legendary_weapon. t3 authoring assigns them to
+  // milestones; do NOT put them in shops, hoards, or tiered drop tables before then.
+  // TODO(#44 icon art): each needs its own webp; placeholders borrow the noted icons.
+  'blade_of_the_shattered_throne': { name: 'Blade of the Shattered Throne', rarity: 'legendary', value: 10000, type: 'weapon', bonus: '+3', description: 'Reforged from the throne the Shadow Overlord broke, this blade remembers every oath sworn upon it.', icon: 'assets/icons/items/legendary_weapon.webp' }, // TODO(#44 icon art): blade_of_the_shattered_throne.webp
+  'aegis_of_dawn': { name: 'Aegis of Dawn', rarity: 'legendary', value: 8000, type: 'armor', bonus: '+5 defense', description: 'Plate armor quenched in first light. Blows that should kill are swallowed by a sunrise glow.', icon: 'assets/icons/items/leather_shield.webp' }, // TODO(#44 icon art): aegis_of_dawn.webp
+  'heart_of_the_last_winter': { name: 'Heart of the Last Winter', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'A shard of unmelting ice cut from the Blood Wendigo\'s frozen heart. Winter itself bends around its bearer.', icon: 'assets/icons/items/purified_heart_shard.webp' }, // TODO(#44 icon art): heart_of_the_last_winter.webp
+  'clockwork_god_core': { name: 'Clockwork God-Core', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'The still-ticking heart of the Herald of the Old Gods. Its gears turn one second ahead of the world.', icon: 'assets/icons/items/magical_item.webp' }, // TODO(#44 icon art): clockwork_god_core.webp
+  'crown_of_the_drowned_city': { name: 'Crown of the Drowned City', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'A coral-crusted diadem raised from the sunken throne room. Voices of the deep counsel whoever wears it.', icon: 'assets/icons/items/crown_of_sunfire.webp' }, // TODO(#44 icon art): crown_of_the_drowned_city.webp
+
   'magic_item': { name: 'Magic Item', rarity: 'uncommon', value: 200, icon: 'assets/icons/items/spell_scroll.webp' },
   'magic_scroll': { name: 'Enchanted Scroll', rarity: 'uncommon', value: 150, icon: 'assets/icons/items/spell_scroll.webp' },
 
