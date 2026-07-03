@@ -9,7 +9,7 @@ export const SHOP_STOCK = {
   market: ['rations', 'torch', 'rope', 'healing_potion', 'antidote'],
   // Blacksmith: weapons and armour (light -> heavy). Hide Armor is wilderness loot only
   // (a sidegrade to Studded), and Dragonscale Plate is quest/loot-gated, so neither is sold.
-  // Very-rare-and-up gear (Runed Greatsword, the t3 legendary shelf) is loot/reward-only:
+  // Very-rare-and-up gear (Runic Greatsword, the t3 legendary shelf) is loot/reward-only:
   // shop purchases bypass the rarity-per-tier drop gate, so selling it would let t1 gold
   // skip the ladder (#44).
   blacksmith: ['shortsword', 'silver_dagger', 'magic_weapon', 'hunters_longbow', 'leather_armor', 'studded_leather', 'scale_mail'],

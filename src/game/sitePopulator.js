@@ -47,7 +47,7 @@ export const LOOT = {
 };
 // NOTE (#44/#49): site loot is granted UNGATED (Game.js grantSiteLoot skips
 // filterDropsByTier), so hoard pools must stay at rarity <= rare. very_rare items
-// (runed_greatsword, stormbound_ring) are placed via encounter drop tables instead,
+// (runic_greatsword, stormbound_ring) are placed via encounter drop tables instead,
 // which DO pass the rarity-per-tier gate.
 export const HOARD_BONUS = {
   cave: ['greater_healing_potion', 'magic_weapon', 'raw_gems'],

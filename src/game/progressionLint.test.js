@@ -89,7 +89,7 @@ const KNOWN_GAPS = {
   ],
 
   // (b) #44: bonus rungs that exist in the catalog but cannot be obtained. The old
-  // weapon-+2 gap is HEALED (runed_greatsword, very_rare, ruin-vault/dragon-lair
+  // weapon-+2 gap is HEALED (runic_greatsword, very_rare, ruin-vault/dragon-lair
   // drops at t2). The pinned rungs now belong to the t3 legendary shelf: weapon +3
   // (blade_of_the_shattered_throne) and armor +5 (aegis_of_dawn) go live with t3.
   unobtainableSlotRungs: { weapon: [3], armor: [5], accessory: [] },
@@ -101,7 +101,7 @@ const KNOWN_GAPS = {
   // Re-measured at TRIALS/SEED after #44 (gear-ladder expansion): t1 mid 69-85%
   // (t1 'best' == mid win rate — the tier-1 rare cap adds defense, not attack),
   // t2 3-hero mid 42-56% (unchanged; the mid preset is fixed), t2 best 79-95%
-  // (up ~8-10pp: 'best' now derives runed_greatsword, the very_rare +2 weapon
+  // (up ~8-10pp: 'best' now derives runic_greatsword, the very_rare +2 weapon
   // rung, at tier 2). All none >= 10%, all tpk <= 25%, all stalemate <= 45%.
   // Add a pin here only for future intentionally-unbalanced content.
   bossBalance: {},

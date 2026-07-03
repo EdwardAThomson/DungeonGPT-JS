@@ -73,9 +73,9 @@ export const RUINS_ENCOUNTERS = {
     // top out at Tier 2, so the item is INTENTIONALLY unobtainable today (issue #49,
     // known gap): it becomes live automatically when T3 campaigns ship. Do not "fix" by
     // downgrading the gate or adding a lower-tier path.
-    // runed_greatsword / stormbound_ring (#44): very_rare, so the same tier gate holds
+    // runic_greatsword / stormbound_ring (#44): very_rare, so the same tier gate holds
     // them back until Tier 2 play — the vault is the "obtainable +2 weapon" path.
-    rewards: { xp: 90, gold: '5d20', items: ['ancient_gold:80%', 'magic_scroll:50%', 'runed_greatsword:20%', 'stormbound_ring:10%', 'legendary_weapon:15%'] },
+    rewards: { xp: 90, gold: '5d20', items: ['ancient_gold:80%', 'magic_scroll:50%', 'runic_greatsword:20%', 'stormbound_ring:10%', 'legendary_weapon:15%'] },
     consequences: {
       criticalSuccess: 'The vault opens to reveal untouched treasure from the ancient era.',
       success: 'You access the vault and find valuable items.',

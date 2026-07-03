@@ -110,9 +110,9 @@ export const ITEM_CATALOG = {
   // Very Rare
   'legendary_weapon': { name: 'Legendary Weapon', rarity: 'legendary', value: 2500, type: 'weapon', bonus: '+2', icon: 'assets/icons/items/legendary_weapon.webp' },
   // #44: the obtainable +2 weapon rung (very_rare, so tier-2 drops can carry it; the
-  // legendary_weapon above stays t3-gated). TODO(#44 icon art): runed_greatsword.webp —
+  // legendary_weapon above stays t3-gated). TODO(#44 icon art): runic_greatsword.webp —
   // placeholder borrows the Legendary Weapon icon.
-  'runed_greatsword': { name: 'Runed Greatsword', rarity: 'very_rare', value: 1500, type: 'weapon', bonus: '+2', description: 'A two-handed blade etched with dwarven war-runes that flare blue mid-swing.', icon: 'assets/icons/items/legendary_weapon.webp' },
+  'runic_greatsword': { name: 'Runic Greatsword', rarity: 'very_rare', value: 1500, type: 'weapon', bonus: '+2', description: 'A two-handed blade etched with dwarven war-runes that flare blue mid-swing.', icon: 'assets/icons/items/legendary_weapon.webp' },
   // #44: a FINDABLE very_rare accessory (the other +2/+3 artifacts are bespoke quest
   // rewards). TODO(#44 icon art): stormbound_ring.webp — placeholder borrows the
   // Protective Ring icon.

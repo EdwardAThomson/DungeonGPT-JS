@@ -159,7 +159,7 @@ export const SIDE_QUESTS = [
 
   // --- minLevel 7 ---
   Q('sealed_gate', 'The Sealed Gate', 7, 'Beneath the ruins stands a gate the ancients sealed — and its keeper still watches.', 'magetower', 'Every ward I cast frays toward the ruins. The ancients sealed a gate down there and set a keeper on it; the keeper has outlived its purpose and now feeds the seal with stolen life. Destroy it, and bring me what it guards.',
-    siteCombat('sgt1', 'Defeat the Gatekeeper beyond the sealed gate in the ruins', 'ruins', 'gatekeeper', 'the Gatekeeper of the Sealed Ways', { xp: 320, gold: 0, items: ['forbidden_knowledge'] }), 'magetower', undefined, { xp: 240, gold: 500, items: ['runed_greatsword'] }),
+    siteCombat('sgt1', 'Defeat the Gatekeeper beyond the sealed gate in the ruins', 'ruins', 'gatekeeper', 'the Gatekeeper of the Sealed Ways', { xp: 320, gold: 0, items: ['forbidden_knowledge'] }), 'magetower', undefined, { xp: 240, gold: 500, items: ['runic_greatsword'] }),
 ];
 
 // Quest "find" items aren't real catalog items (kept unique so random loot can't complete

@@ -38,7 +38,7 @@ describe('catalog equipment data', () => {
     expect(equip('shortsword').attack).toBe(1);
     expect(equip('silver_dagger').attack).toBe(1);
     expect(equip('hunters_longbow').attack).toBe(1);
-    expect(equip('runed_greatsword').attack).toBe(2); // #44: the obtainable +2 rung
+    expect(equip('runic_greatsword').attack).toBe(2); // #44: the obtainable +2 rung
     expect(equip('legendary_weapon').attack).toBe(2);
     expect(equip('blade_of_the_shattered_throne').attack).toBe(3); // t3 shelf
     expect(equip('rusty_dagger').attack).toBe(0); // junk: no bonus
