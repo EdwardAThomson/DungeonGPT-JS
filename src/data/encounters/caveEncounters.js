@@ -34,6 +34,7 @@ export const CAVE_ENCOUNTERS = {
     description: 'A massive swarm of bats erupts from the cave, filling the air with leathery wings and piercing screeches!',
     image: '/assets/encounters/cave_bats.webp',
     difficulty: 'easy',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     suggestedActions: [
       { label: 'Duck and Cover', skill: 'Acrobatics', description: 'Protect yourself from the swarm' },
       { label: 'Wait It Out', skill: 'Constitution', description: 'Endure the chaos' },
@@ -57,6 +58,7 @@ export const CAVE_ENCOUNTERS = {
     description: 'Thick webs coat the cave walls, and massive spiders descend from the darkness above!',
     image: '/assets/encounters/cave_spider_nest.webp',
     difficulty: 'hard',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 45,
     suggestedActions: [
@@ -107,6 +109,7 @@ export const CAVE_ENCOUNTERS = {
     description: 'A fearsome creature guards a hoard of treasure, awakening as you approach!',
     image: '/assets/encounters/cave_treasure_guardian.webp',
     difficulty: 'deadly',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 80,
     suggestedActions: [

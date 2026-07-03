@@ -34,6 +34,7 @@ export const RUINS_ENCOUNTERS = {
     description: 'A spectral figure materializes among the ruins, its hollow eyes fixing upon you!',
     image: '/assets/encounters/ruin_ghost.webp',
     difficulty: 'hard',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 40,
     suggestedActions: [
@@ -89,6 +90,7 @@ export const RUINS_ENCOUNTERS = {
     description: 'Hooded figures chant around a glowing altar in the ruins - you\'ve stumbled upon a dark ritual!',
     image: '/assets/encounters/ruin_cultists.webp',
     difficulty: 'hard',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 60,
     suggestedActions: [

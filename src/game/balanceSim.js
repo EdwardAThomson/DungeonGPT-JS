@@ -20,18 +20,19 @@ import {
   resolveRound,
   generateEncounterSummary,
   getRoundActions,
+  getSupportBonus,
   shouldUseMultiRound
 } from '../utils/multiRoundEncounter';
 import { resolveEncounter } from '../utils/encounterResolver';
 import { calculateModifier, SKILLS } from '../utils/rules';
-import { initializeHP, shouldDealDamage } from '../utils/healthSystem';
+import { initializeHP, encounterDealsDamage } from '../utils/healthSystem';
 import { getEquippedBonuses, parseBonus, SLOT_FOR_TYPE } from './equipment';
 import {
   ITEM_CATALOG,
   RARITY_RANK,
   maxRarityRankForTier
 } from '../utils/inventorySystem';
-import { heroTemplates, STAT_KEYS } from '../data/heroData';
+import { heroTemplates } from '../data/heroData';
 import { XP_THRESHOLDS, getLevelBonus } from '../utils/progressionSystem';
 
 // --- Seeded RNG (mulberry32) ------------------------------------------------------
@@ -148,7 +149,7 @@ export const effectiveActionModifier = (action, hero, encounter) => {
   if (!statName) return -Infinity;
   let modifier = calculateModifier(hero.stats?.[statName] || 10);
   const equip = getEquippedBonuses(hero);
-  if (PHYSICAL_STATS.includes(statName) || shouldDealDamage(encounter)) {
+  if (PHYSICAL_STATS.includes(statName) || encounterDealsDamage(encounter)) {
     modifier += equip.attack;
   }
   modifier += equip.misc;
@@ -191,46 +192,31 @@ const pickAction = (policy, roundState, hero, rng) => {
   );
 };
 
-// --- Party projection (doc §4.4) ---------------------------------------------------
+// --- Party support (Phase 5, LIVE since #43) ----------------------------------------
 /**
- * PROJECTION of the Phase 5 Lead + Support model (docs/ENCOUNTER_SYSTEM.md):
- * each supporting hero contributes a deterministic `max(1, floor(bestStatMod / 2))`
- * to the lead's roll. Phase 5 is NOT implemented in the live resolver; this models
- * the designed formula so party-size DC tuning can be done on numbers before the
- * mechanic ships. Treat multi-hero results as projections, not measurements.
+ * The Phase 5 Lead + Support bonus for a party led by party[0]: each supporting
+ * hero contributes a deterministic `max(1, floor(bestStatMod / 2))` to the lead's
+ * roll. Since #43 this is the LIVE production formula (multiRoundEncounter's
+ * getSupportBonus); the sim delegates to it so the two can never drift. The name
+ * predates the implementation (it began life as a pre-#43 projection) and is kept
+ * for API stability.
  * @param {Array<Object>} party - sim heroes; party[0] is the lead
  * @returns {number} total support bonus added to the lead's modifier
  */
-export const projectedSupportBonus = (party) =>
-  (party || []).slice(1).reduce((sum, hero) => {
-    const bestMod = Math.max(
-      ...STAT_KEYS.map((s) => calculateModifier(hero.stats?.[s] || 10))
-    );
-    return sum + Math.max(1, Math.floor(bestMod / 2));
-  }, 0);
-
-// Fold the projected support bonus into the lead as a pure modifier adder:
-// +2 to every stat per +1 of support bonus (= +1 modifier on every check), leaving
-// the resolver code untouched.
-const applySupportProjection = (party) => {
-  const lead = party[0];
-  if (party.length <= 1) return { lead, supportBonus: 0 };
-  const supportBonus = projectedSupportBonus(party);
-  const boosted = {};
-  for (const key of STAT_KEYS) {
-    boosted[key] = (lead.stats?.[key] || 10) + supportBonus * 2;
-  }
-  return { lead: { ...lead, stats: boosted }, supportBonus };
-};
+export const projectedSupportBonus = (party) => getSupportBonus(party || [], 0);
 
 // --- The simulator ----------------------------------------------------------------
 /**
  * Monte-Carlo one authored encounter block against a hero (or party) with a seeded
- * PRNG, driving the real resolution path.
+ * PRNG, driving the real resolution path — since #43 that INCLUDES the live Phase 5
+ * Lead + Support machinery: the party is passed straight into
+ * createMultiRoundEncounter, resolveRound applies the support bonus, distributes
+ * incoming damage (lead + crit-fail splash) and auto-swaps a KO'd lead exactly as
+ * the game does, so multi-hero results are measurements, not projections.
  *
  * @param {Object} encounter - the authored `encounter` object (template/milestone)
  * @param {Object|Array<Object>} heroOrParty - a sim hero, or 1-4 heroes
- *   (party[0] leads; the rest add the projected Phase 5 support bonus)
+ *   (party[0] starts as lead; the rest support per Phase 5)
  * @param {Object} opts
  * @param {number} opts.trials - Monte-Carlo runs (default 3000: ±~1.8pp at 95%)
  * @param {number} opts.seed - PRNG seed (default 1); same seed => identical result
@@ -245,13 +231,15 @@ export const simulateEncounter = async (encounter, heroOrParty, {
   policy = 'best-modifier'
 } = {}) => {
   const party = Array.isArray(heroOrParty) ? heroOrParty : [heroOrParty];
-  const { lead, supportBonus } = applySupportProjection(party);
+  const lead = party[0];
+  const supportBonus = getSupportBonus(party, 0);
   const rng = mulberry32((seed >>> 0) || 1);
 
   const outcomes = { victory: 0, defeat: 0, stalemate: 0, escaped: 0 };
   let totalRounds = 0;
   let totalHpLoss = 0;
-  let koCount = 0;
+  let koCount = 0; // trials where >= 1 hero hit 0 HP
+  let tpkCount = 0; // trials where EVERY hero hit 0 HP (true wipe)
   let totalXp = 0;
   let xpOnWins = 0;
   let totalGoldDelta = 0;
@@ -263,49 +251,51 @@ export const simulateEncounter = async (encounter, heroOrParty, {
   Math.random = rng; // seed rollCheck (d20) + damage variance; restored in finally
   try {
     for (let i = 0; i < trials; i++) {
-      const maxHP = lead.maxHP || 20;
-      let currentHP = maxHP;
       let hpLoss = 0;
       let ko = false;
+      let tpk = false;
       let outcome;
       let rounds;
       let xp = 0;
       let goldDelta = 0;
 
       if (multiRound) {
-        let state = createMultiRoundEncounter(encounter, lead, settings, {});
+        // The REAL team path: party state, support bonus, damage distribution and
+        // lead KO/auto-swap all live inside multiRoundEncounter (shared with the UI).
+        let state = createMultiRoundEncounter(encounter, lead, settings, {}, party);
         while (!state.isResolved) {
-          const action = pickAction(policy, state, lead, rng);
+          const currentLead = state.party[state.leadIndex];
+          const action = pickAction(policy, state, currentLead, rng);
           if (!action) break;
           if (!actionLabel) actionLabel = action.label;
-          const { roundResult, updatedState } = await resolveRound(state, action.label, rng);
+          const { updatedState } = await resolveRound(state, action.label, rng);
           state = updatedState;
-          if (roundResult.hpDamage > 0) {
-            currentHP -= roundResult.hpDamage;
-            hpLoss += roundResult.hpDamage;
-            if (currentHP <= 0) {
-              // Acting hero downed mid-fight forces defeat (EncounterActionModal rule).
-              state.isResolved = true;
-              state.outcome = 'defeat';
-              ko = true;
-            }
-          }
         }
         const summary = await generateEncounterSummary(state);
         outcome = state.outcome || 'stalemate';
         rounds = state.roundHistory.length;
+        hpLoss = state.party.reduce(
+          (sum, hero, idx) => sum + Math.max(0, (party[idx].maxHP || 20) - hero.currentHP),
+          0
+        );
+        ko = state.party.some((hero) => hero.currentHP <= 0);
+        tpk = state.party.every((hero) => hero.currentHP <= 0);
         xp = summary.rewards?.xp || 0;
         goldDelta = (summary.rewards?.gold || 0) - (summary.penalties?.goldLoss || 0);
       } else {
+        // Single-action encounters stay solo (Phase 5 scopes team combat to
+        // multi-round fights); party[0] acts alone, exactly like the modal.
         const action = pickAction(policy, { encounter, currentRound: 1 }, lead, rng);
         if (!action) break;
         if (!actionLabel) actionLabel = action.label;
         const result = await resolveEncounter(encounter, action.label, lead, settings, {}, rng);
         rounds = 1;
         if (result.hpDamage > 0) {
-          currentHP -= result.hpDamage;
           hpLoss += result.hpDamage;
-          if (currentHP <= 0) ko = true;
+          if ((lead.maxHP || 20) - hpLoss <= 0) {
+            ko = true;
+            tpk = party.length === 1;
+          }
         }
         const success = result.outcomeTier === 'success' || result.outcomeTier === 'criticalSuccess';
         outcome = ko ? 'defeat' : (success ? 'victory' : 'defeat');
@@ -317,6 +307,7 @@ export const simulateEncounter = async (encounter, heroOrParty, {
       totalRounds += rounds;
       totalHpLoss += hpLoss;
       if (ko) koCount += 1;
+      if (tpk) tpkCount += 1;
       totalXp += xp;
       if (outcome === 'victory') xpOnWins += xp;
       totalGoldDelta += goldDelta;
@@ -340,19 +331,21 @@ export const simulateEncounter = async (encounter, heroOrParty, {
     escapeRate: outcomes.escaped / trials,
     outcomeDistribution: { ...outcomes },
     meanRounds: totalRounds / trials,
+    // Total HP lost across the whole party per attempt.
     meanHeroHpLoss: totalHpLoss / trials,
-    // Single acting hero => a knockout IS the party-wipe proxy (doc §4.1 koRate).
+    // koRate: >= 1 hero downed. tpkRisk: the whole party downed (for a solo hero
+    // the two coincide, preserving the pre-#43 semantics).
     koRate: koCount / trials,
-    tpkRisk: koCount / trials,
+    tpkRisk: tpkCount / trials,
     meanXp: totalXp / trials,
     meanXpOnWin: outcomes.victory > 0 ? xpOnWins / outcomes.victory : 0,
     meanGoldDelta: totalGoldDelta / trials,
     expectedAttemptsToWin: winRate > 0 ? 1 / winRate : Infinity,
-    partyProjection: party.length > 1
+    partyModel: party.length > 1
       ? {
           partySize: party.length,
           supportBonus,
-          note: 'PROJECTION: Phase 5 Lead/Support bonus (ENCOUNTER_SYSTEM.md) modeled as a flat modifier adder; not yet implemented in the live resolver.'
+          note: 'LIVE: Phase 5 Lead/Support driven through the real multiRoundEncounter party path (#43).'
         }
       : null
   };

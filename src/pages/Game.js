@@ -34,6 +34,7 @@ import {
 } from '../game/worldMoveController';
 import {
   applyEncounterOutcomeToParty,
+  applyTeamEncounterOutcomeToParty,
   planWorldTileEncounterFlow,
   formatEncounterPenaltyLog,
   formatEncounterRewardLog
@@ -992,18 +993,24 @@ const Game = ({ resumeConversation = null }) => {
   const handleEncounterResolve = (result) => {
     logger.info('Encounter resolved', result);
 
+    // #43: team boss fights split XP across the whole party (+10% pot per
+    // supporter); gold/items/penalties still flow through the lead. Solo results
+    // keep the classic single-hero path. HP damage was already applied live during
+    // the fight via onCharacterUpdate, so only rewards/penalties land here.
     const {
       updatedParty,
       heroIndex,
       rewardMessages,
       penaltyMessages
-    } = applyEncounterOutcomeToParty({
+    } = (result?.isTeamEncounter ? applyTeamEncounterOutcomeToParty : applyEncounterOutcomeToParty)({
       party: selectedHeroes,
       result
     });
     setSelectedHeroes(updatedParty);
 
-    const heroName = updatedParty[heroIndex]?.characterName || 'Hero';
+    const heroName = result?.isTeamEncounter
+      ? 'the party'
+      : (updatedParty[heroIndex]?.characterName || updatedParty[heroIndex]?.heroName || 'Hero');
     const rewardLog = formatEncounterRewardLog(heroName, rewardMessages);
     const penaltyLog = formatEncounterPenaltyLog(heroName, penaltyMessages);
     if (rewardLog) logger.info(rewardLog);

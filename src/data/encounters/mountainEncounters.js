@@ -34,6 +34,7 @@ export const MOUNTAIN_ENCOUNTERS = {
     description: 'A dragon emerges from its mountain lair, ancient and terrible, demanding tribute or combat!',
     image: '/assets/encounters/mountain_dragon.webp',
     difficulty: 'deadly',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 120,
     suggestedActions: [

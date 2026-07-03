@@ -9,6 +9,14 @@
 //   Tier 2 (Lv 3-4) — regional threats, boss HP 100-200, rewards 100-200 XP
 //   Tier 3 (Lv 5+)  — epic threats, boss HP 250-400, rewards 300-500 XP
 //
+// Since #43, enemy HP is a REAL difficulty knob: players deal flat damage per
+// outcome (multiRoundEncounter.ENEMY_DAMAGE_BY_OUTCOME), so a 250 HP boss takes
+// ~10 successes where a 30 HP boss takes ~2, and t2+ bosses are tuned for a
+// 3-hero party (Lead + Support). Boss blocks declare `dealsDamage: true` with an
+// authored `damage` dice profile (per outcome tier), and may pin an exact `dc`
+// (overrides the difficulty label's DC). Tune through src/game/balanceSim.js;
+// the bands are enforced by src/game/progressionLint.test.js.
+//
 // All item IDs in rewards reference entries in ITEM_CATALOG (inventorySystem.js).
 // Existing item IDs (treasure_map, dark_tome, quest_key, etc.) are real.
 // See docs/CAMPAIGN_MILESTONE_SYSTEM.md for the full design.
@@ -88,6 +96,9 @@ export const storyTemplates = [
                         difficulty: 'medium',
                         multiRound: true,
                         enemyHP: 30,
+                        // #43 explicit damage profile (sim-tuned, solo mid-gear Lv 2 in the 30-90% band)
+                        dealsDamage: true,
+                        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
                         suggestedActions: [
                             { label: 'Fight', skill: 'Athletics', description: 'Charge the chieftain head-on' },
                             { label: 'Outflank', skill: 'Stealth', description: 'Use the map to approach from a blind spot' },
@@ -177,8 +188,13 @@ export const storyTemplates = [
                         image: '/assets/icons/items/ritual_dagger.webp',
                         encounterTier: 'boss',
                         difficulty: 'deadly',
+                        // #43 DC retune: deadly's DC 25 was a ~1% lottery; sim-validated at DC 20
+                        // for a 3-hero mid-gear Lv 5 party (~42% win). Label stays 'deadly'.
+                        dc: 20,
                         multiRound: true,
                         enemyHP: 250,
+                        dealsDamage: true,
+                        damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d6' },
                         suggestedActions: [
                             { label: 'Fight', skill: 'Athletics', description: 'Engage the Overlord in direct combat' },
                             { label: 'Use the Map', skill: 'Investigation', description: 'Exploit weaknesses revealed by the hidden map' },
@@ -282,6 +298,8 @@ export const storyTemplates = [
                         difficulty: 'medium',
                         multiRound: true,
                         enemyHP: 30,
+                        dealsDamage: true,
+                        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
                         suggestedActions: [
                             { label: 'Fight', skill: 'Athletics', description: 'Charge through the stinging sand' },
                             { label: 'Read the Wind', skill: 'Survival', description: 'Use the ledger\'s notes to time the storm\'s lulls' },
@@ -386,6 +404,8 @@ export const storyTemplates = [
                         difficulty: 'medium',
                         multiRound: true,
                         enemyHP: 32,
+                        dealsDamage: true,
+                        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
                         suggestedActions: [
                             { label: 'Fight', skill: 'Athletics', description: 'Shatter the wraith\'s frozen core with steel' },
                             { label: 'Endure the Cold', skill: 'Survival', description: 'Use the warden\'s lore to weather the killing frost' },
@@ -481,6 +501,8 @@ export const storyTemplates = [
                         difficulty: 'medium',
                         multiRound: true,
                         enemyHP: 25,
+                        dealsDamage: true,
+                        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
                         suggestedActions: [
                             { label: 'Strike', skill: 'Athletics', description: 'Hack at the writhing mass' },
                             { label: 'Use Herbs', skill: 'Medicine', description: 'Apply the healer\'s herbs to burn the blight' },
@@ -572,6 +594,9 @@ export const storyTemplates = [
                         difficulty: 'hard',
                         multiRound: true,
                         enemyHP: 150,
+                        // #43: DC stays hard/20 — sim lands a 3-hero mid-gear Lv 4 party at ~44% win
+                        dealsDamage: true,
+                        damage: { criticalFailure: '4d6+4', failure: '2d6+2', success: '1d4' },
                         suggestedActions: [
                             { label: 'Strike', skill: 'Athletics', description: 'Attack the pulsing core directly' },
                             { label: 'Apply Antidote', skill: 'Medicine', description: 'Use the alchemist\'s serum to weaken it' },
@@ -667,6 +692,8 @@ export const storyTemplates = [
                         difficulty: 'medium',
                         multiRound: true,
                         enemyHP: 35,
+                        dealsDamage: true,
+                        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
                         suggestedActions: [
                             { label: 'Smash', skill: 'Athletics', description: 'Batter the automaton with brute force' },
                             { label: 'Use Control Rod', skill: 'Arcana', description: 'Insert the control rod to override its commands' },
@@ -756,8 +783,13 @@ export const storyTemplates = [
                         image: '/assets/icons/items/ritual_dagger.webp',
                         encounterTier: 'boss',
                         difficulty: 'deadly',
+                        // #43 DC retune: fought at Lv 4 (one level-bonus rung below the Lv 5
+                        // finales), so DC 19 lands the 3-hero mid-gear band (~45% win).
+                        dc: 19,
                         multiRound: true,
                         enemyHP: 200,
+                        dealsDamage: true,
+                        damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d4' },
                         suggestedActions: [
                             { label: 'Fight', skill: 'Athletics', description: 'Strike at the Herald with enchanted weapons' },
                             { label: 'Disrupt the Ritual', skill: 'Arcana', description: 'Use the blueprints to overload the Aether conduits' },
@@ -853,6 +885,8 @@ export const storyTemplates = [
                         difficulty: 'medium',
                         multiRound: true,
                         enemyHP: 30,
+                        dealsDamage: true,
+                        damage: { criticalFailure: '2d6+2', failure: '1d6+1', success: '1d3' },
                         suggestedActions: [
                             { label: 'Fight', skill: 'Athletics', description: 'Attack the cult leader directly' },
                             { label: 'Disrupt Ritual', skill: 'Arcana', description: 'Scatter the ritual components using clues from the journal' },
@@ -942,8 +976,13 @@ export const storyTemplates = [
                         image: '/assets/icons/items/ritual_dagger.webp',
                         encounterTier: 'boss',
                         difficulty: 'deadly',
+                        // #43 DC retune: the biggest HP pool (300) already makes this the longest
+                        // fight in the game; DC 19 keeps the 3-hero mid-gear Lv 5 party ~56% win.
+                        dc: 19,
                         multiRound: true,
                         enemyHP: 300,
+                        dealsDamage: true,
+                        damage: { criticalFailure: '4d8+4', failure: '2d6+2', success: '1d6' },
                         suggestedActions: [
                             { label: 'Fight', skill: 'Athletics', description: 'Strike at the writhing mass of tentacles' },
                             { label: 'Read the Ritual', skill: 'Arcana', description: 'Use the decoded text to perform the sealing ritual' },

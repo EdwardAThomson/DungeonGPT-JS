@@ -6,13 +6,28 @@
 // sitePopulator pools as ACTUALLY rolled, encounter tables, ITEM_CATALOG,
 // XP_THRESHOLDS), so new content is linted the moment it is authored.
 //
-// KNOWN_GAPS pins the failures that are TRUE TODAY BY DESIGN DEBT (#44/#45/#47/#50
-// and the deadly-t2 tuning). For a pinned entry the guard asserts the CURRENT
-// (broken) value instead of the healthy band, so:
+// KNOWN_GAPS pins the failures that are TRUE TODAY BY DESIGN DEBT (#44/#45/#50).
+// For a pinned entry the guard asserts the CURRENT (broken) value instead of the
+// healthy band, so:
 //   - a REGRESSION (things get worse) fails the pin, and
 //   - a SILENT FIX (things get better) ALSO fails the pin — update/remove the pin
 //     and, where noted, flip the guard to enforcing.
 // The suite as a whole passes.
+//
+// BOSS BAND SEMANTICS (#43, Lead + Support shipped 2026-07-03):
+// Boss fights are party fights, and boss win-rate bands are measured against the
+// party each tier is DESIGNED for:
+//   - tier 1 bosses: a SOLO hero at the boss's intended level (t1 must stay
+//     beatable alone — Phase 5's zero-regression rule for 1-hero parties);
+//   - tier 2+ bosses: a 3-HERO party (Fighter lead + Wizard + Cleric, all at the
+//     intended level, all wearing the named loadout). "Requires more party
+//     members" is the design intent: solo attempts on t2+ bosses may sit BELOW
+//     the band and that is correct, not a gap.
+// Healthy bands per loadout: mid 30-90%, best >= 50%, none >= 10%. Wipe risk
+// (tpkRisk: the WHOLE party downed — for solo heroes identical to the old
+// koRate) <= 25% and stalemate <= 45% at mid. Since #43 all ten authored bosses
+// sim inside these bands (the old deadly-DC-25 pins are gone: those bosses now
+// carry explicit `dc` overrides in the 19-20 range plus damage profiles).
 
 import { storyTemplates } from '../data/storyTemplates';
 import { SIDE_QUESTS, QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
@@ -67,28 +82,13 @@ const KNOWN_GAPS = {
   // weapon +2 = legendary_weapon only (see above). Fix = give the rung a source.
   unobtainableSlotRungs: { weapon: [2], armor: [], accessory: [] },
 
-  // (c) boss win-rate pins, measured at TRIALS/SEED with the live rules
-  // (2026-07-03, re-measured after the #47 level term: Lv 4 intended-level bosses
-  // gain +1 to checks, Lv 5 gain +2 — t1 bosses at Lv 2 are unchanged).
-  // Healthy bands: mid 30-90%, best >= 50%, none >= 10%.
-  //   - The three deadly-DC-25 t2 bosses stay retry lotteries even with the level
-  //     term (mid <= ~3%); their fix is the #43 DC retune, not leveling.
-  //   - Rot-Heart's `none` HEALED to 10.1% with the level term (pin removed);
-  //     mid/best still sit below band pending #43/#44.
-  //   - ALL bosses still fail "best >= 50%": the obtainable weapon ladder tops
-  //     out at +1 (#44). t1 best == mid at +4.
-  bossBalance: {
-    'Goblin Chieftain': { best: [0.40, 0.53] },
-    'Sandstorm Cult Leader': { best: [0.40, 0.53] },
-    'The Hoarfrost Wraith': { best: [0.40, 0.53] },
-    'Blightspawn': { best: [0.40, 0.53] },
-    'Rogue Automaton': { best: [0.40, 0.53] },
-    'The Hooded Priest': { best: [0.40, 0.53] },
-    'Shadow Overlord': { none: [0, 0.04], mid: [0, 0.05], best: [0.05, 0.15] },
-    'The Rot-Heart': { mid: [0.13, 0.27], best: [0.25, 0.40] },
-    'Herald of the Old Gods': { none: [0, 0.04], mid: [0, 0.04], best: [0.02, 0.10] },
-    'The Great Dreamer': { none: [0, 0.04], mid: [0, 0.05], best: [0.05, 0.14] }
-  },
+  // (c) boss win-rate pins. HEALED 2026-07-03 by #43 (Lead + Support party
+  // fights, flat enemy damage, explicit boss damage profiles, deadly-DC retune to
+  // 19-20): every authored boss now sims inside the healthy bands under the band
+  // semantics in the header (t1 solo / t2+ 3-hero party), so NO pins remain.
+  // Measured at TRIALS/SEED: t1 mid 69-85%, t2 3-hero mid 42-56%, all best >= 50%,
+  // all none >= 10%. Add a pin here only for future intentionally-unbalanced content.
+  bossBalance: {},
 
   // (d) Part I §2: no t2 world's authored XP reaches the t3 entry threshold
   // (Lv 5 = 6,500 XP). Totals today are ~2,600-3,200.
@@ -116,7 +116,7 @@ const HEALTHY = {
   mid: [0.30, 0.90],
   best: [0.50, 1.0],
   none: [0.10, 1.0],
-  maxKoRate: 0.25,
+  maxTpkRisk: 0.25, // whole-party wipe per attempt (== old koRate for solo heroes)
   maxStalemateRate: 0.45
 };
 
@@ -218,10 +218,20 @@ const sourcesOf = (key) => {
 const simCache = new Map(); // `${bossName}|L${level}|${loadout}` -> result
 const simKey = (name, level, loadout) => `${name}|L${level}|${loadout}`;
 
+// The band-semantics party (see header): t1 = solo Fighter; t2+ = 3-hero party
+// (Fighter lead + Wizard + Cleric), everyone at the same level and loadout.
+const bandParty = (tier, level, loadout) => {
+  if ((tier || 1) <= 1) return buildSimHero({ level, loadout, tier });
+  return [
+    buildSimHero({ level, characterClass: 'Fighter', loadout, tier }),
+    buildSimHero({ level, characterClass: 'Wizard', loadout, tier }),
+    buildSimHero({ level, characterClass: 'Cleric', loadout, tier })
+  ];
+};
+
 const runSim = async (entry, level, loadout, seed = SEED) => {
   const { template, milestone } = entry;
-  const hero = buildSimHero({ level, loadout, tier: template.tier });
-  return simulateEncounter(milestone.encounter, hero, {
+  return simulateEncounter(milestone.encounter, bandParty(template.tier, level, loadout), {
     trials: TRIALS,
     seed,
     settings: { tier: template.tier }
@@ -368,9 +378,11 @@ describe('guard (c): every authored boss sims inside its win band', () => {
       }
     });
 
-    test('KO risk and stalemate stay inside band (mid loadout)', () => {
+    test('wipe risk and stalemate stay inside band (mid loadout)', () => {
       const result = simCache.get(simKey(name, level, 'mid'));
-      expect(result.koRate).toBeLessThanOrEqual(HEALTHY.maxKoRate);
+      // #43: bosses hit back now, so individual KOs (lead rotations) are part of
+      // an epic fight; the guarded ceiling is the WHOLE party going down.
+      expect(result.tpkRisk).toBeLessThanOrEqual(HEALTHY.maxTpkRisk);
       expect(result.stalemateRate).toBeLessThanOrEqual(HEALTHY.maxStalemateRate);
     });
   });
@@ -421,20 +433,18 @@ describe('guard (e): leveling improves boss outcomes above epsilon', () => {
         // the pin when a leveling-power mechanic ships (done 2026-07-03).
         steps.forEach(({ delta }) => expect(Math.abs(delta)).toBeLessThan(EPSILON));
       } else {
-        // Bonus-aware (#47 shipped): win rate must step up exactly where the
-        // level term steps (getLevelBonus: +1 per 2 levels, cap +3), and stay
-        // ~flat where it doesn't. Catches both regressions to flatness AND a
-        // level term that silently stops applying. Bosses pinned as unbalanced
-        // in KNOWN_GAPS.bossBalance (the deadly DC-25 lotteries) get a halved
-        // threshold: at ~1-3% win rates a +1 step compresses below 2pp, but it
-        // must still be visibly positive.
+        // Bonus-aware (#47 shipped): win rate must step up (>= EPSILON) where the
+        // level term steps (getLevelBonus: +1 per 2 levels, cap +3). Where the
+        // term does NOT step, leveling may still drift the rate UP a little —
+        // since #43 bosses deal real damage, so the max-HP gained per level buys
+        // genuine survivability — but it must never REGRESS: delta >= -EPSILON.
         const minStep = KNOWN_GAPS.bossBalance[name] ? EPSILON / 2 : EPSILON;
         steps.forEach(({ from, delta }) => {
           const bonusStep = getLevelBonus(from + 1) - getLevelBonus(from);
           if (bonusStep >= 1) {
             expect(delta).toBeGreaterThanOrEqual(minStep);
           } else {
-            expect(Math.abs(delta)).toBeLessThan(EPSILON);
+            expect(delta).toBeGreaterThanOrEqual(-EPSILON);
           }
         });
       }

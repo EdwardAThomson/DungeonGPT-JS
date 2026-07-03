@@ -130,3 +130,69 @@ describe('resolveEncounter loot rarity gating by tier', () => {
     expect(result.rewards.items).not.toContain('legendary_artifact');
   });
 });
+
+// --- #43: explicit damage profiles, DC overrides, Lead + Support -------------------
+
+describe('resolveEncounter #43 combat depth', () => {
+  beforeEach(() => {
+    // Deterministic: d20 -> 11, profile dice roll mid, damage variance fixed.
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('dealsDamage: false disarms an encounter even with a hostile keyword name', async () => {
+    const enc = { ...makeEncounter(), dealsDamage: false }; // name still 'Goblin Ambush'
+    const result = await resolveEncounter(enc, 'Fight', makeCharacter(), {});
+    expect(result.hpDamage).toBe(0);
+  });
+
+  it('dealsDamage: true arms an encounter whose name matches no keyword', async () => {
+    const enc = { ...makeEncounter(), name: 'The Silent Warden', dealsDamage: true };
+    const result = await resolveEncounter(enc, 'Fight', makeCharacter(), {});
+    expect(result.hpDamage).toBeGreaterThan(0); // legacy percent model (no profile)
+  });
+
+  it('keyword fallback still applies when the flag is absent (old save data)', async () => {
+    const result = await resolveEncounter(makeEncounter(), 'Fight', makeCharacter(), {});
+    expect(result.hpDamage).toBeGreaterThan(0);
+  });
+
+  it('an authored damage profile overrides the percent-of-maxHP model', async () => {
+    // Numeric profile => exact damage; d20 = 11 vs medium DC 15 => failure tier.
+    const enc = { ...makeEncounter(), dealsDamage: true, damage: { failure: 7 } };
+    const result = await resolveEncounter(enc, 'Fight', makeCharacter(), {});
+    expect(result.outcomeTier).toBe('failure');
+    expect(result.hpDamage).toBe(7);
+  });
+
+  it('armour soak still applies to profile damage', async () => {
+    const enc = { ...makeEncounter(), dealsDamage: true, damage: { failure: 7 } };
+    const result = await resolveEncounter(
+      enc, 'Fight', makeCharacter({ armor: 'magic_plate' }), {}
+    );
+    expect(result.hpDamage).toBe(5); // 7 - 2 soak
+  });
+
+  it('a numeric dc overrides the difficulty label', async () => {
+    // d20 = 11 + 0 mod: medium (DC 15) fails, dc: 11 succeeds.
+    const failing = await resolveEncounter(makeEncounter(), 'Fight', makeCharacter(), {});
+    expect(failing.outcomeTier).toBe('failure');
+    const tuned = await resolveEncounter(
+      { ...makeEncounter(), dc: 11 }, 'Fight', makeCharacter(), {}
+    );
+    expect(tuned.outcomeTier).toBe('success');
+  });
+
+  it('the Phase 5 support bonus lands in the roll and is surfaced for the UI', async () => {
+    const base = await resolveEncounter(makeEncounter(), 'Fight', makeCharacter(), {});
+    const supported = await resolveEncounter(
+      makeEncounter(), 'Fight', makeCharacter(), {}, {}, Math.random, { supportBonus: 3 }
+    );
+    expect(supported.supportBonus).toBe(3);
+    expect(base.supportBonus).toBe(0);
+    expect(supported.rollResult.total).toBe(base.rollResult.total + 3);
+  });
+});

@@ -4,7 +4,9 @@ import {
   applyHealing,
   calculateMaxHP,
   calculateMaxHPForLevel,
-  initializeHP
+  encounterDealsDamage,
+  initializeHP,
+  rollProfileDamage
 } from './healthSystem';
 
 describe('healthSystem calculateMaxHP', () => {
@@ -87,5 +89,36 @@ describe('healthSystem HP state helpers', () => {
     const healed = applyHealing({ maxHP: 20, currentHP: 15 }, 10);
     expect(healed.currentHP).toBe(20);
     expect(healed.isDefeated).toBe(false);
+  });
+});
+
+// --- #43: explicit damage gate + authored damage profiles ---------------------------
+
+describe('encounterDealsDamage (#43)', () => {
+  it('honors an explicit dealsDamage boolean over the keyword fallback', () => {
+    expect(encounterDealsDamage({ name: 'Goblin Ambush', dealsDamage: false })).toBe(false);
+    expect(encounterDealsDamage({ name: 'Quiet Shrine', dealsDamage: true })).toBe(true);
+  });
+
+  it('falls back to the deprecated keyword match for old encounter data', () => {
+    expect(encounterDealsDamage({ name: 'Wolf Pack' })).toBe(true);
+    expect(encounterDealsDamage({ name: 'Traveling Merchant' })).toBe(false);
+    expect(encounterDealsDamage(null)).toBe(false);
+  });
+});
+
+describe('rollProfileDamage (#43)', () => {
+  it('rolls dice-notation tiers deterministically with a seeded rng', () => {
+    const rngLow = () => 0; // every die rolls 1
+    expect(rollProfileDamage({ failure: '2d6+2' }, 'failure', rngLow)).toBe(4);
+    const rngHigh = () => 0.999; // every die rolls max
+    expect(rollProfileDamage({ failure: '2d6+2' }, 'failure', rngHigh)).toBe(14);
+  });
+
+  it('accepts flat numbers and returns 0 for missing tiers or bad specs', () => {
+    expect(rollProfileDamage({ failure: 7 }, 'failure')).toBe(7);
+    expect(rollProfileDamage({ failure: 7 }, 'criticalSuccess')).toBe(0);
+    expect(rollProfileDamage({ failure: 'not-dice' }, 'failure')).toBe(0);
+    expect(rollProfileDamage(null, 'failure')).toBe(0);
   });
 });

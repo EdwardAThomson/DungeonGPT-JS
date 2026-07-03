@@ -177,13 +177,61 @@ export const getHPStatus = (currentHP, maxHP) => {
 };
 
 /**
- * Determine if encounter should deal damage (hostile encounters only)
+ * DEPRECATED (#43): name-keyword damage matching. Kept ONLY as the back-compat
+ * fallback for encounter data that predates the explicit `dealsDamage` flag —
+ * old saves snapshot their encounter blocks, so removing this would silently
+ * disarm the wolves/bandits/goblins in existing campaigns. New encounter data
+ * must declare `dealsDamage` explicitly; use `encounterDealsDamage()` everywhere.
  */
 export const shouldDealDamage = (encounter) => {
   const hostileKeywords = ['goblin', 'wolf', 'bandit', 'spider', 'bear', 'ambush', 'attack'];
   const encounterName = encounter.name.toLowerCase();
-  
+
   return hostileKeywords.some(keyword => encounterName.includes(keyword));
+};
+
+/**
+ * Does this encounter hit back? (#43 explicit damage profiles)
+ *
+ * The authoritative gate is the encounter's own `dealsDamage` boolean. Encounter
+ * data that predates the flag (older saves snapshot their encounter blocks) falls
+ * back to the deprecated keyword match, so nothing regresses.
+ */
+export const encounterDealsDamage = (encounter) => {
+  if (!encounter) return false;
+  if (typeof encounter.dealsDamage === 'boolean') return encounter.dealsDamage;
+  return shouldDealDamage(encounter);
+};
+
+/**
+ * Roll an authored damage profile (#43).
+ *
+ * A profile maps outcome tiers to dice strings or flat numbers:
+ *   damage: { criticalFailure: '4d6+4', failure: '2d6+2', success: '1d4' }
+ * Missing tiers deal 0 (criticalSuccess is usually omitted: a clean hit takes none).
+ * When an encounter has `dealsDamage: true` but NO profile, callers should fall
+ * back to the legacy percent-of-maxHP model (`calculateDamage`).
+ *
+ * @param {Object} profile - the encounter's `damage` block
+ * @param {string} outcomeTier - criticalSuccess | success | failure | criticalFailure
+ * @param {() => number} rng - 0..1 random source (defaults to Math.random)
+ * @returns {number} rolled damage (0 for missing/invalid tiers)
+ */
+export const rollProfileDamage = (profile, outcomeTier, rng = Math.random) => {
+  if (!profile) return 0;
+  const spec = profile[outcomeTier];
+  if (spec === undefined || spec === null) return 0;
+  if (typeof spec === 'number') return Math.max(0, Math.floor(spec));
+  const match = String(spec).match(/^(\d+)d(\d+)(?:\+(\d+))?$/);
+  if (!match) return 0;
+  const count = parseInt(match[1], 10);
+  const sides = parseInt(match[2], 10);
+  const bonus = match[3] ? parseInt(match[3], 10) : 0;
+  let total = bonus;
+  for (let i = 0; i < count; i++) {
+    total += Math.floor(rng() * sides) + 1;
+  }
+  return total;
 };
 
 /**

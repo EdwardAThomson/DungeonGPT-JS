@@ -154,15 +154,16 @@ describe('simulateEncounter', () => {
     expect(r.multiRound).toBe(true);
     const { victory, defeat, stalemate, escaped } = r.outcomeDistribution;
     expect(victory + defeat + stalemate + escaped).toBe(TRIALS);
-    expect(r.winRate).toBeGreaterThan(0.2);
-    expect(r.winRate).toBeLessThan(0.8);
+    expect(r.winRate).toBeGreaterThan(0.3);
+    expect(r.winRate).toBeLessThan(0.95);
     expect(r.meanRounds).toBeGreaterThan(1);
-    expect(r.meanRounds).toBeLessThanOrEqual(3);
+    // #43: maxRounds scales with enemy HP (30 HP => 4 rounds)
+    expect(r.meanRounds).toBeLessThanOrEqual(4);
     expect(r.meanHeroHpLoss).toBeGreaterThan(0); // wolf-named => damage gate applies
     expect(r.meanXpOnWin).toBeGreaterThan(0);
     expect(r.expectedAttemptsToWin).toBeCloseTo(1 / r.winRate, 10);
-    expect(r.tpkRisk).toBe(r.koRate);
-    expect(r.partyProjection).toBeNull();
+    expect(r.tpkRisk).toBe(r.koRate); // solo: any KO is a wipe
+    expect(r.partyModel).toBeNull();
   });
 
   test('single-round path for non-multi-round encounters', async () => {
@@ -192,7 +193,7 @@ describe('simulateEncounter', () => {
     expect(worse.winRate).toBeLessThan(best.winRate);
   });
 
-  test('party of 4 projects the Phase 5 support bonus and lifts the win rate', async () => {
+  test('party of 4 drives the LIVE Phase 5 support path and lifts the win rate', async () => {
     const lead = buildSimHero({ level: 2, loadout: 'mid' });
     const party = [
       lead,
@@ -203,9 +204,12 @@ describe('simulateEncounter', () => {
     expect(projectedSupportBonus(party)).toBe(3); // each supporter: max(1, floor(+2 / 2)) = 1
     const solo = await simulateEncounter(wolfBoss, lead, { trials: TRIALS, seed: 21, settings: { tier: 1 } });
     const team = await simulateEncounter(wolfBoss, party, { trials: TRIALS, seed: 21, settings: { tier: 1 } });
-    expect(team.partyProjection).toMatchObject({ partySize: 4, supportBonus: 3 });
-    expect(team.partyProjection.note).toMatch(/PROJECTION/);
+    expect(team.partyModel).toMatchObject({ partySize: 4, supportBonus: 3 });
+    expect(team.partyModel.note).toMatch(/LIVE/);
     expect(team.winRate).toBeGreaterThan(solo.winRate);
+    // The team path measures party-wide attrition: a wipe (tpk) is at most as
+    // frequent as any-hero KO.
+    expect(team.tpkRisk).toBeLessThanOrEqual(team.koRate);
   });
 });
 
