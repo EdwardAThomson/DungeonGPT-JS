@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useMemo } from 'react';
-import { areRequirementsMet } from '../game/milestoneEngine';
+import { computeVisibleMilestonePois } from '../game/milestoneEngine';
 import { getRevealedSiteTypes } from '../game/questEngine';
 
 // Lazy load modal components for better performance
@@ -31,6 +31,7 @@ const ModalLoadingFallback = () => (
 const GameModals = ({
   isSettingsModalOpen,
   setIsSettingsModalOpen,
+  onContinueLegend,
   settings,
   setSettings,
   selectedProvider,
@@ -63,22 +64,13 @@ const GameModals = ({
   onTurnInQuest,
   onTalkToNpc
 }) => {
-  // Compute which milestone POIs are visible (active or completed, not locked)
-  const visibleMilestonePois = useMemo(() => {
-    const milestones = settings?.milestones;
-    if (!milestones || milestones.length === 0) return null;
-    // Check if any milestones spawn POIs at all
-    const hasPois = milestones.some(m => m.spawn?.type === 'poi');
-    if (!hasPois) return null; // no POI milestones — don't filter anything
-    const visible = new Set();
-    for (const m of milestones) {
-      if (m.spawn?.type === 'poi' && (m.completed || areRequirementsMet(m, milestones))) {
-        visible.add(m.spawn.id);
-      }
-    }
-    // Return the set even if empty — an empty set means "hide all milestone POIs"
-    return visible;
-  }, [settings?.milestones]);
+  // Which milestone POIs are visible: current campaign POIs gate on prerequisites;
+  // POIs stamped by a COMPLETED previous campaign (in-save continuation) are
+  // permanent landmarks and always show. null = no filtering.
+  const visibleMilestonePois = useMemo(
+    () => computeVisibleMilestonePois(settings?.milestones, mapHook.worldMap),
+    [settings?.milestones, mapHook.worldMap]
+  );
 
   // Which site types (cave/ruins) a quest has revealed — for hiding un-quested sites.
   // null = no gating (old saves / campaigns with no side quests keep sites visible).
@@ -93,6 +85,7 @@ const GameModals = ({
         <StorySettingsModalContent
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
+        onContinueLegend={onContinueLegend}
         settings={settings}
         setSettings={setSettings}
         selectedProvider={selectedProvider}

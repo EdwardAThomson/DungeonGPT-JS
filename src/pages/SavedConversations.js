@@ -251,6 +251,28 @@ const SavedConversations = () => {
                         {conversation.conversation_name || 'Untitled Adventure'}
                       </h3>
                     )}
+                    {/* Quest-chaining badges (all additive settings fields; old saves
+                        without them render nothing). currentChapter is the in-save chain
+                        record; chain.chapter tolerates saves made by the retired
+                        linked-save build. A completed save continues IN the save: load
+                        it and use the Journal's "Continue your legend". */}
+                    {((settings?.currentChapter || settings?.chain?.chapter) > 1 || settings?.campaignComplete) && (
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '0 0 8px 0' }}>
+                        {(settings?.currentChapter || settings?.chain?.chapter) > 1 && (
+                          <span style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 'bold', background: 'var(--primary-tint-10, rgba(100,100,255,0.15))', color: 'var(--primary)', border: '1px solid var(--primary)' }}>
+                            📖 Chapter {settings?.currentChapter || settings?.chain?.chapter}
+                          </span>
+                        )}
+                        {settings?.campaignComplete && (
+                          <span
+                            title="Load this game and open the Journal to continue your legend in the same world"
+                            style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 'bold', background: 'var(--success-tint-20, rgba(80,180,80,0.2))', color: 'var(--state-success, #4caf50)', border: '1px solid var(--state-success, #4caf50)' }}
+                          >
+                            🏆 Campaign complete: load to continue your legend
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {settings?.shortDescription && (
                       <p style={{ margin: '8px 0', fontSize: '0.9rem', lineHeight: '1.5', color: 'var(--text)' }}>
                         {settings.shortDescription.length > 120
@@ -266,7 +288,7 @@ const SavedConversations = () => {
                   </div>
                 </div>
 
-                <div className="conversation-actions" style={{ display: 'flex', gap: '10px', marginTop: 'auto' }}>
+                <div className="conversation-actions" style={{ display: 'flex', gap: '10px', marginTop: 'auto', flexWrap: 'wrap' }}>
                   <button
                     onClick={() => loadConversation(conversation.sessionId)}
                     className="primary-button"

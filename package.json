@@ -42,6 +42,7 @@
     "test:e2e:supabase": "npx playwright test supabase-hero-save",
     "test:supabase": "./scripts/test-supabase-local.sh",
     "eject": "react-scripts eject",
+    "predeploy": "node scripts/check-no-premium-slot.mjs",
     "deploy": "npm run build && wrangler deploy",
     "preview": "npm run build && wrangler dev"
   },

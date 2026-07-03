@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from '../contexts/AuthContext';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
@@ -44,6 +44,8 @@ import { resolveProviderAndModel } from '../llm/modelResolver';
 import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile } from '../game/milestoneEngine';
 import { buyItem, sellItem } from '../game/shopController';
 import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, turnInQuest, getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
+import { buildInSaveContinuation, applyContinuationToSettings, healPartyForNextChapter } from '../game/campaignChain';
+import ContinueLegendPicker from '../components/ContinueLegendPicker';
 import { QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
 import { createLogger } from '../utils/logger';
@@ -326,6 +328,84 @@ const Game = ({ resumeConversation = null }) => {
       advanceTour();
     }
   }, [tourActive, hasAdventureStarted, tourStep, advanceTour]);
+
+  // --- Quest chaining: "Continue your legend" (in-save continuation) ---
+  // The picker continues the next campaign INSIDE THIS SAVE: the new campaign's
+  // POIs/enemies/buildings/NPCs are stamped additively onto the existing world and
+  // cached towns (copy-on-write), the settings swap to the new campaign's
+  // milestones, the party is healed in place, and a chapter-divider prologue is
+  // appended to the ongoing journal. Same sessionId, so RAG memories continue.
+  const [legendPicker, setLegendPicker] = useState({ open: false, celebrate: false });
+  const [legendLaunching, setLegendLaunching] = useState(false);
+  const [legendError, setLegendError] = useState(null);
+  const navigate = useNavigate();
+  // Auto-celebrate ONLY when the campaign completes during this session. Saves that
+  // were already complete at load get the CTA through the Journal banner instead of
+  // an auto-modal (retroactive, non-intrusive). Cleared on continuation so the NEXT
+  // chapter's completion celebrates again.
+  const celebrationBlockedRef = useRef(!!settingsObj?.campaignComplete);
+  useEffect(() => {
+    if (celebrationBlockedRef.current) return;
+    if (settings?.campaignComplete) {
+      celebrationBlockedRef.current = true;
+      // Let the CAMPAIGN COMPLETE chat message land before the celebration modal.
+      const timer = setTimeout(() => setLegendPicker({ open: true, celebrate: true }), 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [settings?.campaignComplete]);
+
+  const handleContinueLegend = (template) => {
+    if (legendLaunching) return;
+    setLegendLaunching(true);
+    setLegendError(null);
+    try {
+      const chapter = (settings?.currentChapter || settings?.chain?.chapter || 1) + 1;
+      const continuation = buildInSaveContinuation({
+        template,
+        worldMap: mapHook.worldMap,
+        townMapsCache: mapHook.townMapsCache,
+        worldSeed,
+        existingSideQuests: settings?.sideQuests || [],
+        party: selectedHeroes,
+        chapter
+      });
+
+      // Apply the continuation: additive world stamps (copy-on-write), cached-town
+      // retro-injection, campaign-settings swap (functional, so chain records
+      // derive from the freshest state), party healed in place.
+      mapHook.setWorldMap(continuation.mapData);
+      mapHook.setTownMapsCache(continuation.townMapsCache);
+      setSettings(prev => applyContinuationToSettings(prev, continuation));
+      setSelectedHeroes(prev => healPartyForNextChapter(prev));
+
+      // Chapter divider appended to the ONGOING journal (never replaced); embed it
+      // so the DM's memory of the new chapter starts immediately.
+      interactionHook.setConversation(prev => {
+        const updated = [...prev, { role: 'ai', content: continuation.prologue }];
+        if (sessionId) {
+          embedAndStore(sessionId, continuation.prologue, { msgIndex: updated.length - 1 })
+            .catch(err => logger.warn('RAG embed failed (chapter prologue):', err));
+        }
+        return updated;
+      });
+
+      celebrationBlockedRef.current = false; // the new campaign may celebrate later
+      setLegendPicker({ open: false, celebrate: false });
+      setLegendLaunching(false);
+      // Persist promptly (refs pick up the new state after this render).
+      setTimeout(() => performSave(), 600);
+    } catch (err) {
+      logger.error('Failed to continue the campaign in this save', err);
+      setLegendError(err?.message || 'Failed to start the next chapter. Please try again.');
+      setLegendLaunching(false);
+    }
+  };
+
+  // Incompatible-geography picks hand off to New Game with the template
+  // preselected ("new map = new game": no linked-save machinery).
+  const handleLegendNewAdventure = (template) => {
+    navigate('/new-game', { state: { preselectTemplateId: template.id } });
+  };
 
   // --- Hero HP Update Handler ---
   const handleHeroUpdate = (updatedHero) => {
@@ -1291,6 +1371,10 @@ const Game = ({ resumeConversation = null }) => {
       <GameModals
         isSettingsModalOpen={isSettingsModalOpen}
         setIsSettingsModalOpen={setIsSettingsModalOpen}
+        onContinueLegend={() => {
+          setIsSettingsModalOpen(false);
+          setLegendPicker({ open: true, celebrate: false });
+        }}
         settings={settings}
         setSettings={setSettings}
         selectedProvider={selectedProvider}
@@ -1380,6 +1464,20 @@ const Game = ({ resumeConversation = null }) => {
       {/* Save Confirmation Modal */}
       <SaveConfirmationModal />
       <QuestOfferModal />
+
+      {/* Quest chaining: campaign-complete celebration + next-campaign picker */}
+      <ContinueLegendPicker
+        isOpen={legendPicker.open}
+        celebrate={legendPicker.celebrate}
+        onClose={() => setLegendPicker({ open: false, celebrate: false })}
+        settings={settings}
+        party={selectedHeroes}
+        worldMap={mapHook.worldMap}
+        onPick={handleContinueLegend}
+        onNewAdventure={handleLegendNewAdventure}
+        launching={legendLaunching}
+        error={legendError}
+      />
     </div>
   );
 };
