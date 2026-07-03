@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { getAvailableModels, DEFAULT_MODELS } from '../llm/llm_constants';
 import SettingsContext from '../contexts/SettingsContext';
@@ -68,6 +68,13 @@ export const ShareQRCode = () => {
 // --- AI engine settings (provider/model pickers) --- //
 // Shared by the navbar AI Settings modal and the Adventure Book's ⚙️ AI tab (#52),
 // so the two surfaces cannot drift.
+// Production hides the provider CHOICE entirely: only cf-workers is wired in prod
+// (other providers route to the local dev Express server), and a pool-based model
+// system (#7 premium AI) will replace provider picking. Dev/debug builds keep the
+// full picker for local SDK/CLI testing.
+const SHOW_PROVIDER_CHOICE =
+  process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEBUG_ROUTES === 'true';
+
 export const AiEngineSettings = ({
   selectedProvider, setSelectedProvider,
   selectedModel, setSelectedModel,
@@ -76,6 +83,21 @@ export const AiEngineSettings = ({
   showActiveStatus = false
 }) => {
   const AVAILABLE_MODELS = getAvailableModels();
+
+  // Production coercion: any stored/legacy non-cf-workers provider is pinned back to
+  // the one provider that actually works in prod (prevents silent AI breakage for
+  // players who picked a dev provider before this gate existed).
+  useEffect(() => {
+    if (SHOW_PROVIDER_CHOICE || !AVAILABLE_MODELS['cf-workers']) return;
+    if (selectedProvider !== 'cf-workers') {
+      setSelectedProvider('cf-workers');
+      setSelectedModel(DEFAULT_MODELS['cf-workers']);
+    }
+    if (assistantProvider && assistantProvider !== 'cf-workers') {
+      setAssistantProvider('cf-workers');
+      setAssistantModel(DEFAULT_MODELS['cf-workers']);
+    }
+  }, [selectedProvider, assistantProvider]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleProviderChange = (newProvider, type) => {
     if (type === 'game') {
@@ -90,8 +112,8 @@ export const AiEngineSettings = ({
   const renderPicker = (title, type, provider, model, setModel) => (
     <div style={{ marginBottom: '20px', background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
       <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>{title}</h4>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-        <div>
+      <div style={{ display: 'grid', gridTemplateColumns: SHOW_PROVIDER_CHOICE ? '1fr 1fr' : '1fr', gap: '10px' }}>
+        {SHOW_PROVIDER_CHOICE && <div>
           <label style={labelStyle}>PROVIDER</label>
           <select value={provider} onChange={(e) => handleProviderChange(e.target.value, type)} style={selectStyle}>
             {Object.keys(AVAILABLE_MODELS).includes('openai') && (
@@ -114,7 +136,7 @@ export const AiEngineSettings = ({
               </optgroup>
             )}
           </select>
-        </div>
+        </div>}
         <div>
           <label style={labelStyle}>MODEL</label>
           <select value={model} onChange={(e) => setModel(e.target.value)} style={selectStyle}>
