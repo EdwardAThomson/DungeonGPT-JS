@@ -4,6 +4,7 @@ import {
   calculateEncounterXP,
   calculateLevel,
   calculateMaxHP,
+  getLevelBonus,
   getLevelProgress,
   initializeProgression,
   xpForNextLevel
@@ -182,5 +183,25 @@ describe('progressionSystem', () => {
     });
     expect(initialized.currentHP).toBe(initialized.maxHP);
     expect(Array.isArray(initialized.inventory)).toBe(true);
+  });
+});
+
+describe('getLevelBonus (#47 Option A — level term on every check)', () => {
+  it('grants +1 per 2 levels, capped at +3', () => {
+    expect(getLevelBonus(1)).toBe(0);
+    expect(getLevelBonus(2)).toBe(0);
+    expect(getLevelBonus(3)).toBe(1);
+    expect(getLevelBonus(4)).toBe(1);
+    expect(getLevelBonus(5)).toBe(2);
+    expect(getLevelBonus(6)).toBe(2);
+    expect(getLevelBonus(7)).toBe(3);
+    expect(getLevelBonus(20)).toBe(3); // cap
+  });
+
+  it('tolerates missing/garbage levels (treated as Lv 1)', () => {
+    expect(getLevelBonus(undefined)).toBe(0);
+    expect(getLevelBonus(null)).toBe(0);
+    expect(getLevelBonus(0)).toBe(0);
+    expect(getLevelBonus(-3)).toBe(0);
   });
 });

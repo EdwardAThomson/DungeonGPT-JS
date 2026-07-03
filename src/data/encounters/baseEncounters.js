@@ -216,7 +216,7 @@ export const BASE_ENCOUNTERS = {
       { label: 'Shield Party', skill: 'Athletics', description: 'Use shields to protect everyone' },
       { label: 'Magic Shield', skill: 'Arcana', description: 'Create a magical barrier' }
     ],
-    rewards: { xp: 60, gold: '0', items: ['gemstone:30%', 'rare_ore:20%'] },
+    rewards: { xp: 60, gold: '0', items: ['raw_gems:25%', 'rare_gem:5%', 'rare_ore:20%'] },
     consequences: {
       criticalSuccess: 'You avoid all harm and discover valuable gems in the rubble.',
       success: 'You escape with minor scrapes and bruises.',

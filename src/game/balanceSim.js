@@ -32,7 +32,7 @@ import {
   maxRarityRankForTier
 } from '../utils/inventorySystem';
 import { heroTemplates, STAT_KEYS } from '../data/heroData';
-import { XP_THRESHOLDS } from '../utils/progressionSystem';
+import { XP_THRESHOLDS, getLevelBonus } from '../utils/progressionSystem';
 
 // --- Seeded RNG (mulberry32) ------------------------------------------------------
 // Same generator family as localNarrator's seeded prose RNG (reimplemented here so a
@@ -152,6 +152,8 @@ export const effectiveActionModifier = (action, hero, encounter) => {
     modifier += equip.attack;
   }
   modifier += equip.misc;
+  // Mirrors the live resolver's #47 level term (+1 per 2 levels, cap +3).
+  modifier += getLevelBonus(hero.level);
   return modifier;
 };
 

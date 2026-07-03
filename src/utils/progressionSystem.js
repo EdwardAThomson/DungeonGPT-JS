@@ -38,6 +38,18 @@ export const XP_THRESHOLDS = [
 export const MAX_LEVEL = 20;
 
 /**
+ * Level bonus to every d20 check (#47 Option A): +1 per 2 levels, capped at +3.
+ * Lv 1-2 -> +0 (the healthy t1 band is untouched), Lv 3-4 -> +1, Lv 5-6 -> +2,
+ * Lv 7+ -> +3. Computed from level in code (not stored), so it applies
+ * retroactively to existing saves — a mid-campaign Lv 3 party simply gains its
+ * earned bonus. The ASI stat-choice moment (Option B) ships separately later.
+ * @param {number} level
+ * @returns {number} 0..3
+ */
+export const getLevelBonus = (level) =>
+  Math.min(3, Math.floor((Math.max(1, Math.floor(level || 1)) - 1) / 2));
+
+/**
  * Calculate level from XP
  * @param {number} xp - Current XP
  * @returns {number} Current level (1-20)

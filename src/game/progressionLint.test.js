@@ -25,7 +25,7 @@ import {
   ITEM_CATALOG,
   isItemAllowedForTier
 } from '../utils/inventorySystem';
-import { XP_THRESHOLDS } from '../utils/progressionSystem';
+import { XP_THRESHOLDS, getLevelBonus } from '../utils/progressionSystem';
 import { SLOT_FOR_TYPE, parseBonus } from './equipment';
 import {
   buildSimHero,
@@ -68,11 +68,15 @@ const KNOWN_GAPS = {
   unobtainableSlotRungs: { weapon: [2], armor: [], accessory: [] },
 
   // (c) boss win-rate pins, measured at TRIALS/SEED with the live rules
-  // (2026-07-03). Healthy bands: mid 30-90%, best >= 50%, none >= 10%.
-  //   - The three deadly-DC-25 t2 bosses are ~1% mid / ~3% best (retry lotteries).
-  //   - Rot-Heart (hard DC 20) sits below band at intended level.
-  //   - ALL bosses fail "best >= 50%": the obtainable weapon ladder tops out at +1
-  //     (#44), so best-obtainable gear barely beats mid. t1 best == mid at +4.
+  // (2026-07-03, re-measured after the #47 level term: Lv 4 intended-level bosses
+  // gain +1 to checks, Lv 5 gain +2 — t1 bosses at Lv 2 are unchanged).
+  // Healthy bands: mid 30-90%, best >= 50%, none >= 10%.
+  //   - The three deadly-DC-25 t2 bosses stay retry lotteries even with the level
+  //     term (mid <= ~3%); their fix is the #43 DC retune, not leveling.
+  //   - Rot-Heart's `none` HEALED to 10.1% with the level term (pin removed);
+  //     mid/best still sit below band pending #43/#44.
+  //   - ALL bosses still fail "best >= 50%": the obtainable weapon ladder tops
+  //     out at +1 (#44). t1 best == mid at +4.
   bossBalance: {
     'Goblin Chieftain': { best: [0.40, 0.53] },
     'Sandstorm Cult Leader': { best: [0.40, 0.53] },
@@ -80,10 +84,10 @@ const KNOWN_GAPS = {
     'Blightspawn': { best: [0.40, 0.53] },
     'Rogue Automaton': { best: [0.40, 0.53] },
     'The Hooded Priest': { best: [0.40, 0.53] },
-    'Shadow Overlord': { none: [0, 0.04], mid: [0, 0.04], best: [0.005, 0.06] },
-    'The Rot-Heart': { none: [0.02, 0.09], mid: [0.10, 0.21], best: [0.20, 0.32] },
-    'Herald of the Old Gods': { none: [0, 0.04], mid: [0, 0.04], best: [0.005, 0.06] },
-    'The Great Dreamer': { none: [0, 0.04], mid: [0, 0.04], best: [0.005, 0.06] }
+    'Shadow Overlord': { none: [0, 0.04], mid: [0, 0.05], best: [0.05, 0.15] },
+    'The Rot-Heart': { mid: [0.13, 0.27], best: [0.25, 0.40] },
+    'Herald of the Old Gods': { none: [0, 0.04], mid: [0, 0.04], best: [0.02, 0.10] },
+    'The Great Dreamer': { none: [0, 0.04], mid: [0, 0.05], best: [0.05, 0.14] }
   },
 
   // (d) Part I §2: no t2 world's authored XP reaches the t3 entry threshold
@@ -95,17 +99,16 @@ const KNOWN_GAPS = {
     'eldritch-horror-t2'
   ],
 
-  // (f) NEW finding by this lint: 'gemstone' is rewarded by two encounter templates
-  // (wildernessEncounters.js buried treasure, baseEncounters.js) but has no
-  // ITEM_CATALOG entry — players receive a nameless zero-value item. Fix: add a
-  // catalog entry or rename the drops to raw_gems / rare_gem, then drop this pin.
-  unknownRewardItems: ['gemstone'],
+  // (f) 'gemstone' was rewarded with no ITEM_CATALOG entry (nameless zero-value
+  // item) — FIXED 2026-07-03 by splitting the drops onto existing items
+  // (raw_gems weighted common, rare_gem the rarer cut). No unknowns remain.
+  unknownRewardItems: [],
 
-  // (e) #47: leveling moves win rates by 0.0pp (no level term in the dice). While
-  // this pin stands, the guard asserts FLATNESS; when #47 ships a leveling-power
-  // mechanic, delete this flag and the guard flips to enforcing
-  // winRate(L+1) - winRate(L) >= EPSILON.
-  levelingPowerIsFlat: true
+  // (e) #47 RESOLVED 2026-07-03: the level term shipped (getLevelBonus — +1 per
+  // 2 levels, cap +3, in the resolver). The guard is now bonus-aware: win rate
+  // must step up (>= EPSILON) exactly where getLevelBonus steps between adjacent
+  // levels, and stay ~flat where it doesn't.
+  levelingPowerIsFlat: false
 };
 
 const EPSILON = 0.02; // 2pp — guard (e) improvement threshold
@@ -406,20 +409,34 @@ describe('guard (e): leveling improves boss outcomes above epsilon', () => {
     'leveling delta across the band: %s',
     (name, entry) => {
       const [lo, hi] = entry.template.levelRange;
-      const deltas = [];
+      const steps = [];
       for (let L = lo; L < hi; L++) {
         const at = simCache.get(simKey(name, L, 'mid-leveling'));
         const next = simCache.get(simKey(name, L + 1, 'mid-leveling'));
-        deltas.push(next.winRate - at.winRate);
+        steps.push({ from: L, delta: next.winRate - at.winRate });
       }
-      expect(deltas.length).toBeGreaterThan(0);
+      expect(steps.length).toBeGreaterThan(0);
       if (KNOWN_GAPS.levelingPowerIsFlat) {
-        // PINNED (#47): there is no level term in the dice, so every delta is ~0.
-        // When a leveling-power mechanic ships, delete the pin — the else branch
-        // then enforces that leveling can never silently go flat again.
-        deltas.forEach((d) => expect(Math.abs(d)).toBeLessThan(EPSILON));
+        // PINNED (#47): no level term in the dice, so every delta is ~0. Delete
+        // the pin when a leveling-power mechanic ships (done 2026-07-03).
+        steps.forEach(({ delta }) => expect(Math.abs(delta)).toBeLessThan(EPSILON));
       } else {
-        deltas.forEach((d) => expect(d).toBeGreaterThanOrEqual(EPSILON));
+        // Bonus-aware (#47 shipped): win rate must step up exactly where the
+        // level term steps (getLevelBonus: +1 per 2 levels, cap +3), and stay
+        // ~flat where it doesn't. Catches both regressions to flatness AND a
+        // level term that silently stops applying. Bosses pinned as unbalanced
+        // in KNOWN_GAPS.bossBalance (the deadly DC-25 lotteries) get a halved
+        // threshold: at ~1-3% win rates a +1 step compresses below 2pp, but it
+        // must still be visibly positive.
+        const minStep = KNOWN_GAPS.bossBalance[name] ? EPSILON / 2 : EPSILON;
+        steps.forEach(({ from, delta }) => {
+          const bonusStep = getLevelBonus(from + 1) - getLevelBonus(from);
+          if (bonusStep >= 1) {
+            expect(delta).toBeGreaterThanOrEqual(minStep);
+          } else {
+            expect(Math.abs(delta)).toBeLessThan(EPSILON);
+          }
+        });
       }
     }
   );

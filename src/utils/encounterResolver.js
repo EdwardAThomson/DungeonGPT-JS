@@ -4,6 +4,7 @@ import { DIFFICULTY_DC } from '../data/encounters';
 import { calculateDamage, shouldDealDamage, getDamageDescription } from './healthSystem';
 import { getEquippedBonuses } from '../game/equipment';
 import { filterDropsByTier } from './inventorySystem';
+import { getLevelBonus } from './progressionSystem';
 
 // Stats whose checks count as physical/combat (attack-style), so a weapon's
 // attack bonus applies. Hostile encounters also count regardless of skill.
@@ -54,6 +55,10 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
     modifier += equipBonuses.attack;
   }
   modifier += equipBonuses.misc;
+  // Level term (#47 Option A): +1 per 2 levels, capped +3, on every check —
+  // levels previously granted ZERO roll power (stats freeze at creation).
+  // Applies retroactively (derived from level, not stored in saves).
+  modifier += getLevelBonus(character.level);
 
   // 2. Roll the check
   const rollResult = rollCheck(modifier);
