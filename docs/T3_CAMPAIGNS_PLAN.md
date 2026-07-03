@@ -31,6 +31,11 @@ Changelog:
   low-end verdict (Lv 1-2 is the healthiest band, the deserts are Lv 4-7), the
   level-band table, the progression-lint design, and build-order amendments.
   Backlog rows #47-#50 added to `OUTSTANDING_ISSUES.md`.
+- 2026-07-03 (later still, section 18 added): the #47 decision memo. Four options for
+  HOW levels should grant combat power (level term into the resolver / wire the
+  dormant ASI system / hybrid / intentional status quo), each with exact-enumeration
+  win-rate projections at Lv 1/3/5/7 vs DC 15/18/20/25, a decision table, and a
+  staged recommendation (A now, B later). Decision needed before step 2 of section 9.
 
 ---
 
@@ -958,3 +963,161 @@ reproduced Part I's 40% figure, cross-validating both harnesses). The one
 unverifiable-in-code claim is the session-count estimate in 13.1, marked as such.
 The 15% initiative-steal (`EncounterActionModal.js:94-121`) is UI-layer and excluded
 from sims here, same as Part I.
+
+## 18. Leveling-power fix options — DECIDED 2026-07-03
+
+> **Decision: Option A now, Option B later.** Ship the level term
+> (`+floor((level-1)/2)`, capped +3, shown in the roll breakdown) immediately and
+> RETROACTIVELY (computed from level in code; existing mid-campaign saves simply
+> gain their earned bonus). The ASI picker modal (Option B — the level-up
+> stat-choice moment) ships as its own later feature; the N=2-vs-N=3 restack
+> question is deferred to that point. Lint guard (e) flips from pinned-failing to
+> passing when A lands.
+
+Added 2026-07-03. This is the decision memo for **#47** (section 11: leveling moves
+boss win rates by 0.0pp because the check modifier is stat mod + gear only,
+`encounterResolver.js:39-50`; stats are frozen at creation, point-buy cap 15 → +2
+mod; the ASI machinery in `progressionSystem.js:126-139` is consumed only by
+`ProgressionTest.js`). The maintainer must pick HOW levels grant power before step 2
+of the build order, because every DC tuned afterwards depends on what a modifier IS
+at a given level (section 17.2).
+
+Method note: the projections below are an EXACT enumeration of the 64 outcome-paths
+of the real 3-round loop (`multiRoundEncounter.js` update rules: damage 40/20/5/0%,
+morale -40/-20/+10/+20, advantage +2/+1/-1/-2, defeat at ≤ -3, round-3 victory iff
+advantage > 0), not a Monte-Carlo, so they carry no sampling noise. Cross-validated
+against Part II's 60k-run sims: +4 vs DC 15 → 47.0% (both), +6 vs DC 25 → 2.8% vs
+2.7%, +2 vs DC 15 → 33.4% (both). Working rule of thumb, confirmed exactly:
+**each +1 of total modifier is worth ~6.7pp of win rate in the DC 15-20 band**
+(the "+1 ≈ 7pp" finding, Part I section 5.3). "Mid gear" below = obtainable mid,
+total +4 (stat +2, any +1 weapon, any +1 accessory); "full" = obtainable best,
+total +6 (12.2).
+
+### Option A: proficiency-style level term in the resolver
+
+`modifier += floor((level - 1) / N)` added in `encounterResolver.js` next to the
+gear bonuses. Projected win rate, mid gear, by level (the master modifier-x-DC
+lookup behind these rows is reproducible from the method note):
+
+| N | Lv | mod | DC 15 | DC 18 | DC 20 | DC 25 |
+|---|---|---|---|---|---|---|
+| — | 1 (any N) | +4 | 47.0 | 26.8 | 15.0 | 0.7 |
+| **2** | 3 | +5 | 53.7 | 33.4 | 20.7 | 0.7 |
+| **2** | 5 | +6 | 60.3 | 40.1 | 26.8 | 2.8 |
+| **2** | 7 | +7 | 66.4 | 47.0 | 33.4 | 5.9 |
+| 3 | 5 | +5 | 53.7 | 33.4 | 20.7 | 0.7 |
+| 3 | 7 | +6 | 60.3 | 40.1 | 26.8 | 2.8 |
+
+- **Feel**: automatic, no choice moment; must be SHOWN to be felt (roll breakdown
+  "d20 + 4 gear/stat + 2 level" in `EncounterActionModal`, else it fixes the math
+  but not the complaint). "Come back stronger" finally becomes true: the t1 boss a
+  Lv 1 party beats 47% of the time falls 66% at Lv 7.
+- **Math**: N=2 gives +0/+1/+2/+3 across Lv 1-7. Nice property: the term is +0 at
+  Lv 1-2, so the healthy low band (section 13) is untouched and t1 needs NO retune.
+  t2 hard DC 20 improves 15% → 21-27% at Lv 4-5 (near-healthy without relabeling);
+  t2 deadly DC 25 is still broken (2.8% at Lv 5), so the deadly decision in #43
+  stands regardless. Gear interaction: Lv 7 full gear = +9 total → DC 20 at 47%,
+  DC 25 at 15%; deadly becomes a legitimate "max level + full gear + retries" target
+  instead of a pure lottery. Cap the term at +3 for now (content stops at Lv 7;
+  revisit if Lv 8+ content ever exists, else Lv 20 would mean +9 term and trivialize
+  every authored DC).
+- **Surface**: `progressionSystem.js` (new `getLevelCheckBonus(level)`, one pure
+  function), `encounterResolver.js:50` (one line), roll-breakdown display, sim
+  loadouts + `KNOWN_UNBALANCED` baseline refresh. Smallest option by far.
+- **Back-compat**: resolution is code, not save data, so existing mid-campaign
+  heroes get the term instantly (a Lv 4 hero wakes up +1). It is a pure buff;
+  acceptable, but it is the same retroactivity stance as open question 3.
+- **DC retune impact**: t3 default lands cleanly on hard DC 20 (33% mid / 47% full
+  at Lv 7), inside the 30-90 guard band, without inventing DC 16-19 labels for t3.
+  The DC 16-19 rungs are still wanted for the Lv 3-5 mid-band ladder (section 6),
+  but they stop being load-bearing for t3.
+
+### Option B: wire the existing ASI system into real level-ups
+
+The dormant machinery (`levelGrantsASI`, ASI at Lv 4/8/12/16/19, +2 points to
+distribute) starts firing in production: `encounterController.js:17-20` flags
+pending points on `leveledUp`, a picker modal spends them, stats actually rise, and
+stat mods grow naturally through the existing resolver path (zero resolver change).
+
+- **Math (the honest problem)**: from the 15 cap, the first ASI (Lv 4, both points
+  into the primary stat: 15 → 17) is exactly **+1 modifier**, and the next is at
+  Lv 8, OUTSIDE the entire current content band. So across Lv 1-7 option B delivers
+  one +1 (~7pp) total: mid gear DC 20 goes 15% → 20.7% at Lv 4 and then flatlines to
+  Lv 7. A faster variant (+1 point every 2 levels) still only reaches +2 mod by Lv 7
+  (stat 18), because two points buy one modifier. **ASI alone cannot fix #47 in the
+  band the game actually occupies**; it saturates immediately.
+- **Feel**: the best of any option. A real choice on level-up, character identity
+  (the Wizard raises Int, the Fighter Str), the classic "ding" moment. Also makes
+  Con meaningful (maxHP recalc), which entangles it with the #48 HP-bug fix; ship
+  them together.
+- **Surface**: medium. `progressionSystem.js` (spent-points accounting; earned can
+  stay derived from level), `encounterController.js` (pending flag),
+  a new `AsiPickerModal` via `ModalContext`/`ModalShell` (registry entry + conflict
+  group), `Game.js` trigger, save payload gains an additive `asiSpent` field
+  (renderer-tolerant per the back-compat rules).
+- **Back-compat**: existing heroes at Lv ≥ 4 get retroactive unspent points on load
+  (a pleasant surprise, additive field, old saves unaffected until they level).
+- **DC retune impact**: nearly none, which is the problem; DCs would still need the
+  Option A-style shift to open the top of the ladder.
+
+### Option C: hybrid (small level term + the ASI moment)
+
+A(N=3) + ASI at Lv 4: trajectory +0/+0/+2/+3 across Lv 1/3/5/7 (both bumps land at
+Lv 4-5), numerically identical to A(N=2) at Lv 5-7 (60/40/27 → 66/47/33 mid gear vs
+DC 15/18/20). A(N=2) + ASI would reach +4 by Lv 7 (DC 20 at 40% mid), which starts
+pressing the 90% guard ceiling on t1 content and forces a wider retune. Cost is the
+sum of A's and B's surfaces. This is the "right" long-term shape, but as a single
+step it couples a one-line math fix to a modal/UX project.
+
+### Option D: nothing in the roll; levels gate content only (status quo, made intentional)
+
+The honest case FOR it: this is a gear-progression game (section 11.2: one 25g
+shopping trip buys what four levels don't), levels already buy maxHP and content
+keys (`minLevel` gates, side-quest reveal), and Zelda-style "power is found, not
+ground" is a coherent design. The honest case AGAINST it: the game SURFACES XP bars,
+level-up fanfare ("🎉 LEVEL UP!", `encounterController.js:19`), and D&D-adjacent
+stats, so every player instinct says levels = power; D keeps the complaint by
+design. It also leaves "level up and come back" permanently false while `minLevel`
+gates imply the opposite, and maxHP growth stays worthless until boss damage
+profiles land (9 of 10 bosses deal none). If chosen, it must be made explicit:
+reframe level as "renown" in the UI (progress meter + content key, not power), and
+flip lint guard (e) from "winRate(L+1) − winRate(L) ≥ 2pp" to asserting what levels
+DO grant (maxHP strictly increases post-#48, and each level unlocks ≥ 1 content
+item, tying into guard (a)). Defensible on paper; weakest against the actual
+playtest complaint.
+
+### Decision table
+
+| | A: level term (N=2, cap +3) | B: wire ASI | C: hybrid (N=3 + ASI) | D: intentional status quo |
+|---|---|---|---|---|
+| Power by Lv 7 (mid gear) | +3 mod (~20pp) | +1 mod (~7pp), saturates at Lv 4 | +3 mod (~20pp) | +0 |
+| DC 20 boss at Lv 7 mid / full | 33% / 47% | 21% / 33% | 33% / 47% | 15% / 27% |
+| Fixes lint guard (e) | yes, every level pair ≥ ~3pp | only across Lv 3→4 | yes (from Lv 4) | no (guard must be rewritten) |
+| Player feel | invisible unless shown in roll UI | best (choice + identity) | both | complaint persists by design |
+| Surface | XS (2 functions + display) | M (modal, save field, retro-grant) | A + B | S (UI reframe + lint rewrite) |
+| Save back-compat | retro buff via code (no data) | additive field + retro points | both | n/a |
+| DC retune (#43) | t1 untouched; t3 = DC 20; deadly still needs its own fix | none (still stuck) | as A | full DC 16-19 relabel still required |
+| New UI | roll-breakdown line | ASI picker modal | both | renown reframe |
+
+### Recommendation: staged A then B
+
+1. **Now (inside build-order step 2, with #43/#48)**: ship **A with N=2, capped at
+   +3**, displayed in the roll breakdown. It is a two-function change, it makes
+   guard (e) pass for every level pair, it leaves Lv 1-2 tuning untouched, and it
+   lets the t3 finales be authored at hard DC 20 against known numbers (33% mid /
+   47% full at Lv 7).
+2. **Later (with the modal-migration work)**: wire **B** as the feel upgrade, ASI at
+   Lv 4/8 unchanged, points into stats (Con finally matters, alongside #48). At that
+   moment decide the stacking question: either drop the level term to N=3 (becoming
+   Option C's curve exactly, no retune needed vs step 1's Lv 5-7 numbers) or keep
+   N=2 and re-run the sweep, accepting ~+4 total by Lv 7 and retuning the guard
+   ceiling.
+
+Decision questions for the maintainer:
+1. Is the retroactive buff to existing mid-campaign saves acceptable (same stance as
+   open question 3), or must the level term key off a `mapVersion`-style flag and
+   apply to new campaigns only?
+2. Does the staged pair (A now, B later) fit, or should B's ASI modal ship in the
+   same step because the level-up moment is judged the more urgent complaint?
+3. When B lands, N=3 + ASI (option C's curve, no re-retune) or N=2 + ASI (stronger
+   curve, re-run the sweep)?
