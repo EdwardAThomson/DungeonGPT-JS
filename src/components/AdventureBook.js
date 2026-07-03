@@ -26,7 +26,7 @@ import { AiEngineSettings, ShareQRCode } from './Modals';
 // standalone modal.
 //
 // Frame: ONE fixed silhouette across all tabs — the Journal's proven
-// min(82vh, 860px) frame; tab volumes differ wildly and a shrink-to-fit modal
+// min(90vh, 1000px) frame; tab volumes differ wildly and a shrink-to-fit modal
 // would jarringly resize on every switch. Content scrolls within. The last
 // active tab is remembered for the session (this component stays mounted; the
 // shell only unmounts its children's DOM when closed).
@@ -297,7 +297,7 @@ const AdventureBook = ({
       // Fixed frame height (not content-driven): the tabs hold very different
       // content volumes, and a shrink-to-fit modal jarringly resizes on every
       // tab switch. All tabs share this silhouette; content scrolls within.
-      style={{ maxWidth: '900px', width: '95%', height: 'min(82vh, 860px)', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
+      style={{ maxWidth: '900px', width: '95%', height: 'min(90vh, 1000px)', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
     >
       <div style={{ padding: '20px 20px 0 20px', borderBottom: '1px solid var(--border)' }}>
         <h2 style={{ margin: '0 0 10px 0', color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>📖 Adventure Book</h2>

@@ -130,6 +130,31 @@ export const AiEngineSettings = ({
   return (
     <div className="modal-section">
       <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'var(--text)' }}>🤖 AI Configuration</h3>
+      {/* AI pool selector: Free is the only live pool today. Premium (the Members
+          OpenRouter pool, backlog #7) renders locked until server-side entitlements
+          (#39) + the premium AI backend exist — a visible seam, not a fake feature. */}
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '8px' }} role="radiogroup" aria-label="AI pool">
+        <button
+          type="button"
+          role="radio"
+          aria-checked="true"
+          style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px solid var(--primary)', background: 'var(--surface)', color: 'var(--primary)', fontWeight: 700, cursor: 'default' }}
+        >
+          ⚡ Free AI
+          <div style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-secondary)', marginTop: '2px' }}>Cloudflare open-weights pool — included for everyone</div>
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked="false"
+          disabled
+          title="Premium AI models arrive with Membership — not available yet"
+          style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px dashed var(--border)', background: 'transparent', color: 'var(--text-secondary)', opacity: 0.65, cursor: 'not-allowed' }}
+        >
+          🔒 Premium AI
+          <div style={{ fontSize: '0.72rem', fontWeight: 400, marginTop: '2px' }}>Stronger models · Members — coming soon</div>
+        </button>
+      </div>
       {renderPicker('Narrative DM', 'game', selectedProvider, selectedModel, setSelectedModel)}
       {renderPicker('OOC Assistant', 'assistant', assistantProvider || selectedProvider, assistantModel || selectedModel, setAssistantModel)}
       {showActiveStatus && (
