@@ -124,13 +124,13 @@ export const ITEM_CATALOG = {
   // are UNOBTAINABLE BY DESIGN today — pinned in progressionLint KNOWN_GAPS
   // (unobtainableGear) exactly like legendary_weapon. t3 authoring assigns them to
   // milestones; do NOT put them in shops, hoards, or tiered drop tables before then.
-  // TODO(#44 icon art): each needs its own webp; placeholders borrow the noted icons.
+  // (#44 icon art: complete — every shelf item has its own webp as of 2026-07-03.)
   'legendary_weapon': { name: 'Legendary Weapon', rarity: 'legendary', value: 7500, type: 'weapon', bonus: '+3', icon: 'assets/icons/items/legendary_weapon.webp' },
   'blade_of_the_shattered_throne': { name: 'Blade of the Shattered Throne', rarity: 'legendary', value: 10000, type: 'weapon', bonus: '+3', description: 'Reforged from the throne the Shadow Overlord broke, this blade remembers every oath sworn upon it.', icon: 'assets/icons/items/blade_of_the_shattered_throne.webp' },
   'aegis_of_dawn': { name: 'Aegis of Dawn', rarity: 'legendary', value: 8000, type: 'armor', bonus: '+5 defense', description: 'Plate armor quenched in first light. Blows that should kill are swallowed by a sunrise glow.', icon: 'assets/icons/items/aegis_of_dawn.webp' },
-  'heart_of_the_last_winter': { name: 'Heart of the Last Winter', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'A shard of unmelting ice cut from the Blood Wendigo\'s frozen heart. Winter itself bends around its bearer.', icon: 'assets/icons/items/purified_heart_shard.webp' }, // TODO(#44 icon art): heart_of_the_last_winter.webp
-  'clockwork_god_core': { name: 'Clockwork God-Core', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'The still-ticking heart of the Herald of the Old Gods. Its gears turn one second ahead of the world.', icon: 'assets/icons/items/magical_item.webp' }, // TODO(#44 icon art): clockwork_god_core.webp
-  'crown_of_the_drowned_city': { name: 'Crown of the Drowned City', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'A coral-crusted diadem raised from the sunken throne room. Voices of the deep counsel whoever wears it.', icon: 'assets/icons/items/crown_of_sunfire.webp' }, // TODO(#44 icon art): crown_of_the_drowned_city.webp
+  'heart_of_the_last_winter': { name: 'Heart of the Last Winter', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'A shard of unmelting ice cut from the Blood Wendigo\'s frozen heart. Winter itself bends around its bearer.', icon: 'assets/icons/items/heart_of_the_last_winter.webp' },
+  'clockwork_god_core': { name: 'Clockwork God-Core', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'The still-ticking heart of the Herald of the Old Gods. Its gears turn one second ahead of the world.', icon: 'assets/icons/items/clockwork_god_core.webp' },
+  'crown_of_the_drowned_city': { name: 'Crown of the Drowned City', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'A coral-crusted diadem raised from the sunken throne room. Voices of the deep counsel whoever wears it.', icon: 'assets/icons/items/crown_of_the_drowned_city.webp' },
 
   'magic_item': { name: 'Magic Item', rarity: 'uncommon', value: 200, icon: 'assets/icons/items/spell_scroll.webp' },
   'magic_scroll': { name: 'Enchanted Scroll', rarity: 'uncommon', value: 150, icon: 'assets/icons/items/spell_scroll.webp' },
