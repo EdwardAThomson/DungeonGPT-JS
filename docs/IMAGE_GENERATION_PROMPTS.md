@@ -156,3 +156,32 @@ To generate all template cards:
 ```javascript
 const outputPath = path.join(__dirname, `../public/assets/templates/${item.key}.png`);
 ```
+
+## Generation queue (2026-07-03 — wave 3 additions)
+
+Style base for item icons: *"Painterly digital fantasy art with rich [material] textures,
+dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal
+background (#2c2c2c). Professional 2D game asset."* Boss art follows the existing
+`bosses/` portrait conventions. Placeholders are marked `TODO(#44 icon art)` /
+`TODO(t3 boss art)` in code; drop the finished file in and delete the TODO.
+
+### Item icons (`public/assets/icons/items/`)
+| File | Subject | Priority |
+|---|---|---|
+| `hunters_longbow.webp` | Masterwork yew longbow, sinew string, leather grip [wood] | HIGH (worst placeholder: borrows a sword) |
+| `runed_greatsword.webp` | Two-handed dark-steel greatsword, glowing blue dwarven war-runes [metal] | HIGH (shares the legendary sword icon) |
+| `stormbound_ring.webp` | Sky-iron ring crackling with miniature captive lightning [metal] | medium |
+| `blade_of_the_shattered_throne.webp` | Regal longsword reforged from a broken obsidian throne, gold filigree [obsidian/gold] | low (t3, unobtainable yet) |
+| `aegis_of_dawn.webp` | Ornate plate cuirass glowing with sunrise light along its edges [gilded steel] | low (t3) |
+| `heart_of_the_last_winter.webp` | Heart-shaped shard of unmelting blue ice, frost mist coiling off it [ice] | low (t3) |
+| `clockwork_god_core.webp` | Spherical brass-and-crystal mechanical heart, visible gears, golden inner glow [brass] | low (t3) |
+| `crown_of_the_drowned_city.webp` | Coral-crusted diadem with pearls and seaweed, faint abyssal glow [coral] | low (t3) |
+
+### Boss portraits (`public/assets/encounters/bosses/`)
+| File | Subject | Priority |
+|---|---|---|
+| `ash_titan.webp` | Colossal humanoid of cracked volcanic rock and smouldering ash, magma veins, looming through smoke | low (t3 quest enemy; placeholder reuses rune_golem) |
+| `deathless_king.webp` | Skeletal monarch on a black throne, tattered regal robes, cold blue crown-fire, grimdark | low (t3; placeholder reuses lich) |
+
+Already wired from the unused library (no generation needed): elder_wyrm→leyline_dragon,
+aether_ascendant→psionic_devourer, sleeper_beneath→void_leviathan.
