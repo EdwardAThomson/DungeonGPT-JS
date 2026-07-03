@@ -407,7 +407,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'The Hoarfrost Wraith',
                         icon: '🥶',
-                        image: '/assets/encounters/bosses/shadow_stalker.webp',
+                        image: '/assets/encounters/bosses/hoarfrost_wraith.webp',
                         encounterTier: 'boss',
                         difficulty: 'medium',
                         multiRound: true,
