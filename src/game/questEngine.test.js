@@ -2,8 +2,9 @@ import {
   acceptSideQuest, checkSideQuestEvent, turnInQuest, getReadyTurnIns, getAvailableQuestsAt,
   getActiveSideQuests, getAvailableSideQuests, getCompletedSideQuests,
   getSideQuestProgress, getActiveSiteObjectives, selectSideQuests, effectivePartyLevel,
+  deriveSideQuestAvailability, backfillSideQuests, applySideQuestBackfill,
 } from './questEngine';
-import { initialSideQuests, QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
+import { initialSideQuests, SIDE_QUESTS, QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
 import { ITEM_CATALOG } from '../utils/inventorySystem';
 
 const seededRng = (seed) => { let s = seed; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; };
@@ -193,5 +194,226 @@ describe('questEngine — selection + eligibility (startable AND completable)', 
 
   test('progress reporting counts all steps', () => {
     expect(getSideQuestProgress(find(accept('lost_heirloom'), 'lost_heirloom'))).toEqual({ done: 0, total: 2 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #45 side-quest backfill: top up in-progress saves when the pool grows.
+// ---------------------------------------------------------------------------
+describe('questEngine — backfillSideQuests (#45 pool top-up)', () => {
+  // A generous building set so availability never filters except where a test
+  // deliberately restricts it. townCount 5 -> base 4 -> cap 6.
+  const RICH = {
+    sites: { cave: true, ruins: true },
+    buildings: ['inn', 'tavern', 'shop', 'market', 'mill', 'townhall', 'temple', 'shrine',
+      'library', 'archives', 'magetower', 'alchemist', 'apothecary', 'blacksmith', 'barn',
+      'stables', 'guild', 'bank', 'warehouse', 'tailor', 'fletcher', 'foundry', 'harbormaster'],
+    townCount: 5,
+  };
+  const asStatus = (ids, status) => ids.map((id) => ({ ...SIDE_QUESTS.find((q) => q.id === id), status }));
+
+  test('excludes every id already present, regardless of status (completed included)', () => {
+    const existing = [
+      ...asStatus(['lost_heirloom'], 'completed'),
+      ...asStatus(['prove_mettle'], 'active'),
+      ...asStatus(['sealed_letter'], 'available'),
+    ];
+    const added = backfillSideQuests(existing, { availability: RICH, level: 99, rng: seededRng(3) });
+    expect(added.length).toBeGreaterThan(0);
+    const addedIds = added.map((q) => q.id);
+    ['lost_heirloom', 'prove_mettle', 'sealed_letter'].forEach((id) => expect(addedIds).not.toContain(id));
+  });
+
+  test('cap counts OUTSTANDING quests only: a full open queue adds nothing…', () => {
+    const full = asStatus(['lost_heirloom', 'prove_mettle', 'sealed_letter', 'cave_beast', 'tend_sick', 'sealed_vault'], 'available');
+    expect(backfillSideQuests(full, { availability: RICH, level: 99, rng: seededRng(3) })).toEqual([]);
+  });
+
+  test('…but completed quests free their slots (long saves keep getting content)', () => {
+    const done = asStatus(['lost_heirloom', 'prove_mettle', 'sealed_letter', 'cave_beast', 'tend_sick', 'sealed_vault'], 'completed');
+    const added = backfillSideQuests(done, { availability: RICH, level: 99, rng: seededRng(3) });
+    expect(added.length).toBe(6); // cap 6, nothing outstanding
+    const doneIds = new Set(done.map((q) => q.id));
+    added.forEach((q) => expect(doneIds.has(q.id)).toBe(false));
+  });
+
+  test('cap scales with townCount exactly like the initial selection, plus 2 headroom', () => {
+    const empty = undefined;
+    // 1 town -> base 2 -> cap 4; 10 towns -> base 4 (clamped) -> cap 6
+    expect(backfillSideQuests(empty, { availability: { ...RICH, townCount: 1 }, level: 99, rng: seededRng(5) }).length).toBe(4);
+    expect(backfillSideQuests(empty, { availability: { ...RICH, townCount: 10 }, level: 99, rng: seededRng(5) }).length).toBe(6);
+  });
+
+  test('deterministic given the rng', () => {
+    const existing = asStatus(['lost_heirloom'], 'active');
+    const a = backfillSideQuests(existing, { availability: RICH, level: 99, rng: seededRng(42) });
+    const b = backfillSideQuests(existing, { availability: RICH, level: 99, rng: seededRng(42) });
+    expect(a.map((q) => q.id)).toEqual(b.map((q) => q.id));
+  });
+
+  test('availability gating matches initial selection: sites + giver + turn-in must exist', () => {
+    const innOnly = { sites: {}, buildings: ['inn', 'tavern'], townCount: 3 };
+    const added = backfillSideQuests([], { availability: innOnly, level: 99, rng: seededRng(9) });
+    expect(added.length).toBeGreaterThan(0);
+    added.forEach((q) => {
+      const givers = Array.isArray(q.giver.building) ? q.giver.building : [q.giver.building];
+      expect(givers.some((b) => b === 'inn' || b === 'tavern')).toBe(true);
+      expect(q.milestones.some((m) => m.site)).toBe(false); // no cave/ruins on this map
+      q.milestones.forEach((m) => {
+        if (m.trigger?.turnIn?.building) {
+          const tb = Array.isArray(m.trigger.turnIn.building) ? m.trigger.turnIn.building : [m.trigger.turnIn.building];
+          expect(tb.some((b) => b === 'inn' || b === 'tavern')).toBe(true);
+        }
+      });
+    });
+  });
+
+  test('level gate: only quests within reach soon (minLevel <= level + 2) are added', () => {
+    const added = backfillSideQuests([], { availability: RICH, level: 1, rng: seededRng(11) });
+    added.forEach((q) => expect(q.minLevel || 1).toBeLessThanOrEqual(3));
+  });
+
+  test('added quests are fresh available copies (no shared progress state)', () => {
+    const added = backfillSideQuests([], { availability: RICH, level: 99, rng: seededRng(2) });
+    added.forEach((q) => {
+      expect(q.status).toBe('available');
+      q.milestones.forEach((m) => { expect(m.completed).toBe(false); expect(m.progress).toBe(0); });
+    });
+  });
+
+  test('degenerate map (no sites, no buildings) adds nothing and does not throw', () => {
+    expect(backfillSideQuests(undefined, { availability: { sites: {}, buildings: [], townCount: 0 }, level: 99, rng: seededRng(1) })).toEqual([]);
+  });
+});
+
+describe('questEngine — deriveSideQuestAvailability (#45 load-time availability)', () => {
+  const world = [[
+    { poi: 'town', townName: 'Aldwyn' },
+    { poi: 'town', townName: 'Brimford' },
+    { poi: 'cave_entrance' },
+    { poi: 'ruins' },
+    { biome: 'plains' },
+  ]];
+  const cache = {
+    Aldwyn: { mapData: [[{ type: 'building', buildingType: 'inn' }, { type: 'building', buildingType: 'tavern' }, { type: 'grass' }]] },
+    Brimford: { mapData: [[{ type: 'building', buildingType: 'temple' }, { type: 'building', buildingType: 'townhall' }]] },
+  };
+
+  test('sites come off world tiles exactly as at new-game', () => {
+    expect(deriveSideQuestAvailability(world, cache).sites).toEqual({ cave: true, ruins: true });
+    const noSites = [[{ poi: 'town', townName: 'A' }]];
+    expect(deriveSideQuestAvailability(noSites, {}).sites).toEqual({ cave: false, ruins: false });
+  });
+
+  test('buildings are the union of cached town maps (confirmed-placed only)', () => {
+    const { buildings } = deriveSideQuestAvailability(world, cache);
+    expect(buildings.sort()).toEqual(['inn', 'tavern', 'temple', 'townhall'].sort());
+  });
+
+  test('townCount counts town POIs; tolerates a missing map/cache', () => {
+    expect(deriveSideQuestAvailability(world, cache).townCount).toBe(2);
+    expect(deriveSideQuestAvailability(undefined, undefined)).toEqual({ sites: { cave: false, ruins: false }, buildings: [], townCount: 0 });
+  });
+});
+
+describe('questEngine — applySideQuestBackfill (#45 load-path wrapper + pool-size guard)', () => {
+  // Two towns whose cached maps carry every giver/turn-in the pool needs, plus both sites.
+  const world = [[
+    { poi: 'town', townName: 'Aldwyn' },
+    { poi: 'town', townName: 'Brimford' },
+    { poi: 'town', townName: 'Carleon' },
+    { poi: 'cave_entrance' },
+    { poi: 'ruins' },
+  ]];
+  const b = (buildingType) => ({ type: 'building', buildingType });
+  const townMapsCache = {
+    Aldwyn: { mapData: [['inn', 'tavern', 'shop', 'market', 'townhall', 'mill'].map(b)] },
+    Brimford: { mapData: [['temple', 'shrine', 'library', 'archives', 'magetower', 'blacksmith'].map(b)] },
+    Carleon: { mapData: [['alchemist', 'apothecary', 'barn', 'stables', 'guild', 'bank'].map(b)] },
+  };
+  const party = [{ level: 5 }, { level: 3 }]; // effective level 6 -> gate 8 (whole pool)
+  const baseSettings = (sideQuests) => ({ worldSeed: 12345, sideQuests });
+
+  test('pool-size guard: a stamped save skips entirely (same reference back)', () => {
+    const settings = { ...baseSettings([]), sideQuestPoolSize: SIDE_QUESTS.length };
+    const { settings: out, added } = applySideQuestBackfill(settings, { worldMap: world, townMapsCache, party });
+    expect(out).toBe(settings);
+    expect(added).toEqual([]);
+  });
+
+  test('missing world map: skips WITHOUT stamping so a later good load can retry', () => {
+    const settings = baseSettings([]);
+    const { settings: out, added } = applySideQuestBackfill(settings, { worldMap: undefined, townMapsCache, party });
+    expect(out).toBe(settings);
+    expect(out.sideQuestPoolSize).toBeUndefined();
+    expect(added).toEqual([]);
+  });
+
+  test('unstamped save tops up: appends new available quests, stamps the pool size, and never touches existing quests', () => {
+    const existing = [
+      { ...SIDE_QUESTS.find((q) => q.id === 'lost_heirloom'), status: 'active' },
+      { ...SIDE_QUESTS.find((q) => q.id === 'prove_mettle'), status: 'completed' },
+    ];
+    const settings = baseSettings(existing);
+    const { settings: out, added } = applySideQuestBackfill(settings, { worldMap: world, townMapsCache, party });
+    expect(added.length).toBeGreaterThan(0);
+    expect(out.sideQuestPoolSize).toBe(SIDE_QUESTS.length);
+    // existing entries survive by reference, in order, states untouched
+    expect(out.sideQuests.slice(0, existing.length)).toEqual(existing);
+    expect(out.sideQuests[0]).toBe(existing[0]);
+    expect(out.sideQuests[0].status).toBe('active');
+    expect(out.sideQuests[1].status).toBe('completed');
+    // appended quests are new ids, fresh 'available'
+    const existingIds = new Set(existing.map((q) => q.id));
+    added.forEach((q) => { expect(existingIds.has(q.id)).toBe(false); expect(q.status).toBe('available'); });
+    expect(out.sideQuests.length).toBe(existing.length + added.length);
+  });
+
+  test('idempotent: applying the result again is a pure no-op (same reference)', () => {
+    const first = applySideQuestBackfill(baseSettings([]), { worldMap: world, townMapsCache, party });
+    const second = applySideQuestBackfill(first.settings, { worldMap: world, townMapsCache, party });
+    expect(second.settings).toBe(first.settings);
+    expect(second.added).toEqual([]);
+  });
+
+  test('deterministic per save: recomputing before the stamp persists adds the same quests', () => {
+    const a = applySideQuestBackfill(baseSettings([]), { worldMap: world, townMapsCache, party });
+    const b2 = applySideQuestBackfill(baseSettings([]), { worldMap: world, townMapsCache, party });
+    expect(a.added.map((q) => q.id)).toEqual(b2.added.map((q) => q.id));
+  });
+
+  test('guard recomputes only when the pool size actually changed', () => {
+    // stamped at a smaller (old) pool size -> the pool "grew" -> recompute + restamp
+    const grown = { ...baseSettings([]), sideQuestPoolSize: SIDE_QUESTS.length - 5 };
+    const { settings: out } = applySideQuestBackfill(grown, { worldMap: world, townMapsCache, party });
+    expect(out).not.toBe(grown);
+    expect(out.sideQuestPoolSize).toBe(SIDE_QUESTS.length);
+  });
+
+  test('a very old save with NO sideQuests field gets a fresh selection-equivalent backfill', () => {
+    const settings = { worldSeed: 777 }; // no sideQuests key at all
+    const { settings: out, added } = applySideQuestBackfill(settings, { worldMap: world, townMapsCache, party });
+    expect(added.length).toBeGreaterThanOrEqual(2); // at least the new-game minimum
+    expect(out.sideQuests).toEqual(added);
+    out.sideQuests.forEach((q) => expect(q.status).toBe('available'));
+    expect(out.sideQuestPoolSize).toBe(SIDE_QUESTS.length);
+  });
+
+  test('guests included: no auth/provider input exists on the pure path at all', () => {
+    // The wrapper depends only on settings + map data; absence of any user context
+    // must not throw or change behavior.
+    const { added } = applySideQuestBackfill(baseSettings([]), { worldMap: world, townMapsCache, party: [] });
+    expect(added.length).toBeGreaterThan(0);
+  });
+
+  test('nothing eligible still stamps (cheap skip forever after), without inventing quests', () => {
+    const barren = [[{ poi: 'town', townName: 'A' }]]; // no sites, no cached buildings
+    const settings = baseSettings([]);
+    const { settings: out, added } = applySideQuestBackfill(settings, { worldMap: barren, townMapsCache: {}, party });
+    expect(added).toEqual([]);
+    expect(out.sideQuestPoolSize).toBe(SIDE_QUESTS.length);
+    expect(out.sideQuests).toEqual([]);
+    // and the stamped result short-circuits next time
+    expect(applySideQuestBackfill(out, { worldMap: barren, townMapsCache: {}, party }).settings).toBe(out);
   });
 });

@@ -271,7 +271,8 @@ const Game = ({ resumeConversation = null }) => {
     sessionId,
     hasAdventureStarted,
     setHasAdventureStarted,
-    saveConversationToBackend
+    saveConversationToBackend,
+    sideQuestsBackfilled
   } = useGameSession(loadedConversation, setSettings, setSelectedProvider, setSelectedModel, stateGameSessionId);
 
   // Pass dummy/empty functions for now where we handle logic in Game.js wrapper
@@ -330,6 +331,22 @@ const Game = ({ resumeConversation = null }) => {
       advanceTour();
     }
   }, [tourActive, hasAdventureStarted, tourStep, advanceTour]);
+
+  // #45 side-quest backfill notice: when loading topped up the save from the enlarged
+  // quest pool (useGameSession hydration), drop ONE subtle system line. The backfilled
+  // quests themselves surface organically through the existing rumour/giver flows; no
+  // modal, no list. The ref throttles to once per mount, and the sideQuestPoolSize
+  // stamp means the whole event fires at most once per pool growth anyway.
+  const backfillAnnouncedRef = useRef(false);
+  useEffect(() => {
+    if (!sideQuestsBackfilled || backfillAnnouncedRef.current) return;
+    backfillAnnouncedRef.current = true;
+    interactionHook.setConversation(prev => [...prev, {
+      role: 'system',
+      content: '🗨️ New rumours have reached the region.'
+    }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sideQuestsBackfilled]);
 
   // --- Quest chaining: "Continue your legend" (in-save continuation) ---
   // The picker continues the next campaign INSIDE THIS SAVE: the new campaign's

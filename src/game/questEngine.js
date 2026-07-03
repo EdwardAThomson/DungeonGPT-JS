@@ -87,6 +87,112 @@ export const selectSideQuests = (availability = {}, count = 2, rng = Math.random
   }));
 };
 
+// --- side-quest backfill (#45) ------------------------------------------------
+// A save keeps only the quests selected at world-gen; when the SIDE_QUESTS pool grows,
+// in-progress saves top up ON LOAD from the enlarged pool. Additive only: existing
+// quests (any status) are never touched, only brand-new 'available' copies append.
+
+/**
+ * Availability snapshot for side-quest selection AT LOAD, derived exactly the way the
+ * new-game launcher derives it (campaignLauncher) so backfill eligibility matches the
+ * initial selection: sites from the persisted world map, building types unioned from
+ * the cached town maps. Saves made since town pre-generation carry EVERY town in the
+ * cache, so this is the exact placed-building set; older lazy-gen saves list only
+ * visited towns, which under-offers (never over-offers): every backfilled quest's
+ * giver is confirmed placed. townCount feeds the backfill cap.
+ * @returns {{ sites: {cave:boolean, ruins:boolean}, buildings: string[], townCount: number }}
+ */
+export const deriveSideQuestAvailability = (worldMap, townMapsCache) => {
+  const flatTiles = [].concat(...(Array.isArray(worldMap) ? worldMap : []));
+  const sites = {
+    cave: flatTiles.some((t) => t?.poi === 'cave_entrance'),
+    ruins: flatTiles.some((t) => t?.poi === 'ruins'),
+  };
+  const buildings = new Set();
+  Object.values(townMapsCache || {}).forEach((tm) => {
+    (tm?.mapData || []).forEach((row) => (row || []).forEach((t) => {
+      if (t?.type === 'building' && t.buildingType) buildings.add(t.buildingType);
+    }));
+  });
+  const townCount = flatTiles.filter((t) => t?.poi === 'town').length;
+  return { sites, buildings: [...buildings], townCount };
+};
+
+/**
+ * Which pool quests can be ADDED to a save (pure; deterministic given rng). Eligibility
+ * is identical to the initial selection (isQuestEligible via selectSideQuests: giver
+ * building exists, every site type + turn-in building exists), excluding every quest id
+ * already in the save REGARDLESS of status (completed included, so no repeats).
+ *
+ * Cap: new-game selection picks base = min(4, max(2, townCount)) quests; backfill tops
+ * the save's OUTSTANDING (non-completed) quests up to base + 2. Rationale: the cap
+ * limits the player's open queue, not lifetime history (counting completed quests
+ * would starve exactly the long-running saves this feature targets), and the +2
+ * headroom over the new-game count is what lets a save that already holds its full
+ * initial selection actually see new pool content.
+ *
+ * Level: only quests within reach soon (minLevel <= level + 2, level = effective party
+ * level) are added, mirroring the chain-continuation tier gate, so a low-level party's
+ * few cap slots aren't consumed by quests it couldn't see for many sessions.
+ *
+ * @param {Array} existingSideQuests - settings.sideQuests (absent/[] for very old saves)
+ * @param {{ availability?: {sites?:object, buildings?:string[], townCount?:number},
+ *           level?: number, rng?: () => number, pool?: Array }} opts
+ * @returns {Array} fresh 'available' quest copies to APPEND (possibly empty)
+ */
+export const backfillSideQuests = (existingSideQuests, { availability = {}, level = 1, rng = Math.random, pool = SIDE_QUESTS } = {}) => {
+  const existing = Array.isArray(existingSideQuests) ? existingSideQuests : [];
+  const baseCount = Math.min(4, Math.max(2, availability.townCount ?? 4));
+  const cap = baseCount + 2;
+  const outstanding = existing.filter((q) => q?.status !== 'completed').length;
+  const room = cap - outstanding;
+  if (room <= 0) return [];
+  const existingIds = new Set(existing.map((q) => q?.id));
+  const candidates = pool.filter((q) => !existingIds.has(q.id) && (q.minLevel || 1) <= level + 2);
+  if (candidates.length === 0) return [];
+  return selectSideQuests({ sites: availability.sites || {}, buildings: availability.buildings || [] }, room, rng, candidates);
+};
+
+/**
+ * Load-path wrapper: apply the side-quest backfill to a loaded save's settings.
+ * Pure; returns the SAME settings reference when there is nothing to do (cheap skip).
+ *
+ * Version guard: settings.sideQuestPoolSize records the pool size the save last saw;
+ * when it equals the current pool size the whole computation is skipped, so eligibility
+ * never reruns on every load, only when the pool actually changed (or the save has
+ * never been stamped: pre-feature saves, including ones with NO sideQuests field at
+ * all, which get a fresh selection-equivalent backfill).
+ *
+ * Determinism: the rng is an LCG seeded off worldSeed + poolSize (same LCG family as
+ * the launcher/chain), so re-running before the stamp persists (e.g. a crash between
+ * compute and autosave) adds the exact same quests, never duplicates or rerolls.
+ *
+ * A missing/empty world map skips WITHOUT stamping, so a later load with a good map
+ * can still backfill.
+ *
+ * @param {object} settings - parsed game_settings from the save row
+ * @param {{ worldMap?: Array, townMapsCache?: object, party?: Array }} ctx
+ * @param {Array} [pool]
+ * @returns {{ settings: object, added: Array }}
+ */
+export const applySideQuestBackfill = (settings, { worldMap, townMapsCache, party } = {}, pool = SIDE_QUESTS) => {
+  const poolSize = pool.length;
+  if (!settings || settings.sideQuestPoolSize === poolSize) return { settings, added: [] };
+  if (!Array.isArray(worldMap) || worldMap.length === 0) return { settings, added: [] };
+  const availability = deriveSideQuestAvailability(worldMap, townMapsCache);
+  let seed = ((parseInt(settings.worldSeed, 10) || 1) + poolSize * 104729) % 233280 || 1;
+  const rng = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  const added = backfillSideQuests(settings.sideQuests, {
+    availability,
+    level: effectivePartyLevel(party),
+    rng,
+    pool,
+  });
+  const next = { ...settings, sideQuestPoolSize: poolSize };
+  if (added.length > 0) next.sideQuests = [...(settings.sideQuests || []), ...added];
+  return { settings: next, added };
+};
+
 /**
  * Effective party level for quest gating: the lead hero's level plus a bonus for party
  * size (a full party can take on quests above the lead's level — your call). Roughly
