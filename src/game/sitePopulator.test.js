@@ -1,13 +1,14 @@
-import { populateSite, injectSiteObjective } from './sitePopulator';
+import { populateSite, injectSiteObjective, LOOT, HOARD_BONUS } from './sitePopulator';
 import { generateSiteMap } from '../utils/siteMapGenerator';
-import { ITEM_CATALOG } from '../utils/inventorySystem';
+import { ITEM_CATALOG, filterDropsByTier } from '../utils/inventorySystem';
+import { encounterTemplates } from '../data/encounters';
 
 const make = (type, seed) => populateSite(generateSiteMap(type, type, 'south', seed, { biome: 'plains' }), seed);
 const slotTiles = (site) => site.contentSlots.map((s) => site.mapData[s.y][s.x]);
 
 describe('populateSite', () => {
   test('fills every content slot with an encounter or valid loot', () => {
-    ['cave', 'ruins'].forEach((type) => {
+    ['cave', 'ruins', 'forest', 'hills', 'mountain'].forEach((type) => {
       for (let seed = 1; seed <= 25; seed++) {
         const site = make(type, seed);
         expect(site.populated).toBe(true);
@@ -168,6 +169,77 @@ describe('populateSite', () => {
       const before = JSON.stringify(site.mapData);
       populateSite(site, 21);
       expect(JSON.stringify(site.mapData)).toBe(before); // decor untouched, no deposits added
+    });
+  });
+
+  describe('per-type loot pools (issue #49 — no more cave coercion)', () => {
+    const lootItems = (site) => slotTiles(site)
+      .filter((t) => t.content.kind === 'loot')
+      .flatMap((t) => t.content.loot.items);
+
+    test('forest/hills/mountain sites draw ONLY from their own LOOT/HOARD_BONUS pools', () => {
+      ['forest', 'hills', 'mountain'].forEach((type) => {
+        const allowed = [...LOOT[type], ...HOARD_BONUS[type]];
+        const seen = new Set();
+        for (let seed = 1; seed <= 30; seed++) {
+          lootItems(make(type, seed)).forEach((k) => {
+            seen.add(k);
+            expect(allowed).toContain(k); // never a cave-pool item
+          });
+        }
+        expect(seen.size).toBeGreaterThan(0);
+      });
+    });
+
+    test('combat encounters on forest/hills/mountain sites still work (cave-mob fallback)', () => {
+      let encounters = 0;
+      ['forest', 'hills', 'mountain'].forEach((type) => {
+        for (let seed = 1; seed <= 20; seed++) {
+          slotTiles(make(type, seed))
+            .filter((t) => t.content.kind === 'encounter')
+            .forEach((t) => {
+              encounters++;
+              expect(t.content.encounter.name).toBeTruthy();
+              expect(t.content.encounter.rewards).toBeTruthy();
+              expect(t.content.encounter.suggestedActions.length).toBeGreaterThan(0);
+            });
+        }
+      });
+      expect(encounters).toBeGreaterThan(0);
+    });
+
+    test('hide_armor actually drops from forest and hills hoards (issue #49 obtainability)', () => {
+      ['forest', 'hills'].forEach((type) => {
+        const seen = new Set();
+        for (let seed = 1; seed <= 40; seed++) lootItems(make(type, seed)).forEach((k) => seen.add(k));
+        expect(seen.has('hide_armor')).toBe(true);
+      });
+    });
+
+    test('ring_protection drops from ruins hoards (its single acquisition path)', () => {
+      expect(HOARD_BONUS.ruins).toContain('ring_protection');
+      expect(ITEM_CATALOG.ring_protection.rarity).toBe('rare'); // within the Tier 1 cap
+      const seen = new Set();
+      for (let seed = 1; seed <= 40; seed++) lootItems(make('ruins', seed)).forEach((k) => seen.add(k));
+      expect(seen.has('ring_protection')).toBe(true);
+    });
+  });
+
+  describe('issue #49 — tier-gated drop paths', () => {
+    test('dragonscale_plate drops from the Dragon\'s Lair, gated to Tier 2+', () => {
+      const entries = encounterTemplates.mountain_dragon.rewards.items;
+      expect(entries.some((s) => s.startsWith('dragonscale_plate:'))).toBe(true);
+      expect(ITEM_CATALOG.dragonscale_plate.rarity).toBe('very_rare');
+      // encounterResolver applies filterDropsByTier to encounter loot: T1 strips it, T2 allows it.
+      expect(filterDropsByTier(['dragonscale_plate'], { tier: 1 })).toEqual([]);
+      expect(filterDropsByTier(['dragonscale_plate'], { tier: 2 })).toEqual(['dragonscale_plate']);
+    });
+
+    test('legendary_weapon keeps its vault drop but stays Tier-3-gated (known gap until T3 ships)', () => {
+      const entries = encounterTemplates.ruin_treasure_vault.rewards.items;
+      expect(entries.some((s) => s.startsWith('legendary_weapon:'))).toBe(true);
+      expect(filterDropsByTier(['legendary_weapon'], { tier: 2 })).toEqual([]);
+      expect(filterDropsByTier(['legendary_weapon'], { tier: 3 })).toEqual(['legendary_weapon']);
     });
   });
 

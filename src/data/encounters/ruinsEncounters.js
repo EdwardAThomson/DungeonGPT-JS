@@ -67,6 +67,11 @@ export const RUINS_ENCOUNTERS = {
       { label: 'Dispel Magic', skill: 'Arcana', description: 'Remove magical protections' },
       { label: 'Leave It', skill: null, description: 'The vault is too risky' }
     ],
+    // legendary_weapon: this is its ONLY drop path, and legendary rarity is tier-gated
+    // to Tier 3+ by encounterResolver's filterDropsByTier. Campaign templates currently
+    // top out at Tier 2, so the item is INTENTIONALLY unobtainable today (issue #49,
+    // known gap): it becomes live automatically when T3 campaigns ship. Do not "fix" by
+    // downgrading the gate or adding a lower-tier path.
     rewards: { xp: 90, gold: '5d20', items: ['ancient_gold:80%', 'magic_scroll:50%', 'legendary_weapon:15%'] },
     consequences: {
       criticalSuccess: 'The vault opens to reveal untouched treasure from the ancient era.',

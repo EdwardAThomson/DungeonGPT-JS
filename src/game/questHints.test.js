@@ -24,6 +24,20 @@ describe('describeItemSources (derived from live game data)', () => {
     expect(describeItemSources('no_such_item_xyz')).toBe('');
     expect(describeItemSources(null)).toBe('');
   });
+
+  // Issue #49: these hints used to lie — the pools they described never rolled because
+  // populateSite coerced every non-ruins site to 'cave'. Now the described sources are real.
+  it('hide_armor points at forest/hills sites, where it now actually drops', () => {
+    expect(describeItemSources('hide_armor')).toBe('In forest or hills sites');
+  });
+
+  it('ring_protection points at ruins sites (its single hoard path)', () => {
+    expect(describeItemSources('ring_protection')).toBe('In ruins sites');
+  });
+
+  it('dragonscale_plate points at the wilds (Dragon\'s Lair encounter drop)', () => {
+    expect(describeItemSources('dragonscale_plate')).toBe('Found in the wilds');
+  });
 });
 
 describe('describeTurnInTarget', () => {
