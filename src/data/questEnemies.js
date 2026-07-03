@@ -202,7 +202,7 @@ export const QUEST_ENEMIES = {
     rune_golem: {
         name: 'Rune Golem',
         icon: '🗿',
-        image: '/assets/encounters/bosses/rune_golem.webp', // TODO(t3 boss art): ash_titan.webp — placeholder reuses rune_golem
+        image: '/assets/encounters/bosses/rune_golem.webp',
         tier: 1,
         theme: 'arcane-renaissance',
         encounterTier: 'boss',
@@ -576,7 +576,7 @@ export const QUEST_ENEMIES = {
     lich: {
         name: 'The Bone Tyrant',
         icon: '💀',
-        image: '/assets/encounters/bosses/lich.webp', // TODO(t3 boss art): deathless_king.webp — placeholder reuses lich
+        image: '/assets/encounters/bosses/lich.webp',
         tier: 2,
         theme: 'grimdark-survival',
         encounterTier: 'boss',
@@ -858,7 +858,7 @@ export const QUEST_ENEMIES = {
     ash_titan: {
         name: 'The Ash Titan',
         icon: '🌋',
-        image: '/assets/encounters/bosses/rune_golem.webp',
+        image: '/assets/encounters/bosses/ash_titan.webp',
         tier: 3,
         theme: 'heroic-fantasy',
         encounterTier: 'boss',
@@ -892,7 +892,7 @@ export const QUEST_ENEMIES = {
     deathless_king: {
         name: 'The Deathless King',
         icon: '👑',
-        image: '/assets/encounters/bosses/lich.webp',
+        image: '/assets/encounters/bosses/deathless_king.webp',
         tier: 3,
         theme: 'grimdark-survival',
         encounterTier: 'boss',
