@@ -10,6 +10,8 @@ const EncounterModal = () => {
     const onViewMap = data?.onViewMap;
     const boss = data?.boss; // { enemyId, name } — an active milestone boss lairs here
     const onFight = data?.onFight;
+    const gather = data?.gather; // { itemId, name } — an active wilderness item milestone here
+    const onGather = data?.onGather;
 
     if (!encounter) return null;
 
@@ -62,6 +64,18 @@ const EncounterModal = () => {
                                 aria-label={`Confront ${boss.name}`}
                             >
                                 ⚔️ Confront {boss.name}
+                            </button>
+                        )}
+                        {gather && onGather && (
+                            <button
+                                className="primary-button"
+                                onClick={() => {
+                                    close();
+                                    onGather();
+                                }}
+                                aria-label={`Gather ${gather.name}`}
+                            >
+                                🌿 Gather {gather.name}
                             </button>
                         )}
                         {encounter.canEnter && (

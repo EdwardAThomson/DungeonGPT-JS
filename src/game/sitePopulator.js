@@ -8,6 +8,11 @@
 //   - kind: 'encounter' -> reuses a cave/ruins encounter template (combat)
 //   - kind: 'loot'      -> { gold: number, items: [itemKey, ...] }
 // Milestone objectives (kind: 'objective') are a later step (3c).
+//
+// Besides the reserved slots, populateSite also turns 1-3 of the generator's scattered 💎
+// crystal decorations (cave/mountain sites) into harvestable deposits — loot content with
+// `display: 'crystal'` so the renderer draws the gem itself — and strips the leftover
+// decorative crystals (issue #38: never show a crystal the player can't pick up).
 
 import { CAVE_ENCOUNTERS } from '../data/encounters/caveEncounters';
 import { RUINS_ENCOUNTERS } from '../data/encounters/ruinsEncounters';
@@ -48,7 +53,54 @@ const HOARD_BONUS = {
   mountain: ['storm_crystal', 'mountain_crystal', 'silver_dagger'],
 };
 
+// Harvestable crystal deposits (issue #38): the 💎 tiles the generator scatters are no
+// longer mere decoration — a few become loot nodes the party can walk onto and harvest.
+// Type-appropriate, tier-safe items (uncommon/rare, no very_rare): caves yield raw gems;
+// mountains yield mountain crystal, with a rarer chance of a storm crystal. Weighted by
+// repetition in the pool.
+const CRYSTAL_LOOT = {
+  cave: ['raw_gems'],
+  mountain: ['mountain_crystal', 'mountain_crystal', 'mountain_crystal', 'storm_crystal'],
+};
+
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
+
+// Turn 1-3 of a site's scattered crystal decorations into harvestable deposits:
+// tile.content = { kind:'loot', display:'crystal', ... } so the existing walk-onto-loot
+// flow grants the items, while `display` tells the renderer to draw the 💎 instead of 💰.
+// Every OTHER decorative crystal is demoted to plain floor, so on newly populated sites a
+// crystal you can SEE is always a crystal you can HARVEST (no more unpickable teasers).
+// Cave/mountain sites only; runs once per site under the same `populated` guard.
+function placeCrystalDeposits(site, rng) {
+  const lootPool = CRYSTAL_LOOT[site.type];
+  if (!lootPool || !Array.isArray(site.mapData)) return 0;
+
+  // Row-major sweep keeps candidate order (and thus placement) deterministic per seed.
+  const crystalTiles = [];
+  const plainFloors = [];
+  site.mapData.forEach((row) => Array.isArray(row) && row.forEach((tile) => {
+    if (!tile || !tile.walkable || tile.type === 'entrance' || tile.contentSlot || tile.content) return;
+    if (tile.poi === 'crystal') crystalTiles.push(tile);
+    else if (!tile.poi && tile.type === 'floor') plainFloors.push(tile);
+  }));
+
+  const target = 1 + Math.floor(rng() * 3); // 1-3 deposits per site
+  const takeFrom = (pool) => pool.splice(Math.floor(rng() * pool.length), 1)[0];
+  const deposits = [];
+  // Prefer tiles where the generator already put crystals (organic placement); pad from
+  // plain floor if the scatter pass happened to produce too few.
+  while (deposits.length < target && crystalTiles.length > 0) deposits.push(takeFrom(crystalTiles));
+  while (deposits.length < target && plainFloors.length > 0) deposits.push(takeFrom(plainFloors));
+
+  deposits.forEach((tile) => {
+    tile.poi = null; // the content overlay renders the 💎 (and dims it once harvested)
+    const item = lootPool[Math.floor(rng() * lootPool.length)];
+    tile.content = { kind: 'loot', display: 'crystal', loot: { gold: 0, items: [item] }, consumed: false };
+  });
+  // Leftover decorative crystals would tease the player — demote them to bare floor.
+  crystalTiles.forEach((tile) => { tile.poi = null; });
+  return deposits.length;
+}
 
 const rollLoot = (type, rng, hoard) => {
   const pool = LOOT[type] || LOOT.cave;
@@ -71,39 +123,46 @@ const rollLoot = (type, rng, hoard) => {
  * @returns {Object} the same site, with tile.content set on each slot + site.populated.
  */
 export function populateSite(site, seed) {
-  if (!site || site.populated || !Array.isArray(site.contentSlots) || site.contentSlots.length === 0) {
-    if (site && !site.populated) site.populated = true;
-    return site;
-  }
+  if (!site || site.populated) return site;
   const type = site.type === 'ruins' ? 'ruins' : 'cave';
   const rng = seededRandom((Number.isFinite(seed) ? seed : 1) + 777);
-  const pool = combatPool(type);
-  const entry = site.entryPoint || { x: 0, y: 0 };
-  const dist = (p) => Math.abs(p.x - entry.x) + Math.abs(p.y - entry.y);
+  const slots = Array.isArray(site.contentSlots) ? site.contentSlots : [];
 
-  // The deepest slot (farthest from the entrance) is the reward hoard.
-  let deepestIdx = 0;
-  site.contentSlots.forEach((p, i) => { if (dist(p) > dist(site.contentSlots[deepestIdx])) deepestIdx = i; });
+  if (slots.length > 0) {
+    const pool = combatPool(type);
+    const entry = site.entryPoint || { x: 0, y: 0 };
+    const dist = (p) => Math.abs(p.x - entry.x) + Math.abs(p.y - entry.y);
 
-  const kinds = site.contentSlots.map((_, i) => (i === deepestIdx ? 'loot' : (rng() < 0.6 ? 'encounter' : 'loot')));
-  // Guarantee at least one encounter (mobs) when there's room for it.
-  if (site.contentSlots.length > 1 && !kinds.includes('encounter')) {
-    kinds[(deepestIdx + 1) % kinds.length] = 'encounter';
+    // The deepest slot (farthest from the entrance) is the reward hoard.
+    let deepestIdx = 0;
+    slots.forEach((p, i) => { if (dist(p) > dist(slots[deepestIdx])) deepestIdx = i; });
+
+    const kinds = slots.map((_, i) => (i === deepestIdx ? 'loot' : (rng() < 0.6 ? 'encounter' : 'loot')));
+    // Guarantee at least one encounter (mobs) when there's room for it.
+    if (slots.length > 1 && !kinds.includes('encounter')) {
+      kinds[(deepestIdx + 1) % kinds.length] = 'encounter';
+    }
+
+    slots.forEach((slot, i) => {
+      const tile = site.mapData[slot.y] && site.mapData[slot.y][slot.x];
+      if (!tile) return;
+      if (kinds[i] === 'encounter' && pool.length > 0) {
+        const enc = clone(pool[Math.floor(rng() * pool.length)]);
+        tile.content = { kind: 'encounter', encounter: enc, consumed: false };
+      } else {
+        tile.content = { kind: 'loot', loot: rollLoot(type, rng, i === deepestIdx), consumed: false };
+      }
+    });
   }
 
-  site.contentSlots.forEach((slot, i) => {
-    const tile = site.mapData[slot.y] && site.mapData[slot.y][slot.x];
-    if (!tile) return;
-    if (kinds[i] === 'encounter' && pool.length > 0) {
-      const enc = clone(pool[Math.floor(rng() * pool.length)]);
-      tile.content = { kind: 'encounter', encounter: enc, consumed: false };
-    } else {
-      tile.content = { kind: 'loot', loot: rollLoot(type, rng, i === deepestIdx), consumed: false };
-    }
-  });
+  // After the slots, convert some scattered 💎 decorations into harvestable deposits
+  // (cave/mountain sites only; no-op elsewhere). Runs AFTER the slot rolls so the slot
+  // content for a given seed is unchanged from before this feature existed.
+  const depositCount = placeCrystalDeposits(site, rng);
 
   site.populated = true;
-  logger.info(`[SITE] Populated ${type} "${site.name}" with ${site.contentSlots.length} content slots`);
+  logger.info(`[SITE] Populated ${type} "${site.name}" with ${slots.length} content slots` +
+    (depositCount ? ` + ${depositCount} crystal deposits` : ''));
   return site;
 }
 

@@ -68,6 +68,28 @@ describe('storyTemplates — structural integrity', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
+  // Regression lint for the "authored but never consumed" family: every item milestone
+  // must be collectible by one of the two shipped paths — a quest BUILDING in a named
+  // town (building-search path), or a WILDERNESS spawn location in customNames.mountains
+  // (the Gather-on-arrival path via getMilestoneItemForTile). An item milestone matching
+  // neither would be un-completable (the Grey Moors herbs bug).
+  it('every item milestone is collectible (town building or named wilderness location)', () => {
+    playable.forEach((t) => {
+      const townNames = (t.customNames?.towns || []).map((e) => (typeof e === 'string' ? e : e.name));
+      const mountainNames = t.customNames?.mountains || [];
+      (t.settings?.milestones || [])
+        .filter((m) => m.type === 'item')
+        .forEach((m) => {
+          const viaBuilding = !!m.building && townNames.includes(m.building.location);
+          const loc = m.spawn?.location || m.location;
+          const viaWilderness = !m.building && mountainNames.includes(loc);
+          if (!(viaBuilding || viaWilderness)) {
+            throw new Error(`${t.id} milestone #${m.id} ("${m.text}") is an item milestone with no collection path (no town building, no named wilderness location)`);
+          }
+        });
+    });
+  });
+
   // Collect every item id referenced anywhere in a playable template's rewards
   // (milestone rewards + inline encounter rewards) and assert each exists in the catalog.
   const collectItemIds = (template) => {

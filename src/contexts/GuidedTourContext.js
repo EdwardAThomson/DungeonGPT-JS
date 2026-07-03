@@ -42,7 +42,7 @@ export const TOUR_STEPS = [
     route: '/hero-creation',
     target: '[data-tour="hero-template"]',
     title: 'Optional shortcut — class templates',
-    body: 'This is optional. If you want a head start, applying a class template fills in race, stats, alignment and a background in one click. Prefer to build from scratch? Just skip it.',
+    body: 'This is optional. If you want a head start, applying a class template fills in stats, alignment and a background in one click. Prefer to build from scratch? Just skip it.',
   },
   {
     id: 'create-hero-stats',

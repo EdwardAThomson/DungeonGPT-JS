@@ -376,11 +376,13 @@ export const StorySettingsModalContent = ({
                                   {isCurrent && <span style={{ marginRight: '6px' }}>🎯</span>}
                                   {m.text}
                                   {(() => {
-                                    // For milestones that name an authored NPC and/or building, show
-                                    // the who/where so the player knows the objective target. Most
-                                    // milestones have no spawn/building data — render nothing then.
-                                    const who = m.spawn?.type === 'npc' ? m.spawn.name : null;
-                                    const where = m.building?.name || (m.spawn?.type === 'npc' ? m.spawn.location : null);
+                                    // For milestones that name an authored NPC, item and/or building,
+                                    // show the who/what/where so the player knows the objective target
+                                    // (e.g. "Moorland Herbs · Grey Moors"). Milestones without
+                                    // spawn/building data render nothing.
+                                    const who = (m.spawn?.type === 'npc' || m.spawn?.type === 'item') ? m.spawn.name : null;
+                                    const where = m.building?.name
+                                      || (m.spawn?.type === 'npc' || m.spawn?.type === 'item' ? m.spawn.location : null);
                                     const sub = [who, where].filter(Boolean).join(' · ');
                                     if (!sub) return null;
                                     return (

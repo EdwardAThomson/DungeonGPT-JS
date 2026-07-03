@@ -34,6 +34,7 @@ import TourOverlay from "./components/TourOverlay";
 import LocalHeroSync from "./components/LocalHeroSync";
 import LocalGameSync from "./components/LocalGameSync";
 import GuestBanner from "./components/GuestBanner";
+import ScrollToTop from "./components/ScrollToTop";
 
 const DebugRoutes = lazy(() => import('./pages/DebugRoutes'));
 
@@ -229,6 +230,7 @@ const AppContent = () => {
 const App = () => {
   return (
     <Router>
+      <ScrollToTop />
       <GuidedTourProvider>
         <AppContent />
       </GuidedTourProvider>

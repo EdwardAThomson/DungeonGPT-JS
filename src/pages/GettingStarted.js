@@ -29,7 +29,7 @@ const GettingStarted = () => {
         <section className="getting-started-section">
           <h2>🚀 Quick Start</h2>
           <ol className="steps-list">
-            <li><strong>Create a Hero:</strong> Design your character — pick a class, race, stats, and backstory</li>
+            <li><strong>Create a Hero:</strong> Design your character: pick a class, portrait, stats, and backstory (or apply a class template for a quick start)</li>
             <li><strong>Start a New Game:</strong> Choose a story template, set the tone, and select your party</li>
             <li><strong>Begin Your Quest:</strong> The AI Dungeon Master takes it from here</li>
           </ol>
@@ -57,7 +57,7 @@ const GettingStarted = () => {
                 decision-making.
               </p>
               <ul>
-                <li><strong>Natural Language:</strong> Type what you want to do in plain English</li>
+                <li><strong>Natural Language:</strong> Type what you want to do in plain English (signing in unlocks the AI Dungeon Master; guests explore with built-in narration)</li>
                 <li><strong>AI Responses:</strong> The Dungeon Master narrates outcomes and presents choices</li>
                 <li><strong>Conversation History:</strong> All your actions and story events are saved</li>
                 <li><strong>Multiple Choice Options:</strong> Get suggested actions or write your own</li>

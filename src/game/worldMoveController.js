@@ -57,9 +57,11 @@ export const buildPoiEncounter = (targetTile) => {
   if (!targetTile.poi) return null;
   const poiType = targetTile.poiType || targetTile.poi;
   const NICE_NAMES = { cave_entrance: 'a Cave', cave: 'a Cave', ruins: 'Ruins', forest: 'a Forest', hills: 'the Hills', mountain: 'the Mountains' };
-  // Milestone POIs carry their authored display name on the tile (poiName); the raw poi id
+  // Milestone POIs carry their authored display name on the tile (poiName); named mountain
+  // ranges show their range name ("the Grey Moors", not "the Mountains"); the raw poi id
   // is only ever a last resort and gets title-cased so it never renders underscored.
-  const displayName = targetTile.townName || targetTile.poiName || NICE_NAMES[poiType] || titleCaseId(targetTile.poi);
+  const rangeName = poiType === 'mountain' && targetTile.mountainName ? `the ${targetTile.mountainName}` : null;
+  const displayName = targetTile.townName || targetTile.poiName || rangeName || NICE_NAMES[poiType] || titleCaseId(targetTile.poi);
   return {
     name: displayName,
     poiType,

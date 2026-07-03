@@ -116,6 +116,14 @@ describe('worldMoveController', () => {
     expect(bare.name).toBe('Goblin Hideout');
   });
 
+  it('names mountain tiles by their range ("the Grey Moors", not "the Mountains")', () => {
+    const named = buildPoiEncounter({ poi: 'mountain', poiType: 'mountain', mountainName: 'Grey Moors' });
+    expect(named.name).toBe('the Grey Moors');
+    // Unnamed mountains keep the generic label.
+    const generic = buildPoiEncounter({ poi: 'mountain', poiType: 'mountain' });
+    expect(generic.name).toBe('the Mountains');
+  });
+
   it('formats movement system messages for towns and biomes', () => {
     const townMessage = buildMovementSystemMessage({
       targetTile: { poi: 'town', townName: 'Riverside', townSize: 'village' },

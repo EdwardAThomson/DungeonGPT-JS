@@ -170,6 +170,36 @@ export const isMilestoneItemClaimed = (milestones, itemId) => {
 };
 
 /**
+ * Find the milestone item gatherable on a world tile, if any.
+ *
+ * Covers item milestones authored at WILDERNESS locations (building: null) — e.g.
+ * "Gather healing herbs from the Grey Moors". Town-building item milestones are
+ * excluded: those are collected via the building search (questItemId path). Matching
+ * is by the tile's named location (mountainName / poiName / townName) against the
+ * milestone's spawn location, only while the milestone is active.
+ *
+ * @param {Array} milestones - All campaign milestones
+ * @param {Object} tile - The world tile the party arrived at
+ * @returns {Object|null} { itemId, name, milestoneId } or null
+ */
+export const getMilestoneItemForTile = (milestones, tile) => {
+    if (!Array.isArray(milestones) || !tile) return null;
+    const tileNames = [tile.mountainName, tile.poiName, tile.townName]
+        .filter(Boolean)
+        .map((n) => String(n).toLowerCase());
+    if (tileNames.length === 0) return null;
+
+    const m = milestones.find(m =>
+        m.type === 'item' && !m.completed && m.trigger?.item && !m.building &&
+        m.spawn?.type === 'item' &&
+        tileNames.includes(String(m.spawn.location || m.location || '').toLowerCase()) &&
+        areRequirementsMet(m, milestones)
+    );
+    if (!m) return null;
+    return { itemId: m.trigger.item, name: m.spawn.name || m.trigger.item, milestoneId: m.id };
+};
+
+/**
  * Find the milestone boss fight waiting on a world tile, if any.
  *
  * Two ways a tile hosts a boss:

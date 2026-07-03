@@ -164,13 +164,16 @@ const entrance = (theme) => {
 // Single source of truth for a site's scattered decorations: key (the tile.poi value the
 // generator emits) + emoji (how it renders) + label (how the legend names it). The
 // generator and the map legend both read THIS, so they can never drift. Note 'rubble' is
-// a tile TYPE (rough floor), not a decoration, so it isn't here. Decorations are currently
-// cosmetic atmosphere only — see WILDERNESS_SITES_PLAN.md Phase 3 for making some of them
-// functional (harvestable resource nodes).
+// a tile TYPE (rough floor), not a decoration, so it isn't here. Most decorations are
+// cosmetic atmosphere, with one exception: 'crystal' is a harvestable resource node —
+// sitePopulator converts 1-3 scattered crystals per cave/mountain site into loot deposits
+// (tile.content with display:'crystal') and demotes the rest, so every crystal a player
+// sees on a newly populated site can be picked up. (Sites cached in older saves may still
+// show decorative, non-harvestable crystals.)
 export const SITE_DECORATIONS = {
   cave: [
     { key: 'boulder', emoji: '🪨', label: 'Boulder' },
-    { key: 'crystal', emoji: '💎', label: 'Crystals' },
+    { key: 'crystal', emoji: '💎', label: 'Crystals (harvestable)' },
     { key: 'mushroom', emoji: '🍄', label: 'Mushrooms' },
     { key: 'pool', emoji: '💧', label: 'Pool' },
   ],
@@ -192,7 +195,7 @@ export const SITE_DECORATIONS = {
   ],
   mountain: [
     { key: 'boulder', emoji: '🪨', label: 'Boulder' },
-    { key: 'crystal', emoji: '💎', label: 'Crystals' },
+    { key: 'crystal', emoji: '💎', label: 'Crystals (harvestable)' },
     { key: 'snow', emoji: '❄️', label: 'Snow' },
   ],
 };
