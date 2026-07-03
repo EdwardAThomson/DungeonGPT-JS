@@ -197,3 +197,12 @@ now: shadow_overlord/blightspawn/rot_heart/rogue_automaton/old_god_herald/great_
 their own portraits, Sandstorm Cult Leader→cult_leader, Hooded Priest→worm_that_walks,
 Hoarfrost Wraith→shadow_stalker (bespoke queued above). Guard: src/data/artIntegrity.test.js
 now fails CI on any declared-but-missing art path.
+
+## Generation queue additions (2026-07-04 — t2 sequels)
+
+| File | Subject | Priority |
+|---|---|---|
+| `public/assets/templates/desert-expedition-t2.webp` | Ruined spire half-sunken in a dune sea under a bruised sky, colossal wyrm-shape coiling beneath the sand, 16:9 | HIGH (premium card renders gradient) |
+| `public/assets/templates/frozen-frontier-t2.webp` | False-spring thaw over a buried barrow field, gaunt spirit silhouette in the meltwater mist, 16:9 | HIGH (premium card renders gradient) |
+| `public/assets/encounters/bosses/dune_wyrm.webp` | Colossal sand-scaled wyrm erupting from a dune, sun-bleached bone frills [sand and scale] | medium (shares dragon_wyrm) |
+| `public/assets/encounters/bosses/pale_hunger.webp` | Gaunt frost-revenant famine spirit, ribs of ice, antlered skull, trailing snow [ice and bone] | medium (shares blood_wendigo) |

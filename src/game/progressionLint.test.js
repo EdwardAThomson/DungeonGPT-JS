@@ -112,7 +112,9 @@ const KNOWN_GAPS = {
     'heroic-fantasy-t2',
     'grimdark-survival-t2',
     'arcane-renaissance-t2',
-    'eldritch-horror-t2'
+    'eldritch-horror-t2',
+    'desert-expedition-t2',
+    'frozen-frontier-t2'
   ],
 
   // (f) 'gemstone' was rewarded with no ITEM_CATALOG entry (nameless zero-value
