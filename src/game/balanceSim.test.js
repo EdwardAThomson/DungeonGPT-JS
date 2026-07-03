@@ -89,8 +89,10 @@ describe('loadouts', () => {
     expect(RARITY_RANK[ITEM_CATALOG[t1.armor].rarity]).toBeLessThanOrEqual(RARITY_RANK.rare);
     // t2 unlocks the very_rare +2 weapon rung (#44)
     expect(t2.weapon).toBe('runic_greatsword');
-    // t3 unlocks the legendary shelf: the +3 finale blade and the +5 aegis (#44)
-    expect(t3.weapon).toBe('blade_of_the_shattered_throne');
+    // t3 unlocks the legendary shelf. Both legendary weapons are +3 since the
+    // 2026-07-03 rebalance (legendary_weapon +2 -> +3 to stay above the very_rare
+    // +2 runic_greatsword), so assert the BONUS, not which of the tied items wins.
+    expect(['blade_of_the_shattered_throne', 'legendary_weapon']).toContain(t3.weapon);
     expect(t3.armor).toBe('aegis_of_dawn');
   });
 
