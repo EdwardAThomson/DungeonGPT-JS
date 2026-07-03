@@ -3,14 +3,13 @@ import { computeVisibleMilestonePois } from '../game/milestoneEngine';
 import { getRevealedSiteTypes } from '../game/questEngine';
 
 // Lazy load modal components for better performance
-const StorySettingsModalContent = lazy(() => import('./Modals').then(module => ({ default: module.StorySettingsModalContent })));
+const AdventureBook = lazy(() => import('./AdventureBook'));
 const HowToPlayModalContent = lazy(() => import('./Modals').then(module => ({ default: module.HowToPlayModalContent })));
 const MapModal = lazy(() => import('./MapModal'));
 const EncounterModal = lazy(() => import('./EncounterModal'));
 const EncounterActionModal = lazy(() => import('./EncounterActionModal'));
 const HeroModal = lazy(() => import('./HeroModal'));
 const AiAssistantPanel = lazy(() => import('./AiAssistantPanel'));
-const PartyInventoryModal = lazy(() => import('./PartyInventoryModal'));
 const DiceRoller = lazy(() => import('./DiceRoller'));
 
 // Loading fallback component
@@ -29,11 +28,8 @@ const ModalLoadingFallback = () => (
 );
 
 const GameModals = ({
-  isSettingsModalOpen,
-  setIsSettingsModalOpen,
   onContinueLegend,
   settings,
-  setSettings,
   selectedProvider,
   setSelectedProvider,
   selectedModel,
@@ -42,7 +38,6 @@ const GameModals = ({
   setAssistantProvider,
   assistantModel,
   setAssistantModel,
-  worldSeed,
   selectedHeroes,
   mapHook,
   handleMoveOnWorldMap,
@@ -53,6 +48,7 @@ const GameModals = ({
   handleSiteTileClick,
   handleEncounterResolve,
   handleHeroUpdate,
+  onUseItem,
   onQuestItemFound,
   onRest,
   onResurrect,
@@ -82,12 +78,11 @@ const GameModals = ({
   return (
     <>
       <Suspense fallback={<ModalLoadingFallback />}>
-        <StorySettingsModalContent
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
+        {/* #52: the Adventure Book hub — Journal (campaign), Side Quests, Codex (#51),
+            Party inventory, and AI settings in one tabbed modal. */}
+        <AdventureBook
         onContinueLegend={onContinueLegend}
         settings={settings}
-        setSettings={setSettings}
         selectedProvider={selectedProvider}
         setSelectedProvider={setSelectedProvider}
         selectedModel={selectedModel}
@@ -96,7 +91,9 @@ const GameModals = ({
         setAssistantProvider={setAssistantProvider}
         assistantModel={assistantModel}
         setAssistantModel={setAssistantModel}
-        worldSeed={worldSeed}
+        selectedHeroes={selectedHeroes}
+        onUseItem={onUseItem}
+        onHeroUpdate={handleHeroUpdate}
         />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>
@@ -168,9 +165,6 @@ const GameModals = ({
         onResolve={handleEncounterResolve}
         onCharacterUpdate={handleHeroUpdate}
         />
-      </Suspense>
-      <Suspense fallback={<ModalLoadingFallback />}>
-        <PartyInventoryModal />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>
         <DiceRoller />

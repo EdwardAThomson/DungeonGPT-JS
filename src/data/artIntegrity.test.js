@@ -15,7 +15,7 @@ const exists = (rel) => fs.existsSync(path.join(PUBLIC, rel.replace(/^\//, '')))
 
 // Template cards queued for generation (premium biome adventures shipped without cards;
 // they currently render the gradient fallback).
-const KNOWN_MISSING_CARDS = [];
+const KNOWN_MISSING_CARDS = ['desert-expedition-t2', 'frozen-frontier-t2'];
 
 // Data source files whose string literals declare art paths.
 const DATA_SOURCES = [

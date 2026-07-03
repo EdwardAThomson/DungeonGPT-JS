@@ -231,11 +231,14 @@ export const storyTemplates = [
     // ============================================================
     // DESERT EXPEDITION (Phase 2b — first themed-region adventure)
     // ============================================================
-    // Note: the top-level `theme` here is the campaign GENRE (reused for grouping),
-    // while `settings.theme` is the world BIOME theme that drives map/town/narration.
+    // Note: the top-level `theme` here is the campaign GENRE, while `settings.theme`
+    // is the world BIOME theme that drives map/town/narration. The genre is what
+    // campaignChain uses to recommend the same chain's next tier ("Continue your
+    // legend"), so the biome chains carry their own genre (#50): desert t1 must
+    // recommend desert t2, not compete with heroic-fantasy-t2 for the badge.
     {
         id: 'desert-expedition-t1',
-        theme: 'heroic-fantasy',
+        theme: 'desert-expedition',
         tier: 1,
         levelRange: [1, 2],
         // Premium content: desert (sand) world-gen + its quest are a paid unlock.
@@ -333,16 +336,128 @@ export const storyTemplates = [
         }
     },
 
+    // SAME-WORLD SEQUEL (QUEST_CHAINING_PLAN decision, 2026-07): authored onto
+    // desert-expedition-t1's geography EXACTLY (Sandreach / Dustmere / Oasis Karn /
+    // Suncradle + The Scorched Bluffs) so a completed Sunscorched Road save can
+    // continue this campaign IN the same world (in-save continuation). Venue/NPC
+    // choices deliberately avoid t1's quest buildings (t1 used Sandreach's warehouse
+    // and Oasis Karn's inn) so retro-injection into cached towns never collides.
+    {
+        id: 'desert-expedition-t2',
+        theme: 'desert-expedition',
+        tier: 2,
+        levelRange: [3, 5],
+        // Premium content, same gating as desert-expedition-t1 (settings.theme 'desert'
+        // is in PREMIUM_THEMES; the explicit flag keeps intent obvious).
+        premium: true,
+        name: 'Desert Expedition',
+        subtitle: 'The Waking Sands',
+        icon: '🏜️',
+        description: 'The sandstorm cult is broken, but the deep desert has gone quiet. The storms were feeding something beneath the dunes, and the tribute has stopped. Slay the Dune Wyrm before it swallows the trade roads.',
+        customNames: { towns: ['Sandreach', 'Dustmere', 'Oasis Karn', 'Suncradle'], mountains: ['The Scorched Bluffs'] },
+        settings: {
+            theme: 'desert',
+            shortDescription: 'With the Sandstorm Cult broken, the caravans dared the Sunscorched Road again, and for a season the desert let them pass. Now the dunes themselves are moving. The cult\'s rituals were never commanding the storms; they were feeding them to something asleep beneath the sands, and its tribute has stopped. The scholars of Dustmere whisper an old name from the Sun-Kings\' records: the Dune Wyrm.',
+            campaignGoal: 'Uncover what the sandstorm cult was feeding beneath the dunes and slay the Dune Wyrm before it devours the trade roads.',
+            milestones: [
+                {
+                    id: 1,
+                    text: 'Recover the Sun-Kings\' star-chart from the Dustmere records hall',
+                    location: 'Dustmere',
+                    type: 'item',
+                    requires: [],
+                    trigger: { item: 'ancient_scroll', action: 'acquire' },
+                    spawn: { type: 'item', id: 'ancient_scroll', name: 'Sun-Kings\' Star-Chart', location: 'Dustmere' },
+                    building: { type: 'archives', name: 'The Dustmere Records Hall', location: 'Dustmere' },
+                    rewards: { xp: 100, gold: '2d10', items: [] },
+                    minLevel: null
+                },
+                {
+                    id: 2,
+                    text: 'Seek out the last wyrm-hunter at Suncradle',
+                    location: 'Suncradle',
+                    type: 'talk',
+                    requires: [],
+                    trigger: { npc: 'wyrm_hunter', action: 'talk' },
+                    spawn: { type: 'npc', id: 'wyrm_hunter', name: 'Huntress Zahra', location: 'Suncradle', role: 'Guild Master', gender: 'Female', personality: 'scarred, patient, the last sworn blade of the old wyrm-hunting lodge' },
+                    building: { type: 'guild', name: 'The Wyrmhunters\' Lodge', location: 'Suncradle' },
+                    rewards: { xp: 150, gold: '1d20', items: ['rations'] },
+                    minLevel: null
+                },
+                {
+                    id: 3,
+                    text: 'Descend into the Sunken Spire beneath the Scorched Bluffs',
+                    location: 'The Scorched Bluffs',
+                    type: 'location',
+                    requires: [1, 2],
+                    trigger: { location: 'sunken_spire', action: 'visit' },
+                    spawn: { type: 'poi', id: 'sunken_spire', name: 'The Sunken Spire', location: 'The Scorched Bluffs' },
+                    building: null,
+                    rewards: { xp: 200, gold: '3d20', items: [] },
+                    minLevel: 3
+                },
+                {
+                    id: 4,
+                    text: 'Slay the Dune Wyrm',
+                    location: 'The Scorched Bluffs',
+                    type: 'combat',
+                    requires: [3],
+                    trigger: { enemy: 'dune_wyrm', action: 'defeat' },
+                    spawn: { type: 'enemy', id: 'dune_wyrm', name: 'The Dune Wyrm', location: 'The Scorched Bluffs' },
+                    building: null,
+                    encounter: {
+                        name: 'The Dune Wyrm',
+                        icon: '🐍',
+                        // Boss-art note: closest thematic fit in the current library; shared
+                        // with questEnemies' Red Wyrm. Bespoke sand-wyrm art is an art-queue item.
+                        image: '/assets/encounters/bosses/dragon_wyrm.webp',
+                        encounterTier: 'boss',
+                        difficulty: 'deadly',
+                        // #43 schema: deadly's default DC 25 is a ~1% lottery; DC pinned into
+                        // the sim-validated band. balanceSim @ 3000 trials, seed 1, 3-hero
+                        // mid-gear Lv 5 party: 48.5% win, 0.9% tpk, 18.3% stalemate
+                        // (none 17.9%, best 88.0%). Label stays 'deadly'.
+                        dc: 20,
+                        multiRound: true,
+                        enemyHP: 250,
+                        dealsDamage: true,
+                        damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d6' },
+                        suggestedActions: [
+                            { label: 'Fight', skill: 'Athletics', description: 'Meet the wyrm with steel when it breaches the sand' },
+                            { label: 'Read the Sands', skill: 'Survival', description: 'Use the wyrm-hunter\'s lore to predict where it will surface' },
+                            { label: 'Strike the Star-Mark', skill: 'Investigation', description: 'Aim for the soft plate the Sun-Kings\' star-chart describes' }
+                        ],
+                        consequences: {
+                            criticalSuccess: 'Your blade finds the star-mark. The wyrm convulses, collapses a dune around itself, and is still. The desert exhales.',
+                            success: 'After a battle that reshapes the dunes, the Dune Wyrm sinks dead beneath the sand it ruled.',
+                            failure: 'The wyrm breaches beneath you, jaws scything through the party before it dives.',
+                            criticalFailure: 'The sands open like a mouth. You claw your way clear of the sinking pit, bleeding and half-buried.'
+                        },
+                        rewards: { xp: 500, gold: '5d20', items: ['dragonscale_plate'] }
+                    },
+                    rewards: { xp: 300, gold: '3d20', items: [] },
+                    minLevel: 5
+                }
+            ],
+            grimnessLevel: 'Neutral',
+            darknessLevel: 'Bright',
+            magicLevel: 'Low Magic',
+            technologyLevel: 'Medieval',
+            responseVerbosity: 'Descriptive'
+        }
+    },
+
     // ============================================================
     // FROZEN FRONTIER (Phase 2c — snow biome themed adventure)
     // ============================================================
-    // Like the desert template, the top-level `theme` is the campaign GENRE (reused for
-    // grouping), while `settings.theme` is the world BIOME theme ('snow') that drives the
-    // map/town/narration. Snow is a premium biome (PREMIUM_THEMES), so this is a premium
+    // Like the desert template, the top-level `theme` is the campaign GENRE (its own
+    // chain genre, so campaignChain recommends frozen t2 after frozen t1), while
+    // `settings.theme` is the world BIOME theme ('snow') that drives the map/town/
+    // narration. Snow is a premium biome (PREMIUM_THEMES), so this is a premium
     // adventure; `premium: true` is also set explicitly for clarity.
     {
         id: 'frozen-frontier-t1',
-        theme: 'heroic-fantasy',
+        theme: 'frozen-frontier',
         tier: 1,
         levelRange: [1, 2],
         // Premium content: snow world-gen + its quest are a paid unlock. Gating derives from
@@ -429,6 +544,132 @@ export const storyTemplates = [
                     },
                     rewards: { xp: 50, gold: '1d10', items: [] },
                     minLevel: 2
+                }
+            ],
+            grimnessLevel: 'Bleak',
+            darknessLevel: 'Grey',
+            magicLevel: 'Low Magic',
+            technologyLevel: 'Medieval',
+            responseVerbosity: 'Descriptive'
+        }
+    },
+
+    // SAME-WORLD SEQUEL (QUEST_CHAINING_PLAN decision, 2026-07): authored onto
+    // frozen-frontier-t1's geography EXACTLY (Hearthmere [village] / Frosthollow /
+    // Icemoor / Winterreach + The Rimefang Peaks) so a completed Deepening Frost
+    // save can continue this campaign IN the same world (in-save continuation).
+    // Venue/NPC choices deliberately avoid t1's quest buildings (t1 used
+    // Hearthmere's warehouse and Frosthollow's inn) so retro-injection into cached
+    // towns never collides.
+    {
+        id: 'frozen-frontier-t2',
+        theme: 'frozen-frontier',
+        tier: 2,
+        levelRange: [3, 5],
+        // Premium content, same gating as frozen-frontier-t1 (settings.theme 'snow'
+        // is in PREMIUM_THEMES; the explicit flag keeps intent obvious).
+        premium: true,
+        name: 'Frozen Frontier',
+        subtitle: 'The Hungering Thaw',
+        icon: '❄️',
+        description: 'The Hoarfrost Wraith is destroyed and the false winter is lifting, but the melt is uncovering what the ice had sealed away. Something old and starving walks the thaw.',
+        customNames: { towns: [{ name: 'Hearthmere', size: 'village' }, 'Frosthollow', 'Icemoor', 'Winterreach'], mountains: ['The Rimefang Peaks'] }, // "the village of Hearthmere"
+        settings: {
+            theme: 'snow',
+            shortDescription: 'The Hoarfrost Wraith is gone and warmth is creeping back into the frontier, but the thaw is not the mercy it seemed. The retreating ice is uncovering things the old winters buried, and now folk are vanishing from the outlying steadings in the false spring. The sanctuary\'s oldest saga names the thing the famine-winters always wake: the Pale Hunger.',
+            campaignGoal: 'Follow the disappearances of the false spring to their source and destroy the Pale Hunger freed by the melting ice.',
+            milestones: [
+                {
+                    id: 1,
+                    text: 'Recover the famine-winter saga from the Icemoor sanctuary',
+                    location: 'Icemoor',
+                    type: 'item',
+                    requires: [],
+                    trigger: { item: 'history_tome', action: 'acquire' },
+                    spawn: { type: 'item', id: 'history_tome', name: 'The Famine-Winter Saga', location: 'Icemoor' },
+                    building: { type: 'temple', name: 'The Icemoor Sanctuary', location: 'Icemoor' },
+                    rewards: { xp: 100, gold: '2d10', items: [] },
+                    minLevel: null
+                },
+                {
+                    id: 2,
+                    text: 'Search the silent steading outside Frosthollow',
+                    location: 'Frosthollow',
+                    type: 'location',
+                    requires: [],
+                    trigger: { location: 'silent_steading', action: 'visit' },
+                    spawn: { type: 'poi', id: 'silent_steading', name: 'The Silent Steading', location: 'Frosthollow' },
+                    building: null,
+                    rewards: { xp: 125, gold: '2d10', items: ['quest_clue'] },
+                    minLevel: null
+                },
+                {
+                    id: 3,
+                    text: 'Hear the old hunter\'s counsel at Winterreach',
+                    location: 'Winterreach',
+                    type: 'talk',
+                    requires: [],
+                    trigger: { npc: 'old_hunter', action: 'talk' },
+                    spawn: { type: 'npc', id: 'old_hunter', name: 'Old Maren', location: 'Winterreach', role: 'Villager', gender: 'Female', personality: 'ancient, unblinking, survived the last famine-winter as a girl and knows what walks in the thaw' },
+                    building: { type: 'tavern', name: 'The Long Night Hall', location: 'Winterreach' },
+                    rewards: { xp: 150, gold: '1d20', items: ['rations'] },
+                    minLevel: null
+                },
+                {
+                    id: 4,
+                    text: 'Climb to the Famine Barrow bared by the melting ice',
+                    location: 'The Rimefang Peaks',
+                    type: 'location',
+                    requires: [1, 2, 3],
+                    trigger: { location: 'famine_barrow', action: 'visit' },
+                    spawn: { type: 'poi', id: 'famine_barrow', name: 'The Famine Barrow', location: 'The Rimefang Peaks' },
+                    building: null,
+                    rewards: { xp: 175, gold: '3d20', items: [] },
+                    minLevel: 3
+                },
+                {
+                    id: 5,
+                    text: 'Destroy the Pale Hunger',
+                    location: 'The Rimefang Peaks',
+                    type: 'combat',
+                    requires: [4],
+                    trigger: { enemy: 'pale_hunger', action: 'defeat' },
+                    spawn: { type: 'enemy', id: 'pale_hunger', name: 'The Pale Hunger', location: 'The Rimefang Peaks' },
+                    building: null,
+                    encounter: {
+                        name: 'The Pale Hunger',
+                        icon: '🦴',
+                        // Boss-art note: the wendigo is the closest thematic fit in the current
+                        // library; shared with questEnemies' Blood Wendigo (grimdark t2) and a
+                        // T3_CAMPAIGNS_PLAN candidate for The Last Winter. Bespoke gaunt
+                        // frost-revenant art is an art-queue item.
+                        image: '/assets/encounters/bosses/blood_wendigo.webp',
+                        encounterTier: 'boss',
+                        difficulty: 'deadly',
+                        // #43 schema: deadly's default DC 25 is a ~1% lottery; DC pinned into
+                        // the sim-validated band. balanceSim @ 3000 trials, seed 1, 3-hero
+                        // mid-gear Lv 5 party: 48.1% win, 1.0% tpk, 19.4% stalemate
+                        // (none 17.2%, best 88.4%). Label stays 'deadly'.
+                        dc: 20,
+                        multiRound: true,
+                        enemyHP: 250,
+                        dealsDamage: true,
+                        damage: { criticalFailure: '4d8+4', failure: '2d6+2', success: '1d6' },
+                        suggestedActions: [
+                            { label: 'Fight', skill: 'Athletics', description: 'Hold the line against the starving thing' },
+                            { label: 'Firebrand', skill: 'Survival', description: 'Drive it back behind a burning line, as the steadings once did' },
+                            { label: 'Recite the Saga', skill: 'Religion', description: 'Speak the old binding-words the famine-winter saga preserves' }
+                        ],
+                        consequences: {
+                            criticalSuccess: 'The binding-words land as the firebrand catches. The Pale Hunger comes apart like rotten ice, and the thaw turns gentle at last.',
+                            success: 'Starved of its feast, the Pale Hunger falls beneath fire and steel. The frontier\'s spring is its own again.',
+                            failure: 'It moves between heartbeats. Frost-black claws rake through the party before the fire pushes it back.',
+                            criticalFailure: 'Its hunger swallows the firelight whole. You flee the barrow with the sound of cracking bone behind you.'
+                        },
+                        rewards: { xp: 450, gold: '5d20', items: ['runic_greatsword'] }
+                    },
+                    rewards: { xp: 300, gold: '3d20', items: [] },
+                    minLevel: 5
                 }
             ],
             grimnessLevel: 'Bleak',

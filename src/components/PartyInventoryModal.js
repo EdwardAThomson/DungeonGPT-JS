@@ -10,8 +10,6 @@ import {
   unequipSlot,
   parseBonus
 } from '../game/equipment';
-import { useModal } from '../contexts/ModalContext';
-import ModalShell from './ModalShell';
 
 const SLOT_LABELS = { weapon: 'Weapon', armor: 'Armour', accessory: 'Accessory' };
 const STAT_FOR_SLOT = { weapon: 'attack', armor: 'armour soak', accessory: 'to checks' };
@@ -23,34 +21,26 @@ const formatSlotBonus = (slot, bonusStr) => {
   return `${n >= 0 ? '+' : ''}${n} ${STAT_FOR_SLOT[slot] || ''}`.trim();
 };
 
-const PartyInventoryModal = () => {
-  const { isOpen, data, close } = useModal('inventory');
-  const selectedHeroes = data?.selectedHeroes || [];
-  const onUseItem = data?.onUseItem;
-  const onHeroUpdate = data?.onHeroUpdate;
+// #52: formerly a standalone modal (useModal('inventory') + ModalShell), now the
+// content of the Adventure Book's 🎒 Party tab. The hub mounts it only while the
+// tab is active, so transient UI state (hero picker, result toasts, overrides)
+// resets naturally on tab switch / hub close. Receives LIVE party props (not an
+// open-time snapshot), so external HP/inventory changes stay in sync.
+const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate }) => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [useItemState, setUseItemState] = useState(null); // { itemKey } — hero picker
   const [useResults, setUseResults] = useState([]); // [{ heroName, itemName, rolled, healed, id }]
   const [activeTab, setActiveTab] = useState('items'); // 'items' | 'loadout'
-  // Session-only hero edits (potion use / equip / unequip) layered over the opened
-  // snapshot so the UI updates instantly. Each edit is also persisted via the callbacks.
-  // Cleared when the modal closes.
+  // Session-only hero edits (potion use / equip / unequip) layered over the live
+  // props so the UI updates instantly. Each edit is also persisted via the callbacks.
   const [overrides, setOverrides] = useState({}); // heroUid -> updated hero
   const resultTimers = useRef([]);
 
-  // Clear results and state when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      setUseItemState(null);
-      setUseResults([]);
-      setOverrides({});
-      setActiveTab('items');
-      resultTimers.current.forEach(clearTimeout);
-      resultTimers.current = [];
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
+  // Clear pending result-toast timers on unmount (tab switch / hub close).
+  useEffect(() => () => {
+    resultTimers.current.forEach(clearTimeout);
+    resultTimers.current = [];
+  }, []);
 
   // The party as currently shown: the snapshot with any local edits applied on top.
   const party = selectedHeroes.map((h) => overrides[heroUid(h)] || h);
@@ -164,28 +154,7 @@ const PartyInventoryModal = () => {
   };
 
   return (
-    <ModalShell modalId="inventory" ariaLabel="Party Inventory" style={{
-          maxWidth: '600px',
-          width: '90%',
-          background: 'var(--surface)',
-          border: '2px solid var(--border)',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
-          color: 'var(--text)',
-          borderRadius: '12px',
-          padding: '24px'
-        }}>
-        <h2 style={{
-          marginBottom: '24px',
-          marginTop: 0,
-          textAlign: 'center',
-          fontSize: '2rem',
-          color: 'var(--primary)',
-          borderBottom: '1px solid var(--border)',
-          paddingBottom: '16px'
-        }}>
-          Party Inventory
-        </h2>
-
+    <div style={{ color: 'var(--text)', maxWidth: '640px', margin: '0 auto' }}>
         {/* Themed Gold Section */}
         <div
           style={{
@@ -577,27 +546,6 @@ const PartyInventoryModal = () => {
           </div>
         )}
 
-        <button
-          onClick={close}
-          style={{
-            marginTop: '24px',
-            padding: '14px 20px',
-            background: 'var(--primary)',
-            color: 'var(--bg)',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            width: '100%',
-            fontWeight: 'bold',
-            fontSize: '1.1rem',
-            textTransform: 'uppercase',
-            letterSpacing: '0.2em',
-            boxShadow: '0 4px 8px var(--shadow)'
-          }}
-        >
-          Return to Adventure
-        </button>
-
       {selectedImage && (
         <div
           style={{
@@ -651,8 +599,8 @@ const PartyInventoryModal = () => {
           <p style={{ color: '#888', marginTop: '12px', fontSize: '1.1rem' }}>Click anywhere to return</p>
         </div>
       )}
-    </ModalShell>
+    </div>
   );
 };
 
-export default PartyInventoryModal;
+export default PartyInventoryContent;
