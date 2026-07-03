@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import SafeMarkdownMessage from './SafeMarkdownMessage';
+import NarrativeHookChips from './NarrativeHookChips';
 
 const GameMainPanel = ({
   campaignGoal,
@@ -34,7 +35,13 @@ const GameMainPanel = ({
   aiNarrativeEnabled,
   aiAvailable = true,
   isMapLoaded,
-  lastPrompt
+  lastPrompt,
+  // Transient narrative-hook affordance (#35/#37): chips + preview image rendered
+  // under the ONE Look-around message that carried the hook. Matched by message
+  // object identity, so saved/reloaded conversations never resurrect live chips.
+  hookChips = null,
+  onHookChipAction,
+  onHookChipIgnore
 }) => {
   // High-intent conversion prompt: fired when a guest reaches for the gated AI chat.
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
@@ -93,6 +100,13 @@ const GameMainPanel = ({
         {conversation.map((msg, index) => (
           <div key={index} className={`message ${msg.role}`}>
             <SafeMarkdownMessage content={msg.content} />
+            {hookChips && hookChips.message === msg && (
+              <NarrativeHookChips
+                encounter={hookChips.encounter}
+                onAction={onHookChipAction}
+                onIgnore={onHookChipIgnore}
+              />
+            )}
           </div>
         ))}
         {isLoading && (

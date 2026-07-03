@@ -165,6 +165,47 @@ export const formatEncounterPenaltyLog = (heroName, messages = []) => {
   return `[PROGRESSION] Penalties applied to ${heroName}: ${messages.join(', ')}`;
 };
 
+// How many world-map moves a narrative-tier hook stays actionable after it is
+// parked (pendingLookEncounter) or offered as chips under a Look-around narration.
+// Beyond this the hook expires silently: a cave glint shouldn't be actionable
+// ten tiles later (#36).
+export const NARRATIVE_HOOK_PERSIST_MOVES = 3;
+
+/**
+ * Ages a narrative-tier hook state by one world-map move (#36).
+ *
+ * Works for both lifecycle phases, which share the optional `hookMoves` counter:
+ * - the parked hook (`pendingLookEncounter`, pass `remind: true` so the player
+ *   gets one subtle nudge toward the Look-around button on the first move away)
+ * - the offered action chips under a Look-around narration (no reminder; the
+ *   chips themselves are the visible affordance).
+ *
+ * Pure: never mutates. Returns `{ hookState, reminderText }` where `hookState`
+ * is null once the hook has outlived NARRATIVE_HOOK_PERSIST_MOVES (expired
+ * silently) and `reminderText` is a ready-to-append conversation line or null.
+ *
+ * @param {Object|null} hookState - `{ hook?, encounter?, hookMoves?, ... }`
+ * @param {Object} [options]
+ * @param {boolean} [options.remind=false] - emit the one-time reminder line
+ */
+export const ageNarrativeHook = (hookState, { remind = false } = {}) => {
+  if (!hookState) {
+    return { hookState: null, reminderText: null };
+  }
+
+  const hookMoves = (hookState.hookMoves || 0) + 1;
+  if (hookMoves > NARRATIVE_HOOK_PERSIST_MOVES) {
+    return { hookState: null, reminderText: null }; // expired, clear silently
+  }
+
+  const hook = hookState.hook || hookState.encounter?.narrativeHook || null;
+  const reminderText = remind && hookMoves === 1 && hook
+    ? `*You think back to ${hook}, just a short way behind you. It may be worth a Look around before you press on.*`
+    : null;
+
+  return { hookState: { ...hookState, hookMoves }, reminderText };
+};
+
 export const planWorldTileEncounterFlow = ({
   randomEncounter,
   targetTile,
