@@ -18,7 +18,7 @@ describe('catalog equipment data', () => {
   });
 
   test('the new armour ladder exists with the expected soak values', () => {
-    const expected = { leather_armor: 1, studded_leather: 2, hide_armor: 2, scale_mail: 3, dragonscale_plate: 4 };
+    const expected = { leather_armor: 1, studded_leather: 2, hide_armor: 2, scale_mail: 3, dragonscale_plate: 4, aegis_of_dawn: 5 };
     for (const [key, soak] of Object.entries(expected)) {
       expect(ITEM_CATALOG[key]).toBeDefined();
       expect(ITEM_CATALOG[key].type).toBe('armor');
@@ -37,7 +37,10 @@ describe('catalog equipment data', () => {
     const equip = (key) => getEquippedBonuses(equipItem({ equipment: {}, inventory: [{ key }] }, key));
     expect(equip('shortsword').attack).toBe(1);
     expect(equip('silver_dagger').attack).toBe(1);
+    expect(equip('hunters_longbow').attack).toBe(1);
+    expect(equip('runed_greatsword').attack).toBe(2); // #44: the obtainable +2 rung
     expect(equip('legendary_weapon').attack).toBe(2);
+    expect(equip('blade_of_the_shattered_throne').attack).toBe(3); // t3 shelf
     expect(equip('rusty_dagger').attack).toBe(0); // junk: no bonus
   });
 
@@ -47,5 +50,31 @@ describe('catalog equipment data', () => {
     expect(misc('legendary_artifact')).toBe(2);
     expect(misc('nature_charm')).toBe(1);
     expect(misc('fey_charm')).toBe(1);
+    expect(misc('stormbound_ring')).toBe(2); // #44: findable very_rare accessory
+    expect(misc('wardstone_pendant')).toBe(1);
+  });
+
+  test('#44 weapon/accessory ladder: the rarity-to-bonus rungs are monotone', () => {
+    // t3 shelf items exist and carry the designed bonuses (T3_CAMPAIGNS_PLAN §5.3).
+    const expected = {
+      heart_of_the_last_winter: 3,
+      clockwork_god_core: 3,
+      crown_of_the_drowned_city: 3
+    };
+    for (const [key, bonus] of Object.entries(expected)) {
+      expect(ITEM_CATALOG[key]).toBeDefined();
+      expect(ITEM_CATALOG[key].rarity).toBe('legendary');
+      expect(SLOT_FOR_TYPE[ITEM_CATALOG[key].type]).toBe('accessory');
+      expect(parseBonus(ITEM_CATALOG[key].bonus)).toBe(bonus);
+    }
+  });
+
+  test('every equippable catalog entry has an icon path', () => {
+    Object.entries(ITEM_CATALOG)
+      .filter(([, def]) => SLOT_FOR_TYPE[def.type])
+      .forEach(([key, def]) => {
+        expect(typeof def.icon).toBe('string');
+        expect(def.icon).toMatch(/^assets\/icons\/items\/.+\.webp$/);
+      });
   });
 });

@@ -72,22 +72,38 @@ const KNOWN_GAPS = {
 
   // (b) #44/#49: gear with no live source at any REACHABLE tier (max playable tier
   // is 2 today; legendary rarity unlocks at t3, which has no playable template).
-  // hide_armor / ring_protection / dragonscale_plate got sources in #49 and are
-  // deliberately NOT pinned — the guard reads their live sources.
-  //   - artifact_trinket (+1 charm): NEW finding by this lint — it exists only as an
-  //     icon-borrow source (QUEST_ITEM_ICON_FROM); no drop, shop, pool, or reward.
-  unobtainableGear: ['artifact_trinket', 'legendary_weapon'],
+  // hide_armor / ring_protection / dragonscale_plate got sources in #49, and #44 gave
+  // artifact_trinket one (ruins hoard pool) — none of those are pinned; the guard
+  // reads their live sources. What remains pinned is the LEGENDARY SHELF, which is
+  // unobtainable BY DESIGN until a playable t3 ships: legendary_weapon (ruin-vault
+  // drop, gated to t3) plus the five bespoke t3 reward items authored by #44
+  // (T3_CAMPAIGNS_PLAN §5.3). t3 authoring wires them to milestones and removes them
+  // from this pin.
+  unobtainableGear: [
+    'aegis_of_dawn',
+    'blade_of_the_shattered_throne',
+    'clockwork_god_core',
+    'crown_of_the_drowned_city',
+    'heart_of_the_last_winter',
+    'legendary_weapon'
+  ],
 
-  // (b) #44: bonus rungs that exist in the catalog but cannot be obtained.
-  // weapon +2 = legendary_weapon only (see above). Fix = give the rung a source.
-  unobtainableSlotRungs: { weapon: [2], armor: [], accessory: [] },
+  // (b) #44: bonus rungs that exist in the catalog but cannot be obtained. The old
+  // weapon-+2 gap is HEALED (runed_greatsword, very_rare, ruin-vault/dragon-lair
+  // drops at t2). The pinned rungs now belong to the t3 legendary shelf: weapon +3
+  // (blade_of_the_shattered_throne) and armor +5 (aegis_of_dawn) go live with t3.
+  unobtainableSlotRungs: { weapon: [3], armor: [5], accessory: [] },
 
   // (c) boss win-rate pins. HEALED 2026-07-03 by #43 (Lead + Support party
   // fights, flat enemy damage, explicit boss damage profiles, deadly-DC retune to
   // 19-20): every authored boss now sims inside the healthy bands under the band
   // semantics in the header (t1 solo / t2+ 3-hero party), so NO pins remain.
-  // Measured at TRIALS/SEED: t1 mid 69-85%, t2 3-hero mid 42-56%, all best >= 50%,
-  // all none >= 10%. Add a pin here only for future intentionally-unbalanced content.
+  // Re-measured at TRIALS/SEED after #44 (gear-ladder expansion): t1 mid 69-85%
+  // (t1 'best' == mid win rate — the tier-1 rare cap adds defense, not attack),
+  // t2 3-hero mid 42-56% (unchanged; the mid preset is fixed), t2 best 79-95%
+  // (up ~8-10pp: 'best' now derives runed_greatsword, the very_rare +2 weapon
+  // rung, at tier 2). All none >= 10%, all tpk <= 25%, all stalemate <= 45%.
+  // Add a pin here only for future intentionally-unbalanced content.
   bossBalance: {},
 
   // (d) Part I §2: no t2 world's authored XP reaches the t3 entry threshold

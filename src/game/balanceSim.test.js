@@ -81,13 +81,17 @@ describe('loadouts', () => {
     }
   });
 
-  test('tier gates change what "best" means (t1 rare cap vs t3 legendary)', () => {
+  test('tier gates change what "best" means (t1 rare cap vs t2/t3 shelves)', () => {
     const t1 = bestObtainableLoadout(1);
+    const t2 = bestObtainableLoadout(2);
     const t3 = bestObtainableLoadout(3);
     // t1 caps at rare (no very_rare armor/accessory, no legendary weapon)
     expect(RARITY_RANK[ITEM_CATALOG[t1.armor].rarity]).toBeLessThanOrEqual(RARITY_RANK.rare);
-    // t3 unlocks the only +2 weapon in the catalog
-    expect(t3.weapon).toBe('legendary_weapon');
+    // t2 unlocks the very_rare +2 weapon rung (#44)
+    expect(t2.weapon).toBe('runed_greatsword');
+    // t3 unlocks the legendary shelf: the +3 finale blade and the +5 aegis (#44)
+    expect(t3.weapon).toBe('blade_of_the_shattered_throne');
+    expect(t3.armor).toBe('aegis_of_dawn');
   });
 
   test('resolveLoadout: names, explicit objects, unknown -> none', () => {

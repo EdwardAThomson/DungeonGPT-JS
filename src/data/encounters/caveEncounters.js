@@ -118,7 +118,9 @@ export const CAVE_ENCOUNTERS = {
       { label: 'Distract', skill: 'Deception', description: 'Create a diversion to grab treasure' },
       { label: 'Flee', skill: 'Athletics', description: 'Run for your life' }
     ],
-    rewards: { xp: 150, gold: '10d20', items: ['rare_gem:70%', 'magic_weapon:40%', 'ancient_artifact:30%', 'dragon_scale:20%'] },
+    // stormbound_ring (#44): very_rare findable accessory; filterDropsByTier holds it
+    // back until Tier 2 play.
+    rewards: { xp: 150, gold: '10d20', items: ['rare_gem:70%', 'magic_weapon:40%', 'ancient_artifact:30%', 'dragon_scale:20%', 'stormbound_ring:10%'] },
     consequences: {
       criticalSuccess: 'You defeat the guardian and claim its entire hoard!',
       success: 'You defeat the guardian after a fierce battle.',
