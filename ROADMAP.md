@@ -53,3 +53,4 @@ backlog; see the `docs/` design docs for each system.
 - [ ] SSO expansion (Google, GitHub, Discord) + magic-link sign-in
 - [ ] Monitoring (Sentry), structured logging, automated Worker deploy, ops runbook
 - [ ] Graph-enhanced RAG for long-context quests (basic RAG shipped; see `docs/RAG_GRAPH_ENHANCEMENT_PLAN.md`)
+- [ ] Unified tabbed modal hub for reference surfaces (Journal / Inventory / Codex / Settings) — see OUTSTANDING_ISSUES #52
