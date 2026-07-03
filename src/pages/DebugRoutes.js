@@ -32,6 +32,7 @@ import ImageGenDebug from './ImageGenDebug';
 import SummarizationTest from './SummarizationTest';
 import RagTest from './RagTest';
 import PremiumPage from './PremiumPage';
+import BossFightTest from './BossFightTest';
 
 const sectionIcons = {
   'Terrain & Maps': '🗺️',
@@ -60,6 +61,7 @@ const debugSections = [
   {
     title: 'Encounters',
     links: [
+      { to: 'boss-fight', label: 'Boss Fight Test (party vs t1/t2 bosses)' },
       { to: 'encounter-test', label: 'Encounter Test' },
       { to: 'encounter-debug', label: 'Encounter Debug' },
       { to: '/encounter-debug', label: 'Encounter Modal Test', external: true },
@@ -205,6 +207,7 @@ const DebugRoutes = () => {
           <Route index element={<DebugIndex />} />
           <Route path="terrain-studio-v2" element={<TerrainStudioV2 />} />
           <Route path="terrain-studio" element={<TerrainStudio />} />
+          <Route path="boss-fight" element={<BossFightTest />} />
           <Route path="encounter-test" element={<EncounterTest />} />
           <Route path="encounter-debug" element={<EncounterDebug />} />
           <Route path="dice-test" element={<DiceTest />} />
