@@ -31,6 +31,8 @@ deleted. When the code and a doc disagree, the code wins.
 - `FEATURE_HERO_RECOVERY.md` — downed-hero recovery / revival flow
 - `FEATURE_QUEST_GIVERS.md` — quest-giver NPCs handing out side-quests
 - `FEATURE_SIDEQUEST_BACKFILL.md` — backfilling the discoverable side-quest pool
+- `QUEST_CHAINING_PLAN.md`: quest chaining, continue with your party after campaign completion (decided: linked-save handoff first, same-world sequels as the end goal)
+- `SIDEQUEST_UX_PLAN.md`: side-quest objective clarity and a Journal side-quest tab (issues #41/#42)
 - `RAG_GRAPH_ENHANCEMENT_PLAN.md` — graph-enhanced RAG (proposed)
 - `TERRAIN_ROADMAP.md` — experimental layered/noise terrain (debug-only)
 - `GUEST_MODE_PLAN.md` — guest mode (core shipped; conversion-prompt follow-up open)
