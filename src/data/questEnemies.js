@@ -828,11 +828,19 @@ export const QUEST_ENEMIES = {
         theme: 'heroic-fantasy',
         encounterTier: 'boss',
         difficulty: 'deadly',
-        dc: 20, // #43-style pin: sim-validated band for a levelled 3-hero party
+        // #53 retune: aligned to the t3 flagship's inline Elder Wyrm block (same
+        // monster; the old registry profile, HP 350 / 3d6+3 fail, simmed 18% win
+        // / 65% tpk). Sim-validated (balanceSim, 3000 trials, seed 1, lint band
+        // semantics: 3-hero Fighter/Wizard/Cleric party, mid loadout, Lv 6 = t3
+        // band midpoint):
+        //   mid  Lv6: win 44.3% | tpk  6.8% | stalemate 8.1%  (band 30-90 / <=25 / <=45)
+        //   best Lv6: win 96.7% | none Lv6: win 10.8%
+        //   mid  Lv5: win 38.0% (tpk 18.4%) | mid Lv7: win 64.4% | 4-hero mid Lv6: 60.6%
+        dc: 20,
         multiRound: true,
-        enemyHP: 350,
+        enemyHP: 320,
         dealsDamage: true,
-        damage: { criticalFailure: '6d6+6', failure: '3d6+3', success: '1d6' },
+        damage: { criticalFailure: '5d8+5', failure: '2d6+2', success: '1d6' },
         suggestedActions: [
             { label: 'Charge', skill: 'Athletics', description: 'Close in beneath the wyrm\'s wings' },
             { label: 'Find the Old Wound', skill: 'Investigation', description: 'Strike where an ancient lance once pierced' },
@@ -855,11 +863,18 @@ export const QUEST_ENEMIES = {
         theme: 'heroic-fantasy',
         encounterTier: 'boss',
         difficulty: 'deadly',
-        dc: 20, // #43-style pin: sim-validated band for a levelled 3-hero party
+        // #53 retune: failure damage softened 2d8+2 -> 2d6+2 (the old profile
+        // simmed 43.5% win but 20.9% tpk at Lv6 and 40.5% tpk at Lv5).
+        // Sim-validated (balanceSim, 3000 trials, seed 1, lint band semantics:
+        // 3-hero Fighter/Wizard/Cleric party, mid loadout, Lv 6 = t3 band midpoint):
+        //   mid  Lv6: win 50.2% | tpk  6.6% | stalemate 8.6%  (band 30-90 / <=25 / <=45)
+        //   best Lv6: win 97.3% | none Lv6: win 13.6%
+        //   mid  Lv5: win 44.5% (tpk 18.6%) | mid Lv7: win 70.7% | 4-hero mid Lv6: 67.9%
+        dc: 20,
         multiRound: true,
         enemyHP: 320,
         dealsDamage: true,
-        damage: { criticalFailure: '6d6+6', failure: '2d8+2', success: '1d6' },
+        damage: { criticalFailure: '6d6+6', failure: '2d6+2', success: '1d6' },
         suggestedActions: [
             { label: 'Strike the Joints', skill: 'Athletics', description: 'Hammer the molten seams in its stone hide' },
             { label: 'Quench It', skill: 'Survival', description: 'Drive it toward water to crust its fire' },
@@ -882,11 +897,18 @@ export const QUEST_ENEMIES = {
         theme: 'grimdark-survival',
         encounterTier: 'boss',
         difficulty: 'deadly',
-        dc: 20, // #43-style pin: sim-validated band for a levelled 3-hero party
+        // #53 retune: failure damage softened 2d8+2 -> 2d6+2 (the old profile
+        // simmed 39.8% win, just under the 40-60 aim). Sim-validated (balanceSim,
+        // 3000 trials, seed 1, lint band semantics: 3-hero Fighter/Wizard/Cleric
+        // party, mid loadout, Lv 6 = t3 band midpoint):
+        //   mid  Lv6: win 45.4% | tpk  5.0% | stalemate 13.0%  (band 30-90 / <=25 / <=45)
+        //   best Lv6: win 94.9% | none Lv6: win 13.1%
+        //   mid  Lv5: win 41.3% (tpk 14.5%) | mid Lv7: win 63.8% | 4-hero mid Lv6: 60.8%
+        dc: 20,
         multiRound: true,
         enemyHP: 300,
         dealsDamage: true,
-        damage: { criticalFailure: '5d8+5', failure: '2d8+2', success: '1d6' },
+        damage: { criticalFailure: '5d8+5', failure: '2d6+2', success: '1d6' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Shatter the corpse-king\'s ancient armor' },
             { label: 'Break the Crown', skill: 'Investigation', description: 'The crown, not the king, refuses to die' },
@@ -909,7 +931,14 @@ export const QUEST_ENEMIES = {
         theme: 'arcane-renaissance',
         encounterTier: 'boss',
         difficulty: 'deadly',
-        dc: 19, // #43-style pin: sim-validated band for a levelled 3-hero party
+        // #53 retune: dc pin raised 19 -> 20 (at dc 19 it simmed 69.4% win, above
+        // the 40-60 side-quest-boss aim). Sim-validated (balanceSim, 3000 trials,
+        // seed 1, lint band semantics: 3-hero Fighter/Wizard/Cleric party, mid
+        // loadout, Lv 6 = t3 band midpoint):
+        //   mid  Lv6: win 54.0% | tpk  1.1% | stalemate 8.0%  (band 30-90 / <=25 / <=45)
+        //   best Lv6: win 97.3% | none Lv6: win 17.6%
+        //   mid  Lv5: win 49.4% (tpk 6.3%) | mid Lv7: win 71.7% | 4-hero mid Lv6: 67.9%
+        dc: 20,
         multiRound: true,
         enemyHP: 280,
         dealsDamage: true,
@@ -936,11 +965,20 @@ export const QUEST_ENEMIES = {
         theme: 'eldritch-horror',
         encounterTier: 'boss',
         difficulty: 'deadly',
-        dc: 19, // #43-style pin: biggest t3 HP pool, so the DC gives it back
+        // #53 retune: crit-fail damage softened 5d8+5 -> 4d8+4 (the old profile
+        // simmed 52.0% win but 33.2% tpk over the 25-round grind of the biggest
+        // t3 HP pool; dc 19 keeps giving the HP back). Deliberately the scariest
+        // t3: attempt at Lv 6+, mid Lv5 tpk is 44.6%. Sim-validated (balanceSim,
+        // 3000 trials, seed 1, lint band semantics: 3-hero Fighter/Wizard/Cleric
+        // party, mid loadout, Lv 6 = t3 band midpoint):
+        //   mid  Lv6: win 58.5% | tpk 23.6% | stalemate 4.6%  (band 30-90 / <=25 / <=45)
+        //   best Lv6: win 99.6% | none Lv6: win 8.1%
+        //   mid  Lv5: win 44.8% (tpk 44.6%) | mid Lv7: win 81.3% | 4-hero mid Lv6: 79.4%
+        dc: 19,
         multiRound: true,
         enemyHP: 400,
         dealsDamage: true,
-        damage: { criticalFailure: '5d8+5', failure: '2d6+2', success: '1d6' },
+        damage: { criticalFailure: '4d8+4', failure: '2d6+2', success: '1d6' },
         suggestedActions: [
             { label: 'Strike', skill: 'Athletics', description: 'Attack the vast shape while it is still waking' },
             { label: 'Complete the Rite', skill: 'Arcana', description: 'Finish the sealing rite the ancients left undone' },

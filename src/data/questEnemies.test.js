@@ -122,3 +122,45 @@ describe('tier legend bands (file header)', () => {
     });
   });
 });
+
+// #53 t3 retune pins — STATIC guards only (no sims in CI; the numbers below were
+// measured once with balanceSim under the lint band semantics: 3000 trials, seed 1,
+// 3-hero Fighter/Wizard/Cleric mid-gear party at Lv 6, the t3 band midpoint. All
+// five sim win 44-59% / tpk <= 23.6% / stalemate <= 13% — see the per-entry
+// comments in questEnemies.js). These tests pin the tuned constants so a profile
+// regression can't silently undo the retune.
+describe('#53 t3 retune pins (static, no sims)', () => {
+  const T3_HP_BAND = [250, 400];
+  const T3_DC_BAND = [18, 21];
+  // Mean of an NdS+B dice expression.
+  const mean = (dice) => {
+    const [, n, sides, bonus] = dice.match(/^(\d+)d(\d+)(?:\+(\d+))?$/);
+    return Number(n) * (Number(sides) + 1) / 2 + Number(bonus || 0);
+  };
+
+  test('elder_wyrm matches the flagship-validated inline profile (same monster)', () => {
+    // The t3 flagship campaign's inline Elder Wyrm block was hand-tuned to the
+    // healthy band (44.3% win / 6.8% tpk at 3-hero mid Lv6); the registry copy
+    // must stay aligned with it.
+    const e = QUEST_ENEMIES.elder_wyrm;
+    expect(e.dc).toBe(20);
+    expect(e.enemyHP).toBe(320);
+    expect(e.damage).toEqual({ criticalFailure: '5d8+5', failure: '2d6+2', success: '1d6' });
+  });
+
+  test.each(getEnemiesByTier(3).map((e) => [e.id, e]))('%s static profile inside the tuned t3 envelope', (id, e) => {
+    // DC pin inside the levelled-party band.
+    expect(e.dc).toBeGreaterThanOrEqual(T3_DC_BAND[0]);
+    expect(e.dc).toBeLessThanOrEqual(T3_DC_BAND[1]);
+    // HP inside the documented t3 band.
+    expect(e.enemyHP).toBeGreaterThanOrEqual(T3_HP_BAND[0]);
+    expect(e.enemyHP).toBeLessThanOrEqual(T3_HP_BAND[1]);
+    // Damage dice parseable, and the grind damage capped at the tuned ceilings:
+    // per-round failure damage is what drove the pre-#53 TPK rates (elder_wyrm's
+    // old 3d6+3 fail simmed 65% tpk), so failure mean must stay <= 2d6+2 (9) and
+    // crit-fail mean <= 5d8+5 (27.5), the hottest profile that still sims healthy.
+    ['criticalFailure', 'failure', 'success'].forEach((k) => expect(e.damage[k]).toMatch(DICE));
+    expect(mean(e.damage.failure)).toBeLessThanOrEqual(mean('2d6+2'));
+    expect(mean(e.damage.criticalFailure)).toBeLessThanOrEqual(mean('5d8+5'));
+  });
+});
