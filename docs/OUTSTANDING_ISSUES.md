@@ -35,7 +35,7 @@ Source audits: roadmap survey (2026-04-19), auth verification (2026-04-19), docs
 
 | # | Issue | Source | Size | Decision |
 |---|---|---|---|---|
-| 8 | **AI loot narration.** Encounter rewards applied silently ("+50 XP, +12 gold" text). Phase 4 deferred. AI should narrate discovery. *(Re-scoped 2026-07-03 audit: combat narration is deliberately zero-LLM — see the #33 note — so this must be a post-encounter beat, either an AI call after resolution or a richer local template, not in-combat AI narration.)* | [ENCOUNTER_SYSTEM.md](ENCOUNTER_SYSTEM.md) Phase 4 | M | |
+| 8 | **Richer loot line (de-scoped 2026-07-04: NO AI narration — not worthwhile).** Keep rewards deterministic and instant; just upgrade the flat "+50 XP, +12 gold" system line to a nicer templated sentence (localNarrator-style, item names with rarity color). Low priority polish. | ENCOUNTER_SYSTEM Phase 4 → maintainer de-scope | XS | Low |
 | 9 | **AI image tiles for world map.** Phase 1: 7 easy tiles (features + towns, no edge-matching). Prompts written in [IMAGE_GENERATION_PROMPTS.md](IMAGE_GENERATION_PROMPTS.md); generation not run. | [TERRAIN_ROADMAP.md](TERRAIN_ROADMAP.md) | M (generation + wiring) | |
 | 11 | **Automated CF Worker deploy.** Frontend auto-deploys via Pages; Worker deploy is manual (`wrangler deploy`). Needs `.github/workflows/deploy.yml` + post-deploy smoke test. | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) §5 | S-M | |
 | 12 | **Rate limiting on Worker.** No throttling on `/api/ai`, `/api/db/*`, `/api/embed`. Any authed user can spam. | [DEPLOYMENT_ARCHITECTURE.md](DEPLOYMENT_ARCHITECTURE.md) §5, [LOCAL_RAG_PLAN.md](LOCAL_RAG_PLAN.md) Q6 | S-M | |
