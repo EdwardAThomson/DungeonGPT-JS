@@ -22,13 +22,47 @@
 
 | # | Decision | Recommendation in this doc |
 |---|---|---|
-| D1 | Source of truth for premium | Per-game `user_entitlements` table in the game data Postgres (Hyperdrive), **not** a hub JWT claim |
+| D1 | Source of truth for premium | Per-game `user_entitlements` table in the game data Postgres (Hyperdrive), **not** a hub JWT claim. **2026-07-03 amendment:** the maintainer intends cross-game benefits ("unlocks in other games on octonion.io"), which tilts this toward an **account-level subscription tier at the hub** with per-game feature **mapping** (see the tier ladder below). Under discussion — whatever Phase 1 builds, keep the table **account-scoped and game-agnostic** (tier, not per-game flags) so it can be hoisted to the hub without migration |
 | D2 | Billing provider | **Lemon Squeezy** (merchant of record; already named in backlog #6) |
 | D3 | Product shape at launch | Simple monthly subscription; optional one-time lifetime "Founder" unlock alongside it |
 | D4 | Premium bundle at launch | Desert/snow campaigns + premium Narrative Styles + premium loot cap lift + (when #7 lands) OpenRouter models. Confirm exact list |
 | D5 | Downgrade behavior for existing saves | Gate **creation**, never brick existing saves (a desert campaign started while premium stays playable) |
 | D6 | Usage metering sequencing | Premium stays **binary** first; `ai_usage_events`/credit ledger deferred to a later phase (see §7) |
 | D7 | Pricing, trial, grandfathering | Open questions in §10; needed before Phase 2 (billing), not before Phase 1 |
+
+---
+
+## Tier ladder (maintainer's note, folded in 2026-07-03)
+
+The maintainer's target ladder (from `premium_ideas.txt`, now absorbed here), with two
+amendments agreed on fold-in. **Launch scope remains Free + Members** per this plan's
+phasing; Premium/Elite are the published roadmap and open when their content exists.
+
+- **Guest (free):** heroes/saves browser-local only. *(Already how the game works.)*
+- **Free Account:** heroes/saves in the remote database (cross-device sync — the signup
+  carrot); pooled CF Workers AI credits (rate-limited, "while CF offers it");
+  cross-game account via octonion.io.
+  **Amendment (2026-07-03): NO max-level cap.** The earlier decision stands ("gate the
+  starting point, not the max level"): free tier is bounded by CONTENT — t1/t2 campaigns
+  (which naturally top out ~Lv 4-5) — never by an XP wall.
+- **Members ($5/m):** premium AI pool access; sand/snow maps + their music; custom quests
+  with **rare** items (the existing rarity tier-gate wired to account tier in the quest
+  builder's item picker); higher-tier campaign content; more unlocks in other
+  octonion.io games.
+- **Premium ($10/m):** greater share of the premium AI pool (requires the usage
+  metering/ledger phase — the expensive line); new map types (sea-heavy + ships, depends
+  on FEATURE_FAST_TRAVEL); bigger world maps (generateMapData already parameterized);
+  custom quests with **very rare** items; unlock starting level / Lv-3 templates;
+  player housing (unbuilt — roadmap only); more cross-game unlocks.
+- **Elite ($20/m):** highest AI share; better ships/mounts; biggest maps; custom quests
+  with **legendary** items; Lv-5 starting templates; bigger housing.
+  **Note:** Elite is currently backed almost entirely by unbuilt features — do not sell
+  until the content exists.
+
+Cheapest-to-ship differentiators (reuse existing machinery): remote saves (exists),
+sand/snow + music (gated), rarity-tiered custom quest items (rarity gate exists),
+tiered campaign content (templates already tiered). Most expensive: tier-differentiated
+AI limits (needs #6's ledger) and all new-content promises (ships, housing, bigger maps).
 
 ---
 
