@@ -1,6 +1,7 @@
 import React, { useContext, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { getAvailableModels, DEFAULT_MODELS } from '../llm/llm_constants';
+import { getStepHint, formatStepProgress, isQuestReadyToTurnIn } from '../game/questHints';
 import ApiKeysContext from '../contexts/ApiKeysContext';
 import SettingsContext from '../contexts/SettingsContext';
 import { useModal } from '../contexts/ModalContext';
@@ -242,7 +243,8 @@ export const StorySettingsModalContent = ({
   assistantModel, setAssistantModel,
   worldSeed
 }) => {
-  const [activeTab] = useState('story'); // always 'story' now; 'ai' branch retained but unused
+  // 'story' (campaign goal + milestones) | 'quests' (side quests); 'ai' branch retained but unused.
+  const [activeTab, setActiveTab] = useState('story');
   const [expandedQuests, setExpandedQuests] = useState({});
   const { apiKeys, setApiKeys } = useContext(ApiKeysContext);
   const AVAILABLE_MODELS = getAvailableModels();
@@ -268,8 +270,34 @@ export const StorySettingsModalContent = ({
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content settings-modal-refined" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '900px', width: '95%', maxHeight: '90vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: '20px 20px 10px 20px', borderBottom: '1px solid var(--border)' }}>
-          <h2 style={{ margin: 0, color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>📖 Journal</h2>
+        <div style={{ padding: '20px 20px 0 20px', borderBottom: '1px solid var(--border)' }}>
+          <h2 style={{ margin: '0 0 10px 0', color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>📖 Journal</h2>
+          <div role="tablist" aria-label="Journal sections" style={{ display: 'flex', gap: 6 }}>
+            {[
+              { id: 'story', label: '📜 Campaign' },
+              { id: 'quests', label: `🗺️ Side Quests (${(settings.sideQuests || []).filter(q => q.status === 'active').length})` }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '8px 14px',
+                  background: 'none',
+                  border: 'none',
+                  borderBottom: activeTab === tab.id ? '3px solid var(--primary)' : '3px solid transparent',
+                  color: activeTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: 'var(--header-font)'
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
@@ -424,41 +452,64 @@ export const StorySettingsModalContent = ({
                 </p>
               </div>
 
-              {/* Side Quests — accepted (active/completed) optional quests, as expandable stubs */}
-              {settings.sideQuests && settings.sideQuests.some(q => q.status !== 'available') && (
-                <div className="modal-section" style={{ marginTop: '20px' }}>
-                  <h3 style={{ margin: '0 0 12px 0', fontSize: '1.05rem', color: 'var(--primary)', fontFamily: 'var(--header-font)', textTransform: 'uppercase', letterSpacing: '1px' }}>📜 Side Quests</h3>
-                  {settings.sideQuests.filter(q => q.status !== 'available').map(q => {
-                    const total = q.milestones.length;
-                    const done = q.milestones.filter(m => m.completed).length;
-                    const expanded = !!expandedQuests[q.id];
-                    return (
-                      <div key={q.id} style={{ border: '1px solid var(--border)', borderRadius: '8px', marginBottom: '8px', background: 'var(--bg)' }}>
-                        <button
-                          onClick={() => setExpandedQuests(p => ({ ...p, [q.id]: !p[q.id] }))}
-                          style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text)' }}
-                        >
-                          <span style={{ fontWeight: 700, textDecoration: q.status === 'completed' ? 'line-through' : 'none', opacity: q.status === 'completed' ? 0.7 : 1 }}>
-                            {q.status === 'completed' ? '✓ ' : ''}{q.title}
-                          </span>
-                          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{done}/{total} {expanded ? '▲' : '▼'}</span>
-                        </button>
-                        {expanded && (
-                          <div style={{ padding: '0 14px 12px' }}>
-                            <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: '0 0 8px' }}>{q.description}</p>
-                            {q.milestones.map(m => (
-                              <div key={m.id} style={{ fontSize: '0.95rem', color: m.completed ? 'var(--text-secondary)' : 'var(--text)', textDecoration: m.completed ? 'line-through' : 'none' }}>
-                                {m.completed ? '✓' : '•'} {m.text}
+            </>
+          ) : activeTab === 'quests' ? (
+            <>
+              {/* Side Quests tab — accepted quests with per-step progress + derived how/where
+                  hints (questHints), sorted ready-to-turn-in → active → completed. */}
+              {(() => {
+                const accepted = (settings.sideQuests || []).filter(q => q.status !== 'available');
+                if (accepted.length === 0) {
+                  return (
+                    <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center', marginTop: '30px' }}>
+                      No side quests yet. Keep exploring — rumours travel, and folk in taverns and town halls have work for capable hands.
+                    </p>
+                  );
+                }
+                const rank = (q) => (isQuestReadyToTurnIn(q) ? 0 : q.status === 'active' ? 1 : 2);
+                const sorted = [...accepted].sort((a, b) => rank(a) - rank(b));
+                return sorted.map(q => {
+                  const total = q.milestones.length;
+                  const done = q.milestones.filter(m => m.completed).length;
+                  const ready = isQuestReadyToTurnIn(q);
+                  const expanded = !!expandedQuests[q.id];
+                  return (
+                    <div key={q.id} style={{ border: `1px solid ${ready ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '8px', marginBottom: '8px', background: 'var(--bg)' }}>
+                      <button
+                        onClick={() => setExpandedQuests(p => ({ ...p, [q.id]: !p[q.id] }))}
+                        style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text)' }}
+                      >
+                        <span style={{ fontWeight: 700, textDecoration: q.status === 'completed' ? 'line-through' : 'none', opacity: q.status === 'completed' ? 0.7 : 1 }}>
+                          {q.status === 'completed' ? '✓ ' : ''}{q.title}
+                        </span>
+                        <span style={{ fontSize: '0.85rem', color: ready ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: ready ? 700 : 400 }}>
+                          {ready ? '✅ Ready to turn in' : `${done}/${total}`} {expanded ? '▲' : '▼'}
+                        </span>
+                      </button>
+                      {expanded && (
+                        <div style={{ padding: '0 14px 12px' }}>
+                          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: '0 0 8px' }}>{q.description}</p>
+                          {q.milestones.map(m => {
+                            const hint = getStepHint(m, q);
+                            return (
+                              <div key={m.id} style={{ marginBottom: '6px' }}>
+                                <div style={{ fontSize: '0.95rem', color: m.completed ? 'var(--text-secondary)' : 'var(--text)', textDecoration: m.completed ? 'line-through' : 'none' }}>
+                                  {m.completed ? '✓' : '•'} {m.text}{formatStepProgress(m)}
+                                </div>
+                                {hint && (
+                                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', opacity: 0.85, marginLeft: '16px' }}>
+                                    {hint}
+                                  </div>
+                                )}
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </>
           ) : (
             <>

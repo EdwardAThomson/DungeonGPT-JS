@@ -34,6 +34,7 @@ export const RUINS_ENCOUNTERS = {
     description: 'A spectral figure materializes among the ruins, its hollow eyes fixing upon you!',
     image: '/assets/encounters/ruin_ghost.webp',
     difficulty: 'hard',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 40,
     suggestedActions: [
@@ -67,6 +68,11 @@ export const RUINS_ENCOUNTERS = {
       { label: 'Dispel Magic', skill: 'Arcana', description: 'Remove magical protections' },
       { label: 'Leave It', skill: null, description: 'The vault is too risky' }
     ],
+    // legendary_weapon: this is its ONLY drop path, and legendary rarity is tier-gated
+    // to Tier 3+ by encounterResolver's filterDropsByTier. Campaign templates currently
+    // top out at Tier 2, so the item is INTENTIONALLY unobtainable today (issue #49,
+    // known gap): it becomes live automatically when T3 campaigns ship. Do not "fix" by
+    // downgrading the gate or adding a lower-tier path.
     rewards: { xp: 90, gold: '5d20', items: ['ancient_gold:80%', 'magic_scroll:50%', 'legendary_weapon:15%'] },
     consequences: {
       criticalSuccess: 'The vault opens to reveal untouched treasure from the ancient era.',
@@ -84,6 +90,7 @@ export const RUINS_ENCOUNTERS = {
     description: 'Hooded figures chant around a glowing altar in the ruins - you\'ve stumbled upon a dark ritual!',
     image: '/assets/encounters/ruin_cultists.webp',
     difficulty: 'hard',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 60,
     suggestedActions: [

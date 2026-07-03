@@ -110,5 +110,5 @@ Two strictly separated layers — keep them separate:
 ## Conventions
 
 - Contributions require DCO sign-off (`git commit -s`) and signed commits (see `CONTRIBUTING.md`).
-- Retired docs move to `docs/archive/` rather than being deleted.
+- Retired docs move to `docs/archive/` rather than being deleted. Business-sensitive planning docs (pricing, monetization strategy, revenue) go in `docs/private/` — both are gitignored, local-only. Technical design docs stay public.
 - Styling is feature-based modular CSS under `src/styles/`; modals go through `src/contexts/ModalContext.js` + `ModalShell.js` (migration from boolean modal state is in progress).

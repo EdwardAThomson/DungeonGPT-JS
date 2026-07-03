@@ -31,12 +31,14 @@ import BuildingSearchTest from './BuildingSearchTest';
 import ImageGenDebug from './ImageGenDebug';
 import SummarizationTest from './SummarizationTest';
 import RagTest from './RagTest';
+import PremiumPage from './PremiumPage';
 
 const sectionIcons = {
   'Terrain & Maps': '🗺️',
   'Encounters': '⚔️',
   'Game Systems': '🎲',
   'Backend & AI': '🔧',
+  'Draft Pages': '📄',
 };
 
 const debugSections = [
@@ -90,6 +92,12 @@ const debugSections = [
       { to: 'image-gen', label: 'Image Generation' },
       { to: 'summarization-test', label: 'Summarization A/B Test' },
       { to: 'rag-test', label: 'RAG Test' },
+    ],
+  },
+  {
+    title: 'Draft Pages',
+    links: [
+      { to: 'premium', label: 'Premium Page (draft)' },
     ],
   },
 ];
@@ -226,6 +234,7 @@ const DebugRoutes = () => {
           <Route path="image-gen" element={<ImageGenDebug />} />
           <Route path="summarization-test" element={<SummarizationTest />} />
           <Route path="rag-test" element={<RagTest />} />
+          <Route path="premium" element={<PremiumPage />} />
           <Route path="*" element={<Navigate to="/debug" replace />} />
         </Routes>
       </section>

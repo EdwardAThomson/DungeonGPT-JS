@@ -162,7 +162,7 @@ export const WILDERNESS_ENCOUNTERS = {
       { label: 'Dig Around', skill: 'Athletics', description: 'Excavate the area thoroughly' },
       { label: 'Ignore', skill: null, description: 'Keep moving - could be trouble' }
     ],
-    rewards: { xp: 25, gold: '3d10', items: ['gemstone:50%', 'gold_coins:60%', 'magic_item:15%', 'cursed_item:10%'] },
+    rewards: { xp: 25, gold: '3d10', items: ['raw_gems:40%', 'rare_gem:10%', 'gold_coins:60%', 'magic_item:15%', 'cursed_item:10%'] },
     consequences: {
       criticalSuccess: 'You discover a hidden cache of treasure - gold, gems, and a magical item!',
       success: 'You find a modest amount of coin and valuables.',

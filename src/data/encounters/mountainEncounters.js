@@ -34,6 +34,7 @@ export const MOUNTAIN_ENCOUNTERS = {
     description: 'A dragon emerges from its mountain lair, ancient and terrible, demanding tribute or combat!',
     image: '/assets/encounters/mountain_dragon.webp',
     difficulty: 'deadly',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 120,
     suggestedActions: [
@@ -42,7 +43,11 @@ export const MOUNTAIN_ENCOUNTERS = {
       { label: 'Flee', skill: 'Athletics', description: 'Run for your lives' },
       { label: 'Riddle', skill: 'Intelligence', description: 'Challenge it to a battle of wits' }
     ],
-    rewards: { xp: 200, gold: '20d20', items: ['dragon_scale:80%', 'dragon_gold:90%', 'legendary_artifact:25%', 'dragon_egg:5%'] },
+    // dragonscale_plate (very_rare, +4 def): its ONLY drop path. Thematically the lair
+    // is where dragon-scale armour comes from, and this deadly encounter is the hardest
+    // non-boss fight in the game. encounterResolver's filterDropsByTier strips very_rare
+    // below Tier 2, so it cannot drop during Tier 1 play even if the 20% roll hits.
+    rewards: { xp: 200, gold: '20d20', items: ['dragon_scale:80%', 'dragon_gold:90%', 'legendary_artifact:25%', 'dragon_egg:5%', 'dragonscale_plate:20%'] },
     consequences: {
       criticalSuccess: 'You slay or outsmart the dragon and claim its hoard!',
       success: 'You survive the encounter and escape with some treasure.',

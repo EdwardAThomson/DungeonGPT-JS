@@ -1,0 +1,270 @@
+/*
+ * Premium benefits page (tier comparison).
+ * Font usage: inherits theme fonts via --header-font from src/index.css.
+ * Draft page, currently mounted at /debug/premium; future home is a public
+ * /premium route once billing ships.
+ */
+
+.premium-container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  color: var(--text);
+}
+
+.premium-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.premium-header h1 {
+  font-family: var(--header-font);
+  color: var(--primary);
+  margin-bottom: 8px;
+}
+
+.premium-tagline {
+  color: var(--text-muted, #888);
+  max-width: 640px;
+  margin: 0 auto 32px;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+
+/* --- Tier grid --- */
+
+.premium-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 48px;
+}
+
+.premium-tier-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background-color: var(--surface);
+  padding: 20px 16px;
+  position: relative;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.premium-tier-card:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 10px var(--shadow);
+}
+
+/* Members: the purchasable highlight */
+.premium-tier-card.highlight {
+  border: 2px solid var(--primary);
+  box-shadow: 0 4px 18px var(--shadow);
+}
+
+/* Premium / Elite: roadmap only, visually dimmed and not purchasable */
+.premium-tier-card.roadmap {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.premium-tier-card.roadmap:hover {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.premium-tier-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  color: var(--text-muted, #888);
+}
+
+.premium-tier-card.highlight .premium-tier-badge {
+  background-color: var(--primary);
+  border-color: var(--primary);
+  color: var(--surface);
+}
+
+.premium-tier-name {
+  font-family: var(--header-font);
+  font-size: 1.2rem;
+  color: var(--text);
+  margin: 6px 0 2px;
+  text-align: center;
+}
+
+.premium-tier-card.highlight .premium-tier-name {
+  color: var(--primary);
+}
+
+.premium-tier-price {
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.premium-tier-price .amount {
+  font-family: var(--header-font);
+  font-size: 1.6rem;
+  color: var(--text);
+}
+
+.premium-tier-price .period {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+}
+
+.premium-tier-summary {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+  min-height: 2.4em;
+  margin: 0 0 12px;
+  line-height: 1.35;
+}
+
+.premium-tier-benefits {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+  flex-grow: 1;
+}
+
+.premium-tier-benefits li {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  padding: 6px 0 6px 22px;
+  position: relative;
+  border-bottom: 1px solid var(--border);
+}
+
+.premium-tier-benefits li:last-child {
+  border-bottom: none;
+}
+
+.premium-tier-benefits li::before {
+  content: '\2726'; /* four-pointed star */
+  position: absolute;
+  left: 2px;
+  color: var(--primary);
+  font-size: 0.8rem;
+}
+
+.premium-tier-card.roadmap .premium-tier-benefits li::before {
+  color: var(--text-muted, #888);
+}
+
+/* --- CTA buttons --- */
+
+.premium-cta {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-family: var(--header-font);
+  font-size: 0.95rem;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.premium-cta.primary-cta {
+  background-color: var(--primary);
+  color: var(--surface);
+  border: 1px solid var(--primary);
+  cursor: not-allowed; /* placeholder: no billing wired yet */
+  opacity: 0.85;
+}
+
+.premium-cta.secondary-cta {
+  background-color: transparent;
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.premium-cta.secondary-cta:hover {
+  background-color: var(--primary-tint-10, rgba(212, 175, 55, 0.1));
+}
+
+.premium-cta.disabled-cta {
+  background-color: transparent;
+  color: var(--text-muted, #888);
+  border: 1px dashed var(--border);
+  cursor: not-allowed;
+}
+
+.premium-cta.none-cta {
+  border: 1px solid transparent;
+  color: var(--text-muted, #888);
+}
+
+/* --- FAQ --- */
+
+.premium-faq {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.premium-faq h2 {
+  font-family: var(--header-font);
+  color: var(--primary);
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.premium-faq-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--surface);
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+
+.premium-faq-item h3 {
+  font-family: var(--header-font);
+  font-size: 1rem;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.premium-faq-item p {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--text-muted, #888);
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 1024px) {
+  .premium-tier-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Keep the highlighted Members card full width when the grid wraps */
+  .premium-tier-card.highlight {
+    grid-column: span 2;
+    order: -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .premium-tier-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .premium-tier-card.highlight {
+    grid-column: auto;
+  }
+}

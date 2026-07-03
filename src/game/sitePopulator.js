@@ -36,17 +36,21 @@ const combatPool = (type) => {
 };
 
 // Themed loot item keys (catalog keys from inventorySystem). Kept modest; the hoard slot
-// adds a chance at something rarer.
-const LOOT = {
+// adds a chance at something rarer. Exported for questHints' derived "where do I find
+// this item?" text (read-only consumer).
+export const LOOT = {
   cave: ['cave_mushrooms', 'raw_gems', 'glowing_fungi', 'exposed_minerals', 'healing_potion', 'spider_silk'],
   ruins: ['ancient_scroll', 'salvaged_goods', 'history_tome', 'ritual_dagger', 'pearl', 'enchanted_trinket'],
   forest: ['healing_herbs', 'rare_flower', 'rare_herb', 'beast_hide', 'wolf_pelt', 'fairy_dust'],
   hills: ['mountain_herbs', 'exposed_minerals', 'wolf_fang', 'beast_hide', 'rare_ore', 'healing_herbs'],
   mountain: ['mountain_crystal', 'exposed_minerals', 'rare_ore', 'storm_crystal', 'bear_pelt'],
 };
-const HOARD_BONUS = {
+export const HOARD_BONUS = {
   cave: ['greater_healing_potion', 'magic_weapon', 'raw_gems'],
-  ruins: ['dark_tome', 'magic_item', 'ancient_scroll'],
+  // ring_protection (rare accessory): its ONLY acquisition path — a deep-vault prize
+  // fits ruins (ancient enchanted wares) and hoards are one slot per site, so it stays
+  // suitably scarce. Rare is within the Tier 1 rarity cap, so no tier gate needed.
+  ruins: ['dark_tome', 'magic_item', 'ancient_scroll', 'ring_protection'],
   // Beast country: Hide Armor is a wilderness-only sidegrade to shop-bought Studded Leather.
   forest: ['hide_armor', 'nature_charm', 'fey_charm'],
   hills: ['hide_armor', 'silver_dagger', 'mountain_crystal'],
@@ -124,12 +128,22 @@ const rollLoot = (type, rng, hoard) => {
  */
 export function populateSite(site, seed) {
   if (!site || site.populated) return site;
-  const type = site.type === 'ruins' ? 'ruins' : 'cave';
+  // Two SEPARATE pool keys (issue #49). Loot is themed per site type — forest/hills/
+  // mountain have their own LOOT/HOARD_BONUS tables — but authored combat encounters
+  // only exist for cave/ruins, so other site types legitimately borrow the cave mobs.
+  // These used to be one coerced value ("everything non-ruins is a cave"), which
+  // silently sent forest/hills/mountain sites to the CAVE loot tables: their own pools
+  // never rolled, making pool-exclusive items (e.g. hide_armor) unobtainable and the
+  // journal's derived source hints wrong. Going-forward-only fix: sites populated
+  // before this change are cached with `populated: true` and keep their cave-themed
+  // loot; never retro-mutate a cached site.
+  const lootType = LOOT[site.type] ? site.type : 'cave';
+  const combatType = site.type === 'ruins' ? 'ruins' : 'cave';
   const rng = seededRandom((Number.isFinite(seed) ? seed : 1) + 777);
   const slots = Array.isArray(site.contentSlots) ? site.contentSlots : [];
 
   if (slots.length > 0) {
-    const pool = combatPool(type);
+    const pool = combatPool(combatType);
     const entry = site.entryPoint || { x: 0, y: 0 };
     const dist = (p) => Math.abs(p.x - entry.x) + Math.abs(p.y - entry.y);
 
@@ -150,7 +164,7 @@ export function populateSite(site, seed) {
         const enc = clone(pool[Math.floor(rng() * pool.length)]);
         tile.content = { kind: 'encounter', encounter: enc, consumed: false };
       } else {
-        tile.content = { kind: 'loot', loot: rollLoot(type, rng, i === deepestIdx), consumed: false };
+        tile.content = { kind: 'loot', loot: rollLoot(lootType, rng, i === deepestIdx), consumed: false };
       }
     });
   }
@@ -161,7 +175,7 @@ export function populateSite(site, seed) {
   const depositCount = placeCrystalDeposits(site, rng);
 
   site.populated = true;
-  logger.info(`[SITE] Populated ${type} "${site.name}" with ${slots.length} content slots` +
+  logger.info(`[SITE] Populated ${site.type} "${site.name}" (loot: ${lootType}, mobs: ${combatType}) with ${slots.length} content slots` +
     (depositCount ? ` + ${depositCount} crystal deposits` : ''));
   return site;
 }

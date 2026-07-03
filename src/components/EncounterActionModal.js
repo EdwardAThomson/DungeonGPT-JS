@@ -1,7 +1,8 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { resolveEncounter } from '../utils/encounterResolver';
-import { createMultiRoundEncounter, resolveRound, getRoundActions, generateEncounterSummary } from '../utils/multiRoundEncounter';
+import { createMultiRoundEncounter, resolveRound, getRoundActions, generateEncounterSummary, heroSupportContribution } from '../utils/multiRoundEncounter';
 import { applyDamage, getHPStatus } from '../utils/healthSystem';
+import { effectiveActionModifier } from '../game/balanceSim';
 import SettingsContext from '../contexts/SettingsContext';
 import ClickableImage from './ClickableImage';
 import { useModal } from '../contexts/ModalContext';
@@ -37,6 +38,28 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
   const [roundResults, setRoundResults] = useState([]);
   const [currentRoundResult, setCurrentRoundResult] = useState(null);
 
+  // Suggest the hero with the highest effective modifier for this encounter as
+  // the default lead (Phase 5 auto-assignment; the player can override).
+  const suggestLeadIndex = (heroes, enc) => {
+    if (!Array.isArray(heroes) || heroes.length === 0) return 0;
+    let best = 0;
+    let bestMod = -Infinity;
+    heroes.forEach((hero, idx) => {
+      if (hero.currentHP <= 0 || hero.isDefeated) return;
+      const mod = Math.max(
+        ...(enc.suggestedActions || [])
+          .filter((a) => a.skill)
+          .map((a) => effectiveActionModifier(a, hero, enc)),
+        -Infinity
+      );
+      if (mod > bestMod) {
+        bestMod = mod;
+        best = idx;
+      }
+    });
+    return best;
+  };
+
   // Initialize state ONLY when modal opens with a NEW encounter
   useEffect(() => {
     if (isOpen && encounter) {
@@ -46,7 +69,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
         // New encounter - reset everything
         initializedEncounterRef.current = encounterId;
         setCurrentCharacter(character);
-        setSelectedHeroIndex(0);
+        setSelectedHeroIndex(party && party.length > 1 ? suggestLeadIndex(party, encounter) : 0);
         setInitiativeResult(null);
         setResult(null);
         setSelectedAction(null);
@@ -65,13 +88,13 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
             createMultiRoundEncounter(encounter, character, settings, {
               provider: selectedProvider,
               model: selectedModel
-            })
+            }, party && party.length > 0 ? party : [character])
           );
         } else if (!needsHeroSelection) {
           setIsMultiRound(false);
           setRoundState(null);
         } else {
-          // Multi-hero: wait for hero selection before initializing
+          // Multi-hero: wait for lead selection (Formation phase) before initializing
           setIsMultiRound(false);
           setRoundState(null);
         }
@@ -128,14 +151,15 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
     setHeroConfirmed(true);
     setShowHeroSelection(false);
 
-    // Initialize multi-round state if needed
+    // Initialize multi-round state if needed. #43: the WHOLE party enters the
+    // fight (Phase 5 Lead + Support) — the acting hero leads, the rest support.
     if (encounter.multiRound) {
       setIsMultiRound(true);
       setRoundState(
         createMultiRoundEncounter(encounter, actingHero, settings, {
           provider: selectedProvider,
           model: selectedModel
-        })
+        }, party && party.length > 0 ? party : [actingHero])
       );
     }
   };
@@ -151,23 +175,20 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
 
     try {
       if (isMultiRound && roundState) {
-        // Multi-round resolution
+        // Multi-round resolution. #43: resolveRound owns ALL combat bookkeeping —
+        // it applies incoming damage to the party (lead + crit-fail splash),
+        // auto-swaps a KO'd lead to the highest-HP living hero, and resolves a
+        // wipe as defeat — so the modal just syncs the resulting party state.
         const { roundResult, updatedState } = await resolveRound(roundState, action.label);
 
-        // Apply HP damage if any
-        if (roundResult.hpDamage > 0) {
-          const updatedChar = applyDamage(currentCharacter, roundResult.hpDamage);
-          setCurrentCharacter(updatedChar);
-          if (onCharacterUpdate) {
-            onCharacterUpdate(updatedChar);
-          }
-
-          // Hero defeated mid-fight — force encounter defeat
-          if (updatedChar.currentHP <= 0) {
-            updatedState.isResolved = true;
-            updatedState.outcome = 'defeat';
-          }
+        // Push every damaged hero's new HP up to the game state
+        if (roundResult.partyDamage && onCharacterUpdate) {
+          roundResult.partyDamage.forEach(({ heroIndex }) => {
+            onCharacterUpdate(updatedState.party[heroIndex]);
+          });
         }
+        // The displayed character follows the (possibly auto-swapped) lead
+        setCurrentCharacter(updatedState.party[updatedState.leadIndex]);
 
         setCurrentRoundResult(roundResult);
         // Store the round number from the history that was just added
@@ -282,10 +303,15 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
 
   const handleContinue = () => {
     if (onResolve) {
-      // Include which hero actually participated
+      // Include which hero led. Team summaries (#43) carry leadIndex /
+      // isTeamEncounter / supporterCount from generateEncounterSummary; the final
+      // lead may differ from the picked one after a KO auto-swap.
+      const leadHeroIndex = result?.isTeamEncounter
+        ? result.leadIndex
+        : (initiativeResult ? initiativeResult.actualHeroIndex : (party ? selectedHeroIndex : 0));
       const resultWithHero = {
         ...result,
-        heroIndex: initiativeResult ? initiativeResult.actualHeroIndex : (party ? selectedHeroIndex : 0)
+        heroIndex: leadHeroIndex
       };
       onResolve(resultWithHero);
     }
@@ -363,14 +389,19 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
             </div>
 
             <div className="hero-selection-section" style={{ marginTop: '10px' }}>
-              <h3 style={{ marginBottom: '8px' }}>Choose Your Champion</h3>
+              <h3 style={{ marginBottom: '8px' }}>Choose Your Lead</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '10px' }}>
-                Select hero to lead. (15% chance initiative fails)
+                {encounter.multiRound
+                  ? 'The lead acts and rolls each round; everyone else supports, adding their bonus to the roll. If the lead falls, the healthiest hero steps in. (15% chance initiative fails)'
+                  : 'Select hero to lead. (15% chance initiative fails)'}
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {party.map((hero, idx) => {
                   const defeated = hero.currentHP <= 0 || hero.isDefeated;
+                  const heroSupport = encounter.multiRound && !defeated
+                    ? heroSupportContribution(hero)
+                    : 0;
                   return (
                   <div
                     key={idx}
@@ -411,8 +442,13 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                           {defeated ? '💀 Defeated' : (hero.heroClass || hero.characterClass || '')}
                         </div>
                       </div>
-                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-                        HP: {Math.floor(hero.currentHP)}/{hero.maxHP} | Lvl {hero.level || hero.heroLevel || hero.characterLevel || 1}
+                      <div style={{ fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'right' }}>
+                        <div>HP: {Math.floor(hero.currentHP)}/{hero.maxHP} | Lvl {hero.level || hero.heroLevel || hero.characterLevel || 1}</div>
+                        {heroSupport > 0 && selectedHeroIndex !== idx && (
+                          <div style={{ fontSize: '12px', color: 'var(--state-success-strong)' }}>
+                            Supports: +{heroSupport} to the lead's roll
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -533,6 +569,37 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                 </div>
               )}
 
+              {/* Party support strip (#43 Lead + Support) */}
+              {isMultiRound && roundState && roundState.isTeamEncounter && (
+                <div className="encounter-party-strip" style={{
+                  display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center',
+                  margin: '6px 0', fontSize: '12px'
+                }}>
+                  {roundState.party.map((hero, idx) => {
+                    if (idx === roundState.leadIndex) return null;
+                    const down = hero.currentHP <= 0 || hero.isDefeated;
+                    return (
+                      <span key={idx} style={{
+                        padding: '2px 8px', borderRadius: '10px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--surface)',
+                        opacity: down ? 0.5 : 1
+                      }}>
+                        {hero.heroName || hero.characterName}{' '}
+                        {down
+                          ? '💀 down'
+                          : <>({Math.floor(hero.currentHP)}/{hero.maxHP} HP) supports +{heroSupportContribution(hero)}</>}
+                      </span>
+                    );
+                  })}
+                  {roundState.supportBonus > 0 && (
+                    <span style={{ color: 'var(--state-success-strong)', fontWeight: 'bold' }}>
+                      Party support: +{roundState.supportBonus} to every roll
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* Enemy HP Bar */}
               {isMultiRound && roundState && roundState.enemyMaxHP && (
                 <div className="encounter-hp-bar enemy-hp-bar">
@@ -588,11 +655,22 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                     <span className="dice-icon">🎲</span>
                     <span className="roll-total">{currentRoundResult.rollResult.total}</span>
                     <span className="roll-breakdown">
-                      (d20: {currentRoundResult.rollResult.naturalRoll} + modifier: {currentRoundResult.rollResult.modifier})
+                      (d20: {currentRoundResult.rollResult.naturalRoll}
+                      {' + modifier: '}{currentRoundResult.rollResult.modifier - (currentRoundResult.supportBonus || 0)}
+                      {currentRoundResult.supportBonus > 0 && <> + support: {currentRoundResult.supportBonus}</>})
                     </span>
                     <span className={getOutcomeBadgeClass(currentRoundResult.outcomeTier)} style={{ marginLeft: 'auto', marginBottom: '0' }}>
                       {getOutcomeLabel(currentRoundResult.outcomeTier)}
                     </span>
+                  </div>
+                )}
+
+                {currentRoundResult.leadSwap && (
+                  <div style={{
+                    padding: '10px', margin: '10px 0', background: 'var(--state-warning)',
+                    color: '#000', borderRadius: '4px', fontWeight: 'bold', textAlign: 'center'
+                  }}>
+                    💀 {currentRoundResult.leadSwap.downedHero} is down! {currentRoundResult.leadSwap.newLead} takes the lead!
                   </div>
                 )}
 
@@ -620,6 +698,15 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                       <h4>🩸 Damage Taken</h4>
                       <div className="damage-amount" style={{ color: 'var(--state-danger)' }}>{currentRoundResult.hpDamage} HP</div>
                       <p className="damage-description">The {encounter.name.toLowerCase()} strikes back!</p>
+                      {(currentRoundResult.partyDamage || []).some((d) => d.role === 'support') && (
+                        <p className="damage-description">
+                          The blow splashes into the party:{' '}
+                          {currentRoundResult.partyDamage
+                            .filter((d) => d.role === 'support')
+                            .map((d) => `${roundState.party[d.heroIndex]?.heroName || roundState.party[d.heroIndex]?.characterName || 'ally'} -${d.amount} HP`)
+                            .join(', ')}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -734,7 +821,9 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                   <span className="dice-icon">🎲</span>
                   <span className="roll-total">{result.rollResult.total}</span>
                   <span className="roll-breakdown">
-                    (d20: {result.rollResult.naturalRoll} + modifier: {result.rollResult.modifier})
+                    (d20: {result.rollResult.naturalRoll}
+                    {' + modifier: '}{result.rollResult.modifier - (result.supportBonus || 0)}
+                    {result.supportBonus > 0 && <> + support: {result.supportBonus}</>})
                   </span>
                   <span className={getOutcomeBadgeClass(result.outcomeTier)} style={{ marginLeft: 'auto', marginBottom: '0' }}>
                     {getOutcomeLabel(result.outcomeTier)}

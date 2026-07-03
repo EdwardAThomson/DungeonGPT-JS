@@ -1,22 +1,48 @@
 import { rollCheck } from './dice';
 import { calculateModifier, SKILLS } from './rules';
 import { DIFFICULTY_DC } from '../data/encounters';
-import { calculateDamage, shouldDealDamage, getDamageDescription } from './healthSystem';
+import {
+  calculateDamage,
+  encounterDealsDamage,
+  rollProfileDamage,
+  getDamageDescription
+} from './healthSystem';
 import { getEquippedBonuses } from '../game/equipment';
 import { filterDropsByTier } from './inventorySystem';
+import { getLevelBonus } from './progressionSystem';
 
 // Stats whose checks count as physical/combat (attack-style), so a weapon's
-// attack bonus applies. Hostile encounters also count regardless of skill.
+// attack bonus applies. Encounters that hit back (explicit `dealsDamage`, or the
+// deprecated keyword fallback for old data) also count regardless of skill.
 const PHYSICAL_STATS = ['Strength', 'Dexterity'];
 
 const isCombatAction = (statName, encounter) =>
-  PHYSICAL_STATS.includes(statName) || shouldDealDamage(encounter);
+  PHYSICAL_STATS.includes(statName) || encounterDealsDamage(encounter);
+
+/**
+ * The DC an encounter resolves against. Authored encounters may pin an exact
+ * numeric `dc` (the #43 boss retune uses this to hit the sim-validated 18-21
+ * band without inventing new difficulty labels); otherwise the difficulty
+ * label maps through DIFFICULTY_DC as before.
+ */
+export const encounterDC = (encounter) =>
+  Number.isFinite(encounter?.dc) ? encounter.dc : DIFFICULTY_DC[encounter?.difficulty];
 
 /**
  * Resolves an encounter based on player action and dice roll
  * Returns AI-narrated outcome with rewards/penalties
+ *
+ * @param {() => number} rng - optional 0..1 random source for loot/penalty rolls
+ *   (defaults to Math.random, so behavior is unchanged when omitted). Note the d20
+ *   check (dice.rollCheck) and HP damage variance (healthSystem.calculateDamage)
+ *   still read the global Math.random; a fully seeded run (balanceSim) swaps the
+ *   global for the duration of the simulation.
+ * @param {Object} context - optional extras (#43 Lead+Support):
+ *   context.supportBonus - deterministic party support added to the roll
+ *   (multiRoundEncounter computes it; surfaced on the result for the roll
+ *   breakdown so the UI can show "d20 + modifier + support").
  */
-export const resolveEncounter = async (encounter, playerAction, character, settings, llmConfig = {}) => {
+export const resolveEncounter = async (encounter, playerAction, character, settings, llmConfig = {}, rng = Math.random, context = {}) => {
   // 1. Determine relevant skill and modifier
   const action = encounter.suggestedActions.find(a => a.label === playerAction);
 
@@ -48,9 +74,17 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
     modifier += equipBonuses.attack;
   }
   modifier += equipBonuses.misc;
+  // Level term (#47 Option A): +1 per 2 levels, capped +3, on every check —
+  // levels previously granted ZERO roll power (stats freeze at creation).
+  // Applies retroactively (derived from level, not stored in saves).
+  modifier += getLevelBonus(character.level);
 
-  // 2. Roll the check
-  const rollResult = rollCheck(modifier);
+  // Lead + Support (#43): supporters add a deterministic bonus to the lead's roll.
+  const supportBonus = Number.isFinite(context?.supportBonus) ? context.supportBonus : 0;
+
+  // 2. Roll the check (rollResult.modifier includes the support bonus; the raw
+  // hero modifier is preserved separately for the roll-breakdown display).
+  const rollResult = rollCheck(modifier + supportBonus);
 
   // 3. Determine outcome tier
   let outcomeTier;
@@ -58,7 +92,7 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
     outcomeTier = 'criticalSuccess';
   } else if (rollResult.isCriticalFailure) {
     outcomeTier = 'criticalFailure';
-  } else if (rollResult.total >= DIFFICULTY_DC[encounter.difficulty]) {
+  } else if (rollResult.total >= encounterDC(encounter)) {
     outcomeTier = 'success';
   } else {
     outcomeTier = 'failure';
@@ -71,12 +105,16 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
   // This makes combat instant and eliminates API costs/latency
   const aiNarration = baseConsequence;
 
-  // 6. Calculate HP damage if hostile encounter
+  // 6. Calculate HP damage if the encounter hits back (#43: explicit `dealsDamage`
+  // flag with authored `damage` dice profiles; keyword fallback for old data, and
+  // the legacy percent-of-maxHP model for flagged encounters without a profile).
   let hpDamage = 0;
   let damageDescription = null;
 
-  if (shouldDealDamage(encounter) && character.maxHP) {
-    hpDamage = calculateDamage(outcomeTier, character.maxHP, encounter.difficulty);
+  if (encounterDealsDamage(encounter) && character.maxHP) {
+    hpDamage = encounter.damage
+      ? rollProfileDamage(encounter.damage, outcomeTier, rng)
+      : calculateDamage(outcomeTier, character.maxHP, encounter.difficulty);
     // Armour soaks a flat amount of incoming damage (never below zero).
     hpDamage = Math.max(0, hpDamage - equipBonuses.defense);
     damageDescription = getDamageDescription(hpDamage, character.maxHP);
@@ -86,7 +124,7 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
   // Loot rarity is gated by campaign tier (falls back to party level for older saves
   // that predate settings.tier). Prevents very_rare/legendary random drops at Tier 1.
   const lootCtx = { tier: settings?.tier, level: character?.level };
-  const outcome = applyConsequences(outcomeTier, encounter.rewards, rollResult, encounter, lootCtx);
+  const outcome = applyConsequences(outcomeTier, encounter.rewards, rollResult, encounter, lootCtx, rng);
 
   return {
     narration: aiNarration,
@@ -96,7 +134,9 @@ export const resolveEncounter = async (encounter, playerAction, character, setti
     penalties: clampPenaltyGold(outcome.penalties, character?.gold),
     affectedFactions: encounter.affectedFactions?.[outcomeTier] || null,
     hpDamage,
-    damageDescription
+    damageDescription,
+    // #43: surfaced for the roll-breakdown UI (0 when fighting solo).
+    supportBonus
   };
 };
 
@@ -121,7 +161,7 @@ export const clampPenaltyGold = (penalties, availableGold) => {
   return { ...penalties, goldLoss: clamped, messages };
 };
 
-const applyConsequences = (outcomeTier, rewards, rollResult, encounter, lootCtx) => {
+const applyConsequences = (outcomeTier, rewards, rollResult, encounter, lootCtx, rng = Math.random) => {
   const result = {
     rewards: null,
     penalties: null
@@ -129,17 +169,17 @@ const applyConsequences = (outcomeTier, rewards, rollResult, encounter, lootCtx)
 
   // Success tiers grant rewards
   if (outcomeTier === 'success' || outcomeTier === 'criticalSuccess') {
-    result.rewards = generateLoot(rewards, rollResult, outcomeTier, encounter, lootCtx);
+    result.rewards = generateLoot(rewards, rollResult, outcomeTier, encounter, lootCtx, rng);
   }
 
   // Failure tiers may still get healing from healer encounters
   if ((outcomeTier === 'failure' || outcomeTier === 'criticalFailure') && encounter?.healingByTier) {
-    result.rewards = generateLoot(rewards, rollResult, outcomeTier, encounter, lootCtx);
+    result.rewards = generateLoot(rewards, rollResult, outcomeTier, encounter, lootCtx, rng);
   }
 
   // Failure tiers may have penalties (context-aware)
   if (outcomeTier === 'failure' || outcomeTier === 'criticalFailure') {
-    result.penalties = determinePenalties(outcomeTier, encounter);
+    result.penalties = determinePenalties(outcomeTier, encounter, rng);
   }
 
   return result;
@@ -149,7 +189,7 @@ const applyConsequences = (outcomeTier, rewards, rollResult, encounter, lootCtx)
  * Determines appropriate penalties based on encounter type
  * Returns { messages: [], goldLoss: number, itemsLost: [] }
  */
-const determinePenalties = (outcomeTier, encounter) => {
+const determinePenalties = (outcomeTier, encounter, rng = Math.random) => {
   const isCritical = outcomeTier === 'criticalFailure';
 
   // Categorize encounters
@@ -172,11 +212,11 @@ const determinePenalties = (outcomeTier, encounter) => {
   if (isHostile) {
     if (isCritical) {
       penalties.messages.push('Serious injuries sustained');
-      penalties.goldLoss = rollDice(2, 10) + 10; // 12-30 gold
+      penalties.goldLoss = rollDice(2, 10, rng) + 10; // 12-30 gold
       penalties.messages.push(`Lost ${penalties.goldLoss} gold in the chaos`);
     } else {
       penalties.messages.push('Minor injuries sustained');
-      penalties.goldLoss = rollDice(1, 10) + 5; // 6-15 gold
+      penalties.goldLoss = rollDice(1, 10, rng) + 5; // 6-15 gold
       penalties.messages.push(`Lost ${penalties.goldLoss} gold escaping`);
     }
   }
@@ -185,7 +225,7 @@ const determinePenalties = (outcomeTier, encounter) => {
   else if (isSocial) {
     if (isCritical) {
       penalties.messages.push('Reputation damaged');
-      penalties.goldLoss = rollDice(1, 6) + 2; // 3-8 gold
+      penalties.goldLoss = rollDice(1, 6, rng) + 2; // 3-8 gold
       penalties.messages.push(`Lost ${penalties.goldLoss} gold in the exchange`);
     } else {
       penalties.messages.push('Missed opportunity');
@@ -197,7 +237,7 @@ const determinePenalties = (outcomeTier, encounter) => {
   else if (isEnvironmental) {
     if (isCritical) {
       penalties.messages.push('Injured by hazard');
-      penalties.goldLoss = rollDice(1, 6); // 1-6 gold (supplies damaged)
+      penalties.goldLoss = rollDice(1, 6, rng); // 1-6 gold (supplies damaged)
       if (penalties.goldLoss > 0) {
         penalties.messages.push(`Lost ${penalties.goldLoss} gold worth of supplies`);
       }
@@ -211,7 +251,7 @@ const determinePenalties = (outcomeTier, encounter) => {
   else {
     if (isCritical) {
       penalties.messages.push('Significant setback');
-      penalties.goldLoss = rollDice(1, 8) + 2; // 3-10 gold
+      penalties.goldLoss = rollDice(1, 8, rng) + 2; // 3-10 gold
       penalties.messages.push(`Lost ${penalties.goldLoss} gold`);
     } else {
       penalties.messages.push('Minor setback');
@@ -224,7 +264,7 @@ const determinePenalties = (outcomeTier, encounter) => {
 /**
  * Generates loot based on rewards template and roll result
  */
-const generateLoot = (rewards, rollResult, outcomeTier, encounter, lootCtx = {}) => {
+const generateLoot = (rewards, rollResult, outcomeTier, encounter, lootCtx = {}, rng = Math.random) => {
   if (!rewards) return null;
 
   // Positive rewards (XP / gold / items) are granted ONLY on success tiers. Failure tiers
@@ -242,7 +282,7 @@ const generateLoot = (rewards, rollResult, outcomeTier, encounter, lootCtx = {})
   // Gold rewards (roll dice formula)
   if (isSuccess && rewards.gold) {
     const goldRoll = parseDiceFormula(rewards.gold);
-    loot.gold = rollDice(goldRoll.count, goldRoll.sides);
+    loot.gold = rollDice(goldRoll.count, goldRoll.sides, rng);
   }
 
   // Item rewards (percentage chance)
@@ -256,7 +296,7 @@ const generateLoot = (rewards, rollResult, outcomeTier, encounter, lootCtx = {})
         ? Math.min(chance * 1.5, 1.0)
         : chance;
 
-      if (Math.random() < adjustedChance) {
+      if (rng() < adjustedChance) {
         loot.items.push(itemName);
       }
     }
@@ -276,7 +316,7 @@ const generateLoot = (rewards, rollResult, outcomeTier, encounter, lootCtx = {})
       loot.healing = 'full';  // Will be handled in Game.js to restore to max HP
     } else if (healingFormula) {
       const healRoll = parseDiceFormulaWithBonus(healingFormula);
-      loot.healing = rollDice(healRoll.count, healRoll.sides) + healRoll.bonus;
+      loot.healing = rollDice(healRoll.count, healRoll.sides, rng) + healRoll.bonus;
     }
   }
 
@@ -314,11 +354,12 @@ const parseDiceFormulaWithBonus = (formula) => {
 
 /**
  * Rolls multiple dice and returns total
+ * @param {() => number} rng - optional 0..1 random source (defaults to Math.random)
  */
-const rollDice = (count, sides) => {
+const rollDice = (count, sides, rng = Math.random) => {
   let total = 0;
   for (let i = 0; i < count; i++) {
-    total += Math.floor(Math.random() * sides) + 1;
+    total += Math.floor(rng() * sides) + 1;
   }
   return total;
 };

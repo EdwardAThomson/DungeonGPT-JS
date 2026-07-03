@@ -7,6 +7,7 @@ export const BASE_ENCOUNTERS = {
     encounterTier: 'immediate',
     description: 'A band of goblins leaps from the undergrowth, weapons drawn and eyes gleaming with malice!',
     difficulty: 'easy',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 15,
     suggestedActions: [
@@ -32,6 +33,7 @@ export const BASE_ENCOUNTERS = {
     description: 'Hungry wolves circle your party, growling menacingly as their alpha watches from the shadows.',
     image: '/assets/encounters/wolf_pack.webp',
     difficulty: 'medium',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 20,
     suggestedActions: [
@@ -56,6 +58,7 @@ export const BASE_ENCOUNTERS = {
     description: 'Armed bandits block the road ahead, their leader demanding a toll for safe passage.',
     image: '/assets/encounters/bandit_roadblock.webp',
     difficulty: 'medium',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 25,
     suggestedActions: [
@@ -138,6 +141,7 @@ export const BASE_ENCOUNTERS = {
     description: 'Massive webs stretch between the trees, and you hear the clicking of enormous mandibles.',
     image: '/assets/encounters/giant_spiders.webp',
     difficulty: 'medium',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 18,
     suggestedActions: [
@@ -162,6 +166,7 @@ export const BASE_ENCOUNTERS = {
     description: 'A massive bear rears up on its hind legs, roaring a challenge as you enter its territory.',
     image: '/assets/encounters/bear_encounter.webp',
     difficulty: 'hard',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 35,
     suggestedActions: [
@@ -216,7 +221,7 @@ export const BASE_ENCOUNTERS = {
       { label: 'Shield Party', skill: 'Athletics', description: 'Use shields to protect everyone' },
       { label: 'Magic Shield', skill: 'Arcana', description: 'Create a magical barrier' }
     ],
-    rewards: { xp: 60, gold: '0', items: ['gemstone:30%', 'rare_ore:20%'] },
+    rewards: { xp: 60, gold: '0', items: ['raw_gems:25%', 'rare_gem:5%', 'rare_ore:20%'] },
     consequences: {
       criticalSuccess: 'You avoid all harm and discover valuable gems in the rubble.',
       success: 'You escape with minor scrapes and bruises.',

@@ -102,6 +102,59 @@ export const applyEncounterOutcomeToParty = ({ party, result }) => {
   };
 };
 
+/**
+ * Team-encounter reward distribution (#43, ENCOUNTER_SYSTEM.md Phase 5):
+ * - XP is split evenly across ALL party members (KO'd heroes fought too), with a
+ *   +10% bonus to the pot per support hero to encourage full parties.
+ * - Gold, items, healing and penalties go through the lead (heroIndex), matching
+ *   the existing shared-pool conventions (gold/items are already de facto shared).
+ * Falls back to the classic single-hero path for solo results.
+ *
+ * @param {Object} args
+ * @param {Array} args.party - the full party
+ * @param {Object} args.result - encounter summary; uses result.heroIndex (lead),
+ *   result.isTeamEncounter and result.supporterCount
+ * @returns {{ updatedParty, heroIndex, rewardMessages, penaltyMessages }}
+ */
+export const applyTeamEncounterOutcomeToParty = ({ party, result }) => {
+  if (!result?.isTeamEncounter || !Array.isArray(party) || party.length <= 1) {
+    return applyEncounterOutcomeToParty({ party, result });
+  }
+
+  const heroIndex = result?.heroIndex !== undefined ? result.heroIndex : 0;
+  const supporterCount = result?.supporterCount || Math.max(0, party.length - 1);
+  const rewards = result?.rewards || {};
+  const xpPot = Math.floor((rewards.xp || 0) * (1 + 0.1 * supporterCount));
+  const xpShare = Math.floor(xpPot / party.length);
+  const xpRemainder = xpPot - xpShare * party.length;
+
+  let updatedParty = [...party];
+  const rewardMessages = [];
+
+  updatedParty = updatedParty.map((hero, idx) => {
+    const isLead = idx === heroIndex;
+    const heroRewards = {
+      ...(isLead ? rewards : {}),
+      // Lead keeps the rounding remainder so the pot is fully paid out.
+      xp: xpShare + (isLead ? xpRemainder : 0)
+    };
+    const { hero: updated, messages } = applyEncounterRewards(hero, heroRewards);
+    const name = hero.heroName || hero.characterName || `Hero ${idx + 1}`;
+    messages.forEach((msg) => rewardMessages.push(`${name}: ${msg}`));
+    return updated;
+  });
+
+  const penaltiesResult = applyEncounterPenalties(updatedParty[heroIndex], result?.penalties);
+  updatedParty[heroIndex] = penaltiesResult.hero;
+
+  return {
+    updatedParty,
+    heroIndex,
+    rewardMessages,
+    penaltyMessages: penaltiesResult.messages
+  };
+};
+
 export const formatEncounterRewardLog = (heroName, messages = []) => {
   if (!messages.length) return null;
   return `[PROGRESSION] Rewards applied to ${heroName}: ${messages.join(', ')}`;

@@ -6,7 +6,7 @@ The encounter system is the primary gameplay loop beyond exploration. It uses a 
 
 The core resolution pipeline (`encounterResolver.js`) handles single-action encounters, while `multiRoundEncounter.js` manages multi-round combat with enemy HP, morale tracking, and contextual actions that evolve as combat progresses. The `encounterGenerator.js` module handles random encounter triggering based on biome, grimness settings, visit history, and moves-since-last-encounter. Encounter data is organized across eight category files under `src/data/encounters/` (base, wilderness, town, cave, ruins, grove, mountain, environmental), merged through an index. The `encounterController.js` module applies rewards (XP via `progressionSystem.js`, gold and items via `inventorySystem.js`) and penalties after resolution.
 
-Phase 1 (core encounters), Phase 2 (random generation + movement integration), and Phase 3 (enhanced POI encounters) are complete. Phase 4 (progression) is partially shipped -- XP/leveling and inventory exist but loot narration is incomplete. The two-tier narrative encounter system (Phase 2.4) has data structures (`encounterTier`, `narrativeHook`, `aiContext` on templates) and a `promptBuilder.js` utility, but the full movement-integration flow (suppressing AI prompts for immediate encounters, injecting context for narrative ones) is not fully wired. The team encounter system (Lead+Support model) is designed but not yet implemented.
+Phase 1 (core encounters), Phase 2 (random generation + movement integration), and Phase 3 (enhanced POI encounters) are complete. Phase 4 (progression) is partially shipped -- XP/leveling and inventory exist but loot narration is incomplete. The two-tier narrative encounter system (Phase 2.4) has data structures (`encounterTier`, `narrativeHook`, `aiContext` on templates) and a `promptBuilder.js` utility, but the full movement-integration flow (suppressing AI prompts for immediate encounters, injecting context for narrative ones) is not fully wired. The team encounter system (Lead+Support model, Phase 5) shipped 2026-07-03 as part of the combat-depth program (#43): boss fights are party fights, enemies deal explicit profile damage, and player damage to enemies is flat per outcome (enemy HP is a real difficulty knob).
 
 ### Key Files
 
@@ -142,7 +142,47 @@ discarded on the next move; hooks show no image).
 
 ---
 
-## Phase 5: Team Encounters -- Lead + Support Model (Planned)
+## Phase 5: Team Encounters -- Lead + Support Model (SHIPPED 2026-07-03, #43)
+
+> **Shipped note (2026-07-03, backlog #43 "combat-depth program").** The core
+> Lead + Support model below is live for multi-round fights, together with the
+> two mechanics it depends on:
+>
+> - **Lead + Support**: the "Choose Your Champion" screen became the Formation
+>   phase ("Choose Your Lead", best-modifier hero pre-selected, player can
+>   override). Every living non-lead hero adds `max(1, floor(bestStatMod / 2))`
+>   to the lead's roll (`multiRoundEncounter.getSupportBonus`); the bonus is shown
+>   in the roll breakdown (`d20 + modifier + support`) and on a party strip in the
+>   fight view. A KO'd lead auto-swaps to the highest-HP living hero; all heroes
+>   down = defeat. Solo parties behave exactly as before (zero regression).
+> - **Explicit boss damage (#43)**: `shouldDealDamage` name-keyword matching is
+>   deprecated. Encounters declare `dealsDamage: true/false`, optionally with an
+>   authored `damage` profile (dice per outcome tier, e.g.
+>   `{ criticalFailure: '5d6+5', failure: '2d6+2', success: '1d6' }`); flagged
+>   encounters without a profile use the legacy percent-of-maxHP model. Old data
+>   without the flag falls back to the keyword rule, so existing saves keep their
+>   behavior. All 10 template bosses now hit back. Damage distribution: the lead
+>   takes the base damage; on a critical failure each supporter takes 25% splash
+>   (the "Others" row below). Role-specific rows (Guard/Flank/...) are NOT
+>   implemented -- support roles remain future work.
+> - **Flat enemy damage + scaled rounds (#43)**: players deal flat damage per
+>   outcome (`ENEMY_DAMAGE_BY_OUTCOME`: crit 50 / success 25 / failure 2 / crit
+>   failure 0) instead of percent-of-max, so a 250 HP boss takes ~10 successes
+>   where a 30 HP boss takes ~2. `maxRounds` scales with the pool
+>   (`max(3, ceil(enemyHP / 25) * 2)`), the advantage-defeat floor loosens with
+>   fight length, timeout victory additionally requires the enemy at <= 25% HP,
+>   and reward payouts stay capped at 3 paying rounds (the pre-#43 envelope).
+>   The three deadly t2 bosses got sim-validated `dc` overrides (19-20) in place
+>   of DC 25; per-boss numbers live in `storyTemplates.js` and are enforced by
+>   `progressionLint.test.js` (t1 bosses banded solo, t2+ banded for a 3-hero
+>   mid-gear party at intended level).
+> - **Rewards**: XP splits evenly across the party with +10% pot per supporter
+>   (`encounterController.applyTeamEncounterOutcomeToParty`); gold/items/penalties
+>   flow through the lead (shared-pool convention).
+> - **Deferred from the design below**: named support roles (Guard/Flank/Inspire/
+>   Heal/Analyze/Cover), between-round lead rotation, and whole-party flee rolls.
+>   The 15% initiative-failure mechanic is retained (it now forces a different
+>   lead). Encounter state stays transient -- no save-schema change.
 
 ### Problem
 The current system is single-hero-centric: one hero acts as "champion" while the rest of the party watches. Players build 1-4 hero parties but only use one per fight.

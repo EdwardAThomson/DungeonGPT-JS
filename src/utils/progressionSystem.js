@@ -1,6 +1,14 @@
 // Phase 4: Progression System
 // XP curves, leveling, and stat bonuses
 
+import { calculateMaxHPForLevel } from './healthSystem';
+
+// Heroes created in the app store their class as `heroClass` (HeroCreation);
+// only debug/legacy characters use `characterClass`. Resolve both, matching
+// the HeroModal convention. (Issue #48: missing this made every class level
+// up as a d8 with the wrong formula, LOWERING max HP at level 2.)
+const resolveClass = (character) => character?.characterClass || character?.heroClass;
+
 // XP thresholds for each level (slow progression, narrative-focused)
 // Scaled for encounter-based progression
 // Expect ~20-30 encounters per level at early levels, scaling up
@@ -28,6 +36,18 @@ export const XP_THRESHOLDS = [
 ];
 
 export const MAX_LEVEL = 20;
+
+/**
+ * Level bonus to every d20 check (#47 Option A): +1 per 2 levels, capped at +3.
+ * Lv 1-2 -> +0 (the healthy t1 band is untouched), Lv 3-4 -> +1, Lv 5-6 -> +2,
+ * Lv 7+ -> +3. Computed from level in code (not stored), so it applies
+ * retroactively to existing saves — a mid-campaign Lv 3 party simply gains its
+ * earned bonus. The ASI stat-choice moment (Option B) ships separately later.
+ * @param {number} level
+ * @returns {number} 0..3
+ */
+export const getLevelBonus = (level) =>
+  Math.min(3, Math.floor((Math.max(1, Math.floor(level || 1)) - 1) / 2));
 
 /**
  * Calculate level from XP
@@ -84,37 +104,16 @@ export const getLevelProgress = (xp) => {
 };
 
 /**
- * Calculate HP bonus from leveling
- * Based on class and Constitution modifier
+ * Calculate max HP for a class/CON/level.
+ * Delegates to healthSystem.calculateMaxHPForLevel — the single source of
+ * truth (issue #48). Level-1 values match creation-time HP exactly.
  * @param {string} characterClass - Character class
  * @param {number} constitutionMod - CON modifier
  * @param {number} level - Character level
  * @returns {number} Total max HP
  */
 export const calculateMaxHP = (characterClass, constitutionMod, level) => {
-  const hitDice = {
-    'Barbarian': 12,
-    'Fighter': 10,
-    'Paladin': 10,
-    'Ranger': 10,
-    'Cleric': 8,
-    'Druid': 8,
-    'Monk': 8,
-    'Rogue': 8,
-    'Warlock': 8,
-    'Bard': 8,
-    'Sorcerer': 6,
-    'Wizard': 6
-  };
-  
-  const hd = hitDice[characterClass] || 8;
-  
-  // Level 1: Max hit die + CON mod
-  // Each level after: Average roll (hd/2 + 1) + CON mod
-  const level1HP = hd + constitutionMod;
-  const perLevelHP = Math.floor(hd / 2) + 1 + constitutionMod;
-  
-  return Math.max(1, level1HP + (perLevelHP * (level - 1)));
+  return calculateMaxHPForLevel(characterClass, constitutionMod, level);
 };
 
 /**
@@ -159,7 +158,12 @@ export const awardXP = (character, xpGained) => {
   // If leveled up, recalculate max HP
   if (leveledUp) {
     const conMod = Math.floor(((character.stats?.Constitution || 10) - 10) / 2);
-    updatedCharacter.maxHP = calculateMaxHP(character.characterClass, conMod, newLevel);
+    const recalculatedMaxHP = calculateMaxHP(resolveClass(character), conMod, newLevel);
+    // Never lower max HP on level-up (issue #48). This also repairs heroes in
+    // older saves whose maxHP the pre-fix formula had already lowered: if the
+    // recalculated value beats the stored one we upgrade, otherwise we keep
+    // the stored value — either way, monotonically non-decreasing.
+    updatedCharacter.maxHP = Math.max(recalculatedMaxHP, character.maxHP || 0);
     // Heal to full on level up
     updatedCharacter.currentHP = updatedCharacter.maxHP;
   }
@@ -181,7 +185,7 @@ export const awardXP = (character, xpGained) => {
 export const initializeProgression = (character) => {
   const conMod = Math.floor(((character.stats?.Constitution || 10) - 10) / 2);
   const level = 1;
-  const maxHP = calculateMaxHP(character.characterClass, conMod, level);
+  const maxHP = calculateMaxHP(resolveClass(character), conMod, level);
   
   return {
     ...character,

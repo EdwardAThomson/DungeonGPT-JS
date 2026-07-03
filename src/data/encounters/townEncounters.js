@@ -8,6 +8,7 @@ export const TOWN_ENCOUNTERS = {
     description: 'A drunken argument erupts into a full-blown brawl at the local tavern. Chairs fly and fists swing!',
     image: '/assets/encounters/tavern_brawl.webp',
     difficulty: 'easy',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     suggestedActions: [
       { label: 'Join the Fight', skill: 'Athletics', description: 'Wade in and start throwing punches' },
       { label: 'Break It Up', skill: 'Intimidation', description: 'Bellow for order and separate the fighters' },

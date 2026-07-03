@@ -6,15 +6,63 @@
 import { calculateModifier } from './rules';
 
 /**
- * Calculate maximum HP based on character stats
+ * Hit dice per class, used for HP gained on level-up.
+ */
+export const HIT_DICE = {
+  'Barbarian': 12,
+  'Fighter': 10,
+  'Paladin': 10,
+  'Ranger': 10,
+  'Cleric': 8,
+  'Druid': 8,
+  'Monk': 8,
+  'Rogue': 8,
+  'Warlock': 8,
+  'Bard': 8,
+  'Sorcerer': 6,
+  'Wizard': 6
+};
+
+/**
+ * SINGLE SOURCE OF TRUTH for max HP (issue #48).
+ *
+ * Level 1 preserves the original creation-time formula exactly
+ * (10 + conMod * 5, clamped 5-30) so existing saves keep their HP on load.
+ * Each level beyond 1 adds a class hit-die average (floor(hd/2) + 1 + conMod),
+ * clamped to a minimum of +1 so max HP is monotonically non-decreasing.
+ *
+ * `progressionSystem.calculateMaxHP` delegates here; do not fork the formula.
+ *
+ * @param {string} characterClass - Class name (unknown/missing falls back to d8)
+ * @param {number} constitutionMod - CON modifier
+ * @param {number} level - Character level (missing/invalid treated as 1)
+ * @returns {number} Max HP
+ */
+export const calculateMaxHPForLevel = (characterClass, constitutionMod, level = 1) => {
+  const conMod = Number.isFinite(constitutionMod) ? constitutionMod : 0;
+
+  // Level 1: original creation-time value, unchanged (min 5, max 30).
+  const level1HP = Math.max(5, Math.min(30, 10 + conMod * 5));
+
+  const lvl = Math.max(1, Math.floor(Number(level) || 1));
+  if (lvl === 1) return level1HP;
+
+  const hd = HIT_DICE[characterClass] || 8;
+  // At least +1 HP per level so leveling never lowers max HP.
+  const perLevelHP = Math.max(1, Math.floor(hd / 2) + 1 + conMod);
+
+  return level1HP + perLevelHP * (lvl - 1);
+};
+
+/**
+ * Calculate maximum HP based on character stats (level-aware).
+ * Heroes store their class as `heroClass` (HeroCreation); debug/legacy
+ * characters use `characterClass` — resolve both (HeroModal convention).
  */
 export const calculateMaxHP = (character) => {
-  const constitutionMod = calculateModifier(character.stats.Constitution || 10);
-  const baseHP = 10;
-  const maxHP = baseHP + (constitutionMod * 5);
-  
-  // Minimum 5 HP, maximum 30 HP
-  return Math.max(5, Math.min(30, maxHP));
+  const constitutionMod = calculateModifier(character?.stats?.Constitution || 10);
+  const characterClass = character?.characterClass || character?.heroClass;
+  return calculateMaxHPForLevel(characterClass, constitutionMod, character?.level || 1);
 };
 
 /**
@@ -129,13 +177,61 @@ export const getHPStatus = (currentHP, maxHP) => {
 };
 
 /**
- * Determine if encounter should deal damage (hostile encounters only)
+ * DEPRECATED (#43): name-keyword damage matching. Kept ONLY as the back-compat
+ * fallback for encounter data that predates the explicit `dealsDamage` flag —
+ * old saves snapshot their encounter blocks, so removing this would silently
+ * disarm the wolves/bandits/goblins in existing campaigns. New encounter data
+ * must declare `dealsDamage` explicitly; use `encounterDealsDamage()` everywhere.
  */
 export const shouldDealDamage = (encounter) => {
   const hostileKeywords = ['goblin', 'wolf', 'bandit', 'spider', 'bear', 'ambush', 'attack'];
   const encounterName = encounter.name.toLowerCase();
-  
+
   return hostileKeywords.some(keyword => encounterName.includes(keyword));
+};
+
+/**
+ * Does this encounter hit back? (#43 explicit damage profiles)
+ *
+ * The authoritative gate is the encounter's own `dealsDamage` boolean. Encounter
+ * data that predates the flag (older saves snapshot their encounter blocks) falls
+ * back to the deprecated keyword match, so nothing regresses.
+ */
+export const encounterDealsDamage = (encounter) => {
+  if (!encounter) return false;
+  if (typeof encounter.dealsDamage === 'boolean') return encounter.dealsDamage;
+  return shouldDealDamage(encounter);
+};
+
+/**
+ * Roll an authored damage profile (#43).
+ *
+ * A profile maps outcome tiers to dice strings or flat numbers:
+ *   damage: { criticalFailure: '4d6+4', failure: '2d6+2', success: '1d4' }
+ * Missing tiers deal 0 (criticalSuccess is usually omitted: a clean hit takes none).
+ * When an encounter has `dealsDamage: true` but NO profile, callers should fall
+ * back to the legacy percent-of-maxHP model (`calculateDamage`).
+ *
+ * @param {Object} profile - the encounter's `damage` block
+ * @param {string} outcomeTier - criticalSuccess | success | failure | criticalFailure
+ * @param {() => number} rng - 0..1 random source (defaults to Math.random)
+ * @returns {number} rolled damage (0 for missing/invalid tiers)
+ */
+export const rollProfileDamage = (profile, outcomeTier, rng = Math.random) => {
+  if (!profile) return 0;
+  const spec = profile[outcomeTier];
+  if (spec === undefined || spec === null) return 0;
+  if (typeof spec === 'number') return Math.max(0, Math.floor(spec));
+  const match = String(spec).match(/^(\d+)d(\d+)(?:\+(\d+))?$/);
+  if (!match) return 0;
+  const count = parseInt(match[1], 10);
+  const sides = parseInt(match[2], 10);
+  const bonus = match[3] ? parseInt(match[3], 10) : 0;
+  let total = bonus;
+  for (let i = 0; i < count; i++) {
+    total += Math.floor(rng() * sides) + 1;
+  }
+  return total;
 };
 
 /**

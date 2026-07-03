@@ -59,6 +59,7 @@ export const GROVE_ENCOUNTERS = {
     description: 'A massive boar, its eyes glowing with unnatural intelligence, charges from the undergrowth!',
     image: '/assets/encounters/forest_beast.webp',
     difficulty: 'hard',
+    dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 55,
     suggestedActions: [
