@@ -111,9 +111,8 @@ export const ITEM_CATALOG = {
   // legendary weapons are t3-gated).
   'runic_greatsword': { name: 'Runic Greatsword', rarity: 'very_rare', value: 1500, type: 'weapon', bonus: '+2', description: 'A two-handed blade etched with dwarven war-runes that flare blue mid-swing.', icon: 'assets/icons/items/runic_greatsword.webp' },
   // #44: a FINDABLE very_rare accessory (the other +2/+3 artifacts are bespoke quest
-  // rewards). TODO(#44 icon art): stormbound_ring.webp — placeholder borrows the
-  // Protective Ring icon.
-  'stormbound_ring': { name: 'Stormbound Ring', rarity: 'very_rare', value: 3500, type: 'ring', bonus: '+2', description: 'A band of sky-iron that crackles with a captive storm. Lightning answers its wearer\'s call.', icon: 'assets/icons/items/ring_protection.webp' },
+  // rewards).
+  'stormbound_ring': { name: 'Stormbound Ring', rarity: 'very_rare', value: 3500, type: 'ring', bonus: '+2', description: 'A band of sky-iron that crackles with a captive storm. Lightning answers its wearer\'s call.', icon: 'assets/icons/items/stormbound_ring.webp' },
   'legendary_artifact': { name: 'Mythic Ancient Artifact', rarity: 'very_rare', value: 5000, type: 'artifact', bonus: '+2', icon: 'assets/icons/items/legendary_artifact.webp' },
   'crown_of_sunfire': { name: 'Crown of Sunfire', rarity: 'very_rare', value: 7500, type: 'artifact', bonus: '+3', description: 'A radiant golden crown that blazes with inner fire. Said to grant its wearer dominion over light and shadow.', icon: `assets/icons/items/crown_of_sunfire.webp` },
   'seal_of_binding': { name: 'Seal of Binding', rarity: 'very_rare', value: 6000, type: 'artifact', bonus: '+2', description: 'An ancient seal inscribed with eldritch wards. It can imprison entities from beyond the veil.', icon: `assets/icons/items/seal_of_binding.webp` },
@@ -127,8 +126,8 @@ export const ITEM_CATALOG = {
   // milestones; do NOT put them in shops, hoards, or tiered drop tables before then.
   // TODO(#44 icon art): each needs its own webp; placeholders borrow the noted icons.
   'legendary_weapon': { name: 'Legendary Weapon', rarity: 'legendary', value: 7500, type: 'weapon', bonus: '+3', icon: 'assets/icons/items/legendary_weapon.webp' },
-  'blade_of_the_shattered_throne': { name: 'Blade of the Shattered Throne', rarity: 'legendary', value: 10000, type: 'weapon', bonus: '+3', description: 'Reforged from the throne the Shadow Overlord broke, this blade remembers every oath sworn upon it.', icon: 'assets/icons/items/legendary_weapon.webp' }, // TODO(#44 icon art): blade_of_the_shattered_throne.webp
-  'aegis_of_dawn': { name: 'Aegis of Dawn', rarity: 'legendary', value: 8000, type: 'armor', bonus: '+5 defense', description: 'Plate armor quenched in first light. Blows that should kill are swallowed by a sunrise glow.', icon: 'assets/icons/items/leather_shield.webp' }, // TODO(#44 icon art): aegis_of_dawn.webp
+  'blade_of_the_shattered_throne': { name: 'Blade of the Shattered Throne', rarity: 'legendary', value: 10000, type: 'weapon', bonus: '+3', description: 'Reforged from the throne the Shadow Overlord broke, this blade remembers every oath sworn upon it.', icon: 'assets/icons/items/blade_of_the_shattered_throne.webp' },
+  'aegis_of_dawn': { name: 'Aegis of Dawn', rarity: 'legendary', value: 8000, type: 'armor', bonus: '+5 defense', description: 'Plate armor quenched in first light. Blows that should kill are swallowed by a sunrise glow.', icon: 'assets/icons/items/aegis_of_dawn.webp' },
   'heart_of_the_last_winter': { name: 'Heart of the Last Winter', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'A shard of unmelting ice cut from the Blood Wendigo\'s frozen heart. Winter itself bends around its bearer.', icon: 'assets/icons/items/purified_heart_shard.webp' }, // TODO(#44 icon art): heart_of_the_last_winter.webp
   'clockwork_god_core': { name: 'Clockwork God-Core', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'The still-ticking heart of the Herald of the Old Gods. Its gears turn one second ahead of the world.', icon: 'assets/icons/items/magical_item.webp' }, // TODO(#44 icon art): clockwork_god_core.webp
   'crown_of_the_drowned_city': { name: 'Crown of the Drowned City', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'A coral-crusted diadem raised from the sunken throne room. Voices of the deep counsel whoever wears it.', icon: 'assets/icons/items/crown_of_sunfire.webp' }, // TODO(#44 icon art): crown_of_the_drowned_city.webp
