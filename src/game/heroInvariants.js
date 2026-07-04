@@ -131,7 +131,21 @@ export const healHeroUpward = (hero) => {
   if (maxHP < formulaMaxHP) {
     healed.push(`${name} max HP ${maxHP} -> ${formulaMaxHP}`);
     // Math.max convention (awardXP): monotonically non-decreasing.
-    patch({ maxHP: Math.max(formulaMaxHP, maxHP) });
+    // Raising the CEILING must preserve DAMAGE TAKEN, not the raw number:
+    // a full hero (15/15) raised to max 22 must arrive full (22/22), else the
+    // raise reads as "my tavern heal did not stick" (playtest 2026-07-05).
+    // A hero missing 3 HP stays missing exactly 3.
+    const prevCurrent = Number(h.currentHP);
+    if (Number.isFinite(prevCurrent) && maxHP > 0 && prevCurrent <= maxHP) {
+      const damageTaken = maxHP - prevCurrent;
+      const carried = Math.max(formulaMaxHP, maxHP) - damageTaken;
+      if (carried !== prevCurrent) {
+        healed.push(`${name} HP ${prevCurrent} -> ${carried} (damage taken preserved)`);
+      }
+      patch({ maxHP: Math.max(formulaMaxHP, maxHP), currentHP: carried });
+    } else {
+      patch({ maxHP: Math.max(formulaMaxHP, maxHP) });
+    }
   }
 
   const currentHP = Number(h.currentHP);

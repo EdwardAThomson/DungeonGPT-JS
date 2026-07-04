@@ -200,3 +200,32 @@ describe('reconcileHeroWithLedger', () => {
     expect(reconcileHeroWithLedger(hero, otherLedger).hero).toBe(hero);
   });
 });
+
+describe('maxHP raise preserves damage taken (playtest 2026-07-05: tavern heal looked lost)', () => {
+  const hero = (over = {}) => ({
+    characterName: 'Seraphina', characterClass: 'Fighter', level: 1,
+    xp: 0, gold: 0, inventory: [],
+    // Con 16 (mod +3) puts the formula ceiling ABOVE the stored 15 so the
+    // raise actually fires in these tests (note: the stats key is capitalized).
+    stats: { Constitution: 16 },
+    ...over
+  });
+
+  it('a FULL hero arrives full at the new max', () => {
+    const { hero: h, healed } = healHeroUpward(hero({ maxHP: 15, currentHP: 15 }));
+    expect(h.maxHP).toBeGreaterThan(15);
+    expect(h.currentHP).toBe(h.maxHP);
+    expect(healed.some((m) => m.includes('damage taken preserved'))).toBe(true);
+  });
+
+  it('a wounded hero keeps exactly the damage taken', () => {
+    const { hero: h } = healHeroUpward(hero({ maxHP: 15, currentHP: 12 }));
+    expect(h.maxHP - h.currentHP).toBe(3);
+  });
+
+  it('a hero with no stored currentHP just gets the raised ceiling', () => {
+    const { hero: h } = healHeroUpward(hero({ maxHP: 15 }));
+    expect(h.maxHP).toBeGreaterThan(15);
+    expect(h.currentHP).toBeUndefined();
+  });
+});
