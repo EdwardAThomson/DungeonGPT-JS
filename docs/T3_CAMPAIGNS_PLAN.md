@@ -1,6 +1,10 @@
 # Tier-3 Campaigns & Combat-Depth Program
 
-Status: DESIGN ONLY, no implementation. Planning pass, 2026-07.
+Status: program IMPLEMENTED in waves, 2026-07-03/04. Rows #43-#50 and #53 shipped
+(boss fights, level term, gear ladder incl. the t3 legendary shelf, loot-pool repair,
+balance-sim harness + lint, pool expansion + backfill, t2 sequels); per-row status in
+`OUTSTANDING_ISSUES.md`. t3 campaign authoring itself continues privately via the local
+content slot. The body below is the original planning pass (2026-07), kept as the record.
 
 This plan started as "author the four t3 campaign stubs" and grew, through maintainer
 review, into the combined program it actually is: t3 content is the destination, but

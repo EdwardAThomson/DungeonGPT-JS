@@ -1,7 +1,8 @@
 # Equipment items and stats
 
 Reference for the equippable-item pass that made gear mechanically matter. Companion to
-`docs/FEATURE_EQUIPMENT.md` (the engine) and the `equipment.js` helpers.
+the `src/game/equipment.js` helpers (the equip engine's design doc, `FEATURE_EQUIPMENT.md`,
+is retired to the local `docs/archive/`).
 
 ## Stat model (kept simple, by decision)
 
@@ -24,7 +25,8 @@ occupies decides what that number does (`src/game/equipment.js` -> `getEquippedB
 | common | 0-1 | +1 | +1 |
 | uncommon | +1 | +2 | +1 |
 | rare | +2 | +3 | +2 |
-| very rare | +3 | +4 | +2-3 |
+| very rare | +2-3 | +4 | +2-3 |
+| legendary (t3-gated) | +3 | +5 | +3 |
 
 Armour values run higher because soak is flat HP per hit; to-hit and all-checks are d20
 modifiers where each point is strong, so they stay low.
@@ -38,8 +40,8 @@ All icons reuse existing art (no new images). New keys added; existing items buf
 - `studded_leather` NEW `+2` uncommon, icon `hard_leather.webp`
 - `hide_armor` NEW `+2` uncommon, icon `beast_hide.webp`
 - `scale_mail` NEW `+3` rare, icon `dragon_scale.webp` (blacksmith)
-- `dragonscale_plate` NEW `+4` very rare, icon `dragon_scale.webp` (reused) -- NOT yet
-  obtainable; see Deferred.
+- `dragonscale_plate` NEW `+4` very rare, icon `dragon_scale.webp` (reused) -- initially
+  unobtainable; sourced later by #44/#49 (see the #44 section below).
 
 Hide vs Studded are equal-power (+2) **sidegrades differentiated by source**: Studded is the
 blacksmith buy; Hide drops only from `forest`/`hills` site hoards. Same power, different
@@ -47,7 +49,8 @@ acquisition, so neither is redundant. (Avoid putting both in one shop, or the ch
 
 **Weapons** (bonuses assigned to existing; art is blade/dagger/staff only)
 - `+1`: `shortsword`, `silver_dagger`, `ritual_dagger`, `poisoned_dagger`, `enchanted_staff`
-- already `+1`/`+2`: `magic_weapon`, `legendary_weapon`
+- already `+1`/`+2`: `magic_weapon`, `legendary_weapon` (since moved to the legendary
+  shelf at +3, see the #44 section below)
 - left at 0 (starters/junk): `rusty_dagger`, `bar_stool_leg`
 
 **Accessories** (buffed existing; gave the inert very-rare artifacts teeth)
@@ -66,7 +69,30 @@ acquisition, so neither is redundant. (Avoid putting both in one shop, or the ch
 - Guard test `src/utils/itemCatalogEquipment.test.js`: no dead armour, ladder values,
   weapon/accessory bonuses resolve through the real engine.
 
+## #44 gear-ladder expansion (2026-07-03, wave 3)
+
+The #44 pass filled the gaps this doc left open (design rationale in
+`T3_CAMPAIGNS_PLAN.md` §5 and `OUTSTANDING_ISSUES.md` #44):
+
+- **Findable +2 rung**: `runic_greatsword` (very_rare weapon, +2) and `stormbound_ring`
+  (very_rare ring, +2) drop from encounter tables, so tier-2 play reaches +2 without a
+  bespoke quest artifact. `hunters_longbow` (rare weapon, +1) joined the catalogue. New
+  icon art landed for these (the "no new images" constraint no longer holds).
+- **`dragonscale_plate` is now obtainable**: it drops from the mountain dragon-lair
+  encounter hoard (20%) and is authored as a story-template milestone reward, resolving
+  the "no source yet" deferral below.
+- **t3 legendary shelf**: a `legendary` rarity above very_rare (`legendary_weapon` +3,
+  `blade_of_the_shattered_throne` +3, `aegis_of_dawn` +5 defense, and the +3 artifacts
+  `heart_of_the_last_winter`, `clockwork_god_core`, `crown_of_the_drowned_city`).
+  Legendary is tier-gated to t3+ (`maxRarityRankForTier`); until a playable t3 campaign
+  exists these are unobtainable by design, pinned in the `progressionLint` KNOWN_GAPS
+  guard. Do not put them in shops, hoards, or tiered drop tables; t3 authoring assigns
+  them to milestones.
+
 ## Deferred / not done
+
+*(Historical record of the original pass. The `dragonscale_plate` deferral was resolved
+by #44 above.)*
 
 - **`dragonscale_plate` has no source yet** (not in any shop, loot pool, or quest). It is
   defined and balanced (+4) but currently unobtainable by design, pending a decision on its
