@@ -178,6 +178,10 @@ const SavedConversations = () => {
             const settings = conversation.game_settings
               ? (typeof conversation.game_settings === 'string' ? JSON.parse(conversation.game_settings) : conversation.game_settings)
               : null;
+            // Merged-list honesty badge (SAVE_SYNC_PLAN Phase 2): the newest copy of
+            // this save is local and still awaiting its cloud push. Signed-in players
+            // only; guests see their local list exactly as before (no badge).
+            const showOnThisDeviceBadge = !!user && !!conversation.pendingCloudSync;
 
             return (
               <div key={conversation.sessionId} className="conversation-item" style={{ padding: '25px', minHeight: '180px', display: 'flex', flexDirection: 'column' }}>
@@ -256,8 +260,16 @@ const SavedConversations = () => {
                         record; chain.chapter tolerates saves made by the retired
                         linked-save build. A completed save continues IN the save: load
                         it and use the Journal's "Continue your legend". */}
-                    {((settings?.currentChapter || settings?.chain?.chapter) > 1 || settings?.campaignComplete) && (
+                    {((settings?.currentChapter || settings?.chain?.chapter) > 1 || settings?.campaignComplete || showOnThisDeviceBadge) && (
                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '0 0 8px 0' }}>
+                        {showOnThisDeviceBadge && (
+                          <span
+                            title="This save is stored on this device and will sync to your account automatically"
+                            style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 'bold', background: 'var(--warning-tint-15, rgba(224,168,0,0.15))', color: 'var(--state-warning, #e0a800)', border: '1px solid var(--state-warning, #e0a800)' }}
+                          >
+                            💾 On this device
+                          </span>
+                        )}
                         {(settings?.currentChapter || settings?.chain?.chapter) > 1 && (
                           <span style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 'bold', background: 'var(--primary-tint-10, rgba(100,100,255,0.15))', color: 'var(--primary)', border: '1px solid var(--primary)' }}>
                             📖 Chapter {settings?.currentChapter || settings?.chain?.chapter}

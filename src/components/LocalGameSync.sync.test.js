@@ -1,10 +1,13 @@
-// SAVE_SYNC_PLAN Phase 1: the timestamp-guarded sync pass (runLocalGameSyncPass).
-// A local row must never clobber a NEWER cloud row for the same session: the local
-// copy is parked as its own save ("diverged on this device") instead. Cloud older
-// or missing uploads normally; failed rows (and writes that routed back to local
-// storage mid-pass) stay local for the next pass. Separate file from
-// LocalGameSync.test.js because these tests mock localGameStore, which the
-// round-trip mapping tests need for real.
+// SAVE_SYNC_PLAN Phases 1-2: the timestamp-guarded reconcile pass
+// (runLocalGameSyncPass). A local row must never clobber a NEWER cloud row for the
+// same session: the local copy is parked as its own save ("diverged on this
+// device") instead. Cloud older or missing uploads normally; failed rows (and
+// writes that routed back to local storage mid-pass) stay local for the next pass.
+// Phase 2 adds live-session awareness: rows already marked synced:true are pruned
+// (non-live) or kept (live write-ahead copy, plan §10), and a pushed live row is
+// marked synced instead of removed. Separate file from LocalGameSync.test.js
+// because these tests mock localGameStore, which the round-trip mapping tests need
+// for real.
 
 import { runLocalGameSyncPass } from './LocalGameSync';
 import { conversationsApi } from '../services/conversationsApi';
@@ -15,7 +18,7 @@ jest.mock('../services/conversationsApi', () => ({
 }));
 
 jest.mock('../services/localGameStore', () => ({
-  localGameStore: { list: jest.fn(), remove: jest.fn() },
+  localGameStore: { list: jest.fn(), remove: jest.fn(), markSynced: jest.fn() },
 }));
 
 jest.mock('../services/supabaseClient', () => ({ supabase: null }));
@@ -32,7 +35,10 @@ const localRow = (overrides = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  localStorage.removeItem('activeGameSessionId');
   conversationsApi.save.mockResolvedValue({ storage: 'cloud' });
+  localGameStore.remove.mockResolvedValue({ success: true });
+  localGameStore.markSynced.mockResolvedValue({ synced: true });
 });
 
 describe('runLocalGameSyncPass timestamp guard', () => {
@@ -129,5 +135,90 @@ describe('runLocalGameSyncPass timestamp guard', () => {
     const result = await runLocalGameSyncPass();
     expect(conversationsApi.save).not.toHaveBeenCalled();
     expect(result).toEqual({ count: 0, failed: false, empty: true });
+  });
+
+  test('legacy row without sync fields still uploads (guest-to-account conversion stays lossless)', async () => {
+    // localRow() carries neither `synced` nor `pending_cloud_sync`: the pass must
+    // treat it as unsynced, not as an already-synced cloud-era row to prune.
+    localGameStore.list.mockResolvedValue([localRow()]);
+    conversationsApi.getById.mockRejectedValue(new Error('404'));
+
+    const result = await runLocalGameSyncPass();
+
+    expect(conversationsApi.save).toHaveBeenCalledTimes(1);
+    expect(result.count).toBe(1);
+  });
+});
+
+describe('runLocalGameSyncPass live-session and prune semantics (Phase 2)', () => {
+  test('synced non-live row: pruned without a push (already in the account)', async () => {
+    localGameStore.list.mockResolvedValue([localRow({ synced: true })]);
+
+    const result = await runLocalGameSyncPass();
+
+    expect(conversationsApi.getById).not.toHaveBeenCalled();
+    expect(conversationsApi.save).not.toHaveBeenCalled();
+    expect(localGameStore.remove).toHaveBeenCalledWith('sess-1');
+    expect(result).toEqual({ count: 0, failed: false, empty: false });
+  });
+
+  test('synced LIVE row: kept as the write-ahead copy, no push, no prune', async () => {
+    localStorage.setItem('activeGameSessionId', 'sess-1');
+    localGameStore.list.mockResolvedValue([localRow({ synced: true })]);
+
+    const result = await runLocalGameSyncPass();
+
+    expect(conversationsApi.save).not.toHaveBeenCalled();
+    expect(localGameStore.remove).not.toHaveBeenCalled();
+    expect(result).toEqual({ count: 0, failed: false, empty: false });
+  });
+
+  test('unsynced LIVE row: pushed, then marked synced and KEPT (not removed)', async () => {
+    localStorage.setItem('activeGameSessionId', 'sess-1');
+    localGameStore.list.mockResolvedValue([localRow({ synced: false })]);
+    conversationsApi.getById.mockRejectedValue(new Error('404'));
+
+    const result = await runLocalGameSyncPass();
+
+    expect(conversationsApi.save).toHaveBeenCalledTimes(1);
+    expect(conversationsApi.save.mock.calls[0][0].sessionId).toBe('sess-1');
+    expect(localGameStore.markSynced).toHaveBeenCalledWith('sess-1', { ifUpdatedAt: '2026-07-01T10:00:00.000Z' });
+    expect(localGameStore.remove).not.toHaveBeenCalled();
+    expect(result).toEqual({ count: 1, failed: false, empty: false });
+  });
+
+  test('unsynced LIVE row with a NEWER cloud copy: parked as diverged, local row removed', async () => {
+    localStorage.setItem('activeGameSessionId', 'sess-1');
+    localGameStore.list.mockResolvedValue([localRow({ synced: false })]);
+    conversationsApi.getById.mockResolvedValue({
+      session_id: 'sess-1',
+      updated_at: '2026-07-02T12:00:00.000Z',
+    });
+
+    const result = await runLocalGameSyncPass();
+
+    const uploaded = conversationsApi.save.mock.calls[0][0];
+    expect(uploaded.sessionId).toMatch(/^sess-1-local-[a-z0-9]+$/);
+    // The diverged timeline now lives in the cloud under its own id; the stale
+    // write-ahead copy goes, and the live game's next autosave recreates it.
+    expect(localGameStore.remove).toHaveBeenCalledWith('sess-1');
+    expect(localGameStore.markSynced).not.toHaveBeenCalled();
+    expect(result.count).toBe(1);
+  });
+
+  test('mixed batch: synced non-live pruned, unsynced pushed and removed, counts reflect pushes only', async () => {
+    localGameStore.list.mockResolvedValue([
+      localRow({ session_id: 'sess-done', synced: true }),
+      localRow({ session_id: 'sess-pending', synced: false }),
+    ]);
+    conversationsApi.getById.mockRejectedValue(new Error('404'));
+
+    const result = await runLocalGameSyncPass();
+
+    expect(conversationsApi.save).toHaveBeenCalledTimes(1);
+    expect(conversationsApi.save.mock.calls[0][0].sessionId).toBe('sess-pending');
+    expect(localGameStore.remove).toHaveBeenCalledWith('sess-done');
+    expect(localGameStore.remove).toHaveBeenCalledWith('sess-pending');
+    expect(result).toEqual({ count: 1, failed: false, empty: false });
   });
 });

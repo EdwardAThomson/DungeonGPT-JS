@@ -1,6 +1,12 @@
 // Default root used when the player hasn't named their campaign.
 export const DEFAULT_SAVE_ROOT = 'Adventure';
 
+// Window event fired by useGamePersistence after a save lands device-only
+// ('savedLocal'), telling LocalGameSync to attempt a reconcile pass without waiting
+// for the next auth event (SAVE_SYNC_PLAN Phase 2, §4). Lives here (pure module)
+// so the hook does not have to import the component.
+export const PENDING_LOCAL_SAVE_EVENT = 'dungeongpt:pending-local-save';
+
 // A save's display name is "<root> - <date> <time>". The root is player-editable and
 // persists across saves (stored in game_settings.saveName); the timestamp refreshes each
 // save. Keeping the format in one place means the in-game save, the confirmation modal, and

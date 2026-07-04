@@ -49,7 +49,11 @@ const _clear = () => run('readwrite', (s) => s.clear());
 // when an account-holding player's save fell back to this device because auth was
 // absent. Plain guest rows never carry it (local is their home store), and older
 // rows without the field behave as unstamped.
-export const mapPayloadToRow = (payload, { pendingCloudSync = false } = {}) => {
+// `synced` is the Phase 2 write-through dirty flag (SAVE_SYNC_PLAN §4): every
+// write-through save stamps `synced: false`; markSynced() flips it to true after a
+// confirmed cloud push. Only stamped when the caller passes an explicit boolean, so
+// rows written by other paths keep their legacy shape.
+export const mapPayloadToRow = (payload, { pendingCloudSync = false, synced } = {}) => {
   const now = new Date().toISOString();
   const sessionId = payload.sessionId || payload.session_id;
   const row = {
@@ -69,8 +73,18 @@ export const mapPayloadToRow = (payload, { pendingCloudSync = false } = {}) => {
     updated_at: now,
   };
   if (pendingCloudSync) row.pending_cloud_sync = true;
+  if (typeof synced === 'boolean') row.synced = synced;
   return row;
 };
+
+// A local row counts as unsynced when it still needs to reach the account: the
+// Phase 2 dirty flag says so, or a Phase 1 pending stamp survives. Rows without
+// either field (guest-era or pre-Phase-1 saves) are NOT reported as pending: we
+// never invent an "on this device" divergence badge for old saves. (The reconcile
+// pass still uploads them, see LocalGameSync: skipping only rows explicitly marked
+// synced keeps guest-to-account conversion lossless.)
+export const isUnsyncedLocalRow = (row) =>
+  !!row && (row.synced === false || row.pending_cloud_sync === true);
 
 export const localGameStore = {
   async list() {
@@ -99,13 +113,34 @@ export const localGameStore = {
     return row;
   },
 
-  async updateMessages(sessionId, conversationData, { pendingCloudSync = false } = {}) {
+  async updateMessages(sessionId, conversationData, { pendingCloudSync = false, synced } = {}) {
     const row = await _get(sessionId);
     if (!row) return null;
     row.conversation_data = conversationData;
     row.updated_at = new Date().toISOString();
     // Additive only: an existing stamp survives an unstamped update.
     if (pendingCloudSync) row.pending_cloud_sync = true;
+    if (typeof synced === 'boolean') row.synced = synced;
+    await _put(row);
+    return row;
+  },
+
+  // Phase 2 (SAVE_SYNC_PLAN §4): flip the write-through dirty flag after a
+  // confirmed cloud push. `ifUpdatedAt` guards against a lost race: if another
+  // save rewrote the row while the push was in flight, the newer write's
+  // `synced: false` must survive, so the mark is skipped. `syncedAt` records the
+  // updated_at we sent to the cloud (timestamp comparisons until the rev
+  // protocol, §6). Clearing pending_cloud_sync heals Phase 1 stamps too.
+  async markSynced(sessionId, { ifUpdatedAt, syncedAt } = {}) {
+    const row = await _get(sessionId);
+    if (!row) return null;
+    if (ifUpdatedAt && row.updated_at !== ifUpdatedAt) {
+      logger.debug(`markSynced skipped for ${sessionId}: row was rewritten mid-push`);
+      return null;
+    }
+    row.synced = true;
+    row.synced_at = syncedAt || row.updated_at;
+    delete row.pending_cloud_sync;
     await _put(row);
     return row;
   },

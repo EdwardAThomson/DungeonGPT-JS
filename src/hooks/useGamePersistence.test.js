@@ -1,11 +1,15 @@
-// SAVE_SYNC_PLAN Phase 1: performSave must report an honest status. A cloud write
-// stays 'saved'; an account-holder fallback write (pendingCloudSync from
-// conversationsApi via saveConversationToBackend) becomes 'savedLocal' so the
-// confirmation modal can say "saved on this device". Legacy boolean `true` results
-// keep meaning 'saved' (guests: their local save IS the save).
+// SAVE_SYNC_PLAN Phases 1-2: performSave must report an honest status. A cloud
+// write stays 'saved'; a device-only write for an account-holder (pendingCloudSync
+// from conversationsApi via saveConversationToBackend, whether auth was absent or
+// the cloud push failed) becomes 'savedLocal' so the confirmation modal can say
+// "saved on this device", and fires PENDING_LOCAL_SAVE_EVENT so LocalGameSync
+// retries the push. With write-through saves, 'error' is reserved for "even the
+// local write failed". Legacy boolean `true` results keep meaning 'saved' (guests:
+// their local save IS the save).
 
 import { renderHook } from '@testing-library/react';
 import useGamePersistence from './useGamePersistence';
+import { PENDING_LOCAL_SAVE_EVENT } from '../game/saveController';
 
 const noopLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
 
@@ -96,5 +100,41 @@ describe('performSave status reporting', () => {
     const { result } = renderPersistence(saveMock, { sessionId: null });
     expect(await result.current.performSave()).toBe('skipped');
     expect(saveMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('reconcile trigger on savedLocal (Phase 2)', () => {
+  const listen = () => {
+    const listener = jest.fn();
+    window.addEventListener(PENDING_LOCAL_SAVE_EVENT, listener);
+    return { listener, stop: () => window.removeEventListener(PENDING_LOCAL_SAVE_EVENT, listener) };
+  };
+
+  test("'savedLocal' fires PENDING_LOCAL_SAVE_EVENT so the push is retried once auth returns", async () => {
+    const { listener, stop } = listen();
+    try {
+      const saveMock = jest.fn().mockResolvedValue({ ok: true, storage: 'local', pendingCloudSync: true });
+      const { result } = renderPersistence(saveMock);
+      expect(await result.current.performSave()).toBe('savedLocal');
+      expect(listener).toHaveBeenCalledTimes(1);
+    } finally {
+      stop();
+    }
+  });
+
+  test("'saved' and 'nochange' never fire the reconcile event ('nochange' writes nothing at all)", async () => {
+    const { listener, stop } = listen();
+    try {
+      const saveMock = jest.fn().mockResolvedValue({ ok: true, storage: 'cloud', pendingCloudSync: false });
+      const { result } = renderPersistence(saveMock);
+      expect(await result.current.performSave()).toBe('saved');
+      // 'nochange' short-circuits before saveConversationToBackend, i.e. before
+      // BOTH stores: exactly one write happened across the two calls.
+      expect(await result.current.performSave()).toBe('nochange');
+      expect(saveMock).toHaveBeenCalledTimes(1);
+      expect(listener).not.toHaveBeenCalled();
+    } finally {
+      stop();
+    }
   });
 });
