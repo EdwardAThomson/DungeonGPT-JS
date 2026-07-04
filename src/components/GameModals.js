@@ -150,6 +150,7 @@ const GameModals = ({
         onSiteTileClick={handleSiteTileClick}
         onLeaveSite={() => mapHook.handleLeaveSite(interactionHook.setConversation, interactionHook.conversation)}
         siteError={mapHook.siteError}
+        siteNotice={mapHook.siteNotice}
         />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>

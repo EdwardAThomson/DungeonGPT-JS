@@ -205,7 +205,43 @@ Missing fields on old rows are treated as `synced: false` / `baseRev: 0`
 - Heroes (`heroesApi` + `localHeroStore`) get the same treatment afterwards;
   hero rows are small and conflicts even rarer, so games go first.
 
-## 9. Open questions
+## 9. Hero ledger & mechanics invariants (added 2026-07-04, maintainer direction)
+
+Playtest losses (equipment, then XP/levels, both "after a save") shared one
+property: current state is stored as a mutable snapshot, so any skipped write,
+stale-twin load, or field-shape change silently rewrites history. Direction:
+make progression history immutable and current state verifiable.
+
+### 9.1 Invariant checker (small, ship first)
+On load, verify per hero and self-heal upward, never downward:
+- `level` must equal the level implied by `xp` (XP_THRESHOLDS); if xp implies
+  MORE than the stored level, heal up and report; if less, trust xp only when
+  a ledger (9.2) confirms, otherwise keep the higher level and flag.
+- `maxHP` must equal calculateMaxHPForLevel(class, level, con); heal upward.
+- every equipped item key must exist in inventory (equipment.js already
+  drops the bonus; the checker reports the dangling slot).
+- A one-line system message when anything healed: visible honesty, same
+  philosophy as the save-fallback notice.
+
+### 9.2 Append-only grant ledger (medium)
+Every irreversible gain appends an event to `settings.heroLedger` (capped,
+compact): `{ t, heroId, kind: 'xp'|'level'|'item'|'gold', amount|key, source }`
+written at the same chokepoints that already record codex discoveries. The
+ledger rides inside the save payload (both stores), so:
+- current state can be AUDITED against summed history ("this hero has 557 xp
+  but the ledger sums 890: a stale snapshot overwrote progress"),
+- the invariant checker gains a source of truth for healing DOWNWARD cases,
+- twin-copy divergence (§6) becomes mergeable for progression specifically:
+  union the ledgers, rebuild xp/gold/items, even when narrative state forks.
+Not a full event-sourcing rewrite: snapshots stay authoritative for world
+state; the ledger covers hero progression only.
+
+### 9.3 Relationship to the rest of the plan
+The rev protocol (§6) makes save lineage immutable; the ledger makes hero
+progression immutable within a lineage. Together: an upgrade can change how
+state is computed but can no longer silently lose what was earned.
+
+## 10. Open questions
 
 - Should the live session's IndexedDB write-ahead copy persist after a clean
   cloud sync (crash insurance) or be pruned aggressively (privacy on shared

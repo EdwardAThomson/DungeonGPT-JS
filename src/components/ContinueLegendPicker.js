@@ -41,7 +41,7 @@ const OptionCard = ({
   onNewAdventure,
   onPremiumNudge,
 }) => {
-  const { template, recommended, premiumLocked, underLeveled, compatible } = option;
+  const { template, recommended, premiumLocked, underLeveled, openingAccessible, compatible } = option;
   return (
     <div
       key={template.id}
@@ -83,7 +83,9 @@ const OptionCard = ({
         </div>
         {underLeveled && template.levelRange && (
           <div style={{ fontSize: '0.75rem', color: '#ff9800', fontWeight: 600, marginBottom: '6px' }}>
-            ⚠ Made for Lv {template.levelRange[0]}-{template.levelRange[1]}; your party is Lv {partyLevel}. It may be deadly, but you may still try.
+            {openingAccessible
+              ? `⚠ Made for Lv ${template.levelRange[0]}-${template.levelRange[1]}; your party is Lv ${partyLevel}. The opening steps are within your reach, and fresh rumours in nearby towns will strengthen you for the deeper chapters.`
+              : `⚠ Made for Lv ${template.levelRange[0]}-${template.levelRange[1]}; your party is Lv ${partyLevel}. It may be deadly, but you may still try.`}
           </div>
         )}
         {premiumLocked ? (

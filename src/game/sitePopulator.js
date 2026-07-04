@@ -9,10 +9,11 @@
 //   - kind: 'loot'      -> { gold: number, items: [itemKey, ...] }
 // Milestone objectives (kind: 'objective') are a later step (3c).
 //
-// Besides the reserved slots, populateSite also turns 1-3 of the generator's scattered 💎
-// crystal decorations (cave/mountain sites) into harvestable deposits — loot content with
-// `display: 'crystal'` so the renderer draws the gem itself — and strips the leftover
-// decorative crystals (issue #38: never show a crystal the player can't pick up).
+// Besides the reserved slots, populateSite also turns some of the generator's scattered
+// decorations into harvestable resource nodes (HARVEST_NODES below): loot content with
+// a `display` key so the renderer draws the resource itself. Leftover decorations of any
+// harvestable kind are stripped (issue #38: never show a crystal, mushroom or urn the
+// player can't pick up).
 
 import { CAVE_ENCOUNTERS } from '../data/encounters/caveEncounters';
 import { RUINS_ENCOUNTERS } from '../data/encounters/ruinsEncounters';
@@ -65,53 +66,74 @@ export const HOARD_BONUS = {
   mountain: ['storm_crystal', 'mountain_crystal', 'silver_dagger', 'wardstone_pendant'],
 };
 
-// Harvestable crystal deposits (issue #38): the 💎 tiles the generator scatters are no
-// longer mere decoration — a few become loot nodes the party can walk onto and harvest.
-// Type-appropriate, tier-safe items (uncommon/rare, no very_rare): caves yield raw gems;
-// mountains yield mountain crystal, with a rarer chance of a storm crystal. Weighted by
-// repetition in the pool.
-const CRYSTAL_LOOT = {
-  cave: ['raw_gems'],
-  mountain: ['mountain_crystal', 'mountain_crystal', 'mountain_crystal', 'storm_crystal'],
+// Harvestable resource nodes (issue #38 + playtest 2026-07-04): decorations the generator
+// scatters become loot nodes the party can walk onto and harvest. Each spec converts up to
+// count[] tiles whose poi matches `fromPoi` (padding from plain floor when the scatter pass
+// produced too few) into tile.content = { kind:'loot', display, ... }: the existing
+// walk-onto-loot flow grants the item while `display` (a SITE_POI key) tells the renderer
+// to draw the resource instead of 💰. Items are type-appropriate, tier-safe keys that also
+// appear in the LOOT tables, so questHints' derived source text stays accurate. Counts for
+// cave mushrooms/fungi/gems/ore are >= 3 so a single cave can complete a gather-3 quest.
+// Ruins get searchable urns + relic caches under the overgrowth so they are no longer
+// pickup-free; forest/hills keep decorative-only flora for now (no gather quest needs them).
+export const HARVEST_NODES = {
+  cave: [
+    { fromPoi: 'crystal', display: 'crystal', pool: ['raw_gems'], count: [3, 4] },
+    { fromPoi: 'mushroom', display: 'mushroom', pool: ['cave_mushrooms'], count: [3, 4] },
+    { fromPoi: 'mushroom', display: 'mushroom', pool: ['glowing_fungi'], count: [3, 4] },
+    { fromPoi: 'ore', display: 'ore', pool: ['exposed_minerals'], count: [3, 4] },
+  ],
+  mountain: [
+    { fromPoi: 'crystal', display: 'crystal', pool: ['mountain_crystal', 'mountain_crystal', 'storm_crystal'], count: [3, 4] },
+    { fromPoi: 'ore', display: 'ore', pool: ['exposed_minerals', 'rare_ore'], count: [2, 3] },
+  ],
+  ruins: [
+    { fromPoi: 'urn', display: 'urn', pool: ['pearl', 'salvaged_goods', 'salvaged_goods', 'ancient_scroll'], count: [2, 3] },
+    { fromPoi: 'overgrowth', display: 'overgrowth', pool: ['history_tome', 'enchanted_trinket', 'salvaged_goods'], count: [2, 3] },
+  ],
 };
 
 const clone = (obj) => JSON.parse(JSON.stringify(obj));
 
-// Turn 1-3 of a site's scattered crystal decorations into harvestable deposits:
-// tile.content = { kind:'loot', display:'crystal', ... } so the existing walk-onto-loot
-// flow grants the items, while `display` tells the renderer to draw the 💎 instead of 💰.
-// Every OTHER decorative crystal is demoted to plain floor, so on newly populated sites a
-// crystal you can SEE is always a crystal you can HARVEST (no more unpickable teasers).
-// Cave/mountain sites only; runs once per site under the same `populated` guard.
-function placeCrystalDeposits(site, rng) {
-  const lootPool = CRYSTAL_LOOT[site.type];
-  if (!lootPool || !Array.isArray(site.mapData)) return 0;
+// Convert scattered decorations into harvestable nodes per HARVEST_NODES. Every leftover
+// decoration of a harvestable kind is demoted to bare floor, so on newly populated sites a
+// resource you can SEE is always a resource you can HARVEST (no unpickable teasers).
+// Runs once per site under the same `populated` guard; sites cached before a node kind
+// existed keep their decorative-only tiles (never retro-mutated).
+function placeHarvestNodes(site, rng) {
+  const specs = HARVEST_NODES[site.type];
+  if (!specs || !Array.isArray(site.mapData)) return 0;
 
   // Row-major sweep keeps candidate order (and thus placement) deterministic per seed.
-  const crystalTiles = [];
+  const byPoi = {};
   const plainFloors = [];
   site.mapData.forEach((row) => Array.isArray(row) && row.forEach((tile) => {
     if (!tile || !tile.walkable || tile.type === 'entrance' || tile.contentSlot || tile.content) return;
-    if (tile.poi === 'crystal') crystalTiles.push(tile);
-    else if (!tile.poi && tile.type === 'floor') plainFloors.push(tile);
+    if (tile.poi) (byPoi[tile.poi] = byPoi[tile.poi] || []).push(tile);
+    else if (tile.type === 'floor') plainFloors.push(tile);
   }));
 
-  const target = 1 + Math.floor(rng() * 3); // 1-3 deposits per site
   const takeFrom = (pool) => pool.splice(Math.floor(rng() * pool.length), 1)[0];
-  const deposits = [];
-  // Prefer tiles where the generator already put crystals (organic placement); pad from
-  // plain floor if the scatter pass happened to produce too few.
-  while (deposits.length < target && crystalTiles.length > 0) deposits.push(takeFrom(crystalTiles));
-  while (deposits.length < target && plainFloors.length > 0) deposits.push(takeFrom(plainFloors));
+  let placed = 0;
+  specs.forEach((spec) => {
+    const candidates = byPoi[spec.fromPoi] || [];
+    const target = spec.count[0] + Math.floor(rng() * (spec.count[1] - spec.count[0] + 1));
+    const nodes = [];
+    // Prefer tiles where the generator already put the matching decoration (organic
+    // placement); pad from plain floor if the scatter pass happened to produce too few.
+    while (nodes.length < target && candidates.length > 0) nodes.push(takeFrom(candidates));
+    while (nodes.length < target && plainFloors.length > 0) nodes.push(takeFrom(plainFloors));
 
-  deposits.forEach((tile) => {
-    tile.poi = null; // the content overlay renders the 💎 (and dims it once harvested)
-    const item = lootPool[Math.floor(rng() * lootPool.length)];
-    tile.content = { kind: 'loot', display: 'crystal', loot: { gold: 0, items: [item] }, consumed: false };
+    nodes.forEach((tile) => {
+      tile.poi = null; // the content overlay renders the node (and dims it once harvested)
+      const item = spec.pool[Math.floor(rng() * spec.pool.length)];
+      tile.content = { kind: 'loot', display: spec.display, loot: { gold: 0, items: [item] }, consumed: false };
+    });
+    placed += nodes.length;
   });
-  // Leftover decorative crystals would tease the player — demote them to bare floor.
-  crystalTiles.forEach((tile) => { tile.poi = null; });
-  return deposits.length;
+  // Leftover decorations of a harvestable kind would tease the player: demote to floor.
+  specs.forEach((spec) => (byPoi[spec.fromPoi] || []).forEach((tile) => { tile.poi = null; }));
+  return placed;
 }
 
 const rollLoot = (type, rng, hoard) => {
@@ -177,14 +199,14 @@ export function populateSite(site, seed) {
     });
   }
 
-  // After the slots, convert some scattered 💎 decorations into harvestable deposits
-  // (cave/mountain sites only; no-op elsewhere). Runs AFTER the slot rolls so the slot
+  // After the slots, convert some scattered decorations into harvestable nodes
+  // (cave/mountain/ruins; no-op elsewhere). Runs AFTER the slot rolls so the slot
   // content for a given seed is unchanged from before this feature existed.
-  const depositCount = placeCrystalDeposits(site, rng);
+  const nodeCount = placeHarvestNodes(site, rng);
 
   site.populated = true;
   logger.info(`[SITE] Populated ${site.type} "${site.name}" (loot: ${lootType}, mobs: ${combatType}) with ${slots.length} content slots` +
-    (depositCount ? ` + ${depositCount} crystal deposits` : ''));
+    (nodeCount ? ` + ${nodeCount} harvest nodes` : ''));
   return site;
 }
 
@@ -213,33 +235,80 @@ function makeBossEncounter(objective, type) {
 }
 
 /**
- * Place a campaign milestone objective into a site, on the deepest room (the climax),
- * overriding whatever populateSite put there. Mirrors injectQuestBuildings for towns.
+ * Place quest objectives into a site, deepest rooms first (the climax), overriding
+ * whatever populateSite put there. Mirrors injectQuestBuildings for towns. Accepts one
+ * objective or a list (playtest 2026-07-04: several active quests can target the same
+ * site type, so each gets its OWN slot instead of first-quest-wins).
+ *
+ * Idempotent per milestoneId: an objective already present on any tile is skipped, so
+ * re-running on every site entry (fresh or cached) is safe and fixes "accepted the quest
+ * after first visiting the site". When the claimed slot held unconsumed loot (e.g. the
+ * hoard on the deepest slot), that loot is CARRIED on the objective content (`loot`)
+ * and still pays out on arrival for item/location objectives (Game.js grants it).
+ *
  * @param {Object} site - a generated (ideally populated) site.
- * @param {Object} objective - { objectiveType:'item'|'combat'|'location', id, name,
- *   milestoneId, description? }. `id` is the milestone trigger id (itemId/enemyId/locationId).
- * @returns {Object} the same site with the objective tile set + site.objective recorded.
+ * @param {Object|Array} objectiveOrList - { objectiveType:'item'|'combat'|'location', id,
+ *   name, milestoneId, description? } or an array of them. `id` is the milestone trigger
+ *   id (itemId/enemyId/locationId).
+ * @returns {Object} the same site with objective tiles set + site.objectives recorded.
  */
-export function injectSiteObjective(site, objective) {
-  if (!site || !objective || !Array.isArray(site.contentSlots) || site.contentSlots.length === 0) return site;
+export function injectSiteObjective(site, objectiveOrList) {
+  const objectives = (Array.isArray(objectiveOrList) ? objectiveOrList : [objectiveOrList]).filter(Boolean);
+  if (!site || objectives.length === 0 || !Array.isArray(site.contentSlots) || site.contentSlots.length === 0) return site;
   const type = site.type === 'ruins' ? 'ruins' : 'cave';
   const entry = site.entryPoint || { x: 0, y: 0 };
   const dist = (p) => Math.abs(p.x - entry.x) + Math.abs(p.y - entry.y);
-  const slot = site.contentSlots.reduce((a, b) => (dist(b) > dist(a) ? b : a));
-  const tile = site.mapData[slot.y] && site.mapData[slot.y][slot.x];
-  if (!tile) return site;
+  const tileAt = (p) => site.mapData[p.y] && site.mapData[p.y][p.x];
 
-  const objectiveType = objective.objectiveType;
-  const common = { kind: 'objective', objectiveType, milestoneId: objective.milestoneId, consumed: false };
-  if (objectiveType === 'combat') {
-    tile.content = { ...common, encounter: makeBossEncounter(objective, type) };
-  } else if (objectiveType === 'item') {
-    tile.content = { ...common, item: { id: objective.id, name: objective.name } };
-  } else { // 'location' — reaching this room completes the milestone
-    tile.content = { ...common, locationId: objective.id, name: objective.name };
-  }
-  site.objective = { x: slot.x, y: slot.y, ...objective };
-  logger.info(`[SITE] Injected ${objectiveType} objective "${objective.name}" into "${site.name}"`);
+  // Idempotence reads the TILES, not bookkeeping fields, so sites cached before
+  // site.objectives existed (old saves carry only site.objective) are handled too.
+  const placedIds = new Set();
+  site.mapData.forEach((row) => Array.isArray(row) && row.forEach((t) => {
+    if (t && t.content && t.content.kind === 'objective' && t.content.milestoneId != null) {
+      placedIds.add(t.content.milestoneId);
+    }
+  }));
+
+  // Deepest open slots first; slots already claimed by an objective stay claimed.
+  const openSlots = site.contentSlots
+    .slice()
+    .sort((a, b) => dist(b) - dist(a))
+    .filter((p) => { const t = tileAt(p); return t && !(t.content && t.content.kind === 'objective'); });
+
+  // When slots run short, hard dependencies win: an item/combat objective can only ever
+  // complete on its slot, while a location objective is the softest to drop.
+  const PRIORITY = { item: 0, combat: 1, location: 2 };
+  const pending = objectives
+    .filter((o) => o && o.milestoneId != null && !placedIds.has(o.milestoneId))
+    .sort((a, b) => (PRIORITY[a.objectiveType] ?? 3) - (PRIORITY[b.objectiveType] ?? 3));
+
+  pending.forEach((objective) => {
+    const slot = openSlots.shift();
+    if (!slot) {
+      logger.warn(`[SITE] No free content slot in "${site.name}" for objective "${objective.name}" (${objective.milestoneId}); it will inject on a later visit once a slot frees up`);
+      return;
+    }
+    const tile = tileAt(slot);
+    // Carry unclaimed loot under the objective so the hoard isn't deleted (R1).
+    const carriedLoot = tile.content && tile.content.kind === 'loot' && !tile.content.consumed
+      ? tile.content.loot : null;
+    const objectiveType = objective.objectiveType;
+    const common = {
+      kind: 'objective', objectiveType, milestoneId: objective.milestoneId, consumed: false,
+      ...(carriedLoot ? { loot: carriedLoot } : {}),
+    };
+    if (objectiveType === 'combat') {
+      tile.content = { ...common, encounter: makeBossEncounter(objective, type) };
+    } else if (objectiveType === 'item') {
+      tile.content = { ...common, item: { id: objective.id, name: objective.name } };
+    } else { // 'location': reaching this room completes the milestone
+      tile.content = { ...common, locationId: objective.id, name: objective.name };
+    }
+    const record = { x: slot.x, y: slot.y, ...objective };
+    site.objectives = [...(site.objectives || []), record];
+    site.objective = site.objective || record; // legacy single-objective field (older readers)
+    logger.info(`[SITE] Injected ${objectiveType} objective "${objective.name}" into "${site.name}" at (${slot.x},${slot.y})`);
+  });
   return site;
 }
 

@@ -4,6 +4,7 @@ import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
 import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver';
 import { areRequirementsMet, findMarkerMilestoneIndex } from '../game/milestoneEngine';
+import { getStepHint } from '../game/questHints';
 import { formatPartyInfo } from '../game/promptComposer';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
 import { composeIntro } from '../game/introComposer';
@@ -90,6 +91,21 @@ const formatMilestonePromptText = (milestoneStatus) => {
         text += '\nLocked (prerequisites not met): ' + locked.map(m => m.text).join('; ');
     }
     return text;
+};
+
+// Ground ACTIVE side quests in the prompt so the DM narrates their real sources instead
+// of inventing locations ("the herbalist in the next valley") for quest items. Compact:
+// title + current step + the factual questHints source line, capped at a few quests.
+const formatSideQuestPromptText = (sideQuests) => {
+    const active = (sideQuests || []).filter(q => q && q.status === 'active').slice(0, 3);
+    if (active.length === 0) return '';
+    const lines = active.map(q => {
+        const step = (q.milestones || []).find(m => !m.completed);
+        if (!step) return q.title;
+        const hint = getStepHint(step, q);
+        return `${q.title}: ${step.text}${hint ? ` [${hint}]` : ''}`;
+    });
+    return `\nActive Side Quests: ${lines.join('; ')}. Quest items and objectives are found exactly where these bracketed hints say; do not invent other locations, vendors, or sources for them.`;
 };
 
 // Helper function to clean AI responses
@@ -392,8 +408,9 @@ const useGameInteraction = (
         // Get milestone status
         const milestoneStatus = getMilestoneStatus(settings.milestones);
         const milestonesInfo = formatMilestonePromptText(milestoneStatus);
+        const sideQuestsInfo = formatSideQuestPromptText(settings.sideQuests);
 
-        const gameContext = `Setting: ${settings.shortDescription || 'A mystery fantasy world'}. Mood: ${settings.grimnessLevel || 'Normal'} Intensity. Magic: ${settings.magicLevel || 'Standard'}. Tech: ${settings.technologyLevel || 'Medieval'}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
+        const gameContext = `Setting: ${settings.shortDescription || 'A mystery fantasy world'}. Mood: ${settings.grimnessLevel || 'Normal'} Intensity. Magic: ${settings.magicLevel || 'Standard'}. Tech: ${settings.technologyLevel || 'Medieval'}.${goalInfo}${milestonesInfo}${sideQuestsInfo}\n${locationInfo}. Party: ${partyInfo}.`;
 
         const prompt = `[ADVENTURE START]\n\n[CONTEXT]\n${gameContext}\n\nCurrent Summary: ${currentSummary || 'They stand ready at the journey\'s beginning.'}\n\n[TASK]\nDescribe the arrival of the party and the immediate atmosphere of the scene. Present the initial situation to the players. Use the context provided to set the stage. Begin your response directly with the narrative description.`;
 
@@ -473,8 +490,9 @@ const useGameInteraction = (
         // Get milestone status
         const milestoneStatusRegular = getMilestoneStatus(settings.milestones);
         const milestonesInfoRegular = formatMilestonePromptText(milestoneStatusRegular);
+        const sideQuestsInfoRegular = formatSideQuestPromptText(settings.sideQuests);
 
-        const gameContext = `Setting: ${settings.shortDescription || 'Fantasy Realm'}. Mood: ${settings.grimnessLevel || 'Normal'}.${goalInfo}${milestonesInfoRegular}\n${locationInfo}. Party: ${partyInfo}.`;
+        const gameContext = `Setting: ${settings.shortDescription || 'Fantasy Realm'}. Mood: ${settings.grimnessLevel || 'Normal'}.${goalInfo}${milestonesInfoRegular}${sideQuestsInfoRegular}\n${locationInfo}. Party: ${partyInfo}.`;
 
         // Query RAG for relevant past events (appended at end for cache-friendliness)
         let ragContext = '';

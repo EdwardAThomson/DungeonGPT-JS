@@ -180,6 +180,12 @@ export const launchCampaign = (spec, options = {}) => {
     const availableSites = {
         cave: flatTiles.some((t) => t.poi === 'cave_entrance'),
         ruins: flatTiles.some((t) => t.poi === 'ruins'),
+        // Open site types: gather quests hint these as item sources (questEngine
+        // isQuestEligible checks m.sites against this map), so include them here
+        // exactly as deriveSideQuestAvailability does at load.
+        forest: flatTiles.some((t) => t.poi === 'forest'),
+        hills: flatTiles.some((t) => t.poi === 'hills'),
+        mountain: flatTiles.some((t) => t.poi === 'mountain'),
     };
     const availableBuildings = new Set();
     Object.values(townMapsCache).forEach((tm) => {

@@ -56,6 +56,9 @@ export const isQuestEligible = (quest, availability = {}) => {
   // completable: every step's site / turn-in target must exist
   for (const m of quest.milestones) {
     if (m.site && !sites[m.site.type]) return false;
+    // Gather steps carry a `sites` source hint (where the item can actually be
+    // harvested); the quest is completable if ANY of those site types exists.
+    if (Array.isArray(m.sites) && m.sites.length > 0 && !m.sites.some((t) => sites[t])) return false;
     if (m.trigger?.turnIn?.building && !hasBuilding(m.trigger.turnIn.building)) return false;
   }
   return true;
@@ -107,6 +110,11 @@ export const deriveSideQuestAvailability = (worldMap, townMapsCache) => {
   const sites = {
     cave: flatTiles.some((t) => t?.poi === 'cave_entrance'),
     ruins: flatTiles.some((t) => t?.poi === 'ruins'),
+    // Open (never-hidden) site types: gather quests hint these as item sources, so
+    // eligibility must know whether they exist on the map.
+    forest: flatTiles.some((t) => t?.poi === 'forest'),
+    hills: flatTiles.some((t) => t?.poi === 'hills'),
+    mountain: flatTiles.some((t) => t?.poi === 'mountain'),
   };
   const buildings = new Set();
   Object.values(townMapsCache || {}).forEach((tm) => {
@@ -315,22 +323,30 @@ export const getRevealedSiteTypes = (sideQuests) => {
   const revealed = {};
   (sideQuests || []).forEach((q) => {
     if (q.status === 'available') return;
-    q.milestones.forEach((m) => { if (m.site) revealed[m.site.type] = true; });
+    q.milestones.forEach((m) => {
+      if (m.site) revealed[m.site.type] = true;
+      // Gather steps reveal their source sites too, so e.g. taking "collect 3 cave
+      // mushrooms" uncovers the cave the mushrooms grow in.
+      (m.sites || []).forEach((t) => { revealed[t] = true; });
+    });
   });
   return revealed;
 };
 
 /**
- * Collect the site objectives a quest chain wants, keyed by site type ('cave'|'ruins'),
+ * Collect the site objectives quest chains want, keyed by site type ('cave'|'ruins'),
  * for ACTIVE quests only — so a site reveals/injects only once its quest is picked up.
- * Mirrors requiredBuildings for towns.
+ * Mirrors requiredBuildings for towns. Returns an ARRAY per type: several active quests
+ * can target the same site type and each objective gets its own content slot (playtest
+ * 2026-07-04: first-quest-wins left the second quest's item uncollectable).
+ * @returns {{ cave?: Array, ruins?: Array }}
  */
 export const getActiveSiteObjectives = (sideQuests) => {
   const byType = {};
   getActiveSideQuests(sideQuests).forEach((q) => {
     q.milestones.forEach((m) => {
-      if (m.site && !m.completed && !byType[m.site.type]) {
-        byType[m.site.type] = { ...m.site, milestoneId: m.id, questId: q.id };
+      if (m.site && !m.completed) {
+        (byType[m.site.type] = byType[m.site.type] || []).push({ ...m.site, milestoneId: m.id, questId: q.id });
       }
     });
   });

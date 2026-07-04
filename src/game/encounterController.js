@@ -116,6 +116,42 @@ export const applyEncounterOutcomeToParty = ({ party, result }) => {
  *   result.isTeamEncounter and result.supporterCount
  * @returns {{ updatedParty, heroIndex, rewardMessages, penaltyMessages }}
  */
+/**
+ * Party-wide MILESTONE / QUEST reward distribution (#55): every party member
+ * receives the FULL XP amount, not a split. The authored reward values are
+ * tuned against the per-hero XP_THRESHOLDS curve (and the progression lint's
+ * XP-budget guard compares each world's pot against per-hero thresholds), so
+ * splitting would strand everyone but the lead below the validated curve.
+ * Gold, items and healing still route through the lead (shared-pool
+ * convention), and KO'd heroes are paid too: a campaign step is the whole
+ * party's achievement. Combat XP keeps its own split rules in
+ * applyTeamEncounterOutcomeToParty above.
+ */
+export const applyPartyRewardsToAll = ({ party, rewards, leadIndex = 0 }) => {
+  if (!Array.isArray(party) || party.length === 0) {
+    return { updatedParty: party || [], rewardMessages: [] };
+  }
+  const lead = Math.min(Math.max(leadIndex, 0), party.length - 1);
+  const rewardMessages = [];
+  const updatedParty = party.map((hero, i) => {
+    const slice = i === lead ? rewards : { xp: rewards?.xp || 0 };
+    const { hero: updated, messages } = applyEncounterRewards({ ...hero }, slice);
+    messages.forEach((m) => {
+      if (/^\+\d+ XP$/.test(m)) return; // announced once, party-wide, below
+      if (m.includes('LEVEL UP')) {
+        rewardMessages.push(`${hero.characterName || `Hero ${i + 1}`} ${m}`);
+      } else if (i === lead) {
+        rewardMessages.push(m);
+      }
+    });
+    return updated;
+  });
+  if ((rewards?.xp || 0) > 0) {
+    rewardMessages.unshift(`+${rewards.xp} XP to each party member`);
+  }
+  return { updatedParty, rewardMessages };
+};
+
 export const applyTeamEncounterOutcomeToParty = ({ party, result }) => {
   if (!result?.isTeamEncounter || !Array.isArray(party) || party.length <= 1) {
     return applyEncounterOutcomeToParty({ party, result });

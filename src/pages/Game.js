@@ -35,6 +35,7 @@ import {
 import {
   ageNarrativeHook,
   applyEncounterOutcomeToParty,
+  applyPartyRewardsToAll,
   applyTeamEncounterOutcomeToParty,
   planWorldTileEncounterFlow,
   formatEncounterPenaltyLog,
@@ -529,16 +530,23 @@ const Game = ({ resumeConversation = null }) => {
         let party = currentParty;
         completions.forEach(c => {
           const stepRewards = c.rewards || { xp: 0, gold: 0, items: [] };
-          party = applyEncounterOutcomeToParty({ party, result: { rewards: stepRewards, heroIndex: 0 } }).updatedParty;
+          // Quest rewards are party-wide too (#55): full XP each, loot via lead.
+          const stepResult = applyPartyRewardsToAll({ party, rewards: stepRewards });
+          party = stepResult.updatedParty;
+          const rewardLines = [...stepResult.rewardMessages];
           if (c.questCompleted && c.questRewards) {
-            party = applyEncounterOutcomeToParty({ party, result: { rewards: c.questRewards, heroIndex: 0 } }).updatedParty;
+            const questResult = applyPartyRewardsToAll({ party, rewards: c.questRewards });
+            party = questResult.updatedParty;
+            rewardLines.push(...questResult.rewardMessages);
           }
           // Codex (#51): reward items entering the party's hands are discoveries.
           recordItemsInCodex([...(stepRewards.items || []), ...((c.questCompleted && c.questRewards?.items) || [])]);
-          interactionHook.setConversation(prev => [...prev, {
-            role: 'system',
-            content: c.questCompleted ? `🎉 Side quest complete: ${c.title}!` : `✓ ${c.milestone.text}`
-          }]);
+          // Surface the XP/loot payout with the completion line (it used to be silent),
+          // and mirror it into the site notice when the step completed inside a site.
+          const headline = c.questCompleted ? `🎉 Side quest complete: ${c.title}!` : `✓ ${c.milestone.text}`;
+          const content = rewardLines.length > 0 ? `${headline}\n${rewardLines.join(' · ')}` : headline;
+          interactionHook.setConversation(prev => [...prev, { role: 'system', content }]);
+          if (mapHook.isInsideSite) mapHook.pushSiteNotice(content);
         });
         setSelectedHeroes(party);
         setTimeout(() => performSave(), 500);
@@ -571,18 +579,16 @@ const Game = ({ resumeConversation = null }) => {
       // Persist promptly — milestone completions previously waited up to 30s for autosave.
       setTimeout(() => performSave(), 500);
 
-      // Apply milestone rewards to lead hero
+      // Milestones are party achievements (#55): full XP to every member;
+      // gold/items still pool through the lead.
       const rewards = getMilestoneRewards(result.milestone);
       if (rewards.items.length > 0) recordItemsInCodex(rewards.items); // codex (#51)
       if (rewards.xp > 0 || rewards.gold > 0 || rewards.items.length > 0) {
-        const rewardResult = applyEncounterOutcomeToParty({
-          party: currentParty,
-          result: { rewards, heroIndex: 0 }
-        });
+        const rewardResult = applyPartyRewardsToAll({ party: currentParty, rewards });
         setSelectedHeroes(rewardResult.updatedParty);
-        const heroName = rewardResult.updatedParty[0]?.characterName || 'Hero';
-        const rewardLog = formatEncounterRewardLog(heroName, rewardResult.rewardMessages);
-        if (rewardLog) logger.info(rewardLog);
+        if (rewardResult.rewardMessages.length > 0) {
+          logger.info(`[MILESTONE REWARDS] ${rewardResult.rewardMessages.join(' · ')}`);
+        }
       }
 
       // Chat celebration message (also serves as context for the AI's next narration)
@@ -596,6 +602,13 @@ const Game = ({ resumeConversation = null }) => {
           : `🎉 Milestone Achieved! 🎉\n${result.milestone.text}${rewardSummary}`
       };
       interactionHook.setConversation(prev => [...prev, celebrationMsg]);
+      // Milestones completed while exploring a site (e.g. reaching an objective room)
+      // must be visible in the map modal too, not just in the hidden chat log.
+      if (mapHook.isInsideSite) {
+        mapHook.pushSiteNotice(result.campaignComplete
+          ? '🏆 CAMPAIGN COMPLETE!'
+          : `🎉 Milestone achieved: ${result.milestone.text}${rewardSummary}`);
+      }
 
       if (result.campaignComplete) {
         setSettings(prev => ({ ...prev, campaignComplete: true }));
@@ -650,7 +663,11 @@ const Game = ({ resumeConversation = null }) => {
     const parts = [];
     if (loot.gold) parts.push(`${loot.gold} gold`);
     if (itemNames.length) parts.push(itemNames.join(', '));
-    interactionHook.setConversation(prev => [...prev, { role: 'system', content: `💰 You find ${parts.join(' and ')}.` }]);
+    const message = parts.length > 0 ? `💰 You find ${parts.join(' and ')}.` : '💰 You find nothing of value.';
+    interactionHook.setConversation(prev => [...prev, { role: 'system', content: message }]);
+    // The chat log is hidden behind the fullscreen map modal, so mirror the grant into
+    // the in-modal site notice (playtest R1/R4-R6: pickups looked like nothing happened).
+    if (mapHook.isInsideSite) mapHook.pushSiteNotice(message);
     recordItemsInCodex(loot.items); // codex (#51): looted items are discoveries
     (loot.items || []).forEach(k => checkMilestoneEvent({ type: 'item_acquired', itemId: k }, selectedHeroes));
     setTimeout(() => performSave(), 500);
@@ -676,6 +693,7 @@ const Game = ({ resumeConversation = null }) => {
       return heroes;
     });
     interactionHook.setConversation(prev => [...prev, { role: 'system', content: `❗ You recover ${item.name}.` }]);
+    if (mapHook.isInsideSite) mapHook.pushSiteNotice(`❗ You recover ${item.name}.`);
     recordItemsInCodex([item.id]); // codex (#51): catalog items announce; quest items track silently
     checkMilestoneEvent({ type: 'item_acquired', itemId: item.id }, selectedHeroes);
     setTimeout(() => performSave(), 500);
@@ -709,8 +727,13 @@ const Game = ({ resumeConversation = null }) => {
         grantSiteLoot(c.loot);
       } else if (c.kind === 'objective' && c.objectiveType === 'item') {
         grantObjectiveItem(c.item);
+        // The objective may have been injected over a loot slot (the deep hoard):
+        // the carried loot still pays out alongside the quest item (playtest R1).
+        if (c.loot) grantSiteLoot(c.loot);
       } else if (c.kind === 'objective' && c.objectiveType === 'location') {
         interactionHook.setConversation(prev => [...prev, { role: 'system', content: `❗ You reach ${c.name}.` }]);
+        mapHook.pushSiteNotice(`❗ You reach ${c.name}.`);
+        if (c.loot) grantSiteLoot(c.loot); // carried hoard under the objective (R1)
         checkMilestoneEvent({ type: 'location_visited', locationId: c.locationId }, selectedHeroes);
         setTimeout(() => performSave(), 500);
       }
@@ -739,7 +762,12 @@ const Game = ({ resumeConversation = null }) => {
     setSettings(prev => ({ ...prev, sideQuests: acceptSideQuest(prev.sideQuests || [], questId) }));
     // Accepting a site-bound quest reveals its site type on the world map (sticky) — but
     // the player was never TOLD, which made "recover X from the cave" read as a mystery.
-    const siteTypes = [...new Set((q.milestones || []).filter(m => m.site).map(m => m.site.type))];
+    // Gather steps carry a `sites` source hint; only cave/ruins are actually hidden, so
+    // only those belong in the reveal note (forest/hills/mountain are always visible).
+    const siteTypes = [...new Set((q.milestones || []).flatMap(m => [
+      ...(m.site ? [m.site.type] : []),
+      ...((m.sites || []).filter(t => t === 'cave' || t === 'ruins')),
+    ]))];
     const revealNote = siteTypes.length > 0
       ? `\n🗺️ ${siteTypes.map(t => (t === 'ruins' ? 'Ruins have' : `A ${t} has`)).join(' and ')} been revealed on your world map.`
       : '';
@@ -772,13 +800,20 @@ const Game = ({ resumeConversation = null }) => {
     setSettings(prev => ({ ...prev, sideQuests: turnInQuest(prev.sideQuests || [], ctx).updatedSideQuests }));
     let party = selectedHeroes;
     completions.forEach(c => {
-      party = applyEncounterOutcomeToParty({ party, result: { rewards: c.rewards || { xp: 0, gold: 0, items: [] }, heroIndex: 0 } }).updatedParty;
+      // Turn-in rewards are party-wide (#55): full XP each, loot via lead.
+      const stepResult = applyPartyRewardsToAll({ party, rewards: c.rewards || { xp: 0, gold: 0, items: [] } });
+      party = stepResult.updatedParty;
+      const rewardLines = [...stepResult.rewardMessages];
       if (c.questCompleted && c.questRewards) {
-        party = applyEncounterOutcomeToParty({ party, result: { rewards: c.questRewards, heroIndex: 0 } }).updatedParty;
+        const questResult = applyPartyRewardsToAll({ party, rewards: c.questRewards });
+        party = questResult.updatedParty;
+        rewardLines.push(...questResult.rewardMessages);
       }
       // Codex (#51): turn-in reward items are discoveries.
       recordItemsInCodex([...((c.rewards?.items) || []), ...((c.questCompleted && c.questRewards?.items) || [])]);
-      interactionHook.setConversation(prev => [...prev, { role: 'system', content: c.questCompleted ? `🎉 Side quest complete: ${c.title}!` : `✓ ${c.milestone.text}` }]);
+      const headline = c.questCompleted ? `🎉 Side quest complete: ${c.title}!` : `✓ ${c.milestone.text}`;
+      const content = rewardLines.length > 0 ? `${headline}\n${rewardLines.join(' · ')}` : headline;
+      interactionHook.setConversation(prev => [...prev, { role: 'system', content }]);
     });
     setSelectedHeroes(party);
     setTimeout(() => performSave(), 500);

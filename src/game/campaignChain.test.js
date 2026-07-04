@@ -291,8 +291,25 @@ describe('buildInSaveContinuation: cached-town retro-injection', () => {
     const { cacheBefore, continuation } = setup();
     const before = cacheBefore['Millhaven'];
     const after = continuation.townMapsCache['Millhaven'];
-    // NPC roster untouched (t2 authors no NPC in Millhaven)
-    expect(after.npcs).toEqual(before.npcs);
+    // Roster conserved: same NPCs by name; a house-swap may REHOME residents of the
+    // converted house (playtest 2026-07-04: the Elder haunting the new archives),
+    // but nobody is added or removed, and nobody may still point at the venue.
+    expect(after.npcs.map((n) => n.name)).toEqual(before.npcs.map((n) => n.name));
+    const convertedCoords = [];
+    for (let y = 0; y < before.mapData.length; y++) {
+      for (let x = 0; x < before.mapData[y].length; x++) {
+        if (before.mapData[y][x].buildingType === 'house' && after.mapData[y][x].buildingType !== 'house') {
+          convertedCoords.push(`${x},${y}`);
+        }
+      }
+    }
+    after.npcs.filter((n) => !n.milestoneNpcId).forEach((n) => {
+      if (!n.location) return;
+      expect(convertedCoords).not.toContain(`${n.location.x},${n.location.y}`);
+      if (n.location.homeCoords) {
+        expect(convertedCoords).not.toContain(`${n.location.homeCoords.x},${n.location.homeCoords.y}`);
+      }
+    });
     // exactly the tiles of the converted building may differ
     let changed = 0;
     for (let y = 0; y < before.mapData.length; y++) {
@@ -526,5 +543,100 @@ describe('derived-state conflicts after the swap (maintainer supplement)', () =>
     if (staleBossTile) {
       expect(getMilestoneBossForTile(next.milestones, staleBossTile)).toBeNull();
     }
+  });
+});
+
+describe('missing quest venues prefer FREE GROUND over house conversion (maintainer decision 2026-07-04)', () => {
+  it('places a NEW building on grass; houses are not converted', () => {
+    const g = (x, y) => ({ type: 'grass', x, y });
+    const town = {
+      townName: 'Millhaven',
+      mapData: [
+        [{ type: 'building', buildingType: 'house', x: 0, y: 0 }, g(1, 0), g(2, 0)],
+        [g(0, 1), g(1, 1), g(2, 1)],
+        [g(0, 2), g(1, 2), g(2, 2)]
+      ],
+      npcs: []
+    };
+    const cache = retroInjectQuestContent({
+      townMapsCache: { Millhaven: town },
+      requiredBuildings: { Millhaven: [{ type: 'archives', name: 'Hall of Echoes', milestoneId: 1 }] },
+      milestones: [],
+      worldSeed: 1
+    });
+    const t = cache.Millhaven;
+    expect(t.mapData[0][0].buildingType).toBe('house');
+    const placed = t.mapData.flat().find((tile) => tile.buildingType === 'archives');
+    expect(placed).toBeDefined();
+    expect(placed.questBuilding).toBe(true);
+    expect(placed.buildingName).toBe('Hall of Echoes');
+    expect(placed.walkable).toBe(false);
+  });
+});
+
+// The single-row towns below have NO free ground, so they exercise the
+// last-resort house swap (and its resident rehoming).
+describe('retro house-swap rehomes displaced cached NPCs (playtest 2026-07-04)', () => {
+  // The swap takes the FIRST house in scan order and the village Elder lives in
+  // the FIRST residential site in scan order: systematically the same tile. Cached
+  // towns never re-run populateTown, so without rehoming the Elder haunts the new
+  // quest venue forever ("Leader of Millhaven" standing in the archives).
+  const makeCachedTown = () => ({
+    townName: 'Millhaven',
+    mapData: [[
+      { type: 'building', buildingType: 'house', x: 0, y: 0 },
+      { type: 'building', buildingType: 'house', buildingName: 'The Reed Cottage', x: 1, y: 0 },
+      { type: 'grass', x: 2, y: 0 }
+    ]],
+    npcs: [
+      {
+        name: 'Elder Anwen', job: 'Leader of Millhaven',
+        location: { x: 0, y: 0, buildingType: 'house', buildingName: 'house', homeCoords: { x: 0, y: 0 } }
+      },
+      {
+        name: 'Innkeep Roswyn', job: 'Innkeeper of The Gilded Goose', milestoneNpcId: null,
+        location: { x: 2, y: 0, buildingType: 'tavern', buildingName: 'The Gilded Goose', homeCoords: { x: 2, y: 0 } }
+      }
+    ]
+  });
+
+  it('moves residents of the swapped house to another house (home AND workplace)', () => {
+    const cache = retroInjectQuestContent({
+      townMapsCache: { Millhaven: makeCachedTown() },
+      requiredBuildings: { Millhaven: [{ type: 'archives', name: 'Hall of Echoes', milestoneId: 1 }] },
+      milestones: [],
+      worldSeed: 42
+    });
+    const town = cache.Millhaven;
+    expect(town.mapData[0][0].buildingType).toBe('archives');
+    const elder = town.npcs.find((n) => n.name === 'Elder Anwen');
+    expect(elder.location.homeCoords).toEqual({ x: 1, y: 0 });
+    expect(elder.location.x).toBe(1);
+    expect(elder.location.buildingName).toBe('The Reed Cottage');
+  });
+
+  it('leaves NPCs in untouched buildings alone', () => {
+    const cache = retroInjectQuestContent({
+      townMapsCache: { Millhaven: makeCachedTown() },
+      requiredBuildings: { Millhaven: [{ type: 'archives', name: 'Hall of Echoes', milestoneId: 1 }] },
+      milestones: [],
+      worldSeed: 42
+    });
+    const inn = cache.Millhaven.npcs.find((n) => n.name === 'Innkeep Roswyn');
+    expect(inn.location).toEqual(makeCachedTown().npcs[1].location);
+  });
+});
+
+describe('getNextCampaignOptions: openingAccessible (t1-to-t2 bridge, playtest 2026-07-04)', () => {
+  it('marks an under-leveled t2 as accessible when its opening milestone is ungated', () => {
+    const options = getNextCampaignOptions({
+      settings: { storyTemplateId: 'heroic-fantasy-t1' },
+      party: [{ level: 2 }, { level: 2 }, { level: 2 }],
+      worldMap: null
+    });
+    const t2 = options.find((o) => o.template.id === 'heroic-fantasy-t2');
+    expect(t2).toBeDefined();
+    expect(t2.underLeveled).toBe(true);
+    expect(t2.openingAccessible).toBe(true);
   });
 });

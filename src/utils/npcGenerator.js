@@ -533,7 +533,11 @@ export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
                 if (tile.buildingType === 'house' || tile.buildingType === 'manor' || tile.buildingType === 'keep') {
                     residentialSites.push({ x, y, type: tile.buildingType, name: tile.buildingName });
                 } else {
-                    serviceBuildings.push({ x, y, type: tile.buildingType, name: tile.buildingName });
+                    // Civic buildings (harbormaster, mill, jail, magetower, shrine...) are never
+                    // named by the town generator, and cached town maps can't be renamed
+                    // retroactively, so fall back to the town name: "Harbormaster of Willowdale",
+                    // never "Harbormaster of undefined".
+                    serviceBuildings.push({ x, y, type: tile.buildingType, name: tile.buildingName || townName });
                 }
             } else if (tile.type === 'farm_field' || (tile.type === 'building' && tile.buildingType === 'barn')) {
                 workSites.push({ x, y, type: tile.type === 'farm_field' ? 'field' : 'barn' });
@@ -542,9 +546,25 @@ export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
     }
 
     // Helper to add NPC with linkage
+    // Gender is DEALT from a balanced, seeded deck rather than flipped per NPC
+    // (maintainer directive, playtest 2026-07-04): fair independent coin flips
+    // produce same-gender streaks (runs of 5-6 building heads are expected over
+    // ~85 buildings) that read as bias in play. Dealing in shuffled Male/Female
+    // pairs pins every town at an exact 50/50 and caps dealt runs at 2. NPCs
+    // with an explicit gender (spouses, authored NPCs) bypass the deck.
+    let genderDeck = [];
+    const dealGender = () => {
+        if (genderDeck.length === 0) {
+            genderDeck = rng.random() < 0.5 ? ['Male', 'Female'] : ['Female', 'Male'];
+        }
+        return genderDeck.pop();
+    };
+
     const addNPC = (role, workplace, home, options = {}) => {
         const npcSeed = parseInt(seed) + (workplace.x * 1000) + (workplace.y * 100) + rng.range(0, 9999);
-        const npc = generateNPC({ seed: npcSeed, role, noEvil: true, ...options });
+        const opts = { seed: npcSeed, role, noEvil: true, ...options };
+        if (!opts.gender) opts.gender = dealGender();
+        const npc = generateNPC(opts);
 
         npc.location = {
             x: workplace.x,

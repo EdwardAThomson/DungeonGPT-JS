@@ -90,6 +90,24 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
     const [isInsideSite, setIsInsideSite] = useState(subMapsData?.isInsideSite || false);
     const [siteMapsCache, setSiteMapsCache] = useState(subMapsData?.siteMapsCache || {});
     const [siteError, setSiteError] = useState(null);
+    // In-modal feedback for site events (loot found, objectives reached, quest steps):
+    // the chat log is hidden behind the fullscreen map modal, so anything the player
+    // must SEE while exploring a site goes here. Cleared on move/enter/leave and
+    // auto-dismissed after a few seconds.
+    const [siteNotice, setSiteNotice] = useState(null);
+
+    useEffect(() => {
+        if (!siteNotice) return undefined;
+        const timer = setTimeout(() => setSiteNotice(null), 8000);
+        return () => clearTimeout(timer);
+    }, [siteNotice]);
+
+    // Append a line to the site notice (several grants can land on one arrival:
+    // objective + carried hoard + quest step completion).
+    const pushSiteNotice = (line) => {
+        if (!line) return;
+        setSiteNotice(prev => (prev ? `${prev}\n${line}` : line));
+    };
 
     // On mount: sync currentTownMap with cache to ensure discoveredBuildings is up to date
     useEffect(() => {
@@ -312,14 +330,18 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 logger.debug('Loading cached site map', key);
             }
 
-            // Inject an active quest objective for this site type (if picked up and not
-            // already present) — handles entering before vs. after taking the quest.
+            // Inject EVERY active quest objective for this site type that isn't already
+            // present. Runs on every entry (fresh or cached) and injectSiteObjective is
+            // idempotent per milestoneId, so this handles entering before vs. after
+            // taking a quest AND several active quests targeting the same site type
+            // (playtest 2026-07-04: second cave quest previously never injected).
             const normType = poiType === 'cave_entrance' ? 'cave' : poiType;
-            const siteObjective = requiredSiteObjectives && requiredSiteObjectives[normType];
-            if (siteObjective && (!siteMap.objective || siteMap.objective.milestoneId !== siteObjective.milestoneId)) {
-                injectSiteObjective(siteMap, siteObjective);
+            const rawObjectives = requiredSiteObjectives && requiredSiteObjectives[normType];
+            const objectiveList = Array.isArray(rawObjectives) ? rawObjectives : (rawObjectives ? [rawObjectives] : []);
+            if (objectiveList.length > 0) {
+                injectSiteObjective(siteMap, objectiveList);
                 setSiteMapsCache(prev => ({ ...prev, [key]: siteMap }));
-                logger.info('Injected quest objective into site', { key, milestoneId: siteObjective.milestoneId });
+                logger.info('Ensured quest objectives in site', { key, milestoneIds: objectiveList.map(o => o.milestoneId) });
             }
 
             setCurrentSiteMap(siteMap);
@@ -328,6 +350,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             setCurrentMapLevel('site');
             setIsInsideSite(true);
             setSiteError(null);
+            setSiteNotice(null);
 
             setConversation([...conversation, { role: 'system', content: `You venture into ${siteMap.name}.` }]);
             setIsMapModalOpen(true);
@@ -343,6 +366,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             return;
         }
         setSiteError(null);
+        setSiteNotice(null);
         setCurrentMapLevel('world');
         setCurrentSiteMap(null);
         setSitePlayerPosition(null);
@@ -362,6 +386,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         if (!targetTile) return null;
         if (!targetTile.walkable) { setError('You cannot move there.'); return null; }
         setSiteError(null);
+        setSiteNotice(null); // a fresh move clears the previous pickup/objective notice
         setSitePlayerPosition({ x: clickedX, y: clickedY });
         return targetTile;
     };
@@ -558,6 +583,8 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         isInsideSite,
         siteMapsCache,
         siteError,
+        siteNotice,
+        pushSiteNotice,
         handleLeaveSite,
         handleSiteTileClick,
         markSiteContentConsumed,

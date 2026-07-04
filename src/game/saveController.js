@@ -55,7 +55,14 @@ export const buildSaveFingerprint = ({
         hp: hero.currentHP,
         gold: hero.gold || 0,
         xp: hero.xp || 0,
-        inv: (hero.inventory || []).length
+        // Inventory by CONTENT and equipment by value (playtest 2026-07-04):
+        // fingerprinting only the inventory count made a pure equip, an
+        // equal-count swap, or a loadout change read as "no change", so the
+        // save was skipped and gear evaporated on the next load.
+        inv: (hero.inventory || [])
+          .map((i) => (typeof i === 'string' ? i : i?.key || ''))
+          .join(','),
+        eq: JSON.stringify(hero.equipment || null)
       }))
     )
   ].join('|');

@@ -248,7 +248,46 @@ export const injectQuestBuildings = (townMapData, requiredBuildings) => {
             continue;
         }
 
-        // Building type doesn't exist — find a house to swap
+        // Building type doesn't exist. Maintainer decision (2026-07-04): do NOT
+        // convert houses (people live there; the Elder's house was systematically
+        // the one converted). Place a NEW building on a free grass tile instead,
+        // preferring a spot adjacent to the built-up area so the venue sits in
+        // town rather than in a field.
+        const stampQuestBuilding = (tile) => {
+            tile.type = 'building';
+            tile.buildingType = req.type;
+            tile.buildingName = req.name || req.type;
+            tile.questBuilding = true;
+            tile.walkable = false;
+            tile.poi = null;
+            if (req.questItem) {
+                tile.questItemId = req.questItem.id;
+                tile.questItemName = req.questItem.name;
+            }
+        };
+        let spot = null;
+        let fallbackSpot = null;
+        for (let y = 1; y < mapData.length - 1 && !spot; y++) {
+            for (let x = 1; x < mapData[y].length - 1 && !spot; x++) {
+                const tile = mapData[y][x];
+                if (tile.type !== 'grass' || tile.poi) continue;
+                if (!fallbackSpot) fallbackSpot = tile;
+                const nearBuilding = [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => {
+                    const n = mapData[y + dy] && mapData[y + dy][x + dx];
+                    return n && n.type === 'building';
+                });
+                if (nearBuilding) spot = tile;
+            }
+        }
+        spot = spot || fallbackSpot;
+        if (spot) {
+            stampQuestBuilding(spot);
+            logger.info(`[SPAWN] Placed NEW quest building "${req.name}" (${req.type}) on free ground`);
+            continue;
+        }
+
+        // Last resort only (no free ground at all): swap a house. The retro path
+        // rehomes the displaced residents (rehomeDisplacedNpcs).
         let houseToSwap = null;
         for (let y = 0; y < mapData.length; y++) {
             for (let x = 0; x < mapData[y].length; x++) {
@@ -322,6 +361,37 @@ export const spawnCampaignIntoWorld = (worldMap, milestones) => {
  * @param {number|string} args.worldSeed - save's world seed (deterministic NPCs)
  * @returns {Object} new townMapsCache
  */
+// Move cached NPCs out of a house that a retro quest-injection just converted
+// into a quest venue. Cached towns never re-run populateTown, so without this
+// the old residents would be listed inside the new building forever. Milestone
+// NPCs are left alone (their venue IS their home).
+const rehomeDisplacedNpcs = (townClone, convertedCoords) => {
+    const convertedSet = new Set(convertedCoords);
+    const npcs = townClone.npcs || [];
+    const mapData = townClone.mapData || [];
+    const houses = [];
+    mapData.forEach((row, y) => row.forEach((tile, x) => {
+        if (tile.type === 'building' && tile.buildingType === 'house') houses.push({ x, y, tile });
+    }));
+    if (houses.length === 0) return;
+    let next = 0;
+    for (const npc of npcs) {
+        if (npc.milestoneNpcId || !npc.location) continue;
+        const home = npc.location.homeCoords;
+        const homeKey = home ? `${home.x},${home.y}` : null;
+        const workKey = `${npc.location.x},${npc.location.y}`;
+        if (!convertedSet.has(homeKey) && !convertedSet.has(workKey)) continue;
+        const dest = houses[next++ % houses.length];
+        if (convertedSet.has(homeKey)) npc.location.homeCoords = { x: dest.x, y: dest.y };
+        if (convertedSet.has(workKey)) {
+            npc.location.x = dest.x;
+            npc.location.y = dest.y;
+            npc.location.buildingName = dest.tile.buildingName || npc.location.buildingName;
+            npc.location.buildingType = 'house';
+        }
+    }
+};
+
 export const retroInjectQuestContent = ({ townMapsCache, requiredBuildings, milestones, worldSeed }) => {
     const cache = { ...(townMapsCache || {}) };
     const reqs = requiredBuildings || {};
@@ -334,7 +404,23 @@ export const retroInjectQuestContent = ({ townMapsCache, requiredBuildings, mile
         const townClone = JSON.parse(JSON.stringify(cache[townName]));
 
         if (buildings.length > 0) {
+            // injectQuestBuildings may SWAP a house into the quest venue. At initial
+            // generation that's invisible (populateTown runs afterwards), but cached
+            // towns carry their NPC roster forever, so anyone homed in the swapped
+            // house (the family, often the village Elder, who lives in the FIRST
+            // house in scan order, exactly the house the swap picks) would haunt
+            // the new venue: "Leader of Millhaven" standing in the archives.
+            // Snapshot house tiles, inject, then rehome the displaced.
+            const houseCoords = new Set();
+            (townClone.mapData || []).forEach((row, y) => row.forEach((tile, x) => {
+                if (tile.type === 'building' && tile.buildingType === 'house') houseCoords.add(`${x},${y}`);
+            }));
             injectQuestBuildings(townClone, buildings);
+            const converted = [...houseCoords].filter((k) => {
+                const [x, y] = k.split(',').map(Number);
+                return townClone.mapData[y][x].buildingType !== 'house';
+            });
+            if (converted.length > 0) rehomeDisplacedNpcs(townClone, converted);
             logger.info(`[RETRO] Injected ${buildings.length} quest building(s) into cached town "${townName}"`);
         }
 

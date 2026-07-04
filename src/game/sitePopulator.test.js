@@ -1,4 +1,4 @@
-import { populateSite, injectSiteObjective, LOOT, HOARD_BONUS } from './sitePopulator';
+import { populateSite, injectSiteObjective, LOOT, HOARD_BONUS, HARVEST_NODES } from './sitePopulator';
 import { generateSiteMap } from '../utils/siteMapGenerator';
 import { ITEM_CATALOG, filterDropsByTier } from '../utils/inventorySystem';
 import { encounterTemplates } from '../data/encounters';
@@ -82,19 +82,96 @@ describe('populateSite', () => {
       expect(tile.content.objectiveType).toBe('location');
       expect(tile.content.locationId).toBe('inner_sanctum');
     });
+
+    test('an objective injected over the hoard CARRIES its loot (playtest R1: no vanished treasure)', () => {
+      const site = make('ruins', 9); // seed 9: deepest slot is the loot hoard (asserted above)
+      const hoardLoot = deepestTile(site).content.loot;
+      expect(hoardLoot).toBeTruthy();
+      injectSiteObjective(site, { objectiveType: 'location', id: 'sealed_vault', name: 'the Sealed Vault', milestoneId: 'sv1' });
+      const tile = deepestTile(site);
+      expect(tile.content.kind).toBe('objective');
+      expect(tile.content.loot).toEqual(hoardLoot); // Game.js grants it on arrival
+    });
+
+    test('two objectives inject into DISTINCT slots (multi-quest per site)', () => {
+      // find a cave with at least 2 content slots
+      let site = null;
+      for (let seed = 1; seed <= 30 && !site; seed++) {
+        const s = make('cave', seed);
+        if (s.contentSlots.length >= 2) site = s;
+      }
+      expect(site).toBeTruthy();
+      injectSiteObjective(site, [
+        { objectiveType: 'item', id: 'silver_locket', name: 'the Silver Locket', milestoneId: 'lh1' },
+        { objectiveType: 'item', id: 'cure_root', name: 'the Cure-Root', milestoneId: 'cp1' },
+      ]);
+      const objTiles = site.mapData.flat().filter((t) => t.content?.kind === 'objective');
+      expect(objTiles).toHaveLength(2);
+      expect(objTiles.map((t) => t.content.milestoneId).sort()).toEqual(['cp1', 'lh1']);
+      expect(site.objectives).toHaveLength(2);
+    });
+
+    test('injection is idempotent per milestoneId (re-entry with the same active quests)', () => {
+      const site = make('cave', 3);
+      const list = [{ objectiveType: 'item', id: 'lost_codex', name: 'the Lost Codex', milestoneId: 'lc1' }];
+      injectSiteObjective(site, list);
+      injectSiteObjective(site, list); // second entry: no duplicate placement
+      const objTiles = site.mapData.flat().filter((t) => t.content?.kind === 'objective');
+      expect(objTiles).toHaveLength(1);
+      expect(site.objectives).toHaveLength(1);
+    });
+
+    test('a quest accepted AFTER the first visit still injects on the next entry', () => {
+      let site = null;
+      for (let seed = 1; seed <= 30 && !site; seed++) {
+        const s = make('cave', seed);
+        if (s.contentSlots.length >= 2) site = s;
+      }
+      injectSiteObjective(site, [{ objectiveType: 'item', id: 'silver_locket', name: 'the Silver Locket', milestoneId: 'lh1' }]);
+      // player later accepts a second cave quest, then re-enters
+      injectSiteObjective(site, [
+        { objectiveType: 'item', id: 'silver_locket', name: 'the Silver Locket', milestoneId: 'lh1' },
+        { objectiveType: 'item', id: 'cure_root', name: 'the Cure-Root', milestoneId: 'cp1' },
+      ]);
+      const ids = site.mapData.flat().filter((t) => t.content?.kind === 'objective').map((t) => t.content.milestoneId);
+      expect(ids.sort()).toEqual(['cp1', 'lh1']);
+    });
+
+    test('legacy cached sites (site.objective only, no site.objectives) are not re-injected', () => {
+      const site = make('cave', 3);
+      injectSiteObjective(site, { objectiveType: 'item', id: 'lost_codex', name: 'the Lost Codex', milestoneId: 'lc1' });
+      delete site.objectives; // simulate a save written before the multi-objective field
+      injectSiteObjective(site, [{ objectiveType: 'item', id: 'lost_codex', name: 'the Lost Codex', milestoneId: 'lc1' }]);
+      const objTiles = site.mapData.flat().filter((t) => t.content?.kind === 'objective');
+      expect(objTiles).toHaveLength(1); // idempotence reads the tiles, not the bookkeeping
+    });
+
+    test('overflow: with a single slot, the hard (item) objective wins over the location one', () => {
+      const site = generateSiteMap('cave', 'cave', 'south', 11, { biome: 'plains' });
+      site.contentSlots = site.contentSlots.slice(0, 1); // degenerate: one room only
+      populateSite(site, 11);
+      injectSiteObjective(site, [
+        { objectiveType: 'location', id: 'echo_hollow', name: 'the Echoing Hollow', milestoneId: 'sc1' },
+        { objectiveType: 'item', id: 'cure_root', name: 'the Cure-Root', milestoneId: 'cp1' },
+      ]);
+      const objTiles = site.mapData.flat().filter((t) => t.content?.kind === 'objective');
+      expect(objTiles).toHaveLength(1);
+      expect(objTiles[0].content.objectiveType).toBe('item');
+      expect(objTiles[0].content.milestoneId).toBe('cp1');
+    });
   });
 
   describe('crystal deposits (issue #38 — harvestable 💎)', () => {
     const allTiles = (site) => site.mapData.flat();
     const deposits = (site) => allTiles(site).filter((t) => t.content && t.content.display === 'crystal');
 
-    test('cave and mountain sites get 1-3 harvestable crystal deposits with valid loot', () => {
+    test('cave and mountain sites get 3-4 harvestable crystal deposits with valid loot', () => {
       ['cave', 'mountain'].forEach((type) => {
         for (let seed = 1; seed <= 25; seed++) {
           const site = make(type, seed);
           const nodes = deposits(site);
-          expect(nodes.length).toBeGreaterThanOrEqual(1);
-          expect(nodes.length).toBeLessThanOrEqual(3);
+          expect(nodes.length).toBeGreaterThanOrEqual(3);
+          expect(nodes.length).toBeLessThanOrEqual(4);
           nodes.forEach((tile) => {
             expect(tile.content.kind).toBe('loot'); // reuses the walk-onto-loot flow
             expect(tile.content.consumed).toBe(false);
@@ -169,6 +246,100 @@ describe('populateSite', () => {
       const before = JSON.stringify(site.mapData);
       populateSite(site, 21);
       expect(JSON.stringify(site.mapData)).toBe(before); // decor untouched, no deposits added
+    });
+  });
+
+  describe('harvest nodes (playtest 2026-07-04: mushrooms, ore, ruins parity)', () => {
+    const nodesOf = (site, display) => site.mapData.flat().filter((t) => t.content && t.content.display === display);
+
+    test('caves grow harvestable mushroom and ore nodes with catalog loot', () => {
+      for (let seed = 1; seed <= 25; seed++) {
+        const site = make('cave', seed);
+        const shrooms = nodesOf(site, 'mushroom');
+        const ore = nodesOf(site, 'ore');
+        // two mushroom specs (cave_mushrooms + glowing_fungi), 3-4 nodes each
+        expect(shrooms.length).toBeGreaterThanOrEqual(6);
+        expect(ore.length).toBeGreaterThanOrEqual(3);
+        [...shrooms, ...ore].forEach((tile) => {
+          expect(tile.content.kind).toBe('loot');
+          expect(tile.content.loot.gold).toBe(0);
+          expect(tile.content.loot.items).toHaveLength(1);
+          tile.content.loot.items.forEach((k) => expect(ITEM_CATALOG[k]).toBeTruthy());
+          expect(tile.poi).toBeNull();
+          expect(tile.contentSlot).toBeFalsy();
+          expect(tile.walkable).toBe(true);
+        });
+      }
+    });
+
+    test('every gather quest target is guaranteed by cave nodes: 3+ mushrooms, 3+ fungi, 3+ gems, 3+ ore', () => {
+      for (let seed = 1; seed <= 25; seed++) {
+        const site = make('cave', seed);
+        const itemCounts = {};
+        site.mapData.flat().forEach((t) => {
+          if (!t.content || !t.content.display) return;
+          t.content.loot.items.forEach((k) => { itemCounts[k] = (itemCounts[k] || 0) + 1; });
+        });
+        expect(itemCounts.cave_mushrooms).toBeGreaterThanOrEqual(3); // tend_sick
+        expect(itemCounts.glowing_fungi).toBeGreaterThanOrEqual(3);  // arcane_reagents
+        expect(itemCounts.raw_gems).toBeGreaterThanOrEqual(3);       // field_samples
+        expect(itemCounts.exposed_minerals).toBeGreaterThanOrEqual(3); // rare_ore / antidote
+      }
+    });
+
+    test('mountains keep crystals and gain ore nodes', () => {
+      for (let seed = 1; seed <= 25; seed++) {
+        const site = make('mountain', seed);
+        expect(nodesOf(site, 'crystal').length).toBeGreaterThanOrEqual(3);
+        const ore = nodesOf(site, 'ore');
+        expect(ore.length).toBeGreaterThanOrEqual(2);
+        ore.forEach((t) => t.content.loot.items.forEach((k) =>
+          expect(['exposed_minerals', 'rare_ore']).toContain(k)));
+      }
+    });
+
+    test('ruins are no longer pickup-free: urns + overgrowth caches with ruins-pool items', () => {
+      for (let seed = 1; seed <= 25; seed++) {
+        const site = make('ruins', seed);
+        const urns = nodesOf(site, 'urn');
+        const caches = nodesOf(site, 'overgrowth');
+        expect(urns.length).toBeGreaterThanOrEqual(2);
+        expect(caches.length).toBeGreaterThanOrEqual(2);
+        [...urns, ...caches].forEach((tile) => {
+          expect(tile.content.kind).toBe('loot');
+          tile.content.loot.items.forEach((k) => {
+            expect(ITEM_CATALOG[k]).toBeTruthy();
+            expect(LOOT.ruins).toContain(k); // ruins-appropriate loot only
+          });
+        });
+      }
+    });
+
+    test('no unpickable teasers: every decoration of a harvestable kind was converted or demoted', () => {
+      Object.keys(HARVEST_NODES).forEach((type) => {
+        const harvestKeys = HARVEST_NODES[type].map((s) => s.fromPoi);
+        for (let seed = 1; seed <= 25; seed++) {
+          const teasers = make(type, seed).mapData.flat().filter((t) => harvestKeys.includes(t.poi));
+          expect(teasers).toHaveLength(0);
+        }
+      });
+    });
+
+    test('forest and hills stay node-free (decorative flora only, for now)', () => {
+      ['forest', 'hills'].forEach((type) => {
+        for (let seed = 1; seed <= 10; seed++) {
+          const nodes = make(type, seed).mapData.flat().filter((t) => t.content && t.content.display);
+          expect(nodes).toHaveLength(0);
+        }
+      });
+    });
+
+    test('node placement is deterministic per seed', () => {
+      const sig = (site) => JSON.stringify(site.mapData.flat()
+        .filter((t) => t.content && t.content.display)
+        .map((t) => [t.x, t.y, t.content.display, t.content.loot.items]));
+      expect(sig(make('ruins', 77))).toBe(sig(make('ruins', 77)));
+      expect(sig(make('cave', 77))).toBe(sig(make('cave', 77)));
     });
   });
 

@@ -103,6 +103,14 @@ export const getNextCampaignOptions = ({ settings, party, worldMap = null } = {}
       sameGenre: !!genre && template.theme === genre,
       premiumLocked: !canUseTemplate(template),
       underLeveled: !!(template.levelRange && partyLevel < template.levelRange[0]),
+      // Campaigns ramp internally (early milestones are often ungated while deep
+      // chapters carry minLevel); an under-leveled party can still legitimately
+      // START such a quest and grow into it via rumours. Lets the picker tell
+      // the truth instead of only warning "may be deadly".
+      openingAccessible: (() => {
+        const first = (template.settings?.milestones || [])[0];
+        return !!first && (!first.minLevel || partyLevel >= first.minLevel);
+      })(),
       compatible: isTemplateCompatibleWithWorld(template, worldMap),
     }));
 
@@ -135,6 +143,12 @@ const selectContinuationSideQuests = ({ mapData, townMapsCache, existingSideQues
   const availableSites = {
     cave: flatTiles.some((t) => t.poi === 'cave_entrance'),
     ruins: flatTiles.some((t) => t.poi === 'ruins'),
+    // Parity with campaignLauncher: gather quests hint at forest/hills/mountain
+    // sources too; without these flags mountain-hinted quests were silently
+    // under-offered in chain continuations.
+    forest: flatTiles.some((t) => t.poi === 'forest'),
+    hills: flatTiles.some((t) => t.poi === 'hills'),
+    mountain: flatTiles.some((t) => t.poi === 'mountain'),
   };
   const availableBuildings = new Set();
   Object.values(townMapsCache || {}).forEach((tm) => {

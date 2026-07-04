@@ -144,3 +144,36 @@ describe('saveController', () => {
     expect(payload.visitedTowns).toEqual(['Oakrest']);
   });
 });
+
+describe('fingerprint covers gear (playtest 2026-07-04: equip-only changes were skipped as "no change")', () => {
+  const base = () => ({
+    conversation: [{ role: 'user', content: 'hi' }],
+    playerPosition: { x: 1, y: 1 },
+    currentMapLevel: 'world',
+    isInsideTown: false,
+    settings: { storyTitle: 'T', milestones: [], sideQuests: [] },
+    selectedHeroes: [{
+      currentHP: 10, gold: 5, xp: 100,
+      inventory: ['iron_sword', 'healing_potion'],
+      equipment: { weapon: null, armor: null, accessory: null }
+    }]
+  });
+
+  it('changes when a hero EQUIPS an item (inventory count unchanged)', () => {
+    const a = buildSaveFingerprint(base());
+    const equipped = base();
+    equipped.selectedHeroes[0].equipment = { weapon: 'iron_sword', armor: null, accessory: null };
+    expect(buildSaveFingerprint(equipped)).not.toBe(a);
+  });
+
+  it('changes on an equal-count inventory swap', () => {
+    const a = buildSaveFingerprint(base());
+    const swapped = base();
+    swapped.selectedHeroes[0].inventory = ['steel_sword', 'healing_potion'];
+    expect(buildSaveFingerprint(swapped)).not.toBe(a);
+  });
+
+  it('is stable when nothing changed', () => {
+    expect(buildSaveFingerprint(base())).toBe(buildSaveFingerprint(base()));
+  });
+});

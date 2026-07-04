@@ -6,7 +6,7 @@
 
 import { sampleBiomes, samplePois } from './worldTileArt';
 import { sampleTiles as townSamples, buildingTile, POI_EMOJI } from './townTileArt';
-import { sampleSiteTiles, SITE_DECORATIONS } from './siteTileArt';
+import { sampleSiteTiles, samplePoolTile, SITE_DECORATIONS, ART_POI } from './siteTileArt';
 
 const tile = (bg, label) => ({ bg, label });
 const mark = (emoji, label) => ({ emoji, label });
@@ -116,7 +116,9 @@ export function siteLegendGroups(theme = 'cave', biome = 'grassland') {
     {
       heading: 'Features',
       items: [
-        ...decos.map((d) => mark(d.emoji, d.label)),
+        // ART_POI decorations (the pool) are drawn as tile art, so the legend shows
+        // the same swatch the map renders instead of the legacy emoji.
+        ...decos.map((d) => (ART_POI.has(d.key) ? tile(samplePoolTile(t), d.label) : mark(d.emoji, d.label))),
         mark('⚔️', 'Encounter'),
         mark('💰', 'Treasure'),
       ],
