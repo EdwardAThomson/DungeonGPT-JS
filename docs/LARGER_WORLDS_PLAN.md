@@ -197,6 +197,16 @@ held on every surveyed seed.
 and the ocean-side model may all still change freely; they become save-affecting (and
 frozen, per §3) only when growable saves or paid world sizes ship on top of them.
 
+## 7b. Follow-up notes (2026-07-05 maintainer review)
+
+- **World-level lake quota (#63)**: per-chunk 32% compounds on 3x3 (5-lake
+  worlds observed). Replace with seeded world-level slot assignment, hard cap.
+- **Realism direction (#66)**: world-level elevation/moisture FIELDS sampled
+  by chunks would make seam continuity automatic and unlock coherent
+  hydrology (rivers to sea, estuaries -> #65 water towns). Candidate
+  successor to per-chunk edge constraints; evaluate before freezing the
+  chunk scheme.
+
 ## 8. Open questions
 
 - Chunk count per tier: 2x2 for Members, 3x3 for Premium? (Tier ladder says

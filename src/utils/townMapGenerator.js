@@ -155,7 +155,10 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   if (entryDirs.length === 0) entryDirs = ['south'];
   entryDirs = [...new Set(entryDirs)];
 
-  const entrances = entryDirs.map((dir) => ({ dir, pos: calculateEntryPosition(width, height, dir) }));
+  // Gates get a seeded jitter along their edge so entrances are not always dead-centre
+  // (and so gate roads are rarely axis-aligned with the hub, which reads as a straight
+  // ray). Jitter keeps clear of corners and never lands on water.
+  const entrances = entryDirs.map((dir) => ({ dir, pos: jitterGatePosition(calculateEntryPosition(width, height, dir), dir, width, height, rng, mapData) }));
   const entryPos = entrances[0].pos; // primary spawn
 
   // Place river if it exists
@@ -164,13 +167,21 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
     riverInfo = placeRiverInTown(mapData, riverDirection, width, height, rng);
   }
 
-  // Place an approach road from every entrance gate to the centre. Walls only overwrite
-  // grass, so each road tile already on the perimeter stays an open gate.
-  entrances.forEach(({ dir, pos }) => placeMainRoad(mapData, pos, dir, width, height, townSize, riverInfo));
-
-  // Place town square/center
+  // The hub of the path network: the town square (placed just below). Every gate road
+  // and building spoke anchors here — see the "Path network" section further down.
   const centerPos = { x: Math.floor(width / 2), y: Math.floor(height / 2) };
   logger.debug('[TOWN_MAP] centerPos:', centerPos);
+
+  // Seeded per-tile cost noise drives the windiness of every routed path; spokeStats
+  // collects per-spoke shape metrics (length / straightness / bends) for tests + debug.
+  const costNoise = makeCostNoise(rng);
+  const spokeStats = [];
+
+  // Windy approach road from every entrance gate to the hub. Walls only overwrite
+  // grass, so each road tile already on the perimeter stays an open gate.
+  entrances.forEach(({ pos }) => placeGateRoad(mapData, pos, centerPos, { noise: costNoise, riverInfo, townSize, stats: spokeStats, rng }));
+
+  // Place town square/center
   placeTownCenter(mapData, centerPos, townSize);
 
   // Walls enclose the larger settlements (town + city); hamlets and villages stay
@@ -188,10 +199,25 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
     rngType: typeof rng,
     centerPos
   });
-  placeBuildings(mapData, buildingCount, townSize, rng, centerPos, !!waterInfo);
+  // pathOpts feeds every routed lane: the keep spoke (laid inside placeBuildings right
+  // after the keep, so the estate clusters around it), the building spokes/stubs, and
+  // the house stubs. noPave collects protected sand (dock frontage) no route may pave.
+  const pathOpts = { noise: costNoise, riverInfo, townSize, stats: spokeStats, noPave: new Set() };
+  placeBuildings(mapData, buildingCount, townSize, rng, centerPos, !!waterInfo, pathOpts);
 
-  // Generate paths connecting all buildings to the road network
-  generateBuildingPaths(mapData, centerPos, rng);
+  // Generate paths connecting the placed buildings to the road network (hub-and-spoke,
+  // windy). Runs BEFORE houses so no house can seal a civic building off its lane.
+  generateBuildingPaths(mapData, centerPos, pathOpts);
+
+  // Houses come after the lanes and prefer street-front tiles (they cannot build on a
+  // path, so the network is never blocked); outlying houses then stub onto the nearest
+  // lane, sharing stubs where they cluster.
+  placeHouses(mapData, townSize, rng, centerPos);
+  connectHouses(mapData, centerPos, pathOpts);
+
+  // Safety net: any path tile that somehow ended up disconnected from the hub network
+  // is demoted back to terrain, so the map NEVER ships orphan path fragments.
+  pruneOrphanPaths(mapData);
 
   // Place farm fields (Hamlets, Villages, and Towns). Desert towns skip the green
   // fields — there's no farmland to render on sand.
@@ -218,7 +244,10 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
     water: waterInfo,
     entrances,
     entryPoint: entryPos,
-    centerPoint: centerPos
+    centerPoint: centerPos,
+    // Per-spoke shape metrics from the path router (kind/length/straight/bends).
+    // Additive + optional: renderers ignore it, tests and /debug/tileset read it.
+    pathStats: { windiness: PATH_WINDINESS, spokes: spokeStats }
   };
 
   // Frame the native layout with countryside so every town fills a uniform canvas
@@ -354,6 +383,22 @@ function seededRandom(seed) {
     state = (state * 9301 + 49297) % 233280;
     return state / 233280;
   };
+}
+
+// Slide a gate a few tiles along its edge (seeded). Skips corners (walls need them) and
+// wet tiles; falls back to the unjittered position when no dry offset fits.
+function jitterGatePosition(pos, direction, width, height, rng, mapData) {
+  const vertical = direction === 'east' || direction === 'west'; // gate slides along y
+  const span = vertical ? height : width;
+  const base = vertical ? pos.y : pos.x;
+  const offset = Math.floor(rng() * 5) - 2; // -2..2
+  const candidates = [offset, 0, 1, -1, 2, -2].map((o) => Math.max(2, Math.min(span - 3, base + o)));
+  for (const c of candidates) {
+    const x = vertical ? pos.x : c;
+    const y = vertical ? c : pos.y;
+    if (mapData[y] && mapData[y][x] && mapData[y][x].type !== 'water') return { x, y };
+  }
+  return pos;
 }
 
 // Calculate entry position based on direction
@@ -516,81 +561,328 @@ function extendCoastWater(newMap, edges, offX, offY, coreW, coreH, targetW, targ
   sandShorePass(newMap, targetW, targetH);
 }
 
-// Place main road from entry to center
-function placeMainRoad(mapData, entryPos, direction, width, height, townSize, riverInfo = null) {
-  const centerX = Math.floor(width / 2);
-  const centerY = Math.floor(height / 2);
+// =============================================================================
+// Path network — HUB AND SPOKE with WINDY spokes (redesigned 2026-07)
+//
+// Topology: the town square is the HUB. Every world-road entrance gets a GATE on its
+// town edge, and every gate is routed to the hub. Major buildings (townhall, tavern,
+// inn, temple, market, blacksmith — plus the keep) get SPOKES routed from the hub;
+// minor service buildings and unserved houses attach via short STUBS to the NEAREST
+// existing path, so lanes are shared instead of every building drawing its own ray
+// (the old system's "path spaghetti").
+//
+// Windiness: routes come from a deterministic Dijkstra where every tile carries seeded
+// cost noise (PATH_WINDINESS × [0,1) on top of the base step cost of 1). Cheapest
+// routes meander gently around "expensive" tiles instead of running straight. Existing
+// path tiles are heavily discounted (PATH_REUSE_COST), so later spokes merge into the
+// trunks laid by earlier ones — the network grows as a tree rooted at the hub.
+//
+// Invariants (asserted by townMapGenerator.test.js across a seed survey):
+//   • one connected path component containing the hub and every gate — zero orphans
+//     (pruneOrphanPaths is a belt-and-braces sweep; routing alone should never orphan)
+//   • every non-house building orthogonally adjacent to a path (keep: via its wall ring)
+//   • no route through water: lake/coast water is impassable; the authored river band
+//     may be crossed (laid as 'bridge'), and CAUSEWAY_WATER_COST is a fallback so a
+//     gate/building cut off by water still gets the shortest possible causeway.
+// Waterfront buildings route with discounted beach cost, so their lanes run along the
+// shore as a quay before joining the network.
+// =============================================================================
 
-  // Single-width approach road for every town size (the 2-wide road read as a
-  // gash through the gate; one tile looks cleaner with the new tileset).
-  const isWideRoad = false;
-  const roadType = townSize === 'city' ? 'stone_path' : 'dirt_path';
+// Tile types that count as part of the walkable path network.
+const isPathType = (t) => t === 'dirt_path' || t === 'stone_path' || t === 'town_square' || t === 'bridge';
 
-  // Create path from entry to center
-  if (direction === 'north' || direction === 'south') {
-    // Vertical road
-    const startY = Math.min(entryPos.y, centerY);
-    const endY = Math.max(entryPos.y, centerY);
+// Windiness factor: amplitude of the seeded per-tile cost noise layered over the base
+// step cost of 1. Higher = wigglier spokes; 0 = straight rays. Tuned on /debug/tileset.
+export const PATH_WINDINESS = 2.2;
+const PATH_REUSE_COST = 0.35;   // walking an existing path is cheap → spokes share trunks
+const BEACH_STEP_COST = 1.6;    // roads prefer grass over sand…
+const QUAY_BEACH_COST = 0.7;    // …except waterfront lanes, which hug the shore
+const BORDER_STEP_PENALTY = 6;  // keep routes off the map border (one wall gate per road)
+const RIVER_BRIDGE_COST = 5;    // crossing the authored river is allowed but dear
+const CAUSEWAY_WATER_COST = 15; // fallback-only: shortest causeway when no land route exists
 
-    for (let y = startY; y <= endY; y++) {
-      // Check for bridge
-      if (riverInfo && !riverInfo.isHorizontal && centerX >= riverInfo.center && centerX < riverInfo.center + riverInfo.riverWidth) {
-        mapData[y][centerX].type = 'bridge';
-        mapData[y][centerX].walkable = true;
-      } else if (riverInfo && riverInfo.isHorizontal && y >= riverInfo.center && y < riverInfo.center + riverInfo.riverWidth) {
-        mapData[y][centerX].type = 'bridge';
-        mapData[y][centerX].walkable = true;
-      } else {
-        mapData[y][centerX].type = roadType;
-      }
+// Deterministic per-tile noise in [0,1), salted once per town from the seeded rng.
+function makeCostNoise(rng) {
+  const salt = Math.floor(rng() * 0x7fffffff);
+  return (x, y) => {
+    let h = (Math.imul(x + 1, 374761393) + Math.imul(y + 1, 668265263) + salt) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    h = (h ^ (h >>> 16)) >>> 0;
+    return (h & 1023) / 1024;
+  };
+}
 
-      // Add road width for towns and cities (2 wide total)
-      if (isWideRoad && centerX < width - 1) {
-        const nextX = centerX + 1;
-        if (riverInfo && !riverInfo.isHorizontal && nextX >= riverInfo.center && nextX < riverInfo.center + riverInfo.riverWidth) {
-          mapData[y][nextX].type = 'bridge';
-          mapData[y][nextX].walkable = true;
-        } else if (riverInfo && riverInfo.isHorizontal && y >= riverInfo.center && y < riverInfo.center + riverInfo.riverWidth) {
-          mapData[y][nextX].type = 'bridge';
-          mapData[y][nextX].walkable = true;
-        } else {
-          mapData[y][nextX].type = roadType;
-        }
-      }
+function inRiverBand(riverInfo, x, y) {
+  if (!riverInfo) return false;
+  return riverInfo.isHorizontal
+    ? y >= riverInfo.center && y < riverInfo.center + riverInfo.riverWidth
+    : x >= riverInfo.center && x < riverInfo.center + riverInfo.riverWidth;
+}
+
+// Multi-source Dijkstra over the town grid. Returns the cheapest route (array of
+// {x,y}, sources first) from any of `starts` to the first tile where isTarget(x,y)
+// holds, or null when unreachable. Fully deterministic: ties break on tile index.
+function routeWindyPath(mapData, starts, isTarget, opts) {
+  const width = mapData[0].length;
+  const height = mapData.length;
+  const {
+    noise, riverInfo = null, beachCost = BEACH_STEP_COST,
+    waterCost = null, windiness = PATH_WINDINESS,
+    noPave = null, allowTiles = null,
+  } = opts;
+
+  const enterCost = (x, y) => {
+    // protected tiles (e.g. the sand in front of a dock building) are never paved —
+    // unless explicitly allowed for this route (a stub with no other landing)
+    if (noPave && noPave.has(`${x},${y}`) && !(allowTiles && allowTiles.has(`${x},${y}`))) return Infinity;
+    const t = mapData[y][x];
+    let c;
+    if (isPathType(t.type)) c = PATH_REUSE_COST;
+    else if (t.type === 'grass') c = 1 + windiness * noise(x, y);
+    else if (t.type === 'beach') c = beachCost + windiness * noise(x, y);
+    else if (t.type === 'water') {
+      if (inRiverBand(riverInfo, x, y)) c = RIVER_BRIDGE_COST;
+      else if (waterCost !== null) c = waterCost;
+      else return Infinity;
+    } else return Infinity; // building / wall / keep_wall / farm_field / square-adjacent solids
+    if (x === 0 || y === 0 || x === width - 1 || y === height - 1) c += BORDER_STEP_PENALTY;
+    return c;
+  };
+
+  const idx = (x, y) => y * width + x;
+  const dist = new Float64Array(width * height).fill(Infinity);
+  const prev = new Int32Array(width * height).fill(-1);
+  const done = new Uint8Array(width * height);
+  const frontier = [];
+  for (const s of starts) {
+    const i = idx(s.x, s.y);
+    if (dist[i] !== 0) { dist[i] = 0; frontier.push(i); }
+  }
+
+  while (frontier.length) {
+    let bi = 0; // deterministic min: lowest cost, ties by tile index
+    for (let k = 1; k < frontier.length; k++) {
+      const a = frontier[k], b = frontier[bi];
+      if (dist[a] < dist[b] || (dist[a] === dist[b] && a < b)) bi = k;
     }
-  } else {
-    // Horizontal road
-    const startX = Math.min(entryPos.x, centerX);
-    const endX = Math.max(entryPos.x, centerX);
-    const roadY = Math.floor(height / 2);
+    const cur = frontier.splice(bi, 1)[0];
+    if (done[cur]) continue;
+    done[cur] = 1;
+    const cx = cur % width, cy = (cur - cx) / width;
 
-    for (let x = startX; x <= endX; x++) {
-      // Check for bridge
-      if (riverInfo && riverInfo.isHorizontal && roadY >= riverInfo.center && roadY < riverInfo.center + riverInfo.riverWidth) {
-        mapData[roadY][x].type = 'bridge';
-        mapData[roadY][x].walkable = true;
-      } else if (riverInfo && !riverInfo.isHorizontal && x >= riverInfo.center && x < riverInfo.center + riverInfo.riverWidth) {
-        mapData[roadY][x].type = 'bridge';
-        mapData[roadY][x].walkable = true;
-      } else {
-        mapData[roadY][x].type = roadType;
-      }
+    if (isTarget(cx, cy)) {
+      const route = [];
+      for (let i = cur; i !== -1; i = prev[i]) route.push({ x: i % width, y: (i - (i % width)) / width });
+      return route.reverse();
+    }
 
-      // Add road width for towns and cities (2 wide total)
-      if (isWideRoad && roadY < height - 1) {
-        const nextY = roadY + 1;
-        if (riverInfo && riverInfo.isHorizontal && nextY >= riverInfo.center && nextY < riverInfo.center + riverInfo.riverWidth) {
-          mapData[nextY][x].type = 'bridge';
-          mapData[nextY][x].walkable = true;
-        } else if (riverInfo && !riverInfo.isHorizontal && x >= riverInfo.center && x < riverInfo.center + riverInfo.riverWidth) {
-          mapData[nextY][x].type = 'bridge';
-          mapData[nextY][x].walkable = true;
-        } else {
-          mapData[nextY][x].type = roadType;
-        }
-      }
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+      const nx = cx + dx, ny = cy + dy;
+      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+      const ni = idx(nx, ny);
+      if (done[ni]) continue;
+      const c = enterCost(nx, ny);
+      if (c === Infinity) continue;
+      const nd = dist[cur] + c;
+      if (nd < dist[ni] - 1e-9) { dist[ni] = nd; prev[ni] = cur; frontier.push(ni); }
     }
   }
+  return null;
+}
+
+// Stamp a route onto the map. Existing path tiles pass through untouched; water becomes
+// a bridge; grass/beach becomes stone near the hub (paved core; cities fully paved) and
+// dirt further out.
+function layPathRoute(mapData, route, centerPos, townSize) {
+  const width = mapData[0].length;
+  const height = mapData.length;
+  const paveRadius = Math.floor(Math.max(width, height) / 4);
+  for (const { x, y } of route) {
+    const t = mapData[y][x];
+    if (isPathType(t.type)) continue;
+    if (t.type === 'water') {
+      t.type = 'bridge';
+      t.walkable = true;
+      t.poi = null;
+      continue;
+    }
+    const distFromCenter = Math.abs(x - centerPos.x) + Math.abs(y - centerPos.y);
+    t.type = (townSize === 'city' || distFromCenter < paveRadius) ? 'stone_path' : 'dirt_path';
+    t.walkable = true;
+    t.poi = null;
+  }
+}
+
+// Record shape metrics for one spoke (used by the windiness tests + /debug/tileset).
+function recordSpoke(stats, kind, route) {
+  if (!stats || !route || route.length < 2) return;
+  let bends = 0;
+  for (let i = 2; i < route.length; i++) {
+    const ax = route[i - 1].x - route[i - 2].x, ay = route[i - 1].y - route[i - 2].y;
+    const bx = route[i].x - route[i - 1].x, by = route[i].y - route[i - 1].y;
+    if (ax !== bx || ay !== by) bends++;
+  }
+  const a = route[0], b = route[route.length - 1];
+  const straight = Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+  stats.push({ kind, length: route.length - 1, straight, bends });
+}
+
+// Route one gate to the hub. Water is impassable on the first attempt (routes go AROUND
+// lakes/inlets); if that fails the retry may lay the shortest possible causeway, so a
+// gate is never left unconnected.
+//
+// Windiness needs a nudge here: a gate roughly axis-aligned with the hub would route as
+// a near-straight ray, because the cheapest possible deviation costs two extra steps and
+// per-tile noise rarely repays that. So longer approaches are routed through a seeded
+// midpoint WAYPOINT displaced perpendicular to the approach — that forces the S-bend,
+// and the cost noise decorates each leg.
+function placeGateRoad(mapData, gatePos, centerPos, { noise, riverInfo, townSize, stats, rng }) {
+  const width = mapData[0].length;
+  const height = mapData.length;
+  const isHub = (x, y) => x === centerPos.x && y === centerPos.y;
+  const base = { noise, riverInfo };
+
+  let route = null;
+  const dx = centerPos.x - gatePos.x;
+  const dy = centerPos.y - gatePos.y;
+  if (Math.abs(dx) + Math.abs(dy) >= 4 && rng) {
+    const mag = (1 + Math.floor(rng() * 2)) * (rng() < 0.5 ? -1 : 1); // ±1..2 perpendicular
+    let wx = Math.round((gatePos.x + centerPos.x) / 2);
+    let wy = Math.round((gatePos.y + centerPos.y) / 2);
+    if (Math.abs(dy) >= Math.abs(dx)) wx += mag; else wy += mag;
+    wx = Math.max(1, Math.min(width - 2, wx));
+    wy = Math.max(1, Math.min(height - 2, wy));
+    const wTile = mapData[wy][wx];
+    if (wTile.type === 'grass' || wTile.type === 'beach' || isPathType(wTile.type)) {
+      const leg1 = routeWindyPath(mapData, [gatePos], (x, y) => x === wx && y === wy, base);
+      const leg2 = leg1 && routeWindyPath(mapData, [{ x: wx, y: wy }], isHub, base);
+      if (leg1 && leg2) route = [...leg1, ...leg2.slice(1)];
+    }
+  }
+
+  if (!route) route = routeWindyPath(mapData, [gatePos], isHub, base);
+  if (!route) route = routeWindyPath(mapData, [gatePos], isHub, { ...base, waterCost: CAUSEWAY_WATER_COST });
+  if (!route) {
+    logger.warn(`[TOWN_MAP] Could not route gate road from (${gatePos.x}, ${gatePos.y}) to the hub`);
+    return;
+  }
+  layPathRoute(mapData, route, centerPos, townSize);
+  recordSpoke(stats, 'gate', route);
+}
+
+// Connect a just-placed building to the network IMMEDIATELY (called from placeBuildings
+// as each building lands). Because later buildings only ever build on grass — never on a
+// path — a lane laid now can never be sealed off by anything placed afterwards. Majors
+// get a windy spoke from the hub; everything else stubs to the NEAREST existing path
+// (waterfront buildings with discounted beach cost, so their stubs run along the quay).
+function connectBuildingToNetwork(mapData, pos, buildingType, centerPos, opts) {
+  if (!opts) return;
+  const { noise, riverInfo = null, townSize = 'village', stats = null, noPave = null } = opts;
+  const width = mapData[0].length;
+  const height = mapData.length;
+  const inBounds = (x, y) => x >= 0 && x < width && y >= 0 && y < height;
+
+  // already served?
+  for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+    if (inBounds(pos.x + dx, pos.y + dy) && isPathType(mapData[pos.y + dy][pos.x + dx].type)) return;
+  }
+
+  let front = [];
+  for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+    const nx = pos.x + dx, ny = pos.y + dy;
+    if (!inBounds(nx, ny)) continue;
+    const t = mapData[ny][nx].type;
+    if (t === 'grass' || t === 'beach') front.push({ x: nx, y: ny });
+  }
+  if (!front.length) {
+    logger.debug(`[TOWN_MAP] ${buildingType} at (${pos.x}, ${pos.y}) has no routable frontage`);
+    return;
+  }
+
+  let touchesShore = false;
+  for (let dy = -1; dy <= 1 && !touchesShore; dy++) {
+    for (let dx = -1; dx <= 1 && !touchesShore; dx++) {
+      const t = inBounds(pos.x + dx, pos.y + dy) && mapData[pos.y + dy][pos.x + dx];
+      if (t && (t.type === 'water' || t.type === 'beach')) touchesShore = true;
+    }
+  }
+  // A shore building's lane lands on GRASS when it can, so the building keeps its sand
+  // frontage (a harbormaster paved off its own beach would stop reading as dockside).
+  if (touchesShore) {
+    const grassFront = front.filter((p) => mapData[p.y][p.x].type === 'grass');
+    if (grassFront.length) front = grassFront;
+  }
+  // Respect protected sand (another dock's frontage) — but if that is this building's
+  // ONLY frontage, the protection yields so the building still gets its lane.
+  let allowTiles = null;
+  if (noPave) {
+    const open = front.filter((p) => !noPave.has(`${p.x},${p.y}`));
+    if (open.length) front = open;
+    else allowTiles = new Set(front.map((p) => `${p.x},${p.y}`));
+  }
+  const base = { noise, riverInfo, noPave, allowTiles, ...(touchesShore ? { beachCost: QUAY_BEACH_COST } : {}) };
+
+  let route;
+  if (MAJOR_SPOKE_TYPES.has(buildingType)) {
+    const targets = new Set(front.map((p) => p.x * height + p.y));
+    const isTarget = (x, y) => targets.has(x * height + y);
+    route = routeWindyPath(mapData, [centerPos], isTarget, base)
+      || routeWindyPath(mapData, [centerPos], isTarget, { ...base, waterCost: CAUSEWAY_WATER_COST });
+  } else {
+    const onNetwork = (x, y) => isPathType(mapData[y][x].type);
+    route = routeWindyPath(mapData, front, onNetwork, base)
+      || routeWindyPath(mapData, front, onNetwork, { ...base, waterCost: CAUSEWAY_WATER_COST });
+  }
+  if (!route) {
+    logger.warn(`[TOWN_MAP] Could not connect ${buildingType} at (${pos.x}, ${pos.y}) to the path network`);
+    return;
+  }
+  layPathRoute(mapData, route, centerPos, townSize);
+  recordSpoke(stats, MAJOR_SPOKE_TYPES.has(buildingType) ? 'major' : 'minor', route);
+}
+
+// Route the keep's spoke from the hub to the open tiles just outside its curtain wall
+// (or its own frontage where a wall segment is missing). Called at keep-placement time,
+// BEFORE the noble estate / gaol are placed, so they cluster around the lane. If every
+// approach tile is water (a coast-squeezed keep) the fallback lays a causeway to the
+// wall, so the lord's seat is never left without an approach.
+function routeKeepSpoke(mapData, keepPos, centerPos, { noise, riverInfo, townSize, stats }) {
+  const width = mapData[0].length;
+  const height = mapData.length;
+  const inBounds = (x, y) => x >= 0 && x < width && y >= 0 && y < height;
+  const targets = new Set();
+  const wetTargets = new Set();
+  const collect = (x, y) => {
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+      const nx = x + dx, ny = y + dy;
+      if (!inBounds(nx, ny)) continue;
+      const t = mapData[ny][nx].type;
+      if (t === 'grass' || t === 'beach' || isPathType(t)) targets.add(nx * height + ny);
+      else if (t === 'water') wetTargets.add(nx * height + ny);
+    }
+  };
+  collect(keepPos.x, keepPos.y);
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const nx = keepPos.x + dx, ny = keepPos.y + dy;
+      if (inBounds(nx, ny) && mapData[ny][nx].type === 'keep_wall') collect(nx, ny);
+    }
+  }
+  const lay = (route) => {
+    if (!route) return false;
+    layPathRoute(mapData, route, centerPos, townSize);
+    recordSpoke(stats, 'keep', route);
+    return true;
+  };
+  const base = { noise, riverInfo };
+  let done = targets.size > 0 && (
+    lay(routeWindyPath(mapData, [centerPos], (x, y) => targets.has(x * height + y), base)) ||
+    lay(routeWindyPath(mapData, [centerPos], (x, y) => targets.has(x * height + y), { ...base, waterCost: CAUSEWAY_WATER_COST }))
+  );
+  if (!done && wetTargets.size > 0) {
+    done = lay(routeWindyPath(mapData, [centerPos], (x, y) => wetTargets.has(x * height + y), { ...base, waterCost: CAUSEWAY_WATER_COST }));
+  }
+  if (!done) logger.warn(`[TOWN_MAP] Keep at (${keepPos.x}, ${keepPos.y}) has no routable approach`);
 }
 
 // Place city walls around perimeter (cities only).
@@ -648,7 +940,7 @@ function placeTownCenter(mapData, centerPos, townSize) {
 }
 
 // Place buildings around the town - COMPLETELY REWRITTEN
-function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = false) {
+function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = false, pathOpts = null) {
   if (!centerPos) {
     logger.warn('[TOWN_MAP] placeBuildings called with undefined centerPos, using map defaults');
     centerPos = { x: Math.floor(mapData[0].length / 2), y: Math.floor(mapData.length / 2) };
@@ -658,8 +950,9 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
   const centerY = centerPos.y;
 
   // Per-size building roster (module-level so the water step reserves matching land).
+  // Houses are placed separately in placeHouses, after the path network exists.
   const config = BUILDING_CONFIG[townSize] || BUILDING_CONFIG.village;
-  const { important, houses } = config;
+  const { important } = config;
 
   // Track occupied positions
   const occupied = new Set();
@@ -707,7 +1000,21 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
     }
     return false;
   };
-  const blockedFor = (x, y, type) => isOccupied(x, y) || (SHORE_AVERSE.has(type) && isShore(x, y));
+  // A building must keep at least one open orthogonal side (grass/beach/path) so a lane
+  // can reach its door — never brick a civic building into a pocket with no frontage.
+  const hasOpenSide = (x, y) => [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => {
+    const t = mapData[y + dy] && mapData[y + dy][x + dx];
+    return t && (t.type === 'grass' || t.type === 'beach' || isPathType(t.type));
+  });
+  const blockedFor = (x, y, type) => isOccupied(x, y) || !hasOpenSide(x, y) || (SHORE_AVERSE.has(type) && isShore(x, y));
+
+  // The noble estate (STEP 0.5) is a deliberately tight manor cluster. Civic/commerce
+  // buildings must NOT be wedged into it: a building sealed inside the manor block has
+  // no frontage a lane can reach. Zone is set once the manors are placed.
+  const inEstateZone = (x, y) => {
+    const z = config._estateZone;
+    return !!z && x >= z.minX && x <= z.maxX && y >= z.minY && y <= z.maxY;
+  };
 
   // The keep's anchor row, shared with the noble-estate step below. Defaults to the
   // classic top-centre slot; relocated downward if a coastline floods the top of the city.
@@ -726,12 +1033,8 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
     // keep_wall is placed only on FREE GRASS, so it stops at water (a clean terminus) and
     // never overwrites the city wall, a road, or another building — the walls are respected.
     const keepWall = (x, y) => { if (tileFree(x, y)) { mapData[y][x].type = 'keep_wall'; markOccupied(x, y); } };
-    const pathTo = (fromX, fromY, toX, toY) => {
-      let x = fromX, y = fromY;
-      const lay = () => { if (mapData[y][x].type === 'grass') { mapData[y][x].type = 'stone_path'; mapData[y][x].walkable = true; } };
-      while (x !== toX) { x += x < toX ? 1 : -1; lay(); }
-      while (y !== toY) { y += y < toY ? 1 : -1; lay(); }
-    };
+    // (The keep's path to the square is routed later by generateBuildingPaths — the keep
+    // gets a windy hub spoke to its curtain wall like every other major building.)
 
     // MAIN placement: classic top-centre slot. Search from the top for the first dry tile
     // near the centre column (dodges a coastline), then ring it with a TIGHT 3x3 keep_wall.
@@ -752,8 +1055,9 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
           if ((Math.abs(dx) === 1 || Math.abs(dy) === 1) && !(dx === 0 && dy === 0)) keepWall(fx + dx, fy + dy);
         }
       }
-      let py = keepY + 2; // path from below the wall to the square
-      while (py < centerY) { if (mapData[py][keepX].type === 'grass') { mapData[py][keepX].type = 'stone_path'; mapData[py][keepX].walkable = true; } py++; }
+      // Reserve the tile below the gate-side wall so later buildings (manors cluster
+      // right here) can never brick the keep in — the hub spoke lands on this tile.
+      if (fy + 2 < H) markOccupied(fx, fy + 2);
       return true;
     };
 
@@ -774,7 +1078,10 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
         const wallE = { x: c.cx + 2 * c.sx, y: c.cy + c.sy };       // inner wall, X side
         const wallS = { x: c.cx + c.sx, y: c.cy + 2 * c.sy };       // gate side, Y axis (toward centre)
         const wallC = { x: c.cx + 2 * c.sx, y: c.cy + 2 * c.sy };   // diagonal corner of the L
-        if (![{ x: kx, y: ky }, wallE, wallS, wallC].every((p) => tileFree(p.x, p.y))) continue;
+        const approach = { x: c.cx + c.sx, y: c.cy + 3 * c.sy };    // where the keep's lane will start
+        // the approach tile must be dry land too, so the hub spoke can actually reach
+        // the keep gate (a corner flooded by a coastline is skipped)
+        if (![{ x: kx, y: ky }, wallE, wallS, wallC, approach].every((p) => tileFree(p.x, p.y))) continue;
         keepX = kx; keepY = ky;
         placeKeep(kx, ky);
         // Fully enclose: the two city walls cover the outer sides; keep_wall covers the two
@@ -783,7 +1090,9 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
         keepWall(wallE.x, wallE.y);
         keepWall(wallS.x, wallS.y);
         keepWall(wallC.x, wallC.y);
-        pathTo(c.cx + c.sx, c.cy + 3 * c.sy, centerX, centerY);
+        // Reserve the approach tile beyond the gate-side wall (same reason as the
+        // central keep: the estate cluster must not brick the keep in).
+        markOccupied(approach.x, approach.y);
         logger.debug(`[TOWN_MAP] Placed corner keep at (${kx}, ${ky}) reusing city walls`);
         return true;
       }
@@ -800,6 +1109,11 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
       ? (tryCorner() || tryCentre())
       : (tryCentre() || tryCorner());
     if (!placed) logger.warn('[TOWN_MAP] Could not place the city keep');
+
+    // Route the keep's lane to the hub NOW, before the noble estate / gaol / everything
+    // else fills the area — later placements only build on grass, so they cluster
+    // around the lane instead of sealing the keep in.
+    if (placed && pathOpts) routeKeepSpoke(mapData, { x: keepX, y: keepY }, centerPos, pathOpts);
   }
 
   // STEP 0.5: Place noble estate manors between keep and town square (cities only).
@@ -837,6 +1151,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
                 mapData[y][x].walkable = false;
                 mapData[y][x].poi = null;
                 markOccupied(x, y);
+                connectBuildingToNetwork(mapData, { x, y }, manorType, centerPos, pathOpts);
                 placedManorPositions.push({ x, y });
                 manorsPlaced++;
                 placed = true;
@@ -857,6 +1172,29 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
           const j = Math.floor(rng() * (i + 1));
           [adjacentCandidates[i], adjacentCandidates[j]] = [adjacentCandidates[j], adjacentCandidates[i]];
         }
+        // Escalating fallbacks (playtest 2026-07-05: a boxed-in cluster silently
+        // dropped the fifth manor, one seed in ~60 shipping a lesser city).
+        // Tier 2 loosens to a distance-2 ring around the cluster; tier 3 falls
+        // back to the anchor spiral. The estate stays tight when it can and the
+        // roster is guaranteed when it cannot.
+        if (!placed) {
+          for (const mp of placedManorPositions) {
+            for (let dy = -2; dy <= 2; dy++) {
+              for (let dx = -2; dx <= 2; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) !== 2) continue;
+                adjacentCandidates.push({ x: mp.x + dx, y: mp.y + dy });
+              }
+            }
+          }
+          for (let r = 0; r <= 5; r++) {
+            for (let dy = -r; dy <= r; dy++) {
+              for (let dx = -r; dx <= r; dx++) {
+                if (r > 0 && Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+                adjacentCandidates.push({ x: estateStartX + dx, y: estateStartY + dy });
+              }
+            }
+          }
+        }
         for (const pos of adjacentCandidates) {
           if (!isOccupied(pos.x, pos.y)) {
             mapData[pos.y][pos.x].type = 'building';
@@ -865,6 +1203,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
             mapData[pos.y][pos.x].walkable = false;
             mapData[pos.y][pos.x].poi = null;
             markOccupied(pos.x, pos.y);
+            connectBuildingToNetwork(mapData, pos, manorType, centerPos, pathOpts);
             placedManorPositions.push(pos);
             manorsPlaced++;
             placed = true;
@@ -934,7 +1273,8 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
     }
   };
 
-  // Helper: place a building on a tile
+  // Helper: place a building on a tile, then connect it to the path network right away
+  // (a lane laid now can never be sealed off by later placements — they avoid paths).
   const placeBuilding = (x, y, buildingType) => {
     mapData[y][x].type = 'building';
     mapData[y][x].buildingType = buildingType;
@@ -942,6 +1282,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
     mapData[y][x].poi = null;
     assignBuildingName(mapData[y][x], buildingType);
     markOccupied(x, y);
+    connectBuildingToNetwork(mapData, { x, y }, buildingType, centerPos, pathOpts);
   };
 
   // STEP 0.6: The gaol sits in the authority cluster — historically the town gaol was part
@@ -1038,7 +1379,8 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
               const x = centerX + dx;
               const y = centerY + dy;
 
-              if (!blockedFor(x, y, buildingType)) {
+              // never wedge an important building into the noble estate cluster
+              if (!blockedFor(x, y, buildingType) && !inEstateZone(x, y)) {
                 placeBuilding(x, y, buildingType);
                 importantPlaced++;
                 placed = true;
@@ -1088,15 +1430,6 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
     // fletcher) clusters near the square.
     const PERIPHERAL = new Set(['warehouse', 'foundry', 'mill', 'stables', 'barn']);
 
-    // Building types that should not be placed in the noble estate zone
-    const estateExcluded = new Set(['warehouse', 'foundry']);
-    const estateZone = config._estateZone || null;
-    const isInEstateZone = (x, y) => {
-      if (!estateZone) return false;
-      return x >= estateZone.minX && x <= estateZone.maxX &&
-             y >= estateZone.minY && y <= estateZone.maxY;
-    };
-
     let secondaryPlaced = 0;
     for (const buildingType of secondary) {
       const peripheral = PERIPHERAL.has(buildingType);
@@ -1105,7 +1438,8 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
       for (const band of bands) {
         for (const pos of band) {
           if (blockedFor(pos.x, pos.y, buildingType)) continue;
-          if (estateExcluded.has(buildingType) && isInEstateZone(pos.x, pos.y)) continue;
+          // no service building inside the manor cluster (it would be sealed off the lanes)
+          if (inEstateZone(pos.x, pos.y)) continue;
           placeBuilding(pos.x, pos.y, buildingType);
           secondaryPlaced++;
           done = true;
@@ -1130,7 +1464,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
       : townSize === 'village' ? ['harbormaster']
       : ['harbormaster', 'warehouse', 'warehouse'];
     if (waterfront.length > 0) {
-      const isShoreLand = (x, y) => !isOccupied(x, y) && [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => {
+      const isShoreLand = (x, y) => !isOccupied(x, y) && hasOpenSide(x, y) && [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => {
         const t = mapData[y + dy] && mapData[y + dy][x + dx];
         return t && (t.type === 'water' || t.type === 'beach');
       });
@@ -1148,6 +1482,14 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
         if (wfIndex >= waterfront.length) break;
         if (isOccupied(pos.x, pos.y)) continue;
         if (placedWF.some((p) => Math.abs(p.x - pos.x) + Math.abs(p.y - pos.y) < 3)) continue; // spacing
+        // Protect this dock building's sand frontage BEFORE placing it, so no lane
+        // (its own stub included) paves away the beach it opens onto.
+        if (pathOpts && pathOpts.noPave) {
+          for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
+            const n = mapData[pos.y + dy] && mapData[pos.y + dy][pos.x + dx];
+            if (n && n.type === 'beach') pathOpts.noPave.add(`${pos.x + dx},${pos.y + dy}`);
+          }
+        }
         placeBuilding(pos.x, pos.y, waterfront[wfIndex]);
         placedWF.push(pos);
         wfIndex++;
@@ -1156,55 +1498,61 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
     }
   }
 
-  // STEP 2: Place houses away from center (exclude rings based on town size)
+  // Houses are placed later (placeHouses), AFTER the path network is routed, so they
+  // line the lanes instead of sealing civic buildings away from them.
+  logger.debug(`[TOWN_MAP] Placed ${importantPlaced} important buildings (houses follow the paths)`);
+}
+
+// STEP 2 (run after generateBuildingPaths): place houses away from the centre, outside
+// the size-based exclusion ring. Houses PREFER street-front tiles (orthogonally adjacent
+// to an existing lane) so neighbourhoods line the spokes; the remainder fill in behind
+// and get stubs from connectHouses.
+function placeHouses(mapData, townSize, rng, centerPos) {
+  const config = BUILDING_CONFIG[townSize] || BUILDING_CONFIG.village;
+  const houses = config.houses || 0;
   logger.debug(`[TOWN_MAP] Placing ${houses} houses...`);
 
-  // Smaller exclusion zone for smaller towns
-  const excludeRadius = {
-    hamlet: 1,   // Only exclude 1 ring (just around the well)
-    village: 2,  // Exclude 2 rings
-    town: 3,     // Exclude 3 rings
-    city: 3      // Exclude 3 rings
-  };
-
+  const excludeRadius = { hamlet: 1, village: 2, town: 3, city: 3 };
   const exclusion = excludeRadius[townSize] || 2;
-  let housesPlaced = 0;
+  const width = mapData[0].length;
+  const height = mapData.length;
 
-  // Create list of valid positions for houses (outside exclusion zone)
+  const streetFront = (x, y) => [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => {
+    const t = mapData[y + dy] && mapData[y + dy][x + dx];
+    return t && (t.type === 'dirt_path' || t.type === 'stone_path');
+  });
+
   const housePositions = [];
-  for (let y = 1; y < mapData.length - 1; y++) {
-    for (let x = 1; x < mapData[0].length - 1; x++) {
-      const distFromCenter = Math.max(Math.abs(x - centerX), Math.abs(y - centerY));
-      if (distFromCenter > exclusion) {
-        housePositions.push({ x, y });
-      }
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const distFromCenter = Math.max(Math.abs(x - centerPos.x), Math.abs(y - centerPos.y));
+      if (distFromCenter > exclusion) housePositions.push({ x, y });
     }
   }
 
-  // Shuffle house positions
+  // Shuffle, then stable-sort street-front positions first: houses line the lanes,
+  // with the shuffle still deciding order within each band.
   for (let i = housePositions.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [housePositions[i], housePositions[j]] = [housePositions[j], housePositions[i]];
   }
+  const front = housePositions.filter((p) => streetFront(p.x, p.y));
+  const back = housePositions.filter((p) => !streetFront(p.x, p.y));
+  const ordered = [...front, ...back];
 
-  // Place houses
-  for (const pos of housePositions) {
+  let housesPlaced = 0;
+  for (const pos of ordered) {
     if (housesPlaced >= houses) break;
-
-    if (!pos) continue;
-
-    if (!isOccupied(pos.x, pos.y)) {
-      mapData[pos.y][pos.x].type = 'building';
-      mapData[pos.y][pos.x].buildingType = 'house';
-      mapData[pos.y][pos.x].walkable = false;
-      mapData[pos.y][pos.x].poi = null; // Clear any trees/decorations
-      markOccupied(pos.x, pos.y);
-      housesPlaced++;
-    }
+    const tile = mapData[pos.y][pos.x];
+    if (tile.type !== 'grass') continue; // paths/buildings/water/fields stay untouched
+    tile.type = 'building';
+    tile.buildingType = 'house';
+    tile.walkable = false;
+    tile.poi = null; // Clear any trees/decorations
+    housesPlaced++;
   }
 
   logger.debug(`[TOWN_MAP] Placed ${housesPlaced} houses`);
-  logger.debug(`[TOWN_MAP] Total buildings: ${importantPlaced + housesPlaced}`);
 }
 
 // Place decorative elements
@@ -1279,163 +1627,176 @@ function placeFarmFields(mapData, townSize, rng) {
   }
 }
 
-// Generate paths connecting buildings organically
-function generateBuildingPaths(mapData, centerPos, rng) {
+// Building types that earn a full windy spoke from the hub. Everything else non-house
+// is a "minor" and stubs onto the nearest existing path instead (shared lanes, no
+// per-building rays back to the hub). The keep is handled separately: its curtain wall
+// blocks direct adjacency, so its spoke targets the tiles just outside the wall ring.
+const MAJOR_SPOKE_TYPES = new Set(['townhall', 'tavern', 'inn', 'temple', 'market', 'blacksmith']);
+
+// Safety sweep over the building side of the hub-and-spoke network. Buildings are
+// normally connected the moment they are placed (connectBuildingToNetwork, called from
+// placeBuildings), so this pass usually finds everything already served — it exists to
+// catch any building that slipped through (and asserts nothing new can regress).
+function generateBuildingPaths(mapData, centerPos, { noise, riverInfo = null, townSize = 'village', stats = null, noPave = null } = {}) {
   const width = mapData[0].length;
   const height = mapData.length;
+  const inBounds = (x, y) => x >= 0 && x < width && y >= 0 && y < height;
+  const onNetwork = (x, y) => isPathType(mapData[y][x].type);
 
-  // Find all buildings, separating important buildings from houses
-  const importantBuildings = [];
-  const houses = [];
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      if (mapData[y][x].type === 'building') {
-        if (mapData[y][x].buildingType === 'house') {
-          houses.push({ x, y });
-        } else {
-          importantBuildings.push({ x, y });
-        }
+  // Passable tiles orthogonally adjacent to (x,y) — a building's "frontage".
+  const frontage = (x, y) => {
+    const out = [];
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+      const nx = x + dx, ny = y + dy;
+      if (!inBounds(nx, ny)) continue;
+      const t = mapData[ny][nx].type;
+      if (t === 'grass' || t === 'beach' || isPathType(t)) out.push({ x: nx, y: ny });
+    }
+    return out;
+  };
+  const touchesShore = (x, y) => {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const t = inBounds(x + dx, y + dy) && mapData[y + dy][x + dx];
+        if (t && (t.type === 'water' || t.type === 'beach')) return true;
       }
     }
-  }
-
-  // Track all path tiles (roads and paths we create)
-  const pathTiles = [];
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const type = mapData[y][x].type;
-      if (type === 'stone_path' || type === 'dirt_path') {
-        pathTiles.push({ x, y });
-      }
-    }
-  }
-
-  // Helper to create path between two points
-  const createPath = (from, to) => {
-    let x = from.x;
-    let y = from.y;
-
-    while (x !== to.x || y !== to.y) {
-      if (x < to.x) x++;
-      else if (x > to.x) x--;
-      else if (y < to.y) y++;
-      else if (y > to.y) y--;
-
-      if (mapData[y][x].type === 'grass' && mapData[y][x].poi === null) {
-        const distFromCenter = Math.abs(x - centerPos.x) + Math.abs(y - centerPos.y);
-        const centerRadius = Math.floor(Math.max(width, height) / 4);
-        mapData[y][x].type = distFromCenter < centerRadius ? 'stone_path' : 'dirt_path';
-        pathTiles.push({ x, y });
-      }
-    }
+    return false;
   };
 
-  // STEP 0: Connect all important/secondary buildings to nearest road
-  for (const building of importantBuildings) {
-    let nearestRoad = null;
-    let minDist = Infinity;
-
-    pathTiles.forEach(road => {
-      const dist = Math.abs(building.x - road.x) + Math.abs(building.y - road.y);
-      if (dist < minDist) {
-        minDist = dist;
-        nearestRoad = road;
-      }
-    });
-
-    if (nearestRoad && minDist > 1) {
-      createPath(building, nearestRoad);
+  // Classify buildings in deterministic scan order. (Houses do not exist yet — they are
+  // placed after this pass and handled by connectHouses. The keep already has its lane,
+  // routed at placement time by routeKeepSpoke.)
+  const majors = [], minors = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const t = mapData[y][x];
+      if (t.type !== 'building' || t.buildingType === 'house' || t.buildingType === 'keep') continue;
+      if (MAJOR_SPOKE_TYPES.has(t.buildingType)) majors.push({ x, y });
+      else minors.push({ x, y });
     }
   }
 
-  // Track which houses are connected to the main network
-  const connectedHouses = new Set();
+  // Route + lay + record; falls back to a minimal causeway rather than leaving anything
+  // unconnected (see placeGateRoad for the same land-first policy).
+  const routeAndLay = (starts, isTarget, kind, extra = {}) => {
+    if (noPave) starts = starts.filter((p) => !noPave.has(`${p.x},${p.y}`)); // never start (and pave) on protected sand
+    if (!starts.length) return false;
+    const base = { noise, riverInfo, noPave, ...extra };
+    let route = routeWindyPath(mapData, starts, isTarget, base);
+    if (!route) route = routeWindyPath(mapData, starts, isTarget, { ...base, waterCost: CAUSEWAY_WATER_COST });
+    if (!route) return false;
+    layPathRoute(mapData, route, centerPos, townSize);
+    recordSpoke(stats, kind, route);
+    return true;
+  };
+  const toKeySet = (tiles) => new Set(tiles.map((p) => p.x * height + p.y));
 
-  // STEP 1: Connect a few houses (30%) directly to the main road network
-  const directConnections = Math.ceil(houses.length * 0.3);
-  const shuffledHouses = [...houses];
-
-  // Shuffle houses
-  for (let i = shuffledHouses.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [shuffledHouses[i], shuffledHouses[j]] = [shuffledHouses[j], shuffledHouses[i]];
+  // 1. SPOKES: hub → each major building's frontage (skipped when the building already
+  //    fronts a lane, which is the normal case after placement-time connection).
+  for (const b of majors) {
+    const front = frontage(b.x, b.y);
+    if (!front.length) { logger.warn(`[TOWN_MAP] Major building at (${b.x}, ${b.y}) has no routable frontage`); continue; }
+    if (front.some((p) => onNetwork(p.x, p.y))) continue; // already served
+    const targets = toKeySet(front);
+    routeAndLay([centerPos], (x, y) => targets.has(x * height + y), 'major');
   }
 
-  // Connect first 30% directly to nearest road
-  for (let i = 0; i < directConnections && i < shuffledHouses.length; i++) {
-    const house = shuffledHouses[i];
+  // (The keep's spoke is routed earlier, inside placeBuildings right after the keep is
+  //  placed, so the noble estate clusters AROUND the lane instead of sealing it off —
+  //  see routeKeepSpoke.)
 
-    // Find nearest road tile
-    let nearestRoad = null;
-    let minDist = Infinity;
+  // 2. STUBS: minor service buildings attach to the NEAREST existing path. Waterfront
+  //    buildings route with discounted beach cost so their lanes run along the shore
+  //    (the quay) before joining the network.
+  for (const b of minors) {
+    const front = frontage(b.x, b.y);
+    if (!front.length) { logger.warn(`[TOWN_MAP] Building at (${b.x}, ${b.y}) has no routable frontage`); continue; }
+    if (front.some((p) => onNetwork(p.x, p.y))) continue; // already served
+    routeAndLay(front, onNetwork, 'minor', touchesShore(b.x, b.y) ? { beachCost: QUAY_BEACH_COST } : {});
+  }
 
-    pathTiles.forEach(road => {
-      const dist = Math.abs(house.x - road.x) + Math.abs(house.y - road.y);
-      if (dist < minDist) {
-        minDist = dist;
-        nearestRoad = road;
-      }
-    });
+  logger.debug(`[TOWN_MAP] Hub-and-spoke paths: ${majors.length} major spokes, ${minors.length} minor stubs`);
+}
 
-    if (nearestRoad && minDist > 1) {
-      createPath(house, nearestRoad);
-      connectedHouses.add(`${house.x},${house.y}`);
+// Houses run last: one with a path anywhere in its 8-neighbourhood is served; the rest
+// stub to the NEAREST path. Because each stub joins the network before the next house
+// routes, outlying clusters share one lane instead of each house drawing its own.
+function connectHouses(mapData, centerPos, { noise, riverInfo = null, townSize = 'village', stats = null, noPave = null } = {}) {
+  const width = mapData[0].length;
+  const height = mapData.length;
+  const inBounds = (x, y) => x >= 0 && x < width && y >= 0 && y < height;
+  const onNetwork = (x, y) => isPathType(mapData[y][x].type);
+  const frontage = (x, y) => {
+    const out = [];
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+      const nx = x + dx, ny = y + dy;
+      if (!inBounds(nx, ny)) continue;
+      const t = mapData[ny][nx].type;
+      if (t === 'grass' || t === 'beach' || isPathType(t)) out.push({ x: nx, y: ny });
     }
-  }
+    return out;
+  };
 
-  // STEP 2: Connect remaining houses to nearest CONNECTED building or path
-  // Keep trying until all houses are connected or we can't connect any more
-  let unconnectedHouses = shuffledHouses.slice(directConnections);
-  let maxIterations = 10;
-  let iteration = 0;
-
-  while (unconnectedHouses.length > 0 && iteration < maxIterations) {
-    iteration++;
-    const stillUnconnected = [];
-
-    for (const house of unconnectedHouses) {
-      // Find nearest path tile OR connected house
-      let nearestTarget = null;
-      let minDist = Infinity;
-
-      // Check all path tiles
-      pathTiles.forEach(target => {
-        const dist = Math.abs(house.x - target.x) + Math.abs(house.y - target.y);
-        if (dist < minDist && dist > 0) {
-          minDist = dist;
-          nearestTarget = target;
+  let houseStubs = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const t = mapData[y][x];
+      if (t.type !== 'building' || t.buildingType !== 'house') continue;
+      let served = false;
+      for (let dy = -1; dy <= 1 && !served; dy++) {
+        for (let dx = -1; dx <= 1 && !served; dx++) {
+          if (inBounds(x + dx, y + dy) && isPathType(mapData[y + dy][x + dx].type)) served = true;
         }
-      });
-
-      // Check connected houses
-      shuffledHouses.forEach(otherHouse => {
-        if (connectedHouses.has(`${otherHouse.x},${otherHouse.y}`)) {
-          const dist = Math.abs(house.x - otherHouse.x) + Math.abs(house.y - otherHouse.y);
-          if (dist < minDist && dist > 0) {
-            minDist = dist;
-            nearestTarget = otherHouse;
-          }
-        }
-      });
-
-      if (nearestTarget && minDist > 1 && minDist < 10) {
-        createPath(house, nearestTarget);
-        connectedHouses.add(`${house.x},${house.y}`);
-      } else {
-        stillUnconnected.push(house);
       }
+      if (served) continue;
+      const front = frontage(x, y).filter((p) => !noPave || !noPave.has(`${p.x},${p.y}`));
+      if (!front.length) continue;
+      let route = routeWindyPath(mapData, front, onNetwork, { noise, riverInfo, noPave });
+      if (!route) route = routeWindyPath(mapData, front, onNetwork, { noise, riverInfo, noPave, waterCost: CAUSEWAY_WATER_COST });
+      if (!route) continue;
+      layPathRoute(mapData, route, centerPos, townSize);
+      recordSpoke(stats, 'house', route);
+      houseStubs++;
     }
-
-    // If we didn't connect any houses this iteration, break
-    if (stillUnconnected.length === unconnectedHouses.length) {
-      break;
-    }
-
-    unconnectedHouses = stillUnconnected;
   }
+  if (houseStubs > 0) logger.debug(`[TOWN_MAP] Connected ${houseStubs} outlying houses with stubs`);
+}
 
-  logger.debug(`[TOWN_MAP] Generated organic paths: ${directConnections} direct connections, ${houses.length - directConnections} house-to-house`);
+// Belt-and-braces: demote any path tile that is not connected to the hub (the town
+// square) back to its underlying terrain. Routing alone should never orphan a tile —
+// every route terminates on the network — but this guarantees the invariant.
+function pruneOrphanPaths(mapData) {
+  const width = mapData[0].length;
+  const height = mapData.length;
+  const seen = new Uint8Array(width * height);
+  const stack = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (mapData[y][x].type === 'town_square') { seen[y * width + x] = 1; stack.push([x, y]); }
+    }
+  }
+  while (stack.length) {
+    const [cx, cy] = stack.pop();
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+      const nx = cx + dx, ny = cy + dy;
+      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+      if (seen[ny * width + nx] || !isPathType(mapData[ny][nx].type)) continue;
+      seen[ny * width + nx] = 1;
+      stack.push([nx, ny]);
+    }
+  }
+  let pruned = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const t = mapData[y][x];
+      if (!isPathType(t.type) || seen[y * width + x] || t.type === 'town_square') continue;
+      if (t.type === 'bridge') { t.type = 'water'; t.walkable = false; }
+      else { t.type = 'grass'; t.walkable = true; }
+      pruned++;
+    }
+  }
+  if (pruned > 0) logger.warn(`[TOWN_MAP] Pruned ${pruned} orphan path tiles`);
 }
 
 /**
