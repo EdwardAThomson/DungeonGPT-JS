@@ -1,6 +1,7 @@
 # Side-Quest UX Plan: objective clarity + Journal tab
 
-Status: DESIGN ONLY (2026-07-03), no implementation scheduled yet.
+Status: SHIPPED 2026-07-03 (#41/#42): Journal side-quest tab with progress and derived
+how/where hints (`src/game/questHints.js`). The tab now lives in the Adventure Book (#52).
 Origin: playtest feedback — "side quests ask me to gather herbs or kill rats, but it
 isn't clear how I do that", plus "side quests should get their own Journal tab".
 Related: `FEATURE_SIDEQUEST_BACKFILL.md`, `FEATURE_QUEST_GIVERS.md`, issues #41/#42.

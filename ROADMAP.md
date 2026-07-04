@@ -1,6 +1,6 @@
 # Roadmap — DungeonGPT (JS)
 
-_Status: active · updated 2026-06-25_
+_Status: active · updated 2026-07-04_
 
 The production rewrite of DungeonGPT — a React web app for creating fantasy
 characters and playing AI-narrated RPG campaigns. Deployed at dungeongpt.xyz on
@@ -30,6 +30,12 @@ backlog; see the `docs/` design docs for each system.
 - [x] Local-first guest play: on-device hero roster + IndexedDB game saves, AI-free mechanical loop (explore / combat / progression), one-click sync to the cloud on sign-in, guest conversion banner (`docs/GUEST_MODE_PLAN.md`)
 - [x] New-player onboarding: replayable guided tour (coachmarks), reworked hero creator (27-point-buy validation, gender↔name, portrait picker), simplified New Game, Journal redesign, map discoverability
 - [x] Combat condition surfaced to the AI for believable wounds (deterministic combat stays AI-blind); hardened local-dev CLI task runner
+- [x] Side-quest Journal tab with progress and derived how/where hints (#41/#42)
+- [x] Combat-depth program (#43-#49): party boss fights (Lead + Support formation, multi-round, real enemy HP, bosses hit back), levels grant combat power (+1 per 2 levels), gear-ladder expansion incl. the t3 legendary shelf, revived site loot pools, Monte-Carlo balance-sim harness + progression lint
+- [x] Side-quest pool tripled to 42 with load-time backfill into in-progress saves (#45); desert + frozen t2 sequels so every genre chains t1 → t2 (#50)
+- [x] Adventure Book: unified tabbed modal hub (Campaign / Side Quests / Codex / Party / AI) with a discovered-only bestiary + item codex (#51/#52)
+- [x] Campaign chaining: on completion, continue the next chapter inside the same save and world (`docs/QUEST_CHAINING_PLAN.md`)
+- [x] Premium groundwork: entitlement-gated templates, local content slot for private campaigns, production AI pinned to the CF Workers pool (Free vs Premium pool selector)
 
 ## Next
 
@@ -45,12 +51,10 @@ backlog; see the `docs/` design docs for each system.
 - [ ] Billing + credit system (Lemon Squeezy) + AI usage tracking → unlocks OpenRouter premium tier
 - [ ] Tiered narration — local templated prose for routine moves, AI for notable moments, as a cost/latency lever; subsumes guest movement narration / Guest Mode B3 (`docs/TIERED_NARRATION_PLAN.md`)
 - [ ] Streaming AI responses
-- [ ] Team / turn-based tactical combat (party Lead + Support roles)
 - [ ] Dungeon sub-maps (procedural caves / dungeons)
 - [ ] Layered terrain generation (heightmaps, rivers, erosion) — prototype exists
-- [ ] AI loot narration + AI-generated world-map image tiles
+- [ ] AI-generated world-map image tiles (AI loot narration de-scoped to a richer templated loot line, see OUTSTANDING_ISSUES #8)
 - [ ] Cloudflare D1 / R2 / KV migration (off Supabase)
 - [ ] SSO expansion (Google, GitHub, Discord) + magic-link sign-in
 - [ ] Monitoring (Sentry), structured logging, automated Worker deploy, ops runbook
 - [ ] Graph-enhanced RAG for long-context quests (basic RAG shipped; see `docs/RAG_GRAPH_ENHANCEMENT_PLAN.md`)
-- [ ] Unified tabbed modal hub for reference surfaces (Journal / Inventory / Codex / Settings) — see OUTSTANDING_ISSUES #52

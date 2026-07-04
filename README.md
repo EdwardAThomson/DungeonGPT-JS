@@ -23,11 +23,14 @@ YouTube Videos 🎥:
 *   **AI-Powered Game:** Engage in an interactive text-based adventure where the AI acts as the game master, responding to user actions and summarizing the story.
 *   **World Map:** Explore a procedurally generated world map with biomes, towns, and points of interest.
 *   **Encounter System:** Dynamic encounters with skill checks, rewards, and AI-narrated outcomes.
+*   **Boss Fights & Party Combat:** Multi-round boss fights with a Lead + Support formation, real enemy HP, and bosses that hit back; rolls stay deterministic (d20 in code), the AI only narrates.
 *   **Inventory & Progression:** Track party inventory, gold, HP, and XP progression.
 *   **Equipment:** Equip weapons, armour, and accessories that affect combat (attack, damage soak, all-round bonuses).
 *   **Shops & Economy:** Buy and sell at blacksmiths, markets, alchemists, and general stores so gold has a purpose.
 *   **Explorable Sites:** Enter caves, ruins, forests, hills, and mountains as procedurally generated sub-maps with encounters and loot.
 *   **Quests & Campaigns:** A deterministic campaign-milestone engine (mechanical and AI-judged narrative milestones) plus a pool of discoverable side-quests.
+*   **Campaign Chaining:** Finish a campaign and continue the next chapter inside the same save: same world, same party (healed), with the new campaign's content spawned additively into the existing map.
+*   **Adventure Book:** A tabbed in-game hub (Campaign / Side Quests / Codex / Party / AI) including a discovered-only bestiary and item codex.
 *   **Towns:** Procedurally generated town maps with road-aware gates, lakefront/coastline water, and a civic layout (town square, keep, varied buildings).
 *   **Conversation Memory (RAG):** The AI recalls earlier story beats via on-device retrieval over embedded history.
 *   **Guest / Local-First Play:** Try the game without an account; heroes and saves live in the browser and sync to the cloud on sign-in.
@@ -219,7 +222,7 @@ For deployment instructions, see the deployment guides in `/docs`.
 *   🎬 **Streaming AI Responses** — Real-time text generation for better UX
 *   🧪 **Expanded Testing** — Unit and integration tests for core game loops
 *   🛠️ **Crafting & Alchemy** — Turn gathered materials into gear and potions (planned)
-*   ⚔️ **Tactical / Team Combat** — Turn-based, full-party combat (basic d20 encounter combat already ships)
+*   ⚔️ **Tactical Grid Combat** — Turn-based combat on a battlemap (full-party boss fights with Lead + Support roles already ship)
 *   🎭 **Persistent NPCs** — NPCs with lasting memory and relationships (town NPC interactions already ship)
 
 ## License & Attribution

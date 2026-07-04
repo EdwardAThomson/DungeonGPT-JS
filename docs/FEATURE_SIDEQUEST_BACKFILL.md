@@ -1,5 +1,9 @@
 # Feature: Side-quest backfill on load
 
+Status: SHIPPED 2026-07-04 (#45), extended beyond this spec: a load also tops the save up
+to the cap when the quest pool has grown since the game was created, not only when it has
+zero quests (`src/game/questEngine.js`, `backfillSideQuests` + the load-path wrapper).
+
 Seed side quests for an **in-progress** campaign the first time it loads, **if and only if
 it has none**. Side quests are currently chosen only at New Game (`selectSideQuests`, stored
 in `settings.sideQuests`). Any save created before the side-quest feature shipped, or any
