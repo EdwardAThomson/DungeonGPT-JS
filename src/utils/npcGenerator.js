@@ -533,7 +533,11 @@ export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
                 if (tile.buildingType === 'house' || tile.buildingType === 'manor' || tile.buildingType === 'keep') {
                     residentialSites.push({ x, y, type: tile.buildingType, name: tile.buildingName });
                 } else {
-                    serviceBuildings.push({ x, y, type: tile.buildingType, name: tile.buildingName });
+                    // Civic buildings (harbormaster, mill, jail, magetower, shrine...) are never
+                    // named by the town generator, and cached town maps can't be renamed
+                    // retroactively, so fall back to the town name: "Harbormaster of Willowdale",
+                    // never "Harbormaster of undefined".
+                    serviceBuildings.push({ x, y, type: tile.buildingType, name: tile.buildingName || townName });
                 }
             } else if (tile.type === 'farm_field' || (tile.type === 'building' && tile.buildingType === 'barn')) {
                 workSites.push({ x, y, type: tile.type === 'farm_field' ? 'field' : 'barn' });

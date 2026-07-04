@@ -1,5 +1,6 @@
 import {
   ageNarrativeHook,
+  applyPartyRewardsToAll,
   NARRATIVE_HOOK_PERSIST_MOVES,
   planWorldTileEncounterFlow
 } from './encounterController';
@@ -138,5 +139,50 @@ describe('ageNarrativeHook (#35/#36 hook lifecycle)', () => {
     // One move beyond the window: gone, and no reminder/noise on the way out.
     const expired = ageNarrativeHook(state, { remind: true });
     expect(expired).toEqual({ hookState: null, reminderText: null });
+  });
+});
+
+describe('applyPartyRewardsToAll (#55): milestone/quest rewards are party-wide', () => {
+  const hero = (name, xp = 0) => ({
+    characterName: name,
+    characterClass: 'Fighter',
+    level: 1,
+    xp,
+    gold: 0,
+    inventory: [],
+    stats: { strength: 10, constitution: 10 }
+  });
+
+  it('gives FULL XP to every member (no split), including KO-flagged heroes', () => {
+    const party = [hero('Ara'), { ...hero('Bem'), isDefeated: true }, hero('Cyl')];
+    const { updatedParty } = applyPartyRewardsToAll({ party, rewards: { xp: 200, gold: 0, items: [] } });
+    updatedParty.forEach((h) => expect(h.xp).toBe(200));
+  });
+
+  it('routes gold and items through the lead only (shared-pool convention)', () => {
+    const party = [hero('Ara'), hero('Bem')];
+    const { updatedParty } = applyPartyRewardsToAll({
+      party,
+      rewards: { xp: 50, gold: 30, items: ['quest_key'] }
+    });
+    expect(updatedParty[0].gold).toBe(30);
+    expect(updatedParty[1].gold).toBe(0);
+    expect((updatedParty[0].inventory || []).length).toBeGreaterThan(0);
+    expect((updatedParty[1].inventory || []).length).toBe(0);
+  });
+
+  it('announces the party XP once and level-ups per hero by name', () => {
+    // 250 existing + 100 = 350 XP: crosses the 300 threshold to level 2 for both.
+    const party = [hero('Ara', 250), hero('Bem', 250)];
+    const { updatedParty, rewardMessages } = applyPartyRewardsToAll({ party, rewards: { xp: 100 } });
+    updatedParty.forEach((h) => expect(h.level).toBe(2));
+    expect(rewardMessages[0]).toBe('+100 XP to each party member');
+    expect(rewardMessages.filter((m) => m.includes('LEVEL UP'))).toHaveLength(2);
+    expect(rewardMessages.some((m) => m.startsWith('Ara'))).toBe(true);
+    expect(rewardMessages.some((m) => m.startsWith('Bem'))).toBe(true);
+  });
+
+  it('tolerates an empty party', () => {
+    expect(applyPartyRewardsToAll({ party: [], rewards: { xp: 10 } }).updatedParty).toEqual([]);
   });
 });

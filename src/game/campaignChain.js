@@ -103,6 +103,14 @@ export const getNextCampaignOptions = ({ settings, party, worldMap = null } = {}
       sameGenre: !!genre && template.theme === genre,
       premiumLocked: !canUseTemplate(template),
       underLeveled: !!(template.levelRange && partyLevel < template.levelRange[0]),
+      // Campaigns ramp internally (early milestones are often ungated while deep
+      // chapters carry minLevel); an under-leveled party can still legitimately
+      // START such a quest and grow into it via rumours. Lets the picker tell
+      // the truth instead of only warning "may be deadly".
+      openingAccessible: (() => {
+        const first = (template.settings?.milestones || [])[0];
+        return !!first && (!first.minLevel || partyLevel >= first.minLevel);
+      })(),
       compatible: isTemplateCompatibleWithWorld(template, worldMap),
     }));
 

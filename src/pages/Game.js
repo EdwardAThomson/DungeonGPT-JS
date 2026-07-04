@@ -35,6 +35,7 @@ import {
 import {
   ageNarrativeHook,
   applyEncounterOutcomeToParty,
+  applyPartyRewardsToAll,
   applyTeamEncounterOutcomeToParty,
   planWorldTileEncounterFlow,
   formatEncounterPenaltyLog,
@@ -529,9 +530,10 @@ const Game = ({ resumeConversation = null }) => {
         let party = currentParty;
         completions.forEach(c => {
           const stepRewards = c.rewards || { xp: 0, gold: 0, items: [] };
-          party = applyEncounterOutcomeToParty({ party, result: { rewards: stepRewards, heroIndex: 0 } }).updatedParty;
+          // Quest rewards are party-wide too (#55): full XP each, loot via lead.
+          party = applyPartyRewardsToAll({ party, rewards: stepRewards }).updatedParty;
           if (c.questCompleted && c.questRewards) {
-            party = applyEncounterOutcomeToParty({ party, result: { rewards: c.questRewards, heroIndex: 0 } }).updatedParty;
+            party = applyPartyRewardsToAll({ party, rewards: c.questRewards }).updatedParty;
           }
           // Codex (#51): reward items entering the party's hands are discoveries.
           recordItemsInCodex([...(stepRewards.items || []), ...((c.questCompleted && c.questRewards?.items) || [])]);
@@ -571,18 +573,16 @@ const Game = ({ resumeConversation = null }) => {
       // Persist promptly — milestone completions previously waited up to 30s for autosave.
       setTimeout(() => performSave(), 500);
 
-      // Apply milestone rewards to lead hero
+      // Milestones are party achievements (#55): full XP to every member;
+      // gold/items still pool through the lead.
       const rewards = getMilestoneRewards(result.milestone);
       if (rewards.items.length > 0) recordItemsInCodex(rewards.items); // codex (#51)
       if (rewards.xp > 0 || rewards.gold > 0 || rewards.items.length > 0) {
-        const rewardResult = applyEncounterOutcomeToParty({
-          party: currentParty,
-          result: { rewards, heroIndex: 0 }
-        });
+        const rewardResult = applyPartyRewardsToAll({ party: currentParty, rewards });
         setSelectedHeroes(rewardResult.updatedParty);
-        const heroName = rewardResult.updatedParty[0]?.characterName || 'Hero';
-        const rewardLog = formatEncounterRewardLog(heroName, rewardResult.rewardMessages);
-        if (rewardLog) logger.info(rewardLog);
+        if (rewardResult.rewardMessages.length > 0) {
+          logger.info(`[MILESTONE REWARDS] ${rewardResult.rewardMessages.join(' · ')}`);
+        }
       }
 
       // Chat celebration message (also serves as context for the AI's next narration)
@@ -772,9 +772,10 @@ const Game = ({ resumeConversation = null }) => {
     setSettings(prev => ({ ...prev, sideQuests: turnInQuest(prev.sideQuests || [], ctx).updatedSideQuests }));
     let party = selectedHeroes;
     completions.forEach(c => {
-      party = applyEncounterOutcomeToParty({ party, result: { rewards: c.rewards || { xp: 0, gold: 0, items: [] }, heroIndex: 0 } }).updatedParty;
+      // Turn-in rewards are party-wide (#55): full XP each, loot via lead.
+      party = applyPartyRewardsToAll({ party, rewards: c.rewards || { xp: 0, gold: 0, items: [] } }).updatedParty;
       if (c.questCompleted && c.questRewards) {
-        party = applyEncounterOutcomeToParty({ party, result: { rewards: c.questRewards, heroIndex: 0 } }).updatedParty;
+        party = applyPartyRewardsToAll({ party, rewards: c.questRewards }).updatedParty;
       }
       // Codex (#51): turn-in reward items are discoveries.
       recordItemsInCodex([...((c.rewards?.items) || []), ...((c.questCompleted && c.questRewards?.items) || [])]);

@@ -104,3 +104,30 @@ describe('populateTown canonical (milestone) NPC placement', () => {
     expect(withMilestone.some((n) => /commander/i.test(n.job || ''))).toBe(true);
   });
 });
+
+describe('civic building job strings (unnamed buildings)', () => {
+  // The town generator never names civic buildings (harbormaster, stables, mill,
+  // magetower, jail, shrine, apothecary, tailor, fletcher, townhall); jobs built
+  // from b.name must fall back to the town name, never "of undefined".
+  const CIVIC = ['harbormaster', 'stables', 'mill', 'magetower', 'jail', 'shrine', 'apothecary', 'tailor', 'fletcher', 'townhall'];
+  const makeUnnamedTown = (types) => ({
+    townName: 'Saltmere',
+    townSize: 'town',
+    width: types.length,
+    height: 1,
+    mapData: [types.map((t, x) => ({ type: 'building', buildingType: t, x, y: 0 }))]
+  });
+
+  it('never produces "undefined" in any job string', () => {
+    const npcs = populateTown(makeUnnamedTown(CIVIC), 7);
+    const bad = npcs.filter((n) => /undefined/.test(n.job || ''));
+    expect(bad.map((n) => ({ job: n.job, type: n.location?.buildingType }))).toEqual([]);
+  });
+
+  it('harbormaster reads "<title> of <town>"', () => {
+    const npcs = populateTown(makeUnnamedTown(CIVIC), 7);
+    const hm = npcs.find((n) => n.location?.buildingType === 'harbormaster');
+    expect(hm).toBeDefined();
+    expect(hm.job).toMatch(/ of Saltmere$/);
+  });
+});

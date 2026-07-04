@@ -399,7 +399,10 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                                             borderRadius: '6px',
                                                             fontWeight: '500'
                                                         }}>
-                                                            {npc.job || npc.title || 'Resident'}
+                                                            {/* Cached towns baked NPC jobs before civic buildings had name
+                                                                fallbacks; strip the stale "of undefined" tail so old saves
+                                                                read "Harbormaster", not "Harbormaster of undefined". */}
+                                                            {(npc.job || npc.title || 'Resident').replace(/ (of|at) undefined$/, '')}
                                                         </span>
                                                     </span>
                                                 </div>
