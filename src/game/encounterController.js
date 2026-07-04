@@ -1,28 +1,41 @@
 import { addGold, addItem } from '../utils/inventorySystem';
 import { awardXP, getLevelUpSummary } from '../utils/progressionSystem';
+import { heroUid } from '../utils/partyUtils';
+
+// Grant-ledger note (SAVE_SYNC_PLAN.md 9.2): the reward/penalty helpers below
+// ALSO return the ledger `events` they imply ({ heroId, kind, amount?|key? },
+// no source/timestamp: the Game.js call site stamps the source and
+// appendLedgerEvents stamps the time). Additive return fields only, so
+// existing callers that destructure { hero, messages } are untouched.
 
 const applyEncounterRewards = (hero, rewards) => {
   if (!rewards) {
-    return { hero, messages: [] };
+    return { hero, messages: [], events: [] };
   }
 
   let updatedHero = { ...hero };
   const messages = [];
+  const events = [];
+  const heroId = heroUid(hero);
+  const pushEvent = (event) => { if (heroId) events.push({ heroId, ...event }); };
 
   if (rewards.xp > 0) {
     const xpResult = awardXP(updatedHero, rewards.xp);
     updatedHero = xpResult.character;
     messages.push(`+${rewards.xp} XP`);
+    pushEvent({ kind: 'xp', amount: rewards.xp });
 
     if (xpResult.leveledUp) {
       const summary = getLevelUpSummary(xpResult.previousLevel, xpResult.newLevel, updatedHero);
       messages.push(`🎉 LEVEL UP! Now level ${summary.newLevel}!`);
+      pushEvent({ kind: 'level', amount: xpResult.newLevel });
     }
   }
 
   if (rewards.gold > 0) {
     updatedHero = addGold(updatedHero, rewards.gold);
     messages.push(`+${rewards.gold} gold`);
+    pushEvent({ kind: 'gold', amount: rewards.gold });
   }
 
   if (Array.isArray(rewards.items) && rewards.items.length > 0) {
@@ -32,6 +45,7 @@ const applyEncounterRewards = (hero, rewards) => {
         ...updatedHero,
         inventory: addItem(updatedHero.inventory || [], itemKey)
       };
+      pushEvent({ kind: 'item', key: itemKey });
     }
     messages.push(`Found: ${rewards.items.join(', ')}`);
   }
@@ -53,12 +67,12 @@ const applyEncounterRewards = (hero, rewards) => {
     }
   }
 
-  return { hero: updatedHero, messages };
+  return { hero: updatedHero, messages, events };
 };
 
 const applyEncounterPenalties = (hero, penalties) => {
   if (!penalties || penalties.goldLoss <= 0) {
-    return { hero, messages: [] };
+    return { hero, messages: [], events: [] };
   }
 
   const updatedHero = { ...hero };
@@ -66,9 +80,18 @@ const applyEncounterPenalties = (hero, penalties) => {
   const actualLoss = Math.min(penalties.goldLoss, currentGold);
   updatedHero.gold = Math.max(0, currentGold - actualLoss);
 
+  // Gold losses are ledgered as negative grants so the ledger gold sum keeps
+  // tracking real gold (reconciliation raises gold to the sum; without this,
+  // a penalty would look like a regression and get "healed" back).
+  const heroId = heroUid(hero);
+  const events = heroId && actualLoss > 0
+    ? [{ heroId, kind: 'gold', amount: -actualLoss }]
+    : [];
+
   return {
     hero: updatedHero,
-    messages: [`-${actualLoss} gold (${currentGold} → ${updatedHero.gold})`]
+    messages: [`-${actualLoss} gold (${currentGold} → ${updatedHero.gold})`],
+    events
   };
 };
 
@@ -79,7 +102,8 @@ export const applyEncounterOutcomeToParty = ({ party, result }) => {
       updatedParty: party || [],
       heroIndex,
       rewardMessages: [],
-      penaltyMessages: []
+      penaltyMessages: [],
+      ledgerEvents: []
     };
   }
 
@@ -98,7 +122,8 @@ export const applyEncounterOutcomeToParty = ({ party, result }) => {
     updatedParty,
     heroIndex,
     rewardMessages: rewardsResult.messages,
-    penaltyMessages: penaltiesResult.messages
+    penaltyMessages: penaltiesResult.messages,
+    ledgerEvents: [...rewardsResult.events, ...penaltiesResult.events]
   };
 };
 
@@ -129,13 +154,15 @@ export const applyEncounterOutcomeToParty = ({ party, result }) => {
  */
 export const applyPartyRewardsToAll = ({ party, rewards, leadIndex = 0 }) => {
   if (!Array.isArray(party) || party.length === 0) {
-    return { updatedParty: party || [], rewardMessages: [] };
+    return { updatedParty: party || [], rewardMessages: [], ledgerEvents: [] };
   }
   const lead = Math.min(Math.max(leadIndex, 0), party.length - 1);
   const rewardMessages = [];
+  const ledgerEvents = [];
   const updatedParty = party.map((hero, i) => {
     const slice = i === lead ? rewards : { xp: rewards?.xp || 0 };
-    const { hero: updated, messages } = applyEncounterRewards({ ...hero }, slice);
+    const { hero: updated, messages, events } = applyEncounterRewards({ ...hero }, slice);
+    ledgerEvents.push(...events);
     messages.forEach((m) => {
       if (/^\+\d+ XP$/.test(m)) return; // announced once, party-wide, below
       if (m.includes('LEVEL UP')) {
@@ -149,7 +176,7 @@ export const applyPartyRewardsToAll = ({ party, rewards, leadIndex = 0 }) => {
   if ((rewards?.xp || 0) > 0) {
     rewardMessages.unshift(`+${rewards.xp} XP to each party member`);
   }
-  return { updatedParty, rewardMessages };
+  return { updatedParty, rewardMessages, ledgerEvents };
 };
 
 export const applyTeamEncounterOutcomeToParty = ({ party, result }) => {
@@ -166,6 +193,7 @@ export const applyTeamEncounterOutcomeToParty = ({ party, result }) => {
 
   let updatedParty = [...party];
   const rewardMessages = [];
+  const ledgerEvents = [];
 
   updatedParty = updatedParty.map((hero, idx) => {
     const isLead = idx === heroIndex;
@@ -174,7 +202,8 @@ export const applyTeamEncounterOutcomeToParty = ({ party, result }) => {
       // Lead keeps the rounding remainder so the pot is fully paid out.
       xp: xpShare + (isLead ? xpRemainder : 0)
     };
-    const { hero: updated, messages } = applyEncounterRewards(hero, heroRewards);
+    const { hero: updated, messages, events } = applyEncounterRewards(hero, heroRewards);
+    ledgerEvents.push(...events);
     const name = hero.heroName || hero.characterName || `Hero ${idx + 1}`;
     messages.forEach((msg) => rewardMessages.push(`${name}: ${msg}`));
     return updated;
@@ -182,12 +211,14 @@ export const applyTeamEncounterOutcomeToParty = ({ party, result }) => {
 
   const penaltiesResult = applyEncounterPenalties(updatedParty[heroIndex], result?.penalties);
   updatedParty[heroIndex] = penaltiesResult.hero;
+  ledgerEvents.push(...penaltiesResult.events);
 
   return {
     updatedParty,
     heroIndex,
     rewardMessages,
-    penaltyMessages: penaltiesResult.messages
+    penaltyMessages: penaltiesResult.messages,
+    ledgerEvents
   };
 };
 
