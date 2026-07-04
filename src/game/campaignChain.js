@@ -143,6 +143,12 @@ const selectContinuationSideQuests = ({ mapData, townMapsCache, existingSideQues
   const availableSites = {
     cave: flatTiles.some((t) => t.poi === 'cave_entrance'),
     ruins: flatTiles.some((t) => t.poi === 'ruins'),
+    // Parity with campaignLauncher: gather quests hint at forest/hills/mountain
+    // sources too; without these flags mountain-hinted quests were silently
+    // under-offered in chain continuations.
+    forest: flatTiles.some((t) => t.poi === 'forest'),
+    hills: flatTiles.some((t) => t.poi === 'hills'),
+    mountain: flatTiles.some((t) => t.poi === 'mountain'),
   };
   const availableBuildings = new Set();
   Object.values(townMapsCache || {}).forEach((tm) => {

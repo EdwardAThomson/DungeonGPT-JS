@@ -109,8 +109,15 @@ export const getStepHint = (step, quest) => {
     return 'Any victory in the wilds counts';
   }
 
-  // Gather: derive the sources from live data.
+  // Gather: an authored `sites` source hint wins (those sites are also revealed on the
+  // map when the quest is active); otherwise derive the sources from live data.
   if (step.trigger?.item) {
+    if (Array.isArray(step.sites) && step.sites.length > 0) {
+      const labels = step.sites.map((t) => SITE_LABEL[t] || `a ${t}`);
+      const marked = step.sites.some((t) => t === 'cave' || t === 'ruins')
+        ? ' (marked on your world map)' : '';
+      return `Harvest in ${labels.join(' or ')}${marked}`;
+    }
     return describeItemSources(step.trigger.item);
   }
 

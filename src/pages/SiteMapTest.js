@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { generateSiteMap } from '../utils/siteMapGenerator';
 import { populateSite, injectSiteObjective } from '../game/sitePopulator';
-import { tileBackground, SITE_POI } from '../utils/siteTileArt';
+import { tileBackground, SITE_POI, ART_POI } from '../utils/siteTileArt';
 import MapLegend from '../components/MapLegend';
 import { siteLegendGroups } from '../utils/mapLegend';
 
@@ -113,8 +113,8 @@ const SiteMapTest = () => {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: TILE * 0.6, lineHeight: 1,
             }}>
-              {tile.poi && SITE_POI[tile.poi]}
-              {tile.content && <span style={{ position: 'absolute', fontSize: TILE * 0.55, textShadow: '0 0 3px #000' }}>{tile.content.kind === 'encounter' ? '⚔️' : tile.content.kind === 'objective' ? '❗' : '💰'}</span>}
+              {tile.poi && !ART_POI.has(tile.poi) && SITE_POI[tile.poi]}
+              {tile.content && <span style={{ position: 'absolute', fontSize: TILE * 0.55, textShadow: '0 0 3px #000' }}>{tile.content.kind === 'encounter' ? '⚔️' : tile.content.kind === 'objective' ? '❗' : (SITE_POI[tile.content.display] || '💰')}</span>}
               {!tile.content && tile.contentSlot && <span style={{ color: '#ffd34d', fontSize: TILE * 0.5, textShadow: '0 0 3px #000' }}>◆</span>}
               {isPlayer && <span style={{ position: 'absolute', fontSize: TILE * 0.7 }}>🧍</span>}
             </div>

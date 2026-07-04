@@ -1,4 +1,4 @@
-import { shouldTriggerEncounter } from './encounterGenerator';
+import { shouldTriggerEncounter, checkForPoiEncounter } from './encounterGenerator';
 
 describe('encounterGenerator.shouldTriggerEncounter', () => {
   afterEach(() => {
@@ -51,5 +51,30 @@ describe('encounterGenerator.shouldTriggerEncounter', () => {
 
     expect(nobleResult).toBe(false); // 0.25 * 0.8 = 0.2
     expect(grimdarkResult).toBe(true); // 0.25 * 1.4 = 0.35
+  });
+});
+
+describe('encounterGenerator.checkForPoiEncounter', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("recognises the world map's 'cave_entrance' poi and rolls the cave table", () => {
+    // Force the trigger roll to pass and the table roll to land on a real entry.
+    jest.spyOn(Math, 'random').mockReturnValue(0.01);
+
+    const encounter = checkForPoiEncounter(
+      { biome: 'plains', poi: 'cave_entrance' },
+      true,
+      { grimnessLevel: 'Gritty' }
+    );
+
+    expect(encounter).toBeTruthy();
+    expect(encounter.sourcePoiType).toBe('cave'); // normalised to the cave table key
+  });
+
+  it('still returns null for a poi with no encounter table', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.01);
+    expect(checkForPoiEncounter({ biome: 'plains', poi: 'town' }, true, {})).toBeNull();
   });
 });

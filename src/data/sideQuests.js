@@ -18,8 +18,11 @@ const siteCombat = (id, text, type, enemyId, name, rewards) =>
   ({ id, type: 'combat', text, trigger: { enemy: enemyId }, requires: [], completed: false, site: { type, objectiveType: 'combat', id: enemyId, name }, rewards });
 const siteLoc = (id, text, type, locId, name, rewards) =>
   ({ id, type: 'location', text, trigger: { location: locId }, requires: [], completed: false, site: { type, objectiveType: 'location', id: locId, name }, rewards });
-const gather = (id, text, itemId, count, rewards) =>
-  ({ id, type: 'item', text, trigger: { item: itemId, count }, requires: [], completed: false, rewards });
+// `sites` = the site types where the item can actually be harvested/looted (source hint):
+// isQuestEligible requires at least one to exist on the map, getRevealedSiteTypes reveals
+// them once the quest is active, and questHints/the DM prompt point the player at them.
+const gather = (id, text, itemId, count, rewards, sites) =>
+  ({ id, type: 'item', text, trigger: { item: itemId, count }, requires: [], completed: false, ...(sites ? { sites } : {}), rewards });
 const bounty = (id, text, count, rewards) =>
   ({ id, type: 'combat', text, trigger: { enemy: 'any', count }, requires: [], completed: false, rewards });
 const Q = (id, title, minLevel, description, giverBuilding, hook, objective, turnInBuilding, turnInText, rewards) => ({
@@ -67,7 +70,7 @@ export const SIDE_QUESTS = [
   Q('consecrated_relic', 'Consecrated Relic', 3, 'A holy relic was lost when the temple-of-old fell to ruin.', ['temple', 'shrine'], 'A consecrated relic lies in the ruins. Restore it to us and be blessed.',
     siteItem('co1', 'Retrieve the holy relic from the ruins', 'ruins', 'holy_relic', 'the Holy Relic', { xp: 90, gold: 0, items: [] }), ['temple', 'shrine'], 'Return the relic to the temple', { xp: 90, gold: 120, items: ['dryad_blessing'] }),
   Q('tend_sick', 'Tend the Sick', 1, 'The temple needs healing reagents for the sick.', ['temple', 'shrine'], 'The sick need glowing cave mushrooms for poultices. Gather three.',
-    gather('ts1', 'Collect 3 glowing cave mushrooms', 'cave_mushrooms', 3, { xp: 40, gold: 0, items: [] }), ['temple', 'shrine'], 'Bring the mushrooms to the temple', { xp: 40, gold: 90, items: [] }),
+    gather('ts1', 'Collect 3 glowing cave mushrooms', 'cave_mushrooms', 3, { xp: 40, gold: 0, items: [] }, ['cave']), ['temple', 'shrine'], 'Bring the mushrooms to the temple', { xp: 40, gold: 90, items: [] }),
   Q('lay_to_rest', 'Lay the Dead to Rest', 2, 'Restless dead stir in a forgotten burial vault.', ['temple', 'shrine'], 'The dead are restless in the ruins\' burial vault. Find it so we may consecrate it.',
     siteLoc('lr1', 'Reach the burial vault in the ruins', 'ruins', 'burial_vault', 'the Burial Vault', { xp: 70, gold: 0, items: [] }), ['temple', 'shrine'], 'Report the vault\'s location', { xp: 70, gold: 100, items: [] }),
 
@@ -79,23 +82,23 @@ export const SIDE_QUESTS = [
   Q('lost_codex', 'The Lost Codex', 2, 'A codex of forgotten lore lies in the cave dark.', ['library', 'archives'], 'A lost codex lies somewhere in the cave. Recover it for the archive.',
     siteItem('lc1', 'Recover the lost codex from the cave', 'cave', 'lost_codex', 'the Lost Codex', { xp: 80, gold: 0, items: [] }), ['library', 'archives'], 'Return the codex to the archive', { xp: 80, gold: 130, items: [] }),
   Q('field_samples', 'Field Samples', 1, 'A naturalist wants raw mineral samples.', ['library', 'archives'], 'I need three raw gemstones for study. Gather them from the cave.',
-    gather('fs1', 'Collect 3 raw gemstones', 'raw_gems', 3, { xp: 40, gold: 0, items: [] }), ['library', 'archives'], 'Bring the samples in', { xp: 40, gold: 110, items: [] }),
+    gather('fs1', 'Collect 3 raw gemstones', 'raw_gems', 3, { xp: 40, gold: 0, items: [] }, ['cave']), ['library', 'archives'], 'Bring the samples in', { xp: 40, gold: 110, items: [] }),
   Q('arcane_reagents', 'Arcane Reagents', 2, 'A mage needs luminous fungi for an experiment.', 'magetower', 'I require three glowing fungi from the deep places. Fetch them.',
-    gather('ar1', 'Collect 3 glowing cave fungi', 'glowing_fungi', 3, { xp: 50, gold: 0, items: [] }), 'magetower', 'Deliver the reagents', { xp: 50, gold: 130, items: [] }),
+    gather('ar1', 'Collect 3 glowing cave fungi', 'glowing_fungi', 3, { xp: 50, gold: 0, items: [] }, ['cave']), 'magetower', 'Deliver the reagents', { xp: 50, gold: 130, items: [] }),
   Q('unstable_rift', 'The Unstable Rift', 5, 'An arcane horror has clawed through into the ruins.', 'magetower', 'Something has torn through into the ruins. Destroy it before the rift widens.',
     siteCombat('ur1', 'Destroy the arcane horror in the ruins', 'ruins', 'arcane_horror', 'the Arcane Horror', { xp: 250, gold: 0, items: ['magic_item'] }), 'magetower', undefined, { xp: 150, gold: 220, items: [] }),
 
   // --- alchemist / apothecary ---
   Q('alchemist_reagents', 'Reagents for the Apothecary', 1, 'The apothecary needs spider silk for tinctures.', ['alchemist', 'apothecary'], 'I need three skeins of spider silk for my brews. Gather them.',
-    gather('al1', 'Collect 3 skeins of spider silk', 'spider_silk', 3, { xp: 40, gold: 0, items: [] }), ['alchemist', 'apothecary'], 'Bring the silk to the apothecary', { xp: 40, gold: 90, items: [] }),
+    gather('al1', 'Collect 3 skeins of spider silk', 'spider_silk', 3, { xp: 40, gold: 0, items: [] }, ['cave']), ['alchemist', 'apothecary'], 'Bring the silk to the apothecary', { xp: 40, gold: 90, items: [] }),
   Q('antidote_ingredients', 'Antidote Ingredients', 1, 'An antidote calls for raw minerals.', ['alchemist', 'apothecary'], 'For the antidote I need three lumps of exposed minerals. Mind the dark.',
-    gather('an1', 'Collect 3 lumps of exposed minerals', 'exposed_minerals', 3, { xp: 40, gold: 0, items: [] }), ['alchemist', 'apothecary'], 'Bring the minerals in', { xp: 40, gold: 80, items: [] }),
+    gather('an1', 'Collect 3 lumps of exposed minerals', 'exposed_minerals', 3, { xp: 40, gold: 0, items: [] }, ['cave', 'hills', 'mountain']), ['alchemist', 'apothecary'], 'Bring the minerals in', { xp: 40, gold: 80, items: [] }),
   Q('cursed_patient', 'The Cursed Patient', 2, 'A dying patient needs a cure-root from the cave.', ['alchemist', 'apothecary'], 'My patient fades. The cure-root grows only in the cave. Hurry!',
     siteItem('cp1', 'Recover the cure-root from the cave', 'cave', 'cure_root', 'the Cure-Root', { xp: 80, gold: 0, items: [] }), ['alchemist', 'apothecary'], 'Bring the cure-root back', { xp: 80, gold: 140, items: ['greater_healing_potion'] }),
 
   // --- blacksmith ---
   Q('rare_ore', 'Rare Ore', 1, 'The smith needs ore from the deep cave.', 'blacksmith', 'Bring me three lumps of exposed minerals from the cave and I\'ll forge you something fine.',
-    gather('ro1', 'Collect 3 lumps of ore', 'exposed_minerals', 3, { xp: 40, gold: 0, items: [] }), 'blacksmith', 'Deliver the ore to the smith', { xp: 40, gold: 100, items: [] }),
+    gather('ro1', 'Collect 3 lumps of ore', 'exposed_minerals', 3, { xp: 40, gold: 0, items: [] }, ['cave', 'hills', 'mountain']), 'blacksmith', 'Deliver the ore to the smith', { xp: 40, gold: 100, items: [] }),
   Q('stolen_blade', 'The Stolen Blade', 2, 'A masterwork blade was looted and hidden in the ruins.', 'blacksmith', 'Thieves took my masterwork and hid it in the ruins. Recover it.',
     siteItem('sb1', 'Recover the stolen blade from the ruins', 'ruins', 'stolen_blade', 'the Stolen Blade', { xp: 80, gold: 0, items: [] }), 'blacksmith', 'Return the blade to the smith', { xp: 80, gold: 120, items: ['silver_dagger'] }),
 
@@ -141,7 +144,7 @@ export const SIDE_QUESTS = [
   Q('sunken_bell', 'The Sunken Bell', 4, 'The temple-of-old\'s great bell lies somewhere in the ruins.', ['temple', 'shrine'], 'When the old temple fell, its consecrated bell fell with it. Raise it from the ruins and its voice will bless this town again.',
     siteItem('bell1', 'Recover the temple bell from the ruins', 'ruins', 'sunken_bell', 'the Sunken Bell', { xp: 150, gold: 0, items: [] }), ['temple', 'shrine'], 'Bring the bell to the temple', { xp: 170, gold: 240, items: [] }),
   Q('storm_crystals', 'Storm-Charged Crystals', 4, 'A mage needs crystals that hold the mountain\'s lightning.', 'magetower', 'Ordinary crystal won\'t do — I need three storm crystals, charged where the peaks meet the sky. Dangerous country. Priced accordingly.',
-    gather('stc1', 'Collect 3 storm crystals', 'storm_crystal', 3, { xp: 150, gold: 0, items: [] }), 'magetower', 'Deliver the storm crystals', { xp: 170, gold: 280, items: [] }),
+    gather('stc1', 'Collect 3 storm crystals', 'storm_crystal', 3, { xp: 150, gold: 0, items: [] }, ['mountain']), 'magetower', 'Deliver the storm crystals', { xp: 170, gold: 280, items: [] }),
 
   // --- minLevel 5 ---
   Q('bandit_warcamp', 'Break the Warcamp', 5, 'A warband has grown from nuisance to army. The magistrate wants it broken.', 'townhall', 'This is no longer banditry, it is a warcamp. Scatter five of their raiders in the field and their nerve will break with them.',

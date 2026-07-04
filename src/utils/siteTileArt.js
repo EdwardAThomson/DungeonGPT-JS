@@ -138,6 +138,30 @@ const ground = (kind, seed, mask) => {
   return wrap(marks);
 };
 
+// Still water on the site floor (playtest R3: pools used to render as a 💧 emoji overlay).
+// Drawn as tile art so it reads as terrain, not a pickup: a dark, accent-tinted body over
+// the themed floor with seeded ripple highlights, plus the same wall-adjacency AO as floor.
+const poolTile = (theme, seed, mask) => {
+  const c = themeOf(theme);
+  const r = rng(seed + 31);
+  let marks = `<rect width='32' height='32' fill='${c.floor}'/>`;
+  marks += `<ellipse cx='16' cy='17' rx='12.5' ry='9.5' fill='${c.floorDark}'/>`;
+  marks += `<ellipse cx='16' cy='17' rx='11' ry='8' fill='#1e2f3a'/>`;
+  marks += `<ellipse cx='16' cy='17' rx='11' ry='8' fill='${c.accent}' opacity='0.3'/>`;
+  for (let i = 0; i < 3; i++) {
+    const x = (8 + r() * 13).toFixed(1);
+    const y = (12 + r() * 9).toFixed(1);
+    marks += `<path d='M${x} ${y} q2.4 -1.6 4.8 0' stroke='${c.accent}' stroke-width='0.9' fill='none' opacity='0.55'/>`;
+  }
+  marks += `<ellipse cx='12' cy='13' rx='3.4' ry='1.6' fill='${c.accent}' opacity='0.25'/>`;
+  const ao = (d) => `<rect ${d} fill='${c.wallDark}' opacity='0.45'/>`;
+  if (mask & 1) marks += ao("x='0' y='0' width='32' height='4'");
+  if (mask & 4) marks += ao("x='0' y='28' width='32' height='4'");
+  if (mask & 8) marks += ao("x='0' y='0' width='4' height='32'");
+  if (mask & 2) marks += ao("x='28' y='0' width='4' height='32'");
+  return wrap(marks);
+};
+
 // The way back out to the world. Enclosed sites (cave / mountain): a lit archway carved in
 // rock. Open-air sites (ruins / forest / hills): a worn dirt path leaving the map (it sits
 // on open ground, not in a wall).
@@ -165,22 +189,24 @@ const entrance = (theme) => {
 // generator emits) + emoji (how it renders) + label (how the legend names it). The
 // generator and the map legend both read THIS, so they can never drift. Note 'rubble' is
 // a tile TYPE (rough floor), not a decoration, so it isn't here. Most decorations are
-// cosmetic atmosphere, with one exception: 'crystal' is a harvestable resource node —
-// sitePopulator converts 1-3 scattered crystals per cave/mountain site into loot deposits
-// (tile.content with display:'crystal') and demotes the rest, so every crystal a player
-// sees on a newly populated site can be picked up. (Sites cached in older saves may still
-// show decorative, non-harvestable crystals.)
+// cosmetic atmosphere, but the harvestable kinds (crystal, mushroom, ore, urn,
+// overgrowth) double as resource nodes: sitePopulator (HARVEST_NODES) converts some of
+// each per site into loot deposits (tile.content with display:<key>) and demotes the
+// rest, so everything a player sees on a newly populated site can be picked up. (Sites
+// cached in older saves may still show decorative, non-harvestable copies.)
 export const SITE_DECORATIONS = {
   cave: [
     { key: 'boulder', emoji: '🪨', label: 'Boulder' },
     { key: 'crystal', emoji: '💎', label: 'Crystals (harvestable)' },
-    { key: 'mushroom', emoji: '🍄', label: 'Mushrooms' },
+    { key: 'mushroom', emoji: '🍄', label: 'Mushrooms (harvestable)' },
+    { key: 'ore', emoji: '⛏️', label: 'Ore vein (harvestable)' },
     { key: 'pool', emoji: '💧', label: 'Pool' },
   ],
   ruins: [
     { key: 'column', emoji: '🏛️', label: 'Column' },
     { key: 'statue', emoji: '🗿', label: 'Statue' },
-    { key: 'overgrowth', emoji: '🌿', label: 'Overgrowth' },
+    { key: 'overgrowth', emoji: '🌿', label: 'Overgrowth (searchable)' },
+    { key: 'urn', emoji: '⚱️', label: 'Urn (searchable)' },
   ],
   forest: [
     { key: 'tree', emoji: '🌲', label: 'Tree' },
@@ -196,6 +222,7 @@ export const SITE_DECORATIONS = {
   mountain: [
     { key: 'boulder', emoji: '🪨', label: 'Boulder' },
     { key: 'crystal', emoji: '💎', label: 'Crystals (harvestable)' },
+    { key: 'ore', emoji: '⛏️', label: 'Ore vein (harvestable)' },
     { key: 'snow', emoji: '❄️', label: 'Snow' },
   ],
 };
@@ -204,6 +231,11 @@ export const SITE_DECORATIONS = {
 export const SITE_POI = Object.fromEntries(
   Object.values(SITE_DECORATIONS).flat().map((d) => [d.key, d.emoji])
 );
+
+// Decorations rendered as tile ART by tileBackground rather than an emoji overlay.
+// Renderers should skip the SITE_POI emoji for these keys ('pool' draws real water now).
+// The emoji stays in SITE_DECORATIONS for old code paths and as the legend fallback.
+export const ART_POI = new Set(['pool']);
 
 const _cache = new Map();
 
@@ -231,6 +263,9 @@ export function tileBackground(tile, neighbours = {}, x = 0, y = 0, theme = 'cav
   } else if (type === 'ground') {
     const gk = tile.ground || 'grass';
     key = `ground|${gk}|${mask}|${variantSeed(x, y)}`;
+  } else if (tile.poi === 'pool') {
+    // pool decoration on a walkable tile -> real water art (see ART_POI)
+    key = `pool|${mask}|${theme}|${variantSeed(x, y)}`;
   } else {
     // floor / rubble / unknown -> carved ground with wall-adjacency AO
     key = `${type === 'rubble' ? 'rubble' : 'floor'}|${mask}|${theme}|${variantSeed(x, y)}`;
@@ -240,11 +275,15 @@ export function tileBackground(tile, neighbours = {}, x = 0, y = 0, theme = 'cav
     if (type === 'wall') bg = wall(theme, mask);
     else if (type === 'entrance') bg = entrance(theme);
     else if (type === 'ground') bg = ground(tile.ground || 'grass', variantSeed(x, y), mask);
+    else if (tile.poi === 'pool') bg = poolTile(theme, variantSeed(x, y), mask);
     else bg = floor(theme, variantSeed(x, y), mask, type === 'rubble');
     _cache.set(key, bg);
   }
   return bg;
 }
+
+// Legend swatch for the pool tile (any theme), matching the map rendering exactly.
+export const samplePoolTile = (theme = 'cave') => poolTile(theme, variantSeed(13, 1), 0);
 
 // gallery accessors
 export const sampleSiteTiles = {

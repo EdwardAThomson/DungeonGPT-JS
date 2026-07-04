@@ -56,4 +56,46 @@ describe('SiteMapDisplay content rendering (issue #38)', () => {
     expect(screen.getByText('⚔️')).toBeInTheDocument();
     expect(screen.getByText('❗')).toBeInTheDocument();
   });
+
+  test('mushroom, ore and urn harvest nodes render their own marker, not the money bag', () => {
+    const node = (x, display, item) => tile(x, { content: { kind: 'loot', display, loot: { gold: 0, items: [item] }, consumed: false } });
+    render(<SiteMapDisplay siteMapData={makeSite([
+      node(0, 'mushroom', 'cave_mushrooms'), node(1, 'ore', 'exposed_minerals'), node(2, 'urn', 'pearl'),
+    ])} />);
+    expect(screen.getByText('🍄')).toBeInTheDocument();
+    expect(screen.getByText('⛏️')).toBeInTheDocument();
+    expect(screen.getByText('⚱️')).toBeInTheDocument();
+    expect(screen.queryByText('💰')).not.toBeInTheDocument();
+  });
+});
+
+describe('SiteMapDisplay pool tile (playtest R3: art, not a droplet emoji)', () => {
+  test('a pool decoration no longer renders the 💧 emoji (tile art draws the water)', () => {
+    render(<SiteMapDisplay siteMapData={makeSite([tile(0, { poi: 'pool' })])} />);
+    expect(screen.queryByText('💧')).not.toBeInTheDocument();
+  });
+
+  test('other decorations still render their emoji overlay', () => {
+    render(<SiteMapDisplay siteMapData={makeSite([tile(0, { poi: 'boulder' })])} />);
+    expect(screen.getByText('🪨')).toBeInTheDocument();
+  });
+});
+
+describe('SiteMapDisplay in-modal notice (playtest R1/R4-R6: visible site feedback)', () => {
+  test('renders the site notice prominently when set', () => {
+    render(<SiteMapDisplay siteMapData={makeSite([tile(0)])} siteNotice={'💰 You find Raw Gems.'} />);
+    const notice = screen.getByRole('status');
+    expect(notice).toHaveTextContent('You find Raw Gems.');
+  });
+
+  test('renders nothing extra when there is no notice', () => {
+    render(<SiteMapDisplay siteMapData={makeSite([tile(0)])} />);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  test('notice and error can show together (notice is not the error channel)', () => {
+    render(<SiteMapDisplay siteMapData={makeSite([tile(0)])} siteNotice="✓ Step complete" siteError="You must be at the entrance (the lit exit) to leave." />);
+    expect(screen.getByRole('status')).toHaveTextContent('✓ Step complete');
+    expect(screen.getByText(/You must be at the entrance/)).toBeInTheDocument();
+  });
 });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { tileBackground, SITE_POI } from '../utils/siteTileArt';
+import { tileBackground, SITE_POI, ART_POI } from '../utils/siteTileArt';
 import { resolveProfilePicture } from '../utils/assetHelper';
 
 const TILE = 30; // a 20x20 site is 600px wide — fits the map modal
@@ -8,8 +8,10 @@ const TILE = 30; // a 20x20 site is 600px wide — fits the map modal
  * Renders an explorable wilderness site (cave / ruin) sub-map: the SVG tileset, decoration
  * + content-slot overlays, and the player marker. Mirrors TownMapDisplay but simpler
  * (no buildings / NPC modals). Movement is driven by tile clicks via onTileClick.
+ * `siteNotice` surfaces loot/objective/quest feedback INSIDE the map modal (the chat log
+ * is hidden behind it, so without this a pickup looks like nothing happened).
  */
-const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite, showLeaveButton = true, firstHero, siteError }) => {
+const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite, showLeaveButton = true, firstHero, siteError, siteNotice }) => {
   if (!siteMapData) return null;
   const { width, height, mapData, theme } = siteMapData;
 
@@ -36,7 +38,7 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: TILE * 0.6, lineHeight: 1,
               }}
             >
-              {tile.poi && SITE_POI[tile.poi]}
+              {tile.poi && !ART_POI.has(tile.poi) && SITE_POI[tile.poi]}
               {tile.content && (
                 <span style={{ position: 'absolute', fontSize: TILE * 0.55, opacity: tile.content.consumed ? 0.35 : 1, textShadow: '0 0 3px #000' }}>
                   {tile.content.consumed ? '·'
@@ -56,6 +58,19 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite,
           );
         })}
       </div>
+      {siteNotice && (
+        <div
+          role="status"
+          className="message system"
+          style={{
+            margin: '10px auto', display: 'block', maxWidth: 460, whiteSpace: 'pre-line',
+            background: 'rgba(34, 58, 38, 0.95)', border: '1px solid #7fd08a', color: '#eaffea',
+            padding: '8px 14px', borderRadius: 6, fontWeight: 600, textAlign: 'center',
+          }}
+        >
+          {siteNotice}
+        </div>
+      )}
       {siteError && (
         <div className="message system error" style={{ margin: '10px auto', display: 'block', maxWidth: 400 }}>⚠️ {siteError}</div>
       )}

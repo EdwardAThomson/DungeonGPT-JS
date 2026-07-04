@@ -74,6 +74,9 @@ const legacyNewGamePipeline = (template, seedToUse) => {
   const availableSites = {
     cave: flatTiles.some((t) => t.poi === 'cave_entrance'),
     ruins: flatTiles.some((t) => t.poi === 'ruins'),
+    forest: flatTiles.some((t) => t.poi === 'forest'),
+    hills: flatTiles.some((t) => t.poi === 'hills'),
+    mountain: flatTiles.some((t) => t.poi === 'mountain'),
   };
   const availableBuildings = new Set();
   Object.values(townMapsCache).forEach((tm) => {

@@ -79,11 +79,55 @@ describe('questEngine — basics', () => {
     expect(getRevealedSiteTypes(completed).ruins).toBe(true);
   });
 
-  test('site objectives exposed only for active quests', () => {
+  test('site objectives exposed only for active quests (one list per site type)', () => {
     expect(getActiveSiteObjectives(initialSideQuests())).toEqual({});
     const objs = getActiveSiteObjectives(accept('ruin_menace'));
-    expect(objs.ruins?.id).toBe('wraith_lord');
+    expect(objs.ruins).toHaveLength(1);
+    expect(objs.ruins[0].id).toBe('wraith_lord');
     expect(objs.cave).toBeUndefined();
+  });
+});
+
+describe('questEngine: gather-quest site hints (playtest 2026-07-04)', () => {
+  const { isQuestEligible, getRevealedSiteTypes } = require('./questEngine');
+  const quest = (id) => SIDE_QUESTS.find((q) => q.id === id);
+  const ALL_BUILDINGS = ['inn', 'tavern', 'temple', 'shrine', 'library', 'archives', 'magetower',
+    'alchemist', 'apothecary', 'blacksmith', 'townhall'];
+
+  test('gather quests carry their item-source sites', () => {
+    expect(quest('tend_sick').milestones[0].sites).toEqual(['cave']);
+    expect(quest('arcane_reagents').milestones[0].sites).toEqual(['cave']);
+    expect(quest('field_samples').milestones[0].sites).toEqual(['cave']);
+    expect(quest('storm_crystals').milestones[0].sites).toEqual(['mountain']);
+    expect(quest('rare_ore').milestones[0].sites).toEqual(['cave', 'hills', 'mountain']);
+  });
+
+  test('an active gather quest reveals its source site type (sticky, like site steps)', () => {
+    const active = acceptSideQuest(initialSideQuests(), 'tend_sick');
+    expect(getRevealedSiteTypes(active).cave).toBe(true);
+    // still merely available -> nothing revealed
+    expect(getRevealedSiteTypes(initialSideQuests()).cave).toBeUndefined();
+  });
+
+  test('a gather quest is not offered when none of its source sites exist on the map', () => {
+    const noMountain = { sites: { cave: true, ruins: true, forest: true, hills: false, mountain: false }, buildings: ALL_BUILDINGS };
+    expect(isQuestEligible(quest('storm_crystals'), noMountain)).toBe(false);
+    const withMountain = { sites: { ...noMountain.sites, mountain: true }, buildings: ALL_BUILDINGS };
+    expect(isQuestEligible(quest('storm_crystals'), withMountain)).toBe(true);
+  });
+
+  test('a multi-source gather quest is eligible when ANY source site exists', () => {
+    const hillsOnly = { sites: { cave: false, ruins: false, forest: false, hills: true, mountain: false }, buildings: ALL_BUILDINGS };
+    expect(isQuestEligible(quest('rare_ore'), hillsOnly)).toBe(true);
+    const noSources = { sites: { cave: false, ruins: false, forest: true, hills: false, mountain: false }, buildings: ALL_BUILDINGS };
+    expect(isQuestEligible(quest('rare_ore'), noSources)).toBe(false);
+  });
+
+  test('several active quests for the same site type ALL expose their objectives', () => {
+    let sq = acceptSideQuest(initialSideQuests(), 'lost_heirloom');
+    sq = acceptSideQuest(sq, 'cursed_patient');
+    const objs = getActiveSiteObjectives(sq);
+    expect(objs.cave.map((o) => o.milestoneId).sort()).toEqual(['cp1', 'lh1']);
   });
 });
 
@@ -299,10 +343,15 @@ describe('questEngine — deriveSideQuestAvailability (#45 load-time availabilit
     Brimford: { mapData: [[{ type: 'building', buildingType: 'temple' }, { type: 'building', buildingType: 'townhall' }]] },
   };
 
-  test('sites come off world tiles exactly as at new-game', () => {
-    expect(deriveSideQuestAvailability(world, cache).sites).toEqual({ cave: true, ruins: true });
+  test('sites come off world tiles exactly as at new-game (open types included)', () => {
+    expect(deriveSideQuestAvailability(world, cache).sites)
+      .toEqual({ cave: true, ruins: true, forest: false, hills: false, mountain: false });
     const noSites = [[{ poi: 'town', townName: 'A' }]];
-    expect(deriveSideQuestAvailability(noSites, {}).sites).toEqual({ cave: false, ruins: false });
+    expect(deriveSideQuestAvailability(noSites, {}).sites)
+      .toEqual({ cave: false, ruins: false, forest: false, hills: false, mountain: false });
+    const openSites = [[{ poi: 'forest' }, { poi: 'hills' }, { poi: 'mountain' }]];
+    expect(deriveSideQuestAvailability(openSites, {}).sites)
+      .toEqual({ cave: false, ruins: false, forest: true, hills: true, mountain: true });
   });
 
   test('buildings are the union of cached town maps (confirmed-placed only)', () => {
@@ -312,7 +361,11 @@ describe('questEngine — deriveSideQuestAvailability (#45 load-time availabilit
 
   test('townCount counts town POIs; tolerates a missing map/cache', () => {
     expect(deriveSideQuestAvailability(world, cache).townCount).toBe(2);
-    expect(deriveSideQuestAvailability(undefined, undefined)).toEqual({ sites: { cave: false, ruins: false }, buildings: [], townCount: 0 });
+    expect(deriveSideQuestAvailability(undefined, undefined)).toEqual({
+      sites: { cave: false, ruins: false, forest: false, hills: false, mountain: false },
+      buildings: [],
+      townCount: 0,
+    });
   });
 });
 

@@ -122,7 +122,11 @@ export const shouldTriggerEncounter = (tile, isFirstVisit, settings, movesSinceL
  */
 const getPoiType = (tile) => {
   if (!tile || !tile.poi) return null;
-  
+
+  // World maps store cave POIs as 'cave_entrance'; the encounter tables key on 'cave'.
+  // Without this mapping, cave-themed world encounters never fired at cave tiles.
+  if (tile.poi === 'cave_entrance') return 'cave';
+
   const poiTypes = ['cave', 'ruins', 'grove', 'forest', 'mountain', 'peak'];
   return poiTypes.includes(tile.poi) ? tile.poi : null;
 };
