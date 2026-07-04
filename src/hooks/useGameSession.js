@@ -112,7 +112,14 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
                 ...gameState // spread the rest of the game state
             });
             logger.debug('Conversation saved successfully', result);
-            return true;
+            // Surface where the write landed (SAVE_SYNC_PLAN Phase 1) so
+            // useGamePersistence can report an honest status: pendingCloudSync means
+            // an account-holder's save fell back to this device and awaits sync.
+            return {
+                ok: true,
+                storage: result?.storage,
+                pendingCloudSync: !!result?.pendingCloudSync
+            };
 
         } catch (error) {
             logger.error('Error saving conversation', error);

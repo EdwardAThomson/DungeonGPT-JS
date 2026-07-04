@@ -1,6 +1,9 @@
 import { apiFetch, getErrorMessage } from './apiClient';
 import { supabase } from './supabaseClient';
 import { localGameStore } from './localGameStore';
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('conversations-api');
 
 // Use CF Worker in production, Express/SQLite in dev
 const forceSQLite = process.env.REACT_APP_USE_SQLITE === 'true';
@@ -143,37 +146,91 @@ const backend = useCfWorker ? cfWorkerConversationsApi : expressConversationsApi
 
 // Logged-out (guest) players save/load games to a browser-local IndexedDB store;
 // signed-in players use the cloud backend. Local games are synced on sign-in.
-async function isSignedIn() {
+//
+// Auth-state tracking (SAVE_SYNC_PLAN Phase 1, §4): a failed getSession() is
+// "unknown", not "guest". A transient auth-check blip must not silently reroute an
+// account-holder's saves as if the player were a plain guest. lastKnownAuth
+// remembers the last *successful* check; hasSeenSignedIn remembers whether this
+// page session ever had a live sign-in, so a token that quietly dies mid-session
+// still counts as "this player has an account".
+const AUTH_SIGNED_IN = 'signed-in';
+const AUTH_GUEST = 'guest';
+const AUTH_UNKNOWN = 'unknown';
+
+let lastKnownAuth = AUTH_UNKNOWN;
+let hasSeenSignedIn = false;
+
+export const getLastKnownAuth = () => lastKnownAuth;
+
+export const _resetAuthStateForTests = () => {
+  lastKnownAuth = AUTH_UNKNOWN;
+  hasSeenSignedIn = false;
+};
+
+// Route one call: cloud when signed in, local otherwise. `pendingCloudSync` marks a
+// local write as a *fallback* for an account-holding player (the row gets stamped so
+// the UI can be honest and LocalGameSync can heal it later). Plain guests are never
+// stamped: local IS their home store, not a pending state.
+async function resolveRoute() {
+  if (!supabase) {
+    // Auth is disabled entirely (missing env), so local is the only store.
+    lastKnownAuth = AUTH_GUEST;
+    return { useCloud: false, pendingCloudSync: false };
+  }
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    return !!session?.access_token;
+    const signedIn = !!session?.access_token;
+    lastKnownAuth = signedIn ? AUTH_SIGNED_IN : AUTH_GUEST;
+    if (signedIn) hasSeenSignedIn = true;
+    // Confirmed signed out: still a fallback if the player signed in earlier this
+    // session (their token expired mid-game); a never-signed-in guest is not.
+    return { useCloud: signedIn, pendingCloudSync: !signedIn && hasSeenSignedIn };
   } catch (e) {
-    return false;
+    logger.warn(`Auth check failed; routing local (last known auth: ${lastKnownAuth})`, e);
+    // The player could be signed in behind the blip: stamp pending unless we have
+    // positive knowledge they are a plain guest ('unknown' counts as pending-eligible).
+    return { useCloud: false, pendingCloudSync: hasSeenSignedIn || lastKnownAuth !== AUTH_GUEST };
   }
 }
 
 export const conversationsApi = {
   async list() {
-    return (await isSignedIn()) ? backend.list() : localGameStore.list();
+    return (await resolveRoute()).useCloud ? backend.list() : localGameStore.list();
   },
 
   async getById(sessionId) {
-    return (await isSignedIn()) ? backend.getById(sessionId) : localGameStore.getById(sessionId);
+    return (await resolveRoute()).useCloud ? backend.getById(sessionId) : localGameStore.getById(sessionId);
   },
 
+  // save/updateMessages surface WHERE the write landed via a non-breaking `storage`
+  // marker ('cloud' | 'local') plus `pendingCloudSync: true` for account-holder
+  // fallbacks, so useGamePersistence can report an honest save status. Callers that
+  // ignore the extra fields behave exactly as before.
   async save(payload) {
-    return (await isSignedIn()) ? backend.save(payload) : localGameStore.save(payload);
+    const route = await resolveRoute();
+    if (route.useCloud) {
+      const result = await backend.save(payload);
+      return { ...(result || {}), storage: 'cloud' };
+    }
+    const row = await localGameStore.save(payload, { pendingCloudSync: route.pendingCloudSync });
+    return { ...row, storage: 'local', pendingCloudSync: !!row.pending_cloud_sync };
   },
 
   async updateMessages(sessionId, conversationData) {
-    return (await isSignedIn()) ? backend.updateMessages(sessionId, conversationData) : localGameStore.updateMessages(sessionId, conversationData);
+    const route = await resolveRoute();
+    if (route.useCloud) {
+      const result = await backend.updateMessages(sessionId, conversationData);
+      return { ...(result || {}), storage: 'cloud' };
+    }
+    const row = await localGameStore.updateMessages(sessionId, conversationData, { pendingCloudSync: route.pendingCloudSync });
+    return row ? { ...row, storage: 'local', pendingCloudSync: !!row.pending_cloud_sync } : row;
   },
 
   async updateName(sessionId, conversationName) {
-    return (await isSignedIn()) ? backend.updateName(sessionId, conversationName) : localGameStore.updateName(sessionId, conversationName);
+    return (await resolveRoute()).useCloud ? backend.updateName(sessionId, conversationName) : localGameStore.updateName(sessionId, conversationName);
   },
 
   async remove(sessionId) {
-    return (await isSignedIn()) ? backend.remove(sessionId) : localGameStore.remove(sessionId);
+    return (await resolveRoute()).useCloud ? backend.remove(sessionId) : localGameStore.remove(sessionId);
   }
 };

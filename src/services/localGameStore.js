@@ -45,10 +45,14 @@ const _clear = () => run('readwrite', (s) => s.clear());
 
 // Replicates cf-worker db.ts conversation upsert so local rows match cloud rows.
 // Exported for the LocalGameSync round-trip test (must invert rowToPayload).
-export const mapPayloadToRow = (payload) => {
+// `pendingCloudSync` is the Phase 1 honest-fallback stamp (SAVE_SYNC_PLAN §5): set
+// when an account-holding player's save fell back to this device because auth was
+// absent. Plain guest rows never carry it (local is their home store), and older
+// rows without the field behave as unstamped.
+export const mapPayloadToRow = (payload, { pendingCloudSync = false } = {}) => {
   const now = new Date().toISOString();
   const sessionId = payload.sessionId || payload.session_id;
-  return {
+  const row = {
     session_id: sessionId,
     sessionId, // frontend convenience (backend getById adds this too)
     conversation_name: payload.conversationName || payload.conversation_name || null,
@@ -64,6 +68,8 @@ export const mapPayloadToRow = (payload) => {
     timestamp: payload.timestamp || now,
     updated_at: now,
   };
+  if (pendingCloudSync) row.pending_cloud_sync = true;
+  return row;
 };
 
 export const localGameStore = {
@@ -80,18 +86,26 @@ export const localGameStore = {
     return (await _get(sessionId)) || null;
   },
 
-  async save(payload) {
-    const row = mapPayloadToRow(payload);
+  async save(payload, opts = {}) {
+    const row = mapPayloadToRow(payload, opts);
     if (!row.session_id) throw new Error('localGameStore.save: missing sessionId');
+    if (!row.pending_cloud_sync) {
+      // Never let an unstamped overwrite erase an earlier fallback stamp: the row
+      // still needs to reach the account even if this write was guest-routed.
+      const existing = await _get(row.session_id).catch(() => null);
+      if (existing?.pending_cloud_sync) row.pending_cloud_sync = true;
+    }
     await _put(row);
     return row;
   },
 
-  async updateMessages(sessionId, conversationData) {
+  async updateMessages(sessionId, conversationData, { pendingCloudSync = false } = {}) {
     const row = await _get(sessionId);
     if (!row) return null;
     row.conversation_data = conversationData;
     row.updated_at = new Date().toISOString();
+    // Additive only: an existing stamp survives an unstamped update.
+    if (pendingCloudSync) row.pending_cloud_sync = true;
     await _put(row);
     return row;
   },

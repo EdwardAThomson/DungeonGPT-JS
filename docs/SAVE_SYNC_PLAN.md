@@ -1,6 +1,6 @@
 # Save Storage & Sync Plan — local-first saves, honest durability, divergence-safe reconcile
 
-Status: **planned** (design decided 2026-07-04; not yet built). Backlog item #54.
+Status: **Phase 1 implemented (pending review)**, 2026-07-04; Phases 2-3 planned. Backlog item #54.
 Origin: playtest 2026-07-04. The t1 goblin-campaign save "teleported" between the
 cloud backend and the browser depending on login state (split-brain, see §2.4).
 Builds on `GUEST_MODE_PLAN.md` (localGameStore / LocalGameSync, Phase B).
@@ -103,7 +103,27 @@ should not survive into the sync logic.
 
 ## 5. Interim option (Phase 1, if shipped before the full write-through)
 
-Keeps per-call routing, fixes the silence and the stranding (~20% of the work):
+Status: **implemented 2026-07-04 (pending review)**. What shipped, by mechanism:
+- `conversationsApi.resolveRoute()` replaces `isSignedIn()`: routes per call as
+  before, but tracks module-level `lastKnownAuth` ('signed-in' | 'guest' |
+  'unknown') plus `hasSeenSignedIn`; a getSession() throw falls back to the last
+  known state instead of silently meaning "guest" (§4 last paragraph).
+- `save`/`updateMessages` results carry a non-breaking `storage: 'cloud' | 'local'`
+  marker and `pendingCloudSync`; account-holder fallback rows are stamped
+  `pending_cloud_sync: true` in IndexedDB (localGameStore; plain guest rows stay
+  unstamped, old rows without the field behave as unstamped).
+- `useGamePersistence.performSave` returns a new `'savedLocal'` status; the
+  Game.js save confirmation renders it as a warning ("Saved on this device...
+  will sync when you sign back in"). Guest saves keep the normal 'saved' flow.
+- `LocalGameSync.runLocalGameSyncPass()` (extracted, testable) is timestamp-guarded:
+  a cloud row newer than the local one is never overwritten; the local copy is
+  parked as `<session_id>-local-<rand>` named "(diverged on this device, <date>)"
+  per §6.2. The component also re-arms on `SIGNED_IN` / `TOKEN_REFRESHED` auth
+  events, so restoration mid-session syncs too, and a write that routes back to
+  local mid-pass is kept for retry instead of being deleted.
+
+Original scope (kept for reference). Keeps per-call routing, fixes the silence and
+the stranding (~20% of the work):
 - On fallback (auth expected but absent): stamp the local row
   `pendingCloudSync: true`; confirmation copy says "Saved on this device".
 - Extend `LocalGameSync` to also run on auth restoration, not just sign-in.

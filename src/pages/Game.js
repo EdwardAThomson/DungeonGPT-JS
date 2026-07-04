@@ -77,12 +77,18 @@ const SaveConfirmationModal = () => {
   };
 
   const status = data?.status || 'saved';
-  const isSuccess = status === 'saved' || status === 'nochange';
+  const isSuccess = status === 'saved' || status === 'nochange' || status === 'savedLocal';
   let heading, headingColor, blurb;
   if (status === 'error') {
     heading = '⚠ Save failed';
     headingColor = 'var(--state-error, #d9534f)';
     blurb = 'Your game could not be saved to this browser. Storage may be blocked (a private window?) or full. Try again, or free up space.';
+  } else if (status === 'savedLocal') {
+    // Honest fallback: the write landed locally for an account-holding player
+    // (auth absent or unreachable). A warning, not an error: progress is safe.
+    heading = '⚠ Saved on this device';
+    headingColor = 'var(--state-warning, #e0a800)';
+    blurb = 'Your account could not be reached, so this save is stored on this device for now. It will sync to your account when you sign back in. Saved as:';
   } else if (status === 'skipped') {
     heading = 'Nothing to save yet';
     headingColor = 'var(--text)';
@@ -110,9 +116,11 @@ const SaveConfirmationModal = () => {
             {displayName}
           </p>
           <p style={{ marginBottom: '18px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
-            {data?.signedIn
-              ? '☁️ Saved to your account (syncs across your devices)'
-              : '💾 Saved on this device (this browser)'}
+            {status === 'savedLocal'
+              ? '💾 On this device only. It will sync to your account when you sign back in.'
+              : data?.signedIn
+                ? '☁️ Saved to your account (syncs across your devices)'
+                : '💾 Saved on this device (this browser)'}
           </p>
 
           <div style={{ textAlign: 'left', marginBottom: '20px' }}>
@@ -1386,7 +1394,7 @@ const Game = ({ resumeConversation = null }) => {
             const currentRoot = (settings?.saveName || '').trim();
             const title = buildSaveName(currentRoot);
             // performSave reports what actually happened so the confirmation is honest:
-            // 'saved' | 'nochange' | 'skipped' | 'error'.
+            // 'saved' | 'savedLocal' | 'nochange' | 'skipped' | 'error'.
             const status = await performSave();
             openSaveConfirmation({
               status,
