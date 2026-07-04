@@ -38,6 +38,7 @@ deleted. When the code and a doc disagree, the code wins.
 - `TERRAIN_ROADMAP.md` — experimental layered/noise terrain (debug-only)
 - `GUEST_MODE_PLAN.md` — guest mode (core shipped; conversion-prompt follow-up open)
 - `SAVE_SYNC_PLAN.md` — local-first saves, honest offline fallback, divergence-safe multi-device reconcile (#54)
+- `LARGER_WORLDS_PLAN.md` — chunked generation, flat storage, growable saves for paid tiers (#60)
 
 ## Art & assets
 - `IMAGE_GENERATION_PROMPTS.md` — art-gen prompt library + style guide
