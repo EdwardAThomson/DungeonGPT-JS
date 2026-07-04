@@ -617,3 +617,13 @@ describe('3x3 seed survey (a few dozen seeds)', () => {
     expect(failures).toEqual([]);
   });
 });
+
+describe('world lake cap (#63: a 3x3 world rolled 5 lakes under independent per-chunk odds)', () => {
+  it('no world exceeds the cap, heart lakes included', () => {
+    for (let seed = 500; seed < 530; seed++) {
+      const { report } = assembleWorld({ worldSeed: seed, chunksX: 3, chunksY: 3 });
+      const total = report.chunks.reduce((n, c) => n + (c.lakes || 0), 0);
+      expect(total).toBeLessThanOrEqual(3);
+    }
+  });
+});

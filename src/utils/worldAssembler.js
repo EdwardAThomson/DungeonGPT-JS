@@ -98,6 +98,11 @@ function hashRoll(worldSeed, tag) {
 // heart keeps its legacy lakes untouched; outer wilds only sometimes have one, so a 3x3
 // world is not a lake district. When granted, the normal #59 budget applies in that chunk.
 const OUTER_LAKE_CHANCE = 0.32;
+// #63: hard world-level lake cap. Independent per-chunk rolls compounded (a 3x3
+// world occasionally totalled 5 lakes); the whole WORLD now holds at most this
+// many lakes, heart's own included. Outer land chunks are ranked by their seeded
+// roll and lakes granted to the best rollers only, within the remaining cap.
+const WORLD_LAKE_CAP = 3;
 
 /**
  * World-level coast depth profile (EXPERIMENTAL — not frozen). One deterministic 1D
@@ -278,6 +283,33 @@ export function assembleWorld({ worldSeed, chunksX = 3, chunksY = 3, heartChunk,
   const heartGrid = generateMapData(CHUNK_SIZE, CHUNK_SIZE, seedNum, customNames, theme);
   const coast = detectCoast(heartGrid) || { edge: 1, depth: 2 }; // placeCoast always runs; fallback is defensive
   place(heartGrid, heart.cx, heart.cy);
+
+  // #63 world lake quota: rank outer land chunks by seeded roll; grant lakes to
+  // the best rollers that also pass the old per-chunk odds, within what the
+  // heart's own lakes leave of the world cap. Deterministic for fixed world
+  // dimensions (the ranking depends only on worldSeed + chunk coords).
+  const heartLakeCount = countLakes(heartGrid);
+  const outerLakeQuota = Math.max(0, WORLD_LAKE_CAP - heartLakeCount);
+  const outerLandRolls = [];
+  for (let qy = 0; qy < chunksY; qy++) {
+    for (let qx = 0; qx < chunksX; qx++) {
+      if (qx === heart.cx && qy === heart.cy) continue;
+      if (classifyChunk(qx, qy, heart, coast.edge) === 'ocean') continue;
+      outerLandRolls.push({ cx: qx, cy: qy, roll: hashRoll(seedNum, `lakes:${qx},${qy}`) });
+    }
+  }
+  outerLandRolls.sort((a, b) => a.roll - b.roll);
+  // Budget in LAKES, not chunks: a granted chunk may roll a second smaller lake
+  // (#59), so each grant reserves its maxLakes from the remaining world budget.
+  const lakeGrants = new Map();
+  let lakeBudgetLeft = outerLakeQuota;
+  for (const c of outerLandRolls) {
+    if (lakeBudgetLeft <= 0) break;
+    if (c.roll >= OUTER_LAKE_CHANCE) continue;
+    const allowed = Math.min(2, lakeBudgetLeft);
+    lakeGrants.set(`${c.cx},${c.cy}`, allowed);
+    lakeBudgetLeft -= allowed;
+  }
   chunkKinds[heart.cy][heart.cx] = 'heart';
 
   // World-level coast depth profile over the along-coast coordinate (world y for an E/W
@@ -320,13 +352,13 @@ export function assembleWorld({ worldSeed, chunksX = 3, chunksY = 3, heartChunk,
           const sliceStart = (alongIsY ? cy : cx) * CHUNK_SIZE;
           coastDepths = coastProfile.slice(sliceStart, sliceStart + CHUNK_SIZE);
         }
-        // World-level lake allocation: outer chunks only sometimes get lakes.
-        hasLakes = hashRoll(seedNum, `lakes:${cx},${cy}`) < OUTER_LAKE_CHANCE;
+        // World-level lake allocation (#63): quota-ranked grant, not independent rolls.
+        hasLakes = lakeGrants.has(`${cx},${cy}`);
         grid = generateMapData(CHUNK_SIZE, CHUNK_SIZE, seed, {}, theme, {
           coast: kind === 'coastal' ? { edge: coast.edge, depths: coastDepths } : null,
           edgeConstraints: constraints,
           lakeBorderMargin: 2,
-          maxLakes: hasLakes ? 2 : 0,
+          maxLakes: hasLakes ? lakeGrants.get(`${cx},${cy}`) : 0,
           townDensityFactor: 0.65,
         });
       }
