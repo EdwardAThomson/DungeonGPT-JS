@@ -8,6 +8,7 @@ import {
   chunkSeed,
   gatePoint,
   detectCoast,
+  buildCoastProfile,
   analyzeConnectivity,
   CHUNK_SIZE,
 } from './worldAssembler';
@@ -61,6 +62,55 @@ describe('generator options (chunk-assembly hooks)', () => {
     }
   });
 
+  it('coast: { edge, depths } stamps a variable-depth band that follows the array', () => {
+    const depths = [2, 2, 2, 3, 3, 3, 3, 2, 2, 2];
+    const map = generateMapData(10, 10, 999, {}, 'grassland', { coast: { edge: 0, depths } });
+    for (let i = 0; i < 10; i++) {
+      for (let d = 0; d < 4; d++) {
+        const t = map[d][i];
+        if (d < depths[i] - 1) expect(t.biome).toBe('water');
+        else if (d === depths[i] - 1) expect(t.biome).toBe('beach');
+        else expect(t.biome === 'water' || t.biome === 'beach').toBe(false);
+      }
+    }
+  });
+
+  it('maxLakes: 0 suppresses lakes entirely; maxLakes: 1 never places the companion lake', () => {
+    for (let s = 1; s <= 15; s++) {
+      const none = generateMapData(10, 10, s * 53, {}, 'grassland', { maxLakes: 0 });
+      expect(none.flat().some((t) => t.descriptionSeed === 'A clear lake')).toBe(false);
+      expect(none.flat().some((t) => t.descriptionSeed === 'A sandy lakeshore')).toBe(false);
+    }
+    // maxLakes: 1 — count connected lake components; never more than one.
+    const components = (map) => {
+      const seen = new Set();
+      let count = 0;
+      const isLake = (x, y) => map[y] && map[y][x]
+        && map[y][x].biome === 'water' && map[y][x].descriptionSeed === 'A clear lake';
+      for (let y = 0; y < 10; y++) {
+        for (let x = 0; x < 10; x++) {
+          if (!isLake(x, y) || seen.has(`${x},${y}`)) continue;
+          count++;
+          const stack = [[x, y]];
+          seen.add(`${x},${y}`);
+          while (stack.length) {
+            const [cx, cy] = stack.pop();
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+              if (isLake(cx + dx, cy + dy) && !seen.has(`${cx + dx},${cy + dy}`)) {
+                seen.add(`${cx + dx},${cy + dy}`);
+                stack.push([cx + dx, cy + dy]);
+              }
+            }
+          }
+        }
+      }
+      return count;
+    };
+    for (let s = 1; s <= 15; s++) {
+      expect(components(generateMapData(10, 10, s * 53, {}, 'grassland', { maxLakes: 1 }))).toBeLessThanOrEqual(1);
+    }
+  });
+
   it('townDensityFactor thins settlements on average', () => {
     let full = 0;
     let sparse = 0;
@@ -96,6 +146,65 @@ describe('chunkSeed / gatePoint determinism', () => {
         expect(g).toBeGreaterThanOrEqual(2);
         expect(g).toBeLessThanOrEqual(7);
       }
+    }
+  });
+});
+
+describe('buildCoastProfile (world-level coast depth profile)', () => {
+  // 3x3-like shape: 30 tiles along the coast, heart span at 10..19.
+  const LEN = 30;
+  const ANCHOR = 10;
+
+  it('is deterministic and anchored: heart span exactly equals the heart depth', () => {
+    for (const anchorDepth of [2, 3]) {
+      for (let s = 1; s <= 20; s++) {
+        const a = buildCoastProfile(s * 617, LEN, ANCHOR, anchorDepth);
+        const b = buildCoastProfile(s * 617, LEN, ANCHOR, anchorDepth);
+        expect(a).toEqual(b);
+        expect(a).toHaveLength(LEN);
+        for (let i = ANCHOR; i < ANCHOR + CHUNK_SIZE; i++) expect(a[i]).toBe(anchorDepth);
+      }
+    }
+  });
+
+  it('stays within [2,3], steps by at most 1, holds interior runs of >= 3 tiles', () => {
+    for (let s = 1; s <= 20; s++) {
+      const p = buildCoastProfile(s * 617, LEN, ANCHOR, 2 + (s % 2));
+      p.forEach((d) => {
+        expect(d).toBeGreaterThanOrEqual(2);
+        expect(d).toBeLessThanOrEqual(3);
+      });
+      // Collect runs (start index + length); runs truncated by the world edge (touching
+      // index 0 or LEN-1) may legitimately be shorter than the 3-tile hold.
+      const runs = [];
+      let start = 0;
+      for (let i = 1; i <= LEN; i++) {
+        if (i === LEN || p[i] !== p[i - 1]) {
+          if (i < LEN) expect(Math.abs(p[i] - p[i - 1])).toBe(1);
+          runs.push({ start, len: i - start });
+          start = i;
+        }
+      }
+      runs.forEach((r) => {
+        if (r.start === 0 || r.start + r.len === LEN) return; // world-edge truncation
+        expect(r.len).toBeGreaterThanOrEqual(3);
+      });
+    }
+  });
+
+  it('never steps exactly at a chunk boundary (both sides of every seam share a depth)', () => {
+    for (let s = 1; s <= 40; s++) {
+      const p = buildCoastProfile(s * 617, LEN, ANCHOR, 2 + (s % 2));
+      for (let seam = CHUNK_SIZE; seam < LEN; seam += CHUNK_SIZE) {
+        expect(p[seam]).toBe(p[seam - 1]);
+      }
+    }
+  });
+
+  it('the wobble exists: depth varies along the coastline on every 3x3-shaped profile', () => {
+    for (let s = 1; s <= 40; s++) {
+      const p = buildCoastProfile(s * 617, LEN, ANCHOR, 2 + (s % 2));
+      expect(new Set(p).size).toBeGreaterThan(1);
     }
   });
 });
@@ -164,20 +273,37 @@ describe('assembleWorld', () => {
       const inline = (oceanEdge === 0 || oceanEdge === 2) ? c.cy === heart.cy : c.cx === heart.cx;
       expect(c.kind).toBe(beyond ? 'ocean' : inline ? 'coastal' : 'inland');
       if (c.kind === 'ocean') expect(c.waterPct).toBe(1);
-      if (c.kind === 'inland') expect(c.coastDepth).toBeNull();
+      if (c.kind === 'inland') expect(c.coastDepths).toBeNull();
       if (c.kind === 'coastal') {
-        expect(c.coastDepth).toBeGreaterThanOrEqual(2);
-        expect(c.coastDepth).toBeLessThanOrEqual(3);
-        expect(Math.abs(c.coastDepth - report.heartCoastDepth)).toBeLessThanOrEqual(1);
+        // The chunk's slice of the world-level profile: every depth in placeCoast's own
+        // range, and equal to the profile slice for this chunk's span.
+        expect(c.coastDepths).toHaveLength(CHUNK_SIZE);
+        c.coastDepths.forEach((d) => {
+          expect(d).toBeGreaterThanOrEqual(2);
+          expect(d).toBeLessThanOrEqual(3);
+        });
+        const alongIsY = oceanEdge === 1 || oceanEdge === 3;
+        const sliceStart = (alongIsY ? c.cy : c.cx) * CHUNK_SIZE;
+        expect(c.coastDepths).toEqual(report.coastProfile.slice(sliceStart, sliceStart + CHUNK_SIZE));
       }
     }
   });
 
-  it('coast continuity: every seam the coastline crosses keeps its water band within ±1', () => {
+  it('coast continuity: the water band is EQUAL on both sides of every crossed seam', () => {
     const { report } = build(3);
     const coastSeams = report.seams.filter((s) => s.crossesCoast);
     expect(coastSeams.length).toBeGreaterThan(0);
-    coastSeams.forEach((s) => expect(s.coastBandOk).toBe(true));
+    coastSeams.forEach((s) => expect(s.coastBandOk).toBe(true)); // strict equality now
+  });
+
+  it('the world coast profile is anchored on the heart and wobbles beyond it', () => {
+    const { report } = build(3);
+    const { coastProfile, heart, oceanEdge, heartCoastDepth } = report;
+    const anchorStart = ((oceanEdge === 1 || oceanEdge === 3) ? heart.cy : heart.cx) * CHUNK_SIZE;
+    for (let i = anchorStart; i < anchorStart + CHUNK_SIZE; i++) {
+      expect(coastProfile[i]).toBe(heartCoastDepth); // heart interior cannot change
+    }
+    expect(new Set(coastProfile).size).toBeGreaterThan(1); // the wobble exists
   });
 
   it('non-ocean world edges carry no coast (land chunks never grow a second coastline)', () => {
@@ -196,13 +322,13 @@ describe('assembleWorld', () => {
     });
   });
 
-  it('land-land seams: no water/land hard edges, and exact biome continuity stays high', () => {
+  it('land-land seams: no water/land hard edges anywhere', () => {
     const { report } = build(3);
     expect(report.seams.length).toBeGreaterThan(0);
     report.seams.forEach((s) => {
-      // The hard guarantee: no water-against-land guillotine pairs, except the single
-      // +-1 wobble tile where the coast band crosses a seam.
-      expect(s.compatiblePct).toBeGreaterThanOrEqual(s.crossesCoast ? 0.9 : 1);
+      // The hard guarantee: no water-against-land guillotine pairs. With the world-level
+      // coast profile the band matches exactly at seams, so this holds on coast seams too.
+      expect(s.compatiblePct).toBe(1);
     });
   });
 
@@ -324,7 +450,7 @@ describe('3x3 seed survey (a few dozen seeds)', () => {
     }
   });
 
-  it('coast bands stay within the ±1 wobble across every crossed seam', () => {
+  it('coast bands are EQUAL on both sides of every crossed seam (no depth step)', () => {
     const broken = [];
     for (const { worldSeed, report } of results) {
       for (const s of report.seams) {
@@ -332,6 +458,36 @@ describe('3x3 seed survey (a few dozen seeds)', () => {
       }
     }
     expect(broken).toEqual([]);
+  });
+
+  it('the coastline wobbles on every seed (along-coast depth variance > 0)', () => {
+    for (const { report } of results) {
+      expect(new Set(report.coastProfile).size).toBeGreaterThan(1);
+    }
+  });
+
+  it('world-level lake allocation: outer land chunks average well below one lake each', () => {
+    let outerChunks = 0;
+    let outerLakes = 0;
+    let outerChunksWithLakes = 0;
+    let worldsWithOuterLakes = 0;
+    for (const { report } of results) {
+      let thisWorld = 0;
+      for (const c of report.chunks) {
+        if (c.kind !== 'coastal' && c.kind !== 'inland') continue;
+        outerChunks++;
+        outerLakes += c.lakes;
+        if (c.lakes > 0) { outerChunksWithLakes++; thisWorld++; }
+        if (!c.lakesGranted) expect(c.lakes).toBe(0); // suppression actually suppresses
+      }
+      if (thisWorld > 0) worldsWithOuterLakes++;
+    }
+    const mean = outerLakes / outerChunks;
+    // Target band: sparse wilds, not a lake district — but lakes still exist out there.
+    expect(mean).toBeGreaterThanOrEqual(0.15);
+    expect(mean).toBeLessThanOrEqual(0.55);
+    expect(outerChunksWithLakes / outerChunks).toBeLessThan(0.5); // most outer chunks are lakeless
+    expect(worldsWithOuterLakes).toBeGreaterThan(results.length / 2); // but not a dry world
   });
 
   // Seam-quality floors, tuned to what the blend achieves (measured over 40 seeds / 280
@@ -354,12 +510,11 @@ describe('3x3 seed survey (a few dozen seeds)', () => {
     expect(sum / total).toBeGreaterThanOrEqual(0.85);
   });
 
-  it('land seams: never a water/land hard edge (coast seams get the single wobble tile)', () => {
+  it('land seams: never a water/land hard edge (coast depths now match at seams)', () => {
     const violations = [];
     for (const { worldSeed, report } of results) {
       for (const s of report.seams) {
-        const floor = s.crossesCoast ? 0.9 : 1;
-        if (s.compatiblePct < floor) violations.push({ worldSeed, seam: s.between, pct: s.compatiblePct });
+        if (s.compatiblePct < 1) violations.push({ worldSeed, seam: s.between, pct: s.compatiblePct });
       }
     }
     expect(violations).toEqual([]);

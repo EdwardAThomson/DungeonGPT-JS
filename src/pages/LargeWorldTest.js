@@ -162,24 +162,31 @@ const LargeWorldTest = () => {
           connectivity: <strong style={{ color: report.connectivity.ok ? 'inherit' : '#d94a4a' }}>
             {report.connectivity.reachableTowns}/{report.connectivity.totalTowns} towns reach the starting town over land
           </strong> ·
-          seams: worst biome match {pct(worstSeam)}{coastSeams.length > 0 && <> · coast bands {coastOk ? 'continuous (±1)' : 'BROKEN'}</>}
+          lakes: <strong>{report.totalLakes}</strong> total ({report.lakesPerLandChunk.toFixed(2)}/land chunk) ·
+          seams: worst biome match {pct(worstSeam)}{coastSeams.length > 0 && <> · coast depths {coastOk ? 'matched at seams' : 'MISMATCHED'}</>}
         </p>
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
           <table style={{ borderCollapse: 'collapse' }}>
             <thead>
-              <tr>{['chunk', 'kind', 'seed', 'water', 'towns', 'coast depth'].map((h) => <th key={h} style={{ ...td, textAlign: 'left' }}>{h}</th>)}</tr>
+              <tr>{['chunk', 'kind', 'seed', 'water', 'towns', 'lakes', 'coast depth'].map((h) => <th key={h} style={{ ...td, textAlign: 'left' }}>{h}</th>)}</tr>
             </thead>
             <tbody>
-              {report.chunks.map((c) => (
-                <tr key={`${c.cx},${c.cy}`}>
-                  <td style={td}>({c.cx},{c.cy})</td>
-                  <td style={td}>{c.kind}</td>
-                  <td style={td}>{c.seed}</td>
-                  <td style={td}>{pct(c.waterPct)}</td>
-                  <td style={td}>{c.towns}</td>
-                  <td style={td}>{c.coastDepth ?? '—'}</td>
-                </tr>
-              ))}
+              {report.chunks.map((c) => {
+                const depths = c.coastDepths
+                  ? `${Math.min(...c.coastDepths)}-${Math.max(...c.coastDepths)}`
+                  : (c.coastDepth ?? '—');
+                return (
+                  <tr key={`${c.cx},${c.cy}`}>
+                    <td style={td}>({c.cx},{c.cy})</td>
+                    <td style={td}>{c.kind}</td>
+                    <td style={td}>{c.seed}</td>
+                    <td style={td}>{pct(c.waterPct)}</td>
+                    <td style={td}>{c.towns}</td>
+                    <td style={td}>{c.lakes}{c.kind === 'coastal' || c.kind === 'inland' ? (c.lakesGranted ? '' : ' (skip)') : ''}</td>
+                    <td style={td}>{depths}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
           <table style={{ borderCollapse: 'collapse' }}>
@@ -210,7 +217,7 @@ const LargeWorldTest = () => {
                   <td style={td}>{s.kinds.join('/')}</td>
                   <td style={td}>{pct(s.biomeMatchPct)}</td>
                   <td style={td}>{pct(s.compatiblePct)}</td>
-                  <td style={td}>{s.crossesCoast ? (s.coastBandOk ? '✓ ±1' : '✗') : '—'}</td>
+                  <td style={td}>{s.crossesCoast ? (s.coastBandOk ? '✓ =' : '✗') : '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -218,9 +225,12 @@ const LargeWorldTest = () => {
         </div>
         <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
           Heart chunk interior is the legacy <code>generateMapData(10,10,seed)</code> world (roads to gate points are an
-          additive overlay). Outer land chunks: seeded via <code>chunkSeed(worldSeed,cx,cy)</code>, lakes keep 2 tiles off
-          seams, ~65% settlement density, no coast except the ocean side. Red dashed circles are gate tiles. This page and
-          <code> worldAssembler.js</code> are the whole prototype — nothing touches New Game or saves.
+          additive overlay). Outer land chunks: seeded via <code>chunkSeed(worldSeed,cx,cy)</code>, lakes granted on a
+          seeded ~32% per-chunk roll (and kept 2 tiles off seams), ~65% settlement density, no coast except the ocean
+          side. Coast depth follows one world-level profile (<code>buildCoastProfile</code>) anchored on the heart's own
+          depth: it wobbles in 3-5 tile runs along the coastline but never steps at a chunk seam, so both sides of every
+          seam share the same band depth. Red dashed circles are gate tiles. This page and <code>worldAssembler.js</code>
+          are the whole prototype — nothing touches New Game or saves.
         </p>
       </section>
     </div>

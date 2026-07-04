@@ -121,18 +121,44 @@ right behind a debug page before release.
 Implementation: `src/utils/worldAssembler.js` (+ `worldAssembler.test.js`) and
 `src/pages/LargeWorldTest.js` at **`/debug/large-world`**. Nothing touches the live
 New Game flow or what saves store. `generateMapData` gained an optional final
-`options` param (suppress/prescribe coast, edge constraints, lake border margin,
-town density); omitting it is byte-identical to the legacy call, pinned by fixture
-tests (`src/utils/__fixtures__/legacyMap_seed*.json`).
+`options` param (suppress/prescribe coast — uniform or per-tile depths, edge
+constraints, lake border margin, lake count cap, town density); omitting it is
+byte-identical to the legacy call, pinned by fixture tests
+(`src/utils/__fixtures__/legacyMap_seed*.json`).
 
 **Ocean-side decision.** The heart's placeCoast edge defines the WORLD's ocean side.
-Chunks continuing the heart's row/column along that side carry the coastline through
-(same edge, depth wobbling ±1 within placeCoast's own [2,3] range, seeded per chunk);
+Chunks continuing the heart's row/column along that side carry the coastline through;
 chunks fully beyond the coastline are open ocean (all water; small seeded islands are
 allowed by this design but deliberately not generated in the prototype); all other
 world sides get NO coast. Rationale: one coherent sea keeps the mental model of
 "today's free world, extended inland" — the heart stays a valid free world and a
 second random coast elsewhere would strand water mid-continent.
+
+**World-level coast depth profile (refinement after maintainer seam review).** The
+first cut wobbled the coast depth ±1 independently per chunk, which produced a visible
+band-thickness STEP exactly at chunk seams (repro seed 61211). Replaced by ONE
+deterministic 1D profile over the along-coast coordinate — `buildCoastProfile(worldSeed,
+alongLen, anchorStart, anchorDepth)` — sampled identically by whichever chunk stamps
+that column/row, so both sides of every seam compute the same depth by construction.
+The profile is anchored on the heart: it equals the heart's own fixed coast depth
+across the heart's span (the heart interior cannot change), then walks outward in runs
+of 3-5 tiles (a run is extended by one when its step would otherwise land exactly on a
+chunk boundary), stepping ±1 per run within [2,3] (placeCoast's own range; gate offsets
+2..7 stay clear of the deepest rows). Result: the coastline still wobbles along its
+length (depth variance > 0 on 40/40 surveyed seeds) but the band depth at every seam is
+EQUAL (80/80 coast-crossing seams over 40 seeds; seam compatibility is now 1.0
+everywhere). `stampCoast` gained an optional per-tile `depths` array for this.
+
+**World-level lake allocation (refinement after maintainer seam review).** The first
+cut let every outer land chunk roll its own lakes (generateMapData always places lake
+#1), so a 3x3 world grew a lake in nearly every land chunk (repro seed 4242). Now the
+heart keeps its legacy lakes untouched, and outer land chunks get lakes only on a
+seeded per-chunk grant (world-level `hashRoll(worldSeed, 'lakes:cx,cy') < 0.32`); when
+granted, the normal #59 budget applies inside that chunk. Implemented via a new
+additive generator option `maxLakes` (0 = suppress entirely, 1 = primary lake only,
+default undefined = legacy, byte-identical). Measured over 40 seeds x 5 outer land
+chunks: mean 0.33 lakes per outer chunk (137 chunks with 0, 60 with 1, 3 with 2); seed
+4242 dropped from a lake in nearly every land chunk to 2 lakes world-wide.
 
 **Gate-point decision.** Every land-land shared chunk edge gets exactly ONE crossing
 tile: `gatePoint(worldSeed, edgeId)` (offset 2..7 along the seam, off the corners so
@@ -156,9 +182,9 @@ existing path overlay and feed town entrances for free.
 **Seam quality (40-seed / 280-seam survey).** Exact cross-seam biome match avg 0.94
 (≥0.6 on ~95% of seams; the exceptions are heart lake-shore rings touching the heart
 border — beach meeting grass, same as inside any legacy map). Hard water/land edges:
-none on land seams (compatibility 1.0); coast-crossing seams ≥0.9 (the single ±1
-wobble tile). Lakes in non-heart chunks keep 2 tiles off chunk borders (option
-`lakeBorderMargin: 2`), so no lake is ever bisected by a seam; walkable-land
+none anywhere (seam compatibility 1.0 on land AND coast seams, since coast depths now
+match exactly at seams). Lakes in non-heart chunks keep 2 tiles off chunk borders
+(option `lakeBorderMargin: 2`), so no lake is ever bisected by a seam; walkable-land
 connectivity (every town reaches the heart's starting town without crossing water)
 held on every surveyed seed.
 

@@ -25,13 +25,19 @@ const logger = createLogger('map-generator');
  *   call for the same seed (guarded by a fixture test). Fields:
  *     coast: undefined = legacy random placeCoast (default);
  *            null/false = suppress the coast entirely (inland chunk);
- *            { edge: 0-3, depth: 2-3 } = stamp a prescribed coast band (coastal chunk).
+ *            { edge: 0-3, depth: 2-3 } = stamp a prescribed uniform coast band, or
+ *            { edge: 0-3, depths: [d per along-coast tile] } = variable-depth band (the
+ *            assembler's world-level coast profile, so depths MATCH at chunk seams).
  *     edgeConstraints: { north/east/south/west: [biome per tile] } — the adjacent edge rows
  *            of already-generated neighbour chunks; the first 2 rows on that side are biased
  *            toward continuing those biomes (exact-continuation probability decaying inward).
  *            Water/beach constraints are never stamped (they'd need direction data).
  *     lakeBorderMargin: min distance lake WATER keeps from the map border (default 1 = legacy;
  *            chunks use 2 so no lake is bisected by / crowds a chunk seam).
+ *     maxLakes: cap on the number of lakes placed (default undefined = legacy behaviour, up
+ *            to 2 under the #59 rules; 0 suppresses lake placement entirely — the assembler
+ *            grants outer chunks lakes only on a seeded roll so a 3x3 world is not nine
+ *            lakes; 1 allows the primary lake but never the small companion).
  *     townDensityFactor: scales the random settlement target (default 1; outer chunks ~0.65).
  * @returns {Array} 2D array of map tiles
  */
@@ -75,7 +81,7 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   if (options.coast === undefined) {
     placeCoast(mapData, width, height, rng);
   } else if (options.coast) {
-    stampCoast(mapData, width, height, options.coast.edge, options.coast.depth);
+    stampCoast(mapData, width, height, options.coast.edge, options.coast.depth, options.coast.depths);
   }
 
   // 1b. Edge constraints from already-generated neighbour chunks (issue #60, experimental):
@@ -94,13 +100,19 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   // second lake is only placed when it fits the remaining budget while staying meaningfully
   // smaller (at most half the first lake's tile count). Each lake also draws its own shape
   // personality from the seed (see placeLakeCluster), so two lakes never grow as copies.
-  const lakeBudget = Math.max(4, Math.floor(width * height * 0.12));
-  const wantsSecondLake = rng() < 0.5; // same 1-or-2 odds as the old numLakes roll
-  const firstLake = placeLakeCluster(mapData, width, height, rng, landBiome, lakeBudget, lakeMargin);
-  if (wantsSecondLake && firstLake.length > 0) {
-    const smallCap = Math.min(lakeBudget - firstLake.length, Math.floor(firstLake.length / 2));
-    if (smallCap >= 3) {
-      placeLakeCluster(mapData, width, height, rng, landBiome, smallCap, lakeMargin);
+  // maxLakes (issue #60, experimental): undefined = legacy (identical rng draws); 0 skips
+  // lake placement entirely (the assembler's world-level lake allocation grants outer
+  // chunks lakes only sometimes); 1 keeps the primary lake but never the small companion.
+  const maxLakes = options.maxLakes === undefined ? 2 : options.maxLakes;
+  if (maxLakes > 0) {
+    const lakeBudget = Math.max(4, Math.floor(width * height * 0.12));
+    const wantsSecondLake = rng() < 0.5; // same 1-or-2 odds as the old numLakes roll
+    const firstLake = placeLakeCluster(mapData, width, height, rng, landBiome, lakeBudget, lakeMargin);
+    if (maxLakes > 1 && wantsSecondLake && firstLake.length > 0) {
+      const smallCap = Math.min(lakeBudget - firstLake.length, Math.floor(firstLake.length / 2));
+      if (smallCap >= 3) {
+        placeLakeCluster(mapData, width, height, rng, landBiome, smallCap, lakeMargin);
+      }
     }
   }
 
@@ -747,12 +759,15 @@ function placeCoast(mapData, width, height, rng) {
   stampCoast(mapData, width, height, edge, depth);
 }
 
-// Stamp a coast band on the given edge at the given depth (outer strip water, inner strip
-// beach). Extracted from placeCoast so chunk assembly (issue #60, experimental) can
-// prescribe a coastal chunk's edge/depth to continue the heart chunk's coastline.
-function stampCoast(mapData, width, height, edge, depth) {
+// Stamp a coast band on the given edge (outer strip water, inner strip beach). Extracted
+// from placeCoast so chunk assembly (issue #60, experimental) can prescribe a coastal
+// chunk's band to continue the heart chunk's coastline. depth is a uniform band; depths
+// (optional) is a per-along-coast-tile depth array — the assembler's world-level coast
+// profile, which wobbles along the coastline but matches exactly at chunk seams.
+function stampCoast(mapData, width, height, edge, depth, depths = null) {
   for (let i = 0; i < width; i++) {
-    for (let d = 0; d < depth; d++) {
+    const bandDepth = (depths && Number.isFinite(depths[i])) ? depths[i] : depth;
+    for (let d = 0; d < bandDepth; d++) {
       let x, y;
       if (edge === 0) { x = i; y = d; }
       else if (edge === 1) { x = width - 1 - d; y = i; }
@@ -760,7 +775,7 @@ function stampCoast(mapData, width, height, edge, depth) {
       else { x = d; y = i; }
 
       if (mapData[y] && mapData[y][x]) {
-        if (d === depth - 1) {
+        if (d === bandDepth - 1) {
           // Inner edge touching land becomes the beach
           mapData[y][x].biome = 'beach';
           mapData[y][x].beachDirection = edge;

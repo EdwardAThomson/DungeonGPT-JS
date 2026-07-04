@@ -16,11 +16,15 @@
 //
 // Ocean-side model: placeCoast gave the heart ONE coastal edge; that edge defines the
 // WORLD's ocean side. Chunks in the heart's row/column along that side continue the
-// coastline (same edge, depth wobbling +-1 within [2,3], seeded per chunk); chunks fully
-// beyond the coastline are open ocean (all water — small seeded islands are allowed by the
-// design but deliberately not generated in this prototype); everything else is inland with
-// NO coast (suppressed via the generator's new options param). Named content (customNames /
-// milestone POIs) resolves in the heart only; outer land chunks get ~65% settlement density.
+// coastline via a WORLD-LEVEL depth profile (buildCoastProfile: anchored on the heart's
+// own depth, wobbling in 3-5 tile runs by +-1 within [2,3], with steps never landing on a
+// chunk seam — so the band depth MATCHES exactly on both sides of every seam); chunks
+// fully beyond the coastline are open ocean (all water — small seeded islands are allowed
+// by the design but deliberately not generated in this prototype); everything else is
+// inland with NO coast (suppressed via the generator's options param). Named content
+// (customNames / milestone POIs) resolves in the heart only; outer land chunks get ~65%
+// settlement density, and lakes only on a seeded ~32% per-chunk grant (world-level lake
+// allocation — the heart keeps its legacy lakes) so big worlds are not lake districts.
 //
 // Connectivity: every land-land shared chunk edge gets ONE deterministic gate point
 // (gatePoint(worldSeed, edgeId), offset 2..7 so gates stay clear of chunk corners). After
@@ -73,6 +77,71 @@ export function gatePoint(worldSeed, edgeId) {
   h = Math.imul(h, 0x5bd1e995) >>> 0;
   h = (h ^ (h >>> 15)) >>> 0;
   return 2 + (h % 6);
+}
+
+// Small deterministic roll in [0,1) from (worldSeed, tag) — used for world-level decisions
+// (per-chunk lake grants, coast-profile run lengths) that must not depend on generation
+// order or on any chunk's own rng stream.
+function hashRoll(worldSeed, tag) {
+  let h = (worldSeed | 0) >>> 0;
+  const s = String(tag);
+  for (let i = 0; i < s.length; i++) {
+    h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+  }
+  h = (h ^ (h >>> 13)) >>> 0;
+  h = Math.imul(h, 0x5bd1e995) >>> 0;
+  h = (h ^ (h >>> 15)) >>> 0;
+  return h / 4294967296;
+}
+
+// World-level lake allocation: fraction of OUTER land chunks that get lakes at all. The
+// heart keeps its legacy lakes untouched; outer wilds only sometimes have one, so a 3x3
+// world is not a lake district. When granted, the normal #59 budget applies in that chunk.
+const OUTER_LAKE_CHANCE = 0.32;
+
+/**
+ * World-level coast depth profile (EXPERIMENTAL — not frozen). One deterministic 1D
+ * profile over the along-coast coordinate, sampled identically by whichever chunk stamps
+ * that column/row — so the water-band depth on both sides of every chunk seam MATCHES by
+ * construction (no step at seams) while the coastline still wobbles along its length.
+ *
+ * Anchored on the heart: the profile equals the heart's own fixed coast depth across the
+ * heart's span (its interior cannot change), then walks outward in both directions in
+ * runs of 3-5 tiles (occasionally 6: a run is extended by one when its step would land
+ * exactly on a chunk boundary), stepping +-1 per run within [minDepth, maxDepth]
+ * (default [2,3], placeCoast's own range — gate offsets 2..7 stay clear of the deepest
+ * coast rows).
+ *
+ * @returns {number[]} depth per along-coast tile index (length alongLen)
+ */
+export function buildCoastProfile(worldSeed, alongLen, anchorStart, anchorDepth, minDepth = 2, maxDepth = 3) {
+  const profile = new Array(alongLen).fill(anchorDepth);
+  const anchorEnd = Math.min(alongLen - 1, anchorStart + CHUNK_SIZE - 1);
+  const walk = (startPos, dir) => {
+    let pos = startPos;
+    let depth = anchorDepth; // the first run continues the heart's depth: no step at its seam
+    let k = 0;
+    while (pos >= 0 && pos < alongLen) {
+      let run = 3 + Math.floor(hashRoll(worldSeed, `coast-run:${dir}:${k}`) * 3); // 3..5
+      // The step happens between the last tile of this run and the first of the next; if
+      // that boundary is a chunk seam, extend the run by one so seams never carry a step.
+      const nextStart = dir > 0 ? pos + run : pos - run;
+      const seamIndex = dir > 0 ? nextStart : nextStart + 1;
+      if (seamIndex > 0 && seamIndex % CHUNK_SIZE === 0) run += 1;
+      for (let j = 0; j < run && pos >= 0 && pos < alongLen; j++) {
+        profile[pos] = depth;
+        pos += dir;
+      }
+      const canUp = depth < maxDepth;
+      const canDown = depth > minDepth;
+      const up = canUp && (!canDown || hashRoll(worldSeed, `coast-step:${dir}:${k}`) < 0.5);
+      depth = up ? depth + 1 : depth - 1;
+      k++;
+    }
+  };
+  walk(anchorEnd + 1, 1);
+  walk(anchorStart - 1, -1);
+  return profile;
 }
 
 // Detect the heart chunk's coast: which edge placeCoast picked and how deep the band is
@@ -211,6 +280,14 @@ export function assembleWorld({ worldSeed, chunksX = 3, chunksY = 3, heartChunk,
   place(heartGrid, heart.cx, heart.cy);
   chunkKinds[heart.cy][heart.cx] = 'heart';
 
+  // World-level coast depth profile over the along-coast coordinate (world y for an E/W
+  // coast, world x for a N/S coast), anchored on the heart's fixed depth across its span.
+  // Every coastal chunk samples its own 10-tile slice, so depths MATCH at chunk seams.
+  const alongIsY = coast.edge === 1 || coast.edge === 3;
+  const alongLen = alongIsY ? H : W;
+  const anchorStart = (alongIsY ? heart.cy : heart.cx) * CHUNK_SIZE;
+  const coastProfile = buildCoastProfile(seedNum, alongLen, anchorStart, coast.depth);
+
   // 2. Remaining chunks, row-major, deterministic per (worldSeed, cx, cy). Row-major means
   // north/west neighbours already exist for constraints; the heart may add east/south ones.
   const chunkReports = [];
@@ -221,7 +298,8 @@ export function assembleWorld({ worldSeed, chunksX = 3, chunksY = 3, heartChunk,
       chunkKinds[cy][cx] = kind;
       const seed = chunkSeed(seedNum, cx, cy);
       let grid;
-      let coastDepth = null;
+      let coastDepths = null;
+      let hasLakes = false;
       if (kind === 'ocean') {
         grid = oceanChunk();
       } else {
@@ -237,24 +315,27 @@ export function assembleWorld({ worldSeed, chunksX = 3, chunksY = 3, heartChunk,
         if (nW) constraints.west = nW.map((row) => row[CHUNK_SIZE - 1].biome);
         if (nE) constraints.east = nE.map((row) => row[0].biome);
         if (kind === 'coastal') {
-          // Continue the heart's coastline on the same world side, depth wobbling +-1
-          // within [2,3] (placeCoast's own range) so seams stay within one tile.
-          const wobble = (seed % 3) - 1;
-          coastDepth = Math.max(2, Math.min(3, coast.depth + wobble));
+          // Continue the heart's coastline on the same world side: this chunk's slice of
+          // the world-level depth profile (matches its neighbours' slices at the seams).
+          const sliceStart = (alongIsY ? cy : cx) * CHUNK_SIZE;
+          coastDepths = coastProfile.slice(sliceStart, sliceStart + CHUNK_SIZE);
         }
+        // World-level lake allocation: outer chunks only sometimes get lakes.
+        hasLakes = hashRoll(seedNum, `lakes:${cx},${cy}`) < OUTER_LAKE_CHANCE;
         grid = generateMapData(CHUNK_SIZE, CHUNK_SIZE, seed, {}, theme, {
-          coast: kind === 'coastal' ? { edge: coast.edge, depth: coastDepth } : null,
+          coast: kind === 'coastal' ? { edge: coast.edge, depths: coastDepths } : null,
           edgeConstraints: constraints,
           lakeBorderMargin: 2,
+          maxLakes: hasLakes ? 2 : 0,
           townDensityFactor: 0.65,
         });
       }
       place(grid, cx, cy);
-      chunkReports.push({ cx, cy, kind, seed, coastDepth });
+      chunkReports.push({ cx, cy, kind, seed, coastDepths, lakesGranted: hasLakes });
     }
   }
-  // Heart's report entry (seed = worldSeed by design).
-  chunkReports.push({ cx: heart.cx, cy: heart.cy, kind: 'heart', seed: seedNum, coastDepth: coast.depth });
+  // Heart's report entry (seed = worldSeed by design; legacy lakes always allowed).
+  chunkReports.push({ cx: heart.cx, cy: heart.cy, kind: 'heart', seed: seedNum, coastDepths: null, coastDepth: coast.depth, lakesGranted: true });
   chunkReports.sort((a, b) => (a.cy - b.cy) || (a.cx - b.cx));
 
   // 3. Gate points on every land-land shared edge, then per-chunk road post-passes.
@@ -325,7 +406,10 @@ export function assembleWorld({ worldSeed, chunksX = 3, chunksY = 3, heartChunk,
     }
     cr.waterPct = water / (CHUNK_SIZE * CHUNK_SIZE);
     cr.towns = towns;
+    cr.lakes = countLakes(grid);
   }
+  const totalLakes = chunkReports.reduce((n, c) => n + c.lakes, 0);
+  const landChunks = chunkReports.filter((c) => c.kind !== 'ocean').length;
 
   const report = {
     worldSeed: seedNum,
@@ -334,6 +418,9 @@ export function assembleWorld({ worldSeed, chunksX = 3, chunksY = 3, heartChunk,
     oceanSide: EDGE_NAMES[coast.edge],
     oceanEdge: coast.edge,
     heartCoastDepth: coast.depth,
+    coastProfile, // world-level along-coast depth profile (index = world y for E/W, x for N/S)
+    totalLakes,
+    lakesPerLandChunk: landChunks > 0 ? totalLakes / landChunks : 0,
     chunks: chunkReports,
     gates,
     seams: analyzeSeams(world, chunkKinds, chunksX, chunksY),
@@ -343,16 +430,46 @@ export function assembleWorld({ worldSeed, chunksX = 3, chunksY = 3, heartChunk,
   return { mapData: world, report };
 }
 
+// Count distinct lakes (4-directionally connected components of lake water) in a chunk
+// grid. Lake water is unambiguous via its descriptionSeed, and lakes never touch chunk
+// borders, so per-chunk component counts are whole lakes (nothing spans a seam).
+function countLakes(grid) {
+  const H = grid.length;
+  const W = grid[0].length;
+  const isLake = (x, y) => x >= 0 && x < W && y >= 0 && y < H
+    && grid[y][x].biome === 'water' && grid[y][x].descriptionSeed === 'A clear lake';
+  const seen = Array.from({ length: H }, () => new Array(W).fill(false));
+  let count = 0;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (!isLake(x, y) || seen[y][x]) continue;
+      count++;
+      const stack = [[x, y]];
+      seen[y][x] = true;
+      while (stack.length) {
+        const [cx, cy] = stack.pop();
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = cx + dx;
+          const ny = cy + dy;
+          if (isLake(nx, ny) && !seen[ny][nx]) { seen[ny][nx] = true; stack.push([nx, ny]); }
+        }
+      }
+    }
+  }
+  return count;
+}
+
 // Per-seam continuity metrics between adjacent non-ocean chunk pairs:
 //   biomeMatchPct   — fraction of the 10 cross-seam tile pairs sharing the EXACT biome.
 //                     Measured avg ~0.94; the rare low seams are heart lake-shore rings on
 //                     the heart border (beach meeting grass — visually the same as a shore
 //                     ring's outer edge inside any legacy map, not a hard seam).
 //   compatiblePct   — fraction of pairs with no water/land hard edge (equal biome, or both
-//                     non-water). This is the real "no guillotine seams" guarantee: 1.0 on
-//                     land seams; >= 0.9 on coast-crossing seams (the +-1 wobble tile).
+//                     non-water). This is the real "no guillotine seams" guarantee: 1.0
+//                     everywhere now that coast depths match exactly at seams.
 //   coastBandOk     — for seams the coast band crosses, whether the water-band widths on
-//                     both sides differ by at most the +-1 wobble tolerance.
+//                     both sides are EQUAL at the seam (the world-level coast profile
+//                     guarantees this by construction: depth steps never land on seams).
 export function analyzeSeams(world, chunkKinds, chunksX, chunksY) {
   const seams = [];
   const kindAt = (cx, cy) => chunkKinds[cy][cx];
@@ -394,7 +511,7 @@ export function analyzeSeams(world, chunkKinds, chunksX, chunksY) {
       biomeMatchPct: match / CHUNK_SIZE,
       compatiblePct: compatible / CHUNK_SIZE,
       crossesCoast,
-      coastBandOk: crossesCoast ? Math.abs(runA - runB) <= 1 : null,
+      coastBandOk: crossesCoast ? runA === runB : null,
     };
   };
   for (let cy = 0; cy < chunksY; cy++) {
