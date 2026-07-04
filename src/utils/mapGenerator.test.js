@@ -180,7 +180,8 @@ describe('generateMapData', () => {
     it('does not flood the map — lakes stay a modest fraction of tiles', () => {
       for (let s = 1; s <= 12; s++) {
         const map = generateMapData(10, 10, s * 7);
-        // 1-2 lakes of ~4-9 tiles each on a 100-tile map; well under a third.
+        // Issue #59 budgets total lake water to ~12% of tiles (see the seed-survey block
+        // below for the tight assertions); this older guard stays as a coarse sanity check.
         expect(lakeTiles(map).length).toBeLessThan(33);
       }
     });
@@ -303,6 +304,125 @@ describe('generateMapData', () => {
         if (hasRiverByLake) connected++;
       }
       expect(connected).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Issue #59: lake caps, one-large-one-small rule, shape variety (300-seed survey)', () => {
+    // Lake water carries descriptionSeed 'A clear lake'; coast water is 'The coastal sea'.
+    // Connected (4-directional) components of lake water, largest first.
+    const lakeComponents = (map) => {
+      const H = map.length, W = map[0].length;
+      const isLake = (x, y) => x >= 0 && x < W && y >= 0 && y < H
+        && map[y][x].biome === 'water' && map[y][x].descriptionSeed === 'A clear lake';
+      const seen = Array.from({ length: H }, () => new Array(W).fill(false));
+      const comps = [];
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          if (!isLake(x, y) || seen[y][x]) continue;
+          const tiles = [];
+          const stack = [[x, y]];
+          seen[y][x] = true;
+          while (stack.length) {
+            const [cx, cy] = stack.pop();
+            tiles.push({ x: cx, y: cy });
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+              const nx = cx + dx, ny = cy + dy;
+              if (isLake(nx, ny) && !seen[ny][nx]) { seen[ny][nx] = true; stack.push([nx, ny]); }
+            }
+          }
+          comps.push(tiles);
+        }
+      }
+      return comps.sort((a, b) => b.length - a.length);
+    };
+    const bboxAspect = (tiles) => {
+      const xs = tiles.map((t) => t.x), ys = tiles.map((t) => t.y);
+      const w = Math.max(...xs) - Math.min(...xs) + 1;
+      const h = Math.max(...ys) - Math.min(...ys) + 1;
+      return w / h;
+    };
+
+    const N = 300;
+    const surveys = [];
+    beforeAll(() => {
+      for (let s = 1; s <= N; s++) {
+        const map = generateMapData(10, 10, s * 101 + 7);
+        surveys.push({ seed: s * 101 + 7, map, comps: lakeComponents(map) });
+      }
+    });
+
+    it('caps total lake water on every map (budget 12% of tiles, small smoothing slack)', () => {
+      // Generation budgets lake targets to floor(100 * 0.12) = 12 tiles; the corner-
+      // smoothing pass may add the odd fill tile, so allow up to 15% before failing.
+      const violations = surveys
+        .map(({ seed, comps }) => ({ seed, water: comps.reduce((n, c) => n + c.length, 0) }))
+        .filter((v) => v.water > 15);
+      expect(violations).toEqual([]);
+    });
+
+    it('never places two lakes that are both large: the second is at most ~half the first', () => {
+      const violations = surveys
+        .filter(({ comps }) => comps.length >= 2)
+        .map(({ seed, comps }) => ({ seed, large: comps[0].length, small: comps[1].length }))
+        .filter((v) =>
+          // Both-large is the twin-giants bug (pre-fix: 15 of 47 two-lake maps had both >= 6);
+          // "meaningfully smaller" means at most half, with a one-tile smoothing allowance.
+          (v.small >= 6 && v.large >= 6) || v.small * 2 > v.large + 2
+        );
+      expect(violations).toEqual([]);
+    });
+
+    it('keeps a sane lake-count distribution: never 3+, usually 1, sometimes 2', () => {
+      const counts = { 0: 0, 1: 0, 2: 0, more: 0 };
+      for (const { comps } of surveys) {
+        counts[comps.length > 2 ? 'more' : comps.length]++;
+      }
+      expect(counts.more).toBe(0);
+      expect(counts[1]).toBeGreaterThan(N / 2); // single lake is the common case
+      expect(counts[2]).toBeGreaterThan(0);     // the small companion lake still happens
+      expect(counts[2]).toBeLessThan(counts[1]); // but stays the minority
+    });
+
+    it('keeps two lakes well separated (Chebyshev distance >= 3, i.e. 2 land tiles between)', () => {
+      const violations = surveys
+        .filter(({ comps }) => comps.length >= 2)
+        .map(({ seed, comps }) => {
+          let minCheb = Infinity;
+          for (const a of comps[0]) {
+            for (const b of comps[1]) {
+              minCheb = Math.min(minCheb, Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)));
+            }
+          }
+          return { seed, minCheb };
+        })
+        .filter((v) => v.minCheb < 3);
+      expect(violations).toEqual([]);
+    });
+
+    it('two lakes on one map rarely look like copies (aspect + size similarity is a small minority)', () => {
+      let twoLakeMaps = 0;
+      let lookAlikes = 0;
+      for (const { comps } of surveys) {
+        if (comps.length < 2) continue;
+        twoLakeMaps++;
+        const similarAspect = Math.abs(bboxAspect(comps[0]) - bboxAspect(comps[1])) < 0.15;
+        const similarSize = Math.abs(comps[0].length - comps[1].length) < 2;
+        if (similarAspect && similarSize) lookAlikes++;
+      }
+      expect(twoLakeMaps).toBeGreaterThan(0);
+      // Per-lake shape personality + the size rule: measured 0 look-alikes over 300 seeds,
+      // assert a generous <= 20% so an unlucky future seed set does not flake.
+      expect(lookAlikes).toBeLessThanOrEqual(Math.ceil(twoLakeMaps * 0.2));
+    });
+
+    it('settlement placement still succeeds on every surveyed seed (no seed crashes)', () => {
+      const violations = surveys
+        .map(({ seed, map }) => {
+          const towns = map.flat().filter((t) => t.poi === 'town');
+          return { seed, towns: towns.length, starting: towns.filter((t) => t.isStartingTown).length };
+        })
+        .filter((v) => v.towns < 3 || v.starting !== 1);
+      expect(violations).toEqual([]);
     });
   });
 

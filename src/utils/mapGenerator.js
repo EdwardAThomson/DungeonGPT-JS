@@ -59,10 +59,19 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   // 1. Generate Coast (one random edge)
   placeCoast(mapData, width, height, rng);
 
-  // 2. Generate 1-2 Lake clusters
-  const numLakes = 1 + Math.floor(rng() * 2);
-  for (let i = 0; i < numLakes; i++) {
-    placeLakeCluster(mapData, width, height, rng, landBiome);
+  // 2. Generate lakes (issue #59: two giant look-alike lakes could dominate a 10x10 map).
+  // Rules: total lake water is budgeted to ~12% of the map; at most ONE large lake, and a
+  // second lake is only placed when it fits the remaining budget while staying meaningfully
+  // smaller (at most half the first lake's tile count). Each lake also draws its own shape
+  // personality from the seed (see placeLakeCluster), so two lakes never grow as copies.
+  const lakeBudget = Math.max(4, Math.floor(width * height * 0.12));
+  const wantsSecondLake = rng() < 0.5; // same 1-or-2 odds as the old numLakes roll
+  const firstLake = placeLakeCluster(mapData, width, height, rng, landBiome, lakeBudget);
+  if (wantsSecondLake && firstLake.length > 0) {
+    const smallCap = Math.min(lakeBudget - firstLake.length, Math.floor(firstLake.length / 2));
+    if (smallCap >= 3) {
+      placeLakeCluster(mapData, width, height, rng, landBiome, smallCap);
+    }
   }
 
   // 3. Generate 3-5 forest clusters
@@ -758,7 +767,11 @@ function isNearCoast(mapData, x, y, width, height) {
 //   into a contiguous body. The `isLake` branch stays in the renderer so OLD saves keep
 //   rendering their single-tile ponds (going-forward-only; no migration). Lakes stay marked
 //   semantically via descriptionSeed ("A clear lake" / "A sandy lakeshore").
-function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains') {
+//
+// capTiles (issue #59) is this lake's share of the map's total lake-water budget: the growth
+// target never exceeds it. Returns the carved lake tiles ([] if no room was found) so the
+// caller can size a second, strictly smaller lake against the first one's actual footprint.
+function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains', capTiles = Infinity) {
   // Keep lakes apart: no other water/beach (another lake or the coast) within this many
   // tiles of any lake tile, so two lakes never crowd together (which produced ugly merged
   // corners and a confused path squeezing through the gap). Tiles of THIS lake are excluded.
@@ -787,12 +800,21 @@ function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains') {
       break;
     }
   }
-  if (!seed) return; // no room for another well-separated lake — fine, fewer lakes
+  if (!seed) return []; // no room for another well-separated lake, fine, fewer lakes
 
-  // 2. Target a small multi-tile blob (~4-9 tiles), scaled modestly with map size so we
-  //    never flood a small map.
-  const maxTiles = Math.max(3, Math.min(9, Math.floor((width * height) / 14)));
-  const targetSize = Math.min(maxTiles, 4 + Math.floor(rng() * Math.max(1, maxTiles - 3)));
+  // 2. Target a small multi-tile blob, scaled modestly with map size (~4-7 tiles on 10x10)
+  //    and clamped to this lake's budget share (capTiles) so we never flood a small map.
+  const maxTiles = Math.min(Math.max(3, Math.min(9, Math.floor((width * height) / 14))), capTiles);
+  const minTiles = Math.min(4, maxTiles);
+  const targetSize = minTiles + Math.floor(rng() * (maxTiles - minTiles + 1));
+
+  // 2b. Per-lake shape personality (issue #59): a preferred growth axis and a wander factor,
+  //     all drawn from the seeded rng, so two lakes on one map grow visibly different shapes
+  //     (one stretched east-west and snaky, another compact and tall, etc.) instead of two
+  //     near-identical isotropic blobs.
+  const weightX = 0.5 + rng() * 2.0; // relative pull toward E/W growth
+  const weightY = 0.5 + rng() * 2.0; // relative pull toward N/S growth
+  const wander = 0.2 + rng() * 0.6;  // chance to grow from the newest tile (higher = snakier)
 
   // 3. Seeded flood-fill growth: repeatedly carve an open-land tile adjacent to the lake.
   const lakeTiles = [];
@@ -804,12 +826,26 @@ function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains') {
   };
   carve(seed.x, seed.y);
 
-  const dirs = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }];
+  const dirs = [
+    { dx: 0, dy: -1, w: weightY }, { dx: 1, dy: 0, w: weightX },
+    { dx: 0, dy: 1, w: weightY }, { dx: -1, dy: 0, w: weightX },
+  ];
+  const totalWeight = 2 * (weightX + weightY);
+  const pickDir = () => {
+    let r = rng() * totalWeight;
+    for (const d of dirs) {
+      r -= d.w;
+      if (r <= 0) return d;
+    }
+    return dirs[dirs.length - 1];
+  };
   let guard = 0;
   while (lakeTiles.length < targetSize && guard < targetSize * 12) {
     guard++;
-    const base = lakeTiles[Math.floor(rng() * lakeTiles.length)];
-    const d = dirs[Math.floor(rng() * dirs.length)];
+    const base = rng() < wander
+      ? lakeTiles[lakeTiles.length - 1]
+      : lakeTiles[Math.floor(rng() * lakeTiles.length)];
+    const d = pickDir();
     const nx = base.x + d.dx;
     const ny = base.y + d.dy;
     // Keep at least one tile inside the border so there's room for a shore ring.
@@ -848,6 +884,7 @@ function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains') {
 
   // 4. Lay down the shore ring.
   addLakeShores(mapData, lakeTiles, width, height, landBiome);
+  return lakeTiles;
 }
 
 // Turn each open-land tile orthogonally adjacent to a lake water tile into a beach, with
