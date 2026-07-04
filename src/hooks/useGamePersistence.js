@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { buildSaveFingerprint, buildSubMapsPayload } from '../game/saveController';
+import { buildSaveFingerprint, buildSubMapsPayload, PENDING_LOCAL_SAVE_EVENT } from '../game/saveController';
 
 const useGamePersistence = ({
   sessionId,
@@ -94,13 +94,17 @@ const useGamePersistence = ({
   ]);
 
   // Returns a status the caller can act on:
-  //   'saved'      - state was written to its home store (cloud account, or this
+  //   'saved'      - state reached its home store (the cloud account, or this
   //                  device for a plain guest: their local save IS the save)
-  //   'savedLocal' - honest fallback (SAVE_SYNC_PLAN Phase 1): an account-holder's
-  //                  save landed on this device only, pending cloud sync
-  //   'nochange'   - nothing changed since the last save (already up to date)
+  //   'savedLocal' - honest fallback (SAVE_SYNC_PLAN Phase 2): an account-holder's
+  //                  save landed on this device only (auth absent OR the cloud push
+  //                  failed), pending cloud sync; a reconcile retry is requested
+  //                  via PENDING_LOCAL_SAVE_EVENT
+  //   'nochange'   - nothing changed since the last save; short-circuits BEFORE any
+  //                  write to either store
   //   'skipped'    - nothing to save yet (no session / adventure not started / no data)
-  //   'error'      - the write was attempted and failed
+  //   'error'      - even the local write-ahead failed (write-through means a cloud
+  //                  failure alone is 'savedLocal', not 'error')
   const performSave = useCallback(async (isUnmount = false) => {
     if (!sessionIdRef.current) return 'skipped';
 
@@ -175,7 +179,18 @@ const useGamePersistence = ({
     // (legacy `true` still counts) and false on failure.
     if (result) {
       lastSaveFingerprintRef.current = fingerprint;
-      return result.pendingCloudSync ? 'savedLocal' : 'saved';
+      if (result.pendingCloudSync) {
+        // Ask LocalGameSync for a reconcile pass: retries the cloud push now if
+        // auth is actually live (transient push failure), otherwise the pass stays
+        // armed for the next auth event.
+        try {
+          window.dispatchEvent(new Event(PENDING_LOCAL_SAVE_EVENT));
+        } catch (e) {
+          logger.debug('Could not dispatch pending-local-save event', e);
+        }
+        return 'savedLocal';
+      }
+      return 'saved';
     }
     return 'error';
   }, [loadedConversation?.game_settings, logger, saveConversationToBackend]);

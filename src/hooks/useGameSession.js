@@ -112,9 +112,10 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
                 ...gameState // spread the rest of the game state
             });
             logger.debug('Conversation saved successfully', result);
-            // Surface where the write landed (SAVE_SYNC_PLAN Phase 1) so
+            // Surface where the durable copy landed (SAVE_SYNC_PLAN Phase 2) so
             // useGamePersistence can report an honest status: pendingCloudSync means
-            // an account-holder's save fell back to this device and awaits sync.
+            // an account-holder's save is device-only for now (auth absent or the
+            // cloud push failed) and awaits reconcile.
             return {
                 ok: true,
                 storage: result?.storage,
@@ -122,6 +123,9 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
             };
 
         } catch (error) {
+            // With write-through saves, conversationsApi.save only throws when even
+            // the LOCAL write failed (or a cloud-only path had nothing local to fall
+            // back on), so `false` really means "nothing was persisted anywhere".
             logger.error('Error saving conversation', error);
             return false;
         }

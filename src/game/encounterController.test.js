@@ -1,6 +1,8 @@
 import {
   ageNarrativeHook,
+  applyEncounterOutcomeToParty,
   applyPartyRewardsToAll,
+  applyTeamEncounterOutcomeToParty,
   NARRATIVE_HOOK_PERSIST_MOVES,
   planWorldTileEncounterFlow
 } from './encounterController';
@@ -184,5 +186,99 @@ describe('applyPartyRewardsToAll (#55): milestone/quest rewards are party-wide',
 
   it('tolerates an empty party', () => {
     expect(applyPartyRewardsToAll({ party: [], rewards: { xp: 10 } }).updatedParty).toEqual([]);
+  });
+});
+
+describe('grant-ledger events (SAVE_SYNC_PLAN 9.2): additive ledgerEvents return field', () => {
+  const hero = (id, name, overrides = {}) => ({
+    heroId: id,
+    characterName: name,
+    characterClass: 'Fighter',
+    level: 1,
+    xp: 0,
+    gold: 50,
+    inventory: [],
+    stats: { strength: 10, constitution: 10 },
+    ...overrides
+  });
+
+  it('applyEncounterOutcomeToParty reports xp/gold/item grants and penalty spends', () => {
+    const party = [hero('h1', 'Ara')];
+    const { updatedParty, ledgerEvents } = applyEncounterOutcomeToParty({
+      party,
+      result: {
+        heroIndex: 0,
+        rewards: { xp: 40, gold: 15, items: ['Old Rope'] },
+        penalties: { goldLoss: 5 }
+      }
+    });
+    expect(updatedParty[0].xp).toBe(40);
+    expect(ledgerEvents).toEqual([
+      { heroId: 'h1', kind: 'xp', amount: 40 },
+      { heroId: 'h1', kind: 'gold', amount: 15 },
+      { heroId: 'h1', kind: 'item', key: 'old_rope' },
+      { heroId: 'h1', kind: 'gold', amount: -5 }
+    ]);
+  });
+
+  it('records a level event when a reward crosses a threshold', () => {
+    const party = [hero('h1', 'Ara', { xp: 280 })];
+    const { ledgerEvents } = applyEncounterOutcomeToParty({
+      party,
+      result: { heroIndex: 0, rewards: { xp: 50 } }
+    });
+    expect(ledgerEvents).toContainEqual({ heroId: 'h1', kind: 'level', amount: 2 });
+  });
+
+  it('applyPartyRewardsToAll ledgers full XP per hero, gold/items on the lead', () => {
+    const party = [hero('h1', 'Ara'), hero('h2', 'Bem')];
+    const { ledgerEvents } = applyPartyRewardsToAll({
+      party,
+      rewards: { xp: 100, gold: 30, items: ['quest_key'] }
+    });
+    expect(ledgerEvents).toContainEqual({ heroId: 'h1', kind: 'xp', amount: 100 });
+    expect(ledgerEvents).toContainEqual({ heroId: 'h2', kind: 'xp', amount: 100 });
+    expect(ledgerEvents).toContainEqual({ heroId: 'h1', kind: 'gold', amount: 30 });
+    expect(ledgerEvents).toContainEqual({ heroId: 'h1', kind: 'item', key: 'quest_key' });
+    expect(ledgerEvents.filter((e) => e.kind === 'gold')).toHaveLength(1);
+  });
+
+  it('applyTeamEncounterOutcomeToParty ledgers the split XP shares per hero', () => {
+    const party = [hero('h1', 'Ara'), hero('h2', 'Bem')];
+    const { updatedParty, ledgerEvents } = applyTeamEncounterOutcomeToParty({
+      party,
+      result: {
+        isTeamEncounter: true,
+        heroIndex: 0,
+        supporterCount: 1,
+        rewards: { xp: 100 } // pot = 110, share 55 each
+      }
+    });
+    expect(ledgerEvents).toContainEqual({ heroId: 'h1', kind: 'xp', amount: 55 });
+    expect(ledgerEvents).toContainEqual({ heroId: 'h2', kind: 'xp', amount: 55 });
+    const ledgeredXp = ledgerEvents.filter((e) => e.kind === 'xp').reduce((s, e) => s + e.amount, 0);
+    expect(ledgeredXp).toBe(updatedParty.reduce((s, h) => s + h.xp, 0)); // ledger matches paid XP
+  });
+
+  it('skips events for heroes without a stable id (nothing to attribute)', () => {
+    const anon = { characterName: 'Ghost', level: 1, xp: 0, gold: 0, inventory: [] };
+    const { ledgerEvents, updatedParty } = applyEncounterOutcomeToParty({
+      party: [anon],
+      result: { heroIndex: 0, rewards: { xp: 10, gold: 5 } }
+    });
+    expect(updatedParty[0].xp).toBe(10); // grants still land
+    expect(ledgerEvents).toEqual([]);
+  });
+
+  it('existing callers that ignore ledgerEvents see identical reward behaviour', () => {
+    const party = [hero('h1', 'Ara')];
+    const { updatedParty, rewardMessages, penaltyMessages } = applyEncounterOutcomeToParty({
+      party,
+      result: { heroIndex: 0, rewards: { xp: 25, gold: 10, items: [] } }
+    });
+    expect(updatedParty[0].xp).toBe(25);
+    expect(updatedParty[0].gold).toBe(60);
+    expect(rewardMessages).toEqual(['+25 XP', '+10 gold']);
+    expect(penaltyMessages).toEqual([]);
   });
 });

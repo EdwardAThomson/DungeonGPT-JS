@@ -1,6 +1,7 @@
 # Save Storage & Sync Plan — local-first saves, honest durability, divergence-safe reconcile
 
-Status: **Phase 1 implemented (pending review)**, 2026-07-04; Phases 2-3 planned. Backlog item #54.
+Status: **Phases 1-2 implemented (pending review)** (Phase 1: 2026-07-04, Phase 2:
+2026-07-05); Phase 3 planned. Backlog item #54.
 Origin: playtest 2026-07-04. The t1 goblin-campaign save "teleported" between the
 cloud backend and the browser depending on login state (split-brain, see §2.4).
 Builds on `GUEST_MODE_PLAN.md` (localGameStore / LocalGameSync, Phase B).
@@ -69,6 +70,30 @@ either.
 
 ## 4. Target design: local-first write-through
 
+Status: **IMPLEMENTED (pending review) 2026-07-05** (Phase 2). Shipped mechanisms:
+- `conversationsApi.save`/`updateMessages` write the full row to IndexedDB FIRST,
+  unconditionally, stamped `synced: false`; a cloud push follows when auth is
+  present and `localGameStore.markSynced()` flips the flag on success (guarded by
+  the row's `updated_at`, so a save that rewrote the row mid-push stays dirty).
+  Cloud-push failure while signed in now returns the honest `storage: 'local'` +
+  `pendingCloudSync: true` (→ performSave `'savedLocal'`); `'error'` is reserved
+  for "even the local write failed". Guests are unchanged: their local write IS
+  the save.
+- `getById` returns the newer of the two copies (`updated_at` comparison until the
+  rev protocol of §6; ties and legacy rows prefer the cloud copy) and never
+  deletes the older copy at read time. `list()` merges both stores by
+  `session_id`, newest copy winning, each row annotated `storage:
+  'cloud' | 'local' | 'both'` + `pendingCloudSync`; SavedConversations badges
+  local-unsynced rows ("On this device") for signed-in players only. Deleting
+  while signed in removes both copies; renames follow an unsynced local copy so a
+  rename can never manufacture a divergence fork.
+- The reconcile pass (`runLocalGameSyncPass`) additionally runs on app start with
+  a session present (mount pass) and after any `'savedLocal'`
+  (`PENDING_LOCAL_SAVE_EVENT` from `useGamePersistence`). Rows already marked
+  `synced: true` are pruned for non-live sessions and kept for the live one (§10
+  leaning); rows without any sync field (guest-era saves) still upload, keeping
+  guest→account conversion lossless, but are never *badged* as pending.
+
 Storage stops being an either/or decision. For the **live session**, IndexedDB
 is always the write-ahead copy; the cloud is the durable home it syncs to.
 
@@ -132,7 +157,13 @@ the stranding (~20% of the work):
   §6.3 naming).
 - Fix `isSignedIn()` error handling (§4, last paragraph).
 - Known remainder: the one-store-at-a-time list oddity persists until the
-  merged list exists.
+  merged list exists. *(Resolved by Phase 2: the merged list shipped, see §4.)*
+
+Phase-1 deferral, now resolved: in Phase 1 a cloud-write failure while signed in
+still surfaced as a save **error** (only the auth-absent fallback was honest).
+Phase 2's write-through closes this: the local write-ahead always lands first, so
+a failed cloud push is reported as `'savedLocal'` ("saved on this device, will
+sync"), and `'error'` is reserved for the case where even the local write failed.
 
 ## 6. Multi-device divergence (the hard case)
 

@@ -42,6 +42,8 @@ import {
   formatEncounterRewardLog
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
+import { appendLedgerEvents } from '../game/heroLedger';
+import { healPartyUpward, reconcileHeroWithLedger } from '../game/heroInvariants';
 import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile } from '../game/milestoneEngine';
 import { recordItemDiscoveries, recordEnemyDiscovery, seedCodexFromParty, getBestiaryEntries, findBestiaryMatch, slugify as slugifyCodexKey } from '../game/codexEngine';
 import { buyItem, sellItem } from '../game/shopController';
@@ -89,7 +91,7 @@ const SaveConfirmationModal = () => {
     // (auth absent or unreachable). A warning, not an error: progress is safe.
     heading = '⚠ Saved on this device';
     headingColor = 'var(--state-warning, #e0a800)';
-    blurb = 'Your account could not be reached, so this save is stored on this device for now. It will sync to your account when you sign back in. Saved as:';
+    blurb = 'Your account could not be reached, so this save is stored on this device for now. It will sync to your account automatically. Saved as:';
   } else if (status === 'skipped') {
     heading = 'Nothing to save yet';
     headingColor = 'var(--text)';
@@ -118,7 +120,7 @@ const SaveConfirmationModal = () => {
           </p>
           <p style={{ marginBottom: '18px', fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
             {status === 'savedLocal'
-              ? '💾 On this device only. It will sync to your account when you sign back in.'
+              ? '💾 On this device only. It will sync to your account automatically.'
               : data?.signedIn
                 ? '☁️ Saved to your account (syncs across your devices)'
                 : '💾 Saved on this device (this browser)'}
@@ -183,11 +185,20 @@ const Game = ({ resumeConversation = null }) => {
   const effectiveState = resumeConversation ? null : state;
   const { selectedHeroes: stateHeroes, loadedConversation: stateLoadedConversation, worldSeed: stateSeed, gameSessionId: stateGameSessionId, generatedMap: stateGeneratedMap, townMapsCache: stateTownMapsCache } = effectiveState || { selectedHeroes: [], loadedConversation: null, worldSeed: null, gameSessionId: null, generatedMap: null, townMapsCache: null };
   const loadedConversation = resumeConversation || stateLoadedConversation;
-  const [selectedHeroes, setSelectedHeroes] = useState(() => {
+  // Load-time hero check (SAVE_SYNC_PLAN.md 9.1): normalize + backfill as before,
+  // then verify each hero's mechanics invariants and self-heal UPWARD (level from
+  // xp, maxHP from the formula, HP clamp, dangling equipment, negative floors).
+  // When the save carries a grant ledger (9.2, settings.heroLedger) the heroes are
+  // also reconciled against it, raising xp/gold snapshots that regressed below the
+  // ledgered sums. Computed once in the lazy initializer so the first render
+  // already shows the healed party; the report is stashed here and surfaced as one
+  // system line by the startup effect below. Never throws: any failure falls back
+  // to the unhealed heroes.
+  const [initialPartyCheck] = useState(() => {
     // Normalize first (de-dupe + migrate legacy characterId -> heroId), then backfill
     // progression fields. normalizeParty repairs saves corrupted by the old hero-overwrite bug.
-    const heroes = normalizeParty(loadedConversation?.selected_heroes || stateHeroes || []);
-    return heroes.map(hero => {
+    const normalized = normalizeParty(loadedConversation?.selected_heroes || stateHeroes || []);
+    const heroes = normalized.map(hero => {
       if (hero.xp === undefined) {
         // Use healthSystem's calculateMaxHP for consistency
         const maxHP = hero.maxHP || calculateMaxHP(hero);
@@ -203,7 +214,30 @@ const Game = ({ resumeConversation = null }) => {
       }
       return hero;
     });
+    try {
+      const savedSettings = typeof loadedConversation?.game_settings === 'string'
+        ? JSON.parse(loadedConversation.game_settings)
+        : loadedConversation?.game_settings;
+      const ledger = Array.isArray(savedSettings?.heroLedger) ? savedSettings.heroLedger : null;
+      const { party, healed } = healPartyUpward(heroes);
+      let finalParty = party;
+      const healedMessages = [...healed];
+      const reportedMessages = [];
+      if (ledger && ledger.length > 0) {
+        finalParty = finalParty.map(hero => {
+          const result = reconcileHeroWithLedger(hero, ledger);
+          healedMessages.push(...result.healed);
+          reportedMessages.push(...result.reported);
+          return result.hero;
+        });
+      }
+      return { heroes: finalParty, healedMessages, reportedMessages };
+    } catch (err) {
+      logger.error('Hero invariant check failed on load; using heroes as loaded', err);
+      return { heroes, healedMessages: [], reportedMessages: [] };
+    }
   });
+  const [selectedHeroes, setSelectedHeroes] = useState(initialPartyCheck.heroes);
 
   // Robust seed extraction
   const settingsObj = typeof loadedConversation?.game_settings === 'string'
@@ -356,6 +390,55 @@ const Game = ({ resumeConversation = null }) => {
     }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sideQuestsBackfilled]);
+
+  // 9.1 visible honesty: if the load-time invariant check healed anything, say so
+  // ONCE, in one system line (same philosophy as the save-fallback notice and the
+  // "New rumours" backfill line above). Item-level ledger reports are log-only:
+  // consumables get spent in normal play, so a missing granted potion is not news.
+  const healAnnouncedRef = useRef(false);
+  useEffect(() => {
+    if (healAnnouncedRef.current) return;
+    healAnnouncedRef.current = true;
+    const { healedMessages, reportedMessages } = initialPartyCheck;
+    if (reportedMessages.length > 0) {
+      logger.info(`[HERO LEDGER] ${reportedMessages.join(' · ')}`);
+    }
+    if (healedMessages.length === 0) return;
+    logger.info(`[HERO INVARIANTS] Restored: ${healedMessages.join(' · ')}`);
+    interactionHook.setConversation(prev => [...prev, {
+      role: 'system',
+      content: `🛡️ Restored: ${healedMessages.join(' · ')}`
+    }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- Hero grant ledger (SAVE_SYNC_PLAN.md 9.2) -----------------------------
+  // Every irreversible hero gain appends { t, heroId, kind, amount?|key?, source }
+  // into settings.heroLedger at the same chokepoints that record codex
+  // discoveries. Gold SPENDS are appended as negative amounts so the ledgered
+  // gold sum keeps tracking real gold (reconciliation raises gold up to the sum).
+  // Functional setSettings, additive and capped inside appendLedgerEvents; old
+  // saves without a ledger start one on their first grant.
+  const appendHeroLedger = (events, source) => {
+    if (!Array.isArray(events) || events.length === 0) return;
+    const stamped = events.map(e => ({ ...e, source }));
+    setSettings(prev => (prev ? appendLedgerEvents(prev, stamped) : prev));
+  };
+
+  // Per-hero gold deltas between two party snapshots, as ledger events. Used for
+  // flows that move gold across several heroes at once (pooled shop spending,
+  // resurrection costs) where the controller does not report per-hero amounts.
+  const goldDeltaEvents = (before, after) => {
+    const beforeByUid = new Map((before || []).map(h => [heroUid(h), h.gold || 0]));
+    const events = [];
+    (after || []).forEach(h => {
+      const uid = heroUid(h);
+      if (!uid || !beforeByUid.has(uid)) return;
+      const delta = (h.gold || 0) - beforeByUid.get(uid);
+      if (delta !== 0) events.push({ heroId: uid, kind: 'gold', amount: delta });
+    });
+    return events;
+  };
 
   // --- Quest chaining: "Continue your legend" (in-save continuation) ---
   // The picker continues the next campaign INSIDE THIS SAVE: the new campaign's
@@ -534,11 +617,14 @@ const Game = ({ resumeConversation = null }) => {
           const stepResult = applyPartyRewardsToAll({ party, rewards: stepRewards });
           party = stepResult.updatedParty;
           const rewardLines = [...stepResult.rewardMessages];
+          const grantEvents = [...(stepResult.ledgerEvents || [])];
           if (c.questCompleted && c.questRewards) {
             const questResult = applyPartyRewardsToAll({ party, rewards: c.questRewards });
             party = questResult.updatedParty;
             rewardLines.push(...questResult.rewardMessages);
+            grantEvents.push(...(questResult.ledgerEvents || []));
           }
+          appendHeroLedger(grantEvents, `sidequest:${c.questId}`); // grant ledger (9.2)
           // Codex (#51): reward items entering the party's hands are discoveries.
           recordItemsInCodex([...(stepRewards.items || []), ...((c.questCompleted && c.questRewards?.items) || [])]);
           // Surface the XP/loot payout with the completion line (it used to be silent),
@@ -586,6 +672,7 @@ const Game = ({ resumeConversation = null }) => {
       if (rewards.xp > 0 || rewards.gold > 0 || rewards.items.length > 0) {
         const rewardResult = applyPartyRewardsToAll({ party: currentParty, rewards });
         setSelectedHeroes(rewardResult.updatedParty);
+        appendHeroLedger(rewardResult.ledgerEvents, `milestone:${result.milestoneId}`); // grant ledger (9.2)
         if (rewardResult.rewardMessages.length > 0) {
           logger.info(`[MILESTONE REWARDS] ${rewardResult.rewardMessages.join(' · ')}`);
         }
@@ -659,6 +746,14 @@ const Game = ({ resumeConversation = null }) => {
       heroes[0] = hero;
       return heroes;
     });
+    // Grant ledger (9.2): loot lands on the lead hero (shared-pool convention).
+    const lootLeadId = heroUid(selectedHeroes?.[0]);
+    if (lootLeadId) {
+      const events = [];
+      if (loot.gold > 0) events.push({ heroId: lootLeadId, kind: 'gold', amount: loot.gold });
+      (loot.items || []).forEach(k => events.push({ heroId: lootLeadId, kind: 'item', key: k }));
+      appendHeroLedger(events, 'site');
+    }
     const itemNames = (loot.items || []).map(k => (ITEM_CATALOG[k]?.name) || k);
     const parts = [];
     if (loot.gold) parts.push(`${loot.gold} gold`);
@@ -692,6 +787,11 @@ const Game = ({ resumeConversation = null }) => {
       heroes[0] = hero;
       return heroes;
     });
+    // Grant ledger (9.2): quest/objective items also count as granted.
+    const objectiveLeadId = heroUid(selectedHeroes?.[0]);
+    if (objectiveLeadId) {
+      appendHeroLedger([{ heroId: objectiveLeadId, kind: 'item', key: item.id }], 'site');
+    }
     interactionHook.setConversation(prev => [...prev, { role: 'system', content: `❗ You recover ${item.name}.` }]);
     if (mapHook.isInsideSite) mapHook.pushSiteNotice(`❗ You recover ${item.name}.`);
     recordItemsInCodex([item.id]); // codex (#51): catalog items announce; quest items track silently
@@ -804,11 +904,14 @@ const Game = ({ resumeConversation = null }) => {
       const stepResult = applyPartyRewardsToAll({ party, rewards: c.rewards || { xp: 0, gold: 0, items: [] } });
       party = stepResult.updatedParty;
       const rewardLines = [...stepResult.rewardMessages];
+      const grantEvents = [...(stepResult.ledgerEvents || [])];
       if (c.questCompleted && c.questRewards) {
         const questResult = applyPartyRewardsToAll({ party, rewards: c.questRewards });
         party = questResult.updatedParty;
         rewardLines.push(...questResult.rewardMessages);
+        grantEvents.push(...(questResult.ledgerEvents || []));
       }
+      appendHeroLedger(grantEvents, `sidequest:${c.questId}`); // grant ledger (9.2)
       // Codex (#51): turn-in reward items are discoveries.
       recordItemsInCodex([...((c.rewards?.items) || []), ...((c.questCompleted && c.questRewards?.items) || [])]);
       const headline = c.questCompleted ? `🎉 Side quest complete: ${c.title}!` : `✓ ${c.milestone.text}`;
@@ -1265,7 +1368,8 @@ const Game = ({ resumeConversation = null }) => {
       updatedParty,
       heroIndex,
       rewardMessages,
-      penaltyMessages
+      penaltyMessages,
+      ledgerEvents
     } = (result?.isTeamEncounter ? applyTeamEncounterOutcomeToParty : applyEncounterOutcomeToParty)({
       party: selectedHeroes,
       result
@@ -1283,6 +1387,9 @@ const Game = ({ resumeConversation = null }) => {
     // Milestone checks after encounter resolution
     const activeEncounter = encounterActionData?.encounter;
     const encounterName = activeEncounter?.name || 'Encounter';
+
+    // Grant ledger (9.2): record the rewards/penalties this encounter implied.
+    appendHeroLedger(ledgerEvents, `encounter:${slugifyCodexKey(encounterName) || 'unknown'}`);
 
     // Codex (#51): facing an enemy discovers it — the encounter RESOLVED (win,
     // loss, or flight), so the party has met the creature either way.
@@ -1562,6 +1669,9 @@ const Game = ({ resumeConversation = null }) => {
 
           const hero = updatedHeroes.find(h => heroUid(h) === heroId);
           setSelectedHeroes(updatedHeroes);
+          // Grant ledger (9.2): resurrection gold spends, per hero, as negative
+          // amounts so the ledgered gold sum keeps tracking real gold.
+          appendHeroLedger(goldDeltaEvents(selectedHeroes, updatedHeroes), 'resurrect');
           return {
             heroName: hero.heroName || hero.characterName || 'Unknown',
             hpRestored: hero.currentHP,
@@ -1590,6 +1700,13 @@ const Game = ({ resumeConversation = null }) => {
           const result = buyItem(selectedHeroes, itemKey);
           if (result.ok) {
             setSelectedHeroes(result.party);
+            // Grant ledger (9.2): the bought item plus the pooled gold spend
+            // (negative amounts, per hero) so the ledgered gold sum stays true.
+            const buyLeadId = heroUid(result.party?.[0]);
+            appendHeroLedger([
+              ...goldDeltaEvents(selectedHeroes, result.party),
+              ...(buyLeadId ? [{ heroId: buyLeadId, kind: 'item', key: itemKey }] : [])
+            ], 'shop');
             recordItemsInCodex([itemKey]); // codex (#51): bought items are discoveries
             // Buying IS acquiring: without this, purchasing a quest item (e.g. healing
             // herbs at the apothecary) silently failed to progress its item milestone.
@@ -1599,7 +1716,11 @@ const Game = ({ resumeConversation = null }) => {
         }}
         onSell={(itemKey) => {
           const result = sellItem(selectedHeroes, itemKey);
-          if (result.ok) setSelectedHeroes(result.party);
+          if (result.ok) {
+            setSelectedHeroes(result.party);
+            // Grant ledger (9.2): sale gold is a gain like any other.
+            appendHeroLedger(goldDeltaEvents(selectedHeroes, result.party), 'shop');
+          }
           return result;
         }}
       />

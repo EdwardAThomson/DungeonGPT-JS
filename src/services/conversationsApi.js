@@ -1,6 +1,6 @@
 import { apiFetch, getErrorMessage } from './apiClient';
 import { supabase } from './supabaseClient';
-import { localGameStore } from './localGameStore';
+import { localGameStore, isUnsyncedLocalRow } from './localGameStore';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('conversations-api');
@@ -193,44 +193,222 @@ async function resolveRoute() {
   }
 }
 
+// Row-time helper for the newer-of-two-copies reads (SAVE_SYNC_PLAN §4, timestamp
+// comparison until the rev protocol of §6 lands). NaN for missing/unparseable.
+const rowTime = (row) => Date.parse(row?.updated_at || row?.timestamp || '');
+
+// The local copy wins only when it is strictly, provably newer; every other case
+// (older, tie, unparseable timestamps, legacy rows without them) prefers the cloud
+// copy, the durable home. Never invents divergence for old saves.
+const localIsNewer = (cloudRow, localRow) => {
+  const cloud = rowTime(cloudRow);
+  const local = rowTime(localRow);
+  return Number.isFinite(local) && (!Number.isFinite(cloud) || local > cloud);
+};
+
 export const conversationsApi = {
+  // Merged saved-games list (Phase 2, §4): the union of both stores by session_id,
+  // newest copy winning the row. Every row is annotated with `storage`
+  // ('cloud' | 'local' | 'both') and `pendingCloudSync` (true only when the newest
+  // copy is a local one still awaiting its cloud push) so the UI can badge honestly.
+  // Guests keep seeing exactly their local list, annotations aside.
   async list() {
-    return (await resolveRoute()).useCloud ? backend.list() : localGameStore.list();
+    const route = await resolveRoute();
+    const localRows = await localGameStore.list(); // [] on store failure
+    if (!route.useCloud) {
+      return localRows.map((row) => ({ ...row, storage: 'local', pendingCloudSync: isUnsyncedLocalRow(row) }));
+    }
+
+    let cloudRows;
+    try {
+      cloudRows = (await backend.list()) || [];
+    } catch (e) {
+      // Cloud unreachable: local saves are still worth showing. With nothing local
+      // either, surface the original error as before.
+      if (!localRows.length) throw e;
+      logger.warn('Cloud list failed; showing local saves only', e);
+      return localRows.map((row) => ({ ...row, storage: 'local', pendingCloudSync: isUnsyncedLocalRow(row) }));
+    }
+
+    const merged = new Map();
+    for (const row of cloudRows) {
+      const sid = row.session_id || row.sessionId;
+      merged.set(sid, { ...row, sessionId: row.sessionId || sid, storage: 'cloud', pendingCloudSync: false });
+    }
+    for (const localRow of localRows) {
+      const sid = localRow.session_id;
+      const cloudCopy = merged.get(sid);
+      if (!cloudCopy) {
+        merged.set(sid, { ...localRow, storage: 'local', pendingCloudSync: isUnsyncedLocalRow(localRow) });
+      } else if (localIsNewer(cloudCopy, localRow)) {
+        merged.set(sid, { ...localRow, storage: 'both', pendingCloudSync: isUnsyncedLocalRow(localRow) });
+      } else {
+        merged.set(sid, { ...cloudCopy, storage: 'both' });
+      }
+    }
+    return [...merged.values()];
   },
 
+  // Read path (Phase 2, §4): return the NEWER of the two copies. The older copy is
+  // never deleted here; reconcile (LocalGameSync) heals or prunes it later.
   async getById(sessionId) {
-    return (await resolveRoute()).useCloud ? backend.getById(sessionId) : localGameStore.getById(sessionId);
+    const route = await resolveRoute();
+    if (!route.useCloud) return localGameStore.getById(sessionId);
+
+    let cloudRow = null;
+    let cloudError = null;
+    try {
+      cloudRow = await backend.getById(sessionId);
+    } catch (e) {
+      cloudError = e;
+    }
+    let localRow = null;
+    try {
+      localRow = await localGameStore.getById(sessionId);
+    } catch (e) {
+      localRow = null;
+    }
+
+    if (!localRow) {
+      if (cloudError) throw cloudError;
+      return cloudRow;
+    }
+    if (!cloudRow) return localRow;
+    return localIsNewer(cloudRow, localRow) ? localRow : cloudRow;
   },
 
-  // save/updateMessages surface WHERE the write landed via a non-breaking `storage`
-  // marker ('cloud' | 'local') plus `pendingCloudSync: true` for account-holder
-  // fallbacks, so useGamePersistence can report an honest save status. Callers that
-  // ignore the extra fields behave exactly as before.
+  // Write path (Phase 2, §4): local-first write-through. The full row lands in
+  // IndexedDB FIRST, unconditionally, stamped synced:false; the cloud push follows
+  // when auth is present and flips the flag on success. Results surface WHERE the
+  // durable copy is via `storage` ('cloud' | 'local') plus `pendingCloudSync: true`
+  // when an account-holder's save is still device-only (auth absent OR the push
+  // failed), so useGamePersistence can report an honest 'savedLocal'. The call only
+  // throws when even the local write failed (or a cloud-only attempt with no local
+  // copy failed). Guests: the local write IS the save.
   async save(payload) {
     const route = await resolveRoute();
-    if (route.useCloud) {
-      const result = await backend.save(payload);
-      return { ...(result || {}), storage: 'cloud' };
+
+    let localRow = null;
+    let localWriteError = null;
+    try {
+      localRow = await localGameStore.save(payload, { synced: false, pendingCloudSync: route.pendingCloudSync });
+    } catch (e) {
+      localWriteError = e;
+      logger.error('Local write-ahead save failed', e);
     }
-    const row = await localGameStore.save(payload, { pendingCloudSync: route.pendingCloudSync });
-    return { ...row, storage: 'local', pendingCloudSync: !!row.pending_cloud_sync };
+
+    if (route.useCloud) {
+      try {
+        const result = await backend.save(payload);
+        if (localRow) {
+          // Confirmed in the account: flip the dirty flag (guarded so a save that
+          // rewrote the row mid-push keeps its synced:false).
+          try {
+            await localGameStore.markSynced(localRow.session_id, { ifUpdatedAt: localRow.updated_at });
+          } catch (e) {
+            logger.warn('markSynced failed (row stays pending, reconcile will retry)', e);
+          }
+        }
+        return { ...(result || {}), storage: 'cloud' };
+      } catch (e) {
+        if (!localRow) throw e; // nothing landed anywhere: a real save error
+        logger.warn('Cloud push failed; the save is on this device pending sync', e);
+        return { ...localRow, storage: 'local', pendingCloudSync: true };
+      }
+    }
+
+    if (!localRow) throw localWriteError;
+    return { ...localRow, storage: 'local', pendingCloudSync: !!localRow.pending_cloud_sync };
   },
 
+  // Same write-through contract as save(), for the message-only update path. When
+  // no local copy exists (e.g. debug tooling on a cloud-only row) the cloud write
+  // proceeds alone, as before.
   async updateMessages(sessionId, conversationData) {
     const route = await resolveRoute();
-    if (route.useCloud) {
-      const result = await backend.updateMessages(sessionId, conversationData);
-      return { ...(result || {}), storage: 'cloud' };
+
+    let localRow = null;
+    let localWriteError = null;
+    try {
+      localRow = await localGameStore.updateMessages(sessionId, conversationData, {
+        synced: false,
+        pendingCloudSync: route.pendingCloudSync
+      });
+    } catch (e) {
+      localWriteError = e;
+      logger.error('Local write-ahead update failed', e);
     }
-    const row = await localGameStore.updateMessages(sessionId, conversationData, { pendingCloudSync: route.pendingCloudSync });
-    return row ? { ...row, storage: 'local', pendingCloudSync: !!row.pending_cloud_sync } : row;
+
+    if (route.useCloud) {
+      try {
+        const result = await backend.updateMessages(sessionId, conversationData);
+        if (localRow) {
+          try {
+            await localGameStore.markSynced(sessionId, { ifUpdatedAt: localRow.updated_at });
+          } catch (e) {
+            logger.warn('markSynced failed (row stays pending, reconcile will retry)', e);
+          }
+        }
+        return { ...(result || {}), storage: 'cloud' };
+      } catch (e) {
+        if (!localRow) throw e;
+        logger.warn('Cloud push failed; the update is on this device pending sync', e);
+        return { ...localRow, storage: 'local', pendingCloudSync: true };
+      }
+    }
+
+    if (localWriteError) throw localWriteError;
+    return localRow ? { ...localRow, storage: 'local', pendingCloudSync: !!localRow.pending_cloud_sync } : localRow;
   },
 
   async updateName(sessionId, conversationName) {
-    return (await resolveRoute()).useCloud ? backend.updateName(sessionId, conversationName) : localGameStore.updateName(sessionId, conversationName);
+    const route = await resolveRoute();
+    if (!route.useCloud) return localGameStore.updateName(sessionId, conversationName);
+    const result = await backend.updateName(sessionId, conversationName);
+    // Keep an UNSYNCED local copy's name in step: the cloud rename stamps the cloud
+    // row newer, and without this the next reconcile would park real local progress
+    // as a "diverged" fork over a mere rename. Synced local copies stay untouched
+    // (their content already lives in the account; bumping their updated_at would
+    // let stale content win the newer-of-two reads).
+    try {
+      const localRow = await localGameStore.getById(sessionId);
+      if (localRow && isUnsyncedLocalRow(localRow)) {
+        await localGameStore.updateName(sessionId, conversationName);
+      }
+    } catch (e) {
+      logger.warn('Local rename skipped', e);
+    }
+    return result;
   },
 
+  // Deleting while signed in removes BOTH copies, otherwise the merged list would
+  // resurrect the row from the surviving store. A cloud miss (e.g. the row only
+  // ever lived on this device) still counts as success when a local copy existed.
   async remove(sessionId) {
-    return (await resolveRoute()).useCloud ? backend.remove(sessionId) : localGameStore.remove(sessionId);
+    const route = await resolveRoute();
+    if (!route.useCloud) return localGameStore.remove(sessionId);
+
+    let localRow = null;
+    try {
+      localRow = await localGameStore.getById(sessionId);
+    } catch (e) {
+      localRow = null;
+    }
+    let result = null;
+    let cloudError = null;
+    try {
+      result = await backend.remove(sessionId);
+    } catch (e) {
+      cloudError = e;
+    }
+    if (localRow) {
+      try {
+        await localGameStore.remove(sessionId);
+      } catch (e) {
+        logger.warn('Local delete failed', e);
+      }
+    }
+    if (cloudError && !localRow) throw cloudError;
+    return result || { success: true };
   }
 };

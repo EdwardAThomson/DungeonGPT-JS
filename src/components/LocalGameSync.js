@@ -1,14 +1,19 @@
 // LocalGameSync.js
-// When a guest who has been playing locally signs in, upload their browser-local
-// saved games to the cloud so nothing is lost — mirrors LocalHeroSync (heroes).
-// Runs after sign-in AND on auth restoration mid-session (SAVE_SYNC_PLAN Phase 1);
-// renders a small confirmation toast. See docs/GUEST_MODE_PLAN.md (B2).
+// Reconcile pass for browser-local saved games (SAVE_SYNC_PLAN Phase 2): pushes
+// unsynced local rows to the signed-in player's account, marks or prunes rows that
+// are already there, and parks genuinely diverged copies as separate saves. Also
+// still the guest-to-account conversion path (docs/GUEST_MODE_PLAN.md, B2), and
+// mirrors LocalHeroSync (heroes). Runs on app start with a session present, after
+// sign-in, on auth restoration mid-session (token refresh), and whenever a save
+// reports 'savedLocal' (PENDING_LOCAL_SAVE_EVENT); renders a small confirmation
+// toast when games reach the account.
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { conversationsApi } from '../services/conversationsApi';
 import { localGameStore } from '../services/localGameStore';
 import { supabase } from '../services/supabaseClient';
+import { PENDING_LOCAL_SAVE_EVENT } from '../game/saveController';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('local-game-sync');
@@ -34,11 +39,27 @@ export const rowToPayload = (row) => ({
 // Short random suffix for parking a diverged local copy under its own session_id.
 const shortId = () => Math.random().toString(36).slice(2, 8);
 
-// One sync pass (exported for tests). For each local row:
-// - If the cloud already holds a NEWER copy of the same session, do NOT overwrite it
-//   (SAVE_SYNC_PLAN §5/§6.2): park the local copy as a separate save (new session_id,
-//   name suffixed "(diverged on this device, <date>)") so both timelines survive.
-// - Otherwise (cloud older or missing) upload as-is, same session_id.
+// The live session keeps its local write-ahead copy (§10 leaning: keep while live);
+// only other sessions' local rows may be pruned once they are safely in the cloud.
+const getLiveSessionId = () => {
+  try {
+    return localStorage.getItem('activeGameSessionId') || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+// One reconcile pass (exported for tests). For each local row:
+// - Rows explicitly marked synced:true are already in the account: the LIVE
+//   session's copy is kept (write-ahead cache), any other is pruned (Phase 2, §4).
+// - Unsynced rows (synced:false, a Phase 1 pending stamp, or legacy rows with
+//   neither field: guest saves must still convert losslessly) are pushed with the
+//   timestamp guard: if the cloud already holds a NEWER copy of the same session,
+//   do NOT overwrite it (§5/§6.2): park the local copy as a separate save (new
+//   session_id, name suffixed "(diverged on this device, <date>)") so both
+//   timelines survive. Otherwise (cloud older or missing) upload as-is, same
+//   session_id. After a successful push the live session's row is marked synced
+//   and kept; other rows are removed.
 // Rows whose upload fails, or whose write routed back to local storage because auth
 // vanished again mid-pass, stay local for the next pass.
 export const runLocalGameSyncPass = async () => {
@@ -53,9 +74,23 @@ export const runLocalGameSyncPass = async () => {
     return { count: 0, failed: false, empty: true };
   }
 
+  const liveSessionId = getLiveSessionId();
   let count = 0;
   let failed = false;
   for (const row of rows) {
+    const isLive = row.session_id === liveSessionId;
+    if (row.synced === true) {
+      // Already in the account (write-through confirmed the push). Nothing to
+      // upload; prune the cache copy unless this is the live session.
+      if (!isLive) {
+        try {
+          await localGameStore.remove(row.session_id);
+        } catch (e) {
+          logger.warn(`Failed to prune synced local copy of ${row.session_id}:`, e);
+        }
+      }
+      continue;
+    }
     try {
       // Timestamp guard: never clobber a newer cloud row with a stale local one.
       let cloudRow = null;
@@ -91,7 +126,16 @@ export const runLocalGameSyncPass = async () => {
         failed = true;
         continue;
       }
-      await localGameStore.remove(row.session_id); // drop synced rows as we go
+      if (isLive && !cloudIsNewer) {
+        // The live session keeps its write-ahead copy. The write-through inside
+        // conversationsApi.save normally re-marks it synced already; this guarded
+        // mark covers save paths that skip the local store. ifUpdatedAt makes it a
+        // no-op whenever the row was rewritten since the pass listed it, so a
+        // fresher unsynced write never gets mislabelled as synced.
+        await localGameStore.markSynced(row.session_id, { ifUpdatedAt: row.updated_at });
+      } else {
+        await localGameStore.remove(row.session_id); // pushed: prune the local copy
+      }
       count += 1;
     } catch (e) {
       logger.error(`Failed to sync local game ${row.session_id}:`, e);
@@ -118,6 +162,18 @@ const LocalGameSync = () => {
       }
     });
     return () => subscription?.unsubscribe();
+  }, []);
+
+  // Phase 2 reconcile trigger: a save just reported 'savedLocal' (device-only). If
+  // the player still counts as signed in, retry the push now; if auth is truly gone,
+  // the pass routes local again, stays armed, and the auth events above pick it up.
+  useEffect(() => {
+    const onPendingLocalSave = () => {
+      syncedRef.current = false;
+      setAuthTick((t) => t + 1);
+    };
+    window.addEventListener(PENDING_LOCAL_SAVE_EVENT, onPendingLocalSave);
+    return () => window.removeEventListener(PENDING_LOCAL_SAVE_EVENT, onPendingLocalSave);
   }, []);
 
   useEffect(() => {
