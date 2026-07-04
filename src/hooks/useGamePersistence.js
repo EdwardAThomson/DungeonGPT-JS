@@ -94,10 +94,13 @@ const useGamePersistence = ({
   ]);
 
   // Returns a status the caller can act on:
-  //   'saved'    - state was written to the store
-  //   'nochange' - nothing changed since the last save (already up to date)
-  //   'skipped'  - nothing to save yet (no session / adventure not started / no data)
-  //   'error'    - the write was attempted and failed
+  //   'saved'      - state was written to its home store (cloud account, or this
+  //                  device for a plain guest: their local save IS the save)
+  //   'savedLocal' - honest fallback (SAVE_SYNC_PLAN Phase 1): an account-holder's
+  //                  save landed on this device only, pending cloud sync
+  //   'nochange'   - nothing changed since the last save (already up to date)
+  //   'skipped'    - nothing to save yet (no session / adventure not started / no data)
+  //   'error'      - the write was attempted and failed
   const performSave = useCallback(async (isUnmount = false) => {
     if (!sessionIdRef.current) return 'skipped';
 
@@ -153,7 +156,7 @@ const useGamePersistence = ({
       siteMapsCache: siteMapsCacheRef.current
     });
 
-    const ok = await saveConversationToBackend(sessionIdRef.current, {
+    const result = await saveConversationToBackend(sessionIdRef.current, {
       conversation: conversationRef.current,
       provider: selectedProviderRef.current,
       model: selectedModelRef.current,
@@ -168,9 +171,11 @@ const useGamePersistence = ({
 
     // Only remember the fingerprint on a successful write, so a failed save is retried
     // by the next auto-save instead of being masked as "no change".
-    if (ok) {
+    // saveConversationToBackend returns { ok, storage, pendingCloudSync } on success
+    // (legacy `true` still counts) and false on failure.
+    if (result) {
       lastSaveFingerprintRef.current = fingerprint;
-      return 'saved';
+      return result.pendingCloudSync ? 'savedLocal' : 'saved';
     }
     return 'error';
   }, [loadedConversation?.game_settings, logger, saveConversationToBackend]);
