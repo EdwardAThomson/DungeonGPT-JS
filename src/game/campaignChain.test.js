@@ -546,6 +546,36 @@ describe('derived-state conflicts after the swap (maintainer supplement)', () =>
   });
 });
 
+describe('missing quest venues prefer FREE GROUND over house conversion (maintainer decision 2026-07-04)', () => {
+  it('places a NEW building on grass; houses are not converted', () => {
+    const g = (x, y) => ({ type: 'grass', x, y });
+    const town = {
+      townName: 'Millhaven',
+      mapData: [
+        [{ type: 'building', buildingType: 'house', x: 0, y: 0 }, g(1, 0), g(2, 0)],
+        [g(0, 1), g(1, 1), g(2, 1)],
+        [g(0, 2), g(1, 2), g(2, 2)]
+      ],
+      npcs: []
+    };
+    const cache = retroInjectQuestContent({
+      townMapsCache: { Millhaven: town },
+      requiredBuildings: { Millhaven: [{ type: 'archives', name: 'Hall of Echoes', milestoneId: 1 }] },
+      milestones: [],
+      worldSeed: 1
+    });
+    const t = cache.Millhaven;
+    expect(t.mapData[0][0].buildingType).toBe('house');
+    const placed = t.mapData.flat().find((tile) => tile.buildingType === 'archives');
+    expect(placed).toBeDefined();
+    expect(placed.questBuilding).toBe(true);
+    expect(placed.buildingName).toBe('Hall of Echoes');
+    expect(placed.walkable).toBe(false);
+  });
+});
+
+// The single-row towns below have NO free ground, so they exercise the
+// last-resort house swap (and its resident rehoming).
 describe('retro house-swap rehomes displaced cached NPCs (playtest 2026-07-04)', () => {
   // The swap takes the FIRST house in scan order and the village Elder lives in
   // the FIRST residential site in scan order: systematically the same tile. Cached

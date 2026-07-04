@@ -546,9 +546,25 @@ export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
     }
 
     // Helper to add NPC with linkage
+    // Gender is DEALT from a balanced, seeded deck rather than flipped per NPC
+    // (maintainer directive, playtest 2026-07-04): fair independent coin flips
+    // produce same-gender streaks (runs of 5-6 building heads are expected over
+    // ~85 buildings) that read as bias in play. Dealing in shuffled Male/Female
+    // pairs pins every town at an exact 50/50 and caps dealt runs at 2. NPCs
+    // with an explicit gender (spouses, authored NPCs) bypass the deck.
+    let genderDeck = [];
+    const dealGender = () => {
+        if (genderDeck.length === 0) {
+            genderDeck = rng.random() < 0.5 ? ['Male', 'Female'] : ['Female', 'Male'];
+        }
+        return genderDeck.pop();
+    };
+
     const addNPC = (role, workplace, home, options = {}) => {
         const npcSeed = parseInt(seed) + (workplace.x * 1000) + (workplace.y * 100) + rng.range(0, 9999);
-        const npc = generateNPC({ seed: npcSeed, role, noEvil: true, ...options });
+        const opts = { seed: npcSeed, role, noEvil: true, ...options };
+        if (!opts.gender) opts.gender = dealGender();
+        const npc = generateNPC(opts);
 
         npc.location = {
             x: workplace.x,

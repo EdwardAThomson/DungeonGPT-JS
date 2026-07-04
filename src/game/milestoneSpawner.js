@@ -248,7 +248,46 @@ export const injectQuestBuildings = (townMapData, requiredBuildings) => {
             continue;
         }
 
-        // Building type doesn't exist — find a house to swap
+        // Building type doesn't exist. Maintainer decision (2026-07-04): do NOT
+        // convert houses (people live there; the Elder's house was systematically
+        // the one converted). Place a NEW building on a free grass tile instead,
+        // preferring a spot adjacent to the built-up area so the venue sits in
+        // town rather than in a field.
+        const stampQuestBuilding = (tile) => {
+            tile.type = 'building';
+            tile.buildingType = req.type;
+            tile.buildingName = req.name || req.type;
+            tile.questBuilding = true;
+            tile.walkable = false;
+            tile.poi = null;
+            if (req.questItem) {
+                tile.questItemId = req.questItem.id;
+                tile.questItemName = req.questItem.name;
+            }
+        };
+        let spot = null;
+        let fallbackSpot = null;
+        for (let y = 1; y < mapData.length - 1 && !spot; y++) {
+            for (let x = 1; x < mapData[y].length - 1 && !spot; x++) {
+                const tile = mapData[y][x];
+                if (tile.type !== 'grass' || tile.poi) continue;
+                if (!fallbackSpot) fallbackSpot = tile;
+                const nearBuilding = [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => {
+                    const n = mapData[y + dy] && mapData[y + dy][x + dx];
+                    return n && n.type === 'building';
+                });
+                if (nearBuilding) spot = tile;
+            }
+        }
+        spot = spot || fallbackSpot;
+        if (spot) {
+            stampQuestBuilding(spot);
+            logger.info(`[SPAWN] Placed NEW quest building "${req.name}" (${req.type}) on free ground`);
+            continue;
+        }
+
+        // Last resort only (no free ground at all): swap a house. The retro path
+        // rehomes the displaced residents (rehomeDisplacedNpcs).
         let houseToSwap = null;
         for (let y = 0; y < mapData.length; y++) {
             for (let x = 0; x < mapData[y].length; x++) {

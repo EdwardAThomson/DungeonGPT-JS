@@ -131,3 +131,16 @@ describe('civic building job strings (unnamed buildings)', () => {
     expect(hm.job).toMatch(/ of Saltmere$/);
   });
 });
+
+describe('gender dealing (balanced deck, maintainer directive 2026-07-04)', () => {
+  it('pins every town at near-exact 50/50 (iid coin flips produced streaks that read as bias)', () => {
+    for (const seed of [3, 17, 88, 421]) {
+      const npcs = populateTown(makeTown(SERVICE_TYPES), seed);
+      const f = npcs.filter((n) => n.gender === 'Female').length;
+      const m = npcs.filter((n) => n.gender === 'Male').length;
+      // Deck deals in pairs and spouses mirror their partner, so the only
+      // slack is an unfinished pair plus name-forced proprietors.
+      expect(Math.abs(f - m)).toBeLessThanOrEqual(3);
+    }
+  });
+});
