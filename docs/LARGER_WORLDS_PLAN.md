@@ -147,7 +147,12 @@ chunk boundary), stepping ±1 per run within [2,3] (placeCoast's own range; gate
 2..7 stay clear of the deepest rows). Result: the coastline still wobbles along its
 length (depth variance > 0 on 40/40 surveyed seeds) but the band depth at every seam is
 EQUAL (80/80 coast-crossing seams over 40 seeds; seam compatibility is now 1.0
-everywhere). `stampCoast` gained an optional per-tile `depths` array for this.
+everywhere). Variable-depth bands are stamped by `stampCoastProfile` (water rows only);
+uniform bands keep the original `stampCoast`. Coast depth steps get lake-style diagonal
+shore corners: the beach ring is produced by the same `addLakeShores` pass lakes use,
+so step corners carry the concave/convex `beachDirection` codes (4-11) that
+`worldTileArt` BEACH_CORNERS renders as diagonal chamfers/wedges — no right-angle
+stairs, and zero bare-land-against-water corners across the survey seeds.
 
 **World-level lake allocation (refinement after maintainer seam review).** The first
 cut let every outer land chunk roll its own lakes (generateMapData always places lake

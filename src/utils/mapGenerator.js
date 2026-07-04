@@ -27,7 +27,9 @@ const logger = createLogger('map-generator');
  *            null/false = suppress the coast entirely (inland chunk);
  *            { edge: 0-3, depth: 2-3 } = stamp a prescribed uniform coast band, or
  *            { edge: 0-3, depths: [d per along-coast tile] } = variable-depth band (the
- *            assembler's world-level coast profile, so depths MATCH at chunk seams).
+ *            assembler's world-level coast profile, so depths MATCH at chunk seams);
+ *            depth steps are shored with the lake-style diagonal corner beaches
+ *            (addLakeShores beachDirection codes 4-11), not right-angle stairs.
  *     edgeConstraints: { north/east/south/west: [biome per tile] } — the adjacent edge rows
  *            of already-generated neighbour chunks; the first 2 rows on that side are biased
  *            toward continuing those biomes (exact-continuation probability decaying inward).
@@ -81,7 +83,11 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   if (options.coast === undefined) {
     placeCoast(mapData, width, height, rng);
   } else if (options.coast) {
-    stampCoast(mapData, width, height, options.coast.edge, options.coast.depth, options.coast.depths);
+    if (Array.isArray(options.coast.depths)) {
+      stampCoastProfile(mapData, width, height, options.coast.edge, options.coast.depths, landBiome);
+    } else {
+      stampCoast(mapData, width, height, options.coast.edge, options.coast.depth);
+    }
   }
 
   // 1b. Edge constraints from already-generated neighbour chunks (issue #60, experimental):
@@ -759,15 +765,13 @@ function placeCoast(mapData, width, height, rng) {
   stampCoast(mapData, width, height, edge, depth);
 }
 
-// Stamp a coast band on the given edge (outer strip water, inner strip beach). Extracted
-// from placeCoast so chunk assembly (issue #60, experimental) can prescribe a coastal
-// chunk's band to continue the heart chunk's coastline. depth is a uniform band; depths
-// (optional) is a per-along-coast-tile depth array — the assembler's world-level coast
-// profile, which wobbles along the coastline but matches exactly at chunk seams.
-function stampCoast(mapData, width, height, edge, depth, depths = null) {
+// Stamp a UNIFORM coast band on the given edge at the given depth (outer strip water,
+// inner strip beach). Extracted from placeCoast so chunk assembly (issue #60,
+// experimental) can prescribe a coastal chunk's band. Variable-depth bands (the
+// assembler's world-level coast profile) go through stampCoastProfile instead.
+function stampCoast(mapData, width, height, edge, depth) {
   for (let i = 0; i < width; i++) {
-    const bandDepth = (depths && Number.isFinite(depths[i])) ? depths[i] : depth;
-    for (let d = 0; d < bandDepth; d++) {
+    for (let d = 0; d < depth; d++) {
       let x, y;
       if (edge === 0) { x = i; y = d; }
       else if (edge === 1) { x = width - 1 - d; y = i; }
@@ -775,7 +779,7 @@ function stampCoast(mapData, width, height, edge, depth, depths = null) {
       else { x = d; y = i; }
 
       if (mapData[y] && mapData[y][x]) {
-        if (d === bandDepth - 1) {
+        if (d === depth - 1) {
           // Inner edge touching land becomes the beach
           mapData[y][x].biome = 'beach';
           mapData[y][x].beachDirection = edge;
@@ -784,6 +788,45 @@ function stampCoast(mapData, width, height, edge, depth, depths = null) {
           mapData[y][x].biome = 'water';
           mapData[y][x].descriptionSeed = "The coastal sea";
         }
+      }
+    }
+  }
+}
+
+// Stamp a VARIABLE-depth coast band (issue #60, experimental): per along-coast tile,
+// depths[i] is the total band thickness (water strips + one beach strip). The water rows
+// are stamped directly; the beach then comes from addLakeShores — the exact same
+// directional shore ring lakes use — so every depth STEP in the profile gets the lake
+// visual language (worldTileArt BEACH_CORNERS): a concave diagonal chamfer on the inner
+// corner (beachDirection 4-7) and a convex diagonal wedge on the outer corner (8-11),
+// instead of a hard right-angle stair. Straight sections come out identical to the
+// uniform band (beachDirection = edge). Works for both step directions and needs no new
+// tile field or art: coast corners and lake corners share one representation.
+function stampCoastProfile(mapData, width, height, edge, depths, landBiome) {
+  const waterTiles = [];
+  for (let i = 0; i < width; i++) {
+    const bandDepth = Number.isFinite(depths[i]) ? depths[i] : 2;
+    for (let d = 0; d < bandDepth - 1; d++) { // water rows only; the ring adds the beach
+      let x, y;
+      if (edge === 0) { x = i; y = d; }
+      else if (edge === 1) { x = width - 1 - d; y = i; }
+      else if (edge === 2) { x = i; y = height - 1 - d; }
+      else { x = d; y = i; }
+      if (mapData[y] && mapData[y][x]) {
+        mapData[y][x].biome = 'water';
+        mapData[y][x].descriptionSeed = 'The coastal sea';
+        waterTiles.push({ x, y });
+      }
+    }
+  }
+  addLakeShores(mapData, waterTiles, width, height, landBiome);
+  // The ring labels its shores as lakeshores; these are sea beaches. Coast stamping runs
+  // before lake placement, so every lakeshore label at this point belongs to the coast.
+  for (const { x, y } of waterTiles) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const t = mapData[y + dy] && mapData[y + dy][x + dx];
+        if (t && t.descriptionSeed === 'A sandy lakeshore') t.descriptionSeed = 'A sandy beach';
       }
     }
   }

@@ -229,8 +229,10 @@ const LargeWorldTest = () => {
           seeded ~32% per-chunk roll (and kept 2 tiles off seams), ~65% settlement density, no coast except the ocean
           side. Coast depth follows one world-level profile (<code>buildCoastProfile</code>) anchored on the heart's own
           depth: it wobbles in 3-5 tile runs along the coastline but never steps at a chunk seam, so both sides of every
-          seam share the same band depth. Red dashed circles are gate tiles. This page and <code>worldAssembler.js</code>
-          are the whole prototype — nothing touches New Game or saves.
+          seam share the same band depth; each depth step is smoothed with the lake-style diagonal beach corners
+          (concave chamfer + convex wedge, <code>beachDirection</code> 4-11) instead of a right-angle stair. Red dashed
+          circles are gate tiles. This page and <code>worldAssembler.js</code> are the whole prototype — nothing touches
+          New Game or saves.
         </p>
       </section>
     </div>

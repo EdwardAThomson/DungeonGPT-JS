@@ -70,7 +70,49 @@ describe('generator options (chunk-assembly hooks)', () => {
         const t = map[d][i];
         if (d < depths[i] - 1) expect(t.biome).toBe('water');
         else if (d === depths[i] - 1) expect(t.biome).toBe('beach');
-        else expect(t.biome === 'water' || t.biome === 'beach').toBe(false);
+        // Beyond the band: never water. Beach IS allowed one row past it right at a depth
+        // step (the convex diagonal corner wedge — see the corner-treatment test below).
+        else expect(t.biome).not.toBe('water');
+      }
+    }
+  });
+
+  it('coast depth steps get the lake-style diagonal corner treatment (beachDirection 4-11)', () => {
+    // North coast, deepening 2->3 between i=2/3 and shallowing 3->2 between i=6/7.
+    // maxLakes: 0 so every shore on the map belongs to the coast (unambiguous labels).
+    const depths = [2, 2, 2, 3, 3, 3, 3, 2, 2, 2];
+    const map = generateMapData(10, 10, 999, {}, 'grassland', { coast: { edge: 0, depths }, maxLakes: 0 });
+    // Deepening step: the inner corner beach is a CONCAVE chamfer (water N+E -> code 4)
+    // and the outer land corner becomes a CONVEX wedge (water only at NE diagonal -> 8).
+    expect(map[1][2].biome).toBe('beach');
+    expect(map[1][2].beachDirection).toBe(4);
+    expect(map[2][2].biome).toBe('beach');
+    expect(map[2][2].beachDirection).toBe(8);
+    // Shallowing step, mirrored: concave water N+W -> 7; convex water at NW diagonal -> 11.
+    expect(map[1][7].biome).toBe('beach');
+    expect(map[1][7].beachDirection).toBe(7);
+    expect(map[2][7].biome).toBe('beach');
+    expect(map[2][7].beachDirection).toBe(11);
+    // Straight sections are unchanged: plain edge-facing beach (code 0 for a north coast).
+    expect(map[1][0].beachDirection).toBe(0);
+    expect(map[1][1].beachDirection).toBe(0);
+    expect(map[2][4].beachDirection).toBe(0);
+    expect(map[2][5].beachDirection).toBe(0);
+    // Coast shores are labeled as sea beaches, never lakeshores (later placements — a
+    // town may legitimately sit on a beach tile — can overwrite the description, so
+    // assert the positive label only where nothing was placed on top).
+    expect(map.flat().some((t) => t.descriptionSeed === 'A sandy lakeshore')).toBe(false);
+    [map[1][2], map[2][2], map[1][7], map[2][7]].forEach((t) => {
+      if (!t.poi) expect(t.descriptionSeed).toBe('A sandy beach');
+    });
+    // And the smoothing leaves no bare land touching coast water, even diagonally.
+    for (let y = 0; y < 10; y++) {
+      for (let x = 0; x < 10; x++) {
+        if (map[y][x].biome !== 'plains') continue;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+          const n = map[y + dy] && map[y + dy][x + dx];
+          if (n) expect(n.biome).not.toBe('water');
+        }
       }
     }
   });
@@ -463,6 +505,40 @@ describe('3x3 seed survey (a few dozen seeds)', () => {
   it('the coastline wobbles on every seed (along-coast depth variance > 0)', () => {
     for (const { report } of results) {
       expect(new Set(report.coastProfile).size).toBeGreaterThan(1);
+    }
+  });
+
+  it('zero unsmoothed right-angle water corners: no bare land tile touches water, even diagonally', () => {
+    // Every water body (coast band incl. its depth steps, lakes, ocean) must be fully
+    // ringed by beach — a bare land tile diagonally against water is exactly the hard
+    // stair corner the lake-style diagonal treatment eliminates.
+    const violations = [];
+    for (const { worldSeed, mapData } of results) {
+      const H = mapData.length;
+      const W = mapData[0].length;
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const t = mapData[y][x];
+          if (t.biome === 'water' || t.biome === 'beach') continue;
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+            const n = mapData[y + dy] && mapData[y + dy][x + dx];
+            if (n && n.biome === 'water') violations.push({ worldSeed, x, y, biome: t.biome });
+          }
+        }
+      }
+    }
+    expect(violations).toEqual([]);
+  });
+
+  it('no diagonal corner piece ever straddles a seam (depth equal across every boundary)', () => {
+    // Corner pieces only exist AT depth steps; the profile never steps on a chunk
+    // boundary, so the tiles facing each other across a seam always share a depth and a
+    // diagonal transition is always fully contained within one chunk.
+    for (const { report } of results) {
+      const p = report.coastProfile;
+      for (let seam = CHUNK_SIZE; seam < p.length; seam += CHUNK_SIZE) {
+        expect(p[seam]).toBe(p[seam - 1]);
+      }
     }
   });
 
