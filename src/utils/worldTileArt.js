@@ -233,34 +233,40 @@ const woodland = (seed) => {
 };
 
 // Several mountain silhouettes; the wide ridge (v2) reaches the tile edges so adjacent
-// mountains visually merge into a range.
-const MOUNTAIN_VARIANTS = [
+// mountains visually merge into a range. Parameterized by palette so biomes can
+// re-skin the same silhouettes: temperate/snow keep grey rock with snow caps,
+// desert gets sandstone with sun-bleached summits (no snow over the dunes).
+const mountainVariantsFor = ({ base, shade, cap }) => [
   // single peak
-  `<polygon points='20,4 36,34 4,34' fill='${C.rock}'/>` +
-  `<polygon points='20,4 36,34 24,34' fill='${C.rockDark}'/>` +
-  `<polygon points='20,4 27,17 13,17' fill='${C.snow}'/>` +
+  `<polygon points='20,4 36,34 4,34' fill='${base}'/>` +
+  `<polygon points='20,4 36,34 24,34' fill='${shade}'/>` +
+  `<polygon points='20,4 27,17 13,17' fill='${cap}'/>` +
   outline('20,4 36,34 4,34'),
   // twin peaks
-  `<polygon points='13,9 24,34 2,34' fill='${C.rock}'/>` +
-  `<polygon points='27,6 38,34 16,34' fill='${C.rockDark}'/>` +
-  `<polygon points='27,6 33,18 21,18' fill='${C.snow}'/>` +
-  `<polygon points='13,9 18,19 8,19' fill='${C.snow}'/>` +
+  `<polygon points='13,9 24,34 2,34' fill='${base}'/>` +
+  `<polygon points='27,6 38,34 16,34' fill='${shade}'/>` +
+  `<polygon points='27,6 33,18 21,18' fill='${cap}'/>` +
+  `<polygon points='13,9 18,19 8,19' fill='${cap}'/>` +
   outline('13,9 24,34 2,34') + outline('27,6 38,34 16,34'),
   // wide ridge (edge-to-edge -> connects with neighbours)
-  `<polygon points='0,35 10,16 20,27 30,13 40,35' fill='${C.rock}'/>` +
-  `<polygon points='20,27 30,13 40,35' fill='${C.rockDark}'/>` +
-  `<polygon points='10,16 14,23 6,23' fill='${C.snow}'/>` +
-  `<polygon points='30,13 34,21 26,21' fill='${C.snow}'/>` +
+  `<polygon points='0,35 10,16 20,27 30,13 40,35' fill='${base}'/>` +
+  `<polygon points='20,27 30,13 40,35' fill='${shade}'/>` +
+  `<polygon points='10,16 14,23 6,23' fill='${cap}'/>` +
+  `<polygon points='30,13 34,21 26,21' fill='${cap}'/>` +
   `<polyline points='0,35 10,16 20,27 30,13 40,35' fill='none' stroke='${EDGE}' stroke-width='1.1' stroke-linejoin='round'/>`,
   // peak with a foothill
-  `<polygon points='23,6 38,34 8,34' fill='${C.rock}'/>` +
-  `<polygon points='23,6 38,34 27,34' fill='${C.rockDark}'/>` +
-  `<polygon points='23,6 29,18 17,18' fill='${C.snow}'/>` +
-  `<polygon points='9,21 19,34 0,34' fill='${C.rock}'/>` +
-  `<polygon points='9,21 19,34 12,34' fill='${C.rockDark}'/>` +
+  `<polygon points='23,6 38,34 8,34' fill='${base}'/>` +
+  `<polygon points='23,6 38,34 27,34' fill='${shade}'/>` +
+  `<polygon points='23,6 29,18 17,18' fill='${cap}'/>` +
+  `<polygon points='9,21 19,34 0,34' fill='${base}'/>` +
+  `<polygon points='9,21 19,34 12,34' fill='${shade}'/>` +
   outline('23,6 38,34 8,34') + outline('9,21 19,34 0,34'),
 ];
+const MOUNTAIN_VARIANTS = mountainVariantsFor({ base: C.rock, shade: C.rockDark, cap: C.snow });
+// Sandstone mesa palette; the "cap" is sun-bleached rock, not snow.
+const DESERT_MOUNTAIN_VARIANTS = mountainVariantsFor({ base: '#c19a6b', shade: '#96714a', cap: '#ecdcb8' });
 const mountain = (v = 0) => wrap(MOUNTAIN_VARIANTS[v % MOUNTAIN_VARIANTS.length]);
+const desertMountain = (v = 0) => wrap(DESERT_MOUNTAIN_VARIANTS[v % DESERT_MOUNTAIN_VARIANTS.length]);
 
 // rolling green hills — shaded mounds (dark base, mid body, sunlit top-left) so they read
 // as raised humps, not flat blobs. Several variants for variety.
@@ -428,7 +434,13 @@ export function poiSprite(tile) {
     else if (tile.biome === 'snow') { key = `forest-s|${v}`; build = () => snowForest(v); }
     else { key = `forest|${v}`; build = () => forest(v); }
   }
-  else if (tile.poi === 'mountain') { const v = variantSeed(tile.x || 0, tile.y || 0) % MOUNTAIN_VARIANTS.length; key = `mountain|${v}`; build = () => mountain(v); }
+  else if (tile.poi === 'mountain') {
+    const v = variantSeed(tile.x || 0, tile.y || 0) % MOUNTAIN_VARIANTS.length;
+    // Desert mountains are sandstone mesas (playtest 2026-07-05: snow caps over
+    // the dunes looked wrong); snow/temperate keep the classic snow-capped rock.
+    if (tile.biome === 'desert') { key = `mountain-d|${v}`; build = () => desertMountain(v); }
+    else { key = `mountain|${v}`; build = () => mountain(v); }
+  }
   else if (tile.poi === 'hills') {
     const v = variantSeed(tile.x || 0, tile.y || 0) % HILL_VARIANTS.length;
     if (tile.biome === 'desert') { key = `hills-d|${v}`; build = () => sandHills(v); }
