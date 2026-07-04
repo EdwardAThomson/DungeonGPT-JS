@@ -12,13 +12,61 @@ import { tileBackground, sampleTiles, wallVariant, buildingTile, BUILDING_TYPES,
 const SIZES = ['hamlet', 'village', 'town', 'city'];
 const TILE = 28;
 
-const Cell = ({ tile, neighbours, theme = 'grassland' }) => {
+const isPathType = (t) => t === 'dirt_path' || t === 'stone_path' || t === 'town_square' || t === 'bridge';
+
+// Connectivity report for the path network: component count, orphan tiles, and
+// gate/hub membership — the invariants the hub-and-spoke generator guarantees.
+const analyzePaths = (town) => {
+  const { mapData, width, height } = town;
+  const seen = new Set();
+  const comps = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (!isPathType(mapData[y][x].type) || seen.has(`${x},${y}`)) continue;
+      const comp = new Set();
+      const stack = [[x, y]];
+      seen.add(`${x},${y}`);
+      while (stack.length) {
+        const [cx, cy] = stack.pop();
+        comp.add(`${cx},${cy}`);
+        for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+          const nx = cx + dx, ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          if (!isPathType(mapData[ny][nx].type) || seen.has(`${nx},${ny}`)) continue;
+          seen.add(`${nx},${ny}`);
+          stack.push([nx, ny]);
+        }
+      }
+      comps.push(comp);
+    }
+  }
+  comps.sort((a, b) => b.size - a.size);
+  const main = comps[0] || new Set();
+  const orphans = comps.slice(1).reduce((s, c) => s + c.size, 0);
+  const gatesOk = (town.entrances || []).every(({ pos }) => main.has(`${pos.x},${pos.y}`));
+  const spokes = (town.pathStats?.spokes || []).filter((s) => s.straight >= 4);
+  const avg = (f) => (spokes.length ? spokes.reduce((a, s) => a + f(s), 0) / spokes.length : 0);
+  return {
+    components: comps.length,
+    orphans,
+    gatesOk,
+    hubOk: main.has(`${town.centerPoint.x},${town.centerPoint.y}`),
+    pathTiles: seen.size,
+    spokes: spokes.length,
+    avgBends: avg((s) => s.bends),
+    avgRatio: avg((s) => s.length / s.straight),
+    main,
+  };
+};
+
+const Cell = ({ tile, neighbours, theme = 'grassland', overlay = null }) => {
   const bg = tileBackground(tile, neighbours, tile.x, tile.y, theme);
   const emoji = tile.poi ? POI_EMOJI[tile.poi] : null;
   return (
     <div style={{
       width: TILE, height: TILE, backgroundImage: bg, backgroundSize: 'cover',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: overlay ? `inset 0 0 0 2px ${overlay}` : undefined,
     }}>
       {emoji && <span style={{ fontSize: 16, filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.4))' }}>{emoji}</span>}
     </div>
@@ -37,11 +85,13 @@ const TilesetTest = () => {
   const [size, setSize] = useState('town');
   const [seed, setSeed] = useState(12345);
   const [theme, setTheme] = useState('grassland');
+  const [showPaths, setShowPaths] = useState(false);
 
   const town = useMemo(
     () => generateTownMap(size, `Demo ${size}`, 'south', seed, false, 'NORTH_SOUTH', theme),
     [size, seed, theme]
   );
+  const paths = useMemo(() => analyzePaths(town), [town]);
   const grid = town.mapData;
   const W = town.width;
   const H = town.height;
@@ -103,10 +153,24 @@ const TilesetTest = () => {
           </div>
           <button className="secondary-button" style={{ padding: '4px 10px', fontSize: 12 }}
             onClick={() => setSeed(Math.floor(Math.random() * 100000))}>🎲 reseed</button>
+          <button className={showPaths ? 'primary-button' : 'secondary-button'} style={{ padding: '4px 10px', fontSize: 12 }}
+            onClick={() => setShowPaths((v) => !v)}>path overlay</button>
           <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
             zoom <input type="range" min="0.6" max="2" step="0.1" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} />
           </label>
           <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{W}×{H} · seed {seed}</span>
+        </div>
+        {/* Hub-and-spoke network report: these are the invariants the generator guarantees
+            (one component, hub + gates on it, no orphan tiles) plus windiness stats. */}
+        <div style={{ fontSize: 12, marginBottom: 8, color: 'var(--text-secondary)' }}>
+          <strong style={{ color: paths.components === 1 && paths.gatesOk && paths.hubOk ? '#3a3' : '#c33' }}>
+            {paths.components === 1 ? '✓ 1 path component' : `✗ ${paths.components} path components`}
+            {paths.orphans > 0 ? ` (${paths.orphans} orphan tiles!)` : ''}
+            {paths.gatesOk ? ' · gates connected' : ' · GATE DISCONNECTED'}
+            {paths.hubOk ? ' · hub connected' : ' · HUB DISCONNECTED'}
+          </strong>
+          {' '}· {paths.pathTiles} path tiles · {paths.spokes} spokes ·
+          avg {paths.avgBends.toFixed(1)} bends · length/straight {paths.avgRatio.toFixed(2)}
         </div>
         <div style={{ overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 8, background: 'var(--surface)' }}>
           <div style={{
@@ -116,14 +180,20 @@ const TilesetTest = () => {
             {grid.flatMap((rowArr, gy) =>
               rowArr.map((tile, gx) => {
                 const neighbours = { n: at(gx, gy - 1), e: at(gx + 1, gy), s: at(gx, gy + 1), w: at(gx - 1, gy) };
-                return <Cell key={`${gx},${gy}`} tile={tile} neighbours={neighbours} theme={theme} />;
+                let overlay = null;
+                if (showPaths && isPathType(tile.type)) {
+                  overlay = paths.main.has(`${gx},${gy}`) ? 'rgba(80,200,120,0.9)' : 'rgba(230,60,60,0.95)';
+                }
+                if (showPaths && tile.isGate) overlay = 'rgba(80,140,255,0.95)';
+                return <Cell key={`${gx},${gy}`} tile={tile} neighbours={neighbours} theme={theme} overlay={overlay} />;
               })
             )}
           </div>
         </div>
         <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
           This is the actual <code>generateTownMap()</code> output rendered with the SVG tileset — walls autotile from
-          neighbours (note corner towers and the single south gate), zero image files. Reseed to see different layouts.
+          neighbours, zero image files. Reseed to see different layouts. The <em>path overlay</em> outlines the
+          hub-and-spoke network (green = connected to the hub, red = orphan — should never appear, blue = gates).
         </p>
       </section>
     </div>
