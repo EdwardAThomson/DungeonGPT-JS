@@ -1,7 +1,8 @@
 # Larger Worlds Plan — chunked generation, flat storage, growable saves (#60)
 
-Status: **design agreed 2026-07-05** (this doc); no code yet. Prerequisite: #59
-(water cap) lands inside the generator first.
+Status: **design agreed 2026-07-05**; **step 3 prototype built** (chunk assembly behind
+`/debug/large-world`, debug-only, scheme EXPERIMENTAL and **NOT frozen** — see §7a).
+Prerequisite #59 (water cap) landed inside the generator first.
 Related: `docs/private/` tier ladder ("bigger worlds" is a Premium benefit),
 `TERRAIN_ROADMAP.md` (experimental noise terrain, debug-only, NOT this plan's
 basis), CLAUDE.md map backwards-compatibility rules (binding here).
@@ -109,9 +110,61 @@ right behind a debug page before release.
    world in a viewport that exactly fits = zero visible change).
 3. **Edge-constraint generation + chunk assembly** behind `/debug/large-world`
    with side-by-side seam inspection; freeze the chunk-seed scheme.
+   **PROTOTYPE BUILT (debug-only, scheme EXPERIMENTAL, not frozen)** — see §7a.
+   The freeze happens only when real saves start depending on the scheme.
 4. **Paid gate + New Game size option** via `entitlements.js` (world size is
    a clean `userTier` gate; #39/#40 dependency for real enforcement).
 5. **Growable-save upgrade** last (needs 1-4 stable + mapVersion machinery).
+
+## 7a. Step 3 prototype record (built; EXPERIMENTAL, not frozen)
+
+Implementation: `src/utils/worldAssembler.js` (+ `worldAssembler.test.js`) and
+`src/pages/LargeWorldTest.js` at **`/debug/large-world`**. Nothing touches the live
+New Game flow or what saves store. `generateMapData` gained an optional final
+`options` param (suppress/prescribe coast, edge constraints, lake border margin,
+town density); omitting it is byte-identical to the legacy call, pinned by fixture
+tests (`src/utils/__fixtures__/legacyMap_seed*.json`).
+
+**Ocean-side decision.** The heart's placeCoast edge defines the WORLD's ocean side.
+Chunks continuing the heart's row/column along that side carry the coastline through
+(same edge, depth wobbling ±1 within placeCoast's own [2,3] range, seeded per chunk);
+chunks fully beyond the coastline are open ocean (all water; small seeded islands are
+allowed by this design but deliberately not generated in the prototype); all other
+world sides get NO coast. Rationale: one coherent sea keeps the mental model of
+"today's free world, extended inland" — the heart stays a valid free world and a
+second random coast elsewhere would strand water mid-continent.
+
+**Gate-point decision.** Every land-land shared chunk edge gets exactly ONE crossing
+tile: `gatePoint(worldSeed, edgeId)` (offset 2..7 along the seam, off the corners so
+gates never land in a coastal chunk's corner water band). Each chunk then road-connects
+its nearest town to each of its gate tiles (A* avoiding water), and the pair is stitched
+so the crossing renders continuously. The heart gets this connector at ASSEMBLY time
+only, as an additive overlay over its untouched legacy interior. Rationale: one
+deterministic gate per seam is the minimum that guarantees cross-chunk road
+connectivity while staying reproducible regardless of generation order.
+
+**Road representation (investigated).** World-map roads are NOT a `road` tile field:
+they are `hasPath: true` + `pathConnections: ['north'…]` + `pathDirection:
+'NORTH_SOUTH'|…` written by `markPathTiles` (`src/utils/pathfinding.js`), A*'d
+town-to-town by `generateTownPaths`. Towns themselves are never marked; roads end on
+the neighbouring tile, which is exactly what `getTownRoadEdges`
+(`src/utils/townWater.js`) reads for town-entrance sides. Roads never reach the map
+edge today simply because paths only connect interior towns. The gate post-pass reuses
+these existing fields verbatim (no new tile field), so gate roads render with the
+existing path overlay and feed town entrances for free.
+
+**Seam quality (40-seed / 280-seam survey).** Exact cross-seam biome match avg 0.94
+(≥0.6 on ~95% of seams; the exceptions are heart lake-shore rings touching the heart
+border — beach meeting grass, same as inside any legacy map). Hard water/land edges:
+none on land seams (compatibility 1.0); coast-crossing seams ≥0.9 (the single ±1
+wobble tile). Lakes in non-heart chunks keep 2 tiles off chunk borders (option
+`lakeBorderMargin: 2`), so no lake is ever bisected by a seam; walkable-land
+connectivity (every town reaches the heart's starting town without crossing water)
+held on every surveyed seed.
+
+**FREEZE STATUS: NOT FROZEN.** `chunkSeed`, `gatePoint`, the edge-constraint inputs,
+and the ocean-side model may all still change freely; they become save-affecting (and
+frozen, per §3) only when growable saves or paid world sizes ship on top of them.
 
 ## 8. Open questions
 

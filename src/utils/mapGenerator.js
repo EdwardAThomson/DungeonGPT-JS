@@ -20,9 +20,22 @@ const logger = createLogger('map-generator');
  *   tiles on the 'desert' biome instead; 'snow' bases them on the 'snow' biome. Themed-
  *   region maps (Phase 2b/2c): the whole map IS one biome theme; water/beach/coast/lake/POI
  *   logic is otherwise unchanged.
+ * @param {Object} options - EXPERIMENTAL chunk-assembly hooks (worldAssembler.js, issue #60).
+ *   All optional and additive: omitting them (or passing {}) is byte-identical to the legacy
+ *   call for the same seed (guarded by a fixture test). Fields:
+ *     coast: undefined = legacy random placeCoast (default);
+ *            null/false = suppress the coast entirely (inland chunk);
+ *            { edge: 0-3, depth: 2-3 } = stamp a prescribed coast band (coastal chunk).
+ *     edgeConstraints: { north/east/south/west: [biome per tile] } — the adjacent edge rows
+ *            of already-generated neighbour chunks; the first 2 rows on that side are biased
+ *            toward continuing those biomes (exact-continuation probability decaying inward).
+ *            Water/beach constraints are never stamped (they'd need direction data).
+ *     lakeBorderMargin: min distance lake WATER keeps from the map border (default 1 = legacy;
+ *            chunks use 2 so no lake is bisected by / crowds a chunk seam).
+ *     townDensityFactor: scales the random settlement target (default 1; outer chunks ~0.65).
  * @returns {Array} 2D array of map tiles
  */
-export const generateMapData = (width = 10, height = 10, seed = null, customNames = {}, theme = 'grassland') => {
+export const generateMapData = (width = 10, height = 10, seed = null, customNames = {}, theme = 'grassland', options = {}) => {
   // Normalize customNames: support legacy flat array or new structured object
   const normalizedNames = Array.isArray(customNames)
     ? { towns: customNames, mountains: [] }
@@ -56,8 +69,25 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
     mapData.push(row);
   }
 
-  // 1. Generate Coast (one random edge)
-  placeCoast(mapData, width, height, rng);
+  // 1. Generate Coast (one random edge). Chunk assembly (issue #60, experimental) may
+  // suppress it (inland chunks) or prescribe the edge/depth (coastal chunks continuing the
+  // heart chunk's coastline). Default (options.coast undefined) is the legacy random coast.
+  if (options.coast === undefined) {
+    placeCoast(mapData, width, height, rng);
+  } else if (options.coast) {
+    stampCoast(mapData, width, height, options.coast.edge, options.coast.depth);
+  }
+
+  // 1b. Edge constraints from already-generated neighbour chunks (issue #60, experimental):
+  // bias the first 2 rows on a constrained side toward continuing the neighbour's edge
+  // biomes, with exact-continuation probability decaying inward. No-op when absent.
+  if (options.edgeConstraints) {
+    applyEdgeConstraints(mapData, width, height, rng, options.edgeConstraints, landBiome);
+  }
+
+  // Lake water keeps this distance from the border (legacy 1; chunks pass 2 so a lake and
+  // its shore ring never touch a chunk seam — no bisected half-lakes at seams).
+  const lakeMargin = options.lakeBorderMargin || 1;
 
   // 2. Generate lakes (issue #59: two giant look-alike lakes could dominate a 10x10 map).
   // Rules: total lake water is budgeted to ~12% of the map; at most ONE large lake, and a
@@ -66,11 +96,11 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   // personality from the seed (see placeLakeCluster), so two lakes never grow as copies.
   const lakeBudget = Math.max(4, Math.floor(width * height * 0.12));
   const wantsSecondLake = rng() < 0.5; // same 1-or-2 odds as the old numLakes roll
-  const firstLake = placeLakeCluster(mapData, width, height, rng, landBiome, lakeBudget);
+  const firstLake = placeLakeCluster(mapData, width, height, rng, landBiome, lakeBudget, lakeMargin);
   if (wantsSecondLake && firstLake.length > 0) {
     const smallCap = Math.min(lakeBudget - firstLake.length, Math.floor(firstLake.length / 2));
     if (smallCap >= 3) {
-      placeLakeCluster(mapData, width, height, rng, landBiome, smallCap);
+      placeLakeCluster(mapData, width, height, rng, landBiome, smallCap, lakeMargin);
     }
   }
 
@@ -105,7 +135,10 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   // the campaign requires — each custom name is a milestone/quest location that
   // must exist on the map, otherwise its quest building/item/POI is silently lost.
   const requiredTowns = normalizedNames.towns.length;
-  const targetTowns = Math.max(requiredTowns, 3 + Math.floor(rng() * 4));
+  // townDensityFactor (issue #60, experimental): outer chunks are sparser wilds (~0.65).
+  // Default 1 leaves the legacy 3-6 roll untouched (Math.round of an integer is identity).
+  const densityFactor = options.townDensityFactor || 1;
+  const targetTowns = Math.max(requiredTowns, Math.max(1, Math.round((3 + Math.floor(rng() * 4)) * densityFactor)));
   logger.debug(`[MAP_GENERATION] Placing ${targetTowns} towns (campaign requires ${requiredTowns})...`);
 
   let townSpacing = 3; // relaxed below if the map is too crowded to fit them all
@@ -711,7 +744,13 @@ export const testMapGeneration = () => {
 function placeCoast(mapData, width, height, rng) {
   const edge = Math.floor(rng() * 4); // 0: North, 1: East, 2: South, 3: West
   const depth = 2 + Math.floor(rng() * 2); // At least 2 tiles deep
+  stampCoast(mapData, width, height, edge, depth);
+}
 
+// Stamp a coast band on the given edge at the given depth (outer strip water, inner strip
+// beach). Extracted from placeCoast so chunk assembly (issue #60, experimental) can
+// prescribe a coastal chunk's edge/depth to continue the heart chunk's coastline.
+function stampCoast(mapData, width, height, edge, depth) {
   for (let i = 0; i < width; i++) {
     for (let d = 0; d < depth; d++) {
       let x, y;
@@ -729,6 +768,44 @@ function placeCoast(mapData, width, height, rng) {
         } else {
           mapData[y][x].biome = 'water';
           mapData[y][x].descriptionSeed = "The coastal sea";
+        }
+      }
+    }
+  }
+}
+
+// Bias the first 2 rows on each constrained side toward continuing the neighbour chunk's
+// edge biomes (issue #60, experimental). Simple exact-continuation with probability decaying
+// inward (0.85 at the seam row, 0.4 one row in) — deliberately not interpolation. Only land
+// biomes are stamped: water/beach need direction data the constraint doesn't carry, and
+// stamping bare water would create unringed lakes; the assembler handles coasts separately.
+function applyEdgeConstraints(mapData, width, height, rng, constraints, landBiome) {
+  const CONTINUE_P = [0.85, 0.4];
+  const LAND_BIOMES = new Set(['plains', 'desert', 'snow', 'woodland']);
+  const DESCRIPTIONS = {
+    plains: 'Open fields', desert: 'Open desert', snow: 'Frozen tundra', woodland: 'Deep woodland',
+  };
+  // For side S, coord(i, d) is the tile at position i along that edge, d rows inward.
+  const SIDES = {
+    north: { len: width, coord: (i, d) => [i, d] },
+    south: { len: width, coord: (i, d) => [i, height - 1 - d] },
+    west: { len: height, coord: (i, d) => [d, i] },
+    east: { len: height, coord: (i, d) => [width - 1 - d, i] },
+  };
+  for (const [side, { len, coord }] of Object.entries(SIDES)) {
+    const row = constraints[side];
+    if (!Array.isArray(row)) continue;
+    for (let i = 0; i < Math.min(row.length, len); i++) {
+      const target = row[i];
+      if (!LAND_BIOMES.has(target)) continue;
+      for (let d = 0; d < CONTINUE_P.length; d++) {
+        const [x, y] = coord(i, d);
+        const t = mapData[y] && mapData[y][x];
+        if (!t || t.poi || t.biome === target) continue;
+        if (t.biome === 'water' || t.biome === 'beach') continue; // never overwrite the coast
+        if (rng() < CONTINUE_P[d]) {
+          t.biome = target;
+          t.descriptionSeed = DESCRIPTIONS[target] || t.descriptionSeed;
         }
       }
     }
@@ -771,7 +848,10 @@ function isNearCoast(mapData, x, y, width, height) {
 // capTiles (issue #59) is this lake's share of the map's total lake-water budget: the growth
 // target never exceeds it. Returns the carved lake tiles ([] if no room was found) so the
 // caller can size a second, strictly smaller lake against the first one's actual footprint.
-function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains', capTiles = Infinity) {
+// borderMargin (issue #60, experimental) is how close lake WATER may get to the map border:
+// 1 = legacy (water at 1..w-2, shore ring may touch the border); chunk assembly passes 2 so
+// neither the water nor its shore ring ever sits on a chunk seam.
+function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains', capTiles = Infinity, borderMargin = 1) {
   // Keep lakes apart: no other water/beach (another lake or the coast) within this many
   // tiles of any lake tile, so two lakes never crowd together (which produced ugly merged
   // corners and a confused path squeezing through the gap). Tiles of THIS lake are excluded.
@@ -848,8 +928,9 @@ function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains', cap
     const d = pickDir();
     const nx = base.x + d.dx;
     const ny = base.y + d.dy;
-    // Keep at least one tile inside the border so there's room for a shore ring.
-    if (nx < 1 || nx >= width - 1 || ny < 1 || ny >= height - 1) continue;
+    // Keep at least borderMargin tiles inside the border so there's room for a shore ring
+    // (and, for chunk assembly, so lakes never touch a chunk seam).
+    if (nx < borderMargin || nx >= width - borderMargin || ny < borderMargin || ny >= height - borderMargin) continue;
     const t = mapData[ny][nx];
     // Don't grow toward another lake/coast either — preserve the separation gap.
     if (t.biome === landBiome && !t.poi && clearOfOtherWater(nx, ny)) {
@@ -865,8 +946,8 @@ function placeLakeCluster(mapData, width, height, rng, landBiome = 'plains', cap
   const waterAt = (x, y) => x >= 0 && x < width && y >= 0 && y < height && mapData[y][x].biome === 'water';
   for (let pass = 0; pass < 4; pass++) {
     let changed = false;
-    for (let cy = 1; cy < height - 1; cy++) {
-      for (let cx = 1; cx < width - 1; cx++) {
+    for (let cy = borderMargin; cy < height - borderMargin; cy++) {
+      for (let cx = borderMargin; cx < width - borderMargin; cx++) {
         const t = mapData[cy][cx];
         if (t.biome !== landBiome || t.poi) continue;
         const n = waterAt(cx, cy - 1), e = waterAt(cx + 1, cy), s = waterAt(cx, cy + 1), w = waterAt(cx - 1, cy);
