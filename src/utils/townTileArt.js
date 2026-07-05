@@ -607,9 +607,16 @@ const building = (buildingType, ground = C.grass, theme = 'grassland') => {
   // around ANY compound shape without touching the shape functions: same idea
   // as worldTileArt's dark peak/tree outlines against pale biomes. Temperate
   // gets no filter: its output stays byte-identical.
+  // feMorphology dilate makes a CRISP contour (a soft zero-offset drop shadow
+  // was invisible at tile scale, maintainer 2026-07-05): the silhouette's alpha
+  // is expanded ~0.8px, filled with the theme's outline colour, and merged
+  // under the original artwork.
   const outlined = mat && mat.outline
     ? `<defs><filter id='bo' x='-20%' y='-20%' width='140%' height='140%'>` +
-      `<feDropShadow dx='0' dy='0' stdDeviation='0.7' flood-color='${mat.outline}' flood-opacity='0.9'/>` +
+      `<feMorphology in='SourceAlpha' operator='dilate' radius='0.8' result='d'/>` +
+      `<feFlood flood-color='${mat.outline}' flood-opacity='0.95'/>` +
+      `<feComposite in2='d' operator='in' result='o'/>` +
+      `<feMerge><feMergeNode in='o'/><feMergeNode in='SourceGraphic'/></feMerge>` +
       `</filter></defs><g filter='url(#bo)'>${body}</g>`
     : body;
   return wrap(
