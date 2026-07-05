@@ -17,12 +17,13 @@
 
 import { generateMapData } from '../utils/mapGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
-import { analyzeTownWater, getTownRoadEdges } from '../utils/townWater';
+import { getTownWaterContext, getTownRoadEdges } from '../utils/townWater';
 import { selectSideQuests } from './questEngine';
 import { populateTown } from '../utils/npcGenerator';
 import { spawnWorldMapEntities, injectQuestBuildings } from './milestoneSpawner';
 import { getMilestoneLocationNames, getMilestoneNpcsForTown } from './milestoneEngine';
 import { isPremium, isThemePremium, isTemplatePremium } from './entitlements';
+import { resolveWaterTownAccess, waterTownWorldGenOptions, stampWaterTowns } from './waterTowns';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('campaign-launcher');
@@ -139,8 +140,16 @@ export const launchCampaign = (spec, options = {}) => {
     const customNames = spec.customNames || { towns: [], mountains: [] };
 
     const seedToUse = seed || Math.floor(Math.random() * 1000000);
+
+    // Water towns (#65 Phase 3): the entitlement is checked exactly ONCE, here at New
+    // Game. When the tier allows, the world-gen shims run (river to the sea + estuary
+    // town) and the chosen settlements' world tiles are stamped `waterTown` below; the
+    // save then carries the decision forever (lapsed subscribers keep their water
+    // towns). Free/guest tiers get empty options and no stamps: byte-identical worlds.
+    const waterAccess = resolveWaterTownAccess();
     const mapData = providedMap
-        || generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme);
+        || generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme, waterTownWorldGenOptions(waterAccess));
+    stampWaterTowns(mapData, seedToUse, waterAccess);
 
     // Spawn milestone entities onto the world map before resolving coords
     const spawnResult = spawnWorldMapEntities(mapData, milestones);
@@ -153,7 +162,10 @@ export const launchCampaign = (spec, options = {}) => {
             if (tile.poi === 'town' && tile.townName) {
                 const townSize = tile.townSize || tile.poiType || 'village';
                 const townSeed = parseInt(seedToUse) + (x * 1000) + (y * 10000);
-                const townMapData = generateTownMap(townSize, tile.townName, getTownRoadEdges(mapData, x, y), townSeed, tile.hasRiver, tile.riverDirection, worldTheme, analyzeTownWater(mapData, x, y));
+                // getTownWaterContext carries the tile's waterTown stamp through as
+                // water.archetype (canal/riverfork town layouts, #65); unstamped towns
+                // get exactly the old analyzeTownWater context.
+                const townMapData = generateTownMap(townSize, tile.townName, getTownRoadEdges(mapData, x, y), townSeed, tile.hasRiver, tile.riverDirection, worldTheme, getTownWaterContext(mapData, x, y));
 
                 // Inject quest buildings if needed
                 if (spawnResult.requiredBuildings?.[tile.townName]) {

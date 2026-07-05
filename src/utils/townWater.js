@@ -66,6 +66,26 @@ export function analyzeTownWater(worldMap, x, y) {
   return { kind, edges };
 }
 
+/**
+ * The full water context a town generator call site should pass to generateTownMap:
+ * the adjacency-derived water info PLUS the world tile's `waterTown` stamp (water
+ * towns #65, stamped once at New Game by the launch pipeline) as `water.archetype`.
+ * Old saves and free-tier worlds never carry the stamp, so this returns exactly
+ * analyzeTownWater's result for them, byte-identical town generation included.
+ *
+ * @param {Array<Array<Object>>} worldMap - 2D world grid (rows of tiles).
+ * @param {number} x - town tile column on the world map.
+ * @param {number} y - town tile row on the world map.
+ * @returns {{kind?:string, edges?:Object, archetype?:string}|null}
+ */
+export function getTownWaterContext(worldMap, x, y) {
+  const info = analyzeTownWater(worldMap, x, y);
+  const tile = (Array.isArray(worldMap) && worldMap[y] && worldMap[y][x]) ? worldMap[y][x] : null;
+  const archetype = tile && typeof tile.waterTown === 'string' ? tile.waterTown : null;
+  if (!archetype) return info;
+  return { ...(info || {}), archetype };
+}
+
 // Direction (town -> neighbour) and its opposite, as the lowercase strings the town
 // generator's entry logic uses.
 const ROAD_NEI = { north: [0, -1], east: [1, 0], south: [0, 1], west: [-1, 0] };

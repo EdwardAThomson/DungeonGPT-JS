@@ -1,4 +1,4 @@
-import { analyzeTownWater, getTownRoadEdges } from './townWater';
+import { analyzeTownWater, getTownWaterContext, getTownRoadEdges } from './townWater';
 import { generateTownMap } from './townMapGenerator';
 
 // Build a tiny world grid where the centre tile (1,1) is a town and we control its
@@ -54,6 +54,37 @@ describe('analyzeTownWater', () => {
   test('tolerates out-of-range / missing grid', () => {
     expect(analyzeTownWater(null, 0, 0)).toBeNull();
     expect(analyzeTownWater(world({}), 99, 99)).toBeNull();
+  });
+});
+
+// Water towns #65 Phase 3: town entry passes the world tile's `waterTown` stamp
+// through to generateTownMap as water.archetype, on top of the adjacency-derived info.
+describe('getTownWaterContext', () => {
+  test('unstamped tile returns exactly the analyzeTownWater result (landlocked = null)', () => {
+    expect(getTownWaterContext(world({}), 1, 1)).toBeNull();
+    const g = world({ S: { biome: 'water', isLake: false } });
+    expect(getTownWaterContext(g, 1, 1)).toEqual(analyzeTownWater(g, 1, 1));
+  });
+
+  test('canal stamp rides on the coastal water context', () => {
+    const g = world({ E: { biome: 'water', isLake: false } });
+    g[1][1].waterTown = 'canal';
+    expect(getTownWaterContext(g, 1, 1)).toEqual({
+      kind: 'coast',
+      edges: { N: false, E: true, S: false, W: false },
+      archetype: 'canal',
+    });
+  });
+
+  test('riverfork stamp survives even with no adjacent world water', () => {
+    const g = world({});
+    g[1][1].waterTown = 'riverfork';
+    expect(getTownWaterContext(g, 1, 1)).toEqual({ archetype: 'riverfork' });
+  });
+
+  test('tolerates missing tiles and malformed maps', () => {
+    expect(getTownWaterContext(null, 1, 1)).toBeNull();
+    expect(getTownWaterContext([], 5, 5)).toBeNull();
   });
 });
 

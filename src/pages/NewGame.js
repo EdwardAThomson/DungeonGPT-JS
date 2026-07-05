@@ -15,6 +15,7 @@ import { createLogger } from "../utils/logger";
 import { QUEST_ENEMIES, getEnemiesByTierAndTheme } from "../data/questEnemies";
 import { QUEST_BUILDINGS, NPC_ROLES, SEARCHABLE_ITEMS, POI_TYPES, THEME_DEFAULTS, THEME_NAMES } from "../data/questPickerData";
 import { isPremium, isThemePremium, isTemplatePremium } from "../game/entitlements";
+import { resolveWaterTownAccess, waterTownWorldGenOptions } from "../game/waterTowns";
 
 const logger = createLogger('new-game');
 
@@ -30,6 +31,16 @@ const NewGame = () => {
   // Premium entitlement (placeholder — false for free tier by default; honours the
   // localStorage dev override in entitlements.js so premium content can be tested).
   const premiumUnlocked = isPremium();
+
+  // Water towns (#65): what this tier's new worlds will include. Also drives the
+  // manual map preview's world-gen options so preview and launch build the same
+  // world. Free tier gets no note and no options (absent, not locked: decision 13).
+  const waterTownAccess = resolveWaterTownAccess();
+  const waterTownNote = waterTownAccess.allowCanal
+    ? 'Your realm will include a canal city where its great river meets the sea, and some river settlements will grow into island-district river towns.'
+    : waterTownAccess.allowRiverfork
+      ? 'Your realm\'s great river runs to the sea, and some river settlements will grow into island-district river towns.'
+      : null;
 
   // Clear any stale session ID when starting a new game
   useEffect(() => {
@@ -654,6 +665,11 @@ const NewGame = () => {
       <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
         Pick a starter adventure to begin. Click a card for details.
       </p>
+      {waterTownNote && (
+        <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+          🌊 {waterTownNote}
+        </p>
+      )}
 
       <div style={gridStyle}>
         {freeStarterTemplates.map((t, i) => renderTemplateCard(t, i === 0))}
@@ -1355,6 +1371,11 @@ const NewGame = () => {
       <div className="form-section map-generation-section">
         <h2>World Map</h2>
         <p>Generate a random world map for your adventure. Each map is unique with forests, mountains, and towns.</p>
+        {waterTownNote && (
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+            🌊 {waterTownNote}
+          </p>
+        )}
 
         <div className="map-generation-controls">
           <div className="seed-input-group" style={{ marginBottom: '15px' }}>
@@ -1386,7 +1407,9 @@ const NewGame = () => {
                   }
                   const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
                   if (!worldSeed) setWorldSeed(seedToUse);
-                  const newMap = generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme);
+                  // Same water-town shims the launch pipeline uses, so the previewed
+                  // world is the world the campaign starts on ({} for free tier).
+                  const newMap = generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme, waterTownWorldGenOptions(waterTownAccess));
                   setGeneratedMap(newMap);
                   setShowMapPreview(true);
                 }}

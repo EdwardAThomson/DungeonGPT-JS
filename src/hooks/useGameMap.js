@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { generateMapData, getTile, findStartingTown, enrichWorldMap } from '../utils/mapGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
-import { analyzeTownWater, getTownRoadEdges } from '../utils/townWater';
+// getTownWaterContext = analyzeTownWater PLUS the world tile's `waterTown` stamp
+// (water towns #65, stamped once at New Game) passed through as water.archetype.
+// Cached towns are untouched: only first-visit generation reads the stamp.
+import { getTownWaterContext, getTownRoadEdges } from '../utils/townWater';
 import { generateSiteMap } from '../utils/siteMapGenerator';
 import { populateSite, injectSiteObjective } from '../game/sitePopulator';
 import { populateTown } from '../utils/npcGenerator';
@@ -235,7 +238,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                     currentTownTile.hasRiver,
                     currentTownTile.riverDirection,
                     mapTheme,
-                    analyzeTownWater(worldMap, currentTownTile.x, currentTownTile.y)
+                    getTownWaterContext(worldMap, currentTownTile.x, currentTownTile.y)
                 );
 
                 // Inject quest buildings if needed
@@ -271,7 +274,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 logger.info('Generating new town map', townName);
                 const rawSeed = worldSeed ? (parseInt(worldSeed) + ((townTile.x || 0) * 1000) + ((townTile.y || 0) * 10000)) : (loadedConversation?.sessionId || Math.floor(Math.random() * 1000000));
                 const seed = Number.isFinite(rawSeed) ? rawSeed : Math.floor(Math.random() * 1000000);
-                townMapData = generateTownMap(townSize, townName, getTownRoadEdges(worldMap, townTile.x, townTile.y), seed, townTile.hasRiver, townTile.riverDirection, mapTheme, analyzeTownWater(worldMap, townTile.x, townTile.y));
+                townMapData = generateTownMap(townSize, townName, getTownRoadEdges(worldMap, townTile.x, townTile.y), seed, townTile.hasRiver, townTile.riverDirection, mapTheme, getTownWaterContext(worldMap, townTile.x, townTile.y));
 
                 // Inject quest buildings if needed
                 if (requiredBuildings?.[townName]) {
@@ -460,7 +463,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             }
 
             logger.debug('Using town seed', seed);
-            townMapData = generateTownMap(townSize, townName, getTownRoadEdges(worldMap, tileX, tileY), seed, currentTile.hasRiver, currentTile.riverDirection, mapTheme, analyzeTownWater(worldMap, tileX, tileY));
+            townMapData = generateTownMap(townSize, townName, getTownRoadEdges(worldMap, tileX, tileY), seed, currentTile.hasRiver, currentTile.riverDirection, mapTheme, getTownWaterContext(worldMap, tileX, tileY));
 
             // Inject quest buildings if needed
             if (requiredBuildings?.[townName]) {

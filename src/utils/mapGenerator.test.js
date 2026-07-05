@@ -449,6 +449,90 @@ describe('generateMapData', () => {
   });
 });
 
+describe('Water-town world-gen shims (#65 Phase 3): riverToSea + estuaryTown', () => {
+  const tiles = (map) => map.flat();
+  const seaWithRiver = (map) => tiles(map).some(
+    (t) => t.biome === 'water' && t.hasRiver && t.descriptionSeed !== 'A clear lake'
+  );
+  // Coastal context as the town generator will see it (estuary = this + hasRiver).
+  const coastFn = (map, t) => {
+    const w = require('./townWater').analyzeTownWater(map, t.x, t.y);
+    return w && w.kind === 'coast';
+  };
+
+  const N = 60;
+  const seeds = Array.from({ length: N }, (_, i) => i * 101 + 7);
+
+  it('shims OFF (absent or false) are byte-identical to the legacy map', () => {
+    const legacy = generateMapData(10, 10, 4242);
+    expect(generateMapData(10, 10, 4242, {}, 'grassland', {})).toEqual(legacy);
+    expect(generateMapData(10, 10, 4242, {}, 'grassland', { riverToSea: false, estuaryTown: false })).toEqual(legacy);
+  });
+
+  it('riverToSea makes the river reach the coast on essentially every seed', () => {
+    let baseline = 0;
+    let withShim = 0;
+    for (const s of seeds) {
+      if (seaWithRiver(generateMapData(10, 10, s))) baseline++;
+      if (seaWithRiver(generateMapData(10, 10, s, {}, 'grassland', { riverToSea: true }))) withShim++;
+    }
+    // Legacy routing goes to the NEAREST water (often a lake): the shim must beat it
+    // decisively and land near-universal (findPath always succeeds; the only miss is
+    // a degenerate map). Measured: baseline 34/60, shim 60/60.
+    expect(withShim).toBeGreaterThanOrEqual(Math.floor(N * 0.95));
+    expect(withShim).toBeGreaterThan(baseline);
+  });
+
+  it('estuaryTown yields a coastal city, usually a true river-mouth estuary', () => {
+    let estuaryCity = 0;
+    let coastalCity = 0;
+    for (const s of seeds) {
+      const map = generateMapData(10, 10, s, {}, 'grassland', { riverToSea: true, estuaryTown: true });
+      const cities = tiles(map).filter((t) => t.poi === 'town' && t.townSize === 'city');
+      if (cities.some((t) => t.hasRiver && coastFn(map, t))) estuaryCity++;
+      if (cities.some((t) => coastFn(map, t))) coastalCity++;
+    }
+    // Measured over 150 seeds: coastal city 100%, true estuary city 88.7% (the mouth
+    // tile is occasionally occupied, so the city settles beside the band: the canal
+    // stamp's lagoon fallback covers those). Assert with slack for seed drift.
+    expect(coastalCity).toBeGreaterThanOrEqual(Math.floor(N * 0.95));
+    expect(estuaryCity).toBeGreaterThanOrEqual(Math.floor(N * 0.8));
+  });
+
+  it('the estuary city is never the starting town, and the map stays playable', () => {
+    for (const s of seeds) {
+      const map = generateMapData(10, 10, s, {}, 'grassland', { riverToSea: true, estuaryTown: true });
+      const towns = tiles(map).filter((t) => t.poi === 'town');
+      const starting = towns.filter((t) => t.isStartingTown);
+      expect(starting).toHaveLength(1);
+      // The canal-eligible settlement (coastal city) must be free for the stamp:
+      // whenever coastal cities exist, at least one is NOT the starting town (the
+      // pinned estuary town is excluded from starting-town selection by the shim).
+      const coastalCities = tiles(map).filter(
+        (t) => t.poi === 'town' && t.townSize === 'city' && coastFn(map, t)
+      );
+      if (coastalCities.length > 0) {
+        expect(coastalCities.some((t) => !t.isStartingTown)).toBe(true);
+      }
+      // budget unchanged: the estuary town spends a normal slot (3-6 towns)
+      expect(towns.length).toBeGreaterThanOrEqual(3);
+      expect(towns.length).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it('estuaryTown still honors custom quest-town names and declared sizes', () => {
+    for (const s of [1, 77, 9001]) {
+      const map = generateMapData(10, 10, s, {
+        towns: [{ name: 'Ashford', size: 'village' }, 'Mudhollow', 'Grimstead'],
+        mountains: [],
+      }, 'grassland', { riverToSea: true, estuaryTown: true });
+      const find = (name) => map.flat().find((t) => t.townName === name);
+      expect(find('Ashford')?.townSize).toBe('village');
+      ['Mudhollow', 'Grimstead'].forEach((n) => expect(find(n)).toBeTruthy());
+    }
+  });
+});
+
 describe('generateMapData — size-tagged custom town names', () => {
   const townsOf = (map) => map.flat().filter((t) => t.townName);
   const find = (map, name) => map.flat().find((t) => t.townName === name);

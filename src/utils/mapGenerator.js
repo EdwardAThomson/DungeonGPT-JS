@@ -41,6 +41,15 @@ const logger = createLogger('map-generator');
  *            grants outer chunks lakes only on a seeded roll so a 3x3 world is not nine
  *            lakes; 1 allows the primary lake but never the small companion).
  *     townDensityFactor: scales the random settlement target (default 1; outer chunks ~0.65).
+ *     riverToSea: water-towns shim (#65 Phase 3, WATER_TOWNS_PLAN.md section 2; superseded by
+ *            #66 hydrology when that lands): the FIRST river targets the nearest NON-lake
+ *            water tile, so a river mouth on the coast is reliable instead of lucky.
+ *            Default undefined = legacy nearest-water routing, byte-identical.
+ *     estuaryTown: water-towns shim (#65 Phase 3): after rivers are marked, place the FIRST
+ *            town on a dry tile at/adjacent to the river's sea mouth (spending one slot of
+ *            the normal town budget, not adding to it), pin that settlement to city size,
+ *            and never select it as the starting town. Pairs with riverToSea. Default
+ *            undefined = legacy random placement, byte-identical.
  * @returns {Array} 2D array of map tiles
  */
 export const generateMapData = (width = 10, height = 10, seed = null, customNames = {}, theme = 'grassland', options = {}) => {
@@ -138,9 +147,10 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
     }
   }
 
-  // 5. Generate Rivers (from mountains to lakes/coast)
+  // 5. Generate Rivers (from mountains to lakes/coast). riverToSea (#65, experimental)
+  // steers the first river to the coast instead of a nearer lake; default is legacy.
   if (mountainTiles.length > 0) {
-    generateRivers(mapData, mountainTiles, rng);
+    generateRivers(mapData, mountainTiles, rng, options.riverToSea === true);
   }
 
   // 5b. Rolling hills — foothills near mountains plus the odd standalone cluster (Phase 2a)
@@ -158,6 +168,19 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   const densityFactor = options.townDensityFactor || 1;
   const targetTowns = Math.max(requiredTowns, Math.max(1, Math.round((3 + Math.floor(rng() * 4)) * densityFactor)));
   logger.debug(`[MAP_GENERATION] Placing ${targetTowns} towns (campaign requires ${requiredTowns})...`);
+
+  // 6a. Estuary town (water towns #65 Phase 3, options.estuaryTown): guarantee a
+  // settlement at the river's sea mouth BEFORE the random loop, spending one slot of
+  // the normal budget. No-op when the option is off (legacy) or no river reached the
+  // sea (pair with riverToSea to make the mouth reliable).
+  let estuaryTown = null;
+  if (options.estuaryTown === true) {
+    estuaryTown = placeEstuaryTown(mapData, width, height);
+    if (estuaryTown) {
+      townsList.push(estuaryTown);
+      logger.debug(`[MAP_GENERATION] Placed estuary town at (${estuaryTown.x}, ${estuaryTown.y})`);
+    }
+  }
 
   let townSpacing = 3; // relaxed below if the map is too crowded to fit them all
   let safety = 0;
@@ -186,12 +209,19 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
 
   // Selected starting town first so the name assigner knows which one it is
   if (townsList.length > 0) {
-    const startingTownIndex = Math.floor(rng() * townsList.length);
+    // Water towns (#65 Phase 3): the estuary town (always townsList[0]) is pinned to
+    // city size and may later be stamped as the canal city, whose exotic layout must
+    // never be the campaign's heart. With the shim active the starting town is drawn
+    // from the OTHER settlements; legacy worlds keep the identical rng draw.
+    const startingTownIndex = (estuaryTown && townsList.length > 1)
+      ? 1 + Math.floor(rng() * (townsList.length - 1))
+      : Math.floor(rng() * townsList.length);
     const startingTown = townsList[startingTownIndex];
     mapData[startingTown.y][startingTown.x].isStartingTown = true;
 
-    // Assign sizes and names to all towns
-    assignTownSizesAndNames(mapData, townsList, rng, normalizedNames.towns);
+    // Assign sizes and names to all towns; the estuary town (when present) is pinned
+    // to city size so the canal-city stamp (city-only) has a home by construction.
+    assignTownSizesAndNames(mapData, townsList, rng, normalizedNames.towns, estuaryTown ? 'city' : null);
 
     const startingTile = mapData[startingTown.y][startingTown.x];
     logger.debug(`[MAP_GENERATION] Selected starting town: ${startingTile.townName} (${startingTile.townSize}) at (${startingTown.x}, ${startingTown.y})`);
@@ -354,6 +384,60 @@ function placeTown(mapData, width, height, rng, existingTowns = [], minDistance 
   return null; // Return null if placement failed
 }
 
+// Place the estuary town (water towns #65 Phase 3, options.estuaryTown): the settlement
+// guaranteed at the river's sea mouth. Deterministic (no rng draws): finds the river's
+// outfall (coastal non-lake water carrying the river band; riverToSea makes it reliable)
+// and settles the best dry tile beside it, preferring the tile the river actually flows
+// through (a beach mouth with hasRiver, so the town qualifies as a true estuary: coast
+// water context + river band). Returns the position or null when no river reached the sea
+// or every neighbouring tile is taken.
+function placeEstuaryTown(mapData, width, height) {
+  // Every sea tile the river band touches (the mouth is usually the outer band tile
+  // the river enters plus its deeper goal tile, so consider them ALL).
+  const outfalls = [];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const t = mapData[y][x];
+      if (t.biome === 'water' && t.hasRiver && t.descriptionSeed !== 'A clear lake') {
+        outfalls.push({ x, y });
+      }
+    }
+  }
+  if (outfalls.length === 0) return null;
+
+  const ORTH = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  const candidates = [];
+  const push = (x, y) => {
+    if (!candidates.some((c) => c.x === x && c.y === y)) candidates.push({ x, y });
+  };
+  // Best first: dry river-band neighbours of any outfall (the classic beach mouth),
+  // then any orthogonal neighbour, then the full 8-neighbourhood as a last resort.
+  for (const o of outfalls) {
+    for (const [dx, dy] of ORTH) {
+      const t = mapData[o.y + dy] && mapData[o.y + dy][o.x + dx];
+      if (t && t.hasRiver && t.biome !== 'water') push(t.x, t.y);
+    }
+  }
+  for (const o of outfalls) {
+    for (const [dx, dy] of ORTH) push(o.x + dx, o.y + dy);
+  }
+  for (const o of outfalls) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) push(o.x + dx, o.y + dy);
+    }
+  }
+
+  for (const c of candidates) {
+    if (isValidPlacement(mapData, c.x, c.y, width, height)) {
+      mapData[c.y][c.x].poi = 'town';
+      mapData[c.y][c.x].descriptionSeed = 'A river-mouth settlement';
+      return { x: c.x, y: c.y };
+    }
+  }
+  logger.warn('[MAP_GENERATION] estuaryTown: river mouth found but no dry tile beside it was free');
+  return null;
+}
+
 // Place rolling hills: foothills hugging mountains, plus an occasional standalone cluster.
 function placeHills(mapData, width, height, rng) {
   const dirs = [{ dx: 1, dy: 0 }, { dx: -1, dy: 0 }, { dx: 0, dy: 1 }, { dx: 0, dy: -1 }];
@@ -461,8 +545,10 @@ function placeCave(mapData, width, height, rng) {
   }
 }
 
-// Assign sizes and names to all towns on the map
-function assignTownSizesAndNames(mapData, townsList, rng, customNames = []) {
+// Assign sizes and names to all towns on the map. pinFirstSize (water towns #65,
+// additive, default null = legacy) forces townsList[0] to that size BEFORE names are
+// assigned, swapping sizes with another settlement so the overall mix is preserved.
+function assignTownSizesAndNames(mapData, townsList, rng, customNames = [], pinFirstSize = null) {
   logger.debug(`[ASSIGN_TOWNS] Assigning sizes and names to ${townsList.length} towns (Custom names: ${customNames.length})...`);
 
   const sizeOrder = { 'city': 0, 'town': 1, 'village': 2, 'hamlet': 3 };
@@ -480,6 +566,19 @@ function assignTownSizesAndNames(mapData, townsList, rng, customNames = []) {
     const tile = mapData[town.y][town.x];
     tile.townSize = shuffledSizes[index % shuffledSizes.length];
   });
+
+  // 1b. Size pin (#65): the estuary town must be a city. Swap sizes with whichever
+  // settlement drew 'city' (keeping the world's size mix); if no city was dealt (a
+  // 3-town map may miss one), promote the pinned town outright. Runs before naming,
+  // so size-tagged custom names still land on tiles of the declared size.
+  if (pinFirstSize && townsList.length > 0) {
+    const firstTile = mapData[townsList[0].y][townsList[0].x];
+    if (firstTile.townSize !== pinFirstSize) {
+      const donor = townsList.slice(1).find((t) => mapData[t.y][t.x].townSize === pinFirstSize);
+      if (donor) mapData[donor.y][donor.x].townSize = firstTile.townSize;
+      firstTile.townSize = pinFirstSize;
+    }
+  }
 
   const sizeDescriptions = {
     hamlet: 'A small hamlet',
@@ -1086,14 +1185,19 @@ export function addLakeShores(mapData, lakeTiles, width, height, landBiome) {
   }
 }
 
-// Generate rivers flowing from mountains to water
-function generateRivers(mapData, mountainTiles, rng) {
+// Generate rivers flowing from mountains to water. riverToSea (water towns #65,
+// additive, default false = legacy) steers the FIRST river to the nearest NON-lake
+// water tile, so the coast gets a reliable river mouth instead of a lucky one.
+function generateRivers(mapData, mountainTiles, rng, riverToSea = false) {
   // Find all water tiles
   const waterTiles = [];
+  const seaTiles = [];
   for (let y = 0; y < mapData.length; y++) {
     for (let x = 0; x < mapData[y].length; x++) {
-      if (mapData[y][x].biome === 'water') {
+      const t = mapData[y][x];
+      if (t.biome === 'water') {
         waterTiles.push({ x, y });
+        if (t.descriptionSeed !== 'A clear lake') seaTiles.push({ x, y });
       }
     }
   }
@@ -1108,10 +1212,12 @@ function generateRivers(mapData, mountainTiles, rng) {
   for (let i = 0; i < numRivers; i++) {
     const source = shuffledMountains[i];
 
-    // Find nearest water tile
-    let target = waterTiles[0];
+    // Find nearest water tile. With riverToSea, the first river only considers the
+    // sea (coast water), guaranteeing an estuary; further rivers keep legacy targets.
+    const targetPool = (riverToSea && i === 0 && seaTiles.length > 0) ? seaTiles : waterTiles;
+    let target = targetPool[0];
     let minDist = Infinity;
-    waterTiles.forEach(w => {
+    targetPool.forEach(w => {
       const dist = Math.abs(w.x - source.x) + Math.abs(w.y - source.y);
       if (dist < minDist) {
         minDist = dist;
