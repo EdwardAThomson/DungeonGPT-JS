@@ -38,12 +38,24 @@ describe('describeItemSources (derived from live game data)', () => {
   it('dragonscale_plate points at the wilds (Dragon\'s Lair encounter drop)', () => {
     expect(describeItemSources('dragonscale_plate')).toBe('Found in the wilds');
   });
+
+  // Water towns Phase 6 (#65): the boatwright's gather target must have a live,
+  // honestly-described source (forest LOOT pool + tappable tree harvest nodes).
+  it('pine_resin points at forest sites, where it actually drops', () => {
+    expect(describeItemSources('pine_resin')).toBe('In forest sites');
+  });
 });
 
 describe('describeTurnInTarget', () => {
   it('labels single buildings and arrays', () => {
     expect(describeTurnInTarget('townhall')).toBe('the town hall');
     expect(describeTurnInTarget(['inn', 'tavern'])).toBe('an inn or a tavern');
+  });
+  it('names the water-town venues (#65 Phase 6)', () => {
+    expect(describeTurnInTarget('harbormaster')).toBe('the harbormaster');
+    expect(describeTurnInTarget('boathouse')).toBe('the boathouse');
+    expect(describeTurnInTarget(['harbormaster', 'townhall'])).toBe('the harbormaster or the town hall');
+    expect(describeTurnInTarget(['harbormaster', 'boathouse'])).toBe('the harbormaster or the boathouse');
   });
   it('tolerates unknown buildings and missing input', () => {
     expect(describeTurnInTarget('watchtower')).toBe('the watchtower');
@@ -78,6 +90,11 @@ describe('getStepHint', () => {
   it('gather steps derive their sources', () => {
     const hint = getStepHint({ trigger: { item: 'healing_herbs', count: 3 }, completed: false });
     expect(hint.toLowerCase()).toContain('apothecary');
+  });
+
+  it('the resin gather step points at its authored forest source (#65 Phase 6)', () => {
+    const step = { trigger: { item: 'pine_resin', count: 3 }, sites: ['forest'], completed: false };
+    expect(getStepHint(step)).toBe('Harvest in a forest');
   });
 
   it('turn-in steps show the target, and readiness once prerequisites complete', () => {

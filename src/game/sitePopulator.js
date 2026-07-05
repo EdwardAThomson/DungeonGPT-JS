@@ -42,7 +42,7 @@ const combatPool = (type) => {
 export const LOOT = {
   cave: ['cave_mushrooms', 'raw_gems', 'glowing_fungi', 'exposed_minerals', 'healing_potion', 'spider_silk'],
   ruins: ['ancient_scroll', 'salvaged_goods', 'history_tome', 'ritual_dagger', 'pearl', 'enchanted_trinket'],
-  forest: ['healing_herbs', 'rare_flower', 'rare_herb', 'beast_hide', 'wolf_pelt', 'fairy_dust'],
+  forest: ['healing_herbs', 'rare_flower', 'rare_herb', 'beast_hide', 'wolf_pelt', 'fairy_dust', 'pine_resin'],
   hills: ['mountain_herbs', 'exposed_minerals', 'wolf_fang', 'beast_hide', 'rare_ore', 'healing_herbs'],
   mountain: ['mountain_crystal', 'exposed_minerals', 'rare_ore', 'storm_crystal', 'bear_pelt'],
 };
@@ -75,7 +75,11 @@ export const HOARD_BONUS = {
 // appear in the LOOT tables, so questHints' derived source text stays accurate. Counts for
 // cave mushrooms/fungi/gems/ore are >= 3 so a single cave can complete a gather-3 quest.
 // Ruins get searchable urns + relic caches under the overgrowth so they are no longer
-// pickup-free; forest/hills keep decorative-only flora for now (no gather quest needs them).
+// pickup-free. Forests grow tappable resin trees (water towns Phase 6: the boatwright's
+// gather-3 pine_resin quest completes in a single forest, same guarantee as the cave
+// counts); scattered lone trees not converted are demoted like any harvestable kind,
+// while the forest's tree THICKETS are structural (wall tiles) and untouched. Hills
+// keep decorative-only flora for now (no gather quest needs them).
 export const HARVEST_NODES = {
   cave: [
     { fromPoi: 'crystal', display: 'crystal', pool: ['raw_gems'], count: [3, 4] },
@@ -90,6 +94,9 @@ export const HARVEST_NODES = {
   ruins: [
     { fromPoi: 'urn', display: 'urn', pool: ['pearl', 'salvaged_goods', 'salvaged_goods', 'ancient_scroll'], count: [2, 3] },
     { fromPoi: 'overgrowth', display: 'overgrowth', pool: ['history_tome', 'enchanted_trinket', 'salvaged_goods'], count: [2, 3] },
+  ],
+  forest: [
+    { fromPoi: 'tree', display: 'tree', pool: ['pine_resin'], count: [3, 4] },
   ],
 };
 
@@ -107,10 +114,12 @@ function placeHarvestNodes(site, rng) {
   // Row-major sweep keeps candidate order (and thus placement) deterministic per seed.
   const byPoi = {};
   const plainFloors = [];
+  const plainGrounds = []; // open-air padding reserve (forest 'ground'), drawn only after floors
   site.mapData.forEach((row) => Array.isArray(row) && row.forEach((tile) => {
     if (!tile || !tile.walkable || tile.type === 'entrance' || tile.contentSlot || tile.content) return;
     if (tile.poi) (byPoi[tile.poi] = byPoi[tile.poi] || []).push(tile);
     else if (tile.type === 'floor') plainFloors.push(tile);
+    else if (tile.type === 'ground') plainGrounds.push(tile);
   }));
 
   const takeFrom = (pool) => pool.splice(Math.floor(rng() * pool.length), 1)[0];
@@ -120,9 +129,13 @@ function placeHarvestNodes(site, rng) {
     const target = spec.count[0] + Math.floor(rng() * (spec.count[1] - spec.count[0] + 1));
     const nodes = [];
     // Prefer tiles where the generator already put the matching decoration (organic
-    // placement); pad from plain floor if the scatter pass happened to produce too few.
+    // placement); pad from plain floor if the scatter pass happened to produce too few,
+    // then from open ground (forest sites are open-air: scattered lone trees can run
+    // short and their padding reserve IS the ground). Floors-first keeps cave/mountain/
+    // ruins placement identical to before the ground reserve existed.
     while (nodes.length < target && candidates.length > 0) nodes.push(takeFrom(candidates));
     while (nodes.length < target && plainFloors.length > 0) nodes.push(takeFrom(plainFloors));
+    while (nodes.length < target && plainGrounds.length > 0) nodes.push(takeFrom(plainGrounds));
 
     nodes.forEach((tile) => {
       tile.poi = null; // the content overlay renders the node (and dims it once harvested)

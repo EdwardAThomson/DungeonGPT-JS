@@ -330,6 +330,177 @@ describe('questEngine — backfillSideQuests (#45 pool top-up)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// #65 Phase 6 water-town quests: venue-gated flavor (smuggling / ferry / tolls).
+// ---------------------------------------------------------------------------
+describe('questEngine — water-town quests (#65 Phase 6)', () => {
+  const { isQuestEligible, getRevealedSiteTypes } = require('./questEngine');
+  const WATER_QUEST_IDS = ['dockside_contraband', 'ferry_grievance', 'harbor_fees',
+    'quayside_cargo', 'boatwright_resin', 'harbor_pests'];
+  const quest = (id) => SIDE_QUESTS.find((q) => q.id === id);
+  // A generous LANDLOCKED world: every ordinary venue + every site, but no water buildings.
+  const LANDLOCKED = {
+    sites: { cave: true, ruins: true, forest: true, hills: true, mountain: true },
+    buildings: ['inn', 'tavern', 'shop', 'market', 'mill', 'townhall', 'temple', 'shrine',
+      'library', 'archives', 'magetower', 'alchemist', 'apothecary', 'blacksmith', 'barn',
+      'stables', 'guild', 'bank', 'warehouse', 'tailor', 'fletcher', 'foundry', 'keep', 'jail'],
+  };
+  const withVenues = (...venues) => ({ ...LANDLOCKED, buildings: [...LANDLOCKED.buildings, ...venues] });
+
+  describe('availability gating: no water venue on the map = never offered', () => {
+    test('a landlocked world (all sites, all ordinary buildings) offers none of the six', () => {
+      WATER_QUEST_IDS.forEach((id) => expect(isQuestEligible(quest(id), LANDLOCKED)).toBe(false));
+      for (let s = 1; s <= 20; s++) {
+        selectSideQuests(LANDLOCKED, 48, seededRng(s)).forEach((q) =>
+          expect(WATER_QUEST_IDS).not.toContain(q.id));
+      }
+    });
+
+    test('harbormaster alone unlocks the harbormaster quests but not the boathouse ones', () => {
+      const avail = withVenues('harbormaster');
+      expect(isQuestEligible(quest('dockside_contraband'), avail)).toBe(true);
+      expect(isQuestEligible(quest('harbor_fees'), avail)).toBe(true);
+      expect(isQuestEligible(quest('harbor_pests'), avail)).toBe(true); // either venue gives + takes
+      expect(isQuestEligible(quest('ferry_grievance'), avail)).toBe(false);
+      expect(isQuestEligible(quest('quayside_cargo'), avail)).toBe(false);
+      expect(isQuestEligible(quest('boatwright_resin'), avail)).toBe(false);
+    });
+
+    test('boathouse alone unlocks the boatwright quests but not the harbour-office ones', () => {
+      const avail = withVenues('boathouse');
+      expect(isQuestEligible(quest('ferry_grievance'), avail)).toBe(true);
+      expect(isQuestEligible(quest('quayside_cargo'), avail)).toBe(true);
+      expect(isQuestEligible(quest('boatwright_resin'), avail)).toBe(true);
+      expect(isQuestEligible(quest('harbor_pests'), avail)).toBe(true);
+      expect(isQuestEligible(quest('dockside_contraband'), avail)).toBe(false);
+      expect(isQuestEligible(quest('harbor_fees'), avail)).toBe(false);
+    });
+
+    test('site prerequisites still apply on top of the venue gate', () => {
+      // contraband cache needs a cave; strongbox needs ruins; resin needs a forest
+      const noSites = { sites: {}, buildings: withVenues('harbormaster', 'boathouse').buildings };
+      expect(isQuestEligible(quest('dockside_contraband'), noSites)).toBe(false);
+      expect(isQuestEligible(quest('quayside_cargo'), noSites)).toBe(false);
+      expect(isQuestEligible(quest('boatwright_resin'), noSites)).toBe(false);
+      // the couriers and the pier bounty need no site at all
+      expect(isQuestEligible(quest('ferry_grievance'), noSites)).toBe(true);
+      expect(isQuestEligible(quest('harbor_fees'), noSites)).toBe(true);
+      expect(isQuestEligible(quest('harbor_pests'), noSites)).toBe(true);
+    });
+
+    test('deriveSideQuestAvailability picks the water venues out of a cached town map', () => {
+      const world = [[{ poi: 'town', townName: 'Lagoona' }, { poi: 'cave_entrance' }]];
+      const cache = {
+        Lagoona: { mapData: [[{ type: 'building', buildingType: 'boathouse' },
+          { type: 'building', buildingType: 'harbormaster' }, { type: 'grass' }]] },
+      };
+      const { buildings } = deriveSideQuestAvailability(world, cache);
+      expect(buildings).toEqual(expect.arrayContaining(['boathouse', 'harbormaster']));
+    });
+  });
+
+  describe('trigger paths (verdict table per quest)', () => {
+    test('dockside_contraband: cave site combat -> report at the harbour or the town hall', () => {
+      let sq = accept('dockside_contraband');
+      // the smuggler captain is a cave site objective for the active quest
+      expect(getActiveSiteObjectives(sq).cave.map((o) => o.id)).toContain('smuggler_captain');
+      // an unrelated kill does nothing; the captain completes the objective step
+      expect(checkSideQuestEvent(sq, { type: 'enemy_defeated', enemyId: 'wolf' }).completions).toHaveLength(0);
+      const res = checkSideQuestEvent(sq, { type: 'enemy_defeated', enemyId: 'smuggler_captain' });
+      expect(res.completions).toHaveLength(1);
+      expect(res.completions[0].rewards.items).toEqual(['stolen_goods']);
+      sq = res.updatedSideQuests;
+      // turn-in accepted at EITHER venue, not at the tavern
+      expect(getReadyTurnIns(sq, { buildingType: 'tavern' })).toHaveLength(0);
+      expect(getReadyTurnIns(sq, { buildingType: 'townhall' }).map((q) => q.id)).toEqual(['dockside_contraband']);
+      const done = turnInQuest(sq, { buildingType: 'harbormaster' });
+      expect(done.completions.find((c) => c.questCompleted)?.questRewards).toEqual({ xp: 100, gold: 180, items: [] });
+      expect(find(done.updatedSideQuests, 'dockside_contraband').status).toBe('completed');
+    });
+
+    test('ferry_grievance: single-step courier from the boathouse to the town hall', () => {
+      const sq = accept('ferry_grievance');
+      expect(getReadyTurnIns(sq, { buildingType: 'boathouse' })).toHaveLength(0); // not back to the giver
+      expect(getReadyTurnIns(sq, { buildingType: 'townhall' }).map((q) => q.id)).toEqual(['ferry_grievance']);
+      const { updatedSideQuests, completions } = turnInQuest(sq, { buildingType: 'townhall' });
+      expect(completions.find((c) => c.questCompleted)?.questRewards).toEqual({ xp: 50, gold: 100, items: [] });
+      expect(find(updatedSideQuests, 'ferry_grievance').status).toBe('completed');
+    });
+
+    test('harbor_fees: the fee ledger is accepted at the town hall OR the market', () => {
+      const atMarket = turnInQuest(accept('harbor_fees'), { buildingType: 'market' });
+      expect(find(atMarket.updatedSideQuests, 'harbor_fees').status).toBe('completed');
+      const atHall = turnInQuest(accept('harbor_fees'), { buildingType: 'townhall' });
+      expect(find(atHall.updatedSideQuests, 'harbor_fees').status).toBe('completed');
+      // but not back at the harbour office
+      expect(turnInQuest(accept('harbor_fees'), { buildingType: 'harbormaster' }).completions).toHaveLength(0);
+    });
+
+    test('quayside_cargo: ruins site item -> back to the boathouse', () => {
+      let sq = accept('quayside_cargo');
+      expect(getActiveSiteObjectives(sq).ruins.map((o) => o.id)).toContain('ferry_strongbox');
+      sq = checkSideQuestEvent(sq, { type: 'item_acquired', itemId: 'ferry_strongbox' }).updatedSideQuests;
+      expect(getReadyTurnIns(sq, { buildingType: 'harbormaster' })).toHaveLength(0);
+      const done = turnInQuest(sq, { buildingType: 'boathouse' });
+      expect(done.completions.find((c) => c.questCompleted)?.questRewards).toEqual({ xp: 80, gold: 140, items: [] });
+    });
+
+    test('boatwright_resin: gather 3 pine resin (forest-hinted) -> boathouse turn-in', () => {
+      let sq = accept('boatwright_resin');
+      // the active gather quest reveals its forest source (sticky reveal machinery)
+      expect(getRevealedSiteTypes(sq).forest).toBe(true);
+      const ev = { type: 'item_acquired', itemId: 'pine_resin' };
+      sq = checkSideQuestEvent(sq, ev).updatedSideQuests;
+      sq = checkSideQuestEvent(sq, ev).updatedSideQuests;
+      expect(find(sq, 'boatwright_resin').milestones[0].completed).toBe(false); // 2/3
+      sq = checkSideQuestEvent(sq, ev).updatedSideQuests;
+      expect(find(sq, 'boatwright_resin').milestones[0].completed).toBe(true);
+      const done = turnInQuest(sq, { buildingType: 'boathouse' });
+      expect(find(done.updatedSideQuests, 'boatwright_resin').status).toBe('completed');
+    });
+
+    test('harbor_pests: any-kill bounty x3, hand in at either water venue', () => {
+      let sq = accept('harbor_pests');
+      for (let i = 0; i < 3; i++) sq = checkSideQuestEvent(sq, { type: 'enemy_defeated', enemyId: `pest_${i}` }).updatedSideQuests;
+      expect(find(sq, 'harbor_pests').milestones[0].completed).toBe(true);
+      expect(getReadyTurnIns(sq, { buildingType: 'boathouse' }).map((q) => q.id)).toEqual(['harbor_pests']);
+      const done = turnInQuest(sq, { buildingType: 'harbormaster' });
+      expect(find(done.updatedSideQuests, 'harbor_pests').status).toBe('completed');
+    });
+  });
+
+  describe('integration: generated water towns actually carry the venues', () => {
+    const { generateTownMap } = require('../utils/townMapGenerator');
+    const buildingTypes = (town) => new Set(town.mapData.flat()
+      .filter((t) => t.type === 'building' && t.buildingType)
+      .map((t) => t.buildingType));
+
+    test('a canal city supplies every venue the six quests need (givers + turn-ins)', () => {
+      const canal = generateTownMap('city', 'Lagoona', 'south', 7, false, 'NORTH_SOUTH', 'grassland',
+        { kind: 'coast', edges: { N: false, E: true, S: false, W: false }, archetype: 'canal' });
+      const types = buildingTypes(canal);
+      ['boathouse', 'harbormaster', 'townhall', 'market'].forEach((b) => expect(types.has(b)).toBe(true));
+      // and with the usual sites present, ALL six quests are eligible on such a world
+      const world = [[{ poi: 'town', townName: 'Lagoona' }, { poi: 'cave_entrance' }, { poi: 'ruins' }, { poi: 'forest' }]];
+      const availability = deriveSideQuestAvailability(world, { Lagoona: canal });
+      WATER_QUEST_IDS.forEach((id) => expect(isQuestEligible(quest(id), availability)).toBe(true));
+    });
+
+    test('a riverfork town has no water venues, so a fork-only world is never offered them', () => {
+      const fork = generateTownMap('town', 'Forkford', 'south', 5, true, 'NORTH_SOUTH', 'grassland',
+        { archetype: 'riverfork' });
+      const types = buildingTypes(fork);
+      expect(types.has('boathouse')).toBe(false);
+      expect(types.has('harbormaster')).toBe(false);
+      // but it still supplies the ordinary turn-in venues the couriers point at
+      expect(types.has('townhall')).toBe(true);
+      const world = [[{ poi: 'town', townName: 'Forkford' }, { poi: 'cave_entrance' }, { poi: 'ruins' }, { poi: 'forest' }]];
+      const availability = deriveSideQuestAvailability(world, { Forkford: fork });
+      WATER_QUEST_IDS.forEach((id) => expect(isQuestEligible(quest(id), availability)).toBe(false));
+    });
+  });
+});
+
 describe('questEngine — deriveSideQuestAvailability (#45 load-time availability)', () => {
   const world = [[
     { poi: 'town', townName: 'Aldwyn' },

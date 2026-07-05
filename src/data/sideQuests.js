@@ -122,6 +122,24 @@ export const SIDE_QUESTS = [
   Q('lost_cargo', 'Lost Cargo', 2, 'Storm-lost cargo washed into a sea cave.', 'harbormaster', 'A storm drove cargo into the cave. Recover the crate for the harbour.',
     siteItem('lo1', 'Recover the lost cargo from the cave', 'cave', 'lost_cargo', 'the Lost Cargo', { xp: 80, gold: 0, items: [] }), 'harbormaster', 'Return the cargo to the harbour', { xp: 80, gold: 150, items: [] }),
 
+  // --- water towns (#65 Phase 6): harbormaster / boathouse flavor ---
+  // Venue-gated by the normal eligibility rules: isQuestEligible requires the giver
+  // and every turn-in building to exist on the map, and harbormaster/boathouse only
+  // generate in settlements on water (boathouse: canal cities only), so landlocked
+  // worlds never see these quests. No new mechanics; all composed from the factories.
+  Q('dockside_contraband', 'The Contraband Cache', 3, 'Smugglers land untaxed cargo by night and cache it in a sea cave.', 'harbormaster', 'Someone is running contraband past my ledgers and caching it in the cave. Bust the ring and bring me proof.',
+    siteCombat('dct1', 'Defeat the smuggler captain at the cave cache', 'cave', 'smuggler_captain', 'the Smuggler Captain', { xp: 150, gold: 0, items: ['stolen_goods'] }), ['harbormaster', 'townhall'], 'Report the bust', { xp: 100, gold: 180, items: [] }),
+  Courier('ferry_grievance', "The Ferryman's Grievance", 1, 'The boatwright wants a ferry dispute put before the magistrate.', 'boathouse', 'A rival ferryman poles my crossing and pockets my fares. Take my grievance to the town hall before there is blood on the water.',
+    'townhall', 'Deliver the ferry grievance to the town hall', { xp: 50, gold: 100, items: [] }),
+  Courier('harbor_fees', 'A Question of Harbour Fees', 2, 'The harbour and the town cannot agree on mooring tolls.', 'harbormaster', 'The magistrate doubled the mooring toll and the merchants are ready to riot. Carry my fee ledger into town so cooler heads can argue over numbers instead of knives.',
+    ['townhall', 'market'], 'Deliver the harbour fee ledger', { xp: 60, gold: 120, items: [] }),
+  Q('quayside_cargo', 'Washed Downriver', 2, 'A strongbox slipped off the quay and washed downriver.', 'boathouse', 'A strongbox went off the quay in the last flood and fetched up somewhere in the old ruins downriver. Bring it back unopened.',
+    siteItem('qsc1', 'Recover the ferry strongbox from the ruins', 'ruins', 'ferry_strongbox', 'the Ferry Strongbox', { xp: 80, gold: 0, items: [] }), 'boathouse', 'Return the strongbox to the boathouse', { xp: 80, gold: 140, items: [] }),
+  Q('boatwright_resin', 'Pitch for the Hulls', 1, 'The boatwright needs pine resin to caulk a leaking hull.', 'boathouse', 'Every hull on this bank weeps at the seams. Tap me three lumps of pine resin from the forest and I will see you paid.',
+    gather('bwr1', 'Collect 3 lumps of pine resin', 'pine_resin', 3, { xp: 40, gold: 0, items: [] }, ['forest']), 'boathouse', 'Bring the resin to the boatwright', { xp: 40, gold: 90, items: [] }),
+  Q('harbor_pests', 'Pests off the Pier', 2, 'Something keeps gnawing through mooring lines by night.', ['harbormaster', 'boathouse'], 'Vermin off the water chew through my mooring lines faster than I can splice them. Cull a few and the harbour will owe you.',
+    bounty('hbp1', 'Cull 3 of the vermin plaguing the moorings', 3, { xp: 50, gold: 0, items: [] }), ['harbormaster', 'boathouse'], undefined, { xp: 50, gold: 100, items: [] }),
+
   // =========================================================================
   // Mid/top-band expansion (#45/#50): quests reserved for levelled parties.
   // XP curve: minLevel 3-4 ~250-340 total, minLevel 5 ~440-450, minLevel 6-7
@@ -178,6 +196,7 @@ export const QUEST_ITEM_ICON_FROM = {
   cure_root: 'healing_herbs',
   stolen_blade: 'silver_dagger',
   lost_cargo: 'salvaged_goods',
+  ferry_strongbox: 'drowned_treasure',
   sunken_bell: 'artifact_trinket',
   kings_regalia: 'legendary_artifact',
   tribute_chest: 'ancient_gold',

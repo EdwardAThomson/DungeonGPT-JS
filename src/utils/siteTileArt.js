@@ -209,7 +209,7 @@ export const SITE_DECORATIONS = {
     { key: 'urn', emoji: '⚱️', label: 'Urn (searchable)' },
   ],
   forest: [
-    { key: 'tree', emoji: '🌲', label: 'Tree' },
+    { key: 'tree', emoji: '🌲', label: 'Tree (tappable)' },
     { key: 'bush', emoji: '🌳', label: 'Bush' },
     { key: 'flowers', emoji: '🌼', label: 'Flowers' },
     { key: 'mushroom', emoji: '🍄', label: 'Mushrooms' },

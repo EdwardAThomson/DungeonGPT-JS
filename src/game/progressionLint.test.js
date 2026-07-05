@@ -66,9 +66,11 @@ const KNOWN_GAPS = {
   bandsWithoutCampaigns: [6, 7],
 
   // (a) §13.3: party size trivializes minLevel — 4 heroes at Lv 1 have effective
-  // level 3 and are offered 31 of the 42 side quests on day one (#45 tripled the Lv3+ band). Intentional today;
-  // pinned so a gating change is noticed.
-  questsOfferedToLevel1PartyOf4: 31,
+  // level 3 and are offered 37 of the 48 side quests on day one (#45 tripled the
+  // Lv3+ band; #65 Phase 6 added 6 water-town quests, 5 of them Lv <= 2 flavor).
+  // Intentional today; pinned so a gating change is noticed. In practice the
+  // water six only surface on maps that generate a harbormaster/boathouse.
+  questsOfferedToLevel1PartyOf4: 37,
 
   // (b) #44/#49: gear with no live source at any REACHABLE tier (max playable tier
   // is 2 today; legendary rarity unlocks at t3, which has no playable template).

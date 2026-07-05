@@ -15,7 +15,9 @@ const BUILDING_LABEL = {
   inn: 'an inn', tavern: 'a tavern', townhall: 'the town hall', temple: 'the temple',
   shop: 'the general store', market: 'the market', blacksmith: 'the blacksmith',
   alchemist: 'the alchemist', apothecary: 'the apothecary', archives: 'the archives',
-  library: 'the library', guild: 'the guild', bank: 'the bank', barracks: 'the barracks'
+  library: 'the library', guild: 'the guild', bank: 'the bank', barracks: 'the barracks',
+  // Water-town venues (#65 Phase 6): the harbour office and the canal-city boathouse.
+  harbormaster: 'the harbormaster', boathouse: 'the boathouse'
 };
 
 const labelForBuilding = (b) => BUILDING_LABEL[b] || `the ${String(b).replace(/_/g, ' ')}`;

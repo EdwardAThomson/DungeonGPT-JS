@@ -16,7 +16,7 @@ const SITE_TYPES = ['cave', 'ruins']; // the only quest-gatable world sites (New
 
 describe('side-quest pool size and minLevel distribution (#45/#50)', () => {
   test('pool size', () => {
-    expect(SIDE_QUESTS.length).toBe(42);
+    expect(SIDE_QUESTS.length).toBe(48);
   });
 
   test('quest ids are unique', () => {
@@ -28,7 +28,8 @@ describe('side-quest pool size and minLevel distribution (#45/#50)', () => {
     const dist = {};
     SIDE_QUESTS.forEach((q) => { dist[q.minLevel || 1] = (dist[q.minLevel || 1] || 0) + 1; });
     // Exact pin: expanding or retiring quests should update this consciously.
-    expect(dist).toEqual({ 1: 10, 2: 12, 3: 9, 4: 4, 5: 4, 6: 2, 7: 1 });
+    // 2026-07-05: +6 water-town quests (#65 Phase 6): 1: +2, 2: +3, 3: +1.
+    expect(dist).toEqual({ 1: 12, 2: 15, 3: 10, 4: 4, 5: 4, 6: 2, 7: 1 });
     // The #50 headline: a healthy share of the pool is reserved for Lv 3+.
     const midTop = SIDE_QUESTS.filter((q) => (q.minLevel || 1) >= 3).length;
     expect(midTop).toBeGreaterThanOrEqual(18);
@@ -131,6 +132,60 @@ describe('completability rules (docs/SIDE_QUEST_POOL.md)', () => {
   test('icon borrows all point at real catalog entries', () => {
     Object.values(QUEST_ITEM_ICON_FROM).forEach((key) => {
       expect(ITEM_CATALOG[key]).toBeDefined();
+    });
+  });
+});
+
+describe('water-town quests (#65 Phase 6): venue gating data + icon/hint coverage', () => {
+  const WATER_QUEST_IDS = ['dockside_contraband', 'ferry_grievance', 'harbor_fees',
+    'quayside_cargo', 'boatwright_resin', 'harbor_pests'];
+  const WATER_VENUES = ['harbormaster', 'boathouse'];
+  const quest = (id) => SIDE_QUESTS.find((q) => q.id === id);
+
+  test('all six ship in the pool', () => {
+    WATER_QUEST_IDS.forEach((id) => expect(quest(id)).toBeDefined());
+  });
+
+  test('every water quest is GIVER-gated on a water venue (harbormaster/boathouse)', () => {
+    // The eligibility gate: isQuestEligible requires the giver building to exist, and
+    // these venues only generate in settlements on water, so a landlocked world can
+    // never be offered these quests. Every giver option must be a water venue.
+    WATER_QUEST_IDS.forEach((id) => {
+      const g = quest(id).giver.building;
+      const givers = Array.isArray(g) ? g : [g];
+      givers.forEach((b) => expect(WATER_VENUES).toContain(b));
+    });
+  });
+
+  test('the ferry strongbox find-item borrows a real icon', () => {
+    expect(QUEST_ITEM_ICON_FROM.ferry_strongbox).toBe('drowned_treasure');
+    expect(ITEM_CATALOG.drowned_treasure).toBeDefined();
+  });
+
+  test('pine_resin is a real, sourced gatherable (hint system stays honest)', () => {
+    expect(ITEM_CATALOG.pine_resin).toBeDefined();
+    expect(ITEM_CATALOG.pine_resin.stackable).toBe(true);
+    expect(describeItemSources('pine_resin')).toBe('In forest sites');
+    expect(quest('boatwright_resin').milestones[0].sites).toEqual(['forest']);
+  });
+
+  test('smuggling-bust contraband reward is a catalog item', () => {
+    expect(quest('dockside_contraband').milestones[0].rewards.items).toEqual(['stolen_goods']);
+    expect(ITEM_CATALOG.stolen_goods).toBeDefined();
+  });
+
+  test('rewards sit in the flavor bands, not progression spikes', () => {
+    // Low band (minLevel <= 2) pays 30-200 total XP; the single minLevel-3 quest
+    // stays at the bottom of its band (250 vs the 150-450 t2 range).
+    WATER_QUEST_IDS.forEach((id) => {
+      const q = quest(id);
+      const total = questTotalXp(q);
+      if ((q.minLevel || 1) <= 2) {
+        expect(total).toBeGreaterThanOrEqual(30);
+        expect(total).toBeLessThanOrEqual(200);
+      } else {
+        expect(total).toBeLessThanOrEqual(260);
+      }
     });
   });
 });

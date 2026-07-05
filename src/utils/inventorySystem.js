@@ -172,6 +172,10 @@ export const ITEM_CATALOG = {
   'poison_vial': { name: 'Poison Vial', rarity: 'uncommon', value: 45, icon: 'assets/icons/items/poison_vial.webp' },
   'glowing_fungi': { name: 'Glowing Cave Fungi', rarity: 'common', value: 10, stackable: true, icon: 'assets/icons/items/glowing_fungi.webp' },
   'rare_herb': { name: 'Rare Herb', rarity: 'uncommon', value: 40, icon: 'assets/icons/items/rare_herb.webp' },
+  // Water towns Phase 6 (#65): boatwright gather target, tapped from forest trees
+  // (sitePopulator HARVEST_NODES.forest + LOOT.forest). Icon borrows rare_ingredient
+  // (an amber lump) so no new art is needed.
+  'pine_resin': { name: 'Pine Resin', rarity: 'common', value: 15, stackable: true, icon: 'assets/icons/items/rare_ingredient.webp' },
   'mountain_herbs': { name: 'Mountain Herbs', rarity: 'common', value: 15, icon: 'assets/icons/items/mountain_herbs.webp' },
   'herbal_remedy': { name: 'Herbal Remedy', rarity: 'common', value: 15, effect: 'heal', amount: '1d4', icon: 'assets/icons/items/herbal_remedy.webp' },
   'elven_rations': { name: 'Elven Waybread', rarity: 'uncommon', value: 20, stackable: true, effect: 'heal', amount: '2d4', icon: 'assets/icons/items/elven_rations.webp' },

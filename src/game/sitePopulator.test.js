@@ -325,13 +325,28 @@ describe('populateSite', () => {
       });
     });
 
-    test('forest and hills stay node-free (decorative flora only, for now)', () => {
-      ['forest', 'hills'].forEach((type) => {
-        for (let seed = 1; seed <= 10; seed++) {
-          const nodes = make(type, seed).mapData.flat().filter((t) => t.content && t.content.display);
-          expect(nodes).toHaveLength(0);
-        }
-      });
+    test('hills stay node-free (decorative flora only, for now)', () => {
+      for (let seed = 1; seed <= 10; seed++) {
+        const nodes = make('hills', seed).mapData.flat().filter((t) => t.content && t.content.display);
+        expect(nodes).toHaveLength(0);
+      }
+    });
+
+    test('forests grow tappable resin trees: gather-3 pine_resin completes in one forest (#65 Phase 6)', () => {
+      for (let seed = 1; seed <= 25; seed++) {
+        const site = make('forest', seed);
+        const trees = nodesOf(site, 'tree');
+        expect(trees.length).toBeGreaterThanOrEqual(3); // boatwright_resin needs 3
+        trees.forEach((tile) => {
+          expect(tile.content.kind).toBe('loot');
+          expect(tile.content.loot.gold).toBe(0);
+          expect(tile.content.loot.items).toEqual(['pine_resin']);
+          expect(tile.poi).toBeNull();
+          expect(tile.walkable).toBe(true);
+        });
+        // no unpickable lone-tree teasers remain (thicket walls are structure, not poi)
+        expect(site.mapData.flat().filter((t) => t.poi === 'tree')).toHaveLength(0);
+      }
     });
 
     test('node placement is deterministic per seed', () => {
