@@ -295,6 +295,9 @@ paid artifact; the algorithm is engine.
 **Enforcement: server-side access, not code secrecy.** The Worker checks the
 entitlement before serving premium content or persisting premium-stamped saves
 (#39/#40, post-cutover). Client-side gates are UX, not security.
+*(2026-07-05: the delivery channel now exists (`GET /api/db/premium-templates` +
+`registerPremiumTemplates`, backlog #40), so the authored canal campaign can ship
+server-side, no bundle exposure.)*
 
 ## 7. Quests & NPCs
 

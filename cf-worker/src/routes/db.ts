@@ -423,4 +423,61 @@ dbRoutes.get('/entitlements', async (c) => {
   }
 });
 
+// ============================================
+// PREMIUM CONTENT ENDPOINTS
+// ============================================
+
+// Tier ladder, lowest first (mirror of src/game/entitlements.js TIER_LADDER; the
+// account_tiers CHECK constraint pins the same four values). Unknown/missing tiers
+// rank as 'free' (0): fail closed.
+const TIER_LADDER = ['free', 'member', 'premium', 'elite'];
+const tierRank = (tier: unknown) => Math.max(TIER_LADDER.indexOf(tier as string), 0);
+
+// Server-delivered premium story templates (backlog #40). The `template` JSONB in
+// premium_templates IS a storyTemplates entry, served verbatim; the client registers
+// the list into its picker array (src/data/storyTemplates.js registerPremiumTemplates,
+// fetched via src/services/premiumContentApi.js). Serving only to entitled callers is
+// the actual enforcement: premium content never ships in the public bundle, and the
+// client-side gates stay UX. Read-only on purpose: rows are loaded/disabled manually
+// via psql (see migrations/004_premium_templates.sql for the runbook and recipes).
+//
+// Entitlement: caller tier from account_tiers (no row = 'free'), a row is delivered
+// when tierRank(caller) >= tierRank(min_tier). Free/no-row accounts get
+// { templates: [] } with 200, never an error: an empty delivery is the normal state.
+dbRoutes.get('/premium-templates', async (c) => {
+  const sql = getSql(c.env);
+  try {
+    const userId = c.get('userId');
+
+    const [tierRow] = await sql`
+      SELECT tier FROM account_tiers
+      WHERE user_id = ${userId}
+      LIMIT 1`;
+    const callerRank = tierRank(tierRow?.tier);
+
+    // Ladder comparison in code (few rows, simplest correct): fetch enabled rows,
+    // keep those the caller's rank covers.
+    const rows = await sql`
+      SELECT id, min_tier, template FROM premium_templates
+      WHERE enabled = true
+      ORDER BY id`;
+
+    const templates = rows
+      .filter((row) => tierRank(row.min_tier) <= callerRank)
+      .map((row) => row.template);
+
+    return c.json({ templates });
+  } catch (error: any) {
+    console.error('Error fetching premium templates:', {
+      message: error?.message,
+      code: error?.code,
+      detail: error?.detail,
+      stack: error?.stack,
+    });
+    return c.json({ error: 'Failed to fetch premium templates' }, 500);
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
+  }
+});
+
 export default dbRoutes;

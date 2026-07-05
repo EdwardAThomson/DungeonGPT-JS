@@ -2,6 +2,10 @@
 // is merged into the bundle at BUILD time for local playtesting. Deploying with it
 // populated would publish premium content — the exact thing the private-content
 // architecture exists to prevent (docs/LICENSING_OPTIONS.md, backlog #40).
+// Since #40 landed, SERVER DELIVERY is the production path for premium content
+// (Worker GET /api/db/premium-templates + registerPremiumTemplates at runtime);
+// the local slot is strictly a dev/playtest convenience, so there is never a
+// legitimate reason for it to ride into a deploy.
 // This runs as `predeploy`; override knowingly with ALLOW_PREMIUM_SLOT=1.
 import fs from 'fs';
 import path from 'path';
