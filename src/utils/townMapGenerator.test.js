@@ -669,9 +669,10 @@ describe('canal city archetype (canal, water towns Phase 2)', () => {
         const strandedCanal = flat.filter((t) => t.type === 'water' && t.waterway && !wseen.has(`${t.x},${t.y}`)).length;
         expect({ ctx, strandedCanal }).toEqual({ ctx, strandedCanal: 0 });
 
-        // 3-5 windy canal spokes, and the carve stayed inside its tile budget's realm
+        // 5-7 windy canal spokes (tuned up 2026-07-06: the 3-5 cut read as too few
+        // canals), and the carve stayed inside its tile budget's realm
         const spokes = (town.pathStats?.spokes || []).filter((sp) => sp.kind === 'canal');
-        expect({ ctx, spokesOk: spokes.length >= 3 && spokes.length <= 5, n: spokes.length })
+        expect({ ctx, spokesOk: spokes.length >= 4 && spokes.length <= 7, n: spokes.length })
           .toEqual({ ctx, spokesOk: true, n: spokes.length });
         expect(town.canal.spokes).toBe(spokes.length);
         expect(town.canal.canalTileCount).toBeGreaterThan(4); // basin + at least a channel

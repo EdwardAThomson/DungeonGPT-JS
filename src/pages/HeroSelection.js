@@ -105,7 +105,10 @@ const HeroSelection = () => {
 
   return (
     <div className="page-container hero-selection-page">
-      <OnboardingSteps currentStep={2} completedSteps={heroes.length > 0 ? [1] : []} />
+      {/* This page is reached AFTER choosing the adventure (Back goes to /new-game),
+          so step 2 is done and the player is on the final step: marking step 2 as
+          active here read as "you still need to choose a quest" (playtest 2026-07-06). */}
+      <OnboardingSteps currentStep={3} completedSteps={heroes.length > 0 ? [1, 2] : [2]} />
       <div className="page-header">
         <div className="page-header-titles">
           <h2>Select Your Party</h2>

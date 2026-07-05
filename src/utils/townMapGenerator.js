@@ -966,7 +966,10 @@ function placeCanalsInTown(mapData, width, height, rng, waterInfo) {
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) if (mapData[y][x].type === 'water') seaTiles++;
   }
-  const budget = Math.max(18, Math.min(Math.floor(area * 0.25), area - reserve) - seaTiles);
+  // Maintainer tuning 2026-07-06: the first cut read as "too few canals", so the
+  // water allowance grew (floor 18 -> 26, cap 25% -> 32% of the core) and the
+  // spoke target below rose to 5-7. Venice should feel veined, not moated.
+  const budget = Math.max(26, Math.min(Math.floor(area * 0.32), area - reserve) - seaTiles);
 
   // Seaward side: the flagged coast edge (seeded pick when the sea wraps a corner).
   const wetEdges = ['N', 'E', 'S', 'W'].filter((e) => waterInfo.edges[e]);
@@ -1073,7 +1076,7 @@ function placeCanalsInTown(mapData, width, height, rng, waterInfo) {
   // INTERIOR SPOKES: windy channels from the basin to seeded waypoints threading the
   // landward quarters. Aim for 3-5 spokes total (sea link included); the first two
   // interior spokes ignore the budget so the archetype floor always holds.
-  const spokeTarget = 3 + Math.floor(rng() * 3); // 3-5 spokes, seeded
+  const spokeTarget = 5 + Math.floor(rng() * 3); // 5-7 spokes, seeded (tuned up from 3-5)
   const landward = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]]
     .filter(([dx, dy]) => dx * dir[0] + dy * dir[1] <= 0); // never straight back into the sea
   for (let i = landward.length - 1; i > 0; i--) {
@@ -1104,7 +1107,7 @@ function placeCanalsInTown(mapData, width, height, rng, waterInfo) {
     if (!route || route.length < 2) continue;
     // budget gate (spokes beyond the guaranteed floor of 3 are dropped whole)
     const newTiles = route.filter((p) => mapData[p.y][p.x].type !== 'water').length;
-    if (spokeCount >= 3 && canalTileCount - basinTiles.length + newTiles > budget) continue;
+    if (spokeCount >= 4 && canalTileCount - basinTiles.length + newTiles > budget) continue;
     carveRoute(route);
   }
 
