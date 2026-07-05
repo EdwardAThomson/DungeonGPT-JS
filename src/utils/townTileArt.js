@@ -48,6 +48,7 @@ const ROOFS = {
   apothecary: '#5a8c5a',   // herbal green
   fletcher: '#6f7a3a',     // bowyer olive
   harbormaster: '#3f6f9c', // nautical blue
+  boathouse: '#4a7d8f',    // weathered slipway blue-grey (canal city, water towns #65)
   jail: '#4a4a4a',         // iron grey
   magetower: '#6a4fae',    // arcane violet
   mill: '#b08a4a',         // wheat tan
@@ -360,6 +361,18 @@ const SHAPES = {
     `<rect x='21' y='3' width='1.4' height='5' fill='#555'/><polygon points='22.4,3 27,4.5 22.4,6' fill='#c0504d'/>` +
     door(r, 11, 3) +
     `<circle cx='12' cy='20' r='2.2' fill='none' stroke='#cfd8dc' stroke-width='1'/><line x1='12' y1='17.3' x2='12' y2='22.4' stroke='#cfd8dc' stroke-width='1'/>`,
+  // boathouse: a broad waterside shed — a wide slipway bay with plank doors and an
+  // upturned hull drying beside it (nautical sibling of the harbormaster's office)
+  boathouse: (r) =>
+    `<rect x='5' y='12' width='22' height='14' rx='1' fill='${r}'/>` +
+    `<rect x='5' y='12' width='22' height='2.2' fill='#ffffff' opacity='0.12'/>` +
+    `<rect x='5' y='17' width='22' height='1.4' fill='${shade(r, 0.7)}'/>` +
+    `<rect x='7.5' y='18.5' width='9' height='7.5' rx='0.8' fill='${shade(r, 0.45)}'/>` +
+    `<line x1='12' y1='18.5' x2='12' y2='26' stroke='${shade(r, 0.7)}' stroke-width='0.8'/>` +
+    `<path d='M18.5 23.5 q4 -3.2 8 0 l0 1.6 q-4 -3.2 -8 0 z' fill='#8a5a32'/>` +
+    `<line x1='18.5' y1='24.6' x2='26.5' y2='24.6' stroke='#5d3a1c' stroke-width='0.7'/>` +
+    `<circle cx='22' cy='14.6' r='1.7' fill='none' stroke='#e8e2d2' stroke-width='1'/>` +
+    `<circle cx='22' cy='14.6' r='1.7' fill='none' stroke='#c0504d' stroke-width='1' stroke-dasharray='1.3 1.3'/>`,
   // jail: a stout stone block with two barred windows
   jail: (r) =>
     `<rect x='6' y='11' width='20' height='15' rx='1' fill='${r}'/>` +
@@ -580,6 +593,7 @@ const BUILDING_SHAPE = {
   apothecary: 'apothecary',
   fletcher: 'fletcher',
   harbormaster: 'harbormaster',
+  boathouse: 'boathouse',
   jail: 'jail',
   magetower: 'magetower',
   mill: 'mill',

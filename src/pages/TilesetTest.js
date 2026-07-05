@@ -120,23 +120,57 @@ const analyzeFork = (town) => {
   return { islandSize: town.riverFork.islandTiles.length, islandGrass, bridges, waterway, venues, islandKeys };
 };
 
+// Canal-city report (water towns Phase 2): basin size, canal tiles, bridge count,
+// spokes, and the per-district free grass floors — the invariants the archetype's
+// seed-survey tests assert.
+const analyzeCanal = (town) => {
+  if (!town.canal) return null;
+  const { mapData } = town;
+  const flat = mapData.flat();
+  const canalWater = flat.filter((t) => t.type === 'water' && t.waterway).length;
+  const bridges = flat.filter((t) => t.type === 'bridge').length;
+  const freeGrass = flat.filter((t) => t.type === 'grass' && !t.poi).length;
+  const districtGrass = town.canal.districts.map((d) =>
+    d.filter((p) => mapData[p.y][p.x].type === 'grass' && !mapData[p.y][p.x].poi).length);
+  const boathouse = flat.find((t) => t.type === 'building' && t.buildingType === 'boathouse');
+  const districtKeys = new Set(town.canal.districts.flat().map((p) => `${p.x},${p.y}`));
+  const basinKeys = new Set(town.canal.basin.map((p) => `${p.x},${p.y}`));
+  return {
+    basinSize: town.canal.basin.length,
+    canalTiles: town.canal.canalTileCount,
+    canalWater,
+    spokes: town.canal.spokes,
+    bridges,
+    freeGrass,
+    districtGrass,
+    hasBoathouse: !!boathouse,
+    districtKeys,
+    basinKeys,
+  };
+};
+
 const TilesetTest = () => {
   const [zoom, setZoom] = useState(1);
   const [size, setSize] = useState('town');
   const [seed, setSeed] = useState(12345);
   const [theme, setTheme] = useState('grassland');
   const [showPaths, setShowPaths] = useState(false);
-  const [archetype, setArchetype] = useState('standard'); // 'standard' | 'riverfork'
+  const [archetype, setArchetype] = useState('standard'); // 'standard' | 'riverfork' | 'canal'
   const [riverDir, setRiverDir] = useState('NORTH_SOUTH');
+  const [seaEdge, setSeaEdge] = useState('E'); // canal city: which edge the sea floods
 
   const town = useMemo(
     () => (archetype === 'riverfork'
       ? generateTownMap(size, `Demo ${size}`, 'south', seed, true, riverDir, theme, { archetype: 'riverfork' })
-      : generateTownMap(size, `Demo ${size}`, 'south', seed, false, 'NORTH_SOUTH', theme)),
-    [size, seed, theme, archetype, riverDir]
+      : archetype === 'canal'
+        ? generateTownMap(size, `Demo ${size}`, 'south', seed, false, 'NORTH_SOUTH', theme,
+            { kind: 'coast', edges: { N: seaEdge === 'N', E: seaEdge === 'E', S: seaEdge === 'S', W: seaEdge === 'W' }, archetype: 'canal' })
+        : generateTownMap(size, `Demo ${size}`, 'south', seed, false, 'NORTH_SOUTH', theme)),
+    [size, seed, theme, archetype, riverDir, seaEdge]
   );
   const paths = useMemo(() => analyzePaths(town), [town]);
   const fork = useMemo(() => analyzeFork(town), [town]);
+  const canal = useMemo(() => analyzeCanal(town), [town]);
   const grid = town.mapData;
   const W = town.width;
   const H = town.height;
@@ -184,8 +218,10 @@ const TilesetTest = () => {
           <h3 style={{ ...heading, margin: 0 }}>Generated town</h3>
           <div style={{ display: 'flex', gap: 6 }}>
             {SIZES.map((s) => {
-              // the river-city archetype only exists on town + city grids
-              const disabled = archetype === 'riverfork' && (s === 'hamlet' || s === 'village');
+              // the river-city archetype only exists on town + city grids;
+              // the canal city is city-only
+              const disabled = (archetype === 'riverfork' && (s === 'hamlet' || s === 'village'))
+                || (archetype === 'canal' && s !== 'city');
               return (
                 <button key={s} onClick={() => setSize(s)} disabled={disabled}
                   className={s === size ? 'primary-button' : 'secondary-button'}
@@ -201,11 +237,12 @@ const TilesetTest = () => {
             ))}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
-            {[['standard', 'standard'], ['riverfork', 'river city']].map(([val, label]) => (
+            {[['standard', 'standard'], ['riverfork', 'river city'], ['canal', 'canal city']].map(([val, label]) => (
               <button key={val}
                 onClick={() => {
                   setArchetype(val);
                   if (val === 'riverfork' && (size === 'hamlet' || size === 'village')) setSize('town');
+                  if (val === 'canal') setSize('city'); // city-only archetype
                 }}
                 className={val === archetype ? 'primary-button' : 'secondary-button'}
                 style={{ padding: '4px 10px', fontSize: 12 }}>{label}</button>
@@ -214,6 +251,12 @@ const TilesetTest = () => {
               <button className="secondary-button" style={{ padding: '4px 10px', fontSize: 12 }}
                 onClick={() => setRiverDir((d) => (d === 'NORTH_SOUTH' ? 'EAST_WEST' : 'NORTH_SOUTH'))}>
                 river {riverDir === 'NORTH_SOUTH' ? 'N-S' : 'E-W'}
+              </button>
+            )}
+            {archetype === 'canal' && (
+              <button className="secondary-button" style={{ padding: '4px 10px', fontSize: 12 }}
+                onClick={() => setSeaEdge((e) => ({ E: 'S', S: 'N', N: 'W', W: 'E' }[e]))}>
+                sea {seaEdge}
               </button>
             )}
           </div>
@@ -250,6 +293,19 @@ const TilesetTest = () => {
             island venues: {fork.venues.length ? fork.venues.join(', ') : 'none'}
           </div>
         )}
+        {/* Canal-city invariants (water towns Phase 2): 2x2 basin drains to the sea,
+            3-5 spokes, >= 10 free grass (quest floor), >= 4 free grass per fenced-off
+            district, boathouse moored on a bank. */}
+        {canal && (
+          <div style={{ fontSize: 12, marginBottom: 8, color: 'var(--text-secondary)' }}>
+            <strong style={{ color: canal.freeGrass >= 10 && canal.spokes >= 3 && canal.hasBoathouse && canal.districtGrass.every((g) => g >= 4) ? '#3a3' : '#c33' }}>
+              canal city: basin {canal.basinSize} tiles · {canal.canalTiles} canal tiles carved
+              {' '}· {canal.spokes} spokes · {canal.bridges} bridges · {canal.freeGrass} free grass
+            </strong>
+            {' '}· districts: {canal.districtGrass.length ? canal.districtGrass.map((g) => `${g} grass`).join(', ') : 'none'} ·
+            boathouse {canal.hasBoathouse ? 'moored' : 'MISSING'}
+          </div>
+        )}
         <div style={{ overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 8, background: 'var(--surface)' }}>
           <div style={{
             display: 'grid', gridTemplateColumns: `repeat(${W}, ${TILE}px)`, width: W * TILE,
@@ -265,6 +321,12 @@ const TilesetTest = () => {
                 if (showPaths && !overlay && fork && fork.islandKeys.has(`${gx},${gy}`)) {
                   overlay = 'rgba(240,180,50,0.9)'; // river-city island district
                 }
+                if (showPaths && !overlay && canal && canal.districtKeys.has(`${gx},${gy}`)) {
+                  overlay = 'rgba(240,180,50,0.9)'; // canal-city fenced-off district
+                }
+                if (showPaths && !overlay && canal && canal.basinKeys.has(`${gx},${gy}`)) {
+                  overlay = 'rgba(120,220,240,0.9)'; // the harbour basin
+                }
                 if (showPaths && tile.isGate) overlay = 'rgba(80,140,255,0.95)';
                 return <Cell key={`${gx},${gy}`} tile={tile} neighbours={neighbours} theme={theme} overlay={overlay} />;
               })
@@ -275,9 +337,11 @@ const TilesetTest = () => {
           This is the actual <code>generateTownMap()</code> output rendered with the SVG tileset — walls autotile from
           neighbours, zero image files. Reseed to see different layouts. The <em>path overlay</em> outlines the
           hub-and-spoke network (green = connected to the hub, red = orphan — should never appear, blue = gates,
-          orange = the river-city island district). The <em>river city</em> archetype (town/city only) carves a windy
-          forking river around an island quarter; fork water renders as plain water in this debug cut (art lands in
-          Phase 4).
+          orange = the river-city island / canal-city fenced-off districts, cyan = the harbour basin). The
+          <em> river city</em> archetype (town/city only) carves a windy forking river around an island quarter; the
+          <em> canal city</em> archetype (city only, coastal) carves a harbour basin plus 3-5 windy canal spokes with
+          quay lanes hugging the banks. Fork and canal water render as plain water in this debug cut — the 16-mask
+          directional canal tiles (banks, bends, junctions, mouths) are Phase 4 art, not this phase.
         </p>
       </section>
     </div>
