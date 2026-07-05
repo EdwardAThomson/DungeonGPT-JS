@@ -40,4 +40,21 @@ describe('MapLegend', () => {
       expect(siteLegendGroups(theme).every((g) => g.items.length > 0)).toBe(true);
     });
   });
+
+  test('town legend follows the town theme; default and unknown themes stay temperate', () => {
+    const labels = (groups) => groups.flatMap((g) => g.items.map((i) => i.label));
+    // default temperate legend keeps its historical entries
+    expect(labels(townLegendGroups())).toEqual(expect.arrayContaining(['Grass', 'Tree', 'Flowers']));
+    // desert swaps ground + natural cover and re-tints the building swatches
+    const desert = townLegendGroups('desert');
+    expect(labels(desert)).toEqual(expect.arrayContaining(['Sand', 'Cactus', 'Rocks']));
+    expect(labels(desert)).not.toContain('Grass');
+    // snow does the same with its own set
+    expect(labels(townLegendGroups('snow'))).toEqual(expect.arrayContaining(['Snow', 'Pine', 'Snowdrift']));
+    // unknown themes fall back to the temperate legend, byte-identical swatches
+    expect(townLegendGroups('jungle')).toEqual(townLegendGroups());
+    // themed building swatches differ from the temperate ones
+    const swatch = (groups, label) => groups.find((g) => g.heading === 'Buildings').items.find((i) => i.label === label).bg;
+    expect(swatch(desert, 'House')).not.toBe(swatch(townLegendGroups(), 'House'));
+  });
 });

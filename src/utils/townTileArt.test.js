@@ -1,4 +1,5 @@
 import { tileBackground, sampleTiles, wallVariant, buildingTile, POI_EMOJI } from './townTileArt';
+import PINS from './townTileArt.pins.json';
 
 const TYPES = ['grass', 'dirt_path', 'stone_path', 'town_square', 'farm_field', 'water', 'bridge', 'wall', 'keep_wall', 'building'];
 
@@ -98,5 +99,92 @@ describe('townTileArt', () => {
     });
     // desert cover is visually distinct from the grassland tree
     expect(POI_EMOJI.cactus).not.toBe(POI_EMOJI.tree);
+  });
+});
+
+// Tier-1 themed tilesets (backlog #64): palette-only desert/snow variants. The pins in
+// townTileArt.pins.json were captured from the renderer BEFORE the building-material
+// theming landed, so exact string equality here proves temperate output is untouched
+// (cache keys and data-URIs both) and that old saves with no theme marker re-render
+// byte-identically.
+describe('townTileArt theme palettes', () => {
+  const SNOW_CAP_D = "M5 12.5"; // the snow roof band's path signature
+  // strip every colour so only geometry remains; silhouettes must survive theming
+  const geometry = (bg) => decode(bg)
+    .replace(/<path d='M5 12\.5[^/]*\/>/, '')            // drop the snow cap overlay
+    .replace(/(fill|stroke)='[^']*'/g, "$1=''");
+
+  test('temperate tiles are byte-identical to the pre-theme captures', () => {
+    expect(tileBackground({ type: 'grass' }, {}, 2, 3)).toBe(PINS.grass_2_3);
+    expect(tileBackground({ type: 'dirt_path' }, {}, 4, 5)).toBe(PINS.dirt_path_4_5);
+    expect(tileBackground({ type: 'water' }, {}, 1, 1)).toBe(PINS.water_1_1);
+    expect(tileBackground({ type: 'town_square' }, {}, 6, 6)).toBe(PINS.town_square_6_6);
+    expect(wallVariant(5, false)).toBe(PINS.wall_mask5);
+    expect(wallVariant(3, true)).toBe(PINS.keep_wall_mask3);
+  });
+
+  test('temperate buildings are byte-identical to the pre-theme captures', () => {
+    expect(buildingTile('house')).toBe(PINS.building_house);
+    expect(buildingTile('temple')).toBe(PINS.building_temple);
+    expect(buildingTile('inn')).toBe(PINS.building_inn);
+    // explicit default theme takes the same path
+    expect(buildingTile('house', 'grassland')).toBe(PINS.building_house);
+    expect(tileBackground({ type: 'building', buildingType: 'house' }, {}, 0, 0, 'grassland')).toBe(PINS.building_house);
+  });
+
+  test('missing or unknown theme falls back to temperate', () => {
+    expect(tileBackground({ type: 'grass' }, {}, 2, 3, undefined)).toBe(PINS.grass_2_3);
+    expect(tileBackground({ type: 'grass' }, {}, 2, 3, 'jungle')).toBe(PINS.grass_2_3);
+    expect(buildingTile('house', 'volcanic')).toBe(PINS.building_house);
+    expect(tileBackground({ type: 'building', buildingType: 'temple' }, {}, 0, 0, 'not-a-theme')).toBe(PINS.building_temple);
+  });
+
+  test('building materials differ per theme: temperate, desert, and snow are three palettes', () => {
+    ['house', 'inn', 'temple', 'keep', 'market'].forEach((b) => {
+      const temperate = buildingTile(b);
+      const desert = buildingTile(b, 'desert');
+      const snowy = buildingTile(b, 'snow');
+      expect(new Set([temperate, desert, snowy]).size).toBe(3);
+    });
+    // the temperate roof hex is fully re-tinted away in the desert variant
+    expect(decode(buildingTile('house'))).toContain('9c4a3c');
+    expect(decode(buildingTile('house', 'desert'))).not.toContain('9c4a3c');
+  });
+
+  test('themed buildings keep the exact silhouette: geometry identical once colour is stripped', () => {
+    ['house', 'inn', 'market', 'keep', 'magetower', 'blacksmith'].forEach((b) => {
+      const base = geometry(buildingTile(b));
+      expect(geometry(buildingTile(b, 'desert'))).toBe(base);
+      expect(geometry(buildingTile(b, 'snow'))).toBe(base);
+    });
+  });
+
+  test('snow buildings carry the white roof band; desert and temperate do not', () => {
+    expect(decode(buildingTile('house', 'snow'))).toContain(SNOW_CAP_D);
+    expect(decode(buildingTile('house', 'desert'))).not.toContain(SNOW_CAP_D);
+    expect(decode(buildingTile('house'))).not.toContain(SNOW_CAP_D);
+  });
+
+  test('memoisation caches per theme: repeats hit the cache, themes never collide', () => {
+    const tileArgs = { type: 'building', buildingType: 'inn' };
+    const desert1 = tileBackground(tileArgs, {}, 0, 0, 'desert');
+    const desert2 = tileBackground(tileArgs, {}, 0, 0, 'desert');
+    const snowy = tileBackground(tileArgs, {}, 0, 0, 'snow');
+    const temperate = tileBackground(tileArgs, {}, 0, 0);
+    expect(desert1).toBe(desert2); // same key -> same cached string
+    expect(new Set([desert1, snowy, temperate]).size).toBe(3);
+    // walls: ground under masonry follows the theme, one cache entry per theme
+    const wallGrass = tileBackground({ type: 'wall' }, { n: 'wall', s: 'wall' }, 0, 0);
+    const wallSnow = tileBackground({ type: 'wall' }, { n: 'wall', s: 'wall' }, 0, 0, 'snow');
+    expect(wallGrass).not.toBe(wallSnow);
+    expect(decode(wallSnow)).toContain('eef3f7');
+  });
+
+  test('path and ground contrast: dirt path stays legible on sand and snow grounds', () => {
+    // the dirt path tile itself is theme-independent (stone/dirt everywhere), so the
+    // same tile string is reused across themes; contrast comes from the distinct bases
+    const dirtTile = tileBackground({ type: 'dirt_path' }, {}, 4, 5, 'desert');
+    expect(dirtTile).toBe(PINS.dirt_path_4_5);
+    expect(tileBackground({ type: 'dirt_path' }, {}, 4, 5, 'snow')).toBe(PINS.dirt_path_4_5);
   });
 });

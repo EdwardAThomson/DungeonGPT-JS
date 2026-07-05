@@ -130,7 +130,7 @@ const TilesetTest = () => {
       <section style={{ marginBottom: 28 }}>
         <h3 style={heading}>Building roofs</h3>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          {buildings.map((b) => <Swatch key={b} bg={buildingTile(b)} label={b} />)}
+          {buildings.map((b) => <Swatch key={b} bg={buildingTile(b, theme)} label={b} />)}
         </div>
       </section>
 

@@ -58,6 +58,37 @@ const ROOFS = {
   workshop: '#4a8c8c',     // patina copper (tinker's workshop, deliberately un-medieval)
 };
 
+// --- theme materials (backlog #64, tier 1) ------------------------------------
+// Palette-only theming for buildings: every silhouette stays byte-for-byte identical;
+// only the material colours shift. Each themed roof is the temperate roof mixed toward
+// a biome tint, and since walls/doors derive from the roof via shade(), the whole
+// building follows. Per-building colour identity survives the mix, so the legend still
+// reads. Unknown/missing themes take the temperate branch (no material entry), which
+// keeps old cached town maps rendering exactly as before.
+const THEME_MATERIALS = {
+  // warm clay tint: roofs go terracotta, derived walls read as sun-baked adobe /
+  // sandstone and bleached timber
+  desert: { tint: '#b3663f', amount: 0.45 },
+  // dark timber tint so buildings sit as darker wood against the white ground; the
+  // cap flag adds a white snow band across the roofline (palette-level dressing, not
+  // a new shape: it is invisible where it overhangs the already-white snow ground)
+  snow: { tint: '#4a4038', amount: 0.35, cap: true },
+};
+// One shared roofline band for snow towns, drawn over the finished building body.
+const SNOW_CAP = `<path d='M5 12.5 q11 -5 22 0 l0 2.8 q-11 -5 -22 0 z' fill='#ffffff' opacity='0.75'/>`;
+
+// Mix two '#rrggbb' colours; t is the weight of the tint (t=0 returns the base).
+const mix = (base, tint, t) => {
+  const a = parseInt(base.slice(1), 16);
+  const b = parseInt(tint.slice(1), 16);
+  const ch = (sh) => Math.round(((a >> sh) & 255) * (1 - t) + ((b >> sh) & 255) * t);
+  const hex = (v) => v.toString(16).padStart(2, '0');
+  return `#${hex(ch(16))}${hex(ch(8))}${hex(ch(0))}`;
+};
+
+// Ground fill colour for a theme (used under buildings and walls).
+const themeGroundFill = (theme) => theme === 'desert' ? C.sand : theme === 'snow' ? C.snow : C.grass;
+
 // --- helpers -----------------------------------------------------------------
 const wrap = (inner) =>
   `url("data:image/svg+xml,${encodeURIComponent(
@@ -560,20 +591,25 @@ const BUILDING_SHAPE = {
 // galleries/legends so they never miss a type). Order = roughly civic → commerce → craft.
 export const BUILDING_TYPES = Object.keys(BUILDING_SHAPE);
 
-const building = (buildingType, ground = C.grass) => {
-  const roof = ROOFS[buildingType] || ROOFS.house;
+const building = (buildingType, ground = C.grass, theme = 'grassland') => {
+  const mat = THEME_MATERIALS[theme];
+  const baseRoof = ROOFS[buildingType] || ROOFS.house;
+  // themed towns re-tint the material palette; temperate (or any unknown theme) uses
+  // the roof colour untouched so existing saves render byte-identically
+  const roof = mat ? mix(baseRoof, mat.tint, mat.amount) : baseRoof;
   const shape = SHAPES[BUILDING_SHAPE[buildingType] || 'gable'];
   return wrap(
     `<rect width='32' height='32' fill='${ground}'/>` +
     `<ellipse cx='16' cy='27' rx='12' ry='3' fill='#000000' opacity='0.16'/>` + // ground shadow
-    shape(roof)
+    shape(roof) +
+    (mat && mat.cap ? SNOW_CAP : '')
   );
 };
 
 // --- public API --------------------------------------------------------------
 const _generate = (type, tile, mask, seed, theme) => {
   // ground fill + open-tile texture follow the theme (desert→sand, snow→snow, else grass)
-  const ground = theme === 'desert' ? C.sand : theme === 'snow' ? C.snow : C.grass;
+  const ground = themeGroundFill(theme);
   const groundTile = (s) => theme === 'desert' ? sand(s) : theme === 'snow' ? snow(s) : grass(s);
   switch (type) {
     case 'water': return water(seed);
@@ -583,7 +619,7 @@ const _generate = (type, tile, mask, seed, theme) => {
     case 'town_square': return stone(seed, true);
     case 'stone_path': return stone(seed, true);
     case 'dirt_path': return dirt(seed);
-    case 'building': return building(tile.buildingType, ground);
+    case 'building': return building(tile.buildingType, ground, theme);
     case 'wall': return wall(mask, false, ground);
     case 'keep_wall': return wall(mask, true, ground);
     case 'grass':
@@ -649,5 +685,9 @@ export const sampleTiles = {
   bridge: () => bridge(),
 };
 export const wallVariant = (mask, keep = false) => wall(mask, keep);
-export const buildingTile = (buildingType) => building(buildingType);
+// `theme` is optional: the default renders the historical temperate building so every
+// existing gallery/legend caller is unchanged; 'desert'/'snow' return the themed
+// materials on the matching ground.
+export const buildingTile = (buildingType, theme = 'grassland') =>
+  building(buildingType, themeGroundFill(theme), theme);
 export { hash };

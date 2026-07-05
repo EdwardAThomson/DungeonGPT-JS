@@ -135,7 +135,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                     {showLegend ? (
                         <MapLegend
                             title="Map Key"
-                            groups={viewLevel === 'town' ? townLegendGroups() : viewLevel === 'site' ? siteLegendGroups(siteMapData?.theme, currentTile?.biome) : worldLegendGroups()}
+                            groups={viewLevel === 'town' ? townLegendGroups(townMapData?.theme) : viewLevel === 'site' ? siteLegendGroups(siteMapData?.theme, currentTile?.biome) : worldLegendGroups()}
                             columns={viewLevel === 'town' ? 2 : 1}
                             onMinimize={() => setShowLegend(false)}
                             style={{ maxHeight: '60vh', overflowY: 'auto', flex: '0 0 auto' }}

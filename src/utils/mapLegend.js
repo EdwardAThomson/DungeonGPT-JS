@@ -57,12 +57,24 @@ const TOWN_BUILDINGS = [
   ['harbormaster', 'Harbormaster'], ['workshop', 'Workshop'], ['manor', 'Manor'], ['keep', 'Keep'],
 ];
 
-export function townLegendGroups() {
+// `theme` mirrors the town map's stored theme ('grassland' default, 'desert', 'snow') so
+// the key shows the same ground, building materials, and natural cover the map renders.
+// Calling with no argument (or an unknown theme) yields the historical temperate legend.
+export function townLegendGroups(theme = 'grassland') {
+  const t = theme === 'desert' || theme === 'snow' ? theme : 'grassland';
+  const ground = t === 'desert' ? tile(townSamples.sand(), 'Sand')
+    : t === 'snow' ? tile(townSamples.snow(), 'Snow')
+    : tile(townSamples.grass(), 'Grass');
+  const cover = t === 'desert'
+    ? [mark(POI_EMOJI.cactus, 'Cactus'), mark(POI_EMOJI.rock, 'Rocks')]
+    : t === 'snow'
+      ? [mark(POI_EMOJI.pine, 'Pine'), mark(POI_EMOJI.snowdrift, 'Snowdrift')]
+      : [mark(POI_EMOJI.tree, 'Tree'), mark(POI_EMOJI.flowers, 'Flowers')];
   return [
     {
       heading: 'Ground & paths',
       items: [
-        tile(townSamples.grass(), 'Grass'),
+        ground,
         tile(townSamples.dirt(), 'Dirt path'),
         tile(townSamples.town_square(), 'Stone / square'),
         tile(townSamples.farm_field(), 'Farmland'),
@@ -73,14 +85,13 @@ export function townLegendGroups() {
     },
     {
       heading: 'Buildings',
-      items: TOWN_BUILDINGS.map(([type, label]) => tile(buildingTile(type), label)),
+      items: TOWN_BUILDINGS.map(([type, label]) => tile(buildingTile(type, t), label)),
     },
     {
       heading: 'Features',
       items: [
         mark(POI_EMOJI.fountain, 'Fountain'),
-        mark(POI_EMOJI.tree, 'Tree'),
-        mark(POI_EMOJI.flowers, 'Flowers'),
+        ...cover,
       ],
     },
   ];
