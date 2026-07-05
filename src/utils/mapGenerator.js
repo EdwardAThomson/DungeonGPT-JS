@@ -182,11 +182,18 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
     }
   }
 
+  // 6b. Deal the size shuffle BEFORE placement (hoisted from assignTownSizesAndNames,
+  // which now receives it) so each slot's future size scales its water bias (#67):
+  // slot i will be dealt shuffledSizes[i % 4]: city slots hug water hardest.
+  const shuffledSizes = shuffleTownSizes(rng);
+
   let townSpacing = 3; // relaxed below if the map is too crowded to fit them all
   let safety = 0;
   while (townsList.length < targetTowns && safety < targetTowns + 10) {
     safety++;
-    const townPosition = placeTown(mapData, width, height, rng, townsList, townSpacing);
+    const slotSize = shuffledSizes[townsList.length % shuffledSizes.length];
+    const riverPull = (slotSize === 'town' || slotSize === 'city') ? 0.5 : 0;
+    const townPosition = placeTown(mapData, width, height, rng, townsList, townSpacing, WATER_BIAS_BY_SIZE[slotSize] || 0, riverPull);
     if (townPosition) {
       townsList.push(townPosition);
     } else if (townSpacing > 1) {
@@ -221,7 +228,9 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
 
     // Assign sizes and names to all towns; the estuary town (when present) is pinned
     // to city size so the canal-city stamp (city-only) has a home by construction.
-    assignTownSizesAndNames(mapData, townsList, rng, normalizedNames.towns, estuaryTown ? 'city' : null);
+    // The size deal (shuffledSizes) was drawn before placement so the water bias
+    // (#67) and the final assignment can never disagree.
+    assignTownSizesAndNames(mapData, townsList, rng, normalizedNames.towns, estuaryTown ? 'city' : null, shuffledSizes);
 
     const startingTile = mapData[startingTown.y][startingTown.x];
     logger.debug(`[MAP_GENERATION] Selected starting town: ${startingTile.townName} (${startingTile.townSize}) at (${startingTown.x}, ${startingTown.y})`);
@@ -258,6 +267,44 @@ function seededRandom(seed) {
     state = (state * 9301 + 49297) % 233280;
     return state / 233280;
   };
+}
+
+// Water-adjacent settlement placement bias (#67, river-settlement doctrine:
+// WATER_TOWNS_PLAN.md section 1c). Each town slot prefers a water-adjacent site with a
+// probability scaled by the SIZE that slot will be dealt: city strongest, hamlet
+// weakest, and never 100%: crossroads and mining towns are real, so purely random
+// inland placement always remains possible. The size deal is hoisted ahead of the
+// placement loop (see shuffleTownSizes) so the slot's future size is known at placement
+// time; assignTownSizesAndNames receives the same deal, so the two can never drift.
+// UNIVERSAL across tiers (the premium boundary is the archetype, not the river) and
+// going-forward-only: the legacy world fixtures were deliberately re-captured when this
+// landed (the chunk assembler's scheme is EXPERIMENTAL/not frozen, LARGER_WORLDS_PLAN
+// section 7a, so no shipped continuity promise pinned the old placement).
+const WATER_BIAS_BY_SIZE = { city: 0.8, town: 0.6, village: 0.4, hamlet: 0.2 };
+
+// The size deal: the shuffled [hamlet, village, town, city] cycle each town slot draws
+// its size from (slot i gets shuffledSizes[i % 4]). Extracted from
+// assignTownSizesAndNames with the identical Fisher-Yates draw pattern.
+function shuffleTownSizes(rng) {
+  const shuffled = ['hamlet', 'village', 'town', 'city'];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+// Is (x,y) a water-adjacent settlement site (#67)? On the river band or the beach, or
+// orthogonally beside sea/lake water, a beach, or a land river tile.
+function isWaterAdjacentSite(mapData, x, y, width, height) {
+  const t = mapData[y][x];
+  if (t.hasRiver || t.biome === 'beach') return true;
+  return [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => {
+    const nx = x + dx, ny = y + dy;
+    if (nx < 0 || nx >= width || ny < 0 || ny >= height) return false;
+    const n = mapData[ny][nx];
+    return n.biome === 'water' || n.biome === 'beach' || (n.hasRiver === true && n.biome !== 'water');
+  });
 }
 
 // Place a cluster of 2-4 forest tiles
@@ -347,8 +394,14 @@ function placeMountainRange(mapData, width, height, rng) {
 
 // Place a town at a random empty location with minimum distance from other towns.
 // minDistance can be relaxed by the caller when the map is crowded so required
-// quest towns aren't silently dropped.
-function placeTown(mapData, width, height, rng, existingTowns = [], minDistance = 3) {
+// quest towns aren't silently dropped. waterBias (#67) is the probability this slot
+// tries a water-adjacent site first (scaled by the slot's dealt size, never 1);
+// when the biased pass finds no candidate, placement falls through to the classic
+// random roll, so a town is never lost to the preference. riverPull is the chance a
+// biased pick narrows to river-band tiles specifically (town/city slots only): a
+// settlement ON the band is what riverfork/estuary eligibility keys off, and the
+// coast/lake shore would otherwise dominate the candidate pool.
+function placeTown(mapData, width, height, rng, existingTowns = [], minDistance = 3, waterBias = 0, riverPull = 0) {
   const townNames = [
     "A trading post",
     "A farming hamlet",
@@ -356,27 +409,55 @@ function placeTown(mapData, width, height, rng, existingTowns = [], minDistance 
     "A crossroads inn"
   ];
 
+  const farEnough = (x, y) => {
+    for (const existingTown of existingTowns) {
+      // Manhattan distance from every existing town
+      if (Math.abs(x - existingTown.x) + Math.abs(y - existingTown.y) < minDistance) return false;
+    }
+    return true;
+  };
+  const settle = (x, y) => {
+    mapData[y][x].poi = 'town';
+    mapData[y][x].descriptionSeed = townNames[Math.floor(rng() * townNames.length)];
+    logger.debug(`[PLACE_TOWN] Placed town at (${x}, ${y}): "${mapData[y][x].descriptionSeed}"`);
+    return { x, y };
+  };
+
+  // Biased pass (#67): a seeded roll against the slot's water bias tries the
+  // water-adjacent candidates first (same placement domain as the random roll:
+  // 1..w-2 / 1..h-2). River-band tiles weigh double: rivers were the prime
+  // settlement magnet, and a town ON the band is what riverfork/estuary
+  // eligibility keys off.
+  if (waterBias > 0 && rng() < waterBias) {
+    const candidates = [];
+    const riverCandidates = [];
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        if (!isValidPlacement(mapData, x, y, width, height)) continue;
+        if (!farEnough(x, y)) continue;
+        if (!isWaterAdjacentSite(mapData, x, y, width, height)) continue;
+        candidates.push({ x, y });
+        if (mapData[y][x].hasRiver) {
+          candidates.push({ x, y }); // double weight on the band
+          riverCandidates.push({ x, y });
+        }
+      }
+    }
+    const pool = (riverPull > 0 && riverCandidates.length > 0 && rng() < riverPull)
+      ? riverCandidates
+      : candidates;
+    if (pool.length > 0) {
+      const c = pool[Math.floor(rng() * pool.length)];
+      return settle(c.x, c.y);
+    }
+  }
+
   for (let attempt = 0; attempt < 30; attempt++) {
     const x = 1 + Math.floor(rng() * (width - 2));
     const y = 1 + Math.floor(rng() * (height - 2));
 
-    if (isValidPlacement(mapData, x, y, width, height)) {
-      // Check distance from existing towns using the towns list (more efficient)
-      let tooClose = false;
-      for (const existingTown of existingTowns) {
-        const distance = Math.abs(x - existingTown.x) + Math.abs(y - existingTown.y); // Manhattan distance
-        if (distance < minDistance) {
-          tooClose = true;
-          break;
-        }
-      }
-
-      if (!tooClose) {
-        mapData[y][x].poi = 'town';
-        mapData[y][x].descriptionSeed = townNames[Math.floor(rng() * townNames.length)];
-        logger.debug(`[PLACE_TOWN] Placed town at (${x}, ${y}): "${mapData[y][x].descriptionSeed}"`);
-        return { x, y }; // Return the position
-      }
+    if (isValidPlacement(mapData, x, y, width, height) && farEnough(x, y)) {
+      return settle(x, y);
     }
   }
 
@@ -548,18 +629,15 @@ function placeCave(mapData, width, height, rng) {
 // Assign sizes and names to all towns on the map. pinFirstSize (water towns #65,
 // additive, default null = legacy) forces townsList[0] to that size BEFORE names are
 // assigned, swapping sizes with another settlement so the overall mix is preserved.
-function assignTownSizesAndNames(mapData, townsList, rng, customNames = [], pinFirstSize = null) {
+// dealtSizes is the size shuffle drawn BEFORE placement (shuffleTownSizes, #67) so
+// placement-time water bias and the final assignment share one deal; absent (direct
+// callers/tests) the deal is drawn here as it always was.
+function assignTownSizesAndNames(mapData, townsList, rng, customNames = [], pinFirstSize = null, dealtSizes = null) {
   logger.debug(`[ASSIGN_TOWNS] Assigning sizes and names to ${townsList.length} towns (Custom names: ${customNames.length})...`);
 
   const sizeOrder = { 'city': 0, 'town': 1, 'village': 2, 'hamlet': 3 };
-  const sizeDistribution = ['hamlet', 'village', 'town', 'city'];
 
-  // Shuffle size distribution to randomize which town gets which size
-  const shuffledSizes = [...sizeDistribution];
-  for (let i = shuffledSizes.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [shuffledSizes[i], shuffledSizes[j]] = [shuffledSizes[j], shuffledSizes[i]];
-  }
+  const shuffledSizes = dealtSizes || shuffleTownSizes(rng);
 
   // 1. Assign SIZES first
   townsList.forEach((town, index) => {

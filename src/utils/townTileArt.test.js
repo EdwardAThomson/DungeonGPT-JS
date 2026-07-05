@@ -1,4 +1,4 @@
-import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, jettyTile, jettyInfo, POI_EMOJI } from './townTileArt';
+import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, OFF_MAP, jettyTile, jettyInfo, POI_EMOJI } from './townTileArt';
 import PINS from './townTileArt.pins.json';
 
 const TYPES = ['grass', 'dirt_path', 'stone_path', 'town_square', 'farm_field', 'water', 'bridge', 'wall', 'keep_wall', 'building'];
@@ -422,6 +422,41 @@ describe('townTileArt canal dressing (waterway mask)', () => {
     expect(tileBackground({ type: 'bridge' }, {}, 2, 2)).toBe(sampleTiles.bridge());
     // a waterway bridge routed through tileBackground takes the canal variant
     expect(tileBackground({ type: 'bridge', waterway: true }, {}, 2, 2, 'grassland', 5)).not.toBe(sampleTiles.bridge());
+  });
+});
+
+describe('waterwayMask OFF_MAP (maintainer bug: river dammed at the map border)', () => {
+  const canal = { type: 'water', waterway: true };
+
+  test('off-map beyond a border channel tile counts as wet, so the mouth renders open', () => {
+    // a N-S channel tile on the north border: water S, off-map N -> straight run (5),
+    // not a dead end walled across the mouth (4)
+    expect(waterwayMask(canal, { n: OFF_MAP, s: canal })).toBe(5);
+    expect(waterwayMask(canal, { e: OFF_MAP, w: canal })).toBe(10);
+    expect(waterwayMask(canal, { s: OFF_MAP })).toBe(4);
+    expect(waterwayMask(canal, { w: OFF_MAP })).toBe(8);
+  });
+
+  test('off-map diagonals count too, so border junction hearts draw no stranded nib', () => {
+    expect(waterwayMask(canal, { ne: OFF_MAP })).toBe(16);
+    expect(waterwayMask(canal, { n: OFF_MAP, e: OFF_MAP, s: canal, w: canal, ne: OFF_MAP })).toBe(15 | 16);
+  });
+
+  test('merely-unprovided neighbours stay dry (gallery swatches and legacy callers unchanged)', () => {
+    expect(waterwayMask(canal, {})).toBe(0);
+    expect(waterwayMask(canal, { n: null, e: undefined })).toBe(0);
+    // gallery swatches call canalTile with a fixed mask directly: mask in, same art out
+    expect(canalTile(5, 'grassland', 1)).toBe(canalTile(5, 'grassland', 1));
+  });
+
+  test('OFF_MAP never wets sea/lake water, quay paths, or waterway bridges', () => {
+    // plain sea water masks 0 regardless (renders exactly as before)
+    expect(waterwayMask({ type: 'water' }, { n: OFF_MAP, s: OFF_MAP })).toBe(0);
+    // a shore path at the border earns no quay lip from the void
+    expect(waterwayMask({ type: 'stone_path' }, { s: OFF_MAP })).toBe(0);
+    expect(waterwayMask({ type: 'dirt_path' }, { e: OFF_MAP, s: canal })).toBe(4);
+    // a waterway bridge derives its channel axis from real water only
+    expect(waterwayMask({ type: 'bridge', waterway: true }, { n: OFF_MAP, e: canal, w: canal })).toBe(10);
   });
 });
 

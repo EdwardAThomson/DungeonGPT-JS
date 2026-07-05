@@ -1,4 +1,4 @@
-import { generateTownMap, padTownToUniform, buildingCensus, PATH_WINDINESS, WATERWAY_BRIDGE_COST, CANAL_BANK_COST } from './townMapGenerator';
+import { generateTownMap, padTownToUniform, buildingCensus, PATH_WINDINESS, WATERWAY_BRIDGE_COST, CANAL_BANK_COST, WATERWAY_JUNCTION_PENALTY, WATERWAY_NEAR_BRIDGE_PENALTY } from './townMapGenerator';
 import { getTownWaterContext } from './townWater';
 import legacyVillage777 from './__fixtures__/legacyTown_village_seed777.json';
 import legacyCity12345 from './__fixtures__/legacyTown_city_seed12345.json';
@@ -614,10 +614,13 @@ describe('river city archetype (riverfork, water towns Phase 1)', () => {
       }
     });
 
-    test('coastal riverfork town (the estuary read): channel and fallback band both reach the edges', () => {
+    // #69 (Phase 3.1): flow axis pointing AT the sea used to degrade to the plain
+    // band (the exact-point exit was flooded and unreachable). The channel now
+    // merges into the coastal flood, so coastal river cities keep their island
+    // district in every orientation.
+    test('coastal riverfork town (the estuary read): channel reaches the edges in both orientations', () => {
       // sea to the EAST, flow N-S: the fork carves beside the coast
-      // sea to the EAST, flow E-W: the fork cannot reach the flooded exit edge and
-      // falls back to the plain band, and the band must still run edge-to-edge
+      // sea to the EAST, flow E-W: the fork merges into the flood (#69)
       for (const dir of ['NORTH_SOUTH', 'EAST_WEST']) {
         for (let seed = 1; seed <= 12; seed++) {
           const ctx = { kind: 'coast', edges: { N: false, E: true, S: false, W: false }, archetype: 'riverfork' };
@@ -625,6 +628,54 @@ describe('river city archetype (riverfork, water towns Phase 1)', () => {
           const label = `coastal ${dir} seed ${seed}`;
           expect({ label, through: bordersWet(town, dir) }).toEqual({ label, through: true });
           expect({ label, stranded: strandedWaterway(town) }).toEqual({ label, stranded: 0 });
+        }
+      }
+    });
+
+    test('#69 seed survey: flow toward the sea keeps the island district + two crossings (town/city, both directions)', () => {
+      const islandBridgeGroupCount = (town) => {
+        const islandKeys = new Set(town.riverFork.islandTiles.map((p) => `${p.x},${p.y}`));
+        const seen = new Set();
+        let groups = 0;
+        for (let y = 0; y < town.height; y++) {
+          for (let x = 0; x < town.width; x++) {
+            if (town.mapData[y][x].type !== 'bridge' || seen.has(`${x},${y}`)) continue;
+            const comp = [];
+            const st = [{ x, y }];
+            seen.add(`${x},${y}`);
+            while (st.length) {
+              const c = st.pop();
+              comp.push(c);
+              for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+                const n = town.mapData[c.y + dy] && town.mapData[c.y + dy][c.x + dx];
+                if (!n || n.type !== 'bridge' || seen.has(`${n.x},${n.y}`)) continue;
+                seen.add(`${n.x},${n.y}`);
+                st.push({ x: n.x, y: n.y });
+              }
+            }
+            if (comp.some((c) => [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => islandKeys.has(`${c.x + dx},${c.y + dy}`)))) groups++;
+          }
+        }
+        return groups;
+      };
+      // flow axis pointing straight at the flooded edge, all four orientations
+      const CASES = [
+        [{ N: false, E: true, S: false, W: false }, 'EAST_WEST'],
+        [{ N: false, E: false, S: false, W: true }, 'EAST_WEST'],
+        [{ N: false, E: false, S: true, W: false }, 'NORTH_SOUTH'],
+        [{ N: true, E: false, S: false, W: false }, 'NORTH_SOUTH'],
+      ];
+      for (const size of RIVER_CITY_SIZES) {
+        for (const [edges, dir] of CASES) {
+          for (let seed = 1; seed <= 10; seed++) {
+            const ctx = { kind: 'coast', edges, archetype: 'riverfork' };
+            const town = generateTownMap(size, 'Estuary', 'south', seed, true, dir, 'grassland', ctx);
+            const label = `${size} ${dir} sea ${Object.keys(edges).find((k) => edges[k])} seed ${seed}`;
+            expect({ label, fork: !!town.riverFork }).toEqual({ label, fork: true });
+            expect(town.riverFork.islandTiles.length).toBeGreaterThanOrEqual(4);
+            const groups = islandBridgeGroupCount(town);
+            expect({ label, twoBridges: groups >= 2, groups }).toEqual({ label, twoBridges: true, groups });
+          }
         }
       }
     });
@@ -956,5 +1007,284 @@ describe('buildingCensus (/debug/tileset stats line)', () => {
       { type: 'grass' },
     ]];
     expect(buildingCensus(grid)).toEqual({ total: 2, houses: 0, civic: 2, byType: { inn: 1, unknown: 1 } });
+  });
+});
+
+// =============================================================================
+// Riverside towns (#68, river-settlement doctrine 1c): a town ADJACENT to a river
+// (not on it) renders the river as a band along ONE map edge, waterway-flagged
+// (canal art banks it; OFF_MAP mask rule flows it off the borders), a waterfront
+// lane via the quay machinery (pre-laid quay lane on walled sizes, quay-discount
+// pull on open ones), an optional far-bank strip on hamlets/villages, and at most
+// ONE seeded bridge (only to that strip). All sizes qualify.
+// =============================================================================
+describe('riverside towns (#68)', () => {
+  const isPathType = (t) => t === 'dirt_path' || t === 'stone_path' || t === 'town_square' || t === 'bridge';
+  const SIZES = ['hamlet', 'village', 'town', 'city'];
+  const EDGES = ['N', 'E', 'S', 'W'];
+  const genRiverside = (size, seed, edge) =>
+    generateTownMap(size, 'Bankside', 'south', seed, false, 'NORTH_SOUTH', 'grassland',
+      { kind: 'riverside', edges: { N: edge === 'N', E: edge === 'E', S: edge === 'S', W: edge === 'W' } });
+
+  const pathComponents = (town) => {
+    const { mapData, width, height } = town;
+    const seen = new Set();
+    const comps = [];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (!isPathType(mapData[y][x].type) || seen.has(`${x},${y}`)) continue;
+        const comp = new Set();
+        const stack = [[x, y]];
+        seen.add(`${x},${y}`);
+        while (stack.length) {
+          const [cx, cy] = stack.pop();
+          comp.add(`${cx},${cy}`);
+          for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+            const nx = cx + dx, ny = cy + dy;
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+            if (!isPathType(mapData[ny][nx].type) || seen.has(`${nx},${ny}`)) continue;
+            seen.add(`${nx},${ny}`);
+            stack.push([nx, ny]);
+          }
+        }
+        comps.push(comp);
+      }
+    }
+    return comps;
+  };
+
+  // Distinct crossings over the band: connected components of bridge tiles.
+  const bridgeGroups = (town) => {
+    const seen = new Set();
+    let groups = 0;
+    for (let y = 0; y < town.height; y++) {
+      for (let x = 0; x < town.width; x++) {
+        if (town.mapData[y][x].type !== 'bridge' || seen.has(`${x},${y}`)) continue;
+        groups++;
+        const st = [{ x, y }];
+        seen.add(`${x},${y}`);
+        while (st.length) {
+          const c = st.pop();
+          for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+            const n = town.mapData[c.y + dy] && town.mapData[c.y + dy][c.x + dx];
+            if (!n || n.type !== 'bridge' || seen.has(`${n.x},${n.y}`)) continue;
+            seen.add(`${n.x},${n.y}`);
+            st.push({ x: n.x, y: n.y });
+          }
+        }
+      }
+    }
+    return groups;
+  };
+
+  test('seed survey (all sizes x all edges x 6 seeds): band, flow, walkability, floors, coverage, one bridge max', () => {
+    let farBanks = 0;
+    let bridged = 0;
+    for (const size of SIZES) {
+      for (const edge of EDGES) {
+        for (let s = 1; s <= 6; s++) {
+          const seed = s * 733 + 17;
+          const town = genRiverside(size, seed, edge);
+          const ctx = `${size} ${edge} seed ${seed}`;
+          const flat = town.mapData.flat();
+
+          // the band carved on the CORRECT edge, waterway-flagged
+          expect({ ctx, kind: town.water && town.water.kind }).toEqual({ ctx, kind: 'riverside' });
+          expect({ ctx, edge: town.water.edge }).toEqual({ ctx, edge });
+          const band = flat.filter((t) => t.type === 'water' && t.waterway);
+          expect(band.length).toBeGreaterThan(0);
+
+          // edge-to-edge flow on the padded canvas (water or bridge, waterway carried)
+          const wet = (t) => t && (t.type === 'water' || t.type === 'bridge') && t.waterway;
+          let a = 0, b = 0;
+          if (edge === 'N' || edge === 'S') {
+            for (let y = 0; y < town.height; y++) { if (wet(town.mapData[y][0])) a++; if (wet(town.mapData[y][town.width - 1])) b++; }
+          } else {
+            for (let x = 0; x < town.width; x++) { if (wet(town.mapData[0][x])) a++; if (wet(town.mapData[town.height - 1][x])) b++; }
+          }
+          expect({ ctx, through: a > 0 && b > 0 }).toEqual({ ctx, through: true });
+
+          // walkability invariant: ONE network containing the hub and every gate
+          const comps = pathComponents(town);
+          expect({ ctx, components: comps.length }).toEqual({ ctx, components: 1 });
+          const net = comps[0];
+          expect(net.has(`${town.centerPoint.x},${town.centerPoint.y}`)).toBe(true);
+          town.entrances.forEach(({ pos }) => {
+            expect({ ctx, gate: net.has(`${pos.x},${pos.y}`) }).toEqual({ ctx, gate: true });
+          });
+          // no gate arrives across the river: the band edge carries no entrance
+          town.entrances.forEach(({ dir }) => {
+            const bandDir = { N: 'north', E: 'east', S: 'south', W: 'west' }[edge];
+            expect({ ctx, dir, acrossRiver: dir === bandDir }).toEqual({ ctx, dir, acrossRiver: false });
+          });
+
+          // quay lane (walled sizes): pre-laid, and ON the network (never pruned)
+          if (size === 'town' || size === 'city') {
+            expect(town.water.quay.length).toBeGreaterThan(0);
+            const onNet = town.water.quay.filter((p) => net.has(`${p.x},${p.y}`)).length;
+            expect({ ctx, quayOnNet: onNet === town.water.quay.length }).toEqual({ ctx, quayOnNet: true });
+          }
+
+          // at most ONE bridge crossing, and only to a far-bank strip
+          const groups = bridgeGroups(town);
+          expect({ ctx, maxOneBridge: groups <= 1, groups }).toEqual({ ctx, maxOneBridge: true, groups });
+          if (groups === 1) expect(town.water.farBank).toBe(true);
+          if (town.water.farBank) farBanks++;
+          if (groups === 1) bridged++;
+
+          // quest-grass floor: enough free grass for injectQuestBuildings
+          const freeGrass = flat.filter((t) => t.type === 'grass' && !t.poi).length;
+          expect({ ctx, floorMet: freeGrass >= 10, freeGrass }).toEqual({ ctx, floorMet: true, freeGrass });
+
+          // staffing coverage: every non-house/manor/keep building fronts a lane
+          const misses = [];
+          flat.forEach((t) => {
+            if (t.type !== 'building') return;
+            if (t.buildingType === 'house' || t.buildingType === 'manor' || t.buildingType === 'keep') return;
+            const served = [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => {
+              const n = town.mapData[t.y + dy] && town.mapData[t.y + dy][t.x + dx];
+              return n && isPathType(n.type);
+            });
+            if (!served) misses.push(t.buildingType);
+          });
+          expect({ ctx, misses }).toEqual({ ctx, misses: [] });
+        }
+      }
+    }
+    // seeded variety across the survey: some far banks, some bridges (never many)
+    expect(farBanks).toBeGreaterThan(0);
+    expect(bridged).toBeGreaterThan(0);
+  });
+
+  it.each(SIZES)('%s riverside places the same building count on every seed', (size) => {
+    const totals = new Set();
+    for (let seed = 300; seed < 330; seed++) {
+      const town = genRiverside(size, seed, 'N');
+      let n = 0;
+      town.mapData.forEach((row) => row.forEach((t) => { if (t.type === 'building') n++; }));
+      totals.add(n);
+    }
+    expect([...totals]).toHaveLength(1);
+  });
+
+  test('mill flavor: riverside mills prefer the bank (weighted, not a hard rule)', () => {
+    let mills = 0;
+    let onBank = 0;
+    for (let s = 1; s <= 30; s++) {
+      const town = genRiverside(s % 2 ? 'village' : 'town', s * 419 + 7, EDGES[s % 4]);
+      const mill = town.mapData.flat().find((t) => t.type === 'building' && t.buildingType === 'mill');
+      if (!mill) continue;
+      mills++;
+      const bankSide = [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => {
+        const n = town.mapData[mill.y + dy] && town.mapData[mill.y + dy][mill.x + dx];
+        return n && n.type === 'water' && n.waterway;
+      });
+      if (bankSide) onBank++;
+    }
+    expect(mills).toBeGreaterThan(20);          // the roster carries the mill
+    expect(onBank / mills).toBeGreaterThan(0.35); // materially bank-biased...
+    expect(onBank).toBeLessThan(mills);           // ...but never a hard rule
+  });
+
+  test('same seed twice is identical (map + water descriptor)', () => {
+    const a = genRiverside('village', 5150, 'E');
+    const b = genRiverside('village', 5150, 'E');
+    expect(JSON.stringify(a.mapData)).toBe(JSON.stringify(b.mapData));
+    expect(JSON.stringify(a.water)).toBe(JSON.stringify(b.water));
+  });
+
+  test('live context path: a world tile beside a river generates the riverside band', () => {
+    // the live pipeline: world map -> getTownWaterContext -> generateTownMap
+    const { getTownWaterContext } = require('./townWater');
+    const world = [];
+    for (let y = 0; y < 3; y++) {
+      const row = [];
+      for (let x = 0; x < 3; x++) row.push({ x, y, biome: 'plains' });
+      world.push(row);
+    }
+    world[1][1] = { x: 1, y: 1, biome: 'plains', poi: 'town', townSize: 'hamlet' };
+    world[0][1] = { x: 1, y: 0, biome: 'plains', hasRiver: true }; // river north of town
+    const ctx = getTownWaterContext(world, 1, 1);
+    expect(ctx).toEqual({ kind: 'riverside', edges: { N: true, E: false, S: false, W: false } });
+    const town = generateTownMap('hamlet', 'Livebank', 'south', 99, false, 'NORTH_SOUTH', 'grassland', ctx);
+    expect(town.water.kind).toBe('riverside');
+    expect(town.water.edge).toBe('N');
+  });
+});
+
+// =============================================================================
+// Bridge placement tuning (maintainer playtest 2026-07: crossings were too many
+// and too awkward). New waterway crossings pay WATERWAY_JUNCTION_PENALTY on
+// bend/junction tiles and WATERWAY_NEAR_BRIDGE_PENALTY within 3 tiles of a built
+// bridge, so foot routes funnel over existing bridges and cross straight channel
+// segments. Soft costs only: the connectivity guarantees (one network, island
+// crossings, district access) are asserted by the archetype surveys above and
+// always beat the spacing preference.
+// Measured on a 40-town sample when the tuning landed (baseline -> tuned):
+//   canal: avg bridge tiles 11.5 -> 9.1, awkward crossings 137 -> 70
+//   fork:  avg bridge tiles 12.5 -> 11.0, awkward crossings 150 -> 73,
+//          close crossing pairs 85 -> 53
+// =============================================================================
+describe('bridge placement tuning (fewer + less awkward crossings)', () => {
+  // A bridge tile is an AWKWARD crossing when the channel does not run straight
+  // through it: bends, T-junctions, crosses, ragged joints. A parallel row of a
+  // wider channel (the 2-wide fork) does NOT make a crossing awkward.
+  const awkwardBridges = (town) => {
+    const wet = (x, y) => {
+      const t = town.mapData[y] && town.mapData[y][x];
+      return !!t && (t.type === 'bridge' || (t.type === 'water' && t.waterway));
+    };
+    let awkward = 0;
+    let total = 0;
+    town.mapData.flat().forEach((b) => {
+      if (b.type !== 'bridge') return;
+      total++;
+      const n = wet(b.x, b.y - 1), e = wet(b.x + 1, b.y), s = wet(b.x, b.y + 1), w = wet(b.x - 1, b.y);
+      if (n + e + s + w < 2) return;
+      const rowS = s && wet(b.x + 1, b.y + 1) && wet(b.x - 1, b.y + 1);
+      const rowN = n && wet(b.x + 1, b.y - 1) && wet(b.x - 1, b.y - 1);
+      const colE = e && wet(b.x + 1, b.y - 1) && wet(b.x + 1, b.y + 1);
+      const colW = w && wet(b.x - 1, b.y - 1) && wet(b.x - 1, b.y + 1);
+      const straightEW = (e && w) && (!n || rowN) && (!s || rowS);
+      const straightNS = (n && s) && (!e || colE) && (!w || colW);
+      if (!straightEW && !straightNS) awkward++;
+    });
+    return { awkward, total };
+  };
+
+  test('canal cities: bridge tiles stay inside the tuned band and mostly cross straight segments', () => {
+    let tiles = 0, awkward = 0, towns = 0;
+    for (let s = 1; s <= 20; s++) {
+      const e = ['N', 'E', 'S', 'W'][s % 4];
+      const town = generateTownMap('city', 'Canal', 'south', s * 613 + 11, false, 'NORTH_SOUTH', 'grassland',
+        { kind: 'coast', edges: { N: e === 'N', E: e === 'E', S: e === 'S', W: e === 'W' }, archetype: 'canal' });
+      const a = awkwardBridges(town);
+      tiles += a.total;
+      awkward += a.awkward;
+      towns++;
+    }
+    expect(tiles / towns).toBeLessThanOrEqual(11);    // baseline avg was ~11.5
+    expect(awkward / tiles).toBeLessThanOrEqual(0.3); // baseline fraction was ~0.30
+  });
+
+  test('river cities: bridge tiles stay inside the tuned band and mostly cross straight segments', () => {
+    let tiles = 0, awkward = 0, towns = 0;
+    for (const size of ['town', 'city']) {
+      for (let s = 1; s <= 12; s++) {
+        const town = generateTownMap(size, 'Fork', 'south', s * 613 + 11, true, s % 2 ? 'NORTH_SOUTH' : 'EAST_WEST', 'grassland', { archetype: 'riverfork' });
+        const a = awkwardBridges(town);
+        tiles += a.total;
+        awkward += a.awkward;
+        towns++;
+      }
+    }
+    expect(tiles / towns).toBeLessThanOrEqual(12.5);  // baseline avg was ~12.5
+    expect(awkward / tiles).toBeLessThanOrEqual(0.3); // baseline fraction was ~0.30
+  });
+
+  test('penalties never break the guarantees: they are finite soft costs', () => {
+    expect(WATERWAY_JUNCTION_PENALTY).toBeGreaterThan(0);
+    expect(WATERWAY_NEAR_BRIDGE_PENALTY).toBeGreaterThan(0);
+    expect(Number.isFinite(WATERWAY_JUNCTION_PENALTY + WATERWAY_NEAR_BRIDGE_PENALTY)).toBe(true);
   });
 });

@@ -7,7 +7,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { generateTownMap, buildingCensus } from '../utils/townMapGenerator';
-import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, jettyTile, BUILDING_TYPES, POI_EMOJI } from '../utils/townTileArt';
+import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, OFF_MAP, jettyTile, BUILDING_TYPES, POI_EMOJI } from '../utils/townTileArt';
 
 const SIZES = ['hamlet', 'village', 'town', 'city'];
 const TILE = 28;
@@ -149,6 +149,21 @@ const analyzeCanal = (town) => {
   };
 };
 
+// Riverside report (#68): band edge/depth, the walled sizes' quay lane, the optional
+// far-bank strip and its single seeded bridge: what to eyeball on the preset.
+const analyzeRiverside = (town) => {
+  if (!town.water || town.water.kind !== 'riverside') return null;
+  const flat = town.mapData.flat();
+  return {
+    edge: town.water.edge,
+    depth: town.water.depth,
+    farBank: !!town.water.farBank,
+    quay: (town.water.quay || []).length,
+    bandTiles: flat.filter((t) => t.type === 'water' && t.waterway).length,
+    bridges: flat.filter((t) => t.type === 'bridge').length,
+  };
+};
+
 const TilesetTest = () => {
   const [zoom, setZoom] = useState(1);
   const [size, setSize] = useState('town');
@@ -158,6 +173,7 @@ const TilesetTest = () => {
   const [archetype, setArchetype] = useState('standard'); // 'standard' | 'riverfork' | 'canal'
   const [riverDir, setRiverDir] = useState('NORTH_SOUTH');
   const [seaEdge, setSeaEdge] = useState('E'); // canal city: which edge the sea floods
+  const [riverEdge, setRiverEdge] = useState('N'); // riverside: which edge the river runs along
 
   const town = useMemo(
     () => (archetype === 'riverfork'
@@ -165,8 +181,11 @@ const TilesetTest = () => {
       : archetype === 'canal'
         ? generateTownMap(size, `Demo ${size}`, 'south', seed, false, 'NORTH_SOUTH', theme,
             { kind: 'coast', edges: { N: seaEdge === 'N', E: seaEdge === 'E', S: seaEdge === 'S', W: seaEdge === 'W' }, archetype: 'canal' })
-        : generateTownMap(size, `Demo ${size}`, 'south', seed, false, 'NORTH_SOUTH', theme)),
-    [size, seed, theme, archetype, riverDir, seaEdge]
+        : archetype === 'riverside'
+          ? generateTownMap(size, `Demo ${size}`, 'south', seed, false, 'NORTH_SOUTH', theme,
+              { kind: 'riverside', edges: { N: riverEdge === 'N', E: riverEdge === 'E', S: riverEdge === 'S', W: riverEdge === 'W' } })
+          : generateTownMap(size, `Demo ${size}`, 'south', seed, false, 'NORTH_SOUTH', theme)),
+    [size, seed, theme, archetype, riverDir, seaEdge, riverEdge]
   );
   const paths = useMemo(() => analyzePaths(town), [town]);
   // Building census (maintainer 2026-07-06, reworked after the "count is wrong"
@@ -183,11 +202,15 @@ const TilesetTest = () => {
   }, [town]);
   const fork = useMemo(() => analyzeFork(town), [town]);
   const canal = useMemo(() => analyzeCanal(town), [town]);
+  const riverside = useMemo(() => analyzeRiverside(town), [town]);
   const grid = town.mapData;
   const W = town.width;
   const H = town.height;
   const tileObjAt = (gx, gy) => (gy >= 0 && gy < H && gx >= 0 && gx < W && grid[gy][gx] ? grid[gy][gx] : null);
   const at = (gx, gy) => { const t = tileObjAt(gx, gy); return t ? t.type : null; };
+  // waterwayMask neighbour getter: beyond-the-border positions are OFF_MAP so border
+  // channel tiles render open (the river flows off the map, no bank across the mouth).
+  const wetObjAt = (gx, gy) => (gy >= 0 && gy < H && gx >= 0 && gx < W) ? (grid[gy][gx] || null) : OFF_MAP;
 
   const wallMasks = [
     { m: 5, label: 'N–S' }, { m: 10, label: 'E–W' }, { m: 3, label: 'corner NE' },
@@ -295,7 +318,7 @@ const TilesetTest = () => {
             ))}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
-            {[['standard', 'standard'], ['riverfork', 'river city'], ['canal', 'canal city']].map(([val, label]) => (
+            {[['standard', 'standard'], ['riverfork', 'river city'], ['canal', 'canal city'], ['riverside', 'riverside']].map(([val, label]) => (
               <button key={val}
                 onClick={() => {
                   setArchetype(val);
@@ -317,7 +340,23 @@ const TilesetTest = () => {
                 sea {seaEdge}
               </button>
             )}
+            {archetype === 'riverside' && (
+              <button className="secondary-button" style={{ padding: '4px 10px', fontSize: 12 }}
+                onClick={() => setRiverEdge((e) => ({ N: 'E', E: 'S', S: 'W', W: 'N' }[e]))}>
+                river edge {riverEdge}
+              </button>
+            )}
           </div>
+          {/* Seed is a first-class, always-visible control (maintainer report: the old
+              trailing "seed NNNN" span drowned at the end of this wrapping row once the
+              archetype toggles grew). Editable so a bug-report seed can be re-entered;
+              reseed rolls a fresh one into the same box. */}
+          <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}>
+            seed
+            <input type="number" value={seed}
+              onChange={(e) => setSeed(Number(e.target.value) || 0)}
+              style={{ width: 90, padding: '3px 6px', fontSize: 12 }} />
+          </label>
           <button className="secondary-button" style={{ padding: '4px 10px', fontSize: 12 }}
             onClick={() => setSeed(Math.floor(Math.random() * 100000))}>🎲 reseed</button>
           <button className={showPaths ? 'primary-button' : 'secondary-button'} style={{ padding: '4px 10px', fontSize: 12 }}
@@ -325,7 +364,7 @@ const TilesetTest = () => {
           <label style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
             zoom <input type="range" min="0.6" max="2" step="0.1" value={zoom} onChange={(e) => setZoom(Number(e.target.value))} />
           </label>
-          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{W}×{H} · seed {seed}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{W}×{H}</span>
         </div>
         {/* Hub-and-spoke network report: these are the invariants the generator guarantees
             (one component, hub + gates on it, no orphan tiles) plus windiness stats. */}
@@ -368,6 +407,17 @@ const TilesetTest = () => {
             boathouse {canal.hasBoathouse ? 'moored' : 'MISSING'}
           </div>
         )}
+        {/* Riverside invariants (#68): band along ONE edge flowing off both ends, quay
+            lane on walled sizes, at most one bridge (only to a far-bank strip). */}
+        {riverside && (
+          <div style={{ fontSize: 12, marginBottom: 8, color: 'var(--text-secondary)' }}>
+            <strong style={{ color: riverside.bandTiles > 0 && riverside.bridges <= 1 ? '#3a3' : '#c33' }}>
+              riverside: river along {riverside.edge} edge · {riverside.depth} deep · {riverside.bandTiles} water tiles
+              {' '}· {riverside.bridges} bridge{riverside.bridges === 1 ? '' : 's'} (max 1)
+            </strong>
+            {' '}· far bank {riverside.farBank ? 'strip' : 'off-map'} · quay lane {riverside.quay > 0 ? `${riverside.quay} tiles` : 'none (quay-discount lanes)'}
+          </div>
+        )}
         <div style={{ overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 8, background: 'var(--surface)' }}>
           <div style={{
             display: 'grid', gridTemplateColumns: `repeat(${W}, ${TILE}px)`, width: W * TILE,
@@ -376,7 +426,7 @@ const TilesetTest = () => {
             {grid.flatMap((rowArr, gy) =>
               rowArr.map((tile, gx) => {
                 const neighbours = { n: at(gx, gy - 1), e: at(gx + 1, gy), s: at(gx, gy + 1), w: at(gx - 1, gy) };
-                const wet = waterwayMask(tile, { n: tileObjAt(gx, gy - 1), e: tileObjAt(gx + 1, gy), s: tileObjAt(gx, gy + 1), w: tileObjAt(gx - 1, gy), ne: tileObjAt(gx + 1, gy - 1), se: tileObjAt(gx + 1, gy + 1), sw: tileObjAt(gx - 1, gy + 1), nw: tileObjAt(gx - 1, gy - 1) });
+                const wet = waterwayMask(tile, { n: wetObjAt(gx, gy - 1), e: wetObjAt(gx + 1, gy), s: wetObjAt(gx, gy + 1), w: wetObjAt(gx - 1, gy), ne: wetObjAt(gx + 1, gy - 1), se: wetObjAt(gx + 1, gy + 1), sw: wetObjAt(gx - 1, gy + 1), nw: wetObjAt(gx - 1, gy - 1) });
                 let overlay = null;
                 if (showPaths && isPathType(tile.type)) {
                   overlay = paths.main.has(`${gx},${gy}`) ? 'rgba(80,200,120,0.9)' : 'rgba(230,60,60,0.95)';
@@ -402,6 +452,8 @@ const TilesetTest = () => {
           hub-and-spoke network (green = connected to the hub, red = orphan — should never appear, blue = gates,
           orange = the river-city island / canal-city fenced-off districts, cyan = the harbour basin). The
           <em> river city</em> archetype (town/city only) carves a windy forking river around an island quarter; the
+          <em> riverside</em> preset (#68, all sizes) runs the neighbouring river along one map edge: quay lane on
+          walled sizes, optional far-bank strip + single bridge on hamlets/villages; the
           <em> canal city</em> archetype (city only, coastal) carves a harbour basin plus 5-7 windy canal spokes with
           quay lanes hugging the banks. Fork and canal water render with the Phase 4 directional canal treatment
           (16-mask banks, bends, junctions, mouths; see the canal gallery above); paths beside a waterway gain the

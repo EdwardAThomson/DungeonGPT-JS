@@ -443,12 +443,22 @@ const quayOverlay = (qmask, theme) => {
 export const quayVariant = (qmask, theme = 'grassland', pathType = 'stone_path') =>
   wrap((pathType === 'dirt_path' ? dirtInner(variantSeed(2, 1)) : stoneInner(variantSeed(5, 1), true)) + quayOverlay(qmask, theme));
 
+// Off-map sentinel for waterwayMask neighbours. Callers that know a neighbour position
+// lies BEYOND the map border pass OFF_MAP for it instead of null, so a border channel
+// tile can tell "the river continues off the map" (render the side open, no bank wall)
+// apart from "no neighbour information" (gallery swatches, legacy callers: stays dry,
+// byte-identical). Only waterway WATER treats off-map as wet; a quay path or plain
+// sea tile at the border renders exactly as before.
+export const OFF_MAP = Object.freeze({ offMap: true });
+
 // Compute the 4-bit waterway-neighbour mask (N=1, E=2, S=4, W=8) for a tile from its
 // four orthogonal neighbour TILES (types alone are not enough: the waterway flag is
 // what distinguishes a canal from the sea). What counts as a wet neighbour depends on
 // the tile itself:
 // - canal/fork water (water + waterway): any water (sea, lake, basin) keeps the
-//   channel open at a mouth, and bridge tiles continue the channel underneath;
+//   channel open at a mouth, bridge tiles continue the channel underneath, and
+//   OFF_MAP counts as wet (a river reaching the map border flows off it, it is not
+//   dammed by a bank wall across the mouth (maintainer bug report 2026-07);
 // - a bridge with the waterway flag: waterway/basin/sea WATER neighbours give the
 //   channel axis (adjacent bridges sit along the walk axis and must not count);
 // - path tiles: only true waterway water earns a quay lip (a plain lake/sea shore
@@ -460,7 +470,7 @@ export function waterwayMask(tile, tiles = {}) {
   const isWater = (t) => !!t && t.type === 'water';
   let counts;
   if (tile.type === 'water' && tile.waterway) {
-    counts = (t) => isWater(t) || (!!t && t.type === 'bridge');
+    counts = (t) => t === OFF_MAP || isWater(t) || (!!t && t.type === 'bridge');
   } else if (tile.type === 'bridge' && tile.waterway) {
     counts = isWater;
   } else if (tile.type === 'stone_path' || tile.type === 'dirt_path') {

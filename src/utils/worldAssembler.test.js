@@ -19,8 +19,13 @@ import legacy1337 from './__fixtures__/legacyMap_seed1337.json';
 const EDGE_INDEX = { north: 0, east: 1, south: 2, west: 3 };
 
 describe('legacy byte-identical guard', () => {
-  // Fixtures were captured from the UNTOUCHED generator (before the options param landed).
-  // A legacy-shaped call must still produce the exact same maps.
+  // Fixtures pin the DEFAULT no-options generator output. Originally captured before
+  // the options param landed; deliberately RE-CAPTURED 2026-07 when the universal
+  // water-adjacent settlement bias (#67) landed: the bias applies to all new worlds
+  // (the doctrine: the premium boundary is the archetype, not the river), and the
+  // chunk assembler's scheme is EXPERIMENTAL/not frozen (LARGER_WORLDS_PLAN section 7a),
+  // so no shipped heart-chunk continuity promise pinned the old placement.
+  // A legacy-shaped call must still produce the exact same maps as an options call.
   it('generateMapData(10,10,4242) is unchanged by the generator modifications', () => {
     expect(generateMapData(10, 10, 4242)).toEqual(legacy4242);
   });

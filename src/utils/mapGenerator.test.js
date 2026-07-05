@@ -568,3 +568,76 @@ describe('generateMapData — size-tagged custom town names', () => {
     ['Alpha', 'Beta', 'Gamma', 'Delta'].forEach((n) => expect(find(map, n)).toBeTruthy());
   });
 });
+
+// =============================================================================
+// #67: water-adjacent settlement placement bias (river-settlement doctrine,
+// WATER_TOWNS_PLAN.md section 1c). Placement prefers river/coast/lake-adjacent
+// sites, scaled by the slot's dealt size (city 0.8 .. hamlet 0.2, never 100%),
+// with a river-band pull on town/city slots so riverfork/estuary eligibility
+// rises. UNIVERSAL (no entitlement gate) and going-forward-only: the legacy
+// world fixtures were deliberately re-captured (see worldAssembler.test.js).
+// =============================================================================
+describe('#67: water-adjacent settlement placement bias (120-seed survey)', () => {
+  const waterAdjacent = (map, t) => {
+    if (t.hasRiver || t.biome === 'beach') return true;
+    return [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => {
+      const n = map[t.y + dy] && map[t.y + dy][t.x + dx];
+      if (!n) return false;
+      return n.biome === 'water' || n.biome === 'beach' || (n.hasRiver === true && n.biome !== 'water');
+    });
+  };
+
+  test('adjacency fraction rises materially over the old placement, but never to 100%', () => {
+    // Pre-bias baseline, measured on this exact predicate over the same 120 seeds
+    // before #67 landed: 430/544 settlements water-adjacent (0.790), and 81 of the
+    // 120 worlds carried at least one dry inland settlement.
+    const OLD_FRACTION = 0.790;
+
+    let towns = 0;
+    let adjacent = 0;
+    let dryTowns = 0;
+    for (let s = 1; s <= 120; s++) {
+      const map = generateMapData(10, 10, s * 977 + 3);
+      const list = map.flat().filter((t) => t.poi === 'town');
+      towns += list.length;
+      for (const t of list) {
+        if (waterAdjacent(map, t)) adjacent++; else dryTowns++;
+      }
+    }
+    const fraction = adjacent / towns;
+
+    // materially above the old placement, inside a sane band (measured 0.892)
+    expect(fraction).toBeGreaterThanOrEqual(OLD_FRACTION + 0.05);
+    expect(fraction).toBeLessThanOrEqual(0.97);
+    // never-100% guard: dry inland settlements (crossroads towns) still exist
+    expect(dryTowns).toBeGreaterThan(0);
+  });
+
+  test('member worlds: riverfork eligibility (on the river band, size town+) >= 1 on a strong majority of worlds', () => {
+    // Pre-bias baseline over the same seeds/options: 105/120 eligible worlds (0.875),
+    // 109 eligible settlements. Measured after #67: 109/120 (0.908), 128 settlements.
+    let eligibleWorlds = 0;
+    const WORLDS = 120;
+    for (let s = 1; s <= WORLDS; s++) {
+      const map = generateMapData(10, 10, s * 977 + 3, {}, 'grassland', { riverToSea: true, estuaryTown: true });
+      const eligible = map.flat().filter(
+        (t) => t.poi === 'town' && t.hasRiver && (t.townSize === 'town' || t.townSize === 'city')
+      );
+      if (eligible.length >= 1) eligibleWorlds++;
+    }
+    expect(eligibleWorlds / WORLDS).toBeGreaterThanOrEqual(0.85);
+  });
+
+  test('every world still places its towns and exactly one starting town (bias never starves placement)', () => {
+    for (let s = 1; s <= 40; s++) {
+      const map = generateMapData(10, 10, s * 3301 + 7);
+      const list = map.flat().filter((t) => t.poi === 'town');
+      expect(list.length).toBeGreaterThanOrEqual(3);
+      expect(list.filter((t) => t.isStartingTown)).toHaveLength(1);
+      // dealt sizes still follow the shuffled cycle: all four sizes appear on a 4+ town map
+      if (list.length >= 4) {
+        expect(new Set(list.map((t) => t.townSize)).size).toBe(4);
+      }
+    }
+  });
+});

@@ -57,6 +57,48 @@ describe('analyzeTownWater', () => {
   });
 });
 
+// Riverside detection (#68): a town orthogonally beside a land river tile gets the
+// new weakest kind, with the river edges flagged.
+describe('analyzeTownWater: riverside (#68)', () => {
+  const river = () => ({ biome: 'plains', hasRiver: true });
+
+  test.each(['N', 'E', 'S', 'W'])('river tile to the %s -> riverside on that edge', (dir) => {
+    const r = analyzeTownWater(world({ [dir]: river() }), 1, 1);
+    expect(r.kind).toBe('riverside');
+    expect(r.edges).toEqual({ N: dir === 'N', E: dir === 'E', S: dir === 'S', W: dir === 'W' });
+  });
+
+  test('rivers on two sides flag both edges', () => {
+    const r = analyzeTownWater(world({ N: river(), E: river() }), 1, 1);
+    expect(r).toEqual({ kind: 'riverside', edges: { N: true, E: true, S: false, W: false } });
+  });
+
+  test('coast/lake beat riverside (a real water body flooding the edge wins)', () => {
+    const coast = analyzeTownWater(world({ N: river(), S: { biome: 'water', isLake: false } }), 1, 1);
+    expect(coast).toEqual({ kind: 'coast', edges: { N: false, E: false, S: true, W: false } });
+    const lake = analyzeTownWater(world({ N: river(), E: { biome: 'water', isLake: true } }), 1, 1);
+    expect(lake.kind).toBe('lake');
+  });
+
+  test('diagonal-only river neighbours do not trigger riverside (orthogonal scan only)', () => {
+    expect(analyzeTownWater(world({ NE: river(), SW: river() }), 1, 1)).toBeNull();
+  });
+
+  test('a water tile carrying hasRiver is not a land river (it is the mouth/sea)', () => {
+    const r = analyzeTownWater(world({ N: { biome: 'water', isLake: false, hasRiver: true } }), 1, 1);
+    expect(r.kind).toBe('coast'); // counted as ocean, never as riverside
+  });
+
+  test('on-tile river beats adjacent: generateTownMap ignores a riverside context when hasRiver is true', () => {
+    // hasRiver -> the classic mid-town band, not the edge band (fork/band precedence)
+    const ctx = { kind: 'riverside', edges: { N: true, E: false, S: false, W: false } };
+    const town = generateTownMap('town', 'OnRiver', 'south', 4242, true, 'EAST_WEST', 'grassland', ctx);
+    expect(town.water).toBeNull(); // no riverside descriptor was produced
+    const waterway = town.mapData.flat().filter((t) => t.waterway).length;
+    expect(waterway).toBe(0); // the band is plain water, not the riverside waterway
+  });
+});
+
 // Water towns #65 Phase 3: town entry passes the world tile's `waterTown` stamp
 // through to generateTownMap as water.archetype, on top of the adjacency-derived info.
 describe('getTownWaterContext', () => {

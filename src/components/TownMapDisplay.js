@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { tileBackground, waterwayMask, POI_EMOJI } from '../utils/townTileArt';
+import { tileBackground, waterwayMask, OFF_MAP, POI_EMOJI } from '../utils/townTileArt';
 import BuildingModal from './BuildingModal';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
@@ -36,6 +36,9 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
 
   const tileAt = (c, r) => (r >= 0 && r < height && c >= 0 && c < width && mapData[r][c]) ? mapData[r][c] : null;
   const typeAt = (c, r) => { const t = tileAt(c, r); return t ? t.type : null; };
+  // waterwayMask neighbour getter: positions beyond the map border are OFF_MAP (a border
+  // channel renders open and flows off the map), missing in-bounds tiles stay null.
+  const wetAt = (c, r) => (r >= 0 && r < height && c >= 0 && c < width) ? (mapData[r][c] || null) : OFF_MAP;
 
   const handleBuildingClick = (tile) => {
     if (!playerPosition) return;
@@ -101,7 +104,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           // waterway-neighbour mask (canal banks, quay lips, bridge-over-canal): the
           // canal autotiler's input, same technique as the wall mask above but keyed on
           // the additive waterway flag, so pre-canal maps always yield 0 (old art)
-          const wetMask = waterwayMask(tile, { n: tileAt(col, row - 1), e: tileAt(col + 1, row), s: tileAt(col, row + 1), w: tileAt(col - 1, row), ne: tileAt(col + 1, row - 1), se: tileAt(col + 1, row + 1), sw: tileAt(col - 1, row + 1), nw: tileAt(col - 1, row - 1) });
+          const wetMask = waterwayMask(tile, { n: wetAt(col, row - 1), e: wetAt(col + 1, row), s: wetAt(col, row + 1), w: wetAt(col - 1, row), ne: wetAt(col + 1, row - 1), se: wetAt(col + 1, row + 1), sw: wetAt(col - 1, row + 1), nw: wetAt(col - 1, row - 1) });
           const poiEmoji = tile.poi ? (POI_EMOJI[tile.poi] || null) : null;
 
           return (

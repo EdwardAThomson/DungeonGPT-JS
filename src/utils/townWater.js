@@ -8,6 +8,15 @@
 // are present (the sea is the dominant feature). The returned `edges` say which side(s)
 // of the town the water sits on, so the generator floods inward from those edges only.
 //
+// Riverside (#68, river-settlement doctrine 1c): a town orthogonally ADJACENT to a
+// land river tile (hasRiver, not water) gets `kind: 'riverside'` with the river edges
+// flagged: the historically common one-bank case, rendered as a river band along that
+// town-map edge. Precedence, weakest to strongest: riverside < lake < coast (a real
+// water body flooding an edge beats a neighbouring stream) < the town's OWN river
+// (`hasRiver` on the tile itself; the caller carves the band/fork through town and
+// ignores an adjacent-river context) < a `waterTown` archetype stamp (riverfork/canal,
+// merged over all of this by getTownWaterContext).
+//
 // Pure + tolerant of old saves: returns null when there's no adjacent water, and never
 // throws on missing tiles / unknown biomes.
 
@@ -20,7 +29,7 @@ const DIAG_EDGES = { NE: ['N', 'E'], SE: ['S', 'E'], SW: ['S', 'W'], NW: ['N', '
  * @param {Array<Array<Object>>} worldMap - 2D world grid (rows of tiles).
  * @param {number} x - town tile column on the world map.
  * @param {number} y - town tile row on the world map.
- * @returns {{kind:'lake'|'coast', edges:{N:boolean,E:boolean,S:boolean,W:boolean}}|null}
+ * @returns {{kind:'lake'|'coast'|'riverside', edges:{N:boolean,E:boolean,S:boolean,W:boolean}}|null}
  */
 export function analyzeTownWater(worldMap, x, y) {
   if (!Array.isArray(worldMap) || !worldMap[y] || !worldMap[y][x]) return null;
@@ -58,12 +67,26 @@ export function analyzeTownWater(worldMap, x, y) {
   }
 
   const anyEdge = edges.N || edges.E || edges.S || edges.W;
-  if (!anyEdge) return null;
+  if (anyEdge) {
+    const kind = ocean ? 'coast' : (lake ? 'lake' : null);
+    if (kind) return { kind, edges };
+  }
 
-  const kind = ocean ? 'coast' : (lake ? 'lake' : null);
-  if (!kind) return null;
+  // Riverside (#68): no adjacent water body, but a land river tile orthogonally
+  // beside the town, the one-bank case. Weakest kind: only reached when neither
+  // coast nor lake claimed an edge, so those return byte-identically to before.
+  const isLandRiver = (t) => t && t.hasRiver === true && t.biome !== 'water';
+  const riverEdges = { N: false, E: false, S: false, W: false };
+  let anyRiver = false;
+  for (const [dir, [dx, dy]] of Object.entries(ORTHO)) {
+    if (isLandRiver(at(x + dx, y + dy))) {
+      riverEdges[dir] = true;
+      anyRiver = true;
+    }
+  }
+  if (anyRiver) return { kind: 'riverside', edges: riverEdges };
 
-  return { kind, edges };
+  return null;
 }
 
 /**
