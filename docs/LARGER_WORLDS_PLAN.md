@@ -108,6 +108,16 @@ right behind a debug page before release.
    benefit; do first so tuning happens on 10x10 where it is cheap).
 2. **Scroll/zoom viewport** on the display, shipped dark for 10x10 (a 10x10
    world in a viewport that exactly fits = zero visible change).
+   **BUILT (ship-dark, pending review).** `WorldMapDisplay` renders grids
+   larger than 10x10 inside a 560px scroll pane with three fixed zoom steps
+   (Fit: whole map in the pane; Mid: 36px; Close: 56px, today's size),
+   player-centered auto-scroll (open, zoom change, and near-edge moves with a
+   2-tile margin), a click-vs-pan guard, and windowed rendering above 400
+   tiles (2-tile margin). 10x10 worlds take the exact legacy render path (no
+   pane, no zoom UI; verified byte-identical HTML against the previous
+   component). Pure math in `src/utils/worldViewport.js`; acceptance surface
+   at **`/debug/large-world-viewport`** (10x10 / 20x20 / 30x30 via
+   worldAssembler, movable fake player, culling stats, pane-boundary toggle).
 3. **Edge-constraint generation + chunk assembly** behind `/debug/large-world`
    with side-by-side seam inspection; freeze the chunk-seed scheme.
    **PROTOTYPE BUILT (debug-only, scheme EXPERIMENTAL, not frozen)** — see §7a.
