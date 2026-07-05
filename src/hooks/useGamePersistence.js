@@ -100,6 +100,10 @@ const useGamePersistence = ({
   //                  save landed on this device only (auth absent OR the cloud push
   //                  failed), pending cloud sync; a reconcile retry is requested
   //                  via PENDING_LOCAL_SAVE_EVENT
+  //   'forked'     - rev conflict (SAVE_SYNC_PLAN Phase 3, §6.2): another device
+  //                  advanced this save past our common ancestor; the local
+  //                  timeline was preserved as a separate "(diverged on this
+  //                  device)" save, which this session keeps saving to
   //   'nochange'   - nothing changed since the last save; short-circuits BEFORE any
   //                  write to either store
   //   'skipped'    - nothing to save yet (no session / adventure not started / no data)
@@ -179,6 +183,18 @@ const useGamePersistence = ({
     // (legacy `true` still counts) and false on failure.
     if (result) {
       lastSaveFingerprintRef.current = fingerprint;
+      if (result.forked) {
+        // The progress is preserved (parked save), but if the parked copy is
+        // still device-only a reconcile retry is worth requesting too.
+        if (result.pendingCloudSync) {
+          try {
+            window.dispatchEvent(new Event(PENDING_LOCAL_SAVE_EVENT));
+          } catch (e) {
+            logger.debug('Could not dispatch pending-local-save event', e);
+          }
+        }
+        return 'forked';
+      }
       if (result.pendingCloudSync) {
         // Ask LocalGameSync for a reconcile pass: retries the cloud push now if
         // auth is actually live (transient push failure), otherwise the pass stays

@@ -1,7 +1,8 @@
 # Save Storage & Sync Plan — local-first saves, honest durability, divergence-safe reconcile
 
-Status: **Phases 1-2 implemented (pending review)** (Phase 1: 2026-07-04, Phase 2:
-2026-07-05); Phase 3 planned. Backlog item #54.
+Status: **Phases 1-3 implemented (pending review)** (Phase 1: 2026-07-04, Phase 2:
+2026-07-05, Phase 3: 2026-07-05, live only after the maintainer applies migration
+003 manually, see §6). Backlog item #54.
 Origin: playtest 2026-07-04. The t1 goblin-campaign save "teleported" between the
 cloud backend and the browser depending on login state (split-brain, see §2.4).
 Builds on `GUEST_MODE_PLAN.md` (localGameStore / LocalGameSync, Phase B).
@@ -167,6 +168,37 @@ sync"), and `'error'` is reserved for the case where even the local write failed
 
 ## 6. Multi-device divergence (the hard case)
 
+Status: **IMPLEMENTED (pending review) 2026-07-05** (Phase 3). Goes live once the
+maintainer applies `cf-worker/migrations/003_conversation_rev.sql` manually (apply
+the migration BEFORE deploying the Worker build: the new upsert names the `rev`
+column). Shipped mechanisms:
+- Worker upsert (`cf-worker/src/routes/db.ts`) is revision-guarded per §6.1:
+  optional `expectedRev` in the POST body gates the UPDATE arm
+  (`... DO UPDATE SET ..., rev = conversations.rev + 1 WHERE conversations.rev =
+  $expectedRev`); INSERT arm starts rev at 1; a guard miss answers
+  `409 { code: 'rev_conflict', rev, updated_at }` (the current row's). Without
+  expectedRev (legacy clients, guest sync uploads) the upsert stays unconditional
+  but still bumps rev. The messages PUT bumps rev too (content write); rename does
+  NOT (metadata; a rename must not 409-fork another device's live session).
+  The Express/SQLite dev server mirrors the whole contract.
+- Client lineage: local rows carry `base_rev` (localGameStore), set on
+  load-from-cloud (`conversationsApi.getById` adopting the cloud copy) and on
+  every successful push (`markSynced`), preserved across rewrites. Saves send it
+  as expectedRev; missing rev/base_rev means the unconditional legacy path
+  (divergence is never invented for old saves).
+- Fork-on-conflict (§6.2): on 409, `forkLocalTimeline` parks the local timeline
+  as its own save (`<sid>-local-<rand>`, "(diverged on this device, <date>)",
+  Phase-1 naming), unions the hero-grant ledgers into the adopted cloud row
+  (§9.2, guarded write-back; heroes are raised at next load by the existing
+  reconcile machinery, announced by the existing "Restored:" line), drops the
+  local shadow so reads adopt the cloud row, and redirects the live session's
+  future saves to the parked copy (one fork parks exactly one copy). performSave
+  reports `'forked'` and the save modal says so honestly.
+- The reconcile pass (`runLocalGameSyncPass`) uses the rev comparison instead of
+  timestamps whenever both sides carry lineage; the timestamp guard remains the
+  fallback for legacy rows. Verification harness: `scripts/test-cf-rev.mjs`
+  (documented, not auto-run; needs a live worker + migrated Postgres).
+
 Scenario: a cloud save falls back to local on device A (auth lapsed) and keeps
 being played. Meanwhile device B opens the **cloud** copy and plays forward.
 Two real timelines now descend from the same ancestor.
@@ -222,8 +254,12 @@ fork over sync-engine cleverness.
 | Local row | `baseRev: number` | cloud rev this copy descends from (§6.1) |
 | Local row | `pendingCloudSync: boolean` | Phase-1-only precursor of `synced` (§5) |
 
-Missing fields on old rows are treated as `synced: false` / `baseRev: 0`
-(renderer-tolerance rule; first reconcile heals them).
+Missing fields on old rows are treated as `synced: false` / "no lineage known"
+(renderer-tolerance rule; first reconcile heals them). Concretely (as shipped):
+migration 003 backfills every cloud row with `rev = 0`, and a local row without
+`base_rev` pushes WITHOUT expectedRev (the unconditional legacy upsert), so a
+legacy save can never be 409-forked by its own missing metadata; its first
+successful push records the new rev and joins the protocol.
 
 ## 8. Phasing & dependencies
 
@@ -231,8 +267,10 @@ Missing fields on old rows are treated as `synced: false` / `baseRev: 0`
 - **Phase 2 — local-first write-through + merged list** (M): §4. No schema
   change strictly required (timestamp-guarded until rev lands).
 - **Phase 3 — rev protocol + fork-on-conflict** (M): §6–7. Needs the `rev`
-  column + conditional upsert in the Worker DB routes, so it is **gated on the
-  Hetzner/Hyperdrive cutover settling** (that code is active WIP).
+  column + conditional upsert in the Worker DB routes, so it was gated on the
+  Hetzner/Hyperdrive cutover settling. *Implemented 2026-07-05 (pending review);
+  activation requires the manual apply of migration 003 (§6). Includes the §9.2
+  ledger union across diverged twins.*
 - Heroes (`heroesApi` + `localHeroStore`) get the same treatment afterwards;
   hero rows are small and conflicts even rarer, so games go first.
 
@@ -264,6 +302,10 @@ ledger rides inside the save payload (both stores), so:
 - the invariant checker gains a source of truth for healing DOWNWARD cases,
 - twin-copy divergence (§6) becomes mergeable for progression specifically:
   union the ledgers, rebuild xp/gold/items, even when narrative state forks.
+  *(Shipped with Phase 3: `unionLedgers` dedupes by event identity
+  (t + heroId + kind + magnitude + source), refuses on unshared rollups so
+  nothing ever double-counts, and the fork handler writes the union into the
+  adopted row; the load-time reconcile then raises the heroes and announces.)*
 Not a full event-sourcing rewrite: snapshots stay authoritative for world
 state; the ledger covers hero progression only.
 

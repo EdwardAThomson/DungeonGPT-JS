@@ -212,18 +212,28 @@ dbRoutes.get('/conversations/:sessionId', async (c) => {
   }
 });
 
+// Revision-guarded upsert (SAVE_SYNC_PLAN section 6.1, Phase 3). `rev` is the
+// lineage counter: a fresh INSERT starts it at 1, every write bumps it by 1.
+// When the client sends an integer `expectedRev` (the cloud rev its copy descends
+// from), the UPDATE arm only applies while `conversations.rev = expectedRev`:
+// optimistic concurrency. A guard miss means another device advanced the row past
+// the caller's ancestor (a FORK, 6.2); the caller gets 409 with the CURRENT row's
+// rev + updated_at and must park its timeline, never overwrite. Without
+// expectedRev (legacy clients, guest sync uploads) the upsert stays unconditional
+// as before, but still bumps rev so lineage keeps counting.
 dbRoutes.post('/conversations', async (c) => {
   const sql = getSql(c.env);
   try {
     const userId = c.get('userId');
     const payload = await c.req.json();
 
-    const [row] = await sql`
-      INSERT INTO conversations (
-        user_id, session_id, conversation_name, conversation_data, game_settings,
-        selected_heroes, summary, world_map, player_position, sub_maps,
-        provider, model, timestamp, updated_at
-      ) VALUES (
+    const expectedRev: number | undefined =
+      Number.isInteger(payload.expectedRev) && payload.expectedRev >= 0
+        ? payload.expectedRev
+        : undefined;
+
+    const values = sql`
+      (
         ${userId},
         ${payload.sessionId},
         ${payload.conversationName ?? null},
@@ -237,9 +247,10 @@ dbRoutes.post('/conversations', async (c) => {
         ${payload.provider || null},
         ${payload.model || null},
         ${payload.timestamp || new Date().toISOString()},
-        ${new Date().toISOString()}
-      )
-      ON CONFLICT (session_id) DO UPDATE SET
+        ${new Date().toISOString()},
+        1
+      )`;
+    const updateSet = sql`
         user_id           = EXCLUDED.user_id,
         conversation_name = EXCLUDED.conversation_name,
         conversation_data = EXCLUDED.conversation_data,
@@ -252,8 +263,48 @@ dbRoutes.post('/conversations', async (c) => {
         provider          = EXCLUDED.provider,
         model             = EXCLUDED.model,
         timestamp         = EXCLUDED.timestamp,
-        updated_at        = EXCLUDED.updated_at
-      RETURNING *`;
+        updated_at        = EXCLUDED.updated_at,
+        rev               = conversations.rev + 1`;
+
+    // Two branches instead of an empty-fragment splice: postgres.js composes
+    // sql`` fragments, but an explicit branch keeps the guarded shape readable.
+    const [row] =
+      expectedRev === undefined
+        ? await sql`
+            INSERT INTO conversations (
+              user_id, session_id, conversation_name, conversation_data, game_settings,
+              selected_heroes, summary, world_map, player_position, sub_maps,
+              provider, model, timestamp, updated_at, rev
+            ) VALUES ${values}
+            ON CONFLICT (session_id) DO UPDATE SET ${updateSet}
+            RETURNING *`
+        : await sql`
+            INSERT INTO conversations (
+              user_id, session_id, conversation_name, conversation_data, game_settings,
+              selected_heroes, summary, world_map, player_position, sub_maps,
+              provider, model, timestamp, updated_at, rev
+            ) VALUES ${values}
+            ON CONFLICT (session_id) DO UPDATE SET ${updateSet}
+            WHERE conversations.rev = ${expectedRev}
+            RETURNING *`;
+
+    if (!row) {
+      // Guard miss: the ON CONFLICT ... WHERE filtered the update away. Report the
+      // current lineage so the client can decide (it needs rev AND updated_at).
+      const [current] = await sql`
+        SELECT rev, updated_at FROM conversations
+        WHERE session_id = ${payload.sessionId}
+        LIMIT 1`;
+      return c.json(
+        {
+          error: 'Conversation was advanced by another device',
+          code: 'rev_conflict',
+          rev: current?.rev ?? null,
+          updated_at: current?.updated_at ?? null,
+        },
+        409
+      );
+    }
 
     return c.json(row, 201);
   } catch (error) {
@@ -271,10 +322,13 @@ dbRoutes.put('/conversations/:sessionId', async (c) => {
     const sessionId = c.req.param('sessionId');
     const { conversation_data } = await c.req.json();
 
+    // Content write: bumps rev (lineage counter) like the upsert does, so a
+    // message edit from one device is detectable as an advance by any other.
     const [row] = await sql`
       UPDATE conversations SET
         conversation_data = ${jsonb(sql, conversation_data)},
-        updated_at = ${new Date().toISOString()}
+        updated_at = ${new Date().toISOString()},
+        rev = conversations.rev + 1
       WHERE session_id = ${sessionId} AND user_id = ${userId}
       RETURNING *`;
 
@@ -288,6 +342,10 @@ dbRoutes.put('/conversations/:sessionId', async (c) => {
   }
 });
 
+// Rename deliberately does NOT bump rev: it is metadata, not timeline content.
+// Bumping here would make a rename from the saves list 409-fork another device's
+// live session over nothing; the client already keeps unsynced local copies'
+// names in step (conversationsApi.updateName).
 dbRoutes.put('/conversations/:sessionId/name', async (c) => {
   const sql = getSql(c.env);
   try {

@@ -92,6 +92,13 @@ const SaveConfirmationModal = () => {
     heading = '⚠ Saved on this device';
     headingColor = 'var(--state-warning, #e0a800)';
     blurb = 'Your account could not be reached, so this save is stored on this device for now. It will sync to your account automatically. Saved as:';
+  } else if (status === 'forked') {
+    // Rev conflict (SAVE_SYNC_PLAN Phase 3, §6.2): honest fork, nothing lost.
+    // No rename UI here: renaming would target the adopted cloud row, not the
+    // parked copy this session now saves to.
+    heading = '⚠ Saved as a separate copy';
+    headingColor = 'var(--state-warning, #e0a800)';
+    blurb = 'Another device advanced this save while you were playing here. Your local progress was preserved as a separate save ("diverged on this device") in your saved games, and this device will keep saving to that copy. Nothing was lost.';
   } else if (status === 'skipped') {
     heading = 'Nothing to save yet';
     headingColor = 'var(--text)';
@@ -1536,7 +1543,7 @@ const Game = ({ resumeConversation = null }) => {
             const currentRoot = (settings?.saveName || '').trim();
             const title = buildSaveName(currentRoot);
             // performSave reports what actually happened so the confirmation is honest:
-            // 'saved' | 'savedLocal' | 'nochange' | 'skipped' | 'error'.
+            // 'saved' | 'savedLocal' | 'forked' | 'nochange' | 'skipped' | 'error'.
             const status = await performSave();
             openSaveConfirmation({
               status,
