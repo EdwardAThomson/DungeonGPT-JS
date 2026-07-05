@@ -232,6 +232,22 @@ now so the tier field drops in later:
   (immersion-breaking, and the never-regenerate rule would freeze the locked state into
   the save).
 
+### 6b. Where the code lives (maintainer question 2026-07-05)
+
+**Generator, art, and gating: PUBLIC repo.** The client must render cached canal
+towns on any device, so the autotiler, waterway handling, and building art ship
+in the public bundle regardless; keeping only the layout algorithm private would
+protect the least valuable part. Precedent: desert/snow premium themes (public
+code, in-product gate, accepted by the licensing memo).
+
+**Authored canal-city CAMPAIGN: PRIVATE repo** (dungeongpt-premium-content),
+server-delivered like the heroic-t3 flagship. Authored content is the defensible
+paid artifact; the algorithm is engine.
+
+**Enforcement: server-side access, not code secrecy.** The Worker checks the
+entitlement before serving premium content or persisting premium-stamped saves
+(#39/#40, post-cutover). Client-side gates are UX, not security.
+
 ## 7. Quests & NPCs
 
 - **Staffing:** one new `populateTown` branch: boathouse -> Boatwright (proprietor
