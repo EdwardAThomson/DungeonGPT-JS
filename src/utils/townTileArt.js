@@ -66,9 +66,12 @@ const ROOFS = {
 // reads. Unknown/missing themes take the temperate branch (no material entry), which
 // keeps old cached town maps rendering exactly as before.
 const THEME_MATERIALS = {
-  // warm clay tint: roofs go terracotta, derived walls read as sun-baked adobe /
-  // sandstone and bleached timber
-  desert: { tint: '#b3663f', amount: 0.45 },
+  // pale clay tint, mixed hard: most roofs are already warm browns/reds, so a
+  // dark terracotta tint moved them a few RGB points and desert towns looked
+  // identical to grassland (playtest 2026-07-05). Mixing 60% toward pale clay
+  // lands every building in an unmistakable adobe/tan family (walls follow,
+  // they are shaded from the roof) while lightness still separates the types.
+  desert: { tint: '#c98a5a', amount: 0.6 },
   // dark timber tint so buildings sit as darker wood against the white ground; the
   // cap flag adds a white snow band across the roofline (palette-level dressing, not
   // a new shape: it is invisible where it overhangs the already-white snow ground)
