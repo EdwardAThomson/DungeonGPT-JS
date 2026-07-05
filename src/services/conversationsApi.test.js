@@ -6,7 +6,7 @@
 // The Phase 1 auth-state hardening (failed getSession() is "unknown", not "guest")
 // is pinned here too.
 
-import { conversationsApi, getLastKnownAuth, _resetAuthStateForTests } from './conversationsApi';
+import { conversationsApi, getLastKnownAuth, _resetAuthStateForTests, _resetRevStateForTests } from './conversationsApi';
 import { supabase } from './supabaseClient';
 import { localGameStore } from './localGameStore';
 import { apiFetch } from './apiClient';
@@ -28,6 +28,22 @@ jest.mock('./localGameStore', () => ({
   // Real implementation: unsynced = explicit synced:false or a Phase 1 pending
   // stamp; legacy rows without either field are NOT pending (no invented badges).
   isUnsyncedLocalRow: (row) => !!row && (row.synced === false || row.pending_cloud_sync === true),
+  // Real implementations (pure) so the rev protocol behaves as in production.
+  isValidBaseRev: (value) => Number.isInteger(value) && value >= 0,
+  rowToPayload: (row) => ({
+    sessionId: row.session_id,
+    conversationName: row.conversation_name,
+    conversation: row.conversation_data,
+    gameSettings: row.game_settings,
+    selectedHeroes: row.selected_heroes,
+    currentSummary: row.summary,
+    worldMap: row.world_map,
+    playerPosition: row.player_position,
+    sub_maps: row.sub_maps,
+    provider: row.provider,
+    model: row.model,
+    timestamp: row.timestamp,
+  }),
 }));
 
 jest.mock('./apiClient', () => ({
@@ -49,6 +65,7 @@ const LOCAL_UPDATED_AT = '2026-07-05T10:00:00.000Z';
 beforeEach(() => {
   // CRA's jest config resets mocks between tests, so implementations live here.
   _resetAuthStateForTests();
+  _resetRevStateForTests();
   apiFetch.mockImplementation(async () => ({ ok: true, json: async () => ({ success: true }) }));
   localGameStore.save.mockImplementation(async (payload, opts) => ({
     session_id: payload.sessionId,
@@ -375,6 +392,235 @@ describe('conversationsApi.remove and updateName across both stores (Phase 2)', 
     localGameStore.getById.mockResolvedValueOnce({ session_id: 's1', synced: true });
     await conversationsApi.updateName('s1', 'New Name');
     expect(localGameStore.updateName).not.toHaveBeenCalled();
+  });
+});
+
+describe('rev protocol: guarded push, fork-on-conflict, ledger union (Phase 3)', () => {
+  const sessionAlways = () =>
+    getSession.mockResolvedValue({ data: { session: { access_token: 'tok' } } });
+
+  const postCalls = () =>
+    apiFetch.mock.calls
+      .filter(([, options]) => options?.method === 'POST')
+      .map(([path, options]) => ({ path, body: JSON.parse(options.body) }));
+
+  test('load-from-cloud records the baseRev; the next save pushes it as expectedRev and fast-forwards', async () => {
+    sessionAlways();
+    // Load: the cloud copy (rev 5) is adopted.
+    apiFetch.mockImplementationOnce(async () => ({
+      ok: true,
+      json: async () => ({ session_id: 's1', rev: 5, updated_at: '2026-07-05T10:00:00.000Z' }),
+    }));
+    await conversationsApi.getById('s1');
+
+    // Save: the write-ahead row is stamped with the adopted lineage...
+    apiFetch.mockImplementationOnce(async () => ({
+      ok: true,
+      json: async () => ({ sessionId: 's1', rev: 6 }),
+    }));
+    const result = await conversationsApi.save({ sessionId: 's1' });
+
+    expect(localGameStore.save).toHaveBeenCalledWith(
+      { sessionId: 's1' },
+      { synced: false, pendingCloudSync: false, baseRev: 5 }
+    );
+    // ...the push carries it as the optimistic-concurrency guard...
+    const posts = postCalls();
+    expect(posts).toHaveLength(1);
+    expect(posts[0].body.expectedRev).toBe(5);
+    // ...and the response's new rev becomes the row's base_rev (fast-forward).
+    expect(localGameStore.markSynced).toHaveBeenCalledWith('s1', {
+      ifUpdatedAt: LOCAL_UPDATED_AT,
+      baseRev: 6,
+    });
+    expect(result.storage).toBe('cloud');
+    expect(result.forked).toBeUndefined();
+  });
+
+  test('a local row already carrying base_rev (page reload) pushes it as expectedRev', async () => {
+    sessionAlways();
+    localGameStore.save.mockImplementationOnce(async (payload) => ({
+      session_id: payload.sessionId,
+      updated_at: LOCAL_UPDATED_AT,
+      synced: false,
+      base_rev: 4,
+    }));
+    apiFetch.mockImplementationOnce(async () => ({ ok: true, json: async () => ({ rev: 5 }) }));
+
+    await conversationsApi.save({ sessionId: 's1' });
+    expect(postCalls()[0].body.expectedRev).toBe(4);
+  });
+
+  test('legacy row without any lineage: unconditional push (no expectedRev), base_rev adopted from the response', async () => {
+    sessionAlways();
+    apiFetch.mockImplementationOnce(async () => ({ ok: true, json: async () => ({ rev: 1 }) }));
+
+    await conversationsApi.save({ sessionId: 'old-save' });
+
+    const [{ body }] = postCalls();
+    expect('expectedRev' in body).toBe(false);
+    expect(localGameStore.markSynced).toHaveBeenCalledWith('old-save', {
+      ifUpdatedAt: LOCAL_UPDATED_AT,
+      baseRev: 1,
+    });
+  });
+
+  test('backend without a rev column (pre-migration): everything behaves as in Phase 2', async () => {
+    sessionAlways();
+    // Default apiFetch mock answers { success: true }: no rev anywhere.
+    const result = await conversationsApi.save({ sessionId: 's1' });
+    const [{ body }] = postCalls();
+    expect('expectedRev' in body).toBe(false);
+    expect(localGameStore.markSynced).toHaveBeenCalledWith('s1', { ifUpdatedAt: LOCAL_UPDATED_AT });
+    expect(result.storage).toBe('cloud');
+  });
+
+  test('409 forks: parks the local timeline, unions the hero ledger into the adopted row, adopts the cloud copy, redirects future saves', async () => {
+    sessionAlways();
+    const preForkEvent = { t: 1000, heroId: 'h1', kind: 'xp', amount: 100, source: 'milestone:1' };
+    const cloudOnlyEvent = { t: 2000, heroId: 'h1', kind: 'gold', amount: 50, source: 'sidequest:well' };
+    const localOnlyEvent = { t: 3000, heroId: 'h1', kind: 'xp', amount: 75, source: 'encounter' };
+    const adoptedCloudRow = {
+      session_id: 's1',
+      rev: 7,
+      updated_at: '2026-07-05T12:00:00.000Z',
+      conversation_name: 'Adventure - cloud',
+      conversation_data: [{ role: 'user', content: 'cloud timeline' }],
+      game_settings: { saveName: 'Adventure', heroLedger: [preForkEvent, cloudOnlyEvent] },
+    };
+    // Local write-ahead rows descend from rev 5 (the common ancestor) unless the
+    // caller stamps a fresher lineage (real-store precedence: opts.baseRev wins
+    // over the preserved row value).
+    localGameStore.save.mockImplementation(async (payload, opts) => ({
+      session_id: payload.sessionId,
+      updated_at: LOCAL_UPDATED_AT,
+      synced: false,
+      ...(Number.isInteger(opts?.baseRev)
+        ? { base_rev: opts.baseRev }
+        : payload.sessionId === 's1' ? { base_rev: 5 } : {}),
+    }));
+    apiFetch.mockImplementation(async (path, options = {}) => {
+      const method = options.method || 'GET';
+      if (method === 'GET') return { ok: true, json: async () => adoptedCloudRow };
+      const body = JSON.parse(options.body);
+      if (body.sessionId === 's1' && body.expectedRev === 5) {
+        // The stale push: another device advanced the row to rev 7.
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({ code: 'rev_conflict', rev: 7, updated_at: adoptedCloudRow.updated_at }),
+        };
+      }
+      return { ok: true, json: async () => ({ sessionId: body.sessionId, rev: (body.expectedRev || 0) + 1 }) };
+    });
+
+    const result = await conversationsApi.save({
+      sessionId: 's1',
+      conversationName: 'Adventure - 7/5/2026',
+      gameSettings: { saveName: 'Adventure', heroLedger: [preForkEvent, localOnlyEvent] },
+    });
+
+    // The result is an honest fork, not a silent overwrite or an error.
+    expect(result.forked).toBe(true);
+    expect(result.parkedSessionId).toMatch(/^s1-local-[a-z0-9]+$/);
+    expect(result.storage).toBe('cloud');
+    expect(result.ledgerMerged).toBe(true);
+
+    const posts = postCalls();
+    // 1: stale push (409). 2: parked copy, fresh lineage, suffixed name.
+    const parked = posts.find((p) => p.body.sessionId === result.parkedSessionId);
+    expect(parked).toBeDefined();
+    expect('expectedRev' in parked.body).toBe(false);
+    expect(parked.body.conversationName).toMatch(/^Adventure - 7\/5\/2026 \(diverged on this device, .+\)$/);
+    // 3: the ledger union write-back into the adopted row, guarded on ITS rev,
+    // carrying the deduped union (pre-fork event once, both post-fork events).
+    const unionWrite = posts.find((p) => p.body.sessionId === 's1' && p.body.expectedRev === 7);
+    expect(unionWrite).toBeDefined();
+    expect(unionWrite.body.gameSettings.heroLedger).toEqual([preForkEvent, cloudOnlyEvent, localOnlyEvent]);
+    // The adopted row's own timeline fields are preserved, not replaced by ours.
+    expect(unionWrite.body.conversation).toEqual(adoptedCloudRow.conversation_data);
+    // The local shadow of s1 is dropped: the next read resolves to the cloud row.
+    expect(localGameStore.remove).toHaveBeenCalledWith('s1');
+
+    // A later save from the still-live session belongs to the parked timeline:
+    // one fork parks exactly one copy (no fork-per-autosave cascade).
+    apiFetch.mockClear();
+    await conversationsApi.save({ sessionId: 's1', conversationName: 'Adventure - 7/5/2026' });
+    const followUp = postCalls();
+    expect(followUp).toHaveLength(1);
+    expect(followUp[0].body.sessionId).toBe(result.parkedSessionId);
+    expect(followUp[0].body.conversationName).toMatch(/\(diverged on this device, .+\)$/);
+
+    // Explicitly loading the save again re-establishes lineage and clears the
+    // redirect: saves target s1 with the freshly adopted rev.
+    apiFetch.mockClear();
+    apiFetch.mockImplementationOnce(async () => ({ ok: true, json: async () => ({ ...adoptedCloudRow, rev: 8 }) }));
+    localGameStore.getById.mockResolvedValueOnce(null);
+    await conversationsApi.getById('s1');
+    apiFetch.mockImplementationOnce(async () => ({ ok: true, json: async () => ({ rev: 9 }) }));
+    await conversationsApi.save({ sessionId: 's1' });
+    const reloaded = postCalls();
+    expect(reloaded[0].body.sessionId).toBe('s1');
+    expect(reloaded[0].body.expectedRev).toBe(8);
+  });
+
+  test('fork with nothing new in the local ledger: parked, but no union write-back (no double count)', async () => {
+    sessionAlways();
+    const sharedEvent = { t: 1000, heroId: 'h1', kind: 'xp', amount: 100, source: 'milestone:1' };
+    const cloudRow = {
+      session_id: 's2',
+      rev: 7,
+      updated_at: '2026-07-05T12:00:00.000Z',
+      conversation_data: [],
+      game_settings: { heroLedger: [sharedEvent, { t: 2000, heroId: 'h1', kind: 'gold', amount: 5, source: 'shop' }] },
+    };
+    localGameStore.save.mockImplementation(async (payload) => ({
+      session_id: payload.sessionId,
+      updated_at: LOCAL_UPDATED_AT,
+      synced: false,
+      ...(payload.sessionId === 's2' ? { base_rev: 5 } : {}),
+    }));
+    apiFetch.mockImplementation(async (path, options = {}) => {
+      const method = options.method || 'GET';
+      if (method === 'GET') return { ok: true, json: async () => cloudRow };
+      const body = JSON.parse(options.body);
+      if (body.sessionId === 's2' && body.expectedRev === 5) {
+        return { ok: false, status: 409, json: async () => ({ rev: 7 }) };
+      }
+      return { ok: true, json: async () => ({ rev: 1 }) };
+    });
+
+    const result = await conversationsApi.save({
+      sessionId: 's2',
+      gameSettings: { heroLedger: [sharedEvent] }, // strict subset: all pre-fork
+    });
+
+    expect(result.forked).toBe(true);
+    expect(result.ledgerMerged).toBe(false);
+    const unionWrites = postCalls().filter((p) => p.body.sessionId === 's2' && p.body.expectedRev === 7);
+    expect(unionWrites).toHaveLength(0);
+  });
+
+  test('updateMessages: the PUT response rev advances the lineage (no self-fork on the next save)', async () => {
+    sessionAlways();
+    apiFetch.mockImplementationOnce(async () => ({ ok: true, json: async () => ({ rev: 9 }) }));
+    await conversationsApi.updateMessages('s1', [{ role: 'user', content: 'hi' }]);
+    expect(localGameStore.markSynced).toHaveBeenCalledWith('s1', {
+      ifUpdatedAt: LOCAL_UPDATED_AT,
+      baseRev: 9,
+    });
+  });
+
+  test('guest flows never touch the rev machinery', async () => {
+    sessionAbsent();
+    const result = await conversationsApi.save({ sessionId: 'g1' });
+    expect(apiFetch).not.toHaveBeenCalled();
+    expect(result.storage).toBe('local');
+    expect(result.forked).toBeUndefined();
+    expect(localGameStore.save).toHaveBeenCalledWith(
+      { sessionId: 'g1' },
+      { synced: false, pendingCloudSync: false }
+    );
   });
 });
 

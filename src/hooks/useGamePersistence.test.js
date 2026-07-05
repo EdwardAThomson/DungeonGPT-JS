@@ -101,6 +101,12 @@ describe('performSave status reporting', () => {
     expect(await result.current.performSave()).toBe('skipped');
     expect(saveMock).not.toHaveBeenCalled();
   });
+
+  test('rev-conflict fork (Phase 3): status is "forked" so the modal can be honest', async () => {
+    const saveMock = jest.fn().mockResolvedValue({ ok: true, storage: 'cloud', pendingCloudSync: false, forked: true });
+    const { result } = renderPersistence(saveMock);
+    expect(await result.current.performSave()).toBe('forked');
+  });
 });
 
 describe('reconcile trigger on savedLocal (Phase 2)', () => {
@@ -116,6 +122,18 @@ describe('reconcile trigger on savedLocal (Phase 2)', () => {
       const saveMock = jest.fn().mockResolvedValue({ ok: true, storage: 'local', pendingCloudSync: true });
       const { result } = renderPersistence(saveMock);
       expect(await result.current.performSave()).toBe('savedLocal');
+      expect(listener).toHaveBeenCalledTimes(1);
+    } finally {
+      stop();
+    }
+  });
+
+  test("a fork whose parked copy is still device-only fires the reconcile event too", async () => {
+    const { listener, stop } = listen();
+    try {
+      const saveMock = jest.fn().mockResolvedValue({ ok: true, storage: 'local', pendingCloudSync: true, forked: true });
+      const { result } = renderPersistence(saveMock);
+      expect(await result.current.performSave()).toBe('forked');
       expect(listener).toHaveBeenCalledTimes(1);
     } finally {
       stop();

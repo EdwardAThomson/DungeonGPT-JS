@@ -3,10 +3,13 @@ import {
   auditHeroAgainstLedger,
   LEDGER_MAX_EVENTS,
   LEDGER_TRIM_TO,
+  ledgerEventIdentity,
   ROLLUP_KIND,
   sumLedger,
-  trimLedger
+  trimLedger,
+  unionLedgers
 } from './heroLedger';
+import { reconcileHeroWithLedger } from './heroInvariants';
 
 const xpEvent = (heroId, amount, extra = {}) => ({ heroId, kind: 'xp', amount, source: 'test', ...extra });
 const goldEvent = (heroId, amount) => ({ heroId, kind: 'gold', amount, source: 'test' });
@@ -174,5 +177,94 @@ describe('auditHeroAgainstLedger', () => {
     const { heroId, discrepancies } = auditHeroAgainstLedger({ xp: 0 }, ledger);
     expect(heroId).toBe(null);
     expect(discrepancies).toEqual([]);
+  });
+});
+
+describe('unionLedgers (fork resolution, SAVE_SYNC_PLAN 9.2 / 6.2)', () => {
+  // Two timelines that diverged after sharing a pre-fork history.
+  const preFork = [
+    { t: 1000, heroId: 'h1', kind: 'xp', amount: 100, source: 'milestone:1' },
+    { t: 1500, heroId: 'h1', kind: 'gold', amount: 20, source: 'sidequest:well' }
+  ];
+  const cloudOnly = { t: 2000, heroId: 'h1', kind: 'gold', amount: 50, source: 'shop' };
+  const localOnly = { t: 3000, heroId: 'h1', kind: 'xp', amount: 75, source: 'encounter' };
+  const adopted = [...preFork, cloudOnly];
+  const parked = [...preFork, localOnly];
+
+  it('merges events from both timelines, deduping shared pre-fork history by identity', () => {
+    const { ledger, added, aborted } = unionLedgers(adopted, parked);
+    expect(aborted).toBe(false);
+    expect(added).toBe(1);
+    expect(ledger).toEqual([...preFork, cloudOnly, localOnly]); // chronological
+    // The union sums cover progression EARNED on both sides, counted once.
+    expect(sumLedger(ledger, 'h1')).toEqual({ xp: 175, gold: 70, itemsGranted: {} });
+  });
+
+  it('identity covers t + heroId + kind + magnitude + source (same-looking grants at different times both count)', () => {
+    const again = { ...localOnly, t: 3001 };
+    const { ledger } = unionLedgers([localOnly], [again]);
+    expect(ledger).toHaveLength(2);
+    expect(ledgerEventIdentity(localOnly)).not.toBe(ledgerEventIdentity(again));
+    expect(ledgerEventIdentity(localOnly)).toBe(ledgerEventIdentity({ ...localOnly }));
+  });
+
+  it('is idempotent: re-running the union adds nothing and returns the same array', () => {
+    const first = unionLedgers(adopted, parked).ledger;
+    const second = unionLedgers(first, parked);
+    expect(second.added).toBe(0);
+    expect(second.ledger).toBe(first); // identity contract: unchanged input back
+  });
+
+  it('returns the same array when the incoming ledger brings nothing (subset or empty)', () => {
+    expect(unionLedgers(adopted, preFork).ledger).toBe(adopted);
+    expect(unionLedgers(adopted, []).ledger).toBe(adopted);
+    expect(unionLedgers(adopted, null).ledger).toBe(adopted);
+  });
+
+  it('refuses (aborted) when the PARKED side carries a rollup the adopted side does not share', () => {
+    const parkedRollup = { t: 2500, heroId: 'h1', kind: ROLLUP_KIND, xp: 100, gold: 20, items: {}, source: 'rollup' };
+    const { ledger, aborted } = unionLedgers(adopted, [parkedRollup, localOnly]);
+    expect(aborted).toBe(true);
+    expect(ledger).toBe(adopted); // adopted ledger untouched, nothing double-counts
+  });
+
+  it('refuses when the ADOPTED side carries an unshared rollup (incoming raws may be folded inside it)', () => {
+    const adoptedRollup = { t: 500, heroId: 'h1', kind: ROLLUP_KIND, xp: 100, gold: 20, items: {}, source: 'rollup' };
+    const { aborted } = unionLedgers([adoptedRollup, cloudOnly], parked);
+    expect(aborted).toBe(true);
+  });
+
+  it('a rollup SHARED by both timelines (trim happened before the fork) dedupes and unions safely', () => {
+    const sharedRollup = { t: 500, heroId: 'h1', kind: ROLLUP_KIND, xp: 300, gold: 0, items: {}, source: 'rollup' };
+    const { ledger, aborted } = unionLedgers([sharedRollup, cloudOnly], [sharedRollup, localOnly]);
+    expect(aborted).toBe(false);
+    expect(ledger).toEqual([sharedRollup, cloudOnly, localOnly]);
+    expect(sumLedger(ledger, 'h1')).toEqual({ xp: 375, gold: 50, itemsGranted: {} });
+  });
+
+  it('drops malformed incoming events (no heroId/kind) instead of merging them', () => {
+    const { ledger, added } = unionLedgers(adopted, [{ t: 9, kind: 'xp', amount: 5 }, localOnly]);
+    expect(added).toBe(1);
+    expect(ledger).toContainEqual(localOnly);
+  });
+
+  it('caps an oversized union through the rollup trim (sums preserved)', () => {
+    const base = Array.from({ length: LEDGER_MAX_EVENTS }, (_, i) => xpEvent('h1', 1, { t: i + 1 }));
+    const extra = [xpEvent('h1', 5, { t: LEDGER_MAX_EVENTS + 1 })];
+    const { ledger } = unionLedgers(base, extra);
+    expect(ledger.length).toBeLessThanOrEqual(LEDGER_TRIM_TO + 1);
+    expect(sumLedger(ledger, 'h1')).toEqual({ xp: LEDGER_MAX_EVENTS + 5, gold: 0, itemsGranted: {} });
+  });
+
+  it('the union sums reconcile the ADOPTED heroes upward (losing-timeline earnings survive the fork)', () => {
+    // The adopted snapshot only knows its own timeline: 100 xp + 70 gold.
+    const adoptedHero = { heroId: 'h1', characterName: 'Wynn', heroClass: 'Wizard', level: 1, xp: 100, gold: 70, maxHP: 8, currentHP: 8, inventory: [] };
+    const { ledger } = unionLedgers(adopted, parked);
+    const { hero, healed } = reconcileHeroWithLedger(adoptedHero, ledger);
+    expect(hero.xp).toBe(175); // + the 75 earned on the parked timeline
+    expect(healed.some((line) => line.includes('XP 100 -> 175'))).toBe(true);
+    // Re-running against the same union changes nothing (no double-counting).
+    const again = reconcileHeroWithLedger(hero, ledger);
+    expect(again.hero).toBe(hero);
   });
 });

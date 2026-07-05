@@ -122,6 +122,76 @@ export const appendLedgerEvents = (settings, events) => {
   return { ...settings, heroLedger: next };
 };
 
+/**
+ * Identity of a ledger event, for cross-timeline dedupe (SAVE_SYNC_PLAN 9.2:
+ * twin-copy divergence union). Two events are THE SAME grant when their
+ * timestamp, hero, kind, magnitude (amount / key+count, or rollup sums) and
+ * source all match: events recorded before a fork exist identically in both
+ * timelines and must not double-count.
+ * @param {Object} event
+ * @returns {string}
+ */
+export const ledgerEventIdentity = (event) =>
+  JSON.stringify([
+    event?.t ?? null,
+    event?.heroId ?? null,
+    event?.kind ?? null,
+    event?.amount ?? null,
+    event?.key ?? null,
+    event?.count ?? null,
+    event?.source ?? null,
+    // Rollup baselines carry their sums instead of amount/key.
+    event?.xp ?? null,
+    event?.gold ?? null,
+    event?.items ?? null,
+  ]);
+
+/**
+ * Union two diverged timelines' ledgers (SAVE_SYNC_PLAN 9.2 / fork resolution,
+ * 6.2): every event from `incoming` that `base` does not already contain (by
+ * ledgerEventIdentity) is merged in, so progression earned on the losing
+ * timeline survives even though its narrative fork is parked. Pure and
+ * idempotent: re-running with the same inputs adds nothing (dedupe by identity),
+ * and the SAME `base` array comes back when there is nothing to add.
+ *
+ * Rollup safety: a rollup baseline folds older raw events away, so combining a
+ * rollup from one timeline with raw events from the other can double-count the
+ * pre-fork history. The union therefore refuses (returns `base` unchanged, with
+ * `aborted: true` in the meta) whenever the two sides disagree about rollups:
+ * an incoming rollup `base` does not share, or a `base` rollup `incoming` does
+ * not share. Shared (identical) rollups dedupe away and are safe. Forks are
+ * rare and the cap is 400 events, so a refused union is the corner of a corner;
+ * the adopted ledger simply stays as it was, losing nothing it already had.
+ *
+ * @param {Array} base - the ADOPTED timeline's ledger (kept on refusal)
+ * @param {Array} incoming - the parked timeline's ledger
+ * @returns {{ ledger: Array, added: number, aborted: boolean }}
+ */
+export const unionLedgers = (base, incoming) => {
+  const safeBase = Array.isArray(base) ? base : [];
+  const safeIncoming = Array.isArray(incoming) ? incoming : [];
+  if (safeIncoming.length === 0) return { ledger: safeBase, added: 0, aborted: false };
+
+  const baseIds = new Set(safeBase.map(ledgerEventIdentity));
+  const added = safeIncoming.filter(
+    (event) => event && event.heroId && event.kind && !baseIds.has(ledgerEventIdentity(event))
+  );
+  if (added.length === 0) return { ledger: safeBase, added: 0, aborted: false };
+
+  const incomingIds = new Set(safeIncoming.map(ledgerEventIdentity));
+  const unsharedRollup =
+    added.some((event) => event.kind === ROLLUP_KIND) ||
+    safeBase.some(
+      (event) => event?.kind === ROLLUP_KIND && !incomingIds.has(ledgerEventIdentity(event))
+    );
+  if (unsharedRollup) return { ledger: safeBase, added: 0, aborted: true };
+
+  // Chronological order keeps the trim fold (oldest-first) meaningful.
+  let merged = [...safeBase, ...added].sort((a, b) => (Number(a?.t) || 0) - (Number(b?.t) || 0));
+  if (merged.length > LEDGER_MAX_EVENTS) merged = trimLedger(merged);
+  return { ledger: merged, added: added.length, aborted: false };
+};
+
 /** Count how many of `key` a hero currently holds (string or object entries). */
 const countHeld = (inventory, key) => {
   let held = 0;

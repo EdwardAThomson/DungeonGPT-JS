@@ -53,7 +53,11 @@ const _clear = () => run('readwrite', (s) => s.clear());
 // write-through save stamps `synced: false`; markSynced() flips it to true after a
 // confirmed cloud push. Only stamped when the caller passes an explicit boolean, so
 // rows written by other paths keep their legacy shape.
-export const mapPayloadToRow = (payload, { pendingCloudSync = false, synced } = {}) => {
+// `baseRev` is the Phase 3 lineage marker (SAVE_SYNC_PLAN §6.1): the cloud rev this
+// copy descends from, recorded on load-from-cloud and on every successful push.
+// Only stamped when the caller passes a non-negative integer; legacy rows without
+// the field behave as "no lineage known" (never invents divergence, §7).
+export const mapPayloadToRow = (payload, { pendingCloudSync = false, synced, baseRev } = {}) => {
   const now = new Date().toISOString();
   const sessionId = payload.sessionId || payload.session_id;
   const row = {
@@ -74,8 +78,35 @@ export const mapPayloadToRow = (payload, { pendingCloudSync = false, synced } = 
   };
   if (pendingCloudSync) row.pending_cloud_sync = true;
   if (typeof synced === 'boolean') row.synced = synced;
+  if (isValidBaseRev(baseRev)) row.base_rev = baseRev;
   return row;
 };
+
+// The base_rev contract (SAVE_SYNC_PLAN §6.1/§7): a non-negative integer or
+// nothing. Anything else (missing, null, strings from old shapes) means "no cloud
+// lineage recorded" and the push protocol falls back to the unconditional write.
+export const isValidBaseRev = (value) => Number.isInteger(value) && value >= 0;
+
+// Inverse of mapPayloadToRow: a stored row back to the camelCase payload the save
+// backends destructure. Owned here (next to the row shape) so both LocalGameSync
+// (sync-pass uploads) and conversationsApi (fork parking, ledger-union write-back
+// of a fetched cloud row) share one mapping. Sync/lineage fields (synced,
+// pending_cloud_sync, base_rev, rev) intentionally do not travel: a payload built
+// from a row is a fresh write, and its lineage is decided by the caller.
+export const rowToPayload = (row) => ({
+  sessionId: row.session_id,
+  conversationName: row.conversation_name,
+  conversation: row.conversation_data,
+  gameSettings: row.game_settings,
+  selectedHeroes: row.selected_heroes,
+  currentSummary: row.summary,
+  worldMap: row.world_map,
+  playerPosition: row.player_position,
+  sub_maps: row.sub_maps,
+  provider: row.provider,
+  model: row.model,
+  timestamp: row.timestamp,
+});
 
 // A local row counts as unsynced when it still needs to reach the account: the
 // Phase 2 dirty flag says so, or a Phase 1 pending stamp survives. Rows without
@@ -103,11 +134,17 @@ export const localGameStore = {
   async save(payload, opts = {}) {
     const row = mapPayloadToRow(payload, opts);
     if (!row.session_id) throw new Error('localGameStore.save: missing sessionId');
-    if (!row.pending_cloud_sync) {
-      // Never let an unstamped overwrite erase an earlier fallback stamp: the row
-      // still needs to reach the account even if this write was guest-routed.
-      const existing = await _get(row.session_id).catch(() => null);
-      if (existing?.pending_cloud_sync) row.pending_cloud_sync = true;
+    const existing = await _get(row.session_id).catch(() => null);
+    // Never let an unstamped overwrite erase an earlier fallback stamp: the row
+    // still needs to reach the account even if this write was guest-routed.
+    if (existing?.pending_cloud_sync && !row.pending_cloud_sync) {
+      row.pending_cloud_sync = true;
+    }
+    // Lineage follows the row: a rewrite without an explicit baseRev keeps
+    // descending from the same cloud rev the previous write did (§6.1). An
+    // explicit opts.baseRev (fresh load-from-cloud knowledge) wins instead.
+    if (row.base_rev === undefined && isValidBaseRev(existing?.base_rev)) {
+      row.base_rev = existing.base_rev;
     }
     await _put(row);
     return row;
@@ -131,15 +168,27 @@ export const localGameStore = {
   // `synced: false` must survive, so the mark is skipped. `syncedAt` records the
   // updated_at we sent to the cloud (timestamp comparisons until the rev
   // protocol, §6). Clearing pending_cloud_sync heals Phase 1 stamps too.
-  async markSynced(sessionId, { ifUpdatedAt, syncedAt } = {}) {
+  // Phase 3: `baseRev` records the rev the cloud row now carries after our push.
+  // It is applied EVEN when the ifUpdatedAt guard skips the synced flip: the
+  // newer write that raced us happened on this same device, in the same session,
+  // AFTER the state we just pushed, so it descends from the pushed rev too.
+  // Leaving the old base_rev in place would make that successor 409-fork against
+  // our own push.
+  async markSynced(sessionId, { ifUpdatedAt, syncedAt, baseRev } = {}) {
     const row = await _get(sessionId);
     if (!row) return null;
+    const applyBaseRev = isValidBaseRev(baseRev);
     if (ifUpdatedAt && row.updated_at !== ifUpdatedAt) {
       logger.debug(`markSynced skipped for ${sessionId}: row was rewritten mid-push`);
+      if (applyBaseRev && row.base_rev !== baseRev) {
+        row.base_rev = baseRev;
+        await _put(row);
+      }
       return null;
     }
     row.synced = true;
     row.synced_at = syncedAt || row.updated_at;
+    if (applyBaseRev) row.base_rev = baseRev;
     delete row.pending_cloud_sync;
     await _put(row);
     return row;

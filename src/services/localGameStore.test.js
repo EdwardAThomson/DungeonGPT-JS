@@ -7,7 +7,7 @@
 // installed, so a minimal in-memory fake covers the one-request-per-transaction
 // pattern localGameStore uses.
 
-import { localGameStore, mapPayloadToRow, isUnsyncedLocalRow } from './localGameStore';
+import { localGameStore, mapPayloadToRow, isUnsyncedLocalRow, isValidBaseRev } from './localGameStore';
 
 const makeFakeIndexedDB = () => {
   const data = new Map();
@@ -138,6 +138,69 @@ describe('write-through synced flag (Phase 2)', () => {
     await localGameStore.markSynced('s1');
     await localGameStore.updateMessages('s1', [{ role: 'user', content: 'x' }], { synced: false });
     expect((await localGameStore.getById('s1')).synced).toBe(false);
+  });
+});
+
+describe('base_rev lineage marker (Phase 3, SAVE_SYNC_PLAN §6.1)', () => {
+  test('mapPayloadToRow stamps base_rev only for a valid non-negative integer', () => {
+    expect(mapPayloadToRow({ sessionId: 's1' }, { baseRev: 5 }).base_rev).toBe(5);
+    expect(mapPayloadToRow({ sessionId: 's1' }, { baseRev: 0 }).base_rev).toBe(0);
+    expect('base_rev' in mapPayloadToRow({ sessionId: 's1' })).toBe(false);
+    expect('base_rev' in mapPayloadToRow({ sessionId: 's1' }, { baseRev: -1 })).toBe(false);
+    expect('base_rev' in mapPayloadToRow({ sessionId: 's1' }, { baseRev: '5' })).toBe(false);
+  });
+
+  test('isValidBaseRev: integers >= 0 only (missing rev on legacy rows means "no lineage")', () => {
+    expect(isValidBaseRev(0)).toBe(true);
+    expect(isValidBaseRev(7)).toBe(true);
+    expect(isValidBaseRev(-1)).toBe(false);
+    expect(isValidBaseRev('7')).toBe(false);
+    expect(isValidBaseRev(undefined)).toBe(false);
+    expect(isValidBaseRev(null)).toBe(false);
+  });
+
+  test('a rewrite without an explicit baseRev keeps descending from the same rev (preserved)', async () => {
+    await localGameStore.save({ sessionId: 's1' }, { synced: false, baseRev: 4 });
+    const rewritten = await localGameStore.save({ sessionId: 's1' }, { synced: false });
+    expect(rewritten.base_rev).toBe(4);
+    expect((await localGameStore.getById('s1')).base_rev).toBe(4);
+  });
+
+  test('an explicit baseRev (fresh load-from-cloud knowledge) wins over the preserved one', async () => {
+    await localGameStore.save({ sessionId: 's1' }, { synced: false, baseRev: 4 });
+    const rewritten = await localGameStore.save({ sessionId: 's1' }, { synced: false, baseRev: 9 });
+    expect(rewritten.base_rev).toBe(9);
+  });
+
+  test('updateMessages keeps the row lineage (row is mutated in place)', async () => {
+    await localGameStore.save({ sessionId: 's1' }, { synced: false, baseRev: 4 });
+    await localGameStore.updateMessages('s1', [{ role: 'user', content: 'hi' }], { synced: false });
+    expect((await localGameStore.getById('s1')).base_rev).toBe(4);
+  });
+
+  test('markSynced advances base_rev to the pushed rev', async () => {
+    const saved = await localGameStore.save({ sessionId: 's1' }, { synced: false, baseRev: 4 });
+    await localGameStore.markSynced('s1', { ifUpdatedAt: saved.updated_at, baseRev: 5 });
+    const row = await localGameStore.getById('s1');
+    expect(row.synced).toBe(true);
+    expect(row.base_rev).toBe(5);
+  });
+
+  test('markSynced guard-skip still advances base_rev (same-device successor descends from the pushed rev)', async () => {
+    await localGameStore.save({ sessionId: 's1' }, { synced: false, baseRev: 4 });
+    // A newer save rewrote the row mid-push: the synced flip must not apply, but
+    // the successor's next push must guard against the rev we just created, not
+    // fork against our own write.
+    const marked = await localGameStore.markSynced('s1', { ifUpdatedAt: '2020-01-01T00:00:00.000Z', baseRev: 5 });
+    expect(marked).toBeNull();
+    const row = await localGameStore.getById('s1');
+    expect(row.synced).toBe(false);
+    expect(row.base_rev).toBe(5);
+  });
+
+  test('legacy rows never gain base_rev on their own', async () => {
+    await localGameStore.save({ sessionId: 'old' }, { synced: false });
+    expect('base_rev' in (await localGameStore.getById('old'))).toBe(false);
   });
 });
 

@@ -115,11 +115,14 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
             // Surface where the durable copy landed (SAVE_SYNC_PLAN Phase 2) so
             // useGamePersistence can report an honest status: pendingCloudSync means
             // an account-holder's save is device-only for now (auth absent or the
-            // cloud push failed) and awaits reconcile.
+            // cloud push failed) and awaits reconcile. `forked` (Phase 3, §6.2)
+            // means another device advanced this save and the local timeline was
+            // preserved as a separate save; the save UI must say so.
             return {
                 ok: true,
                 storage: result?.storage,
-                pendingCloudSync: !!result?.pendingCloudSync
+                pendingCloudSync: !!result?.pendingCloudSync,
+                forked: !!result?.forked
             };
 
         } catch (error) {

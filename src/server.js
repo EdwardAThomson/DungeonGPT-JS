@@ -437,6 +437,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
             logger.error('Error adding sub_maps column', err);
           }
         });
+
+        // Save-sync rev protocol (docs/SAVE_SYNC_PLAN.md section 6, Phase 3): the
+        // lineage counter, mirroring cf-worker migration 003 so the dev backend
+        // exercises the same guarded-upsert / 409 contract as production.
+        db.run(`ALTER TABLE conversations ADD COLUMN rev INTEGER DEFAULT 0`, (err) => {
+          if (err && !err.message.includes('duplicate column name')) {
+            logger.error('Error adding rev column', err);
+          }
+        });
       }
     });
   }
@@ -708,6 +717,12 @@ app.post('/api/conversations', (req, res) => {
 
     const { sessionId, conversation, provider, model, timestamp, conversationName, gameSettings, selectedHeroes, currentSummary, worldMap, playerPosition, sub_maps, subMaps } = req.body;
     const effectiveSubMaps = sub_maps || subMaps;
+    // Rev protocol (SAVE_SYNC_PLAN section 6.1): optional optimistic-concurrency
+    // guard, same contract as the CF Worker route. Absent => unconditional upsert
+    // (legacy clients), but rev still bumps so lineage keeps counting.
+    const expectedRev = Number.isInteger(req.body.expectedRev) && req.body.expectedRev >= 0
+      ? req.body.expectedRev
+      : undefined;
 
     logger.debug('Received save request', {
       sessionId,
@@ -723,10 +738,14 @@ app.post('/api/conversations', (req, res) => {
     const positionJson = playerPosition ? JSON.stringify(playerPosition) : null;
     const subMapsJson = effectiveSubMaps ? JSON.stringify(effectiveSubMaps) : null;
 
-    // SQL Query using ON CONFLICT for Upsert behavior
+    // SQL Query using ON CONFLICT for Upsert behavior. A fresh INSERT starts the
+    // lineage counter at 1; every update bumps it. With expectedRev the UPDATE arm
+    // is guarded (WHERE rev = ?): a guard miss changes nothing and is answered 409
+    // with the current rev, exactly like the CF Worker route.
+    const revGuard = expectedRev === undefined ? '' : 'WHERE COALESCE(conversations.rev, 0) = ?';
     const query = `
-      INSERT INTO conversations (sessionId, conversation_data, provider, model, timestamp, conversation_name, game_settings, selected_heroes, summary, world_map, player_position, sub_maps)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO conversations (sessionId, conversation_data, provider, model, timestamp, conversation_name, game_settings, selected_heroes, summary, world_map, player_position, sub_maps, rev)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
       ON CONFLICT (sessionId)
       DO UPDATE SET
         conversation_data = excluded.conversation_data,
@@ -739,7 +758,9 @@ app.post('/api/conversations', (req, res) => {
         summary = excluded.summary,
         world_map = excluded.world_map,
         player_position = excluded.player_position,
-        sub_maps = excluded.sub_maps;
+        sub_maps = excluded.sub_maps,
+        rev = COALESCE(conversations.rev, 0) + 1
+      ${revGuard};
     `;
 
     const params = [
@@ -756,6 +777,7 @@ app.post('/api/conversations', (req, res) => {
       positionJson,
       subMapsJson
     ];
+    if (expectedRev !== undefined) params.push(expectedRev);
 
     db.run(query, params, function (err) {
       if (err) {
@@ -763,8 +785,34 @@ app.post('/api/conversations', (req, res) => {
         return sendError(res, 500, 'Server error saving conversation', err.message);
       }
 
+      if (expectedRev !== undefined && this.changes === 0) {
+        // Guard miss: another device advanced the row past the caller's baseRev.
+        // 409 contract: the CURRENT row's rev + updated_at (SQLite rows have no
+        // updated_at column, so the freshest timestamp stands in).
+        return db.get(`SELECT rev, timestamp FROM conversations WHERE sessionId = ?`, [sessionId], (getErr, row) => {
+          if (getErr) {
+            logger.error('Error reading current rev after guard miss', getErr);
+            return sendError(res, 500, 'Server error saving conversation', getErr.message);
+          }
+          logger.warn(`Rev conflict for session ${sessionId}: expected ${expectedRev}, current ${row?.rev}`);
+          return res.status(409).json({
+            error: 'Conversation was advanced by another device',
+            code: 'rev_conflict',
+            rev: row?.rev ?? null,
+            updated_at: row?.timestamp ?? null
+          });
+        });
+      }
+
       logger.debug(`Conversation saved/updated for session ${sessionId}. Rows affected: ${this.changes}`);
-      res.status(201).json({ message: 'Conversation saved successfully', sessionId });
+      // Report the row's new rev so the client can record it as base_rev.
+      db.get(`SELECT rev FROM conversations WHERE sessionId = ?`, [sessionId], (getErr, row) => {
+        if (getErr) {
+          logger.warn('Saved, but failed to read back rev', getErr);
+          return res.status(201).json({ message: 'Conversation saved successfully', sessionId });
+        }
+        res.status(201).json({ message: 'Conversation saved successfully', sessionId, rev: row?.rev });
+      });
     });
 
   } catch (error) {
@@ -817,7 +865,8 @@ app.put('/api/conversations/:sessionId', (req, res) => {
   const { conversation_data } = req.body;
 
   const conversationDataStr = JSON.stringify(conversation_data);
-  const query = `UPDATE conversations SET conversation_data = ? WHERE sessionId = ?`;
+  // Content write: bumps the lineage counter, matching the CF Worker route.
+  const query = `UPDATE conversations SET conversation_data = ?, rev = COALESCE(rev, 0) + 1 WHERE sessionId = ?`;
 
   db.run(query, [conversationDataStr, sessionId], function (err) {
     if (err) {
@@ -826,7 +875,12 @@ app.put('/api/conversations/:sessionId', (req, res) => {
     } else if (this.changes === 0) {
       return sendError(res, 404, 'Conversation not found');
     } else {
-      res.json({ message: 'Conversation data updated successfully' });
+      db.get(`SELECT rev FROM conversations WHERE sessionId = ?`, [sessionId], (getErr, row) => {
+        if (getErr) {
+          return res.json({ message: 'Conversation data updated successfully' });
+        }
+        res.json({ message: 'Conversation data updated successfully', rev: row?.rev });
+      });
     }
   });
 });

@@ -33,10 +33,26 @@ jest.mock('../contexts/AuthContext', () => ({
 
 jest.mock('../services/conversationsApi', () => ({
   conversationsApi: { save: jest.fn(), getById: jest.fn() },
+  forkLocalTimeline: jest.fn(),
 }));
 
 jest.mock('../services/localGameStore', () => ({
   localGameStore: { list: jest.fn(), remove: jest.fn(), markSynced: jest.fn() },
+  isValidBaseRev: (value) => Number.isInteger(value) && value >= 0,
+  rowToPayload: (row) => ({
+    sessionId: row.session_id,
+    conversationName: row.conversation_name,
+    conversation: row.conversation_data,
+    gameSettings: row.game_settings,
+    selectedHeroes: row.selected_heroes,
+    currentSummary: row.summary,
+    worldMap: row.world_map,
+    playerPosition: row.player_position,
+    sub_maps: row.sub_maps,
+    provider: row.provider,
+    model: row.model,
+    timestamp: row.timestamp,
+  }),
 }));
 
 const localRow = {

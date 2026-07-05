@@ -10,8 +10,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { conversationsApi } from '../services/conversationsApi';
-import { localGameStore } from '../services/localGameStore';
+import { conversationsApi, forkLocalTimeline } from '../services/conversationsApi';
+import { localGameStore, rowToPayload, isValidBaseRev } from '../services/localGameStore';
 import { supabase } from '../services/supabaseClient';
 import { PENDING_LOCAL_SAVE_EVENT } from '../game/saveController';
 import { createLogger } from '../utils/logger';
@@ -19,25 +19,10 @@ import { createLogger } from '../utils/logger';
 const logger = createLogger('local-game-sync');
 
 // localGameStore rows are stored in the backend's snake_case shape; conversationsApi.save
-// expects the camelCase payload. Map back so the upserted cloud row matches the local one
-// (session_id preserved → the live game keeps autosaving to the same row after sign-in).
-export const rowToPayload = (row) => ({
-  sessionId: row.session_id,
-  conversationName: row.conversation_name,
-  conversation: row.conversation_data,
-  gameSettings: row.game_settings,
-  selectedHeroes: row.selected_heroes,
-  currentSummary: row.summary,
-  worldMap: row.world_map,
-  playerPosition: row.player_position,
-  sub_maps: row.sub_maps,
-  provider: row.provider,
-  model: row.model,
-  timestamp: row.timestamp,
-});
-
-// Short random suffix for parking a diverged local copy under its own session_id.
-const shortId = () => Math.random().toString(36).slice(2, 8);
+// expects the camelCase payload. The mapping lives next to the row shape in
+// localGameStore (rowToPayload); re-exported here for the round-trip tests and
+// any older imports.
+export { rowToPayload };
 
 // The live session keeps its local write-ahead copy (§10 leaning: keep while live);
 // only other sessions' local rows may be pruned once they are safely in the cloud.
@@ -53,13 +38,20 @@ const getLiveSessionId = () => {
 // - Rows explicitly marked synced:true are already in the account: the LIVE
 //   session's copy is kept (write-ahead cache), any other is pruned (Phase 2, §4).
 // - Unsynced rows (synced:false, a Phase 1 pending stamp, or legacy rows with
-//   neither field: guest saves must still convert losslessly) are pushed with the
-//   timestamp guard: if the cloud already holds a NEWER copy of the same session,
-//   do NOT overwrite it (§5/§6.2): park the local copy as a separate save (new
-//   session_id, name suffixed "(diverged on this device, <date>)") so both
-//   timelines survive. Otherwise (cloud older or missing) upload as-is, same
-//   session_id. After a successful push the live session's row is marked synced
-//   and kept; other rows are removed.
+//   neither field: guest saves must still convert losslessly) are pushed under a
+//   divergence guard: if the cloud already holds a copy this row does NOT descend
+//   from, do NOT overwrite it (§6.2): the local copy is parked as a separate save
+//   ("(diverged on this device, <date>)", forkLocalTimeline) so both timelines
+//   survive. Otherwise (cloud behind or missing) upload as-is, same session_id.
+//   After a successful push the live session's row is marked synced and kept;
+//   other rows are removed.
+// - Phase 3 (§6.1): when both sides carry lineage (the cloud row has `rev`, the
+//   local row has `base_rev`) the rev comparison REPLACES the timestamp one:
+//   cloud rev beyond our base means fork, equal means fast-forward, and the push
+//   itself is still rev-guarded inside conversationsApi.save (a mid-pass race
+//   comes back as `forked`). The timestamp guard remains the fallback for legacy
+//   rows on either side; rows with no comparable signal at all upload as before
+//   (never invent divergence for old saves).
 // Rows whose upload fails, or whose write routed back to local storage because auth
 // vanished again mid-pass, stay local for the next pass.
 export const runLocalGameSyncPass = async () => {
@@ -92,41 +84,60 @@ export const runLocalGameSyncPass = async () => {
       continue;
     }
     try {
-      // Timestamp guard: never clobber a newer cloud row with a stale local one.
+      // Divergence guard: never clobber a cloud row this local one does not
+      // descend from. Rev lineage when both sides have it, timestamps otherwise.
       let cloudRow = null;
       try {
         cloudRow = await conversationsApi.getById(row.session_id);
       } catch (e) {
         cloudRow = null; // 404 or fetch failure: treat as "no cloud copy"
       }
-      const cloudTime = cloudRow?.updated_at ? Date.parse(cloudRow.updated_at) : NaN;
-      const localTime = row.updated_at ? Date.parse(row.updated_at) : NaN;
-      const cloudIsNewer = Number.isFinite(cloudTime) && Number.isFinite(localTime) && cloudTime > localTime;
 
-      let payload = rowToPayload(row);
-      if (cloudIsNewer) {
-        const divergedDate = new Date(localTime).toLocaleDateString();
-        payload = {
-          ...payload,
-          sessionId: `${row.session_id}-local-${shortId()}`,
-          conversationName: `${payload.conversationName || 'Adventure'} (diverged on this device, ${divergedDate})`,
-        };
-        logger.warn(`Cloud copy of ${row.session_id} is newer than the local one; parking local copy as ${payload.sessionId}`);
+      let diverged;
+      // getById returns the newer of the two copies; only a genuine CLOUD row
+      // carries `rev` (local rows carry `base_rev`), so a defined rev here means
+      // we are really looking at the cloud copy.
+      const cloudRev = Number.isInteger(cloudRow?.rev) && cloudRow.rev >= 0 ? cloudRow.rev : undefined;
+      if (cloudRev !== undefined && isValidBaseRev(row.base_rev)) {
+        diverged = cloudRev > row.base_rev;
       } else {
-        logger.info(`Uploading local game ${row.session_id} (cloud copy ${cloudRow ? 'older' : 'absent'})`);
+        const cloudTime = cloudRow?.updated_at ? Date.parse(cloudRow.updated_at) : NaN;
+        const localTime = row.updated_at ? Date.parse(row.updated_at) : NaN;
+        diverged = Number.isFinite(cloudTime) && Number.isFinite(localTime) && cloudTime > localTime;
       }
 
-      const result = await conversationsApi.save(payload);
+      if (diverged) {
+        // Fork, never merge, never overwrite (§6.2): park the local timeline as
+        // its own save and union hero progression into the adopted cloud row.
+        logger.warn(`Cloud copy of ${row.session_id} advanced past the local one; parking the local timeline`);
+        const forkResult = await forkLocalTimeline(row.session_id, rowToPayload(row));
+        if (forkResult?.pendingCloudSync) {
+          // The parked copy is still device-only (auth vanished mid-pass); it
+          // uploads on a later pass under its own id.
+          failed = true;
+        } else {
+          count += 1;
+        }
+        continue;
+      }
+
+      logger.info(`Uploading local game ${row.session_id} (cloud copy ${cloudRow ? 'behind' : 'absent'})`);
+      const result = await conversationsApi.save(rowToPayload(row));
+      if (result?.forked) {
+        // The guarded push lost a race mid-pass: conversationsApi.save already
+        // parked the local timeline and adopted the cloud row.
+        if (result.pendingCloudSync) failed = true;
+        else count += 1;
+        continue;
+      }
       if (result?.storage === 'local') {
         // Auth vanished between the trigger and this write; the save landed back in
-        // this store. Keep the original row (and drop the accidental local fork) and
-        // retry on the next auth tick.
+        // this store. Keep the original row and retry on the next auth tick.
         logger.warn(`Sync of ${row.session_id} routed back to local storage; will retry`);
-        if (cloudIsNewer) await localGameStore.remove(payload.sessionId);
         failed = true;
         continue;
       }
-      if (isLive && !cloudIsNewer) {
+      if (isLive) {
         // The live session keeps its write-ahead copy. The write-through inside
         // conversationsApi.save normally re-marks it synced already; this guarded
         // mark covers save paths that skip the local store. ifUpdatedAt makes it a

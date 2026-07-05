@@ -1,0 +1,44 @@
+-- 003_conversation_rev.sql
+-- Revision counter on conversations for the save-sync rev protocol
+-- (docs/SAVE_SYNC_PLAN.md section 6, Phase 3 / backlog #54).
+--
+-- TARGET: the self-hosted data Postgres on the games box (reached by the Worker via
+-- Hyperdrive). NOT the retired D1/SQLite database that 001_initial_schema.sql describes.
+--
+-- RUNBOOK (manual apply, never run automatically):
+--   On the box:
+--     ssh octonion-games
+--     psql -U dungeongpt -d dungeongpt -f 003_conversation_rev.sql
+--   Or through the local dev tunnel (port 5433, per wrangler.toml):
+--     psql "postgresql://dungeongpt:<pw>@localhost:5433/dungeongpt" \
+--       -f cf-worker/migrations/003_conversation_rev.sql
+--
+-- ORDER OF OPERATIONS (important): apply this migration BEFORE deploying the Worker
+-- build that references `rev`. The new upsert/update SQL names the column explicitly
+-- (INSERT ... rev ... / SET rev = conversations.rev + 1), so a Worker deployed ahead
+-- of the migration would fail every conversation save with an undefined-column error.
+-- The reverse order is safe: the pre-Phase-3 Worker does SELECT * / never names rev.
+--
+-- WHAT IT DOES:
+-- * rev is the lineage counter (SAVE_SYNC_PLAN 6.1). Every successful cloud write
+--   bumps it by 1; a fresh INSERT starts it at 1. Clients record the rev they last
+--   synced from as base_rev and send it back as expectedRev; the Worker's upsert
+--   only applies the UPDATE arm when conversations.rev = expectedRev, otherwise it
+--   answers 409 with the current rev + updated_at (fork detected, never overwrite).
+-- * DEFAULT 0 backfills every existing row with rev 0, matching the client-side
+--   renderer-tolerance rule "missing rev = 0": legacy rows and legacy clients keep
+--   working (a client that never sends expectedRev gets today's unconditional
+--   upsert, which still bumps rev going forward).
+--
+-- GRANTS: none needed. Column privileges in Postgres are table-level unless
+-- explicitly narrowed; the dungeongpt role already holds INSERT/UPDATE/SELECT on
+-- conversations (it has been upserting this table since the cutover), and a new
+-- column is covered by those existing table grants. If SELECT/UPDATE were ever
+-- re-granted per-column, add `rev` to those lists.
+--
+-- No conditional-upsert helper objects are needed: the guard is plain
+-- `ON CONFLICT (session_id) DO UPDATE ... WHERE conversations.rev = $expectedRev`
+-- inside the Worker's existing raw-SQL upsert (cf-worker/src/routes/db.ts).
+
+ALTER TABLE conversations
+  ADD COLUMN IF NOT EXISTS rev INTEGER NOT NULL DEFAULT 0;
