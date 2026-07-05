@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { markHadAccount } from '../services/accountFlag';
 import { getUserTier, clearUserTier, getCurrentTier } from '../game/entitlements';
+import { loadPremiumTemplates, clearPremiumTemplates } from '../services/premiumContentApi';
 
 const HUB_URL = process.env.REACT_APP_HUB_URL || 'https://octonion.io';
 const CALLBACK_URL = `${window.location.origin}/auth/callback`;
@@ -16,6 +17,12 @@ export const AuthProvider = ({ children }) => {
   // once per session via getUserTier(). Held in state so the tree re-renders when the
   // tier lands and synchronous gates (isPremium/hasTier) get re-read.
   const [tier, setTier] = useState(getCurrentTier);
+  // Premium content delivery (#40). True once this session's server-delivered
+  // templates are registered into storyTemplates. The state flip matters even when
+  // the tier value itself is unchanged (localStorage warm start): setTier alone would
+  // bail out on Object.is equality and consumers rendering off the storyTemplates
+  // array (NewGame's picker) would never re-read it.
+  const [premiumContentReady, setPremiumContentReady] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -23,14 +30,26 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
-    // Signed in: resolve the account tier (memoised, at most one fetch per session).
-    // Signed out: reset to 'free' and drop the mirror so the next account on this
-    // device never inherits a stale tier.
+    // Signed in: resolve the account tier (memoised, at most one fetch per session),
+    // then load the server-delivered premium templates (#40; also memoised, never
+    // rejects) BEFORE publishing the tier, so the state update that re-renders
+    // consumers (NewGame reads the storyTemplates array during render) happens after
+    // the delivered templates are registered.
+    // Signed out: reset to 'free', drop the tier mirror and the premium-content
+    // session cache, so the next account on this device never inherits either.
     const syncTier = (session) => {
       if (session?.user) {
-        getUserTier().then(setTier).catch(() => setTier('free'));
+        getUserTier()
+          .then((resolvedTier) => loadPremiumTemplates().then(() => resolvedTier))
+          .then((resolvedTier) => {
+            setTier(resolvedTier);
+            setPremiumContentReady(true);
+          })
+          .catch(() => setTier('free'));
       } else {
         clearUserTier();
+        clearPremiumTemplates();
+        setPremiumContentReady(false);
         setTier('free');
       }
     };
@@ -77,6 +96,7 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     tier,
+    premiumContentReady,
     redirectToLogin,
     signOut,
   };

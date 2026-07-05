@@ -1306,22 +1306,66 @@ export const storyTemplates = [
     }
 ];
 
-// --- Local premium templates (the MECHANISM is public; the content is not) --------
-// Premium campaigns (t3+) are authored in the private content repo and will reach
-// players via the server channel (#40). For local playtesting, a gitignored
-// src/data/premiumTemplates.local.js (shape: premiumTemplates.local.example.js) is
-// merged in at bundle time: entries whose id matches a public template REPLACE it
-// (a comingSoon stub becomes playable locally), new ids append. require.context
-// tolerates the file being absent under webpack and is undefined under Jest, so
-// tests and the progression lint always run against PUBLIC data only.
+// --- Premium templates (the MECHANISM is public; the content is not) --------------
+// Premium campaigns (t3+) are authored in the private content repo and reach players
+// via the server channel (#40): the Worker's GET /api/db/premium-templates serves the
+// entitled account's templates, and src/services/premiumContentApi.js registers them
+// here at RUNTIME through registerPremiumTemplates below. For local playtesting, a
+// gitignored src/data/premiumTemplates.local.js (shape:
+// premiumTemplates.local.example.js) is merged in at BUNDLE time: entries whose id
+// matches a public template REPLACE it (a comingSoon stub becomes playable locally),
+// new ids append. require.context tolerates the file being absent under webpack and
+// is undefined under Jest, so tests and the progression lint always run against
+// PUBLIC data only.
+//
+// Precedence (highest first): local dev slot > server-delivered > built-in. The local
+// slot claims its ids at bundle time (localSlotIds) and the runtime register skips
+// them, so a playtester's in-progress local copy is never clobbered by the shipped
+// server version of the same campaign.
+
+// ids merged from the LOCAL slot; server delivery never overrides these.
+const localSlotIds = new Set();
+
 export const mergeLocalTemplates = (templates, locals) => {
     (locals || []).forEach((tpl) => {
         if (!tpl?.id) return;
+        localSlotIds.add(tpl.id);
         const i = templates.findIndex((t) => t.id === tpl.id);
         if (i >= 0) templates[i] = tpl; else templates.push(tpl);
     });
     return templates;
 };
+
+/**
+ * Register server-delivered premium templates into the live picker array (mutates in
+ * place: every consumer imports `storyTemplates` directly and keeps the one shared
+ * reference, so appending/replacing by id is the least invasive way to make delivered
+ * content appear; consumers re-render off AuthContext state and re-read the array).
+ * Idempotent by id: re-registering the same delivery is a no-op in effect (matching
+ * ids replace their previous entry, nothing is duplicated). Local-slot ids are
+ * skipped (local wins for dev playtesting). Delivered entries carry their own
+ * `premium` flags and flow through the normal canUseTemplate gating in NewGame.
+ *
+ * Content only ever ADDS this way; there is deliberately no unregister: a lapsed or
+ * signed-out account's tier drops to 'free', which locks the cards via the existing
+ * gates, and the sessionStorage cache dies with the session (premiumContentApi.js).
+ *
+ * @param {Array<object>} delivered - storyTemplates-shaped entries from the Worker
+ * @param {Array<object>} [target] - override for tests; defaults to the live array
+ * @returns {Array<object>} the target array
+ */
+export const registerPremiumTemplates = (delivered, target = storyTemplates) => {
+    (delivered || []).forEach((tpl) => {
+        if (!tpl?.id || localSlotIds.has(tpl.id)) return;
+        const i = target.findIndex((t) => t.id === tpl.id);
+        if (i >= 0) target[i] = tpl; else target.push(tpl);
+    });
+    return target;
+};
+
+/** Test hook: forget local-slot id claims. Not for app code. */
+export const _resetLocalSlotIdsForTests = () => localSlotIds.clear();
+
 if (typeof require.context === 'function') {
     const ctx = require.context('.', false, /^\.\/premiumTemplates\.local\.js$/);
     ctx.keys().forEach((k) => mergeLocalTemplates(storyTemplates, ctx(k).premiumTemplates));
