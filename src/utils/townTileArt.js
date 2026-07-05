@@ -71,11 +71,11 @@ const THEME_MATERIALS = {
   // identical to grassland (playtest 2026-07-05). Mixing 60% toward pale clay
   // lands every building in an unmistakable adobe/tan family (walls follow,
   // they are shaded from the roof) while lightness still separates the types.
-  desert: { tint: '#c98a5a', amount: 0.6 },
+  desert: { tint: '#c47a4a', amount: 0.55, outline: '#4a3626' },
   // dark timber tint so buildings sit as darker wood against the white ground; the
   // cap flag adds a white snow band across the roofline (palette-level dressing, not
   // a new shape: it is invisible where it overhangs the already-white snow ground)
-  snow: { tint: '#4a4038', amount: 0.35, cap: true },
+  snow: { tint: '#4a4038', amount: 0.35, cap: true, outline: '#33404c' },
 };
 // One shared roofline band for snow towns, drawn over the finished building body.
 const SNOW_CAP = `<path d='M5 12.5 q11 -5 22 0 l0 2.8 q-11 -5 -22 0 z' fill='#ffffff' opacity='0.75'/>`;
@@ -601,11 +601,21 @@ const building = (buildingType, ground = C.grass, theme = 'grassland') => {
   // the roof colour untouched so existing saves render byte-identically
   const roof = mat ? mix(baseRoof, mat.tint, mat.amount) : baseRoof;
   const shape = SHAPES[BUILDING_SHAPE[buildingType] || 'gable'];
+  const body = shape(roof) + (mat && mat.cap ? SNOW_CAP : '');
+  // Themed grounds are pale (sand/snow), which washes out building silhouettes
+  // (maintainer 2026-07-05). A zero-offset drop-shadow halo re-cuts the outline
+  // around ANY compound shape without touching the shape functions: same idea
+  // as worldTileArt's dark peak/tree outlines against pale biomes. Temperate
+  // gets no filter: its output stays byte-identical.
+  const outlined = mat && mat.outline
+    ? `<defs><filter id='bo' x='-20%' y='-20%' width='140%' height='140%'>` +
+      `<feDropShadow dx='0' dy='0' stdDeviation='0.7' flood-color='${mat.outline}' flood-opacity='0.9'/>` +
+      `</filter></defs><g filter='url(#bo)'>${body}</g>`
+    : body;
   return wrap(
     `<rect width='32' height='32' fill='${ground}'/>` +
     `<ellipse cx='16' cy='27' rx='12' ry='3' fill='#000000' opacity='0.16'/>` + // ground shadow
-    shape(roof) +
-    (mat && mat.cap ? SNOW_CAP : '')
+    outlined
   );
 };
 

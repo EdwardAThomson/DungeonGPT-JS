@@ -112,6 +112,8 @@ describe('townTileArt theme palettes', () => {
   // strip every colour so only geometry remains; silhouettes must survive theming
   const geometry = (bg) => decode(bg)
     .replace(/<path d='M5 12\.5[^/]*\/>/, '')            // drop the snow cap overlay
+    .replace(/<defs><filter[\s\S]*?<\/filter><\/defs>/, '') // drop the outline-halo filter
+    .replace(/<g filter='url\(#bo\)'>/, '').replace(/<\/g>/, '') // unwrap the halo group
     .replace(/(fill|stroke)='[^']*'/g, "$1=''");
 
   test('temperate tiles are byte-identical to the pre-theme captures', () => {
