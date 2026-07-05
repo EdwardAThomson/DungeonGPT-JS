@@ -1,6 +1,6 @@
 # Guest Mode Plan (Phase B) — local-first, AI-free guest play
 
-Status: **B1 shipped** (commit `201ac23`, 2026-06-21) — guests can run the full local mechanical loop. **B2 shipped** (`LocalGameSync` sync on sign-in + conversion UX: persistent `GuestBanner` and a high-intent sign-in prompt when a guest reaches for the gated AI chat). Phase A (local hero roster + import-on-sign-in) shipped earlier.
+Status: **B1 shipped** (commit `201ac23`, 2026-06-21) — guests can run the full local mechanical loop. **B2 shipped** (`LocalGameSync` sync on sign-in + conversion UX: persistent `GuestBanner` and a high-intent sign-in prompt when a guest reaches for the gated AI chat). Phase A (local hero roster + import-on-sign-in) shipped earlier. Note (2026-07-05): the sync mechanics described below were since reworked by the save-sync program (local-first write-through, merged saved-games list, reconcile on auth restoration; local rows are no longer deleted as they upload). See `SAVE_SYNC_PLAN.md` for current behavior.
 
 ## Goal
 Let a logged-out visitor experience real gameplay before creating an account, with everything saved locally and a one-click sync when they sign up — to reduce signup friction and improve retention.

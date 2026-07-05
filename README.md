@@ -31,14 +31,14 @@ YouTube Videos 🎥:
 *   **Quests & Campaigns:** A deterministic campaign-milestone engine (mechanical and AI-judged narrative milestones) plus a pool of discoverable side-quests.
 *   **Campaign Chaining:** Finish a campaign and continue the next chapter inside the same save: same world, same party (healed), with the new campaign's content spawned additively into the existing map.
 *   **Adventure Book:** A tabbed in-game hub (Campaign / Side Quests / Codex / Party / AI) including a discovered-only bestiary and item codex.
-*   **Towns:** Procedurally generated town maps with road-aware gates, lakefront/coastline water, and a civic layout (town square, keep, varied buildings).
+*   **Towns:** Procedurally generated town maps with road-aware gates, lakefront/coastline water, a civic layout (town square, keep, varied buildings), and a hub-and-spoke street network (windy lanes from every gate to the square).
 *   **Conversation Memory (RAG):** The AI recalls earlier story beats via on-device retrieval over embedded history.
 *   **Guest / Local-First Play:** Try the game without an account; heroes and saves live in the browser and sync to the cloud on sign-in.
 *   **Onboarding:** A guided tour and a 27-point-buy hero creator.
 *   **AI Models:** Runs on Cloudflare Workers AI with a curated 5-model lineup (GPT-OSS 120B/20B, Llama 4 Scout, Gemma 3 12B, Llama 3.1 8B Fast). Local development additionally supports OpenAI, Gemini, and Claude. Premium models via OpenRouter are planned.
 *   **User Authentication:** Secure sign-in via Octonion hub (centralized auth across games).
 *   **Persistent Sessions:** Characters and game sessions saved to Supabase PostgreSQL, accessed through CF Worker with row-level access enforcement.
-*   **Save/Load System:** Manual and auto-save functionality with save confirmation modals.
+*   **Save/Load System:** Manual and auto-save with confirmation modals; saves are written locally first (IndexedDB) and synced to the cloud, with honest "on this device" status in the saved-games list when a cloud push is pending.
 
 ## Technology Stack
 
