@@ -305,3 +305,21 @@ describe('townTileArt canal dressing (waterway mask)', () => {
     expect(tileBackground({ type: 'bridge', waterway: true }, {}, 2, 2, 'grassland', 5)).not.toBe(sampleTiles.bridge());
   });
 });
+
+describe('junction nibs need a dry diagonal (playtest 2026-07-06: bollard floating in the river)', () => {
+  const decode = (bg) => decodeURIComponent(bg.replace(/^url\("data:image\/svg\+xml,/, '').replace(/"\)$/, ''));
+  const NIB = "width='3.2' height='3.2'";
+
+  it('a basin corner with dry diagonals keeps its nibs', () => {
+    expect(decode(canalTile(15, 'grassland', 1))).toContain(NIB);
+  });
+
+  it('a mid-channel junction (all diagonals wet) draws no nibs', () => {
+    expect(decode(canalTile(15 | 16 | 32 | 64 | 128, 'grassland', 1))).not.toContain(NIB);
+  });
+
+  it('mixed: only the dry-diagonal corner gets a nib', () => {
+    const svg = decode(canalTile(15 | 16 | 32 | 64, 'grassland', 1)); // NW dry only
+    expect((svg.match(/width='3\.2' height='3\.2'/g) || []).length).toBe(1);
+  });
+});

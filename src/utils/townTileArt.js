@@ -307,10 +307,13 @@ export const canalTile = (mask, theme = 'grassland', seed = 0) => {
   const count = wet.n + wet.e + wet.s + wet.w;
   if (count >= 3) {
     const nib = (x, y) => `<rect x='${x}' y='${y}' width='3.2' height='3.2' rx='1' fill='${pal.m}' stroke='${pal.lip}' stroke-width='0.6'/>`;
-    if (wet.w && wet.n) nibs += nib(0.6, 0.6);
-    if (wet.n && wet.e) nibs += nib(28.2, 0.6);
-    if (wet.e && wet.s) nibs += nib(28.2, 28.2);
-    if (wet.s && wet.w) nibs += nib(0.6, 28.2);
+    // A nib is the CORNER OF A BANK poking into the pool, so it only exists when the
+    // diagonal behind it is dry land; when the diagonal is also water (mid-channel
+    // junctions in 2-wide fork rivers) drawing one strands a stone dot in open water.
+    if (wet.w && wet.n && !(mask & 128)) nibs += nib(0.6, 0.6);
+    if (wet.n && wet.e && !(mask & 16)) nibs += nib(28.2, 0.6);
+    if (wet.e && wet.s && !(mask & 32)) nibs += nib(28.2, 28.2);
+    if (wet.s && wet.w && !(mask & 64)) nibs += nib(0.6, 28.2);
   }
   return wrap(canalWaterInner(seed) + banks + nibs);
 };
@@ -390,7 +393,12 @@ export function waterwayMask(tile, tiles = {}) {
   } else {
     return 0;
   }
-  return (counts(tiles.n) ? 1 : 0) | (counts(tiles.e) ? 2 : 0) | (counts(tiles.s) ? 4 : 0) | (counts(tiles.w) ? 8 : 0);
+  const ortho = (counts(tiles.n) ? 1 : 0) | (counts(tiles.e) ? 2 : 0) | (counts(tiles.s) ? 4 : 0) | (counts(tiles.w) ? 8 : 0);
+  // Diagonal bits (16 NE, 32 SE, 64 SW, 128 NW) exist so junction hearts can tell a
+  // bank corner (dry diagonal: draw the nib) from open water (wet diagonal: no nib).
+  // A mid-channel nib reads as a bollard floating in the river (playtest 2026-07-06).
+  const diag = (counts(tiles.ne) ? 16 : 0) | (counts(tiles.se) ? 32 : 0) | (counts(tiles.sw) ? 64 : 0) | (counts(tiles.nw) ? 128 : 0);
+  return ortho | diag;
 }
 
 // --- walls (autotiled) -------------------------------------------------------

@@ -101,7 +101,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           // waterway-neighbour mask (canal banks, quay lips, bridge-over-canal): the
           // canal autotiler's input, same technique as the wall mask above but keyed on
           // the additive waterway flag, so pre-canal maps always yield 0 (old art)
-          const wetMask = waterwayMask(tile, { n: tileAt(col, row - 1), e: tileAt(col + 1, row), s: tileAt(col, row + 1), w: tileAt(col - 1, row) });
+          const wetMask = waterwayMask(tile, { n: tileAt(col, row - 1), e: tileAt(col + 1, row), s: tileAt(col, row + 1), w: tileAt(col - 1, row), ne: tileAt(col + 1, row - 1), se: tileAt(col + 1, row + 1), sw: tileAt(col - 1, row + 1), nw: tileAt(col - 1, row - 1) });
           const poiEmoji = tile.poi ? (POI_EMOJI[tile.poi] || null) : null;
 
           return (

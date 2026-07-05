@@ -347,7 +347,7 @@ const TilesetTest = () => {
             {grid.flatMap((rowArr, gy) =>
               rowArr.map((tile, gx) => {
                 const neighbours = { n: at(gx, gy - 1), e: at(gx + 1, gy), s: at(gx, gy + 1), w: at(gx - 1, gy) };
-                const wet = waterwayMask(tile, { n: tileObjAt(gx, gy - 1), e: tileObjAt(gx + 1, gy), s: tileObjAt(gx, gy + 1), w: tileObjAt(gx - 1, gy) });
+                const wet = waterwayMask(tile, { n: tileObjAt(gx, gy - 1), e: tileObjAt(gx + 1, gy), s: tileObjAt(gx, gy + 1), w: tileObjAt(gx - 1, gy), ne: tileObjAt(gx + 1, gy - 1), se: tileObjAt(gx + 1, gy + 1), sw: tileObjAt(gx - 1, gy + 1), nw: tileObjAt(gx - 1, gy - 1) });
                 let overlay = null;
                 if (showPaths && isPathType(tile.type)) {
                   overlay = paths.main.has(`${gx},${gy}`) ? 'rgba(80,200,120,0.9)' : 'rgba(230,60,60,0.95)';
