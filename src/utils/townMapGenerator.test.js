@@ -1,4 +1,5 @@
-import { generateTownMap, padTownToUniform, PATH_WINDINESS, WATERWAY_BRIDGE_COST, CANAL_BANK_COST } from './townMapGenerator';
+import { generateTownMap, padTownToUniform, buildingCensus, PATH_WINDINESS, WATERWAY_BRIDGE_COST, CANAL_BANK_COST } from './townMapGenerator';
+import { getTownWaterContext } from './townWater';
 import legacyVillage777 from './__fixtures__/legacyTown_village_seed777.json';
 import legacyCity12345 from './__fixtures__/legacyTown_city_seed12345.json';
 import legacyRiverTown4242 from './__fixtures__/legacyTown_riverTown_seed4242.json';
@@ -545,6 +546,90 @@ describe('river city archetype (riverfork, water towns Phase 1)', () => {
     });
   });
 
+  // Regression (member playtest 2026-07-06): in river cities the river terminated
+  // WITHIN the town instead of flowing out to the map edges. Root cause: the fork is
+  // carved on the NATIVE grid (18x18 for towns) and padTownToUniform framed it in
+  // countryside without continuing the channel, so every padded river city had a
+  // one-tile grass moat around its river. The test generates THROUGH the same
+  // context-construction path the live game uses (a stamped world tile ->
+  // getTownWaterContext -> generateTownMap) and asserts edge-to-edge continuity.
+  describe('river runs edge-to-edge on the padded canvas (live stamped-world context path)', () => {
+    // water or bridge: a bridge spans the channel, the water flows under it
+    const wet = (t) => t && (t.type === 'water' || t.type === 'bridge');
+
+    // the live path: a synthetic stamped world tile, exactly what the launch
+    // pipeline (stampWaterTowns) leaves on the world map for an inland river town
+    const liveContext = (townSize, dir) => {
+      const world = [];
+      for (let y = 0; y < 3; y++) {
+        const row = [];
+        for (let x = 0; x < 3; x++) row.push({ x, y, biome: 'plains' });
+        world.push(row);
+      }
+      world[1][1] = { x: 1, y: 1, biome: 'plains', poi: 'town', townSize, hasRiver: true, riverDirection: dir, waterTown: 'riverfork' };
+      return { tile: world[1][1], ctx: getTownWaterContext(world, 1, 1) };
+    };
+
+    const bordersWet = (town, dir) => {
+      const { mapData, width, height } = town;
+      let a = 0, b = 0;
+      if (dir === 'NORTH_SOUTH') {
+        for (let x = 0; x < width; x++) { if (wet(mapData[0][x])) a++; if (wet(mapData[height - 1][x])) b++; }
+      } else {
+        for (let y = 0; y < height; y++) { if (wet(mapData[y][0])) a++; if (wet(mapData[y][width - 1])) b++; }
+      }
+      return a > 0 && b > 0;
+    };
+
+    // no waterway tile may be cut off from the map border (water/bridge-connected)
+    const strandedWaterway = (town) => {
+      const { mapData, width, height } = town;
+      const seen = new Set();
+      const stack = [];
+      const push = (x, y) => {
+        if (x < 0 || y < 0 || x >= width || y >= height) return;
+        if (seen.has(`${x},${y}`) || !wet(mapData[y][x])) return;
+        seen.add(`${x},${y}`);
+        stack.push([x, y]);
+      };
+      for (let x = 0; x < width; x++) { push(x, 0); push(x, height - 1); }
+      for (let y = 0; y < height; y++) { push(0, y); push(width - 1, y); }
+      while (stack.length) {
+        const [cx, cy] = stack.pop();
+        for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) push(cx + dx, cy + dy);
+      }
+      return town.mapData.flat().filter((t) => t.type === 'water' && t.waterway && !seen.has(`${t.x},${t.y}`)).length;
+    };
+
+    it.each(RIVER_CITY_SIZES)('%s: inland riverfork stamp, both directions, 12 seeds', (size) => {
+      for (const dir of ['NORTH_SOUTH', 'EAST_WEST']) {
+        for (let seed = 1; seed <= 12; seed++) {
+          const { tile, ctx } = liveContext(size, dir);
+          expect(ctx).toEqual({ archetype: 'riverfork' }); // the merged live context shape
+          const town = generateTownMap(size, 'Livefork', 'south', seed, tile.hasRiver, tile.riverDirection, 'grassland', ctx);
+          const label = `${size} ${dir} seed ${seed}`;
+          expect({ label, through: bordersWet(town, dir) }).toEqual({ label, through: true });
+          expect({ label, stranded: strandedWaterway(town) }).toEqual({ label, stranded: 0 });
+        }
+      }
+    });
+
+    test('coastal riverfork town (the estuary read): channel and fallback band both reach the edges', () => {
+      // sea to the EAST, flow N-S: the fork carves beside the coast
+      // sea to the EAST, flow E-W: the fork cannot reach the flooded exit edge and
+      // falls back to the plain band, and the band must still run edge-to-edge
+      for (const dir of ['NORTH_SOUTH', 'EAST_WEST']) {
+        for (let seed = 1; seed <= 12; seed++) {
+          const ctx = { kind: 'coast', edges: { N: false, E: true, S: false, W: false }, archetype: 'riverfork' };
+          const town = generateTownMap('town', 'Estuary', 'south', seed, true, dir, 'grassland', ctx);
+          const label = `coastal ${dir} seed ${seed}`;
+          expect({ label, through: bordersWet(town, dir) }).toEqual({ label, through: true });
+          expect({ label, stranded: strandedWaterway(town) }).toEqual({ label, stranded: 0 });
+        }
+      }
+    });
+  });
+
   // The archetype is strictly additive: ordinary towns (landlocked, river band,
   // coast) must come out BYTE-IDENTICAL to the pre-fork generator. Fixtures were
   // captured from the generator immediately before this feature landed.
@@ -817,5 +902,59 @@ describe('building roster is seed-invariant (playtest 2026-07-05: reported count
       totals.add(n);
     }
     expect([...totals]).toHaveLength(1);
+  });
+});
+
+// =============================================================================
+// buildingCensus: the /debug/tileset stats-line counter (maintainer 2026-07-06:
+// the displayed count read as "wrong"). Diagnosis, pinned here as ground truth:
+// every structure the generator places is exactly ONE `type: 'building'` tile
+// (the keep is a single tile ringed by `keep_wall`, and walls/wells/fountains/farm
+// fields are other tile types), so the tile count IS the structure count a player
+// gets by counting roofs on the rendered map. What misled was the raw total
+// (houses dominate it), so the census now exposes the civic/houses split.
+// =============================================================================
+describe('buildingCensus (/debug/tileset stats line)', () => {
+  test('city fixture, seed 12345: exact per-type counts; keep counted once; furniture never counted', () => {
+    const c = buildingCensus(legacyCity12345.mapData);
+    expect(c.byType).toEqual({
+      house: 55, manor: 5, keep: 1,
+      jail: 1, stables: 1, warehouse: 2, guild: 3, foundry: 1, alchemist: 2,
+      library: 1, townhall: 1, inn: 1, tavern: 3, temple: 2, apothecary: 1,
+      bank: 3, magetower: 1, tailor: 1, blacksmith: 1, market: 1, archives: 1,
+    });
+    expect(c.total).toBe(88);
+    expect(c.houses).toBe(55);
+    expect(c.civic).toBe(33);
+
+    // Ground truth the census depends on: structures are single tiles, and the
+    // keep's curtain ring is keep_wall (present on this fixture); if the keep
+    // ever became a multi-tile `building` footprint this would break loudly.
+    const tiles = legacyCity12345.mapData.flat();
+    expect(c.total).toBe(tiles.filter((t) => t.type === 'building').length);
+    expect(tiles.filter((t) => t.type === 'building' && t.buildingType === 'keep')).toHaveLength(1);
+    expect(tiles.filter((t) => t.type === 'keep_wall')).toHaveLength(8);
+    expect(tiles.filter((t) => t.type === 'wall').length).toBeGreaterThan(0);
+  });
+
+  test('village fixture, seed 777: hand-countable roster', () => {
+    expect(buildingCensus(legacyVillage777.mapData)).toEqual({
+      total: 26,
+      houses: 18,
+      civic: 8,
+      byType: {
+        house: 18, shrine: 1, alchemist: 1, inn: 1, shop: 1,
+        blacksmith: 1, tavern: 1, mill: 1, stables: 1,
+      },
+    });
+  });
+
+  test('a building tile without a buildingType is still counted (as unknown), never dropped', () => {
+    const grid = [[
+      { type: 'building', buildingType: 'inn' },
+      { type: 'building' },
+      { type: 'grass' },
+    ]];
+    expect(buildingCensus(grid)).toEqual({ total: 2, houses: 0, civic: 2, byType: { inn: 1, unknown: 1 } });
   });
 });

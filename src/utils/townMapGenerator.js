@@ -348,8 +348,12 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   }
 
   // Frame the native layout with countryside so every town fills a uniform canvas
-  // while its buildings stay huddled exactly as generated.
-  return padTownToUniform(result, UNIFORM_TOWN_SIZE, UNIFORM_TOWN_SIZE, rng);
+  // while its buildings stay huddled exactly as generated. River-city stamps also
+  // pass their plain-band geometry so the frame can carry the river out to the
+  // canvas edge on fork-less fallback seeds (see extendRiverWater); ordinary towns
+  // pass null and stay byte-identical (fixture pins).
+  const riverBand = (water && water.archetype === 'riverfork' && riverInfo) ? riverInfo : null;
+  return padTownToUniform(result, UNIFORM_TOWN_SIZE, UNIFORM_TOWN_SIZE, rng, riverBand);
 };
 
 // Centre a natively-sized town in a larger uniform canvas, then dress the surrounding
@@ -357,7 +361,7 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
 // — so small settlements sit in open countryside instead of a cramped box. The core is
 // copied verbatim (only its tile coords + entry/centre are re-indexed); randomness here
 // touches the ring only.
-export function padTownToUniform(town, targetW, targetH, rng) {
+export function padTownToUniform(town, targetW, targetH, rng, riverBand = null) {
   const { mapData, width, height } = town;
   if (width >= targetW && height >= targetH) return town; // city is already full-size
 
@@ -391,6 +395,18 @@ export function padTownToUniform(town, targetW, targetH, rng) {
   // fields/decoration passes (which only write onto grass, so they avoid the new water).
   if (town.water && town.water.kind === 'coast') {
     extendCoastWater(newMap, town.water.edges, offX, offY, width, height, targetW, targetH);
+  }
+
+  // Carry the river-city channel out to the canvas edge, exactly like the coastline
+  // above: the fork (and, on fork-less fallback seeds, the plain band a riverfork
+  // stamp degrades to; that is what `riverBand` carries) was carved on the NATIVE
+  // grid, so without this pass the river would stop dead at the countryside ring
+  // (the "river ends inside the town" playtest bug, water towns #65). Only the two
+  // flow-axis borders are continued; a meander that merely brushes a side border
+  // stays put. Ordinary towns have no riverFork and pass no riverBand, so they are
+  // byte-identical (fixture pins in townMapGenerator.test.js).
+  if (town.riverFork || riverBand) {
+    extendRiverWater(newMap, town.riverFork, riverBand, offX, offY, width, height, targetW, targetH);
   }
 
   // Extend EVERY entrance road straight out through the ring to the map edge — BEFORE
@@ -495,6 +511,29 @@ export function padTownToUniform(town, targetW, targetH, rng) {
     };
   }
   return town;
+}
+
+// Building census over a generated town grid (single source for the /debug/tileset
+// stats line and its tests). Every structure the generator places is exactly ONE tile
+// with `type: 'building'` (the keep is one tile ringed by `keep_wall` tiles, and
+// walls / wells / fountains / farm fields are other tile types entirely), so counting
+// building tiles IS counting structures as a player sees them on the rendered map.
+// `civic` splits dwellings out of the raw total: houses dominate it (50+ on a city),
+// which made the plain total read as "wrong" and buried the civic-roster dropouts the
+// census exists to expose (the manor starvation of 2026-07 was a civic count of 32 vs
+// 33 hiding inside a 90-ish total).
+export function buildingCensus(mapData) {
+  const byType = {};
+  for (const row of mapData) {
+    for (const t of row) {
+      if (t.type !== 'building') continue;
+      const kind = t.buildingType || 'unknown';
+      byType[kind] = (byType[kind] || 0) + 1;
+    }
+  }
+  const total = Object.values(byType).reduce((a, b) => a + b, 0);
+  const houses = byType.house || 0;
+  return { total, houses, civic: total - houses, byType };
 }
 
 // Seeded random number generator
@@ -1298,6 +1337,48 @@ function extendCoastWater(newMap, edges, offX, offY, coreW, coreH, targetW, targ
   }
 
   sandShorePass(newMap, targetW, targetH);
+}
+
+// River-city channel continuation (water towns #65, playtest fix 2026-07-06): the fork
+// carve, and the plain band a riverfork stamp falls back to when no viable fork exists
+// (`riverBand` = that band's descriptor), runs edge-to-edge on the NATIVE grid, so once
+// padTownToUniform frames the town in countryside the river used to stop dead one ring
+// short of the canvas border. Continue every channel tile sitting on a flow-axis core
+// border straight out to the canvas edge, preserving its `waterway` flag so the canal
+// art continues seamlessly. A border channel tile may already have been bridged by a
+// gate road, so bridges over the channel count as sources too (the water flows under
+// them). Called only for river-city towns; ordinary towns never reach this.
+function extendRiverWater(newMap, riverFork, riverBand, offX, offY, coreW, coreH, targetW, targetH) {
+  const isHorizontal = riverFork ? riverFork.direction === 'EAST_WEST' : riverBand.isHorizontal;
+  const inBand = (v) => !!riverBand && v >= riverBand.center && v < riverBand.center + riverBand.riverWidth;
+  // Channel water on a core border: fork water carries `waterway`; band water is plain
+  // water inside the band rows/cols; either may have been turned into a bridge.
+  const channel = (t, across) => t && (t.type === 'water' || t.type === 'bridge') && (t.waterway === true || inBand(across));
+  const stamp = (x, y, waterway) => {
+    const t = newMap[y][x];
+    t.type = 'water';
+    t.walkable = false;
+    t.poi = null;
+    if (waterway) t.waterway = true;
+  };
+
+  if (isHorizontal) {
+    // flow axis W-E: continue border channel tiles westward/eastward to the edge
+    for (let y = offY; y < offY + coreH; y++) {
+      const w = newMap[y][offX];
+      if (channel(w, y - offY)) for (let x = offX - 1; x >= 0; x--) stamp(x, y, w.waterway);
+      const e = newMap[y][offX + coreW - 1];
+      if (channel(e, y - offY)) for (let x = offX + coreW; x < targetW; x++) stamp(x, y, e.waterway);
+    }
+  } else {
+    // flow axis N-S: continue border channel tiles northward/southward to the edge
+    for (let x = offX; x < offX + coreW; x++) {
+      const n = newMap[offY][x];
+      if (channel(n, x - offX)) for (let y = offY - 1; y >= 0; y--) stamp(x, y, n.waterway);
+      const s = newMap[offY + coreH - 1][x];
+      if (channel(s, x - offX)) for (let y = offY + coreH; y < targetH; y++) stamp(x, y, s.waterway);
+    }
+  }
 }
 
 // =============================================================================

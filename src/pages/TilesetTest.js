@@ -6,7 +6,7 @@
 // before we migrate the live TownMapDisplay.
 
 import React, { useMemo, useState } from 'react';
-import { generateTownMap } from '../utils/townMapGenerator';
+import { generateTownMap, buildingCensus } from '../utils/townMapGenerator';
 import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, jettyTile, BUILDING_TYPES, POI_EMOJI } from '../utils/townTileArt';
 
 const SIZES = ['hamlet', 'village', 'town', 'city'];
@@ -169,17 +169,17 @@ const TilesetTest = () => {
     [size, seed, theme, archetype, riverDir, seaEdge]
   );
   const paths = useMemo(() => analyzePaths(town), [town]);
-  // Building census (maintainer 2026-07-06): the total made seed-to-seed roster
-  // dropouts visible (the manor-starvation bug was spotted by eye as 90 vs 91);
-  // the per-type breakdown lives in the title tooltip.
-  const buildingCensus = useMemo(() => {
-    const byType = {};
-    town.mapData.forEach((row) => row.forEach((t) => {
-      if (t.type === 'building') byType[t.buildingType] = (byType[t.buildingType] || 0) + 1;
-    }));
-    const total = Object.values(byType).reduce((a, b) => a + b, 0);
-    const detail = Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}: ${n}`).join('\n');
-    return { total, detail };
+  // Building census (maintainer 2026-07-06, reworked after the "count is wrong"
+  // report): every structure is exactly one building tile (keep = 1 tile; keep_wall /
+  // walls / wells are other types and never counted), so the tile count IS the
+  // structure count. What read as wrong was the raw total, which houses dominate
+  // (55 of a city's 88). The stats line now splits civic vs houses so the roster
+  // number is visible at a glance; the per-type breakdown lives in the title tooltip.
+  // Counting lives in buildingCensus (townMapGenerator.js), pinned by fixture tests.
+  const census = useMemo(() => {
+    const c = buildingCensus(town.mapData);
+    const detail = Object.entries(c.byType).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}: ${n}`).join('\n');
+    return { ...c, detail };
   }, [town]);
   const fork = useMemo(() => analyzeFork(town), [town]);
   const canal = useMemo(() => analyzeCanal(town), [town]);
@@ -338,8 +338,8 @@ const TilesetTest = () => {
           </strong>
           {' '}· {paths.pathTiles} path tiles · {paths.spokes} spokes ·
           avg {paths.avgBends.toFixed(1)} bends · length/straight {paths.avgRatio.toFixed(2)} ·
-          <span title={buildingCensus.detail} style={{ cursor: 'help', textDecoration: 'underline dotted' }}>
-            {buildingCensus.total} buildings
+          <span title={census.detail} style={{ cursor: 'help', textDecoration: 'underline dotted' }}>
+            {census.total} buildings ({census.civic} civic + {census.houses} houses)
           </span>
         </div>
         {/* River-city invariants (water towns Phase 1): island >= 4 free grass
@@ -354,12 +354,13 @@ const TilesetTest = () => {
             island venues: {fork.venues.length ? fork.venues.join(', ') : 'none'}
           </div>
         )}
-        {/* Canal-city invariants (water towns Phase 2): 2x2 basin drains to the sea,
-            3-5 spokes, >= 10 free grass (quest floor), >= 4 free grass per fenced-off
-            district, boathouse moored on a bank. */}
+        {/* Canal-city invariants (water towns Phase 2, spokes retuned 2026-07-06 to
+            5-7 target / floor 4): 2x2 basin drains to the sea, >= 10 free grass
+            (quest floor), >= 4 free grass per fenced-off district, boathouse moored
+            on a bank. */}
         {canal && (
           <div style={{ fontSize: 12, marginBottom: 8, color: 'var(--text-secondary)' }}>
-            <strong style={{ color: canal.freeGrass >= 10 && canal.spokes >= 3 && canal.hasBoathouse && canal.districtGrass.every((g) => g >= 4) ? '#3a3' : '#c33' }}>
+            <strong style={{ color: canal.freeGrass >= 10 && canal.spokes >= 4 && canal.hasBoathouse && canal.districtGrass.every((g) => g >= 4) ? '#3a3' : '#c33' }}>
               canal city: basin {canal.basinSize} tiles · {canal.canalTiles} canal tiles carved
               {' '}· {canal.spokes} spokes · {canal.bridges} bridges · {canal.freeGrass} free grass
             </strong>
@@ -401,7 +402,7 @@ const TilesetTest = () => {
           hub-and-spoke network (green = connected to the hub, red = orphan — should never appear, blue = gates,
           orange = the river-city island / canal-city fenced-off districts, cyan = the harbour basin). The
           <em> river city</em> archetype (town/city only) carves a windy forking river around an island quarter; the
-          <em> canal city</em> archetype (city only, coastal) carves a harbour basin plus 3-5 windy canal spokes with
+          <em> canal city</em> archetype (city only, coastal) carves a harbour basin plus 5-7 windy canal spokes with
           quay lanes hugging the banks. Fork and canal water render with the Phase 4 directional canal treatment
           (16-mask banks, bends, junctions, mouths; see the canal gallery above); paths beside a waterway gain the
           quay lip, and bridges over one show the channel continuing beneath. Sea and lake water are untouched.
