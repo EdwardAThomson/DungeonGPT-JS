@@ -1,17 +1,40 @@
 import { Hono } from 'hono';
-import { createClient } from '@supabase/supabase-js';
+import postgres from 'postgres';
 import type { Env } from '../types';
 import type { AuthVariables } from '../middleware/auth';
 
 const dbRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
-function getSupabase(env: Env) {
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error('Supabase not configured');
+// One postgres.js client per request, reaching Postgres via Cloudflare Hyperdrive.
+// Hyperdrive does the real connection pooling, so a small client-side `max` is fine.
+// `fetch_types: false` skips per-query type introspection round-trips (recommended on Workers).
+function getSql(env: Env) {
+  if (!env.HYPERDRIVE?.connectionString) {
+    throw new Error('Hyperdrive not configured');
   }
-  return createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return postgres(env.HYPERDRIVE.connectionString, { max: 5, fetch_types: false });
+}
+
+// jsonb columns: postgres.js needs values wrapped in sql.json() on write (it auto-parses on read).
+// Pass through real null as SQL NULL (matches the previous supabase-js behaviour).
+type Sql = ReturnType<typeof getSql>;
+const jsonb = (sql: Sql, v: unknown) => (v === undefined || v === null ? null : sql.json(v as any));
+
+// heroes rows are snake_case in the DB; the API contract is camelCase. Keep this mapping identical
+// to the pre-migration shape — the frontend depends on it.
+function mapHero(h: any) {
+  return {
+    heroId: h.hero_id,
+    heroName: h.hero_name,
+    heroGender: h.hero_gender,
+    heroRace: h.hero_race,
+    heroClass: h.hero_class,
+    heroLevel: h.hero_level,
+    heroBackground: h.hero_background,
+    heroAlignment: h.hero_alignment,
+    profilePicture: h.profile_picture,
+    stats: h.stats,
+  };
 }
 
 // ============================================
@@ -19,173 +42,128 @@ function getSupabase(env: Env) {
 // ============================================
 
 dbRoutes.get('/heroes', async (c) => {
+  const sql = getSql(c.env);
   try {
-    const supabase = getSupabase(c.env);
     const userId = c.get('userId');
 
-    const { data, error } = await supabase
-      .from('heroes')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+    const rows = await sql`
+      SELECT * FROM heroes
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC`;
 
-    if (error) throw error;
-
-    return c.json((data || []).map(hero => ({
-      heroId: hero.hero_id,
-      heroName: hero.hero_name,
-      heroGender: hero.hero_gender,
-      heroRace: hero.hero_race,
-      heroClass: hero.hero_class,
-      heroLevel: hero.hero_level,
-      heroBackground: hero.hero_background,
-      heroAlignment: hero.hero_alignment,
-      profilePicture: hero.profile_picture,
-      stats: hero.stats,
-    })));
+    return c.json(rows.map(mapHero));
   } catch (error: any) {
     console.error('Error fetching heroes:', {
       message: error?.message,
       code: error?.code,
-      details: error?.details,
-      hint: error?.hint,
+      detail: error?.detail,
       stack: error?.stack,
     });
     return c.json({ error: 'Failed to fetch heroes' }, 500);
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
   }
 });
 
 dbRoutes.post('/heroes', async (c) => {
+  const sql = getSql(c.env);
   try {
-    const supabase = getSupabase(c.env);
     const userId = c.get('userId');
     const hero = await c.req.json();
 
-    const insertData: Record<string, unknown> = {
-      user_id: userId,
-      hero_id: hero.heroId,
-      hero_name: hero.heroName,
-      hero_race: hero.heroRace,
-      hero_class: hero.heroClass,
-      hero_level: hero.heroLevel || 1,
-      hero_background: hero.heroBackground,
-      stats: hero.stats,
-    };
-    if (hero.heroGender) insertData.hero_gender = hero.heroGender;
-    if (hero.profilePicture) insertData.profile_picture = hero.profilePicture;
-    if (hero.heroAlignment) insertData.hero_alignment = hero.heroAlignment;
+    const [row] = await sql`
+      INSERT INTO heroes (
+        user_id, hero_id, hero_name, hero_gender, hero_race, hero_class,
+        hero_level, hero_background, hero_alignment, profile_picture, stats
+      ) VALUES (
+        ${userId}, ${hero.heroId}, ${hero.heroName}, ${hero.heroGender ?? null},
+        ${hero.heroRace}, ${hero.heroClass}, ${hero.heroLevel || 1},
+        ${hero.heroBackground}, ${hero.heroAlignment ?? null},
+        ${hero.profilePicture ?? null}, ${jsonb(sql, hero.stats)}
+      )
+      RETURNING *`;
 
-    const { data, error } = await supabase
-      .from('heroes')
-      .insert([insertData])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return c.json({
-      heroId: data.hero_id,
-      heroName: data.hero_name,
-      heroGender: data.hero_gender,
-      heroRace: data.hero_race,
-      heroClass: data.hero_class,
-      heroLevel: data.hero_level,
-      heroBackground: data.hero_background,
-      heroAlignment: data.hero_alignment,
-      profilePicture: data.profile_picture,
-      stats: data.stats,
-    }, 201);
+    return c.json(mapHero(row), 201);
   } catch (error: any) {
     console.error('Error creating hero:', {
       message: error?.message,
       code: error?.code,
-      details: error?.details,
-      hint: error?.hint,
+      detail: error?.detail,
       stack: error?.stack,
     });
     return c.json({ error: 'Failed to create hero' }, 500);
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
   }
 });
 
 dbRoutes.put('/heroes/:heroId', async (c) => {
+  const sql = getSql(c.env);
   try {
-    const supabase = getSupabase(c.env);
     const userId = c.get('userId');
     const heroId = c.req.param('heroId');
     const hero = await c.req.json();
 
-    const updateData: Record<string, unknown> = {};
-    if (hero.heroName !== undefined) updateData.hero_name = hero.heroName;
-    if (hero.heroRace !== undefined) updateData.hero_race = hero.heroRace;
-    if (hero.heroClass !== undefined) updateData.hero_class = hero.heroClass;
-    if (hero.heroLevel !== undefined) updateData.hero_level = hero.heroLevel;
-    if (hero.heroBackground !== undefined) updateData.hero_background = hero.heroBackground;
-    if (hero.heroAlignment !== undefined) updateData.hero_alignment = hero.heroAlignment;
-    if (hero.heroGender !== undefined) updateData.hero_gender = hero.heroGender;
-    if (hero.profilePicture !== undefined) updateData.profile_picture = hero.profilePicture;
-    if (hero.stats !== undefined) updateData.stats = hero.stats;
-
-    if (Object.keys(updateData).length === 0) {
+    // Preserve the "nothing to update -> 400" guard from the supabase-js version.
+    const updatable = [
+      'heroName', 'heroRace', 'heroClass', 'heroLevel',
+      'heroBackground', 'heroAlignment', 'heroGender', 'profilePicture', 'stats',
+    ];
+    if (!updatable.some((k) => hero[k] !== undefined)) {
       return c.json({ error: 'No fields to update' }, 400);
     }
 
-    const { data, error } = await supabase
-      .from('heroes')
-      .update(updateData)
-      .eq('hero_id', heroId)
-      .eq('user_id', userId)
-      .select()
-      .single();
+    // Partial update via COALESCE: a field left undefined keeps its current value.
+    const [row] = await sql`
+      UPDATE heroes SET
+        hero_name       = COALESCE(${hero.heroName ?? null}, hero_name),
+        hero_race       = COALESCE(${hero.heroRace ?? null}, hero_race),
+        hero_class      = COALESCE(${hero.heroClass ?? null}, hero_class),
+        hero_level      = COALESCE(${hero.heroLevel ?? null}, hero_level),
+        hero_background = COALESCE(${hero.heroBackground ?? null}, hero_background),
+        hero_alignment  = COALESCE(${hero.heroAlignment ?? null}, hero_alignment),
+        hero_gender     = COALESCE(${hero.heroGender ?? null}, hero_gender),
+        profile_picture = COALESCE(${hero.profilePicture ?? null}, profile_picture),
+        stats           = COALESCE(${hero.stats !== undefined ? jsonb(sql, hero.stats) : null}, stats)
+      WHERE hero_id = ${heroId} AND user_id = ${userId}
+      RETURNING *`;
 
-    if (error) throw error;
-
-    return c.json({
-      heroId: data.hero_id,
-      heroName: data.hero_name,
-      heroGender: data.hero_gender,
-      heroRace: data.hero_race,
-      heroClass: data.hero_class,
-      heroLevel: data.hero_level,
-      heroBackground: data.hero_background,
-      heroAlignment: data.hero_alignment,
-      profilePicture: data.profile_picture,
-      stats: data.stats,
-    });
+    if (!row) return c.json({ error: 'Hero not found' }, 404);
+    return c.json(mapHero(row));
   } catch (error: any) {
     console.error('Error updating hero:', {
       message: error?.message,
       code: error?.code,
-      details: error?.details,
-      hint: error?.hint,
+      detail: error?.detail,
       stack: error?.stack,
     });
     return c.json({ error: 'Failed to update hero' }, 500);
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
   }
 });
 
 dbRoutes.delete('/heroes/:heroId', async (c) => {
+  const sql = getSql(c.env);
   try {
-    const supabase = getSupabase(c.env);
     const userId = c.get('userId');
     const heroId = c.req.param('heroId');
 
-    const { error } = await supabase
-      .from('heroes')
-      .delete()
-      .eq('hero_id', heroId)
-      .eq('user_id', userId);
+    await sql`
+      DELETE FROM heroes
+      WHERE hero_id = ${heroId} AND user_id = ${userId}`;
 
-    if (error) throw error;
     return c.json({ success: true });
   } catch (error: any) {
     console.error('Error deleting hero:', {
       message: error?.message,
       code: error?.code,
-      details: error?.details,
-      hint: error?.hint,
+      detail: error?.detail,
       stack: error?.stack,
     });
     return c.json({ error: 'Failed to delete hero' }, 500);
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
   }
 });
 
@@ -194,153 +172,162 @@ dbRoutes.delete('/heroes/:heroId', async (c) => {
 // ============================================
 
 dbRoutes.get('/conversations', async (c) => {
+  const sql = getSql(c.env);
   try {
-    const supabase = getSupabase(c.env);
     const userId = c.get('userId');
 
-    const { data, error } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false });
+    const rows = await sql`
+      SELECT * FROM conversations
+      WHERE user_id = ${userId}
+      ORDER BY updated_at DESC`;
 
-    if (error) throw error;
-
-    return c.json((data || []).map(row => ({ ...row, sessionId: row.session_id })));
+    return c.json(rows.map((row) => ({ ...row, sessionId: row.session_id })));
   } catch (error) {
     console.error('Error fetching conversations:', error);
     return c.json({ error: 'Failed to fetch conversations' }, 500);
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
   }
 });
 
 dbRoutes.get('/conversations/:sessionId', async (c) => {
+  const sql = getSql(c.env);
   try {
-    const supabase = getSupabase(c.env);
     const userId = c.get('userId');
     const sessionId = c.req.param('sessionId');
 
-    const { data, error } = await supabase
-      .from('conversations')
-      .select('*')
-      .eq('session_id', sessionId)
-      .eq('user_id', userId)
-      .limit(1)
-      .maybeSingle();
+    const [row] = await sql`
+      SELECT * FROM conversations
+      WHERE session_id = ${sessionId} AND user_id = ${userId}
+      LIMIT 1`;
 
-    if (error) throw error;
-    if (!data) return c.json({ error: 'Conversation not found' }, 404);
+    if (!row) return c.json({ error: 'Conversation not found' }, 404);
 
-    return c.json({ ...data, sessionId: data.session_id });
+    return c.json({ ...row, sessionId: row.session_id });
   } catch (error) {
     console.error('Error fetching conversation:', error);
     return c.json({ error: 'Failed to fetch conversation' }, 500);
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
   }
 });
 
 dbRoutes.post('/conversations', async (c) => {
+  const sql = getSql(c.env);
   try {
-    const supabase = getSupabase(c.env);
     const userId = c.get('userId');
     const payload = await c.req.json();
 
-    const { data, error } = await supabase
-      .from('conversations')
-      .upsert([{
-        user_id: userId,
-        session_id: payload.sessionId,
-        conversation_name: payload.conversationName,
-        conversation_data: payload.conversation || payload.conversationData,
-        game_settings: payload.gameSettings || payload.settingsSnapshot || null,
-        selected_heroes: payload.selectedHeroes || null,
-        summary: payload.currentSummary || null,
-        world_map: payload.worldMap || null,
-        player_position: payload.playerPosition || null,
-        sub_maps: payload.sub_maps || null,
-        provider: payload.provider || null,
-        model: payload.model || null,
-        timestamp: payload.timestamp || new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }], { onConflict: 'session_id' })
-      .select()
-      .single();
+    const [row] = await sql`
+      INSERT INTO conversations (
+        user_id, session_id, conversation_name, conversation_data, game_settings,
+        selected_heroes, summary, world_map, player_position, sub_maps,
+        provider, model, timestamp, updated_at
+      ) VALUES (
+        ${userId},
+        ${payload.sessionId},
+        ${payload.conversationName ?? null},
+        ${jsonb(sql, payload.conversation || payload.conversationData)},
+        ${jsonb(sql, payload.gameSettings || payload.settingsSnapshot || null)},
+        ${jsonb(sql, payload.selectedHeroes || null)},
+        ${payload.currentSummary || null},
+        ${jsonb(sql, payload.worldMap || null)},
+        ${jsonb(sql, payload.playerPosition || null)},
+        ${jsonb(sql, payload.sub_maps || null)},
+        ${payload.provider || null},
+        ${payload.model || null},
+        ${payload.timestamp || new Date().toISOString()},
+        ${new Date().toISOString()}
+      )
+      ON CONFLICT (session_id) DO UPDATE SET
+        user_id           = EXCLUDED.user_id,
+        conversation_name = EXCLUDED.conversation_name,
+        conversation_data = EXCLUDED.conversation_data,
+        game_settings     = EXCLUDED.game_settings,
+        selected_heroes   = EXCLUDED.selected_heroes,
+        summary           = EXCLUDED.summary,
+        world_map         = EXCLUDED.world_map,
+        player_position   = EXCLUDED.player_position,
+        sub_maps          = EXCLUDED.sub_maps,
+        provider          = EXCLUDED.provider,
+        model             = EXCLUDED.model,
+        timestamp         = EXCLUDED.timestamp,
+        updated_at        = EXCLUDED.updated_at
+      RETURNING *`;
 
-    if (error) throw error;
-    return c.json(data, 201);
+    return c.json(row, 201);
   } catch (error) {
     console.error('Error saving conversation:', error);
     return c.json({ error: 'Failed to save conversation' }, 500);
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
   }
 });
 
 dbRoutes.put('/conversations/:sessionId', async (c) => {
+  const sql = getSql(c.env);
   try {
-    const supabase = getSupabase(c.env);
     const userId = c.get('userId');
     const sessionId = c.req.param('sessionId');
     const { conversation_data } = await c.req.json();
 
-    const { data, error } = await supabase
-      .from('conversations')
-      .update({
-        conversation_data,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('session_id', sessionId)
-      .eq('user_id', userId)
-      .select()
-      .single();
+    const [row] = await sql`
+      UPDATE conversations SET
+        conversation_data = ${jsonb(sql, conversation_data)},
+        updated_at = ${new Date().toISOString()}
+      WHERE session_id = ${sessionId} AND user_id = ${userId}
+      RETURNING *`;
 
-    if (error) throw error;
-    return c.json(data);
+    if (!row) return c.json({ error: 'Conversation not found' }, 404);
+    return c.json(row);
   } catch (error) {
     console.error('Error updating conversation:', error);
     return c.json({ error: 'Failed to update conversation' }, 500);
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
   }
 });
 
 dbRoutes.put('/conversations/:sessionId/name', async (c) => {
+  const sql = getSql(c.env);
   try {
-    const supabase = getSupabase(c.env);
     const userId = c.get('userId');
     const sessionId = c.req.param('sessionId');
     const { conversationName } = await c.req.json();
 
-    const { data, error } = await supabase
-      .from('conversations')
-      .update({
-        conversation_name: conversationName,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('session_id', sessionId)
-      .eq('user_id', userId)
-      .select()
-      .single();
+    const [row] = await sql`
+      UPDATE conversations SET
+        conversation_name = ${conversationName},
+        updated_at = ${new Date().toISOString()}
+      WHERE session_id = ${sessionId} AND user_id = ${userId}
+      RETURNING *`;
 
-    if (error) throw error;
-    return c.json(data);
+    if (!row) return c.json({ error: 'Conversation not found' }, 404);
+    return c.json(row);
   } catch (error) {
     console.error('Error updating conversation name:', error);
     return c.json({ error: 'Failed to update conversation name' }, 500);
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
   }
 });
 
 dbRoutes.delete('/conversations/:sessionId', async (c) => {
+  const sql = getSql(c.env);
   try {
-    const supabase = getSupabase(c.env);
     const userId = c.get('userId');
     const sessionId = c.req.param('sessionId');
 
-    const { error } = await supabase
-      .from('conversations')
-      .delete()
-      .eq('session_id', sessionId)
-      .eq('user_id', userId);
+    await sql`
+      DELETE FROM conversations
+      WHERE session_id = ${sessionId} AND user_id = ${userId}`;
 
-    if (error) throw error;
     return c.json({ success: true });
   } catch (error) {
     console.error('Error deleting conversation:', error);
     return c.json({ error: 'Failed to delete conversation' }, 500);
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
   }
 });
 

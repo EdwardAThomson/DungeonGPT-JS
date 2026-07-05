@@ -6,6 +6,20 @@ compatibility_flags = ["nodejs_compat"]
 [ai]
 binding = "AI"
 
+# Data Postgres on the Hetzner games box, reached via Hyperdrive.
+# Prod origin: box public IP:5432 over TLS (sslmode=require, self-signed cert); the Hetzner
+# firewall restricts inbound 5432 to Cloudflare's published IP ranges. Recreate the config with:
+#   npx wrangler hyperdrive create dungeongpt-db \
+#     --connection-string="postgresql://dungeongpt:<pw>@<box-public-ip>:5432/dungeongpt" --sslmode require
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "fbe8cace6ef34b9f9894887ade11254e"
+# Local dev: don't hardcode the password here (committed file). Tunnel to the box and export the
+# local connection string (use a spare local port if 5432 is already taken on your machine):
+#   ssh -f -N -L 5433:localhost:5432 octonion-games
+#   export WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="postgresql://dungeongpt:<pw>@localhost:5433/dungeongpt"
+#   npm run dev
+
 [vars]
 ENVIRONMENT = "development"
 CF_ACCOUNT_ID = "0696395687ae6f35b87de803102ae3ca"
