@@ -39,6 +39,7 @@ deleted. When the code and a doc disagree, the code wins.
 - `GUEST_MODE_PLAN.md` — guest mode (core shipped; conversion-prompt follow-up open)
 - `SAVE_SYNC_PLAN.md` — local-first saves, honest offline fallback, divergence-safe multi-device reconcile (#54; Phases 1-2 shipped 2026-07-04/05, Phase 3 planned)
 - `LARGER_WORLDS_PLAN.md` — chunked generation, flat storage, growable saves for paid tiers (#60; step 3 chunk-assembly prototype shipped debug-only behind `/debug/large-world`)
+- `WATER_TOWNS_PLAN.md`: canal city + river city as water-typed hub-and-spoke variants, premium (#65)
 
 ## Art & assets
 - `IMAGE_GENERATION_PROMPTS.md` — art-gen prompt library + style guide
