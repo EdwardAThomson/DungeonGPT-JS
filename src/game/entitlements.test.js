@@ -351,3 +351,19 @@ describe('entitlements', () => {
         });
     });
 });
+
+describe('per-template minTier (#70: flagship campaigns gate above member)', () => {
+  it('minTier premium locks a member and admits a premium account', () => {
+    const flagship = { id: 'tidewater-t3', premium: true, minTier: 'premium' };
+    setUserTier('member');
+    expect(canUseTemplate(flagship)).toBe(false);
+    setUserTier('premium');
+    expect(canUseTemplate(flagship)).toBe(true);
+  });
+
+  it('templates without minTier keep the member-wide gate', () => {
+    const t2 = { id: 'desert-expedition-t2', premium: true };
+    setUserTier('member');
+    expect(canUseTemplate(t2)).toBe(true);
+  });
+});

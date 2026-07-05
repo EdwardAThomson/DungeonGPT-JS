@@ -220,11 +220,16 @@ export function canUseTheme(themeId) {
 
 /**
  * Convenience: may the current user start this template?
- * Gate tier: 'member' (premium templates ship with Membership).
+ * Default gate tier: 'member' (premium templates ship with Membership).
+ * A template may carry an explicit minTier ('member' | 'premium' | 'elite')
+ * to gate higher: the server-delivered flagship campaigns need this (#70;
+ * e.g. The Drowned Bells is premium-only because the canal city it is set
+ * in only exists in premium worlds). minTier wins over the boolean flag.
  * @param {object} template
  * @returns {boolean}
  */
 export function canUseTemplate(template) {
+    if (template && template.minTier) return hasTier(template.minTier);
     return !isTemplatePremium(template) || hasTier('member');
 }
 
