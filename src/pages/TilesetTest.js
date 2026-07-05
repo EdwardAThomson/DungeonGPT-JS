@@ -80,18 +80,63 @@ const Swatch = ({ bg, label, size = 48 }) => (
   </div>
 );
 
+// River-city report (water towns Phase 1): island size, free island grass (the
+// quest-injection floor), distinct bridge crossings to the island, waterway tiles,
+// and which venues actually sit on the island.
+const analyzeFork = (town) => {
+  if (!town.riverFork) return null;
+  const { mapData, width, height } = town;
+  const islandKeys = new Set(town.riverFork.islandTiles.map((p) => `${p.x},${p.y}`));
+  let islandGrass = 0;
+  const venues = [];
+  for (const p of town.riverFork.islandTiles) {
+    const t = mapData[p.y][p.x];
+    if (t.type === 'grass' && !t.poi) islandGrass++;
+    if (t.type === 'building' && t.buildingType !== 'house') venues.push(t.buildingType);
+  }
+  const waterway = mapData.flat().filter((t) => t.type === 'water' && t.waterway).length;
+  // distinct crossings: connected components of bridge tiles touching island land
+  const seen = new Set();
+  let bridges = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (mapData[y][x].type !== 'bridge' || seen.has(`${x},${y}`)) continue;
+      const comp = [];
+      const st = [{ x, y }];
+      seen.add(`${x},${y}`);
+      while (st.length) {
+        const c = st.pop();
+        comp.push(c);
+        for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+          const n = mapData[c.y + dy] && mapData[c.y + dy][c.x + dx];
+          if (!n || n.type !== 'bridge' || seen.has(`${c.x + dx},${c.y + dy}`)) continue;
+          seen.add(`${c.x + dx},${c.y + dy}`);
+          st.push({ x: c.x + dx, y: c.y + dy });
+        }
+      }
+      if (comp.some((c) => [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => islandKeys.has(`${c.x + dx},${c.y + dy}`)))) bridges++;
+    }
+  }
+  return { islandSize: town.riverFork.islandTiles.length, islandGrass, bridges, waterway, venues, islandKeys };
+};
+
 const TilesetTest = () => {
   const [zoom, setZoom] = useState(1);
   const [size, setSize] = useState('town');
   const [seed, setSeed] = useState(12345);
   const [theme, setTheme] = useState('grassland');
   const [showPaths, setShowPaths] = useState(false);
+  const [archetype, setArchetype] = useState('standard'); // 'standard' | 'riverfork'
+  const [riverDir, setRiverDir] = useState('NORTH_SOUTH');
 
   const town = useMemo(
-    () => generateTownMap(size, `Demo ${size}`, 'south', seed, false, 'NORTH_SOUTH', theme),
-    [size, seed, theme]
+    () => (archetype === 'riverfork'
+      ? generateTownMap(size, `Demo ${size}`, 'south', seed, true, riverDir, theme, { archetype: 'riverfork' })
+      : generateTownMap(size, `Demo ${size}`, 'south', seed, false, 'NORTH_SOUTH', theme)),
+    [size, seed, theme, archetype, riverDir]
   );
   const paths = useMemo(() => analyzePaths(town), [town]);
+  const fork = useMemo(() => analyzeFork(town), [town]);
   const grid = town.mapData;
   const W = town.width;
   const H = town.height;
@@ -138,11 +183,15 @@ const TilesetTest = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10, flexWrap: 'wrap' }}>
           <h3 style={{ ...heading, margin: 0 }}>Generated town</h3>
           <div style={{ display: 'flex', gap: 6 }}>
-            {SIZES.map((s) => (
-              <button key={s} onClick={() => setSize(s)}
-                className={s === size ? 'primary-button' : 'secondary-button'}
-                style={{ padding: '4px 10px', fontSize: 12 }}>{s}</button>
-            ))}
+            {SIZES.map((s) => {
+              // the river-city archetype only exists on town + city grids
+              const disabled = archetype === 'riverfork' && (s === 'hamlet' || s === 'village');
+              return (
+                <button key={s} onClick={() => setSize(s)} disabled={disabled}
+                  className={s === size ? 'primary-button' : 'secondary-button'}
+                  style={{ padding: '4px 10px', fontSize: 12, opacity: disabled ? 0.4 : 1 }}>{s}</button>
+              );
+            })}
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
             {['grassland', 'desert', 'snow'].map((t) => (
@@ -150,6 +199,23 @@ const TilesetTest = () => {
                 className={t === theme ? 'primary-button' : 'secondary-button'}
                 style={{ padding: '4px 10px', fontSize: 12 }}>{t}</button>
             ))}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[['standard', 'standard'], ['riverfork', 'river city']].map(([val, label]) => (
+              <button key={val}
+                onClick={() => {
+                  setArchetype(val);
+                  if (val === 'riverfork' && (size === 'hamlet' || size === 'village')) setSize('town');
+                }}
+                className={val === archetype ? 'primary-button' : 'secondary-button'}
+                style={{ padding: '4px 10px', fontSize: 12 }}>{label}</button>
+            ))}
+            {archetype === 'riverfork' && (
+              <button className="secondary-button" style={{ padding: '4px 10px', fontSize: 12 }}
+                onClick={() => setRiverDir((d) => (d === 'NORTH_SOUTH' ? 'EAST_WEST' : 'NORTH_SOUTH'))}>
+                river {riverDir === 'NORTH_SOUTH' ? 'N-S' : 'E-W'}
+              </button>
+            )}
           </div>
           <button className="secondary-button" style={{ padding: '4px 10px', fontSize: 12 }}
             onClick={() => setSeed(Math.floor(Math.random() * 100000))}>🎲 reseed</button>
@@ -172,6 +238,18 @@ const TilesetTest = () => {
           {' '}· {paths.pathTiles} path tiles · {paths.spokes} spokes ·
           avg {paths.avgBends.toFixed(1)} bends · length/straight {paths.avgRatio.toFixed(2)}
         </div>
+        {/* River-city invariants (water towns Phase 1): island >= 4 free grass
+            (quest floor) and >= 2 distinct bridge crossings, per the plan. */}
+        {fork && (
+          <div style={{ fontSize: 12, marginBottom: 8, color: 'var(--text-secondary)' }}>
+            <strong style={{ color: fork.bridges >= 2 && fork.islandGrass >= 4 ? '#3a3' : '#c33' }}>
+              river city: {fork.bridges} bridge crossing{fork.bridges === 1 ? '' : 's'} to the island
+              {' '}· {fork.islandGrass} free island grass
+            </strong>
+            {' '}· island {fork.islandSize} tiles · {fork.waterway} waterway tiles ·
+            island venues: {fork.venues.length ? fork.venues.join(', ') : 'none'}
+          </div>
+        )}
         <div style={{ overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8, padding: 8, background: 'var(--surface)' }}>
           <div style={{
             display: 'grid', gridTemplateColumns: `repeat(${W}, ${TILE}px)`, width: W * TILE,
@@ -184,6 +262,9 @@ const TilesetTest = () => {
                 if (showPaths && isPathType(tile.type)) {
                   overlay = paths.main.has(`${gx},${gy}`) ? 'rgba(80,200,120,0.9)' : 'rgba(230,60,60,0.95)';
                 }
+                if (showPaths && !overlay && fork && fork.islandKeys.has(`${gx},${gy}`)) {
+                  overlay = 'rgba(240,180,50,0.9)'; // river-city island district
+                }
                 if (showPaths && tile.isGate) overlay = 'rgba(80,140,255,0.95)';
                 return <Cell key={`${gx},${gy}`} tile={tile} neighbours={neighbours} theme={theme} overlay={overlay} />;
               })
@@ -193,7 +274,10 @@ const TilesetTest = () => {
         <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
           This is the actual <code>generateTownMap()</code> output rendered with the SVG tileset — walls autotile from
           neighbours, zero image files. Reseed to see different layouts. The <em>path overlay</em> outlines the
-          hub-and-spoke network (green = connected to the hub, red = orphan — should never appear, blue = gates).
+          hub-and-spoke network (green = connected to the hub, red = orphan — should never appear, blue = gates,
+          orange = the river-city island district). The <em>river city</em> archetype (town/city only) carves a windy
+          forking river around an island quarter; fork water renders as plain water in this debug cut (art lands in
+          Phase 4).
         </p>
       </section>
     </div>

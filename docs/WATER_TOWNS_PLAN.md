@@ -291,7 +291,7 @@ separate `/debug/water-town` page is not needed.
 
 | Phase | What | Size | Depends on |
 |---|---|---|---|
-| 1 | River-fork carve + `waterway` field + bridging cost + island venue bias + invariant tests, behind `/debug/tileset` | M | nothing |
+| 1 | River-fork carve + `waterway` field + bridging cost + island venue bias + invariant tests, behind `/debug/tileset`. **BUILT 2026-07-05 (debug-only, pending review):** `placeRiverForkInTown` in `townMapGenerator.js` (opt-in via `water.archetype: 'riverfork'`), island venue bias + reserved quest grass in `placeBuildings`, `ensureIslandBridges` post-pass (>= 2 crossings), river-city seed-survey tests + legacy fixture pins in `townMapGenerator.test.js`, river-city preset on `/debug/tileset` | M | nothing |
 | 2 | Canal city: basin + canal spokes + bank-hug cost + density variant + grass-floor tests, behind `/debug/tileset` | L | 1 (shares plumbing) |
 | 3 | World-gen shim (`riverToSea`, `estuaryTown` options) + `waterTown` stamp in NewGame + `useGameMap` pass-through | M | 1-2 |
 | 4 | Art polish: canal water variant, quay autotiling, boathouse art/emoji/legend + Boatwright staffing | S-M | 1-2 |

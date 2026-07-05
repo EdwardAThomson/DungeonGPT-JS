@@ -1,4 +1,8 @@
-import { generateTownMap, padTownToUniform, PATH_WINDINESS } from './townMapGenerator';
+import { generateTownMap, padTownToUniform, PATH_WINDINESS, WATERWAY_BRIDGE_COST } from './townMapGenerator';
+import legacyVillage777 from './__fixtures__/legacyTown_village_seed777.json';
+import legacyCity12345 from './__fixtures__/legacyTown_city_seed12345.json';
+import legacyRiverTown4242 from './__fixtures__/legacyTown_riverTown_seed4242.json';
+import legacyCoastTown9001 from './__fixtures__/legacyTown_coastTown_seed9001.json';
 
 const SIZES = ['hamlet', 'village', 'town', 'city'];
 const countType = (town, type) => town.mapData.flat().filter((t) => t.type === type).length;
@@ -353,6 +357,212 @@ describe('hub-and-spoke path network', () => {
     expect(JSON.stringify(a.mapData)).toBe(JSON.stringify(b.mapData));
     expect(JSON.stringify(a.pathStats)).toBe(JSON.stringify(b.pathStats));
     expect(JSON.stringify(a.entrances)).toBe(JSON.stringify(b.entrances));
+  });
+});
+
+// =============================================================================
+// River city archetype (water towns Phase 1, #65): a windy river enters one edge,
+// forks around an island district, rejoins, and exits. Fork water carries the
+// additive `waterway: true` flag, foot routes cross it on bridges, the island
+// hosts the distinctive venues, and every #62 walkability invariant still holds.
+// =============================================================================
+describe('river city archetype (riverfork, water towns Phase 1)', () => {
+  const RIVER_CITY_SIZES = ['town', 'city'];
+  const isPathType = (t) => t === 'dirt_path' || t === 'stone_path' || t === 'town_square' || t === 'bridge';
+  const genFork = (size, seed, dir = 'NORTH_SOUTH', entry = 'south') =>
+    generateTownMap(size, 'Forkford', entry, seed, true, dir, 'grassland', { archetype: 'riverfork' });
+
+  const pathComponents = (town) => {
+    const { mapData, width, height } = town;
+    const seen = new Set();
+    const comps = [];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (!isPathType(mapData[y][x].type) || seen.has(`${x},${y}`)) continue;
+        const comp = new Set();
+        const stack = [[x, y]];
+        seen.add(`${x},${y}`);
+        while (stack.length) {
+          const [cx, cy] = stack.pop();
+          comp.add(`${cx},${cy}`);
+          for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+            const nx = cx + dx, ny = cy + dy;
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+            if (!isPathType(mapData[ny][nx].type) || seen.has(`${nx},${ny}`)) continue;
+            seen.add(`${nx},${ny}`);
+            stack.push([nx, ny]);
+          }
+        }
+        comps.push(comp);
+      }
+    }
+    return comps;
+  };
+
+  const adjacentToPath = (town, x, y) => [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => {
+    const n = town.mapData[y + dy] && town.mapData[y + dy][x + dx];
+    return n && isPathType(n.type);
+  });
+
+  // Distinct crossings: connected components of bridge tiles orthogonally adjacent
+  // to island land (two bridges is the Konigsberg minimum, plan decision 8).
+  const islandBridgeGroups = (town) => {
+    const islandKeys = new Set(town.riverFork.islandTiles.map((p) => `${p.x},${p.y}`));
+    const seen = new Set();
+    let groups = 0;
+    for (let y = 0; y < town.height; y++) {
+      for (let x = 0; x < town.width; x++) {
+        if (town.mapData[y][x].type !== 'bridge' || seen.has(`${x},${y}`)) continue;
+        const comp = [];
+        const st = [{ x, y }];
+        seen.add(`${x},${y}`);
+        while (st.length) {
+          const c = st.pop();
+          comp.push(c);
+          for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+            const nx = c.x + dx, ny = c.y + dy;
+            const n = town.mapData[ny] && town.mapData[ny][nx];
+            if (!n || n.type !== 'bridge' || seen.has(`${nx},${ny}`)) continue;
+            seen.add(`${nx},${ny}`);
+            st.push({ x: nx, y: ny });
+          }
+        }
+        const touchesIsland = comp.some((c) =>
+          [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => islandKeys.has(`${c.x + dx},${c.y + dy}`)));
+        if (touchesIsland) groups++;
+      }
+    }
+    return groups;
+  };
+
+  test('the waterway bridging cost matches the river band cost from the plan', () => {
+    expect(WATERWAY_BRIDGE_COST).toBe(5);
+  });
+
+  test('seed survey (40 seeds x town/city x both directions): fork, island, bridges, floors, one network', () => {
+    const channelSpokes = [];
+
+    RIVER_CITY_SIZES.forEach((size) => {
+      for (let s = 1; s <= 40; s++) {
+        const seed = s * 613 + 11;
+        const dir = s % 2 ? 'NORTH_SOUTH' : 'EAST_WEST';
+        const entry = s % 3 === 0 ? ['south', 'east'] : 'south';
+        const town = genFork(size, seed, dir, entry);
+        const ctx = `${size} seed ${seed} ${dir}`;
+
+        // the fork carved and is described (island district exists)
+        expect({ ctx, hasFork: !!town.riverFork }).toEqual({ ctx, hasFork: true });
+        const islandKeys = new Set(town.riverFork.islandTiles.map((p) => `${p.x},${p.y}`));
+        expect(town.riverFork.islandTiles.length).toBeGreaterThanOrEqual(4);
+
+        // fork water carries the additive waterway flag (absent = plain water elsewhere)
+        const waterwayTiles = town.mapData.flat().filter((t) => t.type === 'water' && t.waterway === true).length;
+        expect({ ctx, hasWaterway: waterwayTiles > 0 }).toEqual({ ctx, hasWaterway: true });
+
+        // walkability invariant: ONE network containing the hub and every gate,
+        // zero orphans (pruneOrphanPaths never fires on shipped output)
+        const comps = pathComponents(town);
+        expect({ ctx, components: comps.length }).toEqual({ ctx, components: 1 });
+        const net = comps[0];
+        expect(net.has(`${town.centerPoint.x},${town.centerPoint.y}`)).toBe(true);
+        town.entrances.forEach(({ pos }) => {
+          expect({ ctx, gate: net.has(`${pos.x},${pos.y}`) }).toEqual({ ctx, gate: true });
+        });
+
+        // island venues: cathedral quarter on cities (temple + archives), market
+        // isle on towns; each on the island and fronting a lane (reachable)
+        const wantVenues = size === 'city' ? ['temple', 'archives'] : ['market'];
+        for (const venue of wantVenues) {
+          const hit = town.mapData.flat().find((t) =>
+            t.type === 'building' && t.buildingType === venue && islandKeys.has(`${t.x},${t.y}`));
+          expect({ ctx, venue, onIsland: !!hit }).toEqual({ ctx, venue, onIsland: true });
+          expect({ ctx, venue, served: adjacentToPath(town, hit.x, hit.y) }).toEqual({ ctx, venue, served: true });
+        }
+
+        // every non-house/manor/keep building still fronts a lane (island included)
+        const misses = [];
+        town.mapData.flat().forEach((t) => {
+          if (t.type !== 'building') return;
+          if (t.buildingType === 'house' || t.buildingType === 'manor' || t.buildingType === 'keep') return;
+          if (!adjacentToPath(town, t.x, t.y)) misses.push(t.buildingType);
+        });
+        expect({ ctx, misses }).toEqual({ ctx, misses: [] });
+
+        // at least two distinct bridge crossings knit the island to the town
+        const groups = islandBridgeGroups(town);
+        expect({ ctx, twoBridges: groups >= 2, groups }).toEqual({ ctx, twoBridges: true, groups });
+
+        // quest-injection floor: >= 4 free grass tiles ON the island
+        const freeGrass = town.riverFork.islandTiles.filter((p) => {
+          const t = town.mapData[p.y][p.x];
+          return t.type === 'grass' && !t.poi;
+        }).length;
+        expect({ ctx, floorMet: freeGrass >= 4, freeGrass }).toEqual({ ctx, floorMet: true, freeGrass });
+
+        // collect fork-arm windiness (asserted in aggregate below)
+        (town.pathStats?.spokes || []).forEach((sp) => {
+          if (sp.kind === 'channel' && sp.straight >= 4) channelSpokes.push(sp);
+        });
+      }
+    });
+
+    // the fork's arms meander like the foot paths do (same seeded technique)
+    const avg = (arr, f) => arr.reduce((a, sp) => a + f(sp), 0) / arr.length;
+    expect(channelSpokes.length).toBeGreaterThan(100);
+    expect(avg(channelSpokes, (sp) => sp.bends)).toBeGreaterThanOrEqual(2);
+    const avgRatio = avg(channelSpokes, (sp) => sp.length / sp.straight);
+    expect(avgRatio).toBeGreaterThanOrEqual(1.05);
+    expect(avgRatio).toBeLessThanOrEqual(2.5);
+  });
+
+  it.each(RIVER_CITY_SIZES)('%s river city places the same building count on every seed', (size) => {
+    const totals = new Set();
+    for (let seed = 100; seed < 140; seed++) {
+      const town = genFork(size, seed);
+      let n = 0;
+      town.mapData.forEach((row) => row.forEach((t) => { if (t.type === 'building') n++; }));
+      totals.add(n);
+    }
+    expect([...totals]).toHaveLength(1);
+  });
+
+  test('same seed twice is identical (map, path stats, fork descriptor)', () => {
+    const a = genFork('city', 90210, 'EAST_WEST', ['south', 'west']);
+    const b = genFork('city', 90210, 'EAST_WEST', ['south', 'west']);
+    expect(JSON.stringify(a.mapData)).toBe(JSON.stringify(b.mapData));
+    expect(JSON.stringify(a.pathStats)).toBe(JSON.stringify(b.pathStats));
+    expect(JSON.stringify(a.riverFork)).toBe(JSON.stringify(b.riverFork));
+  });
+
+  test('riverfork on small sizes falls back to the plain river band (no fork, no island)', () => {
+    ['hamlet', 'village'].forEach((size) => {
+      const town = genFork(size, 777);
+      expect(town.riverFork).toBeUndefined();
+      const waterway = town.mapData.flat().filter((t) => t.waterway).length;
+      expect(waterway).toBe(0);
+      expect(town.mapData.flat().some((t) => t.type === 'water')).toBe(true); // the band
+    });
+  });
+
+  // The archetype is strictly additive: ordinary towns (landlocked, river band,
+  // coast) must come out BYTE-IDENTICAL to the pre-fork generator. Fixtures were
+  // captured from the generator immediately before this feature landed.
+  describe('ordinary towns are unchanged (fixture pins)', () => {
+    const normalize = (town) => JSON.parse(JSON.stringify(town));
+
+    test('landlocked village, seed 777', () => {
+      expect(normalize(generateTownMap('village', 'Fixture', 'south', 777))).toEqual(legacyVillage777);
+    });
+    test('two-gate city, seed 12345', () => {
+      expect(normalize(generateTownMap('city', 'Fixture', ['south', 'east'], 12345))).toEqual(legacyCity12345);
+    });
+    test('river-band town, seed 4242', () => {
+      expect(normalize(generateTownMap('town', 'Fixture', 'south', 4242, true, 'EAST_WEST'))).toEqual(legacyRiverTown4242);
+    });
+    test('coastal town, seed 9001', () => {
+      const water = { kind: 'coast', edges: { N: false, E: true, S: false, W: false } };
+      expect(normalize(generateTownMap('town', 'Fixture', 'south', 9001, false, 'NORTH_SOUTH', 'grassland', water))).toEqual(legacyCoastTown9001);
+    });
   });
 });
 
