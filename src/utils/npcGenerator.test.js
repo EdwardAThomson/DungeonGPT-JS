@@ -37,6 +37,12 @@ describe('populateTown staffing coverage', () => {
     expect(staff.length).toBeGreaterThan(0);
   });
 
+  it('staffs a boathouse with a boatwright (canal city, water towns #65 Phase 2)', () => {
+    const staff = staffFor(populateTown(makeTown(['boathouse']), 11), 'boathouse');
+    expect(staff.length).toBeGreaterThan(0);
+    expect(staff.some((n) => /Boatwright|Shipwright|Ferryman|Oarmaker/i.test(`${n.title} ${n.job}`))).toBe(true);
+  });
+
   it('is deterministic for the same seed', () => {
     const a = populateTown(makeTown(['barracks', 'workshop', 'bank']), 99);
     const b = populateTown(makeTown(['barracks', 'workshop', 'bank']), 99);

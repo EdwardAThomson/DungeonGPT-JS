@@ -296,6 +296,13 @@ const ROLES = {
         inventory: ["Oilskin Coat", "Brass Spyglass", "Shipping Ledger"],
         hpRange: [8, 12]
     },
+    "Boatwright": {
+        possibleTitles: ["Boatwright", "Shipwright", "Ferryman", "Oarmaker"],
+        defaultClass: "Expert",
+        baseStats: { Strength: 12, Dexterity: 12, Constitution: 12, Intelligence: 11, Wisdom: 12, Charisma: 10 },
+        inventory: ["Caulking Mallet", "Tar Pot", "Coil of Rope"],
+        hpRange: [7, 11]
+    },
     "Mage": {
         possibleTitles: {
             Male: ["Mage", "Wizard", "Sorcerer", "Enchanter", "Archmage"],
@@ -790,6 +797,12 @@ export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
         } else if (b.type === 'harbormaster') {
             const hm = addNPC("Harbormaster", b, b);
             hm.job = `${hm.title} of ${b.name}`;
+        } else if (b.type === 'boathouse') {
+            // Canal-city boathouse (water towns #65): proprietor pattern, sibling of
+            // the harbormaster branch above. Unnamed civic building, so b.name is the
+            // town-name fallback ("Boatwright of Saltmere").
+            const bw = addNPC("Boatwright", b, b);
+            bw.job = `${bw.title} of ${b.name}`;
         } else if (b.type === 'magetower') {
             const mage = addNPC("Mage", b, b);
             mage.job = `${mage.title} of ${b.name}`;

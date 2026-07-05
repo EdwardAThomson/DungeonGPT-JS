@@ -1,8 +1,9 @@
-import { generateTownMap, padTownToUniform, PATH_WINDINESS, WATERWAY_BRIDGE_COST } from './townMapGenerator';
+import { generateTownMap, padTownToUniform, PATH_WINDINESS, WATERWAY_BRIDGE_COST, CANAL_BANK_COST } from './townMapGenerator';
 import legacyVillage777 from './__fixtures__/legacyTown_village_seed777.json';
 import legacyCity12345 from './__fixtures__/legacyTown_city_seed12345.json';
 import legacyRiverTown4242 from './__fixtures__/legacyTown_riverTown_seed4242.json';
 import legacyCoastTown9001 from './__fixtures__/legacyTown_coastTown_seed9001.json';
+import legacyCoastCity3131 from './__fixtures__/legacyTown_coastCity_seed3131.json';
 
 const SIZES = ['hamlet', 'village', 'town', 'city'];
 const countType = (town, type) => town.mapData.flat().filter((t) => t.type === type).length;
@@ -563,6 +564,242 @@ describe('river city archetype (riverfork, water towns Phase 1)', () => {
       const water = { kind: 'coast', edges: { N: false, E: true, S: false, W: false } };
       expect(normalize(generateTownMap('town', 'Fixture', 'south', 9001, false, 'NORTH_SOUTH', 'grassland', water))).toEqual(legacyCoastTown9001);
     });
+  });
+});
+
+// =============================================================================
+// Canal city archetype (water towns Phase 2, #65): a harbour basin off the town
+// square, one guaranteed channel to the open sea (plus a seeded second outlet
+// that fences off a district), and windy 1-wide canal spokes threading the
+// quarters. Canal water carries the additive `waterway: true` flag, foot lanes
+// hug the banks (CANAL_BANK_COST quays) and cross on bridges, the reduced
+// CANAL_BUILDING_CONFIG roster fits the wetter grid, and every #62 walkability
+// invariant still holds. Debug-only in this cut (preset on /debug/tileset).
+// =============================================================================
+describe('canal city archetype (canal, water towns Phase 2)', () => {
+  const isPathType = (t) => t === 'dirt_path' || t === 'stone_path' || t === 'town_square' || t === 'bridge';
+  const COASTS = [
+    { kind: 'coast', edges: { N: false, E: true, S: false, W: false }, archetype: 'canal' },
+    { kind: 'coast', edges: { N: false, E: false, S: true, W: false }, archetype: 'canal' },
+    { kind: 'coast', edges: { N: true, E: false, S: false, W: false }, archetype: 'canal' },
+    { kind: 'coast', edges: { N: false, E: false, S: false, W: true }, archetype: 'canal' },
+  ];
+  const genCanal = (seed, water = COASTS[0], entry = 'south', size = 'city') =>
+    generateTownMap(size, 'Lagoona', entry, seed, false, 'NORTH_SOUTH', 'grassland', water);
+
+  const pathComponents = (town) => {
+    const { mapData, width, height } = town;
+    const seen = new Set();
+    const comps = [];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (!isPathType(mapData[y][x].type) || seen.has(`${x},${y}`)) continue;
+        const comp = new Set();
+        const stack = [[x, y]];
+        seen.add(`${x},${y}`);
+        while (stack.length) {
+          const [cx, cy] = stack.pop();
+          comp.add(`${cx},${cy}`);
+          for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+            const nx = cx + dx, ny = cy + dy;
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+            if (!isPathType(mapData[ny][nx].type) || seen.has(`${nx},${ny}`)) continue;
+            seen.add(`${nx},${ny}`);
+            stack.push([nx, ny]);
+          }
+        }
+        comps.push(comp);
+      }
+    }
+    return comps;
+  };
+
+  const adjacentToPath = (town, x, y) => [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => {
+    const n = town.mapData[y + dy] && town.mapData[y + dy][x + dx];
+    return n && isPathType(n.type);
+  });
+
+  test('the quay bank discount is exposed and sits between free and a grass step', () => {
+    expect(CANAL_BANK_COST).toBeGreaterThan(0);
+    expect(CANAL_BANK_COST).toBeLessThan(1);
+  });
+
+  test('seed survey (40 seeds x 4 coasts): basin, connected water, spokes, quays, bridges, floors, one network', () => {
+    const canalSpokes = [];
+    let totalBridges = 0;
+    let townsWithDistricts = 0;
+
+    COASTS.forEach((water, wi) => {
+      for (let s = 1; s <= 10; s++) {
+        const seed = s * 419 + wi * 7 + 3;
+        const entry = s % 3 === 0 ? ['south', 'west'] : 'south';
+        const town = genCanal(seed, water, entry);
+        const ctx = `coast ${['E', 'S', 'N', 'W'][wi]} seed ${seed}`;
+        const flat = town.mapData.flat();
+
+        // the archetype carved and is described
+        expect({ ctx, hasCanal: !!town.canal }).toEqual({ ctx, hasCanal: true });
+
+        // BASIN: a 2x2 open-water pool, every tile waterway-flagged water
+        expect(town.canal.basin).toHaveLength(4);
+        town.canal.basin.forEach((p) => {
+          const t = town.mapData[p.y][p.x];
+          expect({ ctx, basinTile: `${t.type}/${!!t.waterway}` }).toEqual({ ctx, basinTile: 'water/true' });
+        });
+
+        // every remaining waterway WATER tile is connected to the basin AND the
+        // basin drains to the open sea — water flows under bridges, so the flood
+        // runs over water + bridge tiles (bridges keep the waterway flag)
+        const wseen = new Set();
+        const st = town.canal.basin.map((p) => [p.x, p.y]);
+        st.forEach(([x, y]) => wseen.add(`${x},${y}`));
+        let reachesSea = false;
+        while (st.length) {
+          const [cx, cy] = st.pop();
+          for (const [dx, dy] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+            const nx = cx + dx, ny = cy + dy;
+            const t = town.mapData[ny] && town.mapData[ny][nx];
+            if (!t || (t.type !== 'water' && t.type !== 'bridge') || wseen.has(`${nx},${ny}`)) continue;
+            if (t.type === 'water' && !t.waterway) reachesSea = true;
+            wseen.add(`${nx},${ny}`);
+            st.push([nx, ny]);
+          }
+        }
+        expect({ ctx, reachesSea }).toEqual({ ctx, reachesSea: true });
+        const strandedCanal = flat.filter((t) => t.type === 'water' && t.waterway && !wseen.has(`${t.x},${t.y}`)).length;
+        expect({ ctx, strandedCanal }).toEqual({ ctx, strandedCanal: 0 });
+
+        // 3-5 windy canal spokes, and the carve stayed inside its tile budget's realm
+        const spokes = (town.pathStats?.spokes || []).filter((sp) => sp.kind === 'canal');
+        expect({ ctx, spokesOk: spokes.length >= 3 && spokes.length <= 5, n: spokes.length })
+          .toEqual({ ctx, spokesOk: true, n: spokes.length });
+        expect(town.canal.spokes).toBe(spokes.length);
+        expect(town.canal.canalTileCount).toBeGreaterThan(4); // basin + at least a channel
+
+        // walkability invariant (#62): ONE network containing the hub and every gate
+        const comps = pathComponents(town);
+        expect({ ctx, components: comps.length }).toEqual({ ctx, components: 1 });
+        const net = comps[0];
+        expect(net.has(`${town.centerPoint.x},${town.centerPoint.y}`)).toBe(true);
+        town.entrances.forEach(({ pos }) => {
+          expect({ ctx, gate: net.has(`${pos.x},${pos.y}`) }).toEqual({ ctx, gate: true });
+        });
+
+        // every building reachable from the hub on foot: non-house/manor/keep
+        // buildings front a lane on the single hub network
+        const misses = [];
+        flat.forEach((t) => {
+          if (t.type !== 'building') return;
+          if (t.buildingType === 'house' || t.buildingType === 'manor' || t.buildingType === 'keep') return;
+          if (!adjacentToPath(town, t.x, t.y)) misses.push(t.buildingType);
+        });
+        expect({ ctx, misses }).toEqual({ ctx, misses: [] });
+
+        // density variant: no stables/mill in the lagoon city; exactly one boathouse,
+        // moored on a canal/basin bank (waterway water, or a bridge laid over it)
+        expect(flat.some((t) => t.buildingType === 'stables' || t.buildingType === 'mill')).toBe(false);
+        const boathouses = flat.filter((t) => t.type === 'building' && t.buildingType === 'boathouse');
+        expect({ ctx, boathouses: boathouses.length }).toEqual({ ctx, boathouses: 1 });
+        const onBank = [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => {
+          const n = town.mapData[boathouses[0].y + dy] && town.mapData[boathouses[0].y + dy][boathouses[0].x + dx];
+          return n && n.waterway;
+        });
+        expect({ ctx, onBank }).toEqual({ ctx, onBank: true });
+        // the harbour roster still ships
+        expect(flat.some((t) => t.buildingType === 'harbormaster')).toBe(true);
+
+        // grass floors (quest-injection supply): >= 10 free grass in the core, every
+        // reserved tile still free grass, >= 4 free grass in each fenced-off district
+        const freeGrass = flat.filter((t) => t.type === 'grass' && !t.poi).length;
+        expect({ ctx, floor10: freeGrass >= 10, freeGrass }).toEqual({ ctx, floor10: true, freeGrass });
+        town.canal.reservedTiles.forEach((p) => {
+          const t = town.mapData[p.y][p.x];
+          expect({ ctx, reserved: `${t.type}/${t.poi || ''}` }).toEqual({ ctx, reserved: 'grass/' });
+        });
+        town.canal.districts.forEach((district, di) => {
+          const dGrass = district.filter((p) => {
+            const t = town.mapData[p.y][p.x];
+            return t.type === 'grass' && !t.poi;
+          }).length;
+          expect({ ctx, di, districtFloor: dGrass >= 4, dGrass }).toEqual({ ctx, di, districtFloor: true, dGrass });
+        });
+
+        // bridges knit the quarters: whenever a district was fenced off, at least one
+        // crossing exists (the single-component assert above is the general guarantee
+        // that every lane-crossed canal got its bridge)
+        const bridges = flat.filter((t) => t.type === 'bridge').length;
+        totalBridges += bridges;
+        if (town.canal.districts.length > 0) {
+          townsWithDistricts++;
+          expect({ ctx, bridgedDistrict: bridges >= 1 }).toEqual({ ctx, bridgedDistrict: true });
+        }
+
+        // collect canal-spoke windiness (asserted in aggregate below)
+        spokes.forEach((sp) => { if (sp.straight >= 4) canalSpokes.push(sp); });
+      }
+    });
+
+    // the canals meander like the foot paths do (same seeded cost-noise technique)
+    const avg = (arr, f) => arr.reduce((a, sp) => a + f(sp), 0) / arr.length;
+    expect(canalSpokes.length).toBeGreaterThan(60);
+    expect(avg(canalSpokes, (sp) => sp.bends)).toBeGreaterThanOrEqual(1.5);
+    const avgRatio = avg(canalSpokes, (sp) => sp.length / sp.straight);
+    expect(avgRatio).toBeGreaterThanOrEqual(1.05);
+    expect(avgRatio).toBeLessThanOrEqual(2.5);
+    // lanes do cross the canals across the survey (individual seeds may not need to)
+    expect(totalBridges).toBeGreaterThan(100);
+    // the seeded second outlet produces real fenced-off districts somewhere
+    expect(townsWithDistricts).toBeGreaterThan(0);
+  });
+
+  test('canal city places the same building count on every seed (roster fits the density variant)', () => {
+    const totals = new Set();
+    let boathouses = 0;
+    for (let seed = 100; seed < 140; seed++) {
+      const town = genCanal(seed, COASTS[seed % COASTS.length]);
+      let n = 0;
+      town.mapData.forEach((row) => row.forEach((t) => {
+        if (t.type === 'building') n++;
+        if (t.buildingType === 'boathouse') boathouses++;
+      }));
+      totals.add(n);
+    }
+    expect([...totals]).toHaveLength(1);
+    expect(boathouses).toBe(40); // exactly one per city, every seed
+  });
+
+  test('same seed twice is identical (map, path stats, canal descriptor)', () => {
+    const a = genCanal(90210, COASTS[1], ['south', 'west']);
+    const b = genCanal(90210, COASTS[1], ['south', 'west']);
+    expect(JSON.stringify(a.mapData)).toBe(JSON.stringify(b.mapData));
+    expect(JSON.stringify(a.pathStats)).toBe(JSON.stringify(b.pathStats));
+    expect(JSON.stringify(a.canal)).toBe(JSON.stringify(b.canal));
+  });
+
+  test('canal on smaller sizes falls back to the plain coastal town (no basin, no waterway)', () => {
+    ['hamlet', 'village', 'town'].forEach((size) => {
+      const town = genCanal(777, COASTS[0], 'south', size);
+      expect(town.canal).toBeUndefined();
+      expect(town.mapData.flat().filter((t) => t.waterway).length).toBe(0);
+      expect(town.mapData.flat().some((t) => t.type === 'water')).toBe(true); // the sea stays
+    });
+  });
+
+  test('canal requires a coastal context: a lake city falls back to the plain lake town', () => {
+    const lake = { kind: 'lake', edges: { N: true, E: false, S: false, W: false }, archetype: 'canal' };
+    const town = generateTownMap('city', 'L', 'south', 777, false, 'NORTH_SOUTH', 'grassland', lake);
+    expect(town.canal).toBeUndefined();
+    expect(town.mapData.flat().filter((t) => t.waterway).length).toBe(0);
+  });
+
+  // The archetype is strictly additive: the nearest non-canal cousin (a coastal CITY
+  // without the archetype, exercising keep/waterfront/wall paths) must come out
+  // BYTE-IDENTICAL to the pre-Phase-2 generator. Captured immediately before this
+  // feature landed, extending the Phase 1 fixture pins.
+  test('coastal city without the archetype is unchanged (fixture pin, seed 3131)', () => {
+    const water = { kind: 'coast', edges: { N: false, E: true, S: false, W: false } };
+    const town = JSON.parse(JSON.stringify(generateTownMap('city', 'Fixture', ['south', 'west'], 3131, false, 'NORTH_SOUTH', 'grassland', water)));
+    expect(town).toEqual(legacyCoastCity3131);
   });
 });
 
