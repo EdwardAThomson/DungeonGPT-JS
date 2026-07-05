@@ -83,6 +83,7 @@ const KNOWN_GAPS = {
   // from this pin.
   unobtainableGear: [
     'aegis_of_dawn',
+    'bell_of_the_last_tide', // #70: The Drowned Bells finale reward (private flagship, server-delivered); no public source by design
     'blade_of_the_shattered_throne',
     'clockwork_god_core',
     'crown_of_the_drowned_city',
