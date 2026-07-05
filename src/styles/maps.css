@@ -23,6 +23,73 @@
   margin: 10px auto;
 }
 
+/* Large-world viewport (LARGER_WORLDS_PLAN step 2). Only rendered when the world grid
+ * is bigger than the 10x10 pane footprint; today's 10x10 maps never get these nodes. */
+.world-map-viewport-frame {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 20px auto;
+}
+
+.world-map-viewport {
+  max-width: 100%;
+  overflow: auto;
+  display: flex; /* with the grid's margin:auto this centers small (fit-step) grids */
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-x pan-y;
+  border-radius: 4px;
+}
+
+.world-map-zoom {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  background: var(--surface, rgba(20, 20, 20, 0.85));
+  border: 1px solid var(--border, #555);
+  border-radius: 6px;
+  box-shadow: 0 2px 6px var(--shadow-black-30, rgba(0, 0, 0, 0.3));
+  opacity: 0.92;
+}
+
+.world-map-zoom button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+  font-size: 16px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text, #eee);
+  cursor: pointer;
+}
+
+.world-map-zoom button:hover:not(:disabled) {
+  background: var(--state-muted-strong, rgba(255, 255, 255, 0.15));
+}
+
+.world-map-zoom button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.world-map-zoom-step {
+  min-width: 38px;
+  text-align: center;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary, #aaa);
+}
+
 .map-tile {
   border: 1px solid var(--shadow-black-10);
   transition: all 0.3s ease;
