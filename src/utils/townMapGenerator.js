@@ -88,10 +88,13 @@ function buildingTileEstimate(townSize) {
  *   (see townWater.analyzeTownWater): `{ kind:'lake'|'coast', edges:{N,E,S,W} }`. When
  *   present, water is carved into the town BEFORE roads/buildings so the settlement sits
  *   on a real lakefront/coastline. Null (default) = landlocked, byte-identical to before.
+ *   The additive `water.archetype` field selects a water-town archetype (#65): 'riverfork'
+ *   (town + city sizes) carves a windy forking river with an island district instead of
+ *   the straight river band; other sizes and absent archetypes are unchanged.
  * @returns {Object} Town map data with tiles and metadata
  */
 export const generateTownMap = (townSize, townName, entryPoint = 'south', seed = null, hasRiver = false, riverDirection = 'NORTH_SOUTH', theme = 'grassland', water = null) => {
-  logger.debug(`[TOWN_MAP] Generating ${townSize} map for ${townName} (theme: ${theme}${water ? `, water: ${water.kind}` : ''})`);
+  logger.debug(`[TOWN_MAP] Generating ${townSize} map for ${townName} (theme: ${theme}${water ? `, water: ${[water.kind, water.archetype].filter(Boolean).join(' ')}` : ''})`);
   const isDesert = theme === 'desert';
 
   // Generate at the settlement's native size so the buildings stay huddled (the proven
@@ -136,11 +139,26 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
     waterInfo = placeTownWater(mapData, water, width, height, rng, townSize);
   }
 
+  // River-fork archetype (river city, #65 Phase 1): carve the windy forking river
+  // NOW, before gates/roads/buildings, so everything downstream works around it.
+  // Town + city sizes only (plan decision: the fork needs the 18-20 grids to breathe);
+  // other sizes, and the rare seed with no viable fork, keep the plain river band.
+  let riverForkInfo = null;
+  if (water && water.archetype === 'riverfork' && (townSize === 'town' || townSize === 'city')) {
+    riverForkInfo = placeRiverForkInTown(mapData, riverDirection, width, height, rng, townSize);
+  }
+  // Quest-injection floor: the fork's reserved island grass is protected from paving
+  // (noPave feeds every routed lane, gate roads included). Empty for ordinary towns,
+  // so their routing costs are untouched.
+  const noPave = new Set();
+  const reservedKeys = riverForkInfo ? new Set(riverForkInfo.reservedTiles.map((p) => `${p.x},${p.y}`)) : null;
+  if (reservedKeys) reservedKeys.forEach((k) => noPave.add(k));
+
   // Entrances follow the world-map roads: `entryPoint` may be a single direction (legacy)
   // or an array of directions (one per connecting road). The FIRST entrance is the party's
   // spawn/primary gate.
   let entryDirs = (Array.isArray(entryPoint) ? entryPoint : [entryPoint || 'south']).filter(Boolean);
-  if (waterInfo) {
+  if (waterInfo || riverForkInfo) {
     // Drop a gate only when its ACTUAL gate tile is underwater — NOT merely because the
     // edge is flagged wet. A lake/sea in a corner promotes both adjacent edges to "wet",
     // but a road can still arrive at the dry middle of that edge, so we test the real tile
@@ -161,9 +179,9 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   const entrances = entryDirs.map((dir) => ({ dir, pos: jitterGatePosition(calculateEntryPosition(width, height, dir), dir, width, height, rng, mapData) }));
   const entryPos = entrances[0].pos; // primary spawn
 
-  // Place river if it exists
+  // Place river if it exists (the fork carve above replaces the band when active)
   let riverInfo = null;
-  if (hasRiver) {
+  if (hasRiver && !riverForkInfo) {
     riverInfo = placeRiverInTown(mapData, riverDirection, width, height, rng);
   }
 
@@ -176,10 +194,11 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   // collects per-spoke shape metrics (length / straightness / bends) for tests + debug.
   const costNoise = makeCostNoise(rng);
   const spokeStats = [];
+  if (riverForkInfo) spokeStats.push(...riverForkInfo.channelStats); // the fork's arms, for tests + /debug/tileset
 
   // Windy approach road from every entrance gate to the hub. Walls only overwrite
   // grass, so each road tile already on the perimeter stays an open gate.
-  entrances.forEach(({ pos }) => placeGateRoad(mapData, pos, centerPos, { noise: costNoise, riverInfo, townSize, stats: spokeStats, rng }));
+  entrances.forEach(({ pos }) => placeGateRoad(mapData, pos, centerPos, { noise: costNoise, riverInfo, townSize, stats: spokeStats, rng, noPave }));
 
   // Place town square/center
   placeTownCenter(mapData, centerPos, townSize);
@@ -202,17 +221,26 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   // pathOpts feeds every routed lane: the keep spoke (laid inside placeBuildings right
   // after the keep, so the estate clusters around it), the building spokes/stubs, and
   // the house stubs. noPave collects protected sand (dock frontage) no route may pave.
-  const pathOpts = { noise: costNoise, riverInfo, townSize, stats: spokeStats, noPave: new Set() };
-  placeBuildings(mapData, buildingCount, townSize, rng, centerPos, !!waterInfo, pathOpts);
+  const pathOpts = { noise: costNoise, riverInfo, townSize, stats: spokeStats, noPave };
+  placeBuildings(mapData, buildingCount, townSize, rng, centerPos, !!waterInfo, pathOpts, riverForkInfo);
 
   // Generate paths connecting the placed buildings to the road network (hub-and-spoke,
   // windy). Runs BEFORE houses so no house can seal a civic building off its lane.
   generateBuildingPaths(mapData, centerPos, pathOpts);
 
+  // River city: guarantee at least two distinct bridge crossings knit the island to
+  // the network (routing usually provides them; this pass is the floor). Runs BEFORE
+  // houses, while the banks are still open grass, so a second crossing always has
+  // somewhere to land; houses can never block it afterwards (they build on grass
+  // only, never on paths).
+  if (riverForkInfo) {
+    ensureIslandBridges(mapData, riverForkInfo, centerPos, { noise: costNoise, stats: spokeStats, noPave }, townSize);
+  }
+
   // Houses come after the lanes and prefer street-front tiles (they cannot build on a
   // path, so the network is never blocked); outlying houses then stub onto the nearest
   // lane, sharing stubs where they cluster.
-  placeHouses(mapData, townSize, rng, centerPos);
+  placeHouses(mapData, townSize, rng, centerPos, reservedKeys);
   connectHouses(mapData, centerPos, pathOpts);
 
   // Safety net: any path tile that somehow ended up disconnected from the hub network
@@ -222,13 +250,13 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   // Place farm fields (Hamlets, Villages, and Towns). Desert towns skip the green
   // fields — there's no farmland to render on sand.
   if (!isDesert && (townSize === 'hamlet' || townSize === 'village' || townSize === 'town')) {
-    placeFarmFields(mapData, townSize, rng);
+    placeFarmFields(mapData, townSize, rng, reservedKeys);
   }
 
   // Place decorations (trees, wells, etc.) LAST
   // This way they fill in empty spaces without blocking buildings or paths.
   // The theme picks the decoration palette (desert cacti/rocks, snow pines/drifts).
-  placeDecorations(mapData, townSize, rng, theme);
+  placeDecorations(mapData, townSize, rng, theme, reservedKeys);
 
   // Mark gates. Every entrance is a gate; the first is also the party's spawn entry.
   entrances.forEach(({ pos }) => { mapData[pos.y][pos.x].isGate = true; });
@@ -249,6 +277,17 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
     // Additive + optional: renderers ignore it, tests and /debug/tileset read it.
     pathStats: { windiness: PATH_WINDINESS, spokes: spokeStats }
   };
+  // River-fork descriptor (additive: ordinary towns carry no riverFork key).
+  if (riverForkInfo) {
+    result.riverFork = {
+      direction: riverForkInfo.direction,
+      entry: riverForkInfo.entry,
+      exit: riverForkInfo.exit,
+      mainWidth: riverForkInfo.mainWidth,
+      islandTiles: riverForkInfo.islandTiles,
+      reservedTiles: riverForkInfo.reservedTiles,
+    };
+  }
 
   // Frame the native layout with countryside so every town fills a uniform canvas
   // while its buildings stay huddled exactly as generated.
@@ -373,6 +412,18 @@ export function padTownToUniform(town, targetW, targetH, rng) {
   town.height = targetH;
   // entryPoint was moved to the map edge during road extension above.
   if (town.centerPoint) town.centerPoint = { x: town.centerPoint.x + offX, y: town.centerPoint.y + offY };
+  // Re-index the river-fork descriptor (island/reserved tiles, entry/exit) along with
+  // the core it describes. Ordinary towns carry no riverFork and are untouched.
+  if (town.riverFork) {
+    const shift = (p) => ({ x: p.x + offX, y: p.y + offY });
+    town.riverFork = {
+      ...town.riverFork,
+      entry: shift(town.riverFork.entry),
+      exit: shift(town.riverFork.exit),
+      islandTiles: town.riverFork.islandTiles.map(shift),
+      reservedTiles: town.riverFork.reservedTiles.map(shift),
+    };
+  }
   return town;
 }
 
@@ -447,6 +498,345 @@ function placeRiverInTown(mapData, riverDirection, width, height, rng) {
   }
 
   return { isHorizontal, center, riverWidth };
+}
+
+// --- river-fork carve (river city archetype: water towns Phase 1, #65) ------
+//
+// Carves a WINDY river that enters one edge, FORKS around one island district,
+// rejoins, and exits the opposite edge (the Konigsberg read). It replaces the
+// straight placeRiverInTown band only when the water context carries
+// `archetype: 'riverfork'` (town + city sizes); ordinary river towns keep the
+// band verbatim. The carve runs FIRST, before gates/roads/buildings, so every
+// existing placement rule ("only build on grass", walls stop at water, gates
+// dodge wet tiles) works unmodified.
+//
+// Every carved tile is `type: 'water', walkable: false` plus the additive
+// `waterway: true` flag: the path router crosses waterway water at
+// WATERWAY_BRIDGE_COST (laying the existing 'bridge' tile), and renderers that
+// don't know the flag simply draw plain water (zero art changes in this cut).
+//
+// Returns a fork descriptor or null when no viable fork exists on this seed
+// (the caller then falls back to the plain river band):
+//   { direction, entry, exit, mainWidth, islandTiles, islandOrder,
+//     reservedTiles, channelStats }
+function placeRiverForkInTown(mapData, riverDirection, width, height, rng, townSize) {
+  const isHorizontal = riverDirection === 'EAST_WEST';
+  const noise = makeCostNoise(rng); // same seeded technique the foot paths use
+  const stats = [];
+  const key = (x, y) => `${x},${y}`;
+
+  // The hub zone (town square + its important-building ring) must stay dry, so
+  // placeTownCenter never stamps square over fork water.
+  const cx = Math.floor(width / 2), cy = Math.floor(height / 2);
+  const hubBlock = new Set();
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) hubBlock.add(key(cx + dx, cy + dy));
+  }
+
+  const mainWidth = townSize === 'city' ? 2 : 1 + Math.floor(rng() * 2); // plan: 2 on cities, 1-2 on towns
+  const minIsland = townSize === 'city' ? 10 : 8;
+
+  // Widen perpendicular to the flow axis (routes are orthogonal steps, so this
+  // yields a connected channel of the requested width even through bends).
+  const widen = (pts, w) => {
+    const out = new Set();
+    for (const p of pts) {
+      for (let i = 0; i < w; i++) {
+        const x = isHorizontal ? p.x : p.x + i;
+        const y = isHorizontal ? p.y + i : p.y;
+        if (x >= 0 && x < width && y >= 0 && y < height && !hubBlock.has(key(x, y))) out.add(key(x, y));
+      }
+    }
+    return out;
+  };
+
+  // One full carve attempt for a given river alignment (entry/exit pair):
+  //
+  // 1. Main channel: the same windy Dijkstra the paths use (the map is all grass
+  //    here, so the seeded cost noise is the only thing shaping the meander).
+  // 2. Branch arm: diverge near ~1/4 of the main route, swing 2-5 tiles
+  //    perpendicular through a displaced waypoint, rejoin near ~3/4. The branch
+  //    starts and ends on DRY bank tiles orthogonally adjacent to the channel
+  //    (the water stays contiguous: those tiles touch the main channel), and the
+  //    channel's widened footprint PLUS its whole shoulder (land orthogonally
+  //    adjacent to it) is blocked for the legs, which structurally guarantees at
+  //    least a one-tile land strip, the island, between the two arms.
+  //
+  // Returns the alignment's best fork, or null.
+  const carveForAlignment = (entry, exit) => {
+    const mainRoute = routeWindyPath(mapData, [entry], (x, y) => x === exit.x && y === exit.y, { noise, noPave: hubBlock });
+    if (!mainRoute) return null; // cannot happen on an all-grass grid, but stay safe
+
+    const mainWater = widen(mainRoute, mainWidth);
+    const blocked = new Set([...mainWater, ...hubBlock]);
+    // Fork points near the quarter marks: routing attaches the branch at the
+    // cheapest bank tile inside each window, which pulls the fork points inward,
+    // so the windows start wide to keep a proper island span between them.
+    const i1 = Math.floor(mainRoute.length / 4);
+    const i2 = Math.floor((3 * mainRoute.length) / 4);
+
+    const shoulder = new Set();
+    for (const k of mainWater) {
+      const [x, y] = k.split(',').map(Number);
+      for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+        const sk = key(x + dx, y + dy);
+        if (!mainWater.has(sk)) shoulder.add(sk);
+      }
+    }
+    const blockedLeg = new Set([...blocked, ...shoulder]);
+
+    // Dry bank tiles beside the channel over a route-index window, on the disp
+    // side. The windows extend OUTWARD from the fork marks (multi-source routing
+    // attaches at the cheapest bank tile, so an inward window would let the fork
+    // span, and with it the island, collapse).
+    const bankTiles = (iFrom, iTo, disp) => {
+      const out = [];
+      const off = disp < 0 ? -1 : mainWidth; // just past the widened footprint
+      for (let i = Math.max(0, iFrom); i <= Math.min(mainRoute.length - 1, iTo); i++) {
+        const p = mainRoute[i];
+        const x = isHorizontal ? p.x : p.x + off;
+        const y = isHorizontal ? p.y + off : p.y;
+        if (x < 1 || y < 1 || x >= width - 1 || y >= height - 1) continue;
+        if (!blocked.has(key(x, y))) out.push({ x, y });
+      }
+      return out;
+    };
+
+    const disps = [];
+    for (let attempt = 0; attempt < 6; attempt++) {
+      disps.push((3 + Math.floor(rng() * 3)) * (rng() < 0.5 ? -1 : 1)); // seeded 3-5, either side
+    }
+    disps.push(4, -4, 5, -5, 3, -3, 2, -2); // deterministic backstop sweep
+    const iMidBase = Math.floor((i1 + i2) / 2);
+    let best = null;
+    for (const disp of disps) {
+      if (best && best.islandTiles.length >= minIsland) break;
+
+      // Waypoint: |disp| tiles off the channel's bank beside a route tile near the
+      // segment middle (with two alternates along the river), stepping inward when
+      // the map edge / hub zone / channel shoulder leaves no room. Local geometry
+      // matters: the channel may bulge around the hub, so a fixed lateral offset
+      // from the straight midpoint would often land in water or off the map.
+      let wsel = null;
+      for (const iw of [iMidBase, iMidBase - 3, iMidBase + 3]) {
+        if (iw <= i1 || iw >= i2) continue;
+        const p = mainRoute[iw];
+        const v = isHorizontal ? p.y : p.x;
+        const span = isHorizontal ? height : width;
+        for (let a = Math.abs(disp); a >= 1 && !wsel; a--) {
+          const cross = disp > 0 ? v + mainWidth + a - 1 : v - a;
+          if (cross < 1 || cross > span - 2) continue;
+          const cand = isHorizontal ? { x: p.x, y: cross } : { x: cross, y: p.y };
+          if (!blockedLeg.has(key(cand.x, cand.y))) wsel = cand;
+        }
+        if (wsel) break;
+      }
+      if (!wsel) continue;
+      const wx = wsel.x, wy = wsel.y;
+
+      const starts = bankTiles(i1 - 3, i1, disp);
+      const ends = bankTiles(i2, i2 + 3, disp);
+      if (!starts.length || !ends.length) continue;
+      const endKeys = new Set(ends.map((p) => key(p.x, p.y)));
+
+      const leg1 = routeWindyPath(mapData, starts, (x, y) => x === wx && y === wy, { noise, noPave: blockedLeg });
+      if (!leg1) continue;
+      const blocked2 = new Set([...blockedLeg, ...leg1.map((p) => key(p.x, p.y))]);
+      blocked2.delete(key(wx, wy)); // leg 2 starts here
+      const leg2 = routeWindyPath(mapData, [{ x: wx, y: wy }], (x, y) => endKeys.has(key(x, y)),
+        { noise, noPave: blocked2, allowTiles: endKeys });
+      if (!leg2) continue;
+
+      const branchRoute = [...leg1, ...leg2.slice(1)];
+      const waterSet = new Set([...mainWater, ...branchRoute.map((p) => key(p.x, p.y))]);
+      const islandTiles = largestEnclosedLand(waterSet, width, height);
+      if (islandTiles.length === 0) continue;
+      // The island is a DISTINCT quarter: a branch that loops around the town
+      // square (enclosing the hub) is not a fork, so that side is rejected.
+      if (islandTiles.some((p) => hubBlock.has(key(p.x, p.y)))) continue;
+      if (!best || islandTiles.length > best.islandTiles.length) best = { branchRoute, waterSet, islandTiles };
+    }
+    return best && { ...best, entry, exit, mainRoute };
+  };
+
+  // Alignment retries: a river aimed straight at the town square must bulge around
+  // the hub zone and can leave no room for an island on either side. When that
+  // happens the whole river is re-jittered and carved again. Retries keep entry
+  // and exit on the SAME side of the hub (roughly parallel, 3-4 tiles off the hub
+  // line, alternating sides), so one bank always has a clear strip for the fork.
+  const clampAcross = (v, span) => Math.max(2, Math.min(span - 3, v));
+  let retrySide = rng() < 0.5 ? 1 : -1;
+  const alignOffsets = (outer) => {
+    if (outer === 0) {
+      // first try: the natural near-centre alignment, both ends independent
+      return [Math.floor(rng() * 5) - 2, Math.floor(rng() * 5) - 2];
+    }
+    const off = retrySide * (3 + Math.floor(rng() * 2)); // ±3..4
+    retrySide = -retrySide;                              // alternate sides
+    return [off, off + Math.floor(rng() * 3) - 1];       // exit wobbles ±1
+  };
+  let best = null;
+  for (let outer = 0; outer < 4; outer++) {
+    if (best && best.islandTiles.length >= minIsland) break;
+    const [offIn, offOut] = alignOffsets(outer);
+    const entry = isHorizontal
+      ? { x: 0, y: clampAcross(cy + offIn, height) }
+      : { x: clampAcross(cx + offIn, width), y: 0 };
+    const exit = isHorizontal
+      ? { x: width - 1, y: clampAcross(cy + offOut, height) }
+      : { x: clampAcross(cx + offOut, width), y: height - 1 };
+    const cand = carveForAlignment(entry, exit);
+    if (cand && (!best || cand.islandTiles.length > best.islandTiles.length)) best = cand;
+  }
+  // A cramped sliver is not an island district: fall back to the plain band.
+  if (!best || best.islandTiles.length < 6) return null;
+
+  // Carve. Set insertion order is deterministic, so the stamp is too.
+  for (const k of best.waterSet) {
+    const [x, y] = k.split(',').map(Number);
+    const t = mapData[y][x];
+    t.type = 'water';
+    t.walkable = false;
+    t.poi = null;
+    t.waterway = true; // additive: absent = plain water, renderers need no change
+  }
+  recordSpoke(stats, 'channel', best.mainRoute);
+  recordSpoke(stats, 'channel', best.branchRoute);
+
+  // Venue-priority ordering: island heart outward (deterministic, no rng).
+  const cix = best.islandTiles.reduce((a, p) => a + p.x, 0) / best.islandTiles.length;
+  const ciy = best.islandTiles.reduce((a, p) => a + p.y, 0) / best.islandTiles.length;
+  const islandOrder = [...best.islandTiles].sort((a, b) => {
+    const da = (a.x - cix) ** 2 + (a.y - ciy) ** 2;
+    const db = (b.x - cix) ** 2 + (b.y - ciy) ** 2;
+    return da - db || a.y - b.y || a.x - b.x;
+  });
+  // Quest-injection floor (plan decision 7): reserve 4 island grass tiles that no
+  // road, building, house, farm field, or decoration may ever take. The island's
+  // OUTERMOST tiles are reserved so the whole heart stays open for the venues and
+  // their lanes (reserving centrally would wall the venues off their frontage).
+  const reservedTiles = islandOrder.slice(-4);
+
+  return { direction: riverDirection, entry: best.entry, exit: best.exit, mainWidth, islandTiles: best.islandTiles, islandOrder, reservedTiles, channelStats: stats };
+}
+
+// Land (non-water) tiles not reachable from the map border: the fork's island.
+// Returns the largest enclosed component (tiny slivers between converging arms are
+// ignored; they stay reachable anyway because waterway water is always crossable).
+function largestEnclosedLand(waterSet, width, height) {
+  const seen = new Uint8Array(width * height);
+  const stack = [];
+  const push = (x, y) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    const i = y * width + x;
+    if (seen[i] || waterSet.has(`${x},${y}`)) return;
+    seen[i] = 1;
+    stack.push([x, y]);
+  };
+  for (let x = 0; x < width; x++) { push(x, 0); push(x, height - 1); }
+  for (let y = 0; y < height; y++) { push(0, y); push(width - 1, y); }
+  while (stack.length) {
+    const [x, y] = stack.pop();
+    push(x + 1, y); push(x - 1, y); push(x, y + 1); push(x, y - 1);
+  }
+  let bestComp = [];
+  const claimed = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      if (seen[i] || claimed[i] || waterSet.has(`${x},${y}`)) continue;
+      const comp = [];
+      const st = [[x, y]];
+      claimed[i] = 1;
+      while (st.length) {
+        const [px, py] = st.pop();
+        comp.push({ x: px, y: py });
+        for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+          const nx = px + dx, ny = py + dy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          const ni = ny * width + nx;
+          if (seen[ni] || claimed[ni] || waterSet.has(`${nx},${ny}`)) continue;
+          claimed[ni] = 1;
+          st.push([nx, ny]);
+        }
+      }
+      if (comp.length > bestComp.length) bestComp = comp;
+    }
+  }
+  return bestComp;
+}
+
+// Post-pass GUARANTEE (plan decision 8): the island district must be knitted to the
+// town by at least TWO distinct bridge crossings. Routing usually yields them for
+// free (the island venue's spoke, gate roads crossing the fork); when it does not,
+// extra island-to-network routes are laid with a slightly discounted waterway cost,
+// each blocked from reusing an existing crossing so it lands a NEW bridge.
+function ensureIslandBridges(mapData, forkInfo, centerPos, { noise, stats = null, noPave = null }, townSize) {
+  const width = mapData[0].length;
+  const height = mapData.length;
+  const islandKeys = new Set(forkInfo.islandTiles.map((p) => `${p.x},${p.y}`));
+
+  // Connected components of bridge tiles that touch island land = distinct crossings.
+  const islandBridgeGroups = () => {
+    const seen = new Set();
+    const groups = [];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (mapData[y][x].type !== 'bridge' || seen.has(`${x},${y}`)) continue;
+        const comp = [];
+        const st = [{ x, y }];
+        seen.add(`${x},${y}`);
+        while (st.length) {
+          const c = st.pop();
+          comp.push(c);
+          for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+            const nx = c.x + dx, ny = c.y + dy;
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height || seen.has(`${nx},${ny}`)) continue;
+            if (mapData[ny][nx].type !== 'bridge') continue;
+            seen.add(`${nx},${ny}`);
+            st.push({ x: nx, y: ny });
+          }
+        }
+        const touchesIsland = comp.some((c) =>
+          [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => islandKeys.has(`${c.x + dx},${c.y + dy}`)));
+        if (touchesIsland) groups.push(comp);
+      }
+    }
+    return groups;
+  };
+
+  for (let guard = 0; guard < 3; guard++) {
+    const groups = islandBridgeGroups();
+    if (groups.length >= 2) return;
+    // Route from every island lane AND non-reserved grass tile (grass starts
+    // matter: the reserved quest-grass tiles are unpaveable, so a route must be
+    // able to leave from any open spot without traversing the island interior;
+    // and a route STARTS unchecked, so reserved tiles must not be sources either).
+    // A grass-started crossing still joins the one network: the route ends on it,
+    // so the new lane and bridge hang off the mainland network like any stub.
+    const starts = forkInfo.islandTiles.filter((p) => {
+      if (noPave && noPave.has(`${p.x},${p.y}`)) return false;
+      const t = mapData[p.y][p.x].type;
+      return isPathType(t) || t === 'grass';
+    });
+    if (!starts.length) return;
+    const offIslandNetwork = (x, y) =>
+      isPathType(mapData[y][x].type) && mapData[y][x].type !== 'bridge' && !islandKeys.has(`${x},${y}`);
+    // Existing crossings (and their orthogonal shoulders) are blocked so the new
+    // route must carve a crossing of its own, a couple of tiles away at least.
+    const blocked = new Set(noPave ? [...noPave] : []);
+    for (const comp of groups) {
+      for (const c of comp) {
+        blocked.add(`${c.x},${c.y}`);
+        for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) blocked.add(`${c.x + dx},${c.y + dy}`);
+      }
+    }
+    let route = routeWindyPath(mapData, starts, offIslandNetwork, { noise, noPave: blocked, waterwayCost: WATERWAY_BRIDGE_COST - 1 });
+    if (!route) route = routeWindyPath(mapData, starts, offIslandNetwork, { noise, noPave, waterwayCost: WATERWAY_BRIDGE_COST - 1 });
+    if (!route) return;
+    layPathRoute(mapData, route, centerPos, townSize);
+    recordSpoke(stats, 'bridge', route);
+  }
 }
 
 // --- world-driven water (lakefront / coastline) ------------------------------
@@ -600,6 +990,10 @@ const QUAY_BEACH_COST = 0.7;    // …except waterfront lanes, which hug the sho
 const BORDER_STEP_PENALTY = 6;  // keep routes off the map border (one wall gate per road)
 const RIVER_BRIDGE_COST = 5;    // crossing the authored river is allowed but dear
 const CAUSEWAY_WATER_COST = 15; // fallback-only: shortest causeway when no land route exists
+// Crossing carved waterway water (the river-fork arms; later, canals) costs the same as
+// the authored river band: crossings are allowed everywhere but kept short, so foot
+// routes cross roughly perpendicular and lay 'bridge' tiles (water towns plan, #65).
+export const WATERWAY_BRIDGE_COST = 5;
 
 // Deterministic per-tile noise in [0,1), salted once per town from the seeded rng.
 function makeCostNoise(rng) {
@@ -628,6 +1022,7 @@ function routeWindyPath(mapData, starts, isTarget, opts) {
   const {
     noise, riverInfo = null, beachCost = BEACH_STEP_COST,
     waterCost = null, windiness = PATH_WINDINESS,
+    waterwayCost = WATERWAY_BRIDGE_COST,
     noPave = null, allowTiles = null,
   } = opts;
 
@@ -641,7 +1036,8 @@ function routeWindyPath(mapData, starts, isTarget, opts) {
     else if (t.type === 'grass') c = 1 + windiness * noise(x, y);
     else if (t.type === 'beach') c = beachCost + windiness * noise(x, y);
     else if (t.type === 'water') {
-      if (inRiverBand(riverInfo, x, y)) c = RIVER_BRIDGE_COST;
+      if (t.waterway) c = waterwayCost;           // fork/canal water: crossable, becomes a bridge
+      else if (inRiverBand(riverInfo, x, y)) c = RIVER_BRIDGE_COST;
       else if (waterCost !== null) c = waterCost;
       else return Infinity;
     } else return Infinity; // building / wall / keep_wall / farm_field / square-adjacent solids
@@ -736,11 +1132,11 @@ function recordSpoke(stats, kind, route) {
 // per-tile noise rarely repays that. So longer approaches are routed through a seeded
 // midpoint WAYPOINT displaced perpendicular to the approach — that forces the S-bend,
 // and the cost noise decorates each leg.
-function placeGateRoad(mapData, gatePos, centerPos, { noise, riverInfo, townSize, stats, rng }) {
+function placeGateRoad(mapData, gatePos, centerPos, { noise, riverInfo, townSize, stats, rng, noPave = null }) {
   const width = mapData[0].length;
   const height = mapData.length;
   const isHub = (x, y) => x === centerPos.x && y === centerPos.y;
-  const base = { noise, riverInfo };
+  const base = { noise, riverInfo, noPave };
 
   let route = null;
   const dx = centerPos.x - gatePos.x;
@@ -846,7 +1242,7 @@ function connectBuildingToNetwork(mapData, pos, buildingType, centerPos, opts) {
 // BEFORE the noble estate / gaol are placed, so they cluster around the lane. If every
 // approach tile is water (a coast-squeezed keep) the fallback lays a causeway to the
 // wall, so the lord's seat is never left without an approach.
-function routeKeepSpoke(mapData, keepPos, centerPos, { noise, riverInfo, townSize, stats }) {
+function routeKeepSpoke(mapData, keepPos, centerPos, { noise, riverInfo, townSize, stats, noPave = null }) {
   const width = mapData[0].length;
   const height = mapData.length;
   const inBounds = (x, y) => x >= 0 && x < width && y >= 0 && y < height;
@@ -874,7 +1270,7 @@ function routeKeepSpoke(mapData, keepPos, centerPos, { noise, riverInfo, townSiz
     recordSpoke(stats, 'keep', route);
     return true;
   };
-  const base = { noise, riverInfo };
+  const base = { noise, riverInfo, noPave };
   let done = targets.size > 0 && (
     lay(routeWindyPath(mapData, [centerPos], (x, y) => targets.has(x * height + y), base)) ||
     lay(routeWindyPath(mapData, [centerPos], (x, y) => targets.has(x * height + y), { ...base, waterCost: CAUSEWAY_WATER_COST }))
@@ -940,7 +1336,7 @@ function placeTownCenter(mapData, centerPos, townSize) {
 }
 
 // Place buildings around the town - COMPLETELY REWRITTEN
-function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = false, pathOpts = null) {
+function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = false, pathOpts = null, forkInfo = null) {
   if (!centerPos) {
     logger.warn('[TOWN_MAP] placeBuildings called with undefined centerPos, using map defaults');
     centerPos = { x: Math.floor(mapData[0].length / 2), y: Math.floor(mapData.length / 2) };
@@ -952,7 +1348,10 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
   // Per-size building roster (module-level so the water step reserves matching land).
   // Houses are placed separately in placeHouses, after the path network exists.
   const config = BUILDING_CONFIG[townSize] || BUILDING_CONFIG.village;
-  const { important } = config;
+  // River-city towns gain a market for the island district (the plan's "market isle"):
+  // the standard town roster has no market, and the isle needs its venue. Cities
+  // already carry one (plus the temple + archives the island prefers).
+  const important = (forkInfo && townSize === 'town') ? [...config.important, 'market'] : config.important;
 
   // Track occupied positions
   const occupied = new Set();
@@ -961,6 +1360,16 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
   const markOccupied = (x, y) => {
     occupied.add(`${x},${y}`);
   };
+
+  // The fork's reserved island grass (quest-injection floor) is never built on.
+  if (forkInfo) forkInfo.reservedTiles.forEach((p) => markOccupied(p.x, p.y));
+
+  // River city: the island district belongs to its venues (cathedral quarter /
+  // market isle). Other typed buildings (keep, manors, jail, ring commerce) are
+  // kept OFF the island so the venues always fit; houses may still fill in later.
+  const ISLAND_VENUES = new Set(forkInfo ? (townSize === 'city' ? ['temple', 'archives'] : ['market']) : []);
+  const forkIslandKeys = forkInfo ? new Set(forkInfo.islandTiles.map((p) => `${p.x},${p.y}`)) : null;
+  const onIsland = (x, y) => !!(forkIslandKeys && forkIslandKeys.has(`${x},${y}`));
 
   // Helper to check if occupied
   const isOccupied = (x, y) => {
@@ -1006,7 +1415,8 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
     const t = mapData[y + dy] && mapData[y + dy][x + dx];
     return t && (t.type === 'grass' || t.type === 'beach' || isPathType(t.type));
   });
-  const blockedFor = (x, y, type) => isOccupied(x, y) || !hasOpenSide(x, y) || (SHORE_AVERSE.has(type) && isShore(x, y));
+  const blockedFor = (x, y, type) => isOccupied(x, y) || !hasOpenSide(x, y) || (SHORE_AVERSE.has(type) && isShore(x, y))
+    || (onIsland(x, y) && !ISLAND_VENUES.has(type));
 
   // The noble estate (STEP 0.5) is a deliberately tight manor cluster. Civic/commerce
   // buildings must NOT be wedged into it: a building sealed inside the manor block has
@@ -1024,7 +1434,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
   // STEP 0: Place the keep (cities only). REQUIRED.
   if (config.hasKeep) {
     const W = mapData[0].length, H = mapData.length;
-    const tileFree = (x, y) => x > 0 && x < W - 1 && y > 0 && y < H - 1 && mapData[y][x].type === 'grass';
+    const tileFree = (x, y) => x > 0 && x < W - 1 && y > 0 && y < H - 1 && mapData[y][x].type === 'grass' && !onIsland(x, y);
     const placeKeep = (x, y) => {
       const t = mapData[y][x];
       t.type = 'building'; t.buildingType = 'keep'; t.buildingName = generateManorName(rng);
@@ -1144,7 +1554,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
               if (r > 0 && Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
               const x = estateStartX + dx;
               const y = estateStartY + dy;
-              if (!isOccupied(x, y)) {
+              if (!isOccupied(x, y) && !onIsland(x, y)) {
                 mapData[y][x].type = 'building';
                 mapData[y][x].buildingType = manorType;
                 mapData[y][x].buildingName = generateManorName(rng);
@@ -1196,7 +1606,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
           }
         }
         for (const pos of adjacentCandidates) {
-          if (!isOccupied(pos.x, pos.y)) {
+          if (!isOccupied(pos.x, pos.y) && !onIsland(pos.x, pos.y)) {
             mapData[pos.y][pos.x].type = 'building';
             mapData[pos.y][pos.x].buildingType = manorType;
             mapData[pos.y][pos.x].buildingName = generateManorName(rng);
@@ -1285,6 +1695,34 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
     connectBuildingToNetwork(mapData, { x, y }, buildingType, centerPos, pathOpts);
   };
 
+  // Island venue bias (river city): the fork's island district hosts the town's
+  // distinctive venues: the cathedral quarter on cities (temple + archives, the
+  // Kneiphof read), the market isle on towns. Those types try the island's tiles
+  // first (island heart outward, deterministic order) and fall back to the normal
+  // ring placement when no island tile fits. One island attempt per venue type.
+  const islandPending = new Set(ISLAND_VENUES); // one island attempt per venue type
+  const tryPlaceOnIsland = (buildingType) => {
+    if (!islandPending.has(buildingType)) return false;
+    islandPending.delete(buildingType);
+    const noPave = pathOpts && pathOpts.noPave;
+    // The venue needs a frontage that is not reserved quest grass, so its lane
+    // never has to yield the reservation (the only-frontage escape hatch in
+    // connectBuildingToNetwork would pave it).
+    const hasFreeFrontage = (x, y) => [[0, -1], [1, 0], [0, 1], [-1, 0]].some(([dx, dy]) => {
+      const t = mapData[y + dy] && mapData[y + dy][x + dx];
+      if (!t || (noPave && noPave.has(`${x + dx},${y + dy}`))) return false;
+      return t.type === 'grass' || t.type === 'beach' || isPathType(t.type);
+    });
+    for (const pos of forkInfo.islandOrder) {
+      if (!blockedFor(pos.x, pos.y, buildingType) && hasFreeFrontage(pos.x, pos.y)) {
+        placeBuilding(pos.x, pos.y, buildingType);
+        return true;
+      }
+    }
+    logger.warn(`[TOWN_MAP] No island tile fits the ${buildingType}; falling back to ring placement`);
+    return false;
+  };
+
   // STEP 0.6: The gaol sits in the authority cluster — historically the town gaol was part
   // of the castle, so we place it on the first free tile spiralling out from the keep
   // (which is already placed). Done before the market/house steps so it claims its spot.
@@ -1356,6 +1794,9 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
   for (const buildingType of important) {
     let placed = false;
 
+    // River city: island venues (temple / market) claim their island tile first
+    if (tryPlaceOnIsland(buildingType)) { importantPlaced++; continue; }
+
     // Try positions around square
     for (let i = 0; i < squarePositions.length && !placed; i++) {
       const pos = squarePositions[(posIndex + i) % squarePositions.length];
@@ -1386,6 +1827,21 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
                 placed = true;
               }
             }
+          }
+        }
+      }
+    }
+
+    // Last resort: deterministic whole-map scan, so the roster never quietly
+    // drops a building. Ordinary towns never get here (the rings always fit);
+    // a river fork plus its island can starve the rings on rare seeds.
+    if (!placed) {
+      for (let y = 1; y < mapData.length - 1 && !placed; y++) {
+        for (let x = 1; x < mapData[0].length - 1 && !placed; x++) {
+          if (!blockedFor(x, y, buildingType) && !inEstateZone(x, y)) {
+            placeBuilding(x, y, buildingType);
+            importantPlaced++;
+            placed = true;
           }
         }
       }
@@ -1432,6 +1888,8 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
 
     let secondaryPlaced = 0;
     for (const buildingType of secondary) {
+      // River city: the archives joins the island's cathedral quarter on cities
+      if (tryPlaceOnIsland(buildingType)) { secondaryPlaced++; continue; }
       const peripheral = PERIPHERAL.has(buildingType);
       const bands = peripheral ? [outerRing, innerRing] : [innerRing, outerRing];
       let done = false;
@@ -1507,7 +1965,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
 // the size-based exclusion ring. Houses PREFER street-front tiles (orthogonally adjacent
 // to an existing lane) so neighbourhoods line the spokes; the remainder fill in behind
 // and get stubs from connectHouses.
-function placeHouses(mapData, townSize, rng, centerPos) {
+function placeHouses(mapData, townSize, rng, centerPos, reserved = null) {
   const config = BUILDING_CONFIG[townSize] || BUILDING_CONFIG.village;
   const houses = config.houses || 0;
   logger.debug(`[TOWN_MAP] Placing ${houses} houses...`);
@@ -1543,6 +2001,7 @@ function placeHouses(mapData, townSize, rng, centerPos) {
   let housesPlaced = 0;
   for (const pos of ordered) {
     if (housesPlaced >= houses) break;
+    if (reserved && reserved.has(`${pos.x},${pos.y}`)) continue; // river city: quest-grass floor
     const tile = mapData[pos.y][pos.x];
     if (tile.type !== 'grass') continue; // paths/buildings/water/fields stay untouched
     tile.type = 'building';
@@ -1556,7 +2015,7 @@ function placeHouses(mapData, townSize, rng, centerPos) {
 }
 
 // Place decorative elements
-function placeDecorations(mapData, townSize, rng, theme = 'grassland') {
+function placeDecorations(mapData, townSize, rng, theme = 'grassland', reserved = null) {
   // Core decoration (the countryside ring is dressed separately in padTownToUniform)
   const decorationCount = {
     hamlet: 36,   // Lots of trees in hamlets (tripled)
@@ -1575,6 +2034,8 @@ function placeDecorations(mapData, townSize, rng, theme = 'grassland') {
 
     const tile = mapData[y][x];
 
+    if (reserved && reserved.has(`${x},${y}`)) continue; // river city: quest-grass floor
+
     // Only place on grass tiles without POIs
     if (tile.type === 'grass' && tile.poi === null) {
       tile.poi = decorations[Math.floor(rng() * decorations.length)];
@@ -1583,7 +2044,7 @@ function placeDecorations(mapData, townSize, rng, theme = 'grassland') {
 }
 
 // Place farm fields in clusters (Hamlets and Villages only)
-function placeFarmFields(mapData, townSize, rng) {
+function placeFarmFields(mapData, townSize, rng, reserved = null) {
   const width = mapData[0].length;
   const height = mapData.length;
 
@@ -1618,6 +2079,7 @@ function placeFarmFields(mapData, townSize, rng) {
         const y = startY + dy;
 
         if (x >= 0 && x < width && y >= 0 && y < height) {
+          if (reserved && reserved.has(`${x},${y}`)) continue; // river city: quest-grass floor
           if (mapData[y][x].type === 'grass' && mapData[y][x].poi === null) {
             mapData[y][x].type = 'farm_field';
           }

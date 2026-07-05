@@ -122,3 +122,4 @@ feedback_*
 # repo; synced by its scripts/sync-local.sh; shipped to players via the server
 # channel #40; the merge mechanism in storyTemplates.js is public, content is not)
 src/data/premiumTemplates.local.js
+.claude/
