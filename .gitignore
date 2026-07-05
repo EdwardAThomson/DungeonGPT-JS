@@ -73,8 +73,11 @@ cf-worker/.dev.vars
 wrangler.toml
 .dev.vars
 
-# D1 database files
-cf-worker/migrations/
+# D1 database files (glob, not the dir itself, so newer files can be negated back in)
+cf-worker/migrations/*
+# Post-cutover Postgres migrations are code (DDL + runbook) and must ship in the repo;
+# only the legacy D1-era contents of migrations/ stay local. Negate new ones explicitly.
+!cf-worker/migrations/002_account_tiers.sql
 
 # Local-only archive of stale docs (preserved on disk, not tracked)
 docs/archive/

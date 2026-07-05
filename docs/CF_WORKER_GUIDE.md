@@ -24,7 +24,8 @@
 | `POST /api/embed`      | `routes/embed.ts`       | Yes  | Text embeddings (`@cf/baai/bge-base-en-v1.5`, 768-dim, max 100 texts) |
 | `GET  /api/image/models`| `routes/image.ts`      | Yes  | List image models |
 | `POST /api/image/generate`| `routes/image.ts`    | Yes* | Image generation (8 models; FLUX.2 uses REST API, others use AI binding) |
-| `/api/db/*`            | `routes/db.ts`          | Yes  | Supabase CRUD proxy (heroes, saves, etc.) |
+| `/api/db/*`            | `routes/db.ts`          | Yes  | Postgres CRUD proxy via Hyperdrive (heroes, saves, etc.) |
+| `GET  /api/db/entitlements` | `routes/db.ts`     | Yes  | Caller's account tier: `{ tier, updatedAt }`, no row = `free`. Read-only (grants via psql, see `cf-worker/migrations/002_account_tiers.sql`); smoke test: `scripts/test-cf-entitlements.mjs` |
 
 *Image generate currently has `requireAuth` commented out (TODO in code).
 
