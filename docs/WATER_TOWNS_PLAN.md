@@ -55,6 +55,30 @@ the flagship set piece); river city on roughly half of eligible river settlement
   Gallery: `/debug/tileset` (jetty row in the canal section); town legend shows a
   Jetty swatch.
 
+### 1c. River-settlement doctrine (maintainer design session, 2026-07-06)
+
+Principle: **the premium boundary is the ARCHETYPE, not the river.** Sitting on a
+river is free geography (plain band + bridge, long-standing); members buy the
+riverfork island-district archetype; premium buys the canal city. Placement
+realism therefore never leaks premium value and applies to every tier.
+
+1. **Small settlements keep spawning on rivers** (hamlet/village): natural, and
+   they never fork. Flavor follow-up: mills prefer riverside settlements
+   (water-powered, we already have the building).
+2. **Water-adjacent placement bias (backlog #67)**: settlement placement should
+   PREFER river/coast-adjacent tiles, scaled by size (city strongest, hamlet
+   weakest, never 100%: crossroads and mining towns are real). Universal across
+   tiers, going-forward-only. Side effect: raises river-city eligibility from
+   ~1 per world toward near-certainty on member worlds.
+3. **Riverside (edge) rivers (backlog #68)**: today a river town means the river
+   crosses the town's own world tile and bisects the town map. The historically
+   common case, the town on ONE BANK, is unhandled: a town on a tile ADJACENT to
+   the river renders dry. New water-context kind 'riverside': river band along
+   one town-map edge, waterfront lane via the existing quay machinery, optional
+   thin far-bank strip + single bridge. Better fit for small settlements than
+   mid-channel bisection. Detection: extend analyzeTownWater's neighbor scan
+   (it already finds lakes/coasts) to river tiles.
+
 ## 2. Eligibility & world integration
 
 **Estuary definition:** the town's world tile has `analyzeTownWater(worldMap, x, y)`
