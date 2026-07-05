@@ -1,6 +1,6 @@
 # Roadmap — DungeonGPT (JS)
 
-_Status: active · updated 2026-07-04_
+_Status: active · updated 2026-07-05_
 
 The production rewrite of DungeonGPT — a React web app for creating fantasy
 characters and playing AI-narrated RPG campaigns. Deployed at dungeongpt.xyz on
@@ -36,6 +36,10 @@ backlog; see the `docs/` design docs for each system.
 - [x] Adventure Book: unified tabbed modal hub (Campaign / Side Quests / Codex / Party / AI) with a discovered-only bestiary + item codex (#51/#52)
 - [x] Campaign chaining: on completion, continue the next chapter inside the same save and world (`docs/QUEST_CHAINING_PLAN.md`)
 - [x] Premium groundwork: entitlement-gated templates, local content slot for private campaigns, production AI pinned to the CF Workers pool (Free vs Premium pool selector)
+- [x] Save sync Phases 1-2 (#54/#57): honest local fallback with save-status copy, local-first write-through, merged saved-games list with sync badges, auto-reconcile on auth restoration (`docs/SAVE_SYNC_PLAN.md`; Phase 3 rev-counter fork-on-conflict planned)
+- [x] Hero mechanics invariants + append-only grant ledger (#58): load-time checker heals stats upward from XP/formula; maxHP raises preserve damage taken
+- [x] Explorable-site content wiring (#56): visible in-modal feedback, real harvesting, multi-quest injection, AI grounded on site contents; party-wide milestone XP + NPC naming/rehoming fixes (#55)
+- [x] World-gen wave: lake taming with water budget + shape variety (#59), world-level lake cap (#63), seam-matched coast depth, desert mesa art; hub-and-spoke town path network (#62); large-world chunk-assembly prototype behind `/debug/large-world` (#61, debug-only, `docs/LARGER_WORLDS_PLAN.md`)
 
 ## Next
 
