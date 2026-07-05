@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { tileBackground, POI_EMOJI } from '../utils/townTileArt';
+import { tileBackground, waterwayMask, POI_EMOJI } from '../utils/townTileArt';
 import BuildingModal from './BuildingModal';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
@@ -34,7 +34,8 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
   // lack this field and fall back to grassland — unchanged rendering.
   const townTheme = townMapData.theme || 'grassland';
 
-  const typeAt = (c, r) => (r >= 0 && r < height && c >= 0 && c < width && mapData[r][c]) ? mapData[r][c].type : null;
+  const tileAt = (c, r) => (r >= 0 && r < height && c >= 0 && c < width && mapData[r][c]) ? mapData[r][c] : null;
+  const typeAt = (c, r) => { const t = tileAt(c, r); return t ? t.type : null; };
 
   const handleBuildingClick = (tile) => {
     if (!playerPosition) return;
@@ -97,6 +98,10 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           const isClickable = onTileClick && isInRange && (tile.walkable || isBuilding) && !isPlayer;
 
           const neighbours = { n: typeAt(col, row - 1), e: typeAt(col + 1, row), s: typeAt(col, row + 1), w: typeAt(col - 1, row) };
+          // waterway-neighbour mask (canal banks, quay lips, bridge-over-canal): the
+          // canal autotiler's input, same technique as the wall mask above but keyed on
+          // the additive waterway flag, so pre-canal maps always yield 0 (old art)
+          const wetMask = waterwayMask(tile, { n: tileAt(col, row - 1), e: tileAt(col + 1, row), s: tileAt(col, row + 1), w: tileAt(col - 1, row) });
           const poiEmoji = tile.poi ? (POI_EMOJI[tile.poi] || null) : null;
 
           return (
@@ -105,7 +110,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
               style={{
                 width: TILE,
                 height: TILE,
-                backgroundImage: tileBackground(tile, neighbours, col, row, townTheme),
+                backgroundImage: tileBackground(tile, neighbours, col, row, townTheme, wetMask),
                 backgroundSize: 'cover',
                 display: 'flex',
                 alignItems: 'center',

@@ -5,7 +5,7 @@
 // Grouped into sections for display by <MapLegend>.
 
 import { sampleBiomes, samplePois } from './worldTileArt';
-import { sampleTiles as townSamples, buildingTile, POI_EMOJI } from './townTileArt';
+import { sampleTiles as townSamples, buildingTile, canalTile, POI_EMOJI } from './townTileArt';
 import { sampleSiteTiles, samplePoolTile, SITE_DECORATIONS, ART_POI } from './siteTileArt';
 
 const tile = (bg, label) => ({ bg, label });
@@ -80,6 +80,7 @@ export function townLegendGroups(theme = 'grassland') {
         tile(townSamples.town_square(), 'Stone / square'),
         tile(townSamples.farm_field(), 'Farmland'),
         tile(townSamples.water(), 'Water'),
+        tile(canalTile(10, t), 'Canal'),
         tile(townSamples.beach(), 'Shore'),
         tile(townSamples.bridge(), 'Bridge'),
       ],

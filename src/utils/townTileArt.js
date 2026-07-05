@@ -18,6 +18,9 @@ const C = {
   snow: '#eef3f7', snowDark: '#d2dde6', snowLight: '#ffffff',
   dirt: '#b07b46', dirtDark: '#8f5f31', dirtLight: '#c89a64',
   water: '#3f7cc2', waterLight: '#5a93d6', foam: '#bcd8f5',
+  // canal water: slightly darker and calmer than open sea/lake water so channels
+  // read as engineered waterways (water towns #65, Phase 4)
+  canal: '#386da8',
   // shore sand — softer than the desert ground so coastlines don't read as a harsh
   // yellow border (mirrors worldTileArt's toned-down beach sand).
   beach: '#dccfac', beachDark: '#c6b78d', beachLight: '#ece1c2',
@@ -160,7 +163,10 @@ const snow = (seed) => {
   return wrap(`<rect width='32' height='32' fill='${C.snow}'/>${marks}`);
 };
 
-const dirt = (seed) => {
+// dirt/stone are split into inner (unwrapped SVG) + wrapped forms so the quay-edge
+// overlay (water towns #65, Phase 4) can compose on the identical base markup: a path
+// with no waterway neighbour still emits byte-for-byte the pre-canal string.
+const dirtInner = (seed) => {
   const r = rng(seed + 2);
   let marks = '';
   for (let i = 0; i < 9; i++) {
@@ -169,8 +175,9 @@ const dirt = (seed) => {
     const c = r() > 0.5 ? C.dirtDark : C.dirtLight;
     marks += `<circle cx='${x}' cy='${y}' r='${(r() * 1.1 + 0.5).toFixed(1)}' fill='${c}'/>`;
   }
-  return wrap(`<rect width='32' height='32' fill='${C.dirt}'/>${marks}`);
+  return `<rect width='32' height='32' fill='${C.dirt}'/>${marks}`;
 };
+const dirt = (seed) => wrap(dirtInner(seed));
 
 // shore sand: the walkable land/water transition for lakefront + coastal towns. Soft
 // sand base with a few pebbles and faint tide lines, deliberately calmer than the desert
@@ -216,7 +223,7 @@ const field = (seed) => {
   return wrap(`<rect width='32' height='32' fill='${C.soil}'/>${rows}`);
 };
 
-const stone = (seed, light) => {
+const stoneInner = (seed, light) => {
   const r = rng(seed + 5);
   const base = light ? C.stone : C.stoneDark;
   let cobbles = '';
@@ -228,8 +235,9 @@ const stone = (seed, light) => {
       cobbles += `<rect x='${x.toFixed(1)}' y='${y.toFixed(1)}' width='6.4' height='6.4' rx='1.6' fill='${c}'/>`;
     }
   }
-  return wrap(`<rect width='32' height='32' fill='${C.mortar}'/><rect width='32' height='32' fill='${base}' opacity='0.25'/>${cobbles}`);
+  return `<rect width='32' height='32' fill='${C.mortar}'/><rect width='32' height='32' fill='${base}' opacity='0.25'/>${cobbles}`;
 };
+const stone = (seed, light) => wrap(stoneInner(seed, light));
 
 const bridge = () => {
   let planks = '';
@@ -239,6 +247,151 @@ const bridge = () => {
   }
   return wrap(`${planks}<rect x='1' y='0' width='1.6' height='32' fill='${C.plankGap}' opacity='0.7'/><rect x='29.4' y='0' width='1.6' height='32' fill='${C.plankGap}' opacity='0.7'/>`);
 };
+
+// --- canals (autotiled) --------------------------------------------------------
+// Water towns #65, Phase 4. Canal/fork water carries `waterway: true`; the renderer
+// derives everything below at render time from a 4-bit waterway-neighbour mask
+// (N=1, E=2, S=4, W=8, the wall autotiler's technique), so channels read as CHANNELS
+// (stone banks, bends, junctions, mouths), not ponds, and junction shapes follow any
+// future generation change for free. Neighbouring basin/sea water and bridge tiles
+// count as waterway neighbours (a canal mouth renders open, and the channel continues
+// under a bridge); the masking itself lives in waterwayMask() below.
+
+// Masonry tone of the banks per town theme: default stone, desert sandstone, snow
+// icy grey. Unknown/missing themes take the temperate stone, mirroring THEME_MATERIALS.
+const CANAL_BANKS = {
+  grassland: { m: '#c2bba9', d: '#a29a88', lip: '#8f8775' },
+  desert: { m: '#d9bc82', d: '#bf9f60', lip: '#a5854a' },
+  snow: { m: '#ccd6de', d: '#aebac5', lip: '#8fa0ac' },
+};
+const canalBankPalette = (theme) => CANAL_BANKS[theme] || CANAL_BANKS.grassland;
+
+// Calmer canal-water base: narrower wave strokes on a slightly darker blue, so canal
+// water reads distinct from open sea/lake water even before the banks are drawn.
+const canalWaterInner = (seed) => {
+  const r = rng(seed + 11);
+  let waves = '';
+  for (let i = 0; i < 3; i++) {
+    const y = 8 + i * 8 + Math.floor(r() * 3);
+    waves += `<path d='M0 ${y} q8 -2 16 0 t16 0' stroke='${C.waterLight}' stroke-width='0.8' fill='none' opacity='0.55'/>`;
+  }
+  return `<rect width='32' height='32' fill='${C.canal}'/>${waves}`;
+};
+
+const BANK_T = 4.5;   // bank strip thickness
+const BANK_LIP = 1.3; // darker lip line on the water-facing edge
+
+// Directional canal tile. Dry sides (mask bit unset) get a stone bank strip with a
+// darker lip on the waterside and two mortar joints; the 16 masks cover straight runs
+// (5, 10), bends (3/6/9/12), T-junctions (7/11/13/14), the 4-way cross (15), dead
+// ends/mouth stubs (1/2/4/8) and a fully enclosed pool (0). Basin treatment falls out
+// of the same rule: a tile with 3-4 waterway neighbours renders as open harbour water
+// with a bank only on its dry edge plus small corner nibs where two wet edges meet
+// (the masonry ring continuing past the tile).
+export const canalTile = (mask, theme = 'grassland', seed = 0) => {
+  const pal = canalBankPalette(theme);
+  const t = BANK_T;
+  const lw = BANK_LIP;
+  const wet = { n: !!(mask & 1), e: !!(mask & 2), s: !!(mask & 4), w: !!(mask & 8) };
+  let banks = '';
+  // two mortar joints per strip so the banks read as laid masonry, not a flat border
+  const jointsH = (y) => `<rect x='10' y='${y}' width='1' height='2.5' fill='${pal.d}'/><rect x='21' y='${y}' width='1' height='2.5' fill='${pal.d}'/>`;
+  const jointsV = (x) => `<rect x='${x}' y='10' width='2.5' height='1' fill='${pal.d}'/><rect x='${x}' y='21' width='2.5' height='1' fill='${pal.d}'/>`;
+  if (!wet.n) banks += `<rect x='0' y='0' width='32' height='${t}' fill='${pal.m}'/><rect x='0' y='${t - lw}' width='32' height='${lw}' fill='${pal.lip}'/>` + jointsH(0.7);
+  if (!wet.s) banks += `<rect x='0' y='${32 - t}' width='32' height='${t}' fill='${pal.m}'/><rect x='0' y='${32 - t}' width='32' height='${lw}' fill='${pal.lip}'/>` + jointsH(28.8);
+  if (!wet.w) banks += `<rect x='0' y='0' width='${t}' height='32' fill='${pal.m}'/><rect x='${t - lw}' y='0' width='${lw}' height='32' fill='${pal.lip}'/>` + jointsV(0.7);
+  if (!wet.e) banks += `<rect x='${32 - t}' y='0' width='${t}' height='32' fill='${pal.m}'/><rect x='${32 - t}' y='0' width='${lw}' height='32' fill='${pal.lip}'/>` + jointsV(28.8);
+  // corner nibs: only mostly-open tiles (3-4 wet neighbours: basin water, junction
+  // hearts) get them, at corners where two wet edges meet
+  let nibs = '';
+  const count = wet.n + wet.e + wet.s + wet.w;
+  if (count >= 3) {
+    const nib = (x, y) => `<rect x='${x}' y='${y}' width='3.2' height='3.2' rx='1' fill='${pal.m}' stroke='${pal.lip}' stroke-width='0.6'/>`;
+    if (wet.w && wet.n) nibs += nib(0.6, 0.6);
+    if (wet.n && wet.e) nibs += nib(28.2, 0.6);
+    if (wet.e && wet.s) nibs += nib(28.2, 28.2);
+    if (wet.s && wet.w) nibs += nib(0.6, 28.2);
+  }
+  return wrap(canalWaterInner(seed) + banks + nibs);
+};
+
+// Bridge over a canal: the channel continues beneath the plank span. Orientation is
+// derived from which neighbours are waterway water: a N-S channel gets a horizontal
+// deck band (walk E-W) with water showing at the top and bottom edges; an E-W channel
+// gets a vertical deck (walk N-S, the classic bridge's reading) with water at the
+// left and right edges. Ties/no-water default to the E-W channel so the deck matches
+// the classic bridge tile's walk axis.
+export const canalBridgeTile = (wetMask, seed = 0) => {
+  const ns = (wetMask & 1 ? 1 : 0) + (wetMask & 4 ? 1 : 0);
+  const ew = (wetMask & 2 ? 1 : 0) + (wetMask & 8 ? 1 : 0);
+  let deck = '';
+  if (ns > ew) {
+    // channel runs N-S under an E-W walk: horizontal deck band, vertical planks
+    const y0 = 4.5, h = 23;
+    for (let i = 0; i < 5; i++) {
+      const x = i * 6.4;
+      deck += `<rect x='${x}' y='${y0}' width='6' height='${h}' fill='${C.plank}'/><rect x='${x + 6}' y='${y0}' width='0.8' height='${h}' fill='${C.plankGap}'/>`;
+    }
+    deck += `<rect x='0' y='${y0 + 0.5}' width='32' height='1.6' fill='${C.plankGap}' opacity='0.7'/><rect x='0' y='${y0 + h - 2.1}' width='32' height='1.6' fill='${C.plankGap}' opacity='0.7'/>`;
+  } else {
+    // channel runs E-W under a N-S walk: vertical deck band, horizontal planks
+    const x0 = 4.5, w = 23;
+    for (let i = 0; i < 5; i++) {
+      const y = i * 6.4;
+      deck += `<rect x='${x0}' y='${y}' width='${w}' height='6' fill='${C.plank}'/><rect x='${x0}' y='${y + 6}' width='${w}' height='0.8' fill='${C.plankGap}'/>`;
+    }
+    deck += `<rect x='${x0 + 0.5}' y='0' width='1.6' height='32' fill='${C.plankGap}' opacity='0.7'/><rect x='${x0 + w - 2.1}' y='0' width='1.6' height='32' fill='${C.plankGap}' opacity='0.7'/>`;
+  }
+  return wrap(canalWaterInner(seed) + deck);
+};
+
+// Quay edge treatment: a subtle stone lip (2.6px band in the theme's masonry lip tone,
+// with a couple of bollard dots) drawn on each wet side of a path tile that borders
+// waterway water. Composes over the untouched path base, so paths away from canals
+// stay byte-identical.
+const quayOverlay = (qmask, theme) => {
+  const pal = canalBankPalette(theme);
+  const b = 2.6;
+  const post = (cx, cy) => `<circle cx='${cx}' cy='${cy}' r='0.9' fill='#4d4738'/>`;
+  let out = '';
+  if (qmask & 1) out += `<rect x='0' y='0' width='32' height='${b}' fill='${pal.lip}'/>` + post(9, 1.3) + post(23, 1.3);
+  if (qmask & 2) out += `<rect x='${32 - b}' y='0' width='${b}' height='32' fill='${pal.lip}'/>` + post(30.7, 9) + post(30.7, 23);
+  if (qmask & 4) out += `<rect x='0' y='${32 - b}' width='32' height='${b}' fill='${pal.lip}'/>` + post(9, 30.7) + post(23, 30.7);
+  if (qmask & 8) out += `<rect x='0' y='0' width='${b}' height='32' fill='${pal.lip}'/>` + post(1.3, 9) + post(1.3, 23);
+  return out;
+};
+
+// Gallery/test accessor: a path tile with the quay lip applied (stone by default).
+export const quayVariant = (qmask, theme = 'grassland', pathType = 'stone_path') =>
+  wrap((pathType === 'dirt_path' ? dirtInner(variantSeed(2, 1)) : stoneInner(variantSeed(5, 1), true)) + quayOverlay(qmask, theme));
+
+// Compute the 4-bit waterway-neighbour mask (N=1, E=2, S=4, W=8) for a tile from its
+// four orthogonal neighbour TILES (types alone are not enough: the waterway flag is
+// what distinguishes a canal from the sea). What counts as a wet neighbour depends on
+// the tile itself:
+// - canal/fork water (water + waterway): any water (sea, lake, basin) keeps the
+//   channel open at a mouth, and bridge tiles continue the channel underneath;
+// - a bridge with the waterway flag: waterway/basin/sea WATER neighbours give the
+//   channel axis (adjacent bridges sit along the walk axis and must not count);
+// - path tiles: only true waterway water earns a quay lip (a plain lake/sea shore
+//   path stays a shore);
+// - everything else: 0. Sea/lake water without the flag always returns 0, so plain
+//   water tiles render exactly as before.
+export function waterwayMask(tile, tiles = {}) {
+  if (!tile) return 0;
+  const isWater = (t) => !!t && t.type === 'water';
+  let counts;
+  if (tile.type === 'water' && tile.waterway) {
+    counts = (t) => isWater(t) || (!!t && t.type === 'bridge');
+  } else if (tile.type === 'bridge' && tile.waterway) {
+    counts = isWater;
+  } else if (tile.type === 'stone_path' || tile.type === 'dirt_path') {
+    counts = (t) => isWater(t) && !!t.waterway;
+  } else {
+    return 0;
+  }
+  return (counts(tiles.n) ? 1 : 0) | (counts(tiles.e) ? 2 : 0) | (counts(tiles.s) ? 4 : 0) | (counts(tiles.w) ? 8 : 0);
+}
 
 // --- walls (autotiled) -------------------------------------------------------
 // mask bits: N=1, E=2, S=4, W=8
@@ -641,18 +794,20 @@ const building = (buildingType, ground = C.grass, theme = 'grassland') => {
 };
 
 // --- public API --------------------------------------------------------------
-const _generate = (type, tile, mask, seed, theme) => {
+// `wet` is the waterway-neighbour mask (waterwayMask above); 0 for every tile that has
+// nothing to do with canals, in which case each branch takes its historical path.
+const _generate = (type, tile, mask, seed, theme, wet = 0) => {
   // ground fill + open-tile texture follow the theme (desert→sand, snow→snow, else grass)
   const ground = themeGroundFill(theme);
   const groundTile = (s) => theme === 'desert' ? sand(s) : theme === 'snow' ? snow(s) : grass(s);
   switch (type) {
-    case 'water': return water(seed);
+    case 'water': return tile.waterway ? canalTile(wet, theme, seed) : water(seed);
     case 'beach': return beach(seed);
-    case 'bridge': return bridge();
+    case 'bridge': return tile.waterway ? canalBridgeTile(wet, seed) : bridge();
     case 'farm_field': return field(seed);
     case 'town_square': return stone(seed, true);
-    case 'stone_path': return stone(seed, true);
-    case 'dirt_path': return dirt(seed);
+    case 'stone_path': return wet ? wrap(stoneInner(seed, true) + quayOverlay(wet, theme)) : stone(seed, true);
+    case 'dirt_path': return wet ? wrap(dirtInner(seed) + quayOverlay(wet, theme)) : dirt(seed);
     case 'building': return building(tile.buildingType, ground, theme);
     case 'wall': return wall(mask, false, ground);
     case 'keep_wall': return wall(mask, true, ground);
@@ -670,12 +825,15 @@ const _cache = new Map();
 // Returns a CSS background-image string for a tile. `neighbours` is { n,e,s,w } of
 // tile types, used for wall autotiling. `theme` selects the town's ground palette
 // (default 'grassland' renders exactly as before; 'desert' renders a sand base; 'snow'
-// renders a pale snow base).
-export function tileBackground(tile, neighbours = {}, x = 0, y = 0, theme = 'grassland') {
+// renders a pale snow base). `waterMask` is the 4-bit waterway-neighbour mask from
+// waterwayMask() (additive, default 0 = the historical rendering for every caller
+// that does not compute it).
+export function tileBackground(tile, neighbours = {}, x = 0, y = 0, theme = 'grassland', waterMask = 0) {
   const type = tile.type;
   // Theme tag in the cache key so each theme's tiles never collide. Grassland is the
   // default, so its keys/output are unchanged from before ('g').
   const tt = theme === 'desert' ? 'd' : theme === 'snow' ? 's' : 'g';
+  const wet = waterMask | 0;
   let mask = 0;
   let key;
   if (type === 'wall' || type === 'keep_wall') {
@@ -685,10 +843,14 @@ export function tileBackground(tile, neighbours = {}, x = 0, y = 0, theme = 'gra
     key = `building|${tile.buildingType || 'house'}|${tt}`;
   } else {
     key = `${type}|${variantSeed(x, y)}|${tt}`;
+    // Canal dressing folds into the key additively: pre-canal tiles (wet 0, no
+    // waterway flag) keep their historical keys, and a waterway tile can never
+    // collide with plain water/bridge art at the same coordinate.
+    if (wet || tile.waterway) key += `|w${wet}${tile.waterway ? 'c' : ''}`;
   }
   let bg = _cache.get(key);
   if (bg === undefined) {
-    bg = _generate(type, tile, mask, variantSeed(x, y), theme);
+    bg = _generate(type, tile, mask, variantSeed(x, y), theme, wet);
     _cache.set(key, bg);
   }
   return bg;
@@ -717,6 +879,7 @@ export const sampleTiles = {
   farm_field: () => field(variantSeed(4, 1)),
   town_square: () => stone(variantSeed(5, 1), true),
   bridge: () => bridge(),
+  canal: () => canalTile(10, 'grassland', variantSeed(3, 3)),
 };
 export const wallVariant = (mask, keep = false) => wall(mask, keep);
 // `theme` is optional: the default renders the historical temperate building so every
