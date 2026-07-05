@@ -1,4 +1,4 @@
-import { tileBackground, sampleTiles, wallVariant, buildingTile, POI_EMOJI } from './townTileArt';
+import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, POI_EMOJI } from './townTileArt';
 import PINS from './townTileArt.pins.json';
 
 const TYPES = ['grass', 'dirt_path', 'stone_path', 'town_square', 'farm_field', 'water', 'bridge', 'wall', 'keep_wall', 'building'];
@@ -188,5 +188,120 @@ describe('townTileArt theme palettes', () => {
     const dirtTile = tileBackground({ type: 'dirt_path' }, {}, 4, 5, 'desert');
     expect(dirtTile).toBe(PINS.dirt_path_4_5);
     expect(tileBackground({ type: 'dirt_path' }, {}, 4, 5, 'snow')).toBe(PINS.dirt_path_4_5);
+  });
+});
+
+// Water towns #65, Phase 4: directional canal tiles, basin treatment, quay lips, and
+// bridge-over-canal, all derived at render time from the 4-bit waterway-neighbour mask
+// (N=1, E=2, S=4, W=8). Sea/lake water without the waterway flag, and every path away
+// from a canal, must keep the pre-canal pinned output byte-for-byte.
+describe('townTileArt canal dressing (waterway mask)', () => {
+  const NIB = "rx='1' fill="; // corner-nib signature (banks carry no rx; cobbles use rx='1.6')
+
+  test('all 16 waterway masks produce distinct, well-formed channel shapes', () => {
+    const all = Array.from({ length: 16 }, (_, m) => canalTile(m, 'grassland', 7));
+    all.forEach((bg) => expect(decode(bg)).toContain('386da8')); // calmer, darker canal water base
+    expect(new Set(all).size).toBe(16);
+  });
+
+  test('straight runs carry stone banks along both dry sides only', () => {
+    const ns = decode(canalTile(5, 'grassland', 1)); // wet N+S: banks W and E
+    expect(ns).toContain("x='0' y='0' width='4.5' height='32'");    // W bank
+    expect(ns).toContain("x='27.5' y='0' width='4.5' height='32'"); // E bank
+    expect(ns).not.toContain("width='32' height='4.5'");            // no N/S bank
+    const ew = decode(canalTile(10, 'grassland', 1)); // wet E+W: banks N and S
+    expect(ew).toContain("x='0' y='0' width='32' height='4.5'");
+    expect(ew).not.toContain("height='32' fill='#c2bba9'");
+  });
+
+  test('basin threshold: 3-4 wet neighbours render open with corner nibs, 2 or fewer do not', () => {
+    expect(decode(canalTile(15, 'grassland', 1))).toContain(NIB); // 4-way cross / basin interior
+    expect(decode(canalTile(7, 'grassland', 1))).toContain(NIB);  // T-junction / basin edge
+    expect(decode(canalTile(5, 'grassland', 1))).not.toContain(NIB);  // straight
+    expect(decode(canalTile(3, 'grassland', 1))).not.toContain(NIB);  // bend
+    expect(decode(canalTile(1, 'grassland', 1))).not.toContain(NIB);  // dead end
+  });
+
+  test('sea/lake water without the waterway flag renders exactly the pinned pre-canal tile', () => {
+    expect(tileBackground({ type: 'water' }, {}, 1, 1)).toBe(PINS.water_1_1);
+    // even a (spurious) nonzero mask never restyles plain water
+    expect(tileBackground({ type: 'water' }, {}, 1, 1, 'grassland', 10)).toBe(PINS.water_1_1);
+    // waterway water at the same coordinate is the canal treatment, not plain water
+    expect(tileBackground({ type: 'water', waterway: true }, {}, 1, 1, 'grassland', 10)).not.toBe(PINS.water_1_1);
+  });
+
+  test('memo keys are distinct per mask and theme (no cache collisions)', () => {
+    const canal = { type: 'water', waterway: true };
+    const a = tileBackground(canal, {}, 4, 4, 'grassland', 5);
+    const b = tileBackground(canal, {}, 4, 4, 'grassland', 10);
+    const c = tileBackground(canal, {}, 4, 4, 'desert', 5);
+    const a2 = tileBackground(canal, {}, 4, 4, 'grassland', 5);
+    expect(a2).toBe(a); // repeat hits the cache
+    expect(new Set([a, b, c]).size).toBe(3);
+    // quay variants never collide with the plain path at the same coordinate
+    const plain = tileBackground({ type: 'stone_path' }, {}, 6, 7);
+    const quay = tileBackground({ type: 'stone_path' }, {}, 6, 7, 'grassland', 4);
+    expect(quay).not.toBe(plain);
+  });
+
+  test('waterwayMask: canal water counts sea/basin water and bridges as open channel', () => {
+    const canal = { type: 'water', waterway: true };
+    expect(waterwayMask(canal, { n: { type: 'water' } })).toBe(1); // sea/lake/basin mouth stays open
+    expect(waterwayMask(canal, { e: { type: 'water', waterway: true } })).toBe(2);
+    expect(waterwayMask(canal, { s: { type: 'bridge', waterway: true } })).toBe(4); // channel continues under
+    expect(waterwayMask(canal, { w: { type: 'grass' } })).toBe(0);
+    expect(waterwayMask(canal, { n: { type: 'water' }, e: { type: 'water' }, s: { type: 'water' }, w: { type: 'water' } })).toBe(15);
+    // plain water never masks (renders as before regardless of neighbours)
+    expect(waterwayMask({ type: 'water' }, { n: canal, e: canal, s: canal, w: canal })).toBe(0);
+    expect(waterwayMask(null, { n: canal })).toBe(0);
+  });
+
+  test('quay lip appears only beside waterway water', () => {
+    const canal = { type: 'water', waterway: true };
+    expect(waterwayMask({ type: 'stone_path' }, { s: canal })).toBe(4);
+    expect(waterwayMask({ type: 'dirt_path' }, { e: canal })).toBe(2);
+    expect(waterwayMask({ type: 'stone_path' }, { s: { type: 'water' } })).toBe(0);          // plain sea shore: no lip
+    expect(waterwayMask({ type: 'stone_path' }, { s: { type: 'bridge', waterway: true } })).toBe(0); // bridges earn none
+    expect(waterwayMask({ type: 'town_square' }, { s: canal })).toBe(0);
+    // mask 0 renders byte-identical to the pinned pre-canal path
+    expect(tileBackground({ type: 'dirt_path' }, {}, 4, 5)).toBe(PINS.dirt_path_4_5);
+    // a lipped path keeps the full path base underneath and adds the band + bollards
+    const quay = decode(quayVariant(4, 'grassland'));
+    const base = decode(sampleTiles.town_square()); // same stoneInner seed as quayVariant's stone base
+    expect(quay).toContain(base.slice(base.indexOf('<rect'), base.indexOf('</svg>')));
+    expect(quay).toContain('<circle');
+  });
+
+  test('theme bank palettes: temperate stone, desert sandstone, snow icy grey', () => {
+    const g = canalTile(5, 'grassland', 3);
+    const d = canalTile(5, 'desert', 3);
+    const s = canalTile(5, 'snow', 3);
+    expect(new Set([g, d, s]).size).toBe(3);
+    expect(decode(g)).toContain('c2bba9');
+    expect(decode(d)).toContain('d9bc82');
+    expect(decode(s)).toContain('ccd6de');
+    // unknown/missing themes fall back to temperate stone
+    expect(canalTile(5, 'jungle', 3)).toBe(g);
+    // quay lips follow the same palettes
+    expect(decode(quayVariant(4, 'desert'))).toContain('a5854a');
+    expect(decode(quayVariant(4, 'snow'))).toContain('8fa0ac');
+  });
+
+  test('bridge over a canal orients the deck across the channel; plain bridges unchanged', () => {
+    const nsChannel = decode(canalBridgeTile(5, 2));  // water N+S: horizontal deck band
+    const ewChannel = decode(canalBridgeTile(10, 2)); // water E+W: vertical deck band
+    expect(nsChannel).not.toBe(ewChannel);
+    expect(nsChannel).toContain("y='4.5'"); // deck band inset top/bottom, water shows N and S
+    expect(nsChannel).not.toContain("x='4.5'");
+    expect(ewChannel).toContain("x='4.5'"); // deck band inset left/right, water shows E and W
+    expect(ewChannel).not.toContain("y='4.5'");
+    // both show canal water beneath the span
+    expect(nsChannel).toContain('386da8');
+    // a tie (no clear channel axis) defaults to the classic walk axis, never throws
+    expect(decode(canalBridgeTile(0, 2))).toContain('386da8');
+    // ordinary bridges (no waterway flag) are byte-identical to the classic plank tile
+    expect(tileBackground({ type: 'bridge' }, {}, 2, 2)).toBe(sampleTiles.bridge());
+    // a waterway bridge routed through tileBackground takes the canal variant
+    expect(tileBackground({ type: 'bridge', waterway: true }, {}, 2, 2, 'grassland', 5)).not.toBe(sampleTiles.bridge());
   });
 });

@@ -7,7 +7,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { generateTownMap } from '../utils/townMapGenerator';
-import { tileBackground, sampleTiles, wallVariant, buildingTile, BUILDING_TYPES, POI_EMOJI } from '../utils/townTileArt';
+import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, BUILDING_TYPES, POI_EMOJI } from '../utils/townTileArt';
 
 const SIZES = ['hamlet', 'village', 'town', 'city'];
 const TILE = 28;
@@ -59,8 +59,8 @@ const analyzePaths = (town) => {
   };
 };
 
-const Cell = ({ tile, neighbours, theme = 'grassland', overlay = null }) => {
-  const bg = tileBackground(tile, neighbours, tile.x, tile.y, theme);
+const Cell = ({ tile, neighbours, theme = 'grassland', overlay = null, wet = 0 }) => {
+  const bg = tileBackground(tile, neighbours, tile.x, tile.y, theme, wet);
   const emoji = tile.poi ? POI_EMOJI[tile.poi] : null;
   return (
     <div style={{
@@ -174,12 +174,24 @@ const TilesetTest = () => {
   const grid = town.mapData;
   const W = town.width;
   const H = town.height;
-  const at = (gx, gy) => (gy >= 0 && gy < H && gx >= 0 && gx < W && grid[gy][gx] ? grid[gy][gx].type : null);
+  const tileObjAt = (gx, gy) => (gy >= 0 && gy < H && gx >= 0 && gx < W && grid[gy][gx] ? grid[gy][gx] : null);
+  const at = (gx, gy) => { const t = tileObjAt(gx, gy); return t ? t.type : null; };
 
   const wallMasks = [
     { m: 5, label: 'N–S' }, { m: 10, label: 'E–W' }, { m: 3, label: 'corner NE' },
     { m: 6, label: 'corner SE' }, { m: 7, label: 'T-junction' }, { m: 15, label: 'cross' },
     { m: 1, label: 'endpoint' },
+  ];
+  // Full directional canal vocabulary (water towns Phase 4): all 16 waterway-neighbour
+  // masks, labelled by what the shape reads as. Masks with 3-4 wet neighbours double as
+  // the basin treatment (open water, bank only on dry edges, corner nibs).
+  const canalMasks = [
+    { m: 0, label: 'pool (walled)' },
+    { m: 1, label: 'end, open N' }, { m: 2, label: 'end, open E' }, { m: 4, label: 'end, open S' }, { m: 8, label: 'end, open W' },
+    { m: 5, label: 'straight N-S' }, { m: 10, label: 'straight E-W' },
+    { m: 3, label: 'bend NE' }, { m: 6, label: 'bend SE' }, { m: 12, label: 'bend SW' }, { m: 9, label: 'bend NW' },
+    { m: 7, label: 'T, bank W' }, { m: 14, label: 'T, bank N' }, { m: 13, label: 'T, bank E' }, { m: 11, label: 'T, bank S' },
+    { m: 15, label: 'cross / basin' },
   ];
   // Every building type the renderer knows (single source of truth, so new types appear
   // here automatically).
@@ -204,6 +216,27 @@ const TilesetTest = () => {
           {wallMasks.map((w) => <Swatch key={`w${w.m}`} bg={wallVariant(w.m, false)} label={w.label} />)}
           {wallMasks.slice(0, 4).map((w) => <Swatch key={`k${w.m}`} bg={wallVariant(w.m, true)} label={`keep ${w.label}`} />)}
         </div>
+      </section>
+
+      <section style={{ marginBottom: 28 }}>
+        <h3 style={heading}>Canals (autotiled): banks follow the theme ({theme})</h3>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          {canalMasks.map((c) => <Swatch key={`c${c.m}`} bg={canalTile(c.m, theme, c.m * 7 + 1)} label={c.label} />)}
+        </div>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
+          <Swatch bg={canalBridgeTile(5, 3)} label='bridge, canal N-S' />
+          <Swatch bg={canalBridgeTile(10, 3)} label='bridge, canal E-W' />
+          <Swatch bg={quayVariant(4, theme)} label='quay lip S' />
+          <Swatch bg={quayVariant(6, theme)} label='quay lip S+E' />
+          <Swatch bg={quayVariant(2, theme, 'dirt_path')} label='dirt quay E' />
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
+          All 16 waterway-neighbour masks (N=1 E=2 S=4 W=8, the wall autotiler's technique).
+          Masks with 3-4 wet neighbours are the basin treatment: open harbour water, bank only
+          on dry edges, corner nibs where two wet edges meet. Bridges over a canal show the
+          channel continuing beneath, deck oriented across it. Quay lips are the subtle stone
+          band + bollards a path tile gains beside waterway water.
+        </p>
       </section>
 
       <section style={{ marginBottom: 28 }}>
@@ -314,6 +347,7 @@ const TilesetTest = () => {
             {grid.flatMap((rowArr, gy) =>
               rowArr.map((tile, gx) => {
                 const neighbours = { n: at(gx, gy - 1), e: at(gx + 1, gy), s: at(gx, gy + 1), w: at(gx - 1, gy) };
+                const wet = waterwayMask(tile, { n: tileObjAt(gx, gy - 1), e: tileObjAt(gx + 1, gy), s: tileObjAt(gx, gy + 1), w: tileObjAt(gx - 1, gy) });
                 let overlay = null;
                 if (showPaths && isPathType(tile.type)) {
                   overlay = paths.main.has(`${gx},${gy}`) ? 'rgba(80,200,120,0.9)' : 'rgba(230,60,60,0.95)';
@@ -328,7 +362,7 @@ const TilesetTest = () => {
                   overlay = 'rgba(120,220,240,0.9)'; // the harbour basin
                 }
                 if (showPaths && tile.isGate) overlay = 'rgba(80,140,255,0.95)';
-                return <Cell key={`${gx},${gy}`} tile={tile} neighbours={neighbours} theme={theme} overlay={overlay} />;
+                return <Cell key={`${gx},${gy}`} tile={tile} neighbours={neighbours} theme={theme} overlay={overlay} wet={wet} />;
               })
             )}
           </div>
@@ -340,8 +374,9 @@ const TilesetTest = () => {
           orange = the river-city island / canal-city fenced-off districts, cyan = the harbour basin). The
           <em> river city</em> archetype (town/city only) carves a windy forking river around an island quarter; the
           <em> canal city</em> archetype (city only, coastal) carves a harbour basin plus 3-5 windy canal spokes with
-          quay lanes hugging the banks. Fork and canal water render as plain water in this debug cut — the 16-mask
-          directional canal tiles (banks, bends, junctions, mouths) are Phase 4 art, not this phase.
+          quay lanes hugging the banks. Fork and canal water render with the Phase 4 directional canal treatment
+          (16-mask banks, bends, junctions, mouths; see the canal gallery above); paths beside a waterway gain the
+          quay lip, and bridges over one show the channel continuing beneath. Sea and lake water are untouched.
         </p>
       </section>
     </div>
