@@ -331,4 +331,38 @@ dbRoutes.delete('/conversations/:sessionId', async (c) => {
   }
 });
 
+// ============================================
+// ENTITLEMENTS ENDPOINTS
+// ============================================
+
+// Account tier for the calling user (backlog #39). Read-only on purpose: until billing
+// lands, tier changes happen manually via psql (see migrations/002_account_tiers.sql for
+// the runbook and the INSERT ... ON CONFLICT grant recipe). No row means the account has
+// never been granted anything, which is plain 'free'. The tier-to-benefit mapping lives
+// client-side (src/game/entitlements.js); this endpoint only reports the stored tier.
+dbRoutes.get('/entitlements', async (c) => {
+  const sql = getSql(c.env);
+  try {
+    const userId = c.get('userId');
+
+    const [row] = await sql`
+      SELECT tier, updated_at FROM account_tiers
+      WHERE user_id = ${userId}
+      LIMIT 1`;
+
+    if (!row) return c.json({ tier: 'free', updatedAt: null });
+    return c.json({ tier: row.tier, updatedAt: row.updated_at });
+  } catch (error: any) {
+    console.error('Error fetching entitlements:', {
+      message: error?.message,
+      code: error?.code,
+      detail: error?.detail,
+      stack: error?.stack,
+    });
+    return c.json({ error: 'Failed to fetch entitlements' }, 500);
+  } finally {
+    c.executionCtx.waitUntil(sql.end());
+  }
+});
+
 export default dbRoutes;

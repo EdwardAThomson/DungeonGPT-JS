@@ -238,7 +238,11 @@ now so the tier field drops in later:
   'members', canal: 'premium' })` and `canUseWaterTown(archetype)`, following the
   `PREMIUM_THEMES`/`canUseTheme` pattern exactly. NewGame calls it when stamping
   `waterTown` (§2); nothing downstream ever re-checks (saves carry the stamp,
-  grandfathering lapsed subscribers like premium themes do).
+  grandfathering lapsed subscribers like premium themes do). *(Landed 2026-07-05
+  with #39: real tiers exist now, and the mapping values are `TIER_LADDER` rungs,
+  so riverfork maps to `'member'` (the ladder's singular spelling of the Members
+  tier) and canal to `'premium'`. `canUseWaterTown` is live and tier-aware; it
+  just waits on the §2 world integration to be called.)*
 - The flagship canal campaign ships as a premium story template in
   `premiumTemplates.local.js` (merged by `storyTemplates.js:1326`), with a size-tagged
   `customNames` entry pinning the estuary town to `city`, and `premium: true` so
