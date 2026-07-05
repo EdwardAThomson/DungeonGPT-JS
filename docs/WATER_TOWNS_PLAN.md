@@ -192,6 +192,14 @@ Pure view layer, retroactive and safe per house rules:
 - **Add (small):** a calmer canal-water variant keyed off `tile.waterway` (narrower
   wave strokes, slightly darker), so canals read distinct from open sea. Falls back to
   plain water when the field is absent.
+- **Add (medium, maintainer 2026-07-05): directional canal shapes.** A canal tile must
+  read as a CHANNEL, not a pond: stone banks along straight runs (N-S and E-W), bends
+  at corners, openings at T-junctions where a spoke branches, a cross at intersections,
+  and mouth pieces where a canal meets the basin or the sea. All derived at render time
+  from a 4-bit waterway-neighbor mask (N=1, E=2, S=4, W=8, up to 16 shapes), exactly the
+  wall autotiler's technique: no stored direction field, so art stays retroactive and
+  junction shapes follow generation changes for free. Neighboring basin/sea water counts
+  as a waterway neighbor for masking (a canal mouth is open, not walled).
 - **Add (medium):** quay edge treatment on path tiles orthogonally adjacent to water:
   a stone lip on the wet side, autotile-style neighbor keying exactly like the existing
   wall autotiler. This is what makes the quays read; the walls prove the technique.
