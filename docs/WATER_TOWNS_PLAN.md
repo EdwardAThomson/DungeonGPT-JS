@@ -45,13 +45,15 @@ the flagship set piece); river city on roughly half of eligible river settlement
   routing, dock-sand protection), so it is cheap (S). Tier suggestion: free or
   Members, the tease below the canal flagship. Not scheduled; add to phasing
   when picked up.
-- **Jetty tiles for coastal towns (any size).** Dock structures currently reuse
-  the `bridge` tile: close, but not quite the right feel (a bridge reads as a
-  crossing, a jetty reads as a wooden finger over the water). Consider a
-  dedicated jetty treatment: either a `jetty` tile type or a flag on bridge
-  tiles that the art keys off (planks along the walk axis, mooring posts, open
-  water end). View-layer-first approach preferred so existing docks re-skin
-  retroactively; pairs naturally with the fishing village and Phase 4 canal art.
+- ~~**Jetty tiles for coastal towns (any size).**~~ **SHIPPED 2026-07-05, view
+  layer only.** No new tile type or flag: `townTileArt` detects jetties at render
+  time from the neighbour types the wall autotiler already receives (`jettyInfo`).
+  A bridge whose walk axis ends in water/nothing on exactly one side is a jetty
+  (weathered plank finger, gaps showing the water, mooring post at the open end,
+  rope coil); land-to-land bridges keep the classic crossing deck byte-for-byte.
+  Existing docks re-skin retroactively; canal-side jetties sit on canal water.
+  Gallery: `/debug/tileset` (jetty row in the canal section); town legend shows a
+  Jetty swatch.
 
 ## 2. Eligibility & world integration
 

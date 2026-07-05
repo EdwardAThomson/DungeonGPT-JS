@@ -198,15 +198,19 @@ const beach = (seed) => {
   return wrap(`<rect width='32' height='32' fill='${C.beach}'/>${marks}`);
 };
 
-const water = (seed) => {
+// water is split into inner + wrapped forms (like dirt/stone) so the jetty tile can
+// compose its plank finger over the identical open-water base: a plain water tile
+// still emits byte-for-byte the pre-jetty string.
+const waterInner = (seed) => {
   const r = rng(seed + 3);
   let waves = '';
   for (let i = 0; i < 3; i++) {
     const y = 7 + i * 9 + Math.floor(r() * 3);
     waves += `<path d='M0 ${y} q8 -3 16 0 t16 0' stroke='${C.waterLight}' stroke-width='1.4' fill='none' opacity='0.8'/>`;
   }
-  return wrap(`<rect width='32' height='32' fill='${C.water}'/>${waves}<path d='M0 4 q8 -3 16 0 t16 0' stroke='${C.foam}' stroke-width='1' fill='none' opacity='0.5'/>`);
+  return `<rect width='32' height='32' fill='${C.water}'/>${waves}<path d='M0 4 q8 -3 16 0 t16 0' stroke='${C.foam}' stroke-width='1' fill='none' opacity='0.5'/>`;
 };
+const water = (seed) => wrap(waterInner(seed));
 
 const field = (seed) => {
   const r = rng(seed + 4);
@@ -247,6 +251,77 @@ const bridge = () => {
   }
   return wrap(`${planks}<rect x='1' y='0' width='1.6' height='32' fill='${C.plankGap}' opacity='0.7'/><rect x='29.4' y='0' width='1.6' height='32' fill='${C.plankGap}' opacity='0.7'/>`);
 };
+
+// --- jetties (water towns plan §1b) --------------------------------------------
+// A jetty is a wooden finger over the water, not a crossing: dock structures near
+// harbormasters (and canal-side stubs) are laid as 'bridge' tiles by the generator, so
+// the distinction is made at RENDER TIME from the neighbour types the wall autotiler
+// already receives (view-layer only: every existing dock re-skins retroactively, no
+// map data changes). See jettyInfo() below for the detection rule.
+//
+// Art: a weathered plank finger, slightly narrower than a bridge deck (13px vs the
+// bridge's full 32 / the canal bridge's 23), with gaps between planks showing the
+// water beneath, side beams, a mooring post standing in the water at the open end,
+// and a rope coil near the landward end. Drawn canonically with the water end at N
+// and rotated for the other orientations. `waterway` picks the calmer canal-water
+// base so canal-side jetties sit on canal colour, sea jetties on open water.
+const JETTY = {
+  plankA: '#9c8a6a', plankB: '#8a795e', // sun-bleached, weathered wood
+  beam: '#5d4a30', post: '#4a3a26', postTop: '#7a6448', rope: '#c9b088',
+};
+export const jettyTile = (dir = 'n', seed = 0, waterway = false) => {
+  const base = waterway ? canalWaterInner(seed) : waterInner(seed);
+  const rot = { e: 'rotate(90 16 16)', s: 'rotate(180 16 16)', w: 'rotate(270 16 16)' }[dir] || '';
+  // side beams under the deck edges
+  let deck = `<rect x='9.1' y='5' width='0.9' height='27' fill='${JETTY.beam}' opacity='0.85'/>` +
+    `<rect x='22' y='5' width='0.9' height='27' fill='${JETTY.beam}' opacity='0.85'/>`;
+  // planks from the tip (water shows past y=5) back to the landward tile edge, with
+  // gaps between them so the water reads through the boards
+  for (let i = 0; i < 9; i++) {
+    const y = (5 + i * 3.1).toFixed(1);
+    deck += `<rect x='9.5' y='${y}' width='13' height='2.3' rx='0.4' fill='${i % 2 ? JETTY.plankB : JETTY.plankA}'/>`;
+  }
+  // mooring post standing in the water beside the open end, plus a rope coil on deck
+  deck += `<circle cx='24.6' cy='6.6' r='1.9' fill='${JETTY.post}'/><circle cx='24.1' cy='6.1' r='0.8' fill='${JETTY.postTop}'/>` +
+    `<path d='M22.8 7.4 q-1.6 1.2 -3.3 0.6' stroke='${JETTY.rope}' stroke-width='0.8' fill='none'/>` +
+    `<circle cx='12.6' cy='26.5' r='1.7' fill='none' stroke='${JETTY.rope}' stroke-width='1'/>` +
+    `<circle cx='12.6' cy='26.5' r='0.4' fill='${JETTY.rope}'/>`;
+  return wrap(base + (rot ? `<g transform='${rot}'>${deck}</g>` : deck));
+};
+
+// Render-time jetty detection for a plain 'bridge' tile, from the SAME neighbour-type
+// object ({ n, e, s, w } of tile types) the wall autotiler already receives — no new
+// plumbing, so every existing caller (live TownMapDisplay included) gets jetties for
+// free and callers passing no neighbours keep the historical bridge art.
+//
+// Rule (maintainer, WATER_TOWNS_PLAN §1b): a bridge is a CROSSING when walkable land
+// or path sits at both ends of its walk axis (or when the walk continues on both axes:
+// a bend/junction); it is a JETTY when its walk axis ends in water (or nothing, at a
+// map edge) on exactly ONE side and land on the other — a finger over the water. The
+// walk axis is where path/bridge neighbours continue; failing that, the axis
+// perpendicular to flanking water; failing that, N-S (the classic bridge reading).
+// Returns { waterEnd: 'n'|'e'|'s'|'w' } for a jetty, null for a crossing/no-info.
+export function jettyInfo(tile, neighbours = {}) {
+  if (!tile || tile.type !== 'bridge') return null;
+  const conn = (t) => t === 'bridge' || t === 'dirt_path' || t === 'stone_path' || t === 'town_square';
+  const wat = (t) => !t || t === 'water';
+  const { n, e, s, w } = neighbours;
+  const nsConn = conn(n) || conn(s);
+  const ewConn = conn(e) || conn(w);
+  if (nsConn && ewConn) return null; // the walk continues on both axes: a bend/junction, not a finger
+  let axis;
+  if (nsConn) axis = 'ns';
+  else if (ewConn) axis = 'ew';
+  else if (wat(e) && wat(w) && !(wat(n) && wat(s))) axis = 'ns'; // flanked by water: the walk runs the dry axis
+  else if (wat(n) && wat(s) && !(wat(e) && wat(w))) axis = 'ew';
+  else axis = 'ns';
+  const [a, b, sideA, sideB] = axis === 'ns' ? [n, s, 'n', 's'] : [e, w, 'e', 'w'];
+  if (wat(a) && !wat(b)) return { waterEnd: sideA };
+  if (wat(b) && !wat(a)) return { waterEnd: sideB };
+  // land at both ends = crossing; water/nothing at both ends = no info (an orphan or a
+  // caller with no neighbours) — both keep the historical bridge art
+  return null;
+}
 
 // --- canals (autotiled) --------------------------------------------------------
 // Water towns #65, Phase 4. Canal/fork water carries `waterway: true`; the renderer
@@ -769,13 +844,77 @@ const BUILDING_SHAPE = {
 // galleries/legends so they never miss a type). Order = roughly civic → commerce → craft.
 export const BUILDING_TYPES = Object.keys(BUILDING_SHAPE);
 
+// --- tier-2 architecture flavour (backlog #64, tier 2) --------------------------
+// Small theme-gated SHAPE additions on top of the tier-1 material palettes. Strictly
+// per-theme: the temperate branch never touches any of this, so temperate output stays
+// byte-identical to the pins. Everything is deterministic (seeded by building type via
+// hash(); no Math.random), so a themed town renders identically on every load.
+//
+// Desert: flat-roof variants where they read well — the house trades its gable for a
+// parapet band + an awning stripe over the door; shop/market stalls gain a parapet
+// band over the awning. Civic landmarks (temple, keep, townhall, ...) keep their
+// distinctive silhouettes.
+const awningStripe = (r, x, y) => {
+  let s = '';
+  for (let i = 0; i < 4; i++) s += `<rect x='${(x + i * 2.5).toFixed(1)}' y='${y}' width='2.5' height='2.2' fill='${i % 2 ? '#f2ead6' : shade(r, 0.7)}'/>`;
+  return s;
+};
+const DESERT_FLAT = {
+  // flat-roofed adobe cottage: parapet band instead of the gable triangle
+  house: (r) =>
+    `<rect x='9' y='10' width='14' height='16' rx='1' fill='${shade(r, 0.82)}'/>` +
+    `<rect x='8' y='8' width='16' height='3.2' rx='0.8' fill='${r}'/>` +
+    `<rect x='8' y='10.6' width='16' height='0.9' fill='${shade(r, 0.6)}'/>` +
+    `<rect x='19' y='13.5' width='3' height='3' fill='${shade(r, 1.15)}'/>` +
+    awningStripe(r, 10, 17.6) +
+    door(r, 13.5, 3),
+};
+// shop/market: the stall keeps its counter awning and gains a flat parapet above it
+const desertStall = (r) =>
+  `<rect x='6.5' y='6.8' width='19' height='2.6' rx='0.7' fill='${shade(r, 0.85)}'/>` +
+  `<rect x='6.5' y='8.9' width='19' height='0.7' fill='${shade(r, 0.55)}'/>` +
+  SHAPES.stall(r);
+DESERT_FLAT.shop = desertStall;
+DESERT_FLAT.market = desertStall;
+
+// Snow: chimney smoke curls on the dwelling shapes that have a chimney, and an icicle
+// fringe hanging from the SNOW_CAP roof band on a subset of types. Drawn OUTSIDE the
+// outline halo (see building() below) so the smoke stays wispy and the ice stays pale.
+const smokeWisps = (cx, cy, type) => {
+  const h = hash(type);
+  const dx = ((h & 3) - 1.5) * 0.6; // deterministic per-type drift
+  return `<circle cx='${cx}' cy='${cy}' r='1.5' fill='#e6edf3' opacity='0.85'/>` +
+    `<circle cx='${(cx + 1.6 + dx).toFixed(1)}' cy='${(cy - 2.4).toFixed(1)}' r='1.2' fill='#eff4f8' opacity='0.7'/>` +
+    `<circle cx='${(cx + 3 + dx * 2).toFixed(1)}' cy='${(cy - 4.6).toFixed(1)}' r='0.9' fill='#f7fafc' opacity='0.55'/>`;
+};
+const SNOW_SMOKE = {
+  house: () => smokeWisps(20.8, 6, 'house'),   // gable chimney
+  manor: () => smokeWisps(21.8, 5, 'manor'),   // the right of the twin chimneys
+  inn: () => smokeWisps(23.3, 2.5, 'inn'),     // rooftop chimney (top wisp drifts out of frame)
+  tavern: () => smokeWisps(23.5, 4, 'tavern'), // alehouse chimney
+};
+const icicleFringe = (type) => {
+  const h = hash(type);
+  let out = '';
+  for (let i = 0; i < 5; i++) {
+    const x = 7.5 + i * 4.4 + ((h >> (i * 3)) & 3) * 0.4; // per-type jitter, deterministic
+    const t = (x - 16) / 11;
+    const y = 12.9 + 2.4 * t * t; // follows the SNOW_CAP band's lower curve
+    const len = 2 + ((h >> (i * 2)) & 3) * 0.5;
+    out += `<polygon points='${(x - 0.8).toFixed(1)},${y.toFixed(1)} ${(x + 0.8).toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${(y + len).toFixed(1)}' fill='#dceefc' opacity='0.9'/>`;
+  }
+  return out;
+};
+const SNOW_ICICLES = new Set(['house', 'shop', 'temple', 'inn']);
+
 const building = (buildingType, ground = C.grass, theme = 'grassland') => {
   const mat = THEME_MATERIALS[theme];
   const baseRoof = ROOFS[buildingType] || ROOFS.house;
   // themed towns re-tint the material palette; temperate (or any unknown theme) uses
   // the roof colour untouched so existing saves render byte-identically
   const roof = mat ? mix(baseRoof, mat.tint, mat.amount) : baseRoof;
-  const shape = SHAPES[BUILDING_SHAPE[buildingType] || 'gable'];
+  // tier-2 desert flat-roof variants replace the shape for the allowlisted types only
+  const shape = (theme === 'desert' && DESERT_FLAT[buildingType]) || SHAPES[BUILDING_SHAPE[buildingType] || 'gable'];
   const body = shape(roof) + (mat && mat.cap ? SNOW_CAP : '');
   // Themed grounds are pale (sand/snow), which washes out building silhouettes
   // (maintainer 2026-07-05). A zero-offset drop-shadow halo re-cuts the outline
@@ -794,24 +933,35 @@ const building = (buildingType, ground = C.grass, theme = 'grassland') => {
       `<feMerge><feMergeNode in='o'/><feMergeNode in='SourceGraphic'/></feMerge>` +
       `</filter></defs><g filter='url(#bo)'>${body}</g>`
     : body;
+  // tier-2 snow overlays ride OUTSIDE the halo group: a dark contour around pale
+  // smoke/ice would read as dirt, and temperate/desert never reach this branch
+  let extras = '';
+  if (theme === 'snow') {
+    if (SNOW_ICICLES.has(buildingType)) extras += icicleFringe(buildingType);
+    const smoke = SNOW_SMOKE[buildingType];
+    if (smoke) extras += smoke();
+  }
   return wrap(
     `<rect width='32' height='32' fill='${ground}'/>` +
     `<ellipse cx='16' cy='27' rx='12' ry='3' fill='#000000' opacity='0.16'/>` + // ground shadow
-    outlined
+    outlined + extras
   );
 };
 
 // --- public API --------------------------------------------------------------
 // `wet` is the waterway-neighbour mask (waterwayMask above); 0 for every tile that has
 // nothing to do with canals, in which case each branch takes its historical path.
-const _generate = (type, tile, mask, seed, theme, wet = 0) => {
+// `jetty` is jettyInfo()'s verdict for bridge tiles (null = crossing/historical art).
+const _generate = (type, tile, mask, seed, theme, wet = 0, jetty = null) => {
   // ground fill + open-tile texture follow the theme (desert→sand, snow→snow, else grass)
   const ground = themeGroundFill(theme);
   const groundTile = (s) => theme === 'desert' ? sand(s) : theme === 'snow' ? snow(s) : grass(s);
   switch (type) {
     case 'water': return tile.waterway ? canalTile(wet, theme, seed) : water(seed);
     case 'beach': return beach(seed);
-    case 'bridge': return tile.waterway ? canalBridgeTile(wet, seed) : bridge();
+    case 'bridge':
+      if (jetty) return jettyTile(jetty.waterEnd, seed, !!tile.waterway);
+      return tile.waterway ? canalBridgeTile(wet, seed) : bridge();
     case 'farm_field': return field(seed);
     case 'town_square': return stone(seed, true);
     case 'stone_path': return wet ? wrap(stoneInner(seed, true) + quayOverlay(wet, theme)) : stone(seed, true);
@@ -843,6 +993,7 @@ export function tileBackground(tile, neighbours = {}, x = 0, y = 0, theme = 'gra
   const tt = theme === 'desert' ? 'd' : theme === 'snow' ? 's' : 'g';
   const wet = waterMask | 0;
   let mask = 0;
+  let jetty = null;
   let key;
   if (type === 'wall' || type === 'keep_wall') {
     mask = (neighbours.n === type ? 1 : 0) | (neighbours.e === type ? 2 : 0) | (neighbours.s === type ? 4 : 0) | (neighbours.w === type ? 8 : 0);
@@ -855,10 +1006,17 @@ export function tileBackground(tile, neighbours = {}, x = 0, y = 0, theme = 'gra
     // waterway flag) keep their historical keys, and a waterway tile can never
     // collide with plain water/bridge art at the same coordinate.
     if (wet || tile.waterway) key += `|w${wet}${tile.waterway ? 'c' : ''}`;
+    // Jetty detection (water towns plan §1b) reuses the neighbour-type object the
+    // wall autotiler already gets. Additive: crossings and callers passing no
+    // neighbours yield null, keeping the historical key and bridge art.
+    if (type === 'bridge') {
+      jetty = jettyInfo(tile, neighbours);
+      if (jetty) key += `|j${jetty.waterEnd}`;
+    }
   }
   let bg = _cache.get(key);
   if (bg === undefined) {
-    bg = _generate(type, tile, mask, variantSeed(x, y), theme, wet);
+    bg = _generate(type, tile, mask, variantSeed(x, y), theme, wet, jetty);
     _cache.set(key, bg);
   }
   return bg;
@@ -888,6 +1046,7 @@ export const sampleTiles = {
   town_square: () => stone(variantSeed(5, 1), true),
   bridge: () => bridge(),
   canal: () => canalTile(10, 'grassland', variantSeed(3, 3)),
+  jetty: () => jettyTile('n', variantSeed(3, 4)),
 };
 export const wallVariant = (mask, keep = false) => wall(mask, keep);
 // `theme` is optional: the default renders the historical temperate building so every

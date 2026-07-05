@@ -7,7 +7,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { generateTownMap } from '../utils/townMapGenerator';
-import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, BUILDING_TYPES, POI_EMOJI } from '../utils/townTileArt';
+import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, jettyTile, BUILDING_TYPES, POI_EMOJI } from '../utils/townTileArt';
 
 const SIZES = ['hamlet', 'village', 'town', 'city'];
 const TILE = 28;
@@ -169,6 +169,18 @@ const TilesetTest = () => {
     [size, seed, theme, archetype, riverDir, seaEdge]
   );
   const paths = useMemo(() => analyzePaths(town), [town]);
+  // Building census (maintainer 2026-07-06): the total made seed-to-seed roster
+  // dropouts visible (the manor-starvation bug was spotted by eye as 90 vs 91);
+  // the per-type breakdown lives in the title tooltip.
+  const buildingCensus = useMemo(() => {
+    const byType = {};
+    town.mapData.forEach((row) => row.forEach((t) => {
+      if (t.type === 'building') byType[t.buildingType] = (byType[t.buildingType] || 0) + 1;
+    }));
+    const total = Object.values(byType).reduce((a, b) => a + b, 0);
+    const detail = Object.entries(byType).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}: ${n}`).join('\n');
+    return { total, detail };
+  }, [town]);
   const fork = useMemo(() => analyzeFork(town), [town]);
   const canal = useMemo(() => analyzeCanal(town), [town]);
   const grid = town.mapData;
@@ -230,17 +242,30 @@ const TilesetTest = () => {
           <Swatch bg={quayVariant(6, theme)} label='quay lip S+E' />
           <Swatch bg={quayVariant(2, theme, 'dirt_path')} label='dirt quay E' />
         </div>
+        {/* Jetties (water towns plan §1b): bridge tiles whose walk axis dead-ends in water
+            re-skin as a plank finger with a mooring post. Crossing shown for comparison. */}
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
+          <Swatch bg={jettyTile('n', 11)} label='jetty, open N' />
+          <Swatch bg={jettyTile('e', 11)} label='jetty, open E' />
+          <Swatch bg={jettyTile('s', 11)} label='jetty, open S' />
+          <Swatch bg={jettyTile('w', 11)} label='jetty, open W' />
+          <Swatch bg={jettyTile('n', 11, true)} label='jetty, canal-side' />
+          <Swatch bg={sampleTiles.bridge()} label='bridge (crossing)' />
+        </div>
         <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 8 }}>
           All 16 waterway-neighbour masks (N=1 E=2 S=4 W=8, the wall autotiler's technique).
           Masks with 3-4 wet neighbours are the basin treatment: open harbour water, bank only
           on dry edges, corner nibs where two wet edges meet. Bridges over a canal show the
           channel continuing beneath, deck oriented across it. Quay lips are the subtle stone
-          band + bollards a path tile gains beside waterway water.
+          band + bollards a path tile gains beside waterway water. Jetties are detected at
+          render time: a bridge tile whose walk axis ends in water on one side (a dock finger,
+          not a crossing) gets the weathered-plank jetty treatment; land-to-land bridges keep
+          the classic deck. Sea jetties sit on open water, canal-side ones on canal water.
         </p>
       </section>
 
       <section style={{ marginBottom: 28 }}>
-        <h3 style={heading}>Building roofs</h3>
+        <h3 style={heading}>Building roofs ({theme}: tier-2 flavour — desert flat roofs on house/shop/market, snow smoke + icicles)</h3>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           {buildings.map((b) => <Swatch key={b} bg={buildingTile(b, theme)} label={b} />)}
         </div>
@@ -312,7 +337,10 @@ const TilesetTest = () => {
             {paths.hubOk ? ' · hub connected' : ' · HUB DISCONNECTED'}
           </strong>
           {' '}· {paths.pathTiles} path tiles · {paths.spokes} spokes ·
-          avg {paths.avgBends.toFixed(1)} bends · length/straight {paths.avgRatio.toFixed(2)}
+          avg {paths.avgBends.toFixed(1)} bends · length/straight {paths.avgRatio.toFixed(2)} ·
+          <span title={buildingCensus.detail} style={{ cursor: 'help', textDecoration: 'underline dotted' }}>
+            {buildingCensus.total} buildings
+          </span>
         </div>
         {/* River-city invariants (water towns Phase 1): island >= 4 free grass
             (quest floor) and >= 2 distinct bridge crossings, per the plan. */}

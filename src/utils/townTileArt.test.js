@@ -1,4 +1,4 @@
-import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, POI_EMOJI } from './townTileArt';
+import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, jettyTile, jettyInfo, POI_EMOJI } from './townTileArt';
 import PINS from './townTileArt.pins.json';
 
 const TYPES = ['grass', 'dirt_path', 'stone_path', 'town_square', 'farm_field', 'water', 'bridge', 'wall', 'keep_wall', 'building'];
@@ -153,11 +153,22 @@ describe('townTileArt theme palettes', () => {
     expect(decode(buildingTile('house', 'desert'))).not.toContain('9c4a3c');
   });
 
-  test('themed buildings keep the exact silhouette: geometry identical once colour is stripped', () => {
-    ['house', 'inn', 'market', 'keep', 'magetower', 'blacksmith'].forEach((b) => {
+  // INTENTIONAL BREAK (backlog #64, tier 2): this test used to assert that EVERY themed
+  // building kept the temperate silhouette exactly (tier 1 was palette-only). Tier 2
+  // deliberately adds theme-gated shapes — desert flat roofs on house/shop/market, snow
+  // smoke + icicles on an allowlisted subset — so the invariance now only holds for the
+  // types OUTSIDE those allowlists. Temperate output stays pinned byte-identical above;
+  // the tier-2 describe block below asserts the documented additions are present.
+  test('themed buildings outside the tier-2 allowlists keep the exact silhouette', () => {
+    ['keep', 'magetower', 'blacksmith', 'townhall', 'bank', 'library'].forEach((b) => {
       const base = geometry(buildingTile(b));
       expect(geometry(buildingTile(b, 'desert'))).toBe(base);
       expect(geometry(buildingTile(b, 'snow'))).toBe(base);
+    });
+    // desert types not in the flat-roof set keep their silhouette even when the snow
+    // variant differs (inn gains smoke+icicles only in snow)
+    ['inn', 'manor', 'temple'].forEach((b) => {
+      expect(geometry(buildingTile(b, 'desert'))).toBe(geometry(buildingTile(b)));
     });
   });
 
@@ -188,6 +199,114 @@ describe('townTileArt theme palettes', () => {
     const dirtTile = tileBackground({ type: 'dirt_path' }, {}, 4, 5, 'desert');
     expect(dirtTile).toBe(PINS.dirt_path_4_5);
     expect(tileBackground({ type: 'dirt_path' }, {}, 4, 5, 'snow')).toBe(PINS.dirt_path_4_5);
+  });
+});
+
+// Tier-2 architecture flavour (backlog #64, tier 2): theme-gated SHAPE additions over
+// the tier-1 palettes. Desert: flat-roof variants (parapet + awning) on house/shop/
+// market. Snow: chimney smoke on dwellings (house/inn/tavern/manor) and an icicle
+// fringe on house/shop/temple/inn. Temperate output stays pinned byte-identical.
+describe('townTileArt tier-2 architecture flavour', () => {
+  const GABLE = "points='7,14 16,6 25,14'"; // the temperate house's gable triangle
+  const SMOKE = 'e6edf3';   // lowest smoke wisp tone
+  const ICE = 'dceefc';     // icicle fill
+  const PARAPET = "x='6.5' y='6.8' width='19'"; // the stall parapet band
+
+  test('desert house trades the gable for a parapet band + awning stripe over the door', () => {
+    const desert = decode(buildingTile('house', 'desert'));
+    expect(desert).not.toContain(GABLE);
+    expect(decode(buildingTile('house'))).toContain(GABLE);      // temperate keeps the gable
+    expect(decode(buildingTile('house', 'snow'))).toContain(GABLE); // snow keeps it too
+    expect(desert).toContain("x='8' y='8' width='16' height='3.2'"); // parapet band
+    expect(desert).toContain('f2ead6'); // awning stripe over the door
+  });
+
+  test('desert shop and market stalls gain the parapet band; temperate and snow do not', () => {
+    expect(decode(buildingTile('shop', 'desert'))).toContain(PARAPET);
+    expect(decode(buildingTile('market', 'desert'))).toContain(PARAPET);
+    expect(decode(buildingTile('shop'))).not.toContain(PARAPET);
+    expect(decode(buildingTile('shop', 'snow'))).not.toContain(PARAPET);
+    // shop and market still read apart (different roof colours under the same shape)
+    expect(buildingTile('shop', 'desert')).not.toBe(buildingTile('market', 'desert'));
+  });
+
+  test('snow dwellings puff chimney smoke; temperate, desert, and non-dwellings do not', () => {
+    ['house', 'inn', 'tavern', 'manor'].forEach((b) => {
+      expect(decode(buildingTile(b, 'snow'))).toContain(SMOKE);
+      expect(decode(buildingTile(b))).not.toContain(SMOKE);
+      expect(decode(buildingTile(b, 'desert'))).not.toContain(SMOKE);
+    });
+    expect(decode(buildingTile('keep', 'snow'))).not.toContain(SMOKE);
+  });
+
+  test('snow icicle fringe hangs under the roof cap on the allowlisted types only', () => {
+    ['house', 'shop', 'temple', 'inn'].forEach((b) => {
+      expect(decode(buildingTile(b, 'snow'))).toContain(ICE);
+      expect(decode(buildingTile(b))).not.toContain(ICE);
+      expect(decode(buildingTile(b, 'desert'))).not.toContain(ICE);
+    });
+    expect(decode(buildingTile('keep', 'snow'))).not.toContain(ICE);
+  });
+
+  test('tier-2 additions are deterministic (seeded by type, no randomness)', () => {
+    expect(buildingTile('house', 'desert')).toBe(buildingTile('house', 'desert'));
+    expect(buildingTile('house', 'snow')).toBe(buildingTile('house', 'snow'));
+    expect(buildingTile('inn', 'snow')).toBe(buildingTile('inn', 'snow'));
+  });
+});
+
+// Jetty treatment (WATER_TOWNS_PLAN §1b, shipped as view-layer art): dock structures
+// laid as 'bridge' tiles re-skin retroactively when render-time detection says the
+// plank walk ends in water on exactly one axis end. Crossings stay byte-identical.
+describe('townTileArt jetties (bridge tiles that end in water)', () => {
+  const POST = "r='1.9'"; // the mooring post's signature radius
+  const DOCK = { n: 'water', e: 'water', w: 'water', s: 'beach' };
+
+  test('jettyInfo: a bridge whose walk axis ends in water on one side is a jetty', () => {
+    expect(jettyInfo({ type: 'bridge' }, DOCK)).toEqual({ waterEnd: 'n' }); // dock stub off a beach
+    expect(jettyInfo({ type: 'bridge' }, { n: 'water', s: 'bridge', e: 'water', w: 'water' })).toEqual({ waterEnd: 'n' }); // tip of a longer finger
+    expect(jettyInfo({ type: 'bridge' }, { w: 'stone_path', n: 'water', s: 'water', e: 'water' })).toEqual({ waterEnd: 'e' }); // east-pointing off a quay
+    expect(jettyInfo({ type: 'bridge' }, { n: 'dirt_path', s: 'water', e: 'grass', w: 'grass' })).toEqual({ waterEnd: 's' });
+  });
+
+  test('jettyInfo: crossings, bends, finger bodies, and no-info bridges are not jetties', () => {
+    expect(jettyInfo({ type: 'bridge' }, { n: 'stone_path', s: 'dirt_path', e: 'water', w: 'water' })).toBeNull(); // land to land: crossing
+    expect(jettyInfo({ type: 'bridge' }, { n: 'bridge', s: 'bridge', e: 'water', w: 'water' })).toBeNull();        // mid-span/finger body
+    expect(jettyInfo({ type: 'bridge' }, { s: 'stone_path', e: 'bridge', n: 'water', w: 'water' })).toBeNull();    // bend: walk continues on both axes
+    expect(jettyInfo({ type: 'bridge' }, {})).toBeNull();       // no neighbour info: historical art
+    expect(jettyInfo({ type: 'stone_path' }, DOCK)).toBeNull(); // only bridges qualify
+    expect(jettyInfo(null, DOCK)).toBeNull();
+  });
+
+  test('a jetty renders differently from a crossing bridge; crossings stay byte-identical', () => {
+    const jetty = tileBackground({ type: 'bridge' }, DOCK, 2, 2);
+    expect(jetty).not.toBe(sampleTiles.bridge());
+    expect(decode(jetty)).toContain(POST);     // mooring post at the water end
+    expect(decode(jetty)).toContain('3f7cc2'); // open water shows through the plank gaps
+    // crossings (and neighbour-less callers) keep the classic plank tile byte-for-byte
+    expect(tileBackground({ type: 'bridge' }, { n: 'stone_path', s: 'dirt_path', e: 'water', w: 'water' }, 2, 2)).toBe(sampleTiles.bridge());
+    expect(tileBackground({ type: 'bridge' }, {}, 2, 2)).toBe(sampleTiles.bridge());
+  });
+
+  test('all four orientations render distinct art; canal-side jetties sit on canal water', () => {
+    const dirs = ['n', 'e', 's', 'w'].map((d) => jettyTile(d, 9));
+    expect(new Set(dirs).size).toBe(4);
+    dirs.forEach((bg) => expect(decode(bg)).not.toMatch(/undefined|NaN/));
+    expect(decode(jettyTile('n', 9, true))).toContain('386da8');  // canal-water base
+    expect(decode(jettyTile('n', 9, false))).toContain('3f7cc2'); // sea-water base
+    // a waterway bridge stub routed through tileBackground takes the canal-water jetty
+    const canalJetty = tileBackground({ type: 'bridge', waterway: true }, DOCK, 3, 3, 'grassland', 14);
+    expect(decode(canalJetty)).toContain(POST);
+    expect(decode(canalJetty)).toContain('386da8');
+  });
+
+  test('memo keys: jetty vs crossing at the same coordinate never collide; repeats hit the cache', () => {
+    const a = tileBackground({ type: 'bridge' }, DOCK, 5, 5);
+    const a2 = tileBackground({ type: 'bridge' }, DOCK, 5, 5);
+    const crossing = tileBackground({ type: 'bridge' }, { n: 'stone_path', s: 'stone_path' }, 5, 5);
+    const east = tileBackground({ type: 'bridge' }, { w: 'stone_path', n: 'water', s: 'water', e: 'water' }, 5, 5);
+    expect(a2).toBe(a);
+    expect(new Set([a, crossing, east]).size).toBe(3);
   });
 });
 

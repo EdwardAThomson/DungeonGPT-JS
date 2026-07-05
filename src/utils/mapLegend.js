@@ -83,6 +83,7 @@ export function townLegendGroups(theme = 'grassland') {
         tile(canalTile(10, t), 'Canal'),
         tile(townSamples.beach(), 'Shore'),
         tile(townSamples.bridge(), 'Bridge'),
+        tile(townSamples.jetty(), 'Jetty'),
       ],
     },
     {

@@ -33,6 +33,13 @@ describe('MapLegend', () => {
     expect(screen.getByText('Rock face')).toBeTruthy();
   });
 
+  test('town legend keys the jetty apart from the bridge (water towns plan 1b)', () => {
+    const ground = townLegendGroups().find((g) => g.heading === 'Ground & paths');
+    const bg = (label) => ground.items.find((i) => i.label === label).bg;
+    expect(bg('Jetty')).toBeTruthy();
+    expect(bg('Jetty')).not.toBe(bg('Bridge')); // a jetty is a finger over water, not a crossing
+  });
+
   test('world + town legends produce non-empty groups', () => {
     expect(worldLegendGroups().every((g) => g.items.length > 0)).toBe(true);
     expect(townLegendGroups().every((g) => g.items.length > 0)).toBe(true);
