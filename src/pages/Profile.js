@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const Profile = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, tier } = useAuth();
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
@@ -48,6 +48,21 @@ const Profile = () => {
             <label>Last Sign In</label>
             <p>{user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString() : 'Unknown'}</p>
           </div>
+
+          <div className="profile-field">
+            <label>Membership</label>
+            {/* Tier resolves from the entitlements service (#39); 'free' is also the
+                honest answer while the fetch is pending or unreachable. Doubles as the
+                sanity check that the account-tier chain works end to end. */}
+            <p>
+              {tier === 'elite' && <span className="tier-badge tier-elite">👑 Elite</span>}
+              {tier === 'premium' && <span className="tier-badge tier-premium">💎 Premium</span>}
+              {tier === 'member' && <span className="tier-badge tier-member">🔱 Member</span>}
+              {(!tier || tier === 'free') && (
+                <span className="tier-badge tier-free">⚡ Free <span className="tier-note">· Membership coming soon</span></span>
+              )}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -70,6 +85,20 @@ const Profile = () => {
           max-width: 500px;
           margin: 20px 0;
         }
+
+        .tier-badge {
+          display: inline-block;
+          padding: 4px 12px;
+          border-radius: 12px;
+          font-weight: 600;
+          font-size: 0.95rem;
+          background: var(--bg);
+          border: 1px solid var(--border);
+        }
+        .tier-member { border-color: #2e8b57; color: #2e8b57; }
+        .tier-premium { border-color: #4169e1; color: #4169e1; }
+        .tier-elite { border-color: #b8860b; color: #b8860b; }
+        .tier-note { font-weight: 400; font-size: 0.8rem; color: var(--text-secondary); }
 
         .profile-avatar-large {
           width: 80px;
