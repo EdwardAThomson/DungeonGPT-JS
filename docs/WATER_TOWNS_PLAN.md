@@ -35,6 +35,24 @@ Frequency (all seeded, deterministic per world): at most ONE canal city per worl
 the flagship set piece); river city on roughly half of eligible river settlements
 (seeded roll, §2). Free tier: neither generates (§6).
 
+### 1b. Follow-on archetype notes (maintainer, 2026-07-05)
+
+- **Fishing village (future, small-settlement water flavor).** The fork archetype
+  is town+city by design (island districts need room and venues); the natural
+  water shape for hamlets/villages is a FISHING VILLAGE: docks, a boathouse, and
+  a quay lane along one bank of a lake, coast, or river. No fork, no island:
+  it reuses the existing waterfront machinery (shore placement, quay-stub
+  routing, dock-sand protection), so it is cheap (S). Tier suggestion: free or
+  Members, the tease below the canal flagship. Not scheduled; add to phasing
+  when picked up.
+- **Jetty tiles for coastal towns (any size).** Dock structures currently reuse
+  the `bridge` tile: close, but not quite the right feel (a bridge reads as a
+  crossing, a jetty reads as a wooden finger over the water). Consider a
+  dedicated jetty treatment: either a `jetty` tile type or a flag on bridge
+  tiles that the art keys off (planks along the walk axis, mooring posts, open
+  water end). View-layer-first approach preferred so existing docks re-skin
+  retroactively; pairs naturally with the fishing village and Phase 4 canal art.
+
 ## 2. Eligibility & world integration
 
 **Estuary definition:** the town's world tile has `analyzeTownWater(worldMap, x, y)`
