@@ -12,6 +12,7 @@ deleted. When the code and a doc disagree, the code wins.
 
 ## Architecture & deployment
 - `DEPLOYMENT_ARCHITECTURE.md` — current prod stack (CF Pages + Worker + self-hosted Postgres via Hyperdrive)
+- `OPS_RUNBOOK.md` — incidents, rollbacks, BACKUPS (post-cutover: self-hosted PG), deploy CI, drills
 - `CF_WORKER_GUIDE.md` — production Worker reference (model lineup: code wins over the doc)
 - `authentication_plan.md` — Octonion-hub auth / JWT verification
 

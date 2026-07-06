@@ -1,0 +1,109 @@
+# Deploy the production Cloudflare Worker (dungeongpt-api). Backlog #11 + #21.
+#
+# Triggers:
+#   - push to master touching cf-worker/** (the normal path)
+#   - manual workflow_dispatch (the "I just applied a migration by hand,
+#     now deploy" path; the migration guard is skipped on dispatch)
+#
+# One-time setup (details in docs/OPS_RUNBOOK.md, "Worker deploy CI"):
+#   gh secret set CF_API_TOKEN                      # scoped token, Workers Scripts:Edit
+#   gh variable set CF_ACCOUNT_ID --body "<id>"     # Cloudflare account id
+#   gh variable set PROD_WORKER_URL --body "https://<worker-host>"
+#
+# MIGRATIONS STAY MANUAL BY DESIGN. Migrations must be applied to the box
+# BEFORE the Worker build that references them is deployed (see the ORDER OF
+# OPERATIONS note in cf-worker/migrations/003_conversation_rev.sql). The
+# migration-guard job below fails the deploy loudly whenever a push ADDS a
+# file under cf-worker/migrations/, so an unapplied migration can never race
+# a deploy. After applying it by hand, re-run via workflow_dispatch.
+
+name: Deploy Worker
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "cf-worker/**"
+  workflow_dispatch:
+
+# Parallel merges queue behind each other instead of racing wrangler deploy.
+# cancel-in-progress stays false so a queued deploy of newer code still runs
+# to completion in order (last one wins on the Worker anyway).
+concurrency:
+  group: deploy-worker
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so the migration guard can diff against the
+          # pre-push commit even for multi-commit pushes.
+          fetch-depth: 0
+
+      - name: Migration guard (new migration file blocks deploy)
+        if: github.event_name == 'push'
+        run: |
+          BEFORE="${{ github.event.before }}"
+          # Force-push or unknown before-sha: fall back to the parent commit.
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ] \
+             || ! git cat-file -e "$BEFORE" 2>/dev/null; then
+            BEFORE="$(git rev-parse HEAD~1)"
+          fi
+          NEW_MIGRATIONS="$(git diff --name-only --diff-filter=A "$BEFORE" "$GITHUB_SHA" -- cf-worker/migrations/ || true)"
+          if [ -n "$NEW_MIGRATIONS" ]; then
+            echo "::error::New migration file(s) in this push; NOT deploying the Worker."
+            echo ""
+            echo "This push adds:"
+            echo "$NEW_MIGRATIONS" | sed 's/^/  - /'
+            echo ""
+            echo "Migrations are applied manually and MUST land on the database"
+            echo "BEFORE the Worker build that references them (a Worker deployed"
+            echo "first would error on every request that names the new column/table)."
+            echo ""
+            echo "To proceed:"
+            echo "  1. Apply the migration on the box, per the runbook in the file header:"
+            echo "       ssh octonion-games"
+            echo "       psql -U dungeongpt -d dungeongpt -f <migration file>"
+            echo "  2. Re-run this workflow manually (Actions -> Deploy Worker -> Run"
+            echo "     workflow), which skips this guard, or:"
+            echo "       gh workflow run deploy-worker.yml"
+            echo ""
+            echo "Full procedure: docs/OPS_RUNBOOK.md, 'Deploy checklist'."
+            exit 1
+          fi
+          echo "No new migration files; proceeding."
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: cf-worker/package-lock.json
+
+      - name: Install worker dependencies
+        working-directory: cf-worker
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: cf-worker
+        run: npx tsc --noEmit
+
+      - name: Deploy
+        working-directory: cf-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+        run: npx wrangler deploy
+
+      - name: Post-deploy smoke test
+        env:
+          SMOKE_WORKER_URL: ${{ vars.PROD_WORKER_URL }}
+        run: node scripts/ops/smoke-prod.mjs
