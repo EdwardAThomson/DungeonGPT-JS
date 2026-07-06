@@ -19,7 +19,10 @@
 //
 // Exit code: 0 all green, 1 any check failed, 2 misconfigured (no URL).
 
-const BASE_URL = (process.env.SMOKE_WORKER_URL || process.env.PROD_WORKER_URL || '').replace(/\/+$/, '');
+let BASE_URL = (process.env.SMOKE_WORKER_URL || process.env.PROD_WORKER_URL || '').replace(/\/+$/, '');
+// Tolerate a scheme-less host (a common variable-setting slip): fetch() needs
+// an absolute URL, so default to https when no scheme is given.
+if (BASE_URL && !/^https?:\/\//.test(BASE_URL)) BASE_URL = `https://${BASE_URL}`;
 const TIME_BUDGET_MS = Number(process.env.SMOKE_TIME_BUDGET_MS || 3000);
 const REQUEST_TIMEOUT_MS = Number(process.env.SMOKE_REQUEST_TIMEOUT_MS || 10000);
 
