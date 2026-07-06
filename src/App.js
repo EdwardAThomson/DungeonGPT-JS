@@ -37,6 +37,9 @@ import GuestBanner from "./components/GuestBanner";
 import ScrollToTop from "./components/ScrollToTop";
 
 const DebugRoutes = lazy(() => import('./pages/DebugRoutes'));
+// Premium tier page: mounted at /premium but deliberately NOT linked from any
+// nav yet (billing is not live); it becomes discoverable when #6 ships.
+const PremiumPage = lazy(() => import('./pages/PremiumPage'));
 
 const AppContent = () => {
   const location = useLocation();
@@ -190,6 +193,7 @@ const AppContent = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/getting-started" element={<GettingStarted />} />
+              <Route path="/premium" element={<PremiumPage />} />
               <Route path="/features" element={<HowToPlay />} />
               <Route path="/how-to-play" element={<Navigate to="/getting-started" replace />} />
               <Route path="/hero-creation" element={<HeroCreation />} />

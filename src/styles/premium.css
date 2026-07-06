@@ -268,3 +268,16 @@
     grid-column: auto;
   }
 }
+
+/* Tier already active on the signed-in account (replaces the CTA) */
+.premium-cta.active-cta {
+  display: block;
+  text-align: center;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 2px solid #2e8b57;
+  color: #2e8b57;
+  font-weight: 700;
+  background: transparent;
+  cursor: default;
+}

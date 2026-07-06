@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { hasTier } from '../game/entitlements';
 import '../styles/premium.css';
 
 /**
  * PremiumPage: player-facing tier comparison for DungeonGPT accounts.
  *
- * DRAFT: currently mounted at /debug/premium only (DebugRoutes is gated out of
- * production builds). Its future home is a public /premium route in App.js once
- * billing ships; promoting it should just be moving the route.
+ * Mounted at /premium (App.js) since 2026-07-06, deliberately UNLINKED from
+ * any nav until billing (#6) ships: reachable by URL for review, not
+ * discoverable. Also still on /debug/premium for the debug menu.
  *
  * Content source of truth: docs/private/PREMIUM_ACCOUNTS_PLAN.md (local, gitignored) ("Tier ladder").
  * Launch scope is Free + Members: Members is the purchasable highlight;
@@ -51,10 +53,10 @@ const TIERS = [
     highlight: true,
     summary: 'Everything in Free Account, plus premium adventures.',
     benefits: [
-      'Premium AI model pool for richer storytelling',
-      'Sand and snow campaigns, each with its own music',
-      'Custom quests that can reward rare items',
-      'Higher-tier campaign content for seasoned parties',
+      'Premium AI storytelling, with a generous monthly allowance',
+      'Desert and snow realms, each with its own campaigns and foes',
+      'River cities: settlements grown around island districts',
+      'Higher-tier campaigns for seasoned parties',
       'Unlocks in other octonion.io games as they ship',
     ],
     cta: { kind: 'placeholder', label: 'Coming Soon' },
@@ -68,10 +70,10 @@ const TIERS = [
     roadmap: true,
     summary: 'Planned. Opens when its content is built.',
     benefits: [
-      'Greater share of the premium AI pool',
+      'A canal city at the river mouth, and its flagship campaign',
+      'A larger premium AI allowance',
       'Sea-faring maps with ships',
       'Bigger world maps',
-      'Custom quests with very rare items',
       'Higher starting levels and player housing',
     ],
     cta: { kind: 'disabled', label: 'Not yet available' },
@@ -96,6 +98,10 @@ const TIERS = [
 ];
 
 const FAQ = [
+  {
+    q: 'What happens when my premium AI allowance runs out?',
+    a: "Play never stops. Responses simply continue from the free pool until the allowance refreshes, and the game tells you which pool answered. Your saves, heroes, and progress are never affected.",
+  },
   {
     q: 'What happens to my saves if I cancel?',
     a: 'Your saves and characters are never taken away. Premium gates the creation of new premium content, never your existing games: a desert campaign you started as a member stays fully playable.',
@@ -140,7 +146,12 @@ const TierCta = ({ cta }) => {
   }
 };
 
-const PremiumPage = () => (
+const PremiumPage = () => {
+  // Light, real wiring (2026-07-06): a signed-in member should not see a dead
+  // "Coming Soon" button for the tier they already hold.
+  const { tier } = useAuth();
+  const isMemberPlus = hasTier('member');
+  return (
   <div className="premium-container">
     <header className="premium-header">
       <h1>Support the Adventure</h1>
@@ -151,30 +162,36 @@ const PremiumPage = () => (
     </header>
 
     <div className="premium-tier-grid">
-      {TIERS.map((tier) => (
+      {TIERS.map((t) => (
         <div
-          key={tier.id}
+          key={t.id}
           className={[
             'premium-tier-card',
-            tier.highlight ? 'highlight' : '',
-            tier.roadmap ? 'roadmap' : '',
+            t.highlight ? 'highlight' : '',
+            t.roadmap ? 'roadmap' : '',
           ]
             .filter(Boolean)
             .join(' ')}
         >
-          {tier.badge && <div className="premium-tier-badge">{tier.badge}</div>}
-          <h2 className="premium-tier-name">{tier.name}</h2>
+          {t.badge && <div className="premium-tier-badge">{t.badge}</div>}
+          <h2 className="premium-tier-name">{t.name}</h2>
           <div className="premium-tier-price">
-            <span className="amount">{tier.price}</span>
-            {tier.period && <span className="period">{tier.period}</span>}
+            <span className="amount">{t.price}</span>
+            {t.period && <span className="period">{t.period}</span>}
           </div>
-          <p className="premium-tier-summary">{tier.summary}</p>
+          <p className="premium-tier-summary">{t.summary}</p>
           <ul className="premium-tier-benefits">
-            {tier.benefits.map((benefit) => (
+            {t.benefits.map((benefit) => (
               <li key={benefit}>{benefit}</li>
             ))}
           </ul>
-          <TierCta cta={tier.cta} />
+          {t.id === 'members' && isMemberPlus ? (
+            <div className="premium-cta active-cta" title="This tier is active on your account">
+              {'\u2713'} Active on your account
+            </div>
+          ) : (
+            <TierCta cta={t.cta} />
+          )}
         </div>
       ))}
     </div>
@@ -189,6 +206,7 @@ const PremiumPage = () => (
       ))}
     </section>
   </div>
-);
+  );
+};
 
 export default PremiumPage;
