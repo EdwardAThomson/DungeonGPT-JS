@@ -749,7 +749,7 @@ const NewGame = () => {
           </div>
           {!premiumUnlocked && (
             <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-              Desert and snow campaigns are a Premium unlock (coming soon). Preview them below.
+              Eldritch, desert and snow campaigns are a Members unlock (coming soon). Preview them below.
             </p>
           )}
           <div style={gridStyle}>

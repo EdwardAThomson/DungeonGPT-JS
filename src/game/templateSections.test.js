@@ -23,24 +23,20 @@ describe('getTemplateSections against the shipped catalog', () => {
 
   it('keeps the tier-1 starter split exactly as before (free vs premium)', () => {
     expect(sections.freeStarters.map((t) => t.id).sort()).toEqual([
-      'arcane-renaissance-t1',
-      'eldritch-horror-t1',
-      'grimdark-survival-t1',
-      'heroic-fantasy-t1',
+      'arcane-renaissance-t1', 'grimdark-survival-t1', 'heroic-fantasy-t1',
     ]);
     expect(sections.premiumStarters.map((t) => t.id).sort()).toEqual([
-      'desert-expedition-t1',
-      'frozen-frontier-t1',
+      'desert-expedition-t1', 'eldritch-horror-t1', 'frozen-frontier-t1',
     ]);
   });
 
   it('lists every playable tier-2 campaign in the Seasoned section', () => {
     expect(sections.seasoned.map((t) => t.id).sort()).toEqual([
-      'arcane-renaissance-t2', 'eldritch-horror-t2', 'grimdark-survival-t2', 'heroic-fantasy-t2',
+      'arcane-renaissance-t2', 'grimdark-survival-t2', 'heroic-fantasy-t2',
     ]);
     // Premium t2s are segregated (maintainer 2026-07-06)
     expect(sections.premiumSeasoned.map((t) => t.id).sort()).toEqual([
-      'desert-expedition-t2', 'frozen-frontier-t2',
+      'desert-expedition-t2', 'eldritch-horror-t2', 'frozen-frontier-t2',
     ]);
     sections.seasoned.forEach((t) => expect(t.comingSoon).toBeUndefined());
   });

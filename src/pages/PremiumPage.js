@@ -54,7 +54,7 @@ const TIERS = [
     summary: 'Everything in Free Account, plus premium adventures.',
     benefits: [
       'Premium AI storytelling, with a generous monthly allowance',
-      'Desert and snow realms, each with its own campaigns and foes',
+      'Eldritch, desert and snow realms, each with their own campaigns and foes',
       'River cities: settlements grown around island districts',
       'Higher-tier campaigns for seasoned parties',
       'Unlocks in other octonion.io games as they ship',

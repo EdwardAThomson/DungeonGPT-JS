@@ -1072,6 +1072,11 @@ export const storyTemplates = [
         theme: 'eldritch-horror',
         tier: 1,
         levelRange: [1, 2],
+        // Member tier since 2026-07-06 (maintainer: uniform ladder shape: free =
+        // heroic/grimdark/arcane, member adds eldritch + desert + snow, premium =
+        // tidewater). Production had ZERO eldritch saves at the time, so nobody
+        // was grandfathered; existing saves would keep playing regardless.
+        premium: true,
         name: 'Eldritch Horror',
         subtitle: 'The Blackwood Cult',
         icon: '🐙',
@@ -1165,6 +1170,11 @@ export const storyTemplates = [
         theme: 'eldritch-horror',
         tier: 2,
         levelRange: [3, 5],
+        // Member tier since 2026-07-06 (maintainer: uniform ladder shape: free =
+        // heroic/grimdark/arcane, member adds eldritch + desert + snow, premium =
+        // tidewater). Production had ZERO eldritch saves at the time, so nobody
+        // was grandfathered; existing saves would keep playing regardless.
+        premium: true,
         name: 'Eldritch Horror',
         subtitle: 'The Great Dreamer',
         icon: '🐙',
@@ -1298,6 +1308,11 @@ export const storyTemplates = [
         theme: 'eldritch-horror',
         tier: 3,
         levelRange: [5, 7],
+        // Member tier since 2026-07-06 (maintainer: uniform ladder shape: free =
+        // heroic/grimdark/arcane, member adds eldritch + desert + snow, premium =
+        // tidewater). Production had ZERO eldritch saves at the time, so nobody
+        // was grandfathered; existing saves would keep playing regardless.
+        premium: true,
         name: 'Eldritch Horror',
         subtitle: 'The Drowned City',
         icon: '🐙',
