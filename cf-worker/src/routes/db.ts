@@ -445,9 +445,28 @@ dbRoutes.get('/premium-templates', async (c) => {
       WHERE enabled = true
       ORDER BY id`;
 
-    const templates = rows
-      .filter((row) => tierRank(row.min_tier) <= callerRank)
-      .map((row) => row.template);
+    // Below-tier templates return as marketing-safe TEASERS instead of being
+    // withheld (maintainer 2026-07-06: "the cards should show to all players as
+    // a way to encourage them to upgrade"). The teaser carries only card-face
+    // metadata; the authored content (settings, milestones, customNames, NPCs,
+    // rewards) never reaches a client whose tier does not cover it — that
+    // boundary is the whole point of server-delivered premium content (#40).
+    const templates = rows.map((row) => {
+      if (tierRank(row.min_tier) <= callerRank) return row.template;
+      const t = (row.template ?? {}) as Record<string, unknown>;
+      return {
+        id: t.id ?? row.id,
+        name: t.name,
+        subtitle: t.subtitle,
+        tier: t.tier,
+        levelRange: t.levelRange,
+        shortDescription: t.shortDescription,
+        theme: t.theme,
+        premium: true,
+        minTier: row.min_tier,
+        teaser: true,
+      };
+    });
 
     return c.json({ templates });
   } catch (error: any) {

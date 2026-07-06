@@ -126,3 +126,28 @@ describe('premium gating on higher-tier cards (canUseTemplate, the card lock)', 
     expect(canUseTemplate(t3)).toBe(false);
   });
 });
+
+describe('server-delivered TEASER entries (upsell cards, #40 boundary)', () => {
+  afterEach(() => _resetLocalSlotIdsForTests());
+
+  const teaser = {
+    id: 'tidewater-t2', name: 'Tidewater: The First Bell', tier: 2,
+    levelRange: [3, 5], premium: true, minTier: 'premium', teaser: true,
+    // deliberately NO settings: the server strips authored content below tier
+  };
+
+  it('a teaser lands in the premium group of its tier section', () => {
+    const catalog = [...storyTemplates.map((t) => ({ ...t }))];
+    registerPremiumTemplates([teaser], catalog);
+    const { premiumSeasoned } = getTemplateSections(catalog);
+    expect(premiumSeasoned.map((t) => t.id)).toContain('tidewater-t2');
+  });
+
+  it('a teaser is never usable below its tier (locked card, no launch path)', () => {
+    localStorage.setItem(PREMIUM_DEV_OVERRIDE_KEY, 'true'); // lifts to member, NOT premium
+    _resetEntitlementsForTests();
+    expect(canUseTemplate(teaser)).toBe(false);
+    localStorage.removeItem(PREMIUM_DEV_OVERRIDE_KEY);
+    _resetEntitlementsForTests();
+  });
+});
