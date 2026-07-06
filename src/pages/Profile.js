@@ -57,7 +57,7 @@ const Profile = () => {
                 panel (maintainer request 2026-07-06). */}
             <p>
               <code
-                style={{ fontSize: '0.8rem', cursor: 'pointer', userSelect: 'all' }}
+                style={{ fontSize: '0.8rem', cursor: 'pointer', userSelect: 'all', background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '4px', padding: '2px 6px' }}
                 title="Click to copy"
                 onClick={(e) => {
                   navigator.clipboard?.writeText(user.id);
