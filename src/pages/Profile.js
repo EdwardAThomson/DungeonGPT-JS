@@ -50,6 +50,29 @@ const Profile = () => {
           </div>
 
           <div className="profile-field">
+            <label>Account ID</label>
+            {/* The game's records are keyed by this id, not by email (identity
+                lives in the auth hub). Players quote it for support or
+                membership grants: the maintainer matches it in the admin
+                panel (maintainer request 2026-07-06). */}
+            <p>
+              <code
+                style={{ fontSize: '0.8rem', cursor: 'pointer', userSelect: 'all' }}
+                title="Click to copy"
+                onClick={(e) => {
+                  navigator.clipboard?.writeText(user.id);
+                  const el = e.target;
+                  const prev = el.textContent;
+                  el.textContent = 'copied!';
+                  setTimeout(() => { el.textContent = prev; }, 1200);
+                }}
+              >
+                {user.id}
+              </code>
+            </p>
+          </div>
+
+          <div className="profile-field">
             <label>Membership</label>
             {/* Tier resolves from the entitlements service (#39); 'free' is also the
                 honest answer while the fetch is pending or unreachable. Doubles as the

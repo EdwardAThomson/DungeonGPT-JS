@@ -13,7 +13,7 @@ import '../styles/premium.css';
  * Content source of truth: docs/private/PREMIUM_ACCOUNTS_PLAN.md (local, gitignored) ("Tier ladder").
  * Launch scope is Free + Members: Members is the purchasable highlight;
  * Premium and Elite render as roadmap-only (dimmed, not purchasable) because
- * they are backed by unbuilt content (ships, housing, bigger maps).
+ * they are backed by unbuilt content (ships, bigger maps).
  * No billing is wired: the Members CTA is a disabled "Coming soon" placeholder.
  */
 
@@ -74,7 +74,7 @@ const TIERS = [
       'A larger premium AI allowance',
       'Sea-faring maps with ships',
       'Bigger world maps',
-      'Higher starting levels and player housing',
+      'Higher starting levels for seasoned parties',
     ],
     cta: { kind: 'disabled', label: 'Not yet available' },
   },
@@ -91,7 +91,7 @@ const TIERS = [
       'Better ships and mounts',
       'The biggest world maps',
       'Custom quests with legendary items',
-      'Level 5 starting templates and grander housing',
+      'Level 5 starting templates',
     ],
     cta: { kind: 'disabled', label: 'Not yet available' },
   },
