@@ -1,10 +1,11 @@
 # Roadmap — DungeonGPT (JS)
 
-_Status: active · updated 2026-07-05_
+_Status: active · updated 2026-07-06_
 
 The production rewrite of DungeonGPT — a React web app for creating fantasy
 characters and playing AI-narrated RPG campaigns. Deployed at dungeongpt.xyz on
-Cloudflare Pages + Workers with a Supabase database. (Based on the Python
+Cloudflare Pages + Workers with a self-hosted Postgres database reached via
+Cloudflare Hyperdrive. (Based on the Python
 prototype in the `DungeonGPT` repo.) `docs/OUTSTANDING_ISSUES.md` is the master
 backlog; see the `docs/` design docs for each system.
 
@@ -19,7 +20,7 @@ backlog; see the `docs/` design docs for each system.
 - [x] Multi-provider LLM narration (CF Workers AI in prod; OpenAI / Gemini / Claude in dev)
 - [x] Deterministic campaign-milestone engine (game-verifiable vs narrative milestones)
 - [x] Multi-turn conversation memory + prompt composition (party / location / history)
-- [x] Supabase Postgres persistence (heroes, sessions, conversations) with RLS via CF Worker proxy
+- [x] Postgres persistence (heroes, sessions, conversations) with row ownership enforced by the CF Worker proxy (Supabase originally; self-hosted via Cloudflare Hyperdrive since 2026-07)
 - [x] Manual save (with confirmation) + auto-save
 - [x] Octonion hub centralized auth (cross-game SSO, JWT validation in Worker)
 - [x] Responsive React UI (modals, dice roller, party sidebar, world/town maps, QR share)
@@ -36,10 +37,14 @@ backlog; see the `docs/` design docs for each system.
 - [x] Adventure Book: unified tabbed modal hub (Campaign / Side Quests / Codex / Party / AI) with a discovered-only bestiary + item codex (#51/#52)
 - [x] Campaign chaining: on completion, continue the next chapter inside the same save and world (`docs/QUEST_CHAINING_PLAN.md`)
 - [x] Premium groundwork: entitlement-gated templates, local content slot for private campaigns, production AI pinned to the CF Workers pool (Free vs Premium pool selector)
-- [x] Save sync Phases 1-2 (#54/#57): honest local fallback with save-status copy, local-first write-through, merged saved-games list with sync badges, auto-reconcile on auth restoration (`docs/SAVE_SYNC_PLAN.md`; Phase 3 rev-counter fork-on-conflict planned)
+- [x] Save sync Phases 1-3 (#54/#57): honest local fallback with save-status copy, local-first write-through, merged saved-games list with sync badges, auto-reconcile on auth restoration; rev-counter protocol with exact fork detection, Dropbox-style diverged-save parking, and hero-ledger union across forks (`docs/SAVE_SYNC_PLAN.md`)
 - [x] Hero mechanics invariants + append-only grant ledger (#58): load-time checker heals stats upward from XP/formula; maxHP raises preserve damage taken
 - [x] Explorable-site content wiring (#56): visible in-modal feedback, real harvesting, multi-quest injection, AI grounded on site contents; party-wide milestone XP + NPC naming/rehoming fixes (#55)
 - [x] World-gen wave: lake taming with water budget + shape variety (#59), world-level lake cap (#63), seam-matched coast depth, desert mesa art; hub-and-spoke town path network (#62); large-world chunk-assembly prototype behind `/debug/large-world` (#61, debug-only, `docs/LARGER_WORLDS_PLAN.md`)
+- [x] Data Postgres migrated off Supabase to a self-hosted box via Cloudflare Hyperdrive; worker DB routes rewritten to postgres.js (JWTs still verified against the Octonion hub)
+- [x] Entitlements service (#39): account tiers (free / member / premium / elite) in Postgres behind a worker endpoint, tier-aware client gates, Membership badge on the profile page; server-delivered premium story templates to entitled accounts (#40) with per-template `minTier` (#70)
+- [x] Water towns (#65, `docs/WATER_TOWNS_PLAN.md`): river-city and canal-city archetypes with directional canal tile art, estuary world-gen + once-per-save tier-gated stamping, boathouse/Boatwright, six dockside side quests; river doctrine wave (#67-69): water-biased settlement placement, riverside one-bank towns, coastal forks, open river mouths
+- [x] Themed town building palettes (#64): desert adobe + snow timber with tier-2 details (flat roofs, chimney smoke, icicles, jetty docks); world-map viewport with stepped zoom + tile culling, shipped dark for worlds above 10x10 (#60 step 2)
 
 ## Next
 
@@ -58,7 +63,7 @@ backlog; see the `docs/` design docs for each system.
 - [ ] Dungeon sub-maps (procedural caves / dungeons)
 - [ ] Layered terrain generation (heightmaps, rivers, erosion) — prototype exists
 - [ ] AI-generated world-map image tiles (AI loot narration de-scoped to a richer templated loot line, see OUTSTANDING_ISSUES #8)
-- [ ] Cloudflare D1 / R2 / KV migration (off Supabase)
+- [ ] Cloudflare D1 / R2 / KV migration (data Postgres is already off Supabase, self-hosted via Hyperdrive)
 - [ ] SSO expansion (Google, GitHub, Discord) + magic-link sign-in
 - [ ] Monitoring (Sentry), structured logging, automated Worker deploy, ops runbook
 - [ ] Graph-enhanced RAG for long-context quests (basic RAG shipped; see `docs/RAG_GRAPH_ENHANCEMENT_PLAN.md`)
