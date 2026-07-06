@@ -1033,10 +1033,12 @@ const NewGame = () => {
     // Slot 4: Boss Fight — needs enemy
     // (single field, so it's either complete or empty — no partial state)
 
-    // Check that at least one slot is fully complete
-    const anyComplete = s1Complete || s2Complete || s3Complete || slot4Enemy;
-    if (!anyComplete) {
-      return 'Please complete at least one milestone slot to create a campaign.';
+    // Floor raised to TWO complete slots (maintainer 2026-07-06: "we should
+    // force more than a single milestone though. That isn't particularly
+    // interesting."): a one-beat campaign is over before it starts.
+    const completeCount = [s1Complete, s2Complete, s3Complete, !!slot4Enemy].filter(Boolean).length;
+    if (completeCount < 2) {
+      return 'Please complete at least two milestone slots: a single-milestone campaign is over before it starts.';
     }
 
     if (slotErrors.length > 0) {
@@ -1205,8 +1207,8 @@ const NewGame = () => {
           is optional? It isn't obvious at all. That's a hole in the UX.") */}
       <p style={{ margin: '2px 0 10px', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
         Every slot below is optional. Complete the ones you want your quest to
-        include (each needs all of its fields filled); at least one full slot is
-        required, and empty slots are simply skipped.
+        include (each needs all of its fields filled); at least two full slots
+        are required, and empty slots are simply skipped.
       </p>
 
       {/* Slot 1: Item Search */}
