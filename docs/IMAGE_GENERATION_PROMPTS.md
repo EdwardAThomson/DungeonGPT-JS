@@ -157,7 +157,7 @@ To generate all template cards:
 const outputPath = path.join(__dirname, `../public/assets/templates/${item.key}.png`);
 ```
 
-## Generation queue (2026-07-03 — wave 3 additions)
+## Generation queue (2026-07-03 — wave 3 additions) - COMPLETE
 
 Style base for item icons: *"Painterly digital fantasy art with rich [material] textures,
 dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal
@@ -177,13 +177,13 @@ background (#2c2c2c). Professional 2D game asset."* Boss art follows the existin
 | `clockwork_god_core.webp` | A spherical brass-and-crystal mechanical heart, with visible gears and a golden inner glow. Painterly digital fantasy art with rich brass textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | low (t3) |
 | `crown_of_the_drowned_city.webp` | A coral-crusted diadem encrusted with pearls and seaweed, emitting a faint abyssal glow. Painterly digital fantasy art with rich coral textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | low (t3) |
 
-### Template cards (`public/assets/templates/`, 16:9 cinematic per existing card conventions)
+### Template cards (`public/assets/templates/`, 16:9 cinematic per existing card conventions) - COMPLETE
 | File | Prompt | Priority |
 |---|---|---|
 | `desert-expedition-t1.webp` | A merchant caravan crossing endless golden dunes toward a half-buried ruin, heat shimmer in the air under harsh noon light. Epic fantasy illustration, sweeping landscape with dramatic sky. Wide cinematic composition 16:9. Rich warm color palette, painterly style. No text, no UI, no borders. | HIGH (premium card renders bare gradient today) |
 | `frozen-frontier-t1.webp` | A small party of fur-cloaked adventurers approaching a palisade village in deep snow, a vibrant aurora overhead in the blue dusk sky. Epic fantasy illustration, sweeping landscape with dramatic sky. Wide cinematic composition 16:9. Cold blue and vibrant palette, painterly style. No text, no UI, no borders. | HIGH (premium card renders bare gradient today) |
 
-### Boss portraits (`public/assets/encounters/bosses/`)
+### Boss portraits (`public/assets/encounters/bosses/`) - COMPLETE
 | File | Prompt | Priority |
 |---|---|---|
 | `hoarfrost_wraith.webp` | A spectral figure made of jagged ice and frozen mist, with hollow glacial eyes, and a snowstorm swirling through its ethereal body. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (live premium boss; placeholder reuses shadow_stalker) |
@@ -202,10 +202,10 @@ now fails CI on any declared-but-missing art path.
 
 | File | Subject | Priority |
 |---|---|---|
-| `public/assets/templates/desert-expedition-t2.webp` | Ruined spire half-sunken in a dune sea under a bruised sky, colossal wyrm-shape coiling beneath the sand, 16:9 | HIGH (premium card renders gradient) |
-| `public/assets/templates/frozen-frontier-t2.webp` | False-spring thaw over a buried barrow field, gaunt spirit silhouette in the meltwater mist, 16:9 | HIGH (premium card renders gradient) |
-| `public/assets/encounters/bosses/dune_wyrm.webp` | Colossal sand-scaled wyrm erupting from a dune, sun-bleached bone frills [sand and scale] | medium (shares dragon_wyrm) |
-| `public/assets/encounters/bosses/pale_hunger.webp` | Gaunt frost-revenant famine spirit, ribs of ice, antlered skull, trailing snow [ice and bone] | medium (shares blood_wendigo) |
+| `public/assets/templates/desert-expedition-t2.webp` | Ruined spire half-sunken in a dune sea under a bruised sky, colossal wyrm-shape coiling beneath the sand. Epic fantasy illustration, sweeping landscape with dramatic sky. Wide cinematic composition 16:9. Rich desert palette, painterly style. No text, no UI, no borders. | HIGH (premium card renders gradient) |
+| `public/assets/templates/frozen-frontier-t2.webp` | False-spring thaw over a buried barrow field, gaunt spirit silhouette in the meltwater mist. Epic fantasy illustration, sweeping landscape with dramatic sky. Wide cinematic composition 16:9. Cold blue palette, painterly style. No text, no UI, no borders. | HIGH (premium card renders gradient) |
+| `public/assets/encounters/bosses/dune_wyrm.webp` | Colossal sand-scaled wyrm erupting from a dune, sun-bleached bone frills. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (shares dragon_wyrm) |
+| `public/assets/encounters/bosses/pale_hunger.webp` | Gaunt frost-revenant famine spirit, ribs of ice, antlered skull, trailing snow. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (shares blood_wendigo) |
 | `public/assets/encounters/cave_site_arrival.webp` | Yawning cave mouth in a rocky hillside, faint torchlight from within, adventurers' packs at the threshold. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (playtest 2026-07-04: cave arrival modal shows NO image — buildPoiEncounter carries no image field; interim option: reuse existing cave_entrance.webp) |
 | `public/assets/encounters/ruins_site_arrival.webp` | Crumbling moss-eaten ruins under a brooding sky, broken columns and a sunken vault stair, crows circling. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (same gap as caves; site arrival modals are imageless) |
 | `public/assets/encounters/goblin_hideout.webp` | A palisaded goblin war-camp built into a rocky hollow, crude totems and smoking cookfires, glinting eyes in the shadows. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (playtest 2026-07-04: goblin hideout arrival modal shows no image) |
