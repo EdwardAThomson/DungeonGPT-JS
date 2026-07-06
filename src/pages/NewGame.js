@@ -13,8 +13,8 @@ import { launchCampaign, mergeLocationNames } from "../game/campaignLauncher";
 import { llmService } from "../services/llmService";
 import { createLogger } from "../utils/logger";
 import { QUEST_ENEMIES, getEnemiesByTierAndTheme } from "../data/questEnemies";
-import { QUEST_BUILDINGS, NPC_ROLES, SEARCHABLE_ITEMS, POI_TYPES, THEME_DEFAULTS, THEME_NAMES } from "../data/questPickerData";
-import { isPremium, isThemePremium, isTemplatePremium, canUseTemplate } from "../game/entitlements";
+import { QUEST_BUILDINGS, NPC_ROLES, POI_TYPES, THEME_DEFAULTS, THEME_NAMES, getCustomQuestItems } from "../data/questPickerData";
+import { isPremium, isThemePremium, isTemplatePremium, canUseTemplate, canUseTheme } from "../game/entitlements";
 import { getTemplateSections } from "../game/templateSections";
 import { isOpeningAccessible } from "../game/campaignChain";
 import { resolveWaterTownAccess, waterTownWorldGenOptions } from "../game/waterTowns";
@@ -233,7 +233,7 @@ const NewGame = () => {
         const themeName = THEME_DEFAULTS[customTheme]?.name || 'Fantasy';
         const parts = [];
         if (slot1Item) {
-          const item = SEARCHABLE_ITEMS.find(i => i.id === slot1Item);
+          const item = availableQuestItems.find(i => i.id === slot1Item);
           if (item) parts.push(`seek the ${item.name}`);
         }
         if (slot4Enemy) {
@@ -867,7 +867,9 @@ const NewGame = () => {
     const town2 = slot2Town || 'Town B';
     const wildLoc = slot3Mountain || 'The Wilds';
 
-    const itemData = SEARCHABLE_ITEMS.find(i => i.id === slot1Item);
+    // Resolve through the tier/entitlement-filtered list (not the raw catalog view),
+    // so a stale or out-of-ceiling item id can never become a milestone spawn.
+    const itemData = availableQuestItems.find(i => i.id === slot1Item);
     const buildingData = QUEST_BUILDINGS.find(b => b.id === slot1Building);
     const roleData = NPC_ROLES.find(r => r.id === slot2Role);
     const building2Data = QUEST_BUILDINGS.find(b => b.id === slot2Building);
@@ -1064,6 +1066,35 @@ const NewGame = () => {
   };
 
   const availableEnemies = getEnemiesByTierAndTheme(customTier, customTheme);
+  // Entitlement-filtered item pool for slot 1: excludes flagship/unobtainable campaign
+  // rewards at every tier and caps rarity by campaign tier (tier 3 requires Membership;
+  // getCustomQuestItems coerces at the source). Used for the dropdown AND all lookups.
+  const availableQuestItems = getCustomQuestItems(customTier);
+
+  // Backstop coercions: state can outlive a lock (e.g. the account tier resolves to
+  // 'free' after mount, or a stored selection meets a newly gated catalog). Coerce the
+  // stale value out instead of trusting the disabled <option> to have prevented it.
+  useEffect(() => {
+    if (!canUseTheme(customTheme)) {
+      // No campaign genre is premium today (premium ids are world-biome themes), so
+      // this is a pure seam guard for when a gated theme is surfaced in this picker.
+      setCustomTheme('heroic-fantasy');
+    }
+  }, [customTheme]);
+  useEffect(() => {
+    if (slot1Item && !availableQuestItems.some(i => i.id === slot1Item)) {
+      setSlot1Item('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slot1Item, customTier]);
+  useEffect(() => {
+    // Same rule as the tab-switch handler, re-checked whenever the tier or theme state
+    // settles: a free account must never carry a premium (desert/snow) biome from a
+    // previewed template into a Custom/Freeform world.
+    if ((activeTab === 'custom' || activeTab === 'freeform') && !premiumUnlocked && isThemePremium(worldTheme)) {
+      setWorldTheme('grassland');
+    }
+  }, [activeTab, premiumUnlocked, worldTheme]);
 
   const renderCustomTab = () => (
     <div className="form-section story-settings-section">
@@ -1161,7 +1192,7 @@ const NewGame = () => {
             <RaritySelect
               value={slot1Item}
               onChange={setSlot1Item}
-              options={SEARCHABLE_ITEMS}
+              options={availableQuestItems}
               placeholder="Select item..."
               ariaLabel="Quest item"
               sortByRarity
@@ -1188,7 +1219,7 @@ const NewGame = () => {
         </div>
         {slot1Item && slot1Building && slot1Town && (
           <div style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-            Find the {SEARCHABLE_ITEMS.find(i => i.id === slot1Item)?.name} in the {QUEST_BUILDINGS.find(b => b.id === slot1Building)?.name.toLowerCase()} at {slot1Town}
+            Find the {availableQuestItems.find(i => i.id === slot1Item)?.name} in the {QUEST_BUILDINGS.find(b => b.id === slot1Building)?.name.toLowerCase()} at {slot1Town}
           </div>
         )}
       </div>

@@ -1,7 +1,8 @@
 // Picker data for the Custom campaign configurator.
 // Exposes game registries as selectable options for the milestone slot system.
 
-import { ITEM_CATALOG } from '../utils/inventorySystem';
+import { ITEM_CATALOG, RARITY_RANK, maxRarityRankForTier } from '../utils/inventorySystem';
+import { hasTier } from '../game/entitlements';
 
 // ============================================================
 // BUILDING TYPES
@@ -81,6 +82,52 @@ export const SEARCHABLE_ITEMS = Object.entries(ITEM_CATALOG)
         icon: item.icon,
         type: item.type || 'misc',
     }));
+
+// ============================================================
+// CUSTOM-QUEST ITEM FILTERING (entitlement pass, 2026-07-06)
+// ============================================================
+
+// Flagship campaign rewards and the t3 legendary shelf: bespoke finale/milestone
+// prizes (see inventorySystem.js ITEM_CATALOG and progressionLint KNOWN_GAPS
+// .unobtainableGear). They are campaign rewards, NOT custom-quest material, so they
+// are excluded from the custom builder for EVERY account tier — placing one as a
+// slot-1 objective would hand out a +3 artifact at level 1. bell_of_the_last_tide
+// in particular is the premium-only Drowned Bells finale reward (#70). Keep this
+// list in sync with the legendary shelf when t3 authoring adds rewards.
+export const CUSTOM_QUEST_EXCLUDED_ITEMS = Object.freeze([
+    'aegis_of_dawn',
+    'bell_of_the_last_tide',
+    'blade_of_the_shattered_throne',
+    'clockwork_god_core',
+    'crown_of_the_drowned_city',
+    'heart_of_the_last_winter',
+    'legendary_weapon',
+]);
+
+/**
+ * The items a custom quest may offer as a slot-1 objective at a given campaign tier.
+ * Single source of truth for the builder's item dropdown AND its lookups, so an id
+ * outside the ceiling can neither be listed nor resolved into a milestone.
+ *
+ * Two gates, mirroring the random-drop ceiling (maxRarityRankForTier):
+ *   1. The flagship/unobtainable set above is excluded at every tier.
+ *   2. Rarity is capped by campaign tier (t1: up to rare, t2: adds very_rare,
+ *      t3: everything). Tier 3 is a Members benefit (same lock as the builder's
+ *      Tier selector), so a non-member asking for tier 3 is coerced down to the
+ *      tier-2 ceiling at the source rather than trusting UI state.
+ *
+ * @param {number} tier - campaign tier (1-3), defaults to 1; invalid values clamp to 1
+ * @returns {Array<{id: string, name: string, rarity: string, icon: string, type: string}>}
+ */
+export const getCustomQuestItems = (tier = 1) => {
+    const requestedTier = Math.max(1, Number(tier) || 1);
+    const effectiveTier = requestedTier >= 3 && !hasTier('member') ? 2 : requestedTier;
+    const maxRank = maxRarityRankForTier(effectiveTier);
+    return SEARCHABLE_ITEMS.filter((item) =>
+        !CUSTOM_QUEST_EXCLUDED_ITEMS.includes(item.id) &&
+        (RARITY_RANK[item.rarity] ?? RARITY_RANK.common) <= maxRank
+    );
+};
 
 // ============================================================
 // POI TYPES
