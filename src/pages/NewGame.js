@@ -1355,7 +1355,7 @@ const NewGame = () => {
         </div>
         {slot4Enemy && QUEST_ENEMIES[slot4Enemy] && (
           <div style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-            Defeat {QUEST_ENEMIES[slot4Enemy].name} at the {POI_TYPES.find(p => p.id === slot3Poi)?.name || 'location'} in {slot3Mountain || 'The Wilds'}
+            Defeat {QUEST_ENEMIES[slot4Enemy].name} at the {POI_TYPES.find(p => p.id === slot3Poi)?.name || 'location'} in {slot3Mountain || (THEME_NAMES[customTheme] || THEME_NAMES['heroic-fantasy']).mountains[0]}
           </div>
         )}
       </div>
