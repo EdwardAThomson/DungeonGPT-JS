@@ -243,31 +243,64 @@ describe("PUT /conversations/:sessionId/name (metadata write)", () => {
 });
 
 describe("GET /premium-templates", () => {
+  // Full authored templates as stored: settings/milestones are the protected
+  // content and must NEVER appear in a teaser (maintainer 2026-07-06: cards
+  // show to everyone as upsell; content stays tier-gated).
   const rows = [
-    { id: 1, min_tier: "member", template: { title: "Desert" } },
-    { id: 2, min_tier: "premium", template: { title: "Snow" } },
+    {
+      id: "desert-x",
+      min_tier: "member",
+      template: {
+        id: "desert-x", name: "Desert", subtitle: "The Dunes", tier: 2,
+        levelRange: [3, 5], shortDescription: "Sand.", theme: "desert",
+        minTier: "member",
+        settings: { milestones: [{ id: 1, text: "secret" }], customNames: { towns: ["Hidden"] } },
+      },
+    },
+    {
+      id: "snow-x",
+      min_tier: "premium",
+      template: {
+        id: "snow-x", name: "Snow", subtitle: "The Drifts", tier: 3,
+        levelRange: [5, 7], shortDescription: "Cold.", theme: "snow",
+        minTier: "premium",
+        settings: { milestones: [{ id: 1, text: "secret" }] },
+      },
+    },
   ];
 
-  it("delivers an empty list (200, never an error) for free accounts", async () => {
+  it("free accounts get TEASERS for everything: card metadata, no content", async () => {
     sql.onQuery(/FROM premium_templates/, () => rows);
     const res = await call("/premium-templates");
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ templates: [] });
+    const body = (await res.json()) as { templates: any[] };
+    expect(body.templates).toHaveLength(2);
+    for (const t of body.templates) {
+      expect(t.teaser).toBe(true);
+      expect(t.premium).toBe(true);
+      expect(t.name).toBeTruthy();
+      expect(t.levelRange).toBeTruthy();
+      expect(t).not.toHaveProperty("settings");
+      expect(JSON.stringify(t)).not.toContain("secret");
+      expect(JSON.stringify(t)).not.toContain("Hidden");
+    }
+    expect(body.templates.map((t) => t.minTier)).toEqual(["member", "premium"]);
   });
 
-  it("delivers rows the caller's tier covers", async () => {
+  it("members get full covered rows and teasers above", async () => {
     sql.onQuery(/FROM account_tiers/, () => [{ tier: "member" }]);
     sql.onQuery(/FROM premium_templates/, () => rows);
-    const res = await call("/premium-templates");
-    expect(await res.json()).toEqual({ templates: [{ title: "Desert" }] });
+    const body = (await (await call("/premium-templates")).json()) as { templates: any[] };
+    expect(body.templates[0].settings.milestones).toHaveLength(1); // full
+    expect(body.templates[0].teaser).toBeUndefined();
+    expect(body.templates[1].teaser).toBe(true); // premium row teased
+    expect(body.templates[1]).not.toHaveProperty("settings");
   });
 
-  it("delivers everything at elite", async () => {
+  it("delivers everything full at elite", async () => {
     sql.onQuery(/FROM account_tiers/, () => [{ tier: "elite" }]);
     sql.onQuery(/FROM premium_templates/, () => rows);
-    const res = await call("/premium-templates");
-    expect(await res.json()).toEqual({
-      templates: [{ title: "Desert" }, { title: "Snow" }],
-    });
+    const body = (await (await call("/premium-templates")).json()) as { templates: any[] };
+    expect(body.templates.every((t) => !t.teaser && t.settings)).toBe(true);
   });
 });
