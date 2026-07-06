@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
@@ -15,8 +17,10 @@
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.18.0",
     "@cloudflare/workers-types": "^4.20250214.0",
     "typescript": "^5.7.0",
+    "vitest": "4.1.10",
     "wrangler": "^4.0.0"
   }
 }

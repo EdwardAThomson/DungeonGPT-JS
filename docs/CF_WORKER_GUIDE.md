@@ -224,3 +224,15 @@ const res = await fetch(`${CF_WORKER_URL}/api/embed`, {
 | Frontend LLM service | `src/services/llmService.js` |
 | Frontend embedding service | `src/services/embeddingService.js` |
 | Frontend model constants | `src/llm/llm_constants.js` |
+
+## Automated tests (vitest, in-runtime)
+
+`cd cf-worker && npm test` (or `npm run test:worker` from the root): vitest via
+@cloudflare/vitest-pool-workers runs the suite INSIDE workerd, fully offline
+(fake Postgres seam, stubbed AI binding, mocked fetch incl. a real-JWKS JWT
+path), no credentials needed. Branch-gated premium tests in test/premium/
+self-activate when the premium modules exist (probe import + skipIf). The
+config deliberately does not inherit wrangler.toml bindings (the [ai] binding
+would demand a Cloudflare token at pool startup); it parses compatibility
+date/flags from wrangler.toml instead. CI: run the suite before wrangler
+deploy in .github/workflows/deploy-worker.yml.

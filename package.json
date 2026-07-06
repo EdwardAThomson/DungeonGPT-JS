@@ -35,6 +35,7 @@
     "start": "react-scripts start",
     "build": "CI=false react-scripts build",
     "test": "react-scripts test",
+    "test:worker": "npm --prefix cf-worker test",
     "test:e2e": "npx playwright test",
     "test:e2e:headed": "npx playwright test --headed",
     "test:e2e:express": "npx playwright test express-smoke-new-game-save-reload",
