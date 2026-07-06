@@ -3,6 +3,15 @@ import { Link } from 'react-router-dom';
 import SafeMarkdownMessage from './SafeMarkdownMessage';
 import NarrativeHookChips from './NarrativeHookChips';
 
+// Player-action length guard (maintainer 2026-07-06): the worker rejects
+// composed prompts over 32k chars, of which the typed action is one slice
+// alongside the DM protocol, context, and history. 2,000 chars is far more
+// than any action needs while leaving the composed prompt enormous headroom.
+// No auto-truncation: near the limit a live counter appears, over it the
+// counter turns red and Send is blocked.
+export const MAX_ACTION_CHARS = 2000;
+const COUNTER_SHOW_AT = 1700;
+
 const GameMainPanel = ({
   campaignGoal,
   townName,
@@ -122,7 +131,7 @@ const GameMainPanel = ({
       <div className="game-lower-section">
         <form onSubmit={aiAvailable ? onSubmit : (e) => e.preventDefault()}>
           <label htmlFor="user-action-input" className="sr-only">Your action</label>
-          <div className="user-input-wrap">
+          <div className="user-input-wrap" style={{ position: 'relative' }}>
             <textarea
               id="user-action-input"
               value={userInput}
@@ -137,6 +146,20 @@ const GameMainPanel = ({
               disabled={!aiAvailable || !hasAdventureStarted || isLoading}
               aria-label="Type your action or command"
             />
+            {aiAvailable && userInput.length >= COUNTER_SHOW_AT && (
+              <div
+                className="action-char-counter"
+                style={{
+                  position: 'absolute', right: 10, bottom: 6, fontSize: 11,
+                  color: userInput.length > MAX_ACTION_CHARS ? '#c33' : 'var(--text-secondary)',
+                  fontWeight: userInput.length > MAX_ACTION_CHARS ? 700 : 400,
+                }}
+                role="status"
+              >
+                {userInput.length.toLocaleString()} / {MAX_ACTION_CHARS.toLocaleString()}
+                {userInput.length > MAX_ACTION_CHARS ? ': too long to send' : ''}
+              </div>
+            )}
             {/* Guests can't type to the DM — a click here is peak intent, so prompt to sign in. */}
             {!aiAvailable && (
               <button
@@ -148,7 +171,7 @@ const GameMainPanel = ({
             )}
           </div>
           {aiAvailable ? (
-            <button type="submit" className="game-send-button" disabled={!hasAdventureStarted || !userInput.trim() || isLoading}>
+            <button type="submit" className="game-send-button" disabled={!hasAdventureStarted || !userInput.trim() || isLoading || userInput.length > MAX_ACTION_CHARS}>
               {isLoading ? '...' : '↑ Send'}
             </button>
           ) : (

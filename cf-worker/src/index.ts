@@ -5,6 +5,7 @@ import { embedRoutes } from "./routes/embed";
 import { imageRoutes } from "./routes/image";
 import dbRoutes from "./routes/db";
 import { requireAuth } from "./middleware/auth";
+import { rateLimit } from "./middleware/rateLimit";
 import type { Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -66,6 +67,14 @@ app.route("/api/embed", embedRoutes);
 app.route("/api/ai", aiRoutes);
 app.route("/api/image", imageRoutes);
 app.use("/api/db/*", requireAuth);
+// Rate limiting (backlog #12): mutating db calls share the 'db-write' bucket.
+// GET stays unthrottled on purpose (sign-in reads: entitlements, premium-templates,
+// saves list must stay cheap; rationale in middleware/rateLimit.ts). The /api/ai
+// and /api/embed buckets are applied inside their route files, after requireAuth.
+app.use(
+  "/api/db/*",
+  rateLimit("db-write", { methods: ["POST", "PUT", "PATCH", "DELETE"] })
+);
 app.route("/api/db", dbRoutes);
 
 app.notFound((c) =>

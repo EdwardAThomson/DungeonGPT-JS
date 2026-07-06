@@ -22,7 +22,9 @@ interface GenerateOptions {
   systemPrompt?: string;
 }
 
-function sanitizeResponse(text: string): string {
+// Exported so the premium OpenRouter pool (services/openrouter.ts) applies the
+// exact same pass; keep this the single sanitization implementation on the Worker.
+export function sanitizeResponse(text: string): string {
   if (!text) return "";
 
   let sanitized = text;
