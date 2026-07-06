@@ -1,6 +1,7 @@
 import { apiFetch, getErrorMessage } from './apiClient';
 import { supabase } from './supabaseClient';
 import { localGameStore, isUnsyncedLocalRow, isValidBaseRev, rowToPayload } from './localGameStore';
+import { ragStore } from './ragStore';
 import { unionLedgers } from '../game/heroLedger';
 import { createLogger } from '../utils/logger';
 
@@ -506,9 +507,19 @@ export const conversationsApi = {
   // Deleting while signed in removes BOTH copies, otherwise the merged list would
   // resurrect the row from the surviving store. A cloud miss (e.g. the row only
   // ever lived on this device) still counts as success when a local copy existed.
+  // Either way the save's RAG vectors are purged too (#17): they are keyed by
+  // sessionId in their own IndexedDB, so without this a deleted save strands its
+  // embeddings forever. Guests included, and parked diverged copies too: a
+  // "<sid>-local-<rand>" copy is its own session id, so deleting it through this
+  // same path purges exactly its own index (vectors embedded while the ORIGINAL
+  // id was live stay with the original save, which owns them).
   async remove(sessionId) {
     const route = await resolveRoute();
-    if (!route.useCloud) return localGameStore.remove(sessionId);
+    if (!route.useCloud) {
+      const result = await localGameStore.remove(sessionId);
+      await purgeRagIndex(sessionId);
+      return result;
+    }
 
     let localRow = null;
     try {
@@ -531,9 +542,21 @@ export const conversationsApi = {
       }
     }
     if (cloudError && !localRow) throw cloudError;
+    await purgeRagIndex(sessionId);
     return result || { success: true };
   }
 };
+
+// #17: best-effort RAG-index cleanup for a deleted save. Never blocks or fails
+// the delete itself; a purge error just means the vectors linger (yesterday's
+// status quo) until the next delete or a manual reset.
+async function purgeRagIndex(sessionId) {
+  try {
+    await ragStore.clearSession(sessionId);
+  } catch (e) {
+    logger.warn(`RAG index purge failed for ${sessionId} (embeddings may linger)`, e);
+  }
+}
 
 // Short random suffix for parking a diverged local copy under its own session_id
 // (same naming as the Phase 1 reconcile parking: "<sid>-local-<rand>").

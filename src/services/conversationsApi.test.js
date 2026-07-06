@@ -10,6 +10,7 @@ import { conversationsApi, getLastKnownAuth, _resetAuthStateForTests, _resetRevS
 import { supabase } from './supabaseClient';
 import { localGameStore } from './localGameStore';
 import { apiFetch } from './apiClient';
+import { ragStore } from './ragStore';
 
 jest.mock('./supabaseClient', () => ({
   supabase: { auth: { getSession: jest.fn() } },
@@ -51,6 +52,11 @@ jest.mock('./apiClient', () => ({
   getErrorMessage: jest.fn(),
 }));
 
+// #17: save deletion also purges the save's RAG vectors (keyed by sessionId).
+jest.mock('./ragStore', () => ({
+  ragStore: { clearSession: jest.fn() },
+}));
+
 const getSession = supabase.auth.getSession;
 
 const sessionPresent = () =>
@@ -85,6 +91,7 @@ beforeEach(() => {
   localGameStore.remove.mockResolvedValue({ success: true });
   localGameStore.markSynced.mockResolvedValue(null);
   localGameStore.updateName.mockResolvedValue(null);
+  ragStore.clearSession.mockResolvedValue();
 });
 
 const cloudFailsOnce = () => apiFetch.mockRejectedValueOnce(new Error('worker down'));
@@ -392,6 +399,44 @@ describe('conversationsApi.remove and updateName across both stores (Phase 2)', 
     localGameStore.getById.mockResolvedValueOnce({ session_id: 's1', synced: true });
     await conversationsApi.updateName('s1', 'New Name');
     expect(localGameStore.updateName).not.toHaveBeenCalled();
+  });
+});
+
+describe('RAG index purge on save delete (#17)', () => {
+  test('signed in: deleting a save purges its RAG vectors too', async () => {
+    sessionPresent();
+    localGameStore.getById.mockResolvedValueOnce({ session_id: 's1' });
+    await conversationsApi.remove('s1');
+    expect(ragStore.clearSession).toHaveBeenCalledWith('s1');
+  });
+
+  test('guest: local-only deletes purge the vectors as well', async () => {
+    sessionAbsent();
+    await conversationsApi.remove('s1');
+    expect(ragStore.clearSession).toHaveBeenCalledWith('s1');
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  test('parked diverged copies purge exactly their own index (own session id)', async () => {
+    sessionPresent();
+    localGameStore.getById.mockResolvedValueOnce({ session_id: 's1-local-ab12cd' });
+    await conversationsApi.remove('s1-local-ab12cd');
+    expect(ragStore.clearSession).toHaveBeenCalledTimes(1);
+    expect(ragStore.clearSession).toHaveBeenCalledWith('s1-local-ab12cd');
+  });
+
+  test('a failed purge never fails the delete (best effort)', async () => {
+    sessionAbsent();
+    ragStore.clearSession.mockRejectedValueOnce(new Error('IDB unavailable'));
+    await expect(conversationsApi.remove('s1')).resolves.toEqual({ success: true });
+  });
+
+  test('a delete that failed outright (no copy anywhere) does not purge', async () => {
+    sessionPresent();
+    localGameStore.getById.mockResolvedValueOnce(null);
+    apiFetch.mockRejectedValueOnce(new Error('404'));
+    await expect(conversationsApi.remove('s1')).rejects.toThrow();
+    expect(ragStore.clearSession).not.toHaveBeenCalled();
   });
 });
 

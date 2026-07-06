@@ -20,6 +20,7 @@ import { addGold, addItem, ITEM_CATALOG } from '../utils/inventorySystem';
 import { replaceHeroInParty, normalizeParty, heroUid } from '../utils/partyUtils';
 import { composeMovementNarrativePrompt, composeNpcMeetingPrompt } from '../game/promptComposer';
 import { composeLocalMovementNarrative, composeLocalAmbientNarrative, composeNpcMeeting } from '../game/localNarrator';
+import { composeRewardSentence, composeLootSentence, narrateRewardMessages } from '../game/rewardNarrator';
 import { generateMovementNarrative } from '../game/movementController';
 import { buildSaveName } from '../game/saveController';
 import { conversationsApi } from '../services/conversationsApi';
@@ -623,12 +624,13 @@ const Game = ({ resumeConversation = null }) => {
           // Quest rewards are party-wide too (#55): full XP each, loot via lead.
           const stepResult = applyPartyRewardsToAll({ party, rewards: stepRewards });
           party = stepResult.updatedParty;
-          const rewardLines = [...stepResult.rewardMessages];
+          // #8: display copy only; the machine rewardMessages stay untouched.
+          const rewardLines = narrateRewardMessages(stepResult.rewardMessages);
           const grantEvents = [...(stepResult.ledgerEvents || [])];
           if (c.questCompleted && c.questRewards) {
             const questResult = applyPartyRewardsToAll({ party, rewards: c.questRewards });
             party = questResult.updatedParty;
-            rewardLines.push(...questResult.rewardMessages);
+            rewardLines.push(...narrateRewardMessages(questResult.rewardMessages));
             grantEvents.push(...(questResult.ledgerEvents || []));
           }
           appendHeroLedger(grantEvents, `sidequest:${c.questId}`); // grant ledger (9.2)
@@ -637,7 +639,7 @@ const Game = ({ resumeConversation = null }) => {
           // Surface the XP/loot payout with the completion line (it used to be silent),
           // and mirror it into the site notice when the step completed inside a site.
           const headline = c.questCompleted ? `🎉 Side quest complete: ${c.title}!` : `✓ ${c.milestone.text}`;
-          const content = rewardLines.length > 0 ? `${headline}\n${rewardLines.join(' · ')}` : headline;
+          const content = rewardLines.length > 0 ? `${headline}\n${rewardLines.join(' ')}` : headline;
           interactionHook.setConversation(prev => [...prev, { role: 'system', content }]);
           if (mapHook.isInsideSite) mapHook.pushSiteNotice(content);
         });
@@ -685,10 +687,13 @@ const Game = ({ resumeConversation = null }) => {
         }
       }
 
-      // Chat celebration message (also serves as context for the AI's next narration)
-      const rewardSummary = rewards.xp > 0 || rewards.gold > 0
-        ? `\nRewards: ${rewards.xp > 0 ? `+${rewards.xp} XP` : ''}${rewards.gold > 0 ? ` +${rewards.gold} gold` : ''}${rewards.items.length > 0 ? ` + ${rewards.items.join(', ')}` : ''}`
-        : '';
+      // Chat celebration message (also serves as context for the AI's next narration).
+      // #8: seeded templated sentence instead of the flat "+50 XP +12 gold" line
+      // (milestone XP is party-wide, #55, so the sentence says so).
+      const rewardSentence = composeRewardSentence({
+        xp: rewards.xp, gold: rewards.gold, items: rewards.items, xpPartyWide: true
+      });
+      const rewardSummary = rewardSentence ? `\n${rewardSentence}` : '';
       const celebrationMsg = {
         role: 'system',
         content: result.campaignComplete
@@ -762,10 +767,10 @@ const Game = ({ resumeConversation = null }) => {
       appendHeroLedger(events, 'site');
     }
     const itemNames = (loot.items || []).map(k => (ITEM_CATALOG[k]?.name) || k);
-    const parts = [];
-    if (loot.gold) parts.push(`${loot.gold} gold`);
-    if (itemNames.length) parts.push(itemNames.join(', '));
-    const message = parts.length > 0 ? `💰 You find ${parts.join(' and ')}.` : '💰 You find nothing of value.';
+    // #8: seeded templated sentence instead of the flat "You find X and Y" line;
+    // the 💰 marker prefix stays (site notices key off it visually).
+    const lootSentence = composeLootSentence({ gold: loot.gold || 0, items: itemNames });
+    const message = lootSentence ? `💰 ${lootSentence}` : '💰 You find nothing of value.';
     interactionHook.setConversation(prev => [...prev, { role: 'system', content: message }]);
     // The chat log is hidden behind the fullscreen map modal, so mirror the grant into
     // the in-modal site notice (playtest R1/R4-R6: pickups looked like nothing happened).
@@ -910,19 +915,20 @@ const Game = ({ resumeConversation = null }) => {
       // Turn-in rewards are party-wide (#55): full XP each, loot via lead.
       const stepResult = applyPartyRewardsToAll({ party, rewards: c.rewards || { xp: 0, gold: 0, items: [] } });
       party = stepResult.updatedParty;
-      const rewardLines = [...stepResult.rewardMessages];
+      // #8: display copy only; the machine rewardMessages stay untouched.
+      const rewardLines = narrateRewardMessages(stepResult.rewardMessages);
       const grantEvents = [...(stepResult.ledgerEvents || [])];
       if (c.questCompleted && c.questRewards) {
         const questResult = applyPartyRewardsToAll({ party, rewards: c.questRewards });
         party = questResult.updatedParty;
-        rewardLines.push(...questResult.rewardMessages);
+        rewardLines.push(...narrateRewardMessages(questResult.rewardMessages));
         grantEvents.push(...(questResult.ledgerEvents || []));
       }
       appendHeroLedger(grantEvents, `sidequest:${c.questId}`); // grant ledger (9.2)
       // Codex (#51): turn-in reward items are discoveries.
       recordItemsInCodex([...((c.rewards?.items) || []), ...((c.questCompleted && c.questRewards?.items) || [])]);
       const headline = c.questCompleted ? `🎉 Side quest complete: ${c.title}!` : `✓ ${c.milestone.text}`;
-      const content = rewardLines.length > 0 ? `${headline}\n${rewardLines.join(' · ')}` : headline;
+      const content = rewardLines.length > 0 ? `${headline}\n${rewardLines.join(' ')}` : headline;
       interactionHook.setConversation(prev => [...prev, { role: 'system', content }]);
     });
     setSelectedHeroes(party);

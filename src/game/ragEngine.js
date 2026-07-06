@@ -4,6 +4,27 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('rag-engine');
 
+// Embedding version stamp (#18): mirrors EMBEDDING_MODEL in
+// cf-worker/src/routes/embed.ts; bump BOTH together if the worker's embedding
+// model ever changes. Vectors from different models live in incompatible spaces,
+// so retrieval against mixed vectors silently corrupts; the stamp lets us detect
+// and exclude stale ones instead.
+//
+// Compatibility policy:
+// - MISSING stamp (pre-#18 entries): treated as current: every vector written
+//   before this landed came from this same model, so no migration is needed.
+// - MISMATCHED stamp: excluded from retrieval (logged once per session) and
+//   treated as NOT indexed by backfill/getIndexStatus, so the existing
+//   load-time sync flow (useRagSync auto-backfill) re-embeds and overwrites it
+//   in place (same `${sessionId}-${msgIndex}` id); that IS the re-index path.
+export const EMBEDDING_MODEL_VERSION = '@cf/baai/bge-base-en-v1.5';
+
+const isCurrentVersion = (entry) =>
+  !entry.modelVersion || entry.modelVersion === EMBEDDING_MODEL_VERSION;
+
+// Log the stale-vector exclusion once per session per app run, not per query.
+const staleWarnedSessions = new Set();
+
 /**
  * Cosine similarity between two vectors.
  */
@@ -35,6 +56,7 @@ export const embedAndStore = async (sessionId, text, metadata) => {
       msgIndex: metadata.msgIndex,
       timestamp: metadata.timestamp || Date.now(),
       tags: metadata.tags || [],
+      modelVersion: EMBEDDING_MODEL_VERSION, // #18
     });
     logger.info(`Indexed event ${metadata.msgIndex} for session ${sessionId}`);
     return true;
@@ -56,7 +78,21 @@ export const query = async (sessionId, queryText, options = {}) => {
 
   try {
     const queryVector = await embeddingService.embedSingle(queryText);
-    const entries = await ragStore.getBySession(sessionId);
+    const allEntries = await ragStore.getBySession(sessionId);
+
+    // #18: vectors stamped with a DIFFERENT model are excluded: comparing them
+    // against a current-model query vector is meaningless. Unstamped entries
+    // (pre-#18) are current by definition and stay in.
+    const entries = allEntries.filter(isCurrentVersion);
+    const staleCount = allEntries.length - entries.length;
+    if (staleCount > 0 && !staleWarnedSessions.has(sessionId)) {
+      staleWarnedSessions.add(sessionId);
+      logger.warn(
+        `Excluding ${staleCount} stale vector(s) for session ${sessionId} ` +
+        `(embedded with a different model than ${EMBEDDING_MODEL_VERSION}); ` +
+        `the next load-time backfill will re-index them.`
+      );
+    }
 
     if (entries.length === 0) return [];
 
@@ -95,16 +131,17 @@ export const backfill = async (sessionId, conversation, options = {}) => {
 
   if (embeddable.length === 0) return 0;
 
-  // Check what's already indexed
-  const existingCount = await ragStore.countBySession(sessionId);
+  // Check what's already indexed. Entries stamped with a different embedding
+  // model (#18) do NOT count: they get re-embedded below, and the fresh put()
+  // overwrites the stale entry in place (same `${sessionId}-${msgIndex}` id).
+  const existing = (await ragStore.getBySession(sessionId)).filter(isCurrentVersion);
+  const existingCount = existing.length;
   if (existingCount >= embeddable.length) {
     logger.info(`Session ${sessionId} already fully indexed (${existingCount} entries)`);
     if (onProgress) onProgress(existingCount, embeddable.length);
     return 0;
   }
 
-  // Get existing entries to know which msgIndexes are already done
-  const existing = await ragStore.getBySession(sessionId);
   const indexedSet = new Set(existing.map(e => e.msgIndex));
 
   // Most recent first
@@ -131,6 +168,7 @@ export const backfill = async (sessionId, conversation, options = {}) => {
         msgIndex: index,
         timestamp: Date.now(),
         tags: [],
+        modelVersion: EMBEDDING_MODEL_VERSION, // #18
       }));
 
       await ragStore.putBatch(entries);
@@ -155,7 +193,9 @@ export const backfill = async (sessionId, conversation, options = {}) => {
  */
 export const getIndexStatus = async (sessionId, conversation) => {
   const embeddableCount = conversation.filter(m => m.role === 'ai').length;
-  const indexedCount = await ragStore.countBySession(sessionId);
+  // #18: stale-model vectors count as unindexed, so a model change surfaces as
+  // 'partial'/'empty' and useRagSync's auto-backfill re-indexes on next load.
+  const indexedCount = (await ragStore.getBySession(sessionId)).filter(isCurrentVersion).length;
 
   let status = 'current';
   if (indexedCount === 0) status = 'empty';
