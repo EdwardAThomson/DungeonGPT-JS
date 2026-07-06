@@ -450,6 +450,11 @@ export const QUEST_ENEMIES = {
         difficulty: 'deadly',
         dc: 20, // #43 retune: deadly's default DC 25 is a ~1% lottery; pinned into the sim-validated band
         multiRound: true,
+        // Finale mirror: this entry duplicates a t2 CAMPAIGN FINALE block for
+        // side/custom-quest use. Tuned for intended level 5 (42-48% win, 3-hero
+        // mid); the balance wave's standing recommendation is that anything
+        // pulling it gates at Lv 5, not the generic t2 gate.
+        recommendedLevel: 5,
         enemyHP: 250,
         dealsDamage: true,
         damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d6' },
@@ -530,6 +535,11 @@ export const QUEST_ENEMIES = {
         difficulty: 'deadly',
         dc: 19, // #43 retune: deadly's default DC 25 is a ~1% lottery; pinned into the sim-validated band
         multiRound: true,
+        // Finale mirror: this entry duplicates a t2 CAMPAIGN FINALE block for
+        // side/custom-quest use. Tuned for intended level 5 (42-48% win, 3-hero
+        // mid); the balance wave's standing recommendation is that anything
+        // pulling it gates at Lv 5, not the generic t2 gate.
+        recommendedLevel: 5,
         enemyHP: 300,
         dealsDamage: true,
         damage: { criticalFailure: '4d8+4', failure: '2d6+2', success: '1d6' },
@@ -745,6 +755,11 @@ export const QUEST_ENEMIES = {
         difficulty: 'deadly',
         dc: 20, // #43 retune: deadly's default DC 25 is a ~1% lottery; pinned into the sim-validated band
         multiRound: true,
+        // Finale mirror: this entry duplicates a t2 CAMPAIGN FINALE block for
+        // side/custom-quest use. Tuned for intended level 5 (42-48% win, 3-hero
+        // mid); the balance wave's standing recommendation is that anything
+        // pulling it gates at Lv 5, not the generic t2 gate.
+        recommendedLevel: 5,
         enemyHP: 250,
         dealsDamage: true,
         damage: { criticalFailure: '5d6+5', failure: '2d6+2', success: '1d6' },

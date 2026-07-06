@@ -57,6 +57,16 @@ export const buildPoiEncounter = (targetTile) => {
   if (!targetTile.poi) return null;
   const poiType = targetTile.poiType || targetTile.poi;
   const NICE_NAMES = { cave_entrance: 'a Cave', cave: 'a Cave', ruins: 'Ruins', forest: 'a Forest', hills: 'the Hills', mountain: 'the Mountains' };
+  const POI_IMAGES = {
+    cave_entrance: '/assets/encounters/cave_site_arrival.webp',
+    cave: '/assets/encounters/cave_site_arrival.webp',
+    ruins: '/assets/encounters/ruins_site_arrival.webp',
+    goblin_hideout: '/assets/encounters/goblin_hideout.webp',
+    mountain: '/assets/encounters/mountain_site_arrival.webp',
+    // Interim art until the queued bespoke arrivals land (IMAGE_GENERATION_PROMPTS):
+    forest: '/assets/encounters/forest_beast.webp',
+    hills: '/assets/encounters/mountain_pass.webp',
+  };
   // Milestone POIs carry their authored display name on the tile (poiName); named mountain
   // ranges show their range name ("the Grey Moors", not "the Mountains"); the raw poi id
   // is only ever a last resort and gets title-cased so it never renders underscored.
@@ -65,6 +75,7 @@ export const buildPoiEncounter = (targetTile) => {
   return {
     name: displayName,
     poiType,
+    image: POI_IMAGES[poiType] || null,
     isMilestonePoi: !!targetTile.milestonePoi,
     description: targetTile.descriptionSeed || `You have arrived at ${displayName}.`,
     canEnter: ['town', 'city', 'village', 'hamlet', 'dungeon', 'cave_entrance', 'cave', 'ruins', 'forest', 'hills', 'mountain'].includes(poiType),

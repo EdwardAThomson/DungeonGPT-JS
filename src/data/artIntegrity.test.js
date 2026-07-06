@@ -23,6 +23,7 @@ const DATA_SOURCES = [
   'src/data/questEnemies.js',
   'src/data/sideQuests.js',
   'src/utils/inventorySystem.js',
+  'src/game/worldMoveController.js', // POI arrival images (playtest 2026-07-06: these silently 404'd when they pointed at queued-but-ungenerated art)
   ...fs.readdirSync(path.join(__dirname, 'encounters'))
     .filter((f) => f.endsWith('.js'))
     .map((f) => `src/data/encounters/${f}`)

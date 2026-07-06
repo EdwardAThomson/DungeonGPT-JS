@@ -935,7 +935,13 @@ const NewGame = () => {
         building: null,
         encounter: { ...enemyData },
         rewards: { xp: customTier === 1 ? 50 : 300, gold: customTier === 1 ? '1d10' : '3d20', items: [] },
-        minLevel: customTier === 1 ? 2 : customTier + 2,
+        // Finale-mirror bosses carry a recommendedLevel (t2 finales are tuned
+        // for Lv 5); honor it over the generic tier gate so a custom quest
+        // cannot serve a 42%-at-Lv5 boss behind a Lv 4 gate.
+        minLevel: Math.max(
+          customTier === 1 ? 2 : customTier + 2,
+          enemyData.recommendedLevel || 0
+        ),
       });
     }
 
