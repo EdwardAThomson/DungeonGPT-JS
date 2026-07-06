@@ -221,12 +221,13 @@ export const AiEngineSettings = ({
           </button>
         )}
       </div>
-      {/* Active-engine resolver (maintainer 2026-07-06): locally the provider
-          dropdown and the pool pills can disagree (a non-cf-workers provider
-          routes to the Express dev server and bypasses the pool entirely), which
-          was confusing. This line always states what will actually handle the
-          next request. */}
-      {(() => {
+      {/* Active-engine resolver: DEV ONLY. Locally the provider dropdown and the
+          pool pills can disagree (a non-cf-workers provider routes to the Express
+          dev server and bypasses the pool), so this line states what will
+          actually handle the next request. Production has no dropdown to disagree
+          with, so the pool pills alone are the truth and this line would be
+          clutter (maintainer 2026-07-06). */}
+      {SHOW_PROVIDER_CHOICE && (() => {
         const onWorker = selectedProvider === 'cf-workers';
         return (
           <div
@@ -243,7 +244,7 @@ export const AiEngineSettings = ({
               premiumActive ? (
                 <span><strong style={{ color: 'var(--text)' }}>Active engine:</strong> Cloudflare Worker, ✨ Premium pool, {PREMIUM_MODEL_LABEL}.<br />The model picker below is ignored while Premium is active.</span>
               ) : (
-                <span><strong style={{ color: 'var(--text)' }}>Active engine:</strong> Cloudflare Worker, ⚡ Free pool, model: {selectedModel || DEFAULT_MODELS['cf-workers']}</span>
+                <span><strong style={{ color: 'var(--text)' }}>Active engine:</strong> Cloudflare Worker, ⚡ Free pool</span>
               )
             ) : (
               <span>
