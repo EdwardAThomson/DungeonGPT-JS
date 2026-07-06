@@ -27,6 +27,28 @@ import { storyTemplates } from '../data/storyTemplates';
 import { isTemplatePremium } from './entitlements';
 
 /**
+ * Canonical tier -> level bands, the single source of truth for every generic
+ * "Tier N (Lv X-Y)" label and requirement gate (maintainer 2026-07-06: the
+ * custom builder and the ready-made sections had drifted apart). Individual
+ * templates still carry their own levelRange for their cards; these bands
+ * describe the TIER as a concept: derived from the authored catalog census
+ * (t1 all 1-2; t2 3-5 with a couple of 3-4s inside the band; t3 4-7, entered
+ * at 5 for a standard party).
+ */
+export const TIER_LEVEL_BANDS = Object.freeze({
+    1: Object.freeze([1, 2]),
+    2: Object.freeze([3, 5]),
+    3: Object.freeze([5, 7]),
+});
+
+/** "Lv 3-5" style label for a tier. */
+export const tierBandLabel = (tier) => {
+    const band = TIER_LEVEL_BANDS[tier];
+    return band ? `Lv ${band[0]}-${band[1]}` : '';
+};
+
+
+/**
  * Split a template catalog into the New Game picker's sections.
  * @param {Array<object>} [templates] - defaults to the live storyTemplates array
  * @returns {{ freeStarters: Array, premiumStarters: Array, seasoned: Array, premiumSeasoned: Array, legendary: Array, premiumLegendary: Array }}

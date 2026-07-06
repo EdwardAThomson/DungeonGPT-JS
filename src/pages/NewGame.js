@@ -15,7 +15,7 @@ import { createLogger } from "../utils/logger";
 import { QUEST_ENEMIES, getEnemiesByTierAndTheme } from "../data/questEnemies";
 import { QUEST_BUILDINGS, NPC_ROLES, POI_TYPES, THEME_DEFAULTS, THEME_NAMES, getCustomQuestItems } from "../data/questPickerData";
 import { isPremium, isThemePremium, isTemplatePremium, canUseTemplate, canUseTheme } from "../game/entitlements";
-import { getTemplateSections } from "../game/templateSections";
+import { getTemplateSections, TIER_LEVEL_BANDS, tierBandLabel } from "../game/templateSections";
 import { isOpeningAccessible } from "../game/campaignChain";
 import { resolveWaterTownAccess, waterTownWorldGenOptions } from "../game/waterTowns";
 
@@ -780,7 +780,7 @@ const NewGame = () => {
             🐲 Legendary Campaigns (Tier 3)
           </h3>
           <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-            The realm's greatest tales, made for heroes of Lv 5 and beyond.
+            The realm's greatest tales, made for heroes of Lv {TIER_LEVEL_BANDS[3][0]} and beyond.
           </p>
           {legendaryTemplates.length > 0 && (
             <div style={gridStyle}>
@@ -1149,11 +1149,15 @@ const NewGame = () => {
               minLevel math already scales with the chosen tier. */}
           {(() => {
             const highestLevel = heroes.reduce((m, h) => Math.max(m, h.level || 1), 0);
-            const t2Locked = highestLevel < 3;
-            const t3Locked = highestLevel < 5 || !premiumUnlocked;
-            const t3Reason = !premiumUnlocked && highestLevel < 5
-              ? '🔒 Members + Lv 5 hero'
-              : !premiumUnlocked ? '🔒 Members' : 'needs a Lv 5+ hero';
+            // Gates derive from the canonical bands so the custom page can never
+            // drift from the ready-made sections again (maintainer 2026-07-06).
+            const t2Entry = TIER_LEVEL_BANDS[2][0];
+            const t3Entry = TIER_LEVEL_BANDS[3][0];
+            const t2Locked = highestLevel < t2Entry;
+            const t3Locked = highestLevel < t3Entry || !premiumUnlocked;
+            const t3Reason = !premiumUnlocked && highestLevel < t3Entry
+              ? `🔒 Members + Lv ${t3Entry} hero`
+              : !premiumUnlocked ? '🔒 Members' : `needs a Lv ${t3Entry}+ hero`;
             return (
               <select
                 value={customTier}
@@ -1163,12 +1167,12 @@ const NewGame = () => {
                 }}
                 style={selectStyle}
               >
-                <option value={1}>Tier 1 (Lv 1-2)</option>
+                <option value={1}>Tier 1 ({tierBandLabel(1)})</option>
                 <option value={2} disabled={t2Locked}>
-                  Tier 2 (Lv 3-4){t2Locked ? ' — needs a Lv 3+ hero' : ''}
+                  Tier 2 ({tierBandLabel(2)}){t2Locked ? ` — needs a Lv ${t2Entry}+ hero` : ''}
                 </option>
                 <option value={3} disabled={t3Locked}>
-                  Tier 3 (Lv 5-6){t3Locked ? ` — ${t3Reason}` : ''}
+                  Tier 3 ({tierBandLabel(3)}){t3Locked ? ` — ${t3Reason}` : ''}
                 </option>
               </select>
             );
