@@ -80,6 +80,7 @@ cf-worker/migrations/*
 !cf-worker/migrations/002_account_tiers.sql
 !cf-worker/migrations/003_conversation_rev.sql
 !cf-worker/migrations/004_premium_templates.sql
+!cf-worker/migrations/005_request_counters.sql
 
 # Local-only archive of stale docs (preserved on disk, not tracked)
 docs/archive/

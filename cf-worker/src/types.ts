@@ -10,6 +10,10 @@ export interface Env {
   SUPABASE_SERVICE_ROLE_KEY?: string;
   // Auth hub — untouched by this migration.
   OCTONION_SUPABASE_URL?: string;
+  // Premium AI pool (backlog #7): OpenRouter API key, set via
+  // `npx wrangler secret put OPENROUTER_API_KEY` (local dev: cf-worker/.dev.vars).
+  // Optional: when absent the premium pool degrades to the free pool.
+  OPENROUTER_API_KEY?: string;
   CUSTOM_DOMAIN?: string;
   ALLOW_UNAUTHENTICATED_DEV?: string;
 }

@@ -20,7 +20,7 @@
 |------------------------|-------------------------|------|---------|
 | `GET  /health`         | `index.ts`              | No   | Liveness check |
 | `GET  /api/ai/models`  | `routes/ai.ts`          | Yes  | List registered text models + default |
-| `POST /api/ai/generate`| `routes/ai.ts`          | Yes  | Text generation (model, prompt, systemPrompt, maxTokens, temperature) |
+| `POST /api/ai/generate`| `routes/ai.ts`          | Yes  | Text generation (model, prompt, systemPrompt, maxTokens, temperature, optional `pool: 'free' \| 'premium'` — see AI Pools below). Rate-limited (`ai-generate` bucket) |
 | `POST /api/embed`      | `routes/embed.ts`       | Yes  | Text embeddings (`@cf/baai/bge-base-en-v1.5`, 768-dim, max 100 texts) |
 | `GET  /api/image/models`| `routes/image.ts`      | Yes  | List image models |
 | `POST /api/image/generate`| `routes/image.ts`    | Yes* | Image generation (8 models; FLUX.2 uses REST API, others use AI binding) |
@@ -32,8 +32,57 @@
 
 ### Service layer
 
-- **`services/models.ts`** — `MODEL_REGISTRY`, `DEFAULT_MODEL_ID`, `getFallbackCandidates()`, lookup helpers.
-- **`services/ai.ts`** — `generateText()` orchestrates: resolve model (unknown IDs fall back to default), call Workers AI, handle response format variants, try fallback on failure, sanitize output (strips leaked prompt markers).
+- **`services/models.ts`** — `MODEL_REGISTRY`, `DEFAULT_MODEL_ID`, `getFallbackCandidates()`, lookup helpers (free pool).
+- **`services/ai.ts`** — `generateText()` orchestrates: resolve model (unknown IDs fall back to default), call Workers AI, handle response format variants, try fallback on failure, sanitize output (strips leaked prompt markers; `sanitizeResponse` is exported so the premium pool reuses the exact same pass).
+- **`services/openrouter.ts`** — premium pool (#7): `PREMIUM_MODEL_REGISTRY`, `DEFAULT_PREMIUM_MODEL_ID`, `generatePremiumText()` (OpenRouter chat completions, same resolve/clamp/fallback/sanitize shape as `ai.ts`).
+- **`services/pg.ts` / `services/tiers.ts`** — shared per-request postgres.js client (Hyperdrive) and the tier ladder + `getAccountTier()` lookup, used by `routes/db.ts`, the rate limiter, and the premium gate.
+
+### Rate limiting (`middleware/rateLimit.ts`, backlog #12)
+
+Fixed-window per-user counters in the `request_counters` Postgres table (migration `cf-worker/migrations/005_request_counters.sql`, applied manually via psql BEFORE deploying the limiter; see the migration header for the runbook and cleanup cron). Each counted request is one atomic upsert-increment (`INSERT ... ON CONFLICT ... DO UPDATE SET count = count + 1 RETURNING count`): a single DB round trip, race-free. The limiter **fails OPEN** on any DB error (availability over strictness, logged loudly) and is skipped when there is no `userId` (the `ALLOW_UNAUTHENTICATED_DEV` bypass).
+
+| Bucket | Window | Limit | Applied to |
+|--------|--------|-------|------------|
+| `ai-generate` | 5 min | 30 free / 60 member+ | `POST /api/ai/generate` |
+| `embed` | 5 min | 60 | `POST /api/embed` |
+| `db-write` | 5 min | 120 | `POST/PUT/PATCH/DELETE /api/db/*` |
+| `ai-premium-daily` | 1 day (UTC) | 120 member / 300 premium+ | premium-pool generations (checked in `routes/ai.ts`, not middleware) |
+
+**Worst-case premium cost math (2026-07-06, gpt-5-mini default at ~$0.25/M input, ~$2/M output):** input capped at 32k chars (~8k tokens) and output at 800 tokens gives a ceiling of ~$0.0036 per generation. The MONTHLY allowance is the revenue-aligned bound: member 800/month (~$2.90 worst case against $5), premium 2000 (~$7.20 against $10), elite 4000 (~$14.40 against $20); daily caps (100/200/300) are burst protection within it. Typical generations (~3k in / 500 out) cost under $0.002, so realistic heavy play runs well under a dollar a month. Haiku 4.5 stays in the fallback chain for quality diversity. Player model choice is removed entirely: the premium pool always runs the server default chain.
+
+`GET /api/db/*` (entitlements, premium-templates, saves reads) is deliberately **unthrottled**: reads are cheap and a counter upsert per read would roughly double their DB cost. The member-tier allowance lookup is lazy: the tier is only queried once a user is already past the free limit inside the current window. 429 responses carry `{ error, code: 'rate_limited', bucket, retryAfterSeconds }` plus a `Retry-After` header. Limits are constants in `rateLimit.ts` (`RATE_LIMITS`, `PREMIUM_DAILY_LIMITS`); tuning them is a code deploy, never a migration.
+
+### AI pools (`routes/ai.ts` + `services/openrouter.ts`, backlog #7)
+
+`POST /api/ai/generate` accepts an optional `pool` field: `'premium'` requests the Members OpenRouter pool; anything else (absent, `'free'`, unknown values) is the free Workers AI pool — never an error.
+
+**Premium request contract:**
+
+- Tier gate: `account_tiers` must rank member+ → otherwise `403 { error, code: 'premium_required' }`.
+- Daily allowance: `ai-premium-daily` bucket (120/day member, 300/day premium+ (calibrated 2026-07-06 against worst-case cost: see below)) → over-allowance is `429 { error, code: 'premium_cap', retryAfterSeconds }`.
+- Success: `200 { text, pool: 'premium' }`.
+- OpenRouter failure (or missing `OPENROUTER_API_KEY`, or a DB error during the tier/allowance check): generation **falls back to the free pool automatically** — never a dead generation — and the response is marked: `200 { text, pool: 'free', fallbackFrom: 'premium', fallbackReason: 'premium_error' }`. A DB error never opens the paid pool.
+- Free requests always answer `200 { text, pool: 'free' }` (the `pool` field is new; older clients simply ignore it).
+
+**Premium model registry** (`PREMIUM_MODEL_REGISTRY`, curated cheap-fast frontier rungs, same conventions as `models.ts`: default first, fallback = default then registry order, first two candidates tried):
+
+| Model ID | Display Name | Notes |
+|----------|--------------|-------|
+| `anthropic/claude-haiku-4.5` | Claude Haiku 4.5 | **DEFAULT_PREMIUM_MODEL_ID** — best prose per dollar of the class |
+| `openai/gpt-5-mini` | GPT-5 Mini | Very cheap, reliable workhorse fallback |
+| `google/gemini-3.5-flash` | Gemini 3.5 Flash | Lab-diversity fallback, long context |
+
+The pool is the choice in production: clients send their free-pool model id and the premium default carries the pool (only ids present in `PREMIUM_MODEL_REGISTRY` are honored; everything else resolves to the premium default). The client side lives in `src/services/aiPool.js` (persisted preference, tier-gated request pool, pool-outcome notices), `src/services/llmService.js` (sends `pool`, retries once on `premium_cap`/`premium_required`), and the pool chips in `src/components/Modals.js`.
+
+**Secret setup** (never `.env`; same pattern as `CF_API_TOKEN`):
+
+```bash
+cd cf-worker
+npx wrangler secret put OPENROUTER_API_KEY   # production
+# local dev: OPENROUTER_API_KEY=sk-or-... in cf-worker/.dev.vars (gitignored)
+```
+
+Smoke test: `scripts/test-cf-premium-ai.mjs` (manual, not auto-run; covers 401, the free-tier 403, the member 200 shape, the 429 cap shape, and unknown-pool collapse).
 
 ### Auth (`middleware/auth.ts`)
 
@@ -47,15 +96,17 @@ Checks `OCTONION_SUPABASE_URL` first, falls back to `SUPABASE_URL`. If neither i
 interface Env {
   AI: Ai;                          // [ai] binding — no API key needed for text/embedding
   ENVIRONMENT: string;
+  HYPERDRIVE: Hyperdrive;          // data Postgres (games box) via Cloudflare Hyperdrive
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   OCTONION_SUPABASE_URL?: string;
+  OPENROUTER_API_KEY?: string;     // premium AI pool (#7); secret via wrangler
   CUSTOM_DOMAIN?: string;
   ALLOW_UNAUTHENTICATED_DEV?: string;
 }
 ```
 
-`CF_ACCOUNT_ID` and `CF_API_TOKEN` are only used by the image route for FLUX.2 models (REST API path).
+`CF_ACCOUNT_ID` and `CF_API_TOKEN` are only used by the image route for FLUX.2 models (REST API path). `OPENROUTER_API_KEY` powers the premium pool; when absent, premium requests degrade to the free pool (marked in the response).
 
 ---
 
@@ -164,7 +215,8 @@ cd cf-worker
 nvm use 20
 npm run dev          # wrangler dev (local on :8787)
 npx wrangler deploy  # deploy to production
-npx wrangler secret put CF_API_TOKEN  # set production secret
+npx wrangler secret put CF_API_TOKEN        # set production secret (image REST path)
+npx wrangler secret put OPENROUTER_API_KEY  # premium AI pool secret (#7)
 ```
 
 ### wrangler.toml essentials
@@ -215,13 +267,17 @@ const res = await fetch(`${CF_WORKER_URL}/api/embed`, {
 |------|------|
 | Worker entry + CORS | `cf-worker/src/index.ts` |
 | Auth middleware | `cf-worker/src/middleware/auth.ts` |
+| Rate limiting middleware | `cf-worker/src/middleware/rateLimit.ts` |
 | Text generation route | `cf-worker/src/routes/ai.ts` |
+| Premium pool (OpenRouter) | `cf-worker/src/services/openrouter.ts` |
+| Shared Postgres client / tier ladder | `cf-worker/src/services/pg.ts`, `cf-worker/src/services/tiers.ts` |
 | Embedding route | `cf-worker/src/routes/embed.ts` |
 | Image route | `cf-worker/src/routes/image.ts` |
 | DB proxy route | `cf-worker/src/routes/db.ts` |
 | Model registry | `cf-worker/src/services/models.ts` |
 | AI service logic | `cf-worker/src/services/ai.ts` |
 | Frontend LLM service | `src/services/llmService.js` |
+| Frontend AI pool selection | `src/services/aiPool.js` |
 | Frontend embedding service | `src/services/embeddingService.js` |
 | Frontend model constants | `src/llm/llm_constants.js` |
 

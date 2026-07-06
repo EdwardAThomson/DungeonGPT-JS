@@ -1,23 +1,16 @@
 import { Hono } from 'hono';
-import postgres from 'postgres';
 import type { Env } from '../types';
 import type { AuthVariables } from '../middleware/auth';
+// getSql (per-request postgres.js client over Hyperdrive) and the tier ladder moved
+// to services/pg.ts and services/tiers.ts so the rate limiter (#12) and the premium
+// AI pool gate (#7) share them; behaviour here is unchanged.
+import { getSql, type Sql } from '../services/pg';
+import { getAccountTier, tierRank } from '../services/tiers';
 
 const dbRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
-// One postgres.js client per request, reaching Postgres via Cloudflare Hyperdrive.
-// Hyperdrive does the real connection pooling, so a small client-side `max` is fine.
-// `fetch_types: false` skips per-query type introspection round-trips (recommended on Workers).
-function getSql(env: Env) {
-  if (!env.HYPERDRIVE?.connectionString) {
-    throw new Error('Hyperdrive not configured');
-  }
-  return postgres(env.HYPERDRIVE.connectionString, { max: 5, fetch_types: false });
-}
-
 // jsonb columns: postgres.js needs values wrapped in sql.json() on write (it auto-parses on read).
 // Pass through real null as SQL NULL (matches the previous supabase-js behaviour).
-type Sql = ReturnType<typeof getSql>;
 const jsonb = (sql: Sql, v: unknown) => (v === undefined || v === null ? null : sql.json(v as any));
 
 // heroes rows are snake_case in the DB; the API contract is camelCase. Keep this mapping identical
@@ -427,12 +420,6 @@ dbRoutes.get('/entitlements', async (c) => {
 // PREMIUM CONTENT ENDPOINTS
 // ============================================
 
-// Tier ladder, lowest first (mirror of src/game/entitlements.js TIER_LADDER; the
-// account_tiers CHECK constraint pins the same four values). Unknown/missing tiers
-// rank as 'free' (0): fail closed.
-const TIER_LADDER = ['free', 'member', 'premium', 'elite'];
-const tierRank = (tier: unknown) => Math.max(TIER_LADDER.indexOf(tier as string), 0);
-
 // Server-delivered premium story templates (backlog #40). The `template` JSONB in
 // premium_templates IS a storyTemplates entry, served verbatim; the client registers
 // the list into its picker array (src/data/storyTemplates.js registerPremiumTemplates,
@@ -449,11 +436,7 @@ dbRoutes.get('/premium-templates', async (c) => {
   try {
     const userId = c.get('userId');
 
-    const [tierRow] = await sql`
-      SELECT tier FROM account_tiers
-      WHERE user_id = ${userId}
-      LIMIT 1`;
-    const callerRank = tierRank(tierRow?.tier);
+    const callerRank = tierRank(await getAccountTier(sql, userId));
 
     // Ladder comparison in code (few rows, simplest correct): fetch enabled rows,
     // keep those the caller's rank covers.

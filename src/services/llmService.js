@@ -1,6 +1,7 @@
 import { apiFetch, buildApiUrl } from './apiClient';
 import { createLogger } from '../utils/logger';
 import { supabase } from './supabaseClient';
+import { getRequestPool, recordPoolOutcome } from './aiPool';
 
 const API_PATH = '/api/llm';
 const rawCfWorkerUrl = process.env.REACT_APP_CF_WORKER_URL || 'http://localhost:8787';
@@ -38,8 +39,6 @@ export const llmService = {
     async generateText({ provider, model, prompt, maxTokens, temperature, systemPrompt }) {
         // Route CF Workers requests to the CF Worker endpoint
         if (provider === 'cf-workers') {
-            const body = { provider, model, prompt, maxTokens, temperature };
-            if (systemPrompt) body.systemPrompt = systemPrompt;
             const cfHeaders = { 'Content-Type': 'application/json' };
 
             // Always attach Supabase auth to CF Worker requests.
@@ -59,25 +58,74 @@ export const llmService = {
                 logger.warn('Supabase client not initialized - CF Worker requests will be unauthenticated');
             }
 
-            let response;
-            try {
-                response = await fetch(`${CF_WORKER_URL}/api/ai/generate`, {
-                    method: 'POST',
-                    headers: cfHeaders,
-                    body: JSON.stringify(body),
-                });
-            } catch (fetchErr) {
-                logger.error('CF Worker fetch failed:', fetchErr, '- URL:', CF_WORKER_URL);
-                throw new Error(`Cannot reach CF Worker at ${CF_WORKER_URL}. Is the worker running? (${fetchErr.message})`);
+            const postGenerate = async (pool) => {
+                const body = { provider, model, prompt, maxTokens, temperature, pool };
+                if (systemPrompt) body.systemPrompt = systemPrompt;
+                let response;
+                try {
+                    response = await fetch(`${CF_WORKER_URL}/api/ai/generate`, {
+                        method: 'POST',
+                        headers: cfHeaders,
+                        body: JSON.stringify(body),
+                    });
+                } catch (fetchErr) {
+                    logger.error('CF Worker fetch failed:', fetchErr, '- URL:', CF_WORKER_URL);
+                    throw new Error(`Cannot reach CF Worker at ${CF_WORKER_URL}. Is the worker running? (${fetchErr.message})`);
+                }
+                const data = await response.json().catch(() => null);
+                return { response, data };
+            };
+
+            // Pool selection (backlog #7): 'premium' only goes out for member+
+            // accounts that picked it (aiPool.getRequestPool). The Worker replies
+            // with the pool ACTUALLY used; premium refusals with a code
+            // (premium_cap / premium_required) trigger ONE quiet retry on the free
+            // pool, so a generation is never dead and play never interrupts.
+            const requestedPool = getRequestPool();
+            let { response, data } = await postGenerate(requestedPool);
+
+            let premiumFellBack = false;
+            if (
+                !response.ok &&
+                requestedPool === 'premium' &&
+                (data?.code === 'premium_cap' || data?.code === 'premium_required')
+            ) {
+                logger.warn(`Premium pool refused (${data.code}); retrying on the free pool`);
+                recordPoolOutcome({ requestedPool: 'premium', usedPool: 'free', reason: data.code });
+                premiumFellBack = true;
+                ({ response, data } = await postGenerate('free'));
             }
 
             if (!response.ok) {
-                const error = await response.json().catch(() => null);
-                const errorMessage = error?.error || `CF Worker error ${response.status}: ${response.statusText}`;
+                let errorMessage = data?.error || `CF Worker error ${response.status}: ${response.statusText}`;
+                if (data?.code === 'rate_limited' && data?.retryAfterSeconds) {
+                    errorMessage = `${errorMessage} (try again in ${data.retryAfterSeconds}s)`;
+                }
                 throw new Error(errorMessage);
             }
 
-            const data = await response.json();
+            if (!data || typeof data.text !== 'string') {
+                throw new Error('CF Worker returned an unexpected response body');
+            }
+
+            // Surface the pool actually used (server may itself have fallen back
+            // to free on OpenRouter trouble: fallbackFrom === 'premium').
+            if (requestedPool === 'premium' && !premiumFellBack) {
+                if (data.fallbackFrom === 'premium') {
+                    recordPoolOutcome({
+                        requestedPool: 'premium',
+                        usedPool: 'free',
+                        reason: data.fallbackReason || 'premium_error',
+                    });
+                } else {
+                    recordPoolOutcome({
+                        requestedPool: 'premium',
+                        usedPool: data.pool || 'premium',
+                        reason: null,
+                    });
+                }
+            }
+
             return data.text;
         }
 

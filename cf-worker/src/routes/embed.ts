@@ -1,14 +1,15 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { AiServiceError } from "../services/ai";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, type AuthVariables } from "../middleware/auth";
+import { rateLimit } from "../middleware/rateLimit";
 import type { Env } from "../types";
 
 const EMBEDDING_MODEL = "@cf/baai/bge-base-en-v1.5";
 const EMBEDDING_DIMENSIONS = 768;
 const MAX_BATCH_SIZE = 100;
 
-const embedRoutes = new Hono<{ Bindings: Env }>();
+const embedRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 const embedRequestSchema = z.object({
   text: z.union([
@@ -20,7 +21,7 @@ const embedRequestSchema = z.object({
 // Respond explicitly to CORS preflight for authenticated requests.
 embedRoutes.options("*", (c) => c.body(null, 204));
 
-embedRoutes.post("/", requireAuth, async (c) => {
+embedRoutes.post("/", requireAuth, rateLimit("embed"), async (c) => {
   const body: unknown = await c.req.json();
   const parsed = embedRequestSchema.safeParse(body);
 

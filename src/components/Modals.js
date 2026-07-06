@@ -4,6 +4,11 @@ import { getAvailableModels, DEFAULT_MODELS } from '../llm/llm_constants';
 import SettingsContext from '../contexts/SettingsContext';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
+import { hasTier } from '../game/entitlements';
+import {
+  getPreferredPool, setPreferredPool,
+  getLastPoolOutcome, subscribeAiPool
+} from '../services/aiPool';
 
 // --- Share QR Code (inline expandable) --- //
 export const ShareQRCode = () => {
@@ -84,6 +89,19 @@ export const AiEngineSettings = ({
 }) => {
   const AVAILABLE_MODELS = getAvailableModels();
 
+  // AI pool state (backlog #7): preference lives in src/services/aiPool.js (module
+  // state + localStorage, same pattern as entitlements). The chip only goes live
+  // for member+ accounts; llmService gates the actual request the same way, so a
+  // lapsed tier silently reverts to the free pool without losing the preference.
+  const premiumUnlocked = hasTier('member');
+  const [pool, setPool] = useState(getPreferredPool());
+  const [poolOutcome, setPoolOutcome] = useState(getLastPoolOutcome());
+  useEffect(() => subscribeAiPool(() => {
+    setPool(getPreferredPool());
+    setPoolOutcome(getLastPoolOutcome());
+  }), []);
+  const premiumActive = premiumUnlocked && pool === 'premium';
+
   // Production coercion: any stored/legacy non-cf-workers provider is pinned back to
   // the one provider that actually works in prod (prevents silent AI breakage for
   // players who picked a dev provider before this gate existed).
@@ -152,31 +170,67 @@ export const AiEngineSettings = ({
   return (
     <div className="modal-section">
       <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', color: 'var(--text)' }}>🤖 AI Configuration</h3>
-      {/* AI pool selector: Free is the only live pool today. Premium (the Members
-          OpenRouter pool, backlog #7) renders locked until server-side entitlements
-          (#39) + the premium AI backend exist — a visible seam, not a fake feature. */}
-      <div style={{ marginBottom: '20px', display: 'flex', gap: '8px' }} role="radiogroup" aria-label="AI pool">
+      {/* AI pool selector (backlog #7): Free is live for everyone; Premium (the
+          Members OpenRouter pool) goes live for member+ accounts and stays locked
+          for guests/free exactly as before. The Worker enforces tier + a daily
+          premium allowance server-side; over-allowance responses quietly fall back
+          to the free pool (notice below). */}
+      <div style={{ marginBottom: premiumActive ? '8px' : '20px', display: 'flex', gap: '8px' }} role="radiogroup" aria-label="AI pool">
         <button
           type="button"
           role="radio"
-          aria-checked="true"
-          style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px solid var(--primary)', background: 'var(--surface)', color: 'var(--primary)', fontWeight: 700, cursor: 'default' }}
+          aria-checked={!premiumActive}
+          onClick={() => setPreferredPool('free')}
+          style={!premiumActive
+            ? { flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px solid var(--primary)', background: 'var(--surface)', color: 'var(--primary)', fontWeight: 700, cursor: 'default' }
+            : { flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontWeight: 400, cursor: 'pointer' }}
         >
           ⚡ Free AI
           <div style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-secondary)', marginTop: '2px' }}>Cloudflare open-weights pool — included for everyone</div>
         </button>
-        <button
-          type="button"
-          role="radio"
-          aria-checked="false"
-          disabled
-          title="Premium AI models arrive with Membership — not available yet"
-          style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px dashed var(--border)', background: 'transparent', color: 'var(--text-secondary)', opacity: 0.65, cursor: 'not-allowed' }}
-        >
-          🔒 Premium AI
-          <div style={{ fontSize: '0.72rem', fontWeight: 400, marginTop: '2px' }}>Stronger models · Members — coming soon</div>
-        </button>
+        {premiumUnlocked ? (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={premiumActive}
+            onClick={() => setPreferredPool('premium')}
+            title="Premium AI: stronger models, included with Membership"
+            style={premiumActive
+              ? { flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px solid var(--primary)', background: 'var(--surface)', color: 'var(--primary)', fontWeight: 700, cursor: 'default' }
+              : { flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontWeight: 400, cursor: 'pointer' }}
+          >
+            ✨ Premium AI
+            <div style={{ fontSize: '0.72rem', fontWeight: 400, marginTop: '2px' }}>Stronger models · included with Membership</div>
+          </button>
+        ) : (
+          <button
+            type="button"
+            role="radio"
+            aria-checked="false"
+            disabled
+            title="Premium AI models arrive with Membership"
+            style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px dashed var(--border)', background: 'transparent', color: 'var(--text-secondary)', opacity: 0.65, cursor: 'not-allowed' }}
+          >
+            🔒 Premium AI
+            <div style={{ fontSize: '0.72rem', fontWeight: 400, marginTop: '2px' }}>Stronger models · Members</div>
+          </button>
+        )}
       </div>
+      {premiumActive && (
+        <div style={{ marginBottom: '20px', fontSize: '0.78rem', color: 'var(--text-secondary)' }} data-testid="pool-status">
+          {poolOutcome?.reason === 'premium_cap' ? (
+            <span>Today's Premium allowance is used up — responses are coming from the Free pool until it resets.</span>
+          ) : poolOutcome?.reason === 'premium_error' ? (
+            <span>Premium AI is briefly unavailable — responses fall back to the Free pool automatically.</span>
+          ) : poolOutcome?.reason === 'premium_required' ? (
+            <span>Premium AI needs an active Membership — responses are coming from the Free pool.</span>
+          ) : poolOutcome ? (
+            <span>Last response served by: {poolOutcome.usedPool === 'premium' ? 'Premium AI' : 'Free AI'}</span>
+          ) : (
+            <span>Premium AI selected — the next response will use the premium pool.</span>
+          )}
+        </div>
+      )}
       {/* Production shows NO provider/model dropdowns (maintainer decision: too many
           choices — the pool IS the choice). The free pool runs on managed cf-workers
           models; Premium (#7) adds the OpenRouter pool later. Dev keeps the pickers. */}

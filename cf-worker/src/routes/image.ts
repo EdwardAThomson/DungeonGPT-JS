@@ -166,7 +166,7 @@ imageRoutes.post("/generate", async (c) => {
       );
     } else {
       // All other models work with the AI binding
-      const result = await c.env.AI.run(model, input);
+      const result = await c.env.AI.run(model as keyof AiModels, input);
 
       if (result && typeof result === "object" && "image" in (result as Record<string, unknown>)) {
         b64Image = (result as Record<string, string>).image;
