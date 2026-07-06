@@ -125,6 +125,15 @@ const NewGame = () => {
     const preselectId = navState?.preselectTemplateId;
     if (!preselectId) return;
     const template = storyTemplates.find((t) => t.id === preselectId && !t.comingSoon);
+    // Entitlement check (maintainer 2026-07-06): the preselect path used to
+    // apply ANY template, so a free account handed a premium preselect id got
+    // the desert/snow theme applied to state (the historic "free player
+    // generates a sand map via the custom tab" hole). Locked templates now
+    // nudge instead of applying.
+    if (template && !canUseTemplate(template)) {
+      setFormError('That adventure is part of Membership. Pick a free adventure below, or check the Premium page.');
+      return;
+    }
     if (template) applyTemplate(template);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1577,6 +1586,16 @@ const NewGame = () => {
                   if (!premiumUnlocked && isThemePremium(worldTheme)) {
                     setFormError('Desert and snow maps are a Premium feature (coming soon). Choose a temperate setting to continue.');
                     return;
+                  }
+                  // Slot validation BEFORE map generation (maintainer 2026-07-06):
+                  // incomplete slots fall back to placeholder names, and a preview
+                  // built from them bakes a literal "Town B" into the world.
+                  if (activeTab === 'custom') {
+                    const slotError = validateCustomSlots();
+                    if (slotError) {
+                      setFormError(slotError);
+                      return;
+                    }
                   }
                   const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
                   if (!worldSeed) setWorldSeed(seedToUse);
