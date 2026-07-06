@@ -872,9 +872,15 @@ const NewGame = () => {
 
   // Build milestones from slot selections
   const buildMilestonesFromSlots = () => {
-    const town1 = slot1Town || 'Town A';
-    const town2 = slot2Town || 'Town B';
-    const wildLoc = slot3Mountain || 'The Wilds';
+    // NO literal placeholders may ever reach a map (maintainer 2026-07-06:
+    // "Town B" appeared as a real town name). Validation blocks partial slots
+    // at preview AND submit, but the boss-only quest legitimately has no
+    // region, and defense-in-depth wants every fallback to be a real themed
+    // name rather than a placeholder, whatever path anything takes.
+    const namePool = THEME_NAMES[customTheme] || THEME_NAMES['heroic-fantasy'];
+    const town1 = slot1Town || namePool.towns[0];
+    const town2 = slot2Town || namePool.towns[1] || namePool.towns[0];
+    const wildLoc = slot3Mountain || namePool.mountains[0];
 
     // Resolve through the tier/entitlement-filtered list (not the raw catalog view),
     // so a stale or out-of-ceiling item id can never become a milestone spawn.
