@@ -63,9 +63,8 @@ export const buildPoiEncounter = (targetTile) => {
     ruins: '/assets/encounters/ruins_site_arrival.webp',
     goblin_hideout: '/assets/encounters/goblin_hideout.webp',
     mountain: '/assets/encounters/mountain_site_arrival.webp',
-    // Interim art until the queued bespoke arrivals land (IMAGE_GENERATION_PROMPTS):
-    forest: '/assets/encounters/forest_beast.webp',
-    hills: '/assets/encounters/mountain_pass.webp',
+    forest: '/assets/encounters/forest_site_arrival.webp',
+    hills: '/assets/encounters/hills_site_arrival.webp'
   };
   // Milestone POIs carry their authored display name on the tile (poiName); named mountain
   // ranges show their range name ("the Grey Moors", not "the Mountains"); the raw poi id

@@ -198,7 +198,7 @@ their own portraits, Sandstorm Cult Leader→cult_leader, Hooded Priest→worm_t
 Hoarfrost Wraith→shadow_stalker (bespoke queued above). Guard: src/data/artIntegrity.test.js
 now fails CI on any declared-but-missing art path.
 
-## Generation queue additions (2026-07-04 — t2 sequels)
+## Generation queue additions (2026-07-04 — t2 sequels) - COMPLETE
 
 | File | Subject | Priority |
 |---|---|---|
