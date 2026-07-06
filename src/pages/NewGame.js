@@ -1109,19 +1109,39 @@ const NewGame = () => {
             })}
           </select>
         </div>
-        <div style={{ flex: '0 0 140px' }}>
+        <div style={{ flex: '0 0 200px' }}>
           <label style={slotLabelStyle}>Tier</label>
-          <select
-            value={customTier}
-            onChange={(e) => {
-              setCustomTier(Number(e.target.value));
-              setSlot4Enemy(''); // Reset enemy when tier changes
-            }}
-            style={selectStyle}
-          >
-            <option value={1}>Tier 1 (Lv 1-2)</option>
-            <option value={2}>Tier 2 (Lv 3-4)</option>
-          </select>
+          {/* Higher custom tiers grey out until the requirements are met
+              (maintainer 2026-07-06): Tier 2 wants a Lv 3+ hero on the roster
+              (its milestone gates lock a fresh party out mid-campaign anyway);
+              Tier 3 wants a Lv 5+ hero AND Membership. The builder's milestone
+              minLevel math already scales with the chosen tier. */}
+          {(() => {
+            const highestLevel = heroes.reduce((m, h) => Math.max(m, h.level || 1), 0);
+            const t2Locked = highestLevel < 3;
+            const t3Locked = highestLevel < 5 || !premiumUnlocked;
+            const t3Reason = !premiumUnlocked && highestLevel < 5
+              ? '🔒 Members + Lv 5 hero'
+              : !premiumUnlocked ? '🔒 Members' : 'needs a Lv 5+ hero';
+            return (
+              <select
+                value={customTier}
+                onChange={(e) => {
+                  setCustomTier(Number(e.target.value));
+                  setSlot4Enemy(''); // Reset enemy when tier changes
+                }}
+                style={selectStyle}
+              >
+                <option value={1}>Tier 1 (Lv 1-2)</option>
+                <option value={2} disabled={t2Locked}>
+                  Tier 2 (Lv 3-4){t2Locked ? ' — needs a Lv 3+ hero' : ''}
+                </option>
+                <option value={3} disabled={t3Locked}>
+                  Tier 3 (Lv 5-6){t3Locked ? ` — ${t3Reason}` : ''}
+                </option>
+              </select>
+            );
+          })()}
         </div>
       </div>
 
