@@ -216,6 +216,35 @@ export const AiEngineSettings = ({
           </button>
         )}
       </div>
+      {/* Active-engine resolver (maintainer 2026-07-06): locally the provider
+          dropdown and the pool pills can disagree (a non-cf-workers provider
+          routes to the Express dev server and bypasses the pool entirely), which
+          was confusing. This line always states what will actually handle the
+          next request. */}
+      {(() => {
+        const onWorker = selectedProvider === 'cf-workers';
+        return (
+          <div
+            data-testid="active-engine"
+            style={{
+              marginBottom: '12px', padding: '8px 10px', borderRadius: '6px',
+              fontSize: '0.78rem', lineHeight: 1.4,
+              background: onWorker ? 'var(--surface)' : 'rgba(224,168,0,0.12)',
+              border: `1px solid ${onWorker ? 'var(--border)' : 'var(--state-warning, #e0a800)'}`,
+              color: 'var(--text-secondary)',
+            }}
+          >
+            {onWorker ? (
+              <span><strong style={{ color: 'var(--text)' }}>Active engine:</strong> Cloudflare Worker, {premiumActive ? '✨ Premium' : '⚡ Free'} pool</span>
+            ) : (
+              <span>
+                <strong style={{ color: 'var(--state-warning, #e0a800)' }}>⚠ Active engine: {selectedProvider} (local dev server)</strong>
+                <br />The Free/Premium pool applies only to the Cloudflare Worker. Pick "CF Workers" as the provider below to exercise the pool.
+              </span>
+            )}
+          </div>
+        );
+      })()}
       {premiumActive && (
         <div style={{ marginBottom: '20px', fontSize: '0.78rem', color: 'var(--text-secondary)' }} data-testid="pool-status">
           {poolOutcome?.reason === 'premium_cap' ? (
