@@ -36,12 +36,11 @@ describe('getTemplateSections against the shipped catalog', () => {
 
   it('lists every playable tier-2 campaign in the Seasoned section', () => {
     expect(sections.seasoned.map((t) => t.id).sort()).toEqual([
-      'arcane-renaissance-t2',
-      'desert-expedition-t2',
-      'eldritch-horror-t2',
-      'frozen-frontier-t2',
-      'grimdark-survival-t2',
-      'heroic-fantasy-t2',
+      'arcane-renaissance-t2', 'eldritch-horror-t2', 'grimdark-survival-t2', 'heroic-fantasy-t2',
+    ]);
+    // Premium t2s are segregated (maintainer 2026-07-06)
+    expect(sections.premiumSeasoned.map((t) => t.id).sort()).toEqual([
+      'desert-expedition-t2', 'frozen-frontier-t2',
     ]);
     sections.seasoned.forEach((t) => expect(t.comingSoon).toBeUndefined());
   });
@@ -57,7 +56,9 @@ describe('getTemplateSections against the shipped catalog', () => {
       ...sections.freeStarters,
       ...sections.premiumStarters,
       ...sections.seasoned,
+      ...sections.premiumSeasoned,
       ...sections.legendary,
+      ...sections.premiumLegendary,
     ].map((t) => t.id);
     expect(new Set(all).size).toBe(all.length); // no double listing
     storyTemplates
@@ -85,8 +86,8 @@ describe('server-delivered higher-tier templates (registerPremiumTemplates then 
     const catalog = makeCatalog();
     expect(getTemplateSections(catalog).legendary).toEqual([]);
     registerPremiumTemplates([drownedBells], catalog);
-    const { legendary } = getTemplateSections(catalog);
-    expect(legendary.map((t) => t.id)).toEqual(['tidewater-t3']);
+    const { premiumLegendary } = getTemplateSections(catalog);
+    expect(premiumLegendary.map((t) => t.id)).toEqual(['tidewater-t3']);
   });
 
   it('a delivered entry replacing a comingSoon t3 stub becomes visible in Legendary', () => {
@@ -96,16 +97,16 @@ describe('server-delivered higher-tier templates (registerPremiumTemplates then 
       name: 'Heroic Fantasy', subtitle: 'The Shattered Throne', comingSoon: false,
       settings: { milestones: [] },
     }], catalog);
-    const { legendary } = getTemplateSections(catalog);
-    expect(legendary.map((t) => t.id)).toEqual(['heroic-fantasy-t3']);
+    const { premiumLegendary } = getTemplateSections(catalog);
+    expect(premiumLegendary.map((t) => t.id)).toEqual(['heroic-fantasy-t3']);
     // The remaining stubs stay excluded.
-    expect(legendary.map((t) => t.id)).not.toContain('eldritch-horror-t3');
+    expect(premiumLegendary.map((t) => t.id)).not.toContain('eldritch-horror-t3');
   });
 
   it('a delivered t2 lands in the Seasoned section', () => {
     const catalog = makeCatalog();
     registerPremiumTemplates([{ id: 'delivered-t2', tier: 2, levelRange: [3, 5], premium: true, settings: { milestones: [] } }], catalog);
-    expect(getTemplateSections(catalog).seasoned.map((t) => t.id)).toContain('delivered-t2');
+    expect(getTemplateSections(catalog).premiumSeasoned.map((t) => t.id)).toContain('delivered-t2');
   });
 });
 

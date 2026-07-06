@@ -17,9 +17,11 @@
 //   sections. comingSoon stubs are EXCLUDED there: those sections list only
 //   playable campaigns, so the tier-3 section simply does not render until real
 //   t3 content exists (local dev slot or server delivery).
-// - Premium gating is per card (canUseTemplate), not per section: free and
-//   premium templates mix inside the higher-tier sections and locked cards render
-//   with the existing premium-locked treatment.
+// - Premium templates are SEGREGATED within every tier, mirroring the tier-1
+//   free/premium split (maintainer 2026-07-06: "The sand and snow ones should
+//   be segregated as premium"): each tier section renders its free grid first,
+//   then a premium sub-section with the gold treatment. Card-level gating
+//   (canUseTemplate) still applies inside the premium groups.
 
 import { storyTemplates } from '../data/storyTemplates';
 import { isTemplatePremium } from './entitlements';
@@ -27,14 +29,18 @@ import { isTemplatePremium } from './entitlements';
 /**
  * Split a template catalog into the New Game picker's sections.
  * @param {Array<object>} [templates] - defaults to the live storyTemplates array
- * @returns {{ freeStarters: Array, premiumStarters: Array, seasoned: Array, legendary: Array }}
+ * @returns {{ freeStarters: Array, premiumStarters: Array, seasoned: Array, premiumSeasoned: Array, legendary: Array, premiumLegendary: Array }}
  */
 export const getTemplateSections = (templates = storyTemplates) => {
     const starters = templates.filter((t) => t.tier === 1);
+    const seasoned = templates.filter((t) => t.tier === 2 && !t.comingSoon);
+    const legendary = templates.filter((t) => (t.tier || 1) >= 3 && !t.comingSoon);
     return {
         freeStarters: starters.filter((t) => !isTemplatePremium(t)),
         premiumStarters: starters.filter((t) => isTemplatePremium(t)),
-        seasoned: templates.filter((t) => t.tier === 2 && !t.comingSoon),
-        legendary: templates.filter((t) => (t.tier || 1) >= 3 && !t.comingSoon),
+        seasoned: seasoned.filter((t) => !isTemplatePremium(t)),
+        premiumSeasoned: seasoned.filter((t) => isTemplatePremium(t)),
+        legendary: legendary.filter((t) => !isTemplatePremium(t)),
+        premiumLegendary: legendary.filter((t) => isTemplatePremium(t)),
     };
 };

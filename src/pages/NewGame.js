@@ -669,8 +669,25 @@ const NewGame = () => {
     freeStarters: freeStarterTemplates,
     premiumStarters: premiumStarterTemplates,
     seasoned: seasonedTemplates,
+    premiumSeasoned: premiumSeasonedTemplates,
     legendary: legendaryTemplates,
+    premiumLegendary: premiumLegendaryTemplates,
   } = getTemplateSections(storyTemplates);
+
+  // Shared gold "✨ Premium" sub-heading for the tier 2/3 sections, mirroring the
+  // tier-1 Premium Adventures treatment (maintainer 2026-07-06: premium cards
+  // must be segregated within every tier, never mixed into the free grid).
+  const premiumSubheading = (label) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '14px 0 10px' }}>
+      <h4 style={{ margin: 0, fontSize: '0.9rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
+        ✨ {label}
+      </h4>
+      <span style={{
+        background: 'linear-gradient(135deg, #b8860b, #ffd700)', color: '#2b1d00',
+        padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
+      }}>{premiumUnlocked ? 'UNLOCKED' : 'MEMBERS'}</span>
+    </div>
+  );
 
   // Honest note when a higher-tier (t2/t3) template is SELECTED and the roster
   // can't reach its band yet: same class of soft warning the continue-legend
@@ -732,7 +749,7 @@ const NewGame = () => {
         </div>
       )}
 
-      {seasonedTemplates.length > 0 && (
+      {(seasonedTemplates.length > 0 || premiumSeasonedTemplates.length > 0) && (
         <div style={{ marginTop: '28px' }} data-testid="seasoned-section">
           <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
             🛡️ Seasoned Parties (Tier 2)
@@ -741,13 +758,23 @@ const NewGame = () => {
             The chapters that usually follow a starter adventure. A fresh party may
             begin one, but the opening will be rough and deeper chapters are level-gated.
           </p>
-          <div style={gridStyle}>
-            {seasonedTemplates.map((t) => renderTemplateCard(t))}
-          </div>
+          {seasonedTemplates.length > 0 && (
+            <div style={gridStyle}>
+              {seasonedTemplates.map((t) => renderTemplateCard(t))}
+            </div>
+          )}
+          {premiumSeasonedTemplates.length > 0 && (
+            <div data-testid="seasoned-premium">
+              {premiumSubheading('Premium Chapters')}
+              <div style={gridStyle}>
+                {premiumSeasonedTemplates.map((t) => renderTemplateCard(t))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {legendaryTemplates.length > 0 && (
+      {(legendaryTemplates.length > 0 || premiumLegendaryTemplates.length > 0) && (
         <div style={{ marginTop: '28px' }} data-testid="legendary-section">
           <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
             🐲 Legendary Campaigns (Tier 3)
@@ -755,9 +782,19 @@ const NewGame = () => {
           <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
             The realm's greatest tales, made for heroes of Lv 5 and beyond.
           </p>
-          <div style={gridStyle}>
-            {legendaryTemplates.map((t) => renderTemplateCard(t))}
-          </div>
+          {legendaryTemplates.length > 0 && (
+            <div style={gridStyle}>
+              {legendaryTemplates.map((t) => renderTemplateCard(t))}
+            </div>
+          )}
+          {premiumLegendaryTemplates.length > 0 && (
+            <div data-testid="legendary-premium">
+              {premiumSubheading('Premium Legends')}
+              <div style={gridStyle}>
+                {premiumLegendaryTemplates.map((t) => renderTemplateCard(t))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
