@@ -101,6 +101,11 @@ export const AiEngineSettings = ({
     setPoolOutcome(getLastPoolOutcome());
   }), []);
   const premiumActive = premiumUnlocked && pool === 'premium';
+  // The premium pool's model is chosen SERVER-SIDE (openrouter.ts default chain);
+  // the client never selects it, so any model dropdown selection is ignored while
+  // Premium is active. This label is informational only (kept vague on purpose:
+  // "the pool is the choice", not the model).
+  const PREMIUM_MODEL_LABEL = 'a stronger model (server-selected)';
 
   // Production coercion: any stored/legacy non-cf-workers provider is pinned back to
   // the one provider that actually works in prod (prevents silent AI breakage for
@@ -235,7 +240,11 @@ export const AiEngineSettings = ({
             }}
           >
             {onWorker ? (
-              <span><strong style={{ color: 'var(--text)' }}>Active engine:</strong> Cloudflare Worker, {premiumActive ? '✨ Premium' : '⚡ Free'} pool</span>
+              premiumActive ? (
+                <span><strong style={{ color: 'var(--text)' }}>Active engine:</strong> Cloudflare Worker, ✨ Premium pool, {PREMIUM_MODEL_LABEL}.<br />The model picker below is ignored while Premium is active.</span>
+              ) : (
+                <span><strong style={{ color: 'var(--text)' }}>Active engine:</strong> Cloudflare Worker, ⚡ Free pool, model: {selectedModel || DEFAULT_MODELS['cf-workers']}</span>
+              )
             ) : (
               <span>
                 <strong style={{ color: 'var(--state-warning, #e0a800)' }}>⚠ Active engine: {selectedProvider} (local dev server)</strong>
@@ -264,10 +273,15 @@ export const AiEngineSettings = ({
           choices — the pool IS the choice). The free pool runs on managed cf-workers
           models; Premium (#7) adds the OpenRouter pool later. Dev keeps the pickers. */}
       {SHOW_PROVIDER_CHOICE ? (
-        <>
+        <div style={premiumActive ? { opacity: 0.5, pointerEvents: 'none' } : undefined} aria-disabled={premiumActive}>
+          {premiumActive && (
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '6px', fontStyle: 'italic' }}>
+              Provider/model selection does not apply while the Premium pool is active (the premium model is server-selected).
+            </div>
+          )}
           {renderPicker('Narrative DM', 'game', selectedProvider, selectedModel, setSelectedModel)}
           {renderPicker('OOC Assistant', 'assistant', assistantProvider || selectedProvider, assistantModel || selectedModel, setAssistantModel)}
-        </>
+        </div>
       ) : (
         <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 4px' }}>
           The Dungeon Master runs on the free pool automatically — no setup needed.
