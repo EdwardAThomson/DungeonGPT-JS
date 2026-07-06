@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-DungeonGPT-JS is a React web app for creating fantasy RPG characters and playing AI-narrated campaigns. It is the production rewrite of a Python prototype, deployed at dungeongpt.xyz on Cloudflare Pages + Workers backed by Supabase. `ROADMAP.md` is the high-level status; `docs/OUTSTANDING_ISSUES.md` is the master backlog; `docs/README.md` is the document map (index of every design doc); per-system design docs live in `docs/`.
+DungeonGPT-JS is a React web app for creating fantasy RPG characters and playing AI-narrated campaigns. It is the production rewrite of a Python prototype, deployed at dungeongpt.xyz on Cloudflare Pages + Workers backed by a self-hosted Postgres reached via Cloudflare Hyperdrive. `ROADMAP.md` is the high-level status; `docs/OUTSTANDING_ISSUES.md` is the master backlog; `docs/README.md` is the document map (index of every design doc); per-system design docs live in `docs/`.
 
 ## Commands
 
@@ -38,11 +38,11 @@ Unit tests are colocated (`src/**/*.test.js`), heaviest in `src/game/` and `src/
 There are **two separate backends** and they are not interchangeable:
 
 1. **`src/server.js`** — local-dev-only Express server. SQLite persistence (`src/game.db`) and **direct** LLM SDK calls (`src/llm/llmBackend.js` → OpenAI / Gemini / Claude using server-side env keys). This is a convenience harness for local development; **it is not deployed**.
-2. **`cf-worker/`** — the real production backend. Hono + TypeScript on Cloudflare Workers (`dungeongpt-api`). Entry `cf-worker/src/index.ts` mounts four route groups: `/api/ai` (text gen via Workers AI binding), `/api/embed` (768-dim BGE embeddings), `/api/image`, and `/api/db/*` (Supabase CRUD proxy, the only authed-by-default group). AI runs on the `[ai]` Workers AI binding — curated open-weights models (GPT-OSS, Llama, Gemma); **no API keys** needed for text/embeddings.
+2. **`cf-worker/`** — the real production backend. Hono + TypeScript on Cloudflare Workers (`dungeongpt-api`). Entry `cf-worker/src/index.ts` mounts four route groups: `/api/ai` (text gen via Workers AI binding), `/api/embed` (768-dim BGE embeddings), `/api/image`, and `/api/db/*` (Postgres CRUD proxy over the `HYPERDRIVE` binding, the only authed-by-default group). AI runs on the `[ai]` Workers AI binding — curated open-weights models (GPT-OSS, Llama, Gemma); **no API keys** needed for text/embeddings.
 
 The frontend chooses at request time: provider `cf-workers` routes to `CF_WORKER_URL` (`src/services/llmService.js`); other providers route to `API_BASE_URL` (the Express server). In production only `cf-workers` is wired up. When changing AI behavior, know which path you're touching — `cf-worker/src/services/ai.ts` (prod) vs `src/llm/llmBackend.js` (dev) are independent implementations that must be kept in sync conceptually.
 
-**Data never goes frontend→Supabase directly.** All DB access is proxied through `/api/db/*` so the Worker can enforce row-level ownership. Auth is an **Octonion hub** (octonion.io) issuing Supabase-format JWTs; `cf-worker/src/middleware/auth.ts` verifies them via JWKS (10-min cache), checking expiry/issuer/`role:authenticated` and extracting `sub` as `userId`. Locally the Worker fails closed unless `ALLOW_UNAUTHENTICATED_DEV=true`.
+**Data never goes frontend→Postgres directly.** All DB access is proxied through `/api/db/*` so the Worker can enforce row-level ownership (the data Postgres is self-hosted, migrated off Supabase, and reached via Cloudflare Hyperdrive). Auth is an **Octonion hub** (octonion.io) issuing Supabase-format JWTs; `cf-worker/src/middleware/auth.ts` verifies them via JWKS (10-min cache), checking expiry/issuer/`role:authenticated` and extracting `sub` as `userId`. Locally the Worker fails closed unless `ALLOW_UNAUTHENTICATED_DEV=true`.
 
 ## Frontend architecture
 
@@ -62,7 +62,7 @@ The campaign-progression system spans many files; treat it as one subsystem:
 - **`Game.js`** — `checkMilestoneEvent()` fires on movement, combat, and item acquisition.
 - **`useGameInteraction.js`** — `MILESTONE_COMPLETE_REGEX` detects AI-judged narrative completions.
 
-Two milestone kinds: **mechanical** (item/combat/location/talk) are engine-detected deterministically; **narrative** are AI-judged and only completed via the `[COMPLETE_MILESTONE]` marker (guarded to narrative/legacy-untyped milestones via `findMarkerMilestoneIndex`). The `talk` type completes through a "Talk" button on the milestone NPC (`npc_talked` event); authored milestone NPCs (e.g. Captain Ulric) are placed into their quest building by `populateTown` via `getMilestoneNpcsForTown`, and milestone boss fights launch from the POI arrival modal via `getMilestoneBossForTile`. Milestone POI names are injected into the map generator via `customNames` (entries may be size-tagged: `{ name, size }` pins the settlement size), and POIs stay hidden until prerequisites are met (`visibleMilestonePois`). Story templates carrying `customNames` + `milestones` live in `src/data/storyTemplates.js`; premium templates (desert/snow) are gated through `src/game/entitlements.js`.
+Two milestone kinds: **mechanical** (item/combat/location/talk) are engine-detected deterministically; **narrative** are AI-judged and only completed via the `[COMPLETE_MILESTONE]` marker (guarded to narrative/legacy-untyped milestones via `findMarkerMilestoneIndex`). The `talk` type completes through a "Talk" button on the milestone NPC (`npc_talked` event); authored milestone NPCs (e.g. Captain Ulric) are placed into their quest building by `populateTown` via `getMilestoneNpcsForTown`, and milestone boss fights launch from the POI arrival modal via `getMilestoneBossForTile`. Milestone POI names are injected into the map generator via `customNames` (entries may be size-tagged: `{ name, size }` pins the settlement size), and POIs stay hidden until prerequisites are met (`visibleMilestonePois`). Story templates carrying `customNames` + `milestones` live in `src/data/storyTemplates.js`; premium templates are gated through `src/game/entitlements.js` (tier ladder free < member < premium < elite, fetched once per session from the worker's entitlements endpoint; templates may carry a per-template `minTier`), and server-delivered premium templates are fetched per session via `src/services/premiumContentApi.js` and registered idempotently alongside built-ins.
 
 ## AI prompt system
 
@@ -74,7 +74,7 @@ Two milestone kinds: **mechanical** (item/combat/location/talk) are engine-detec
 
 ## Environment
 
-Copy `.env.example` to `.env`. Frontend keys are `REACT_APP_*` (notably `REACT_APP_API_BASE_URL`, `REACT_APP_CF_WORKER_URL`, `REACT_APP_SUPABASE_URL`/`_ANON_KEY`, `REACT_APP_ENABLE_DEBUG_ROUTES`). Server-side keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`) are only consumed by the local Express server. Worker secrets (`SUPABASE_SERVICE_ROLE_KEY`, `CF_API_TOKEN`) are set via `wrangler secret put` / `.dev.vars`, never `.env`.
+Copy `.env.example` to `.env`. Frontend keys are `REACT_APP_*` (notably `REACT_APP_API_BASE_URL`, `REACT_APP_CF_WORKER_URL`, `REACT_APP_OCTONION_SUPABASE_URL`/`_ANON_KEY` for the auth hub, `REACT_APP_ENABLE_DEBUG_ROUTES`). Server-side keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`) are only consumed by the local Express server. Worker secrets (`CF_API_TOKEN`) are set via `wrangler secret put` / `.dev.vars`, never `.env`; the data Postgres is reached through the `HYPERDRIVE` binding (local dev tunnels to the box and sets `WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE`, see `cf-worker/wrangler.toml`). The worker's `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` vars are legacy, kept only for rollback.
 
 ## Procedural maps, tile art & backwards compatibility
 

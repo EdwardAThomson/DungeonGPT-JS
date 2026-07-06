@@ -31,13 +31,14 @@ YouTube Videos 🎥:
 *   **Quests & Campaigns:** A deterministic campaign-milestone engine (mechanical and AI-judged narrative milestones) plus a pool of discoverable side-quests.
 *   **Campaign Chaining:** Finish a campaign and continue the next chapter inside the same save: same world, same party (healed), with the new campaign's content spawned additively into the existing map.
 *   **Adventure Book:** A tabbed in-game hub (Campaign / Side Quests / Codex / Party / AI) including a discovered-only bestiary and item codex.
-*   **Towns:** Procedurally generated town maps with road-aware gates, lakefront/coastline water, a civic layout (town square, keep, varied buildings), and a hub-and-spoke street network (windy lanes from every gate to the square).
+*   **Towns:** Procedurally generated town maps with road-aware gates, lakefront/coastline water, a civic layout (town square, keep, varied buildings), a hub-and-spoke street network (windy lanes from every gate to the square), themed building palettes per biome (desert adobe, snow timber), and water settlements: riverside quays for river-adjacent towns, plus river-fork and canal-city archetypes for member/premium tiers.
 *   **Conversation Memory (RAG):** The AI recalls earlier story beats via on-device retrieval over embedded history.
 *   **Guest / Local-First Play:** Try the game without an account; heroes and saves live in the browser and sync to the cloud on sign-in.
 *   **Onboarding:** A guided tour and a 27-point-buy hero creator.
 *   **AI Models:** Runs on Cloudflare Workers AI with a curated 5-model lineup (GPT-OSS 120B/20B, Llama 4 Scout, Gemma 3 12B, Llama 3.1 8B Fast). Local development additionally supports OpenAI, Gemini, and Claude. Premium models via OpenRouter are planned.
 *   **User Authentication:** Secure sign-in via Octonion hub (centralized auth across games).
-*   **Persistent Sessions:** Characters and game sessions saved to Supabase PostgreSQL, accessed through CF Worker with row-level access enforcement.
+*   **Membership Tiers:** Account tiers (Free / Member / Premium / Elite) stored server-side; premium story templates are delivered from the server to entitled accounts, and the profile page shows the current tier.
+*   **Persistent Sessions:** Characters and game sessions saved to a self-hosted PostgreSQL database, accessed through the CF Worker (via Cloudflare Hyperdrive) with row-level access enforcement.
 *   **Save/Load System:** Manual and auto-save with confirmation modals; saves are written locally first (IndexedDB) and synced to the cloud, with honest "on this device" status in the saved-games list when a cloud push is pending.
 
 ## Technology Stack
@@ -46,7 +47,7 @@ YouTube Videos 🎥:
 *   **Routing:** React Router DOM
 *   **Styling:** Modular CSS (feature-based organization in `src/styles/`)
 *   **Backend:** Cloudflare Workers (TypeScript with Hono framework)
-*   **Database:** Supabase PostgreSQL (accessed via CF Worker with row-level access enforcement)
+*   **Database:** Self-hosted PostgreSQL, reached from the CF Worker via Cloudflare Hyperdrive (row-level access enforced in the Worker)
 *   **Authentication:** Octonion hub (centralized auth at octonion.io)
 *   **AI Providers:** Cloudflare Workers AI in production. Local development also supports OpenAI, Gemini, and Claude (server-side only, no exposed keys). OpenRouter integration planned for premium tier.
 
@@ -172,7 +173,7 @@ The app is deployed on:
 
 - **Frontend:** Cloudflare Pages (https://dungeongpt.xyz)
 - **Backend:** Cloudflare Workers
-- **Database:** Supabase PostgreSQL
+- **Database:** Self-hosted PostgreSQL via Cloudflare Hyperdrive
 
 For deployment instructions, see the deployment guides in `/docs`.
 
@@ -185,12 +186,12 @@ For deployment instructions, see the deployment guides in `/docs`.
 5.  **Play the game** by interacting with the AI Dungeon Master through text commands
 6.  **Save your progress** - characters and game sessions are saved to the local SQLite database
 
-**Note:** The live production app at https://dungeongpt.xyz/ includes additional features like centralized authentication via Octonion hub and cloud persistence via Supabase.
+**Note:** The live production app at https://dungeongpt.xyz/ includes additional features like centralized authentication via Octonion hub and cloud persistence in PostgreSQL.
 
 ## Recent Improvements
 
 *   ✅ **Production Deployment** — Live on Cloudflare Pages with Workers backend
-*   ✅ **Supabase Integration** — PostgreSQL database accessed via CF Worker
+*   ✅ **PostgreSQL Persistence** — self-hosted database accessed via CF Worker (originally on Supabase)
 *   ✅ **Octonion Hub Auth** — Centralized authentication across games
 *   ✅ **Cloudflare Workers AI** — Server-side AI with no exposed API keys
 *   ✅ **Multi-User Support** — Each user's data isolated by CF Worker access control
