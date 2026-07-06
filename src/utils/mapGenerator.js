@@ -120,8 +120,19 @@ export const generateMapData = (width = 10, height = 10, seed = null, customName
   // chunks lakes only sometimes); 1 keeps the primary lake but never the small companion.
   const maxLakes = options.maxLakes === undefined ? 2 : options.maxLakes;
   if (maxLakes > 0) {
-    const lakeBudget = Math.max(4, Math.floor(width * height * 0.12));
-    const wantsSecondLake = rng() < 0.5; // same 1-or-2 odds as the old numLakes roll
+    // Lake sizing (maintainer 2026-07-06: "reduce the size of the lakes, they can
+    // generate with coast and it is a lot of water"): budget dropped 12% -> 8% of
+    // the map, and when a coast already claimed water tiles the budget shrinks
+    // further (half a tile off per two coast-water tiles), so coastal worlds do
+    // not drown. Generation change: NEW maps only, existing saves keep their grid.
+    let coastWater = 0;
+    for (let cy = 0; cy < height; cy++) {
+      for (let cx = 0; cx < width; cx++) {
+        if (mapData[cy][cx].biome === 'water') coastWater++;
+      }
+    }
+    const lakeBudget = Math.max(4, Math.floor(width * height * 0.08) - Math.floor(coastWater / 4));
+    const wantsSecondLake = coastWater === 0 && rng() < 0.5; // coastal maps get one lake at most
     const firstLake = placeLakeCluster(mapData, width, height, rng, landBiome, lakeBudget, lakeMargin);
     if (maxLakes > 1 && wantsSecondLake && firstLake.length > 0) {
       const smallCap = Math.min(lakeBudget - firstLake.length, Math.floor(firstLake.length / 2));
@@ -314,7 +325,9 @@ function placeForestCluster(mapData, width, height, rng) {
   for (let attempt = 0; attempt < 10; attempt++) {
     startX = 1 + Math.floor(rng() * (width - 2));
     startY = 1 + Math.floor(rng() * (height - 2));
-    if (mapData[startY][startX].biome !== 'water') break;
+    // beach excluded too (playtest 2026-07-06: trees drawn on the sand tile's
+    // water half looked like they stood in the sea)
+    if (mapData[startY][startX].biome !== 'water' && mapData[startY][startX].biome !== 'beach') break;
   }
 
   const tiles = [{ x: startX, y: startY }];
@@ -342,9 +355,10 @@ function placeForestCluster(mapData, width, height, rng) {
 
   // Place forest tiles
   tiles.forEach(tile => {
-    if (mapData[tile.y] && mapData[tile.y][tile.x] && !mapData[tile.y][tile.x].poi && mapData[tile.y][tile.x].biome !== 'water') {
-      mapData[tile.y][tile.x].poi = 'forest';
-      mapData[tile.y][tile.x].descriptionSeed = "Dense woods";
+    const t = mapData[tile.y] && mapData[tile.y][tile.x];
+    if (t && !t.poi && t.biome !== 'water' && t.biome !== 'beach') {
+      t.poi = 'forest';
+      t.descriptionSeed = "Dense woods";
     }
   });
 }

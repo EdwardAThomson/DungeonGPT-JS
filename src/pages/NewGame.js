@@ -1201,6 +1201,14 @@ const NewGame = () => {
         </div>
       </div>
 
+      {/* Optionality was invisible (maintainer 2026-07-06: "Oh, that milestone
+          is optional? It isn't obvious at all. That's a hole in the UX.") */}
+      <p style={{ margin: '2px 0 10px', color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+        Every slot below is optional. Complete the ones you want your quest to
+        include (each needs all of its fields filled); at least one full slot is
+        required, and empty slots are simply skipped.
+      </p>
+
       {/* Slot 1: Item Search */}
       <div style={slotCardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
@@ -1209,7 +1217,7 @@ const NewGame = () => {
             borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '0.75rem', fontWeight: 'bold',
           }}>1</span>
-          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text)' }}>📦 Find a Quest Item</span>
+          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text)' }}>📦 Find a Quest Item <span style={{ fontWeight: 'normal', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>(optional)</span></span>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 200px' }}>
@@ -1257,7 +1265,7 @@ const NewGame = () => {
             borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '0.75rem', fontWeight: 'bold',
           }}>2</span>
-          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text)' }}>💬 Meet an NPC</span>
+          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text)' }}>💬 Meet an NPC <span style={{ fontWeight: 'normal', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>(optional)</span></span>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 200px' }}>
@@ -1303,7 +1311,7 @@ const NewGame = () => {
             borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '0.75rem', fontWeight: 'bold',
           }}>3</span>
-          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text)' }}>📍 Reach a Location</span>
+          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text)' }}>📍 Reach a Location <span style={{ fontWeight: 'normal', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>(optional)</span></span>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>Requires #1 + #2</span>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
@@ -1341,7 +1349,7 @@ const NewGame = () => {
             borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '0.75rem', fontWeight: 'bold',
           }}>4</span>
-          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text)' }}>⚔️ Boss Fight</span>
+          <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: 'var(--text)' }}>⚔️ Boss Fight <span style={{ fontWeight: 'normal', color: 'var(--text-secondary)', fontSize: '0.75rem' }}>(optional)</span></span>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: 'auto' }}>Requires #3</span>
         </div>
         <div style={{ flex: '1 1 200px' }}>

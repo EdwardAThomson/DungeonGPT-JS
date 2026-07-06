@@ -25,6 +25,9 @@ describe('legacy byte-identical guard', () => {
   // (the doctrine: the premium boundary is the archetype, not the river), and the
   // chunk assembler's scheme is EXPERIMENTAL/not frozen (LARGER_WORLDS_PLAN section 7a),
   // so no shipped heart-chunk continuity promise pinned the old placement.
+  // RE-CAPTURED again 2026-07-06: coast-aware lake sizing (budget 8% minus coast
+  // water, coastal maps single-lake) and the forest-on-beach exclusion landed, both
+  // deliberate generation changes (maintainer: "reduce the size of the lakes...").
   // A legacy-shaped call must still produce the exact same maps as an options call.
   it('generateMapData(10,10,4242) is unchanged by the generator modifications', () => {
     expect(generateMapData(10, 10, 4242)).toEqual(legacy4242);

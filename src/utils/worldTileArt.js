@@ -218,6 +218,31 @@ const forest = (v = 0) => {
   return wrap(s);
 };
 
+// forest POI stranded on a beach tile (legacy saves): 2-3 slightly smaller trees
+// confined to the SAND half for the tile's beachDirection (0 = water North, so
+// trees south; 1 = water East -> trees west; 2 = water South -> north; 3 -> east).
+const beachForest = (v = 0, dir = 2) => {
+  const r = rng(v * 7 + dir + 23);
+  // slot boxes [minX, maxX, minY, maxY] on the sand side, margin off the shoreline
+  const SAND = {
+    0: [6, 32, 26, 34], // water N -> lower band
+    1: [4, 14, 8, 32],  // water E -> left band
+    2: [6, 32, 8, 16],  // water S -> upper band
+    3: [24, 34, 8, 32], // water W -> right band
+  };
+  const [x0, x1, y0, y1] = SAND[dir] || SAND[2];
+  const n = 2 + Math.floor(r() * 2);
+  let s = '';
+  for (let i = 0; i < n; i++) {
+    const cx = x0 + Math.floor(r() * (x1 - x0 + 1));
+    const cy = y0 + Math.floor(r() * (y1 - y0 + 1));
+    const sz = 5 + Math.floor(r() * 3);
+    const [lo, hi] = GREENS[Math.floor(r() * GREENS.length)];
+    s += (r() > 0.45 ? pineT : roundT)(cx, cy, sz, lo, hi);
+  }
+  return wrap(s);
+};
+
 // woodland biome: a grass floor densely filled with mixed trees (a forest *region*,
 // vs the single-cluster forest POI)
 const woodland = (seed) => {
@@ -430,7 +455,14 @@ export function poiSprite(tile) {
   if (tile.poi === 'town') { key = `town|${tile.townSize || 'village'}`; build = () => townSprite(tile.townSize || 'village'); }
   else if (tile.poi === 'forest') {
     const v = variantSeed(tile.x || 0, tile.y || 0) % 8;
-    if (tile.biome === 'desert') { key = `forest-d|${v}`; build = () => desertForest(v); }
+    if (tile.biome === 'beach') {
+      // Retroactive heal (playtest 2026-07-06): old saves have forest POIs on
+      // beach tiles; clamp the trees to the sand half so none stand in the sea.
+      // New maps no longer place forests on beach at all.
+      const dir = tile.beachDirection != null ? tile.beachDirection : 2;
+      key = `forest-b|${dir}|${v}`; build = () => beachForest(v, dir);
+    }
+    else if (tile.biome === 'desert') { key = `forest-d|${v}`; build = () => desertForest(v); }
     else if (tile.biome === 'snow') { key = `forest-s|${v}`; build = () => snowForest(v); }
     else { key = `forest|${v}`; build = () => forest(v); }
   }

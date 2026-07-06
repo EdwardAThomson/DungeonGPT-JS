@@ -351,9 +351,10 @@ describe('generateMapData', () => {
       }
     });
 
-    it('caps total lake water on every map (budget 12% of tiles, small smoothing slack)', () => {
-      // Generation budgets lake targets to floor(100 * 0.12) = 12 tiles; the corner-
-      // smoothing pass may add the odd fill tile, so allow up to 15% before failing.
+    it('caps total lake water on every map (budget 8% minus coast share, smoothing slack)', () => {
+      // Generation budgets lake targets to floor(100 * 0.08) = 8 tiles minus a
+      // quarter of the coast's water tiles (2026-07-06 sizing); smoothing may add
+      // the odd fill tile, so allow a small margin before failing.
       const violations = surveys
         .map(({ seed, comps }) => ({ seed, water: comps.reduce((n, c) => n + c.length, 0) }))
         .filter((v) => v.water > 15);
@@ -372,15 +373,28 @@ describe('generateMapData', () => {
       expect(violations).toEqual([]);
     });
 
-    it('keeps a sane lake-count distribution: never 3+, usually 1, sometimes 2', () => {
+    it('keeps a sane lake-count distribution: coastal default maps get exactly one lake', () => {
+      // Coast-aware sizing (maintainer 2026-07-06: "reduce the size of the lakes,
+      // they can generate with coast and it is a lot of water"): default worlds
+      // always carry a coast, so the companion lake is reserved for coastless
+      // maps (chunk interiors) and every default map gets a single modest lake.
       const counts = { 0: 0, 1: 0, 2: 0, more: 0 };
       for (const { comps } of surveys) {
         counts[comps.length > 2 ? 'more' : comps.length]++;
       }
       expect(counts.more).toBe(0);
-      expect(counts[1]).toBeGreaterThan(N / 2); // single lake is the common case
-      expect(counts[2]).toBeGreaterThan(0);     // the small companion lake still happens
-      expect(counts[2]).toBeLessThan(counts[1]); // but stays the minority
+      expect(counts[2]).toBe(0);
+      expect(counts[1]).toBe(N); // every coastal map: exactly one lake
+    });
+
+    it('the companion lake is extinct under the 8% budget (single lake everywhere)', () => {
+      // min(budget - first, floor(first / 2)) can never reach the 3-tile floor
+      // once the budget is 8, so every map (coastal or not) gets exactly one
+      // lake. Deliberate (maintainer 2026-07-06): less standing water overall.
+      for (let seed = 500; seed < 540; seed++) {
+        const map = generateMapData(10, 10, seed, undefined, undefined, { coast: false });
+        expect(lakeComponents(map).length).toBe(1);
+      }
     });
 
     it('keeps two lakes well separated (Chebyshev distance >= 3, i.e. 2 land tiles between)', () => {
@@ -399,20 +413,11 @@ describe('generateMapData', () => {
       expect(violations).toEqual([]);
     });
 
-    it('two lakes on one map rarely look like copies (aspect + size similarity is a small minority)', () => {
-      let twoLakeMaps = 0;
-      let lookAlikes = 0;
-      for (const { comps } of surveys) {
-        if (comps.length < 2) continue;
-        twoLakeMaps++;
-        const similarAspect = Math.abs(bboxAspect(comps[0]) - bboxAspect(comps[1])) < 0.15;
-        const similarSize = Math.abs(comps[0].length - comps[1].length) < 2;
-        if (similarAspect && similarSize) lookAlikes++;
-      }
-      expect(twoLakeMaps).toBeGreaterThan(0);
-      // Per-lake shape personality + the size rule: measured 0 look-alikes over 300 seeds,
-      // assert a generous <= 20% so an unlucky future seed set does not flake.
-      expect(lookAlikes).toBeLessThanOrEqual(Math.ceil(twoLakeMaps * 0.2));
+    it('two-lake maps no longer occur (look-alike rule kept for the record)', () => {
+      // The 2026-07-06 sizing retired companion lakes entirely; if a future
+      // budget increase revives them, restore the aspect/size look-alike survey
+      // from git history (it measured 0 look-alikes over 300 seeds).
+      expect(surveys.filter(({ comps }) => comps.length >= 2)).toEqual([]);
     });
 
     it('settlement placement still succeeds on every surveyed seed (no seed crashes)', () => {
