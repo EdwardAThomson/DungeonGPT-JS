@@ -9,6 +9,8 @@ import {
   getPartyLevel,
   getNextCampaignOptions,
   isTemplateCompatibleWithWorld,
+  isOpeningAccessible,
+  getLevelFitNotice,
   healPartyForNextChapter,
   buildInSaveContinuation,
   applyContinuationToSettings,
@@ -638,5 +640,54 @@ describe('getNextCampaignOptions: openingAccessible (t1-to-t2 bridge, playtest 2
     expect(t2).toBeDefined();
     expect(t2.underLeveled).toBe(true);
     expect(t2.openingAccessible).toBe(true);
+  });
+});
+
+describe('isOpeningAccessible (shared by picker, New Game note and hero selection)', () => {
+  it('true when the first milestone has no minLevel', () => {
+    expect(isOpeningAccessible([{ id: 1, text: 'x', minLevel: null }], 1)).toBe(true);
+  });
+
+  it('honours the first milestone minLevel against the party level', () => {
+    const gated = [{ id: 1, text: 'x', minLevel: 5 }];
+    expect(isOpeningAccessible(gated, 4)).toBe(false);
+    expect(isOpeningAccessible(gated, 5)).toBe(true);
+  });
+
+  it('false with no milestones at all (nothing known to be reachable)', () => {
+    expect(isOpeningAccessible([], 10)).toBe(false);
+    expect(isOpeningAccessible(undefined, 10)).toBe(false);
+  });
+});
+
+describe('getLevelFitNotice (hero-selection warning trigger, #72)', () => {
+  const t2Settings = {
+    levelRange: [3, 5],
+    milestones: [{ id: 1, text: 'open', minLevel: null }, { id: 2, text: 'deep', minLevel: 4 }],
+  };
+
+  it('triggers when the band start exceeds EVERY selected hero level', () => {
+    const notice = getLevelFitNotice(t2Settings, [{ heroLevel: 1 }, { heroLevel: 2 }]);
+    expect(notice).toEqual({ levelRange: [3, 5], partyLevel: 2, openingAccessible: true });
+  });
+
+  it('stays silent when at least one hero reaches the band', () => {
+    expect(getLevelFitNotice(t2Settings, [{ heroLevel: 1 }, { heroLevel: 3 }])).toBeNull();
+  });
+
+  it('stays silent with no selected heroes or no authored band (custom/freeform saves)', () => {
+    expect(getLevelFitNotice(t2Settings, [])).toBeNull();
+    expect(getLevelFitNotice({ milestones: t2Settings.milestones }, [{ heroLevel: 1 }])).toBeNull();
+  });
+
+  it('reports a gated opening (t3-style minLevel on milestone #1) as not accessible', () => {
+    const t3Settings = { levelRange: [5, 7], milestones: [{ id: 1, text: 'x', minLevel: 5 }] };
+    const notice = getLevelFitNotice(t3Settings, [{ heroLevel: 2 }]);
+    expect(notice).toEqual({ levelRange: [5, 7], partyLevel: 2, openingAccessible: false });
+  });
+
+  it('reads both hero level field spellings (level / heroLevel)', () => {
+    expect(getLevelFitNotice(t2Settings, [{ level: 4 }])).toBeNull();
+    expect(getLevelFitNotice(t2Settings, [{ level: 2 }])?.partyLevel).toBe(2);
   });
 });

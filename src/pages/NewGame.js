@@ -14,7 +14,9 @@ import { llmService } from "../services/llmService";
 import { createLogger } from "../utils/logger";
 import { QUEST_ENEMIES, getEnemiesByTierAndTheme } from "../data/questEnemies";
 import { QUEST_BUILDINGS, NPC_ROLES, SEARCHABLE_ITEMS, POI_TYPES, THEME_DEFAULTS, THEME_NAMES } from "../data/questPickerData";
-import { isPremium, isThemePremium, isTemplatePremium } from "../game/entitlements";
+import { isPremium, isThemePremium, isTemplatePremium, canUseTemplate } from "../game/entitlements";
+import { getTemplateSections } from "../game/templateSections";
+import { isOpeningAccessible } from "../game/campaignChain";
 import { resolveWaterTownAccess, waterTownWorldGenOptions } from "../game/waterTowns";
 
 const logger = createLogger('new-game');
@@ -264,17 +266,21 @@ const NewGame = () => {
     }
     setFormError('');
 
-    // Premium backstop: no matter which path set it, a free user must never generate a
-    // sand/snow (premium) world map or start a premium adventure. This closes loopholes
-    // like a premium biome theme carried over from a previewed template into Custom/Freeform.
-    if (!premiumUnlocked) {
-      const selTpl = selectedTemplate && selectedTemplate !== 'custom' && selectedTemplate !== 'ai'
-        ? storyTemplates.find(t => t.id === selectedTemplate)
-        : null;
-      if (isThemePremium(worldTheme) || isTemplatePremium(selTpl)) {
-        setFormError('Desert and snow adventures are a Premium feature (coming soon). Choose a temperate setting to continue.');
-        return;
-      }
+    // Premium backstop: no matter which path set it, a user must never start an
+    // adventure their tier can't use (canUseTemplate also honours per-template
+    // minTier), and a free user must never generate a sand/snow (premium) world
+    // map. This closes loopholes like a premium biome theme carried over from a
+    // previewed template into Custom/Freeform.
+    const selTpl = selectedTemplate && selectedTemplate !== 'custom' && selectedTemplate !== 'ai'
+      ? storyTemplates.find(t => t.id === selectedTemplate)
+      : null;
+    if (selTpl && !canUseTemplate(selTpl)) {
+      setFormError('This is a Premium adventure. Premium unlock is coming soon; pick a free adventure to begin.');
+      return;
+    }
+    if (!premiumUnlocked && isThemePremium(worldTheme)) {
+      setFormError('Desert and snow adventures are a Premium feature (coming soon). Choose a temperate setting to continue.');
+      return;
     }
 
     const templateName = templateLabel
@@ -370,7 +376,7 @@ const NewGame = () => {
     const t = previewTemplate;
     const ms = t.settings.milestones || [];
     const isSelected = selectedTemplate === t.id;
-    const isPremiumLocked = !premiumUnlocked && isTemplatePremium(t);
+    const isPremiumLocked = !canUseTemplate(t);
 
     return (
       <div className="modal-overlay" onClick={() => setPreviewTemplate(null)}>
@@ -564,8 +570,10 @@ const NewGame = () => {
 
   const renderTemplateCard = (template, isFirst = false) => {
     const isSelected = selectedTemplate === template.id;
-    // Premium-locked = a paid adventure the current (free) user can't start yet.
-    const isPremiumLocked = !premiumUnlocked && isTemplatePremium(template);
+    // Premium-locked = a paid adventure the current user's tier can't start yet
+    // (canUseTemplate also honours per-template minTier, e.g. premium-only
+    // server-delivered campaigns).
+    const isPremiumLocked = !template.comingSoon && !canUseTemplate(template);
     const isLocked = template.comingSoon || isPremiumLocked;
     return (
       <div
@@ -650,20 +658,45 @@ const NewGame = () => {
     );
   };
 
-  // Only the starter (tier 1) adventures are shown — higher-level chapters are
-  // hidden to keep the choice simple for new players. Premium adventures (desert/snow
-  // biome quests) are split into their own section so free users can see, but not start,
-  // paid content.
-  const starterTemplates = storyTemplates.filter((t) => t.tier === 1);
-  const freeStarterTemplates = starterTemplates.filter((t) => !isTemplatePremium(t));
-  const premiumStarterTemplates = starterTemplates.filter((t) => isTemplatePremium(t));
+  // Picker sections (#72, see src/game/templateSections.js): tier-1 starters keep
+  // their free/premium split; tier 2 ("Seasoned Parties") and tier 3+ ("Legendary
+  // Campaigns") are listed too so higher-tier content is discoverable from day one
+  // instead of only surfacing in the continue-legend picker. Recomputed every
+  // render on purpose: server-delivered premium templates register into the live
+  // storyTemplates array mid-session and AuthContext's premiumContentReady flip
+  // re-renders this page.
+  const {
+    freeStarters: freeStarterTemplates,
+    premiumStarters: premiumStarterTemplates,
+    seasoned: seasonedTemplates,
+    legendary: legendaryTemplates,
+  } = getTemplateSections(storyTemplates);
+
+  // Honest note when a higher-tier (t2/t3) template is SELECTED and the roster
+  // can't reach its band yet: same class of soft warning the continue-legend
+  // picker uses. Never a block: the real party-level warning (and still no
+  // block) happens at hero selection, where the chosen party is known.
+  const selectedTemplateData = selectedTemplate && !['custom', 'ai', 'freeform'].includes(selectedTemplate)
+    ? storyTemplates.find((t) => t.id === selectedTemplate)
+    : null;
+  const higherTierNote = (() => {
+    const t = selectedTemplateData;
+    if (!t || (t.tier || 1) < 2 || !t.levelRange) return null;
+    const effectiveLevel = partyMaxLevel || 1; // no roster yet = a fresh Lv 1 party
+    if (effectiveLevel >= t.levelRange[0]) return null;
+    const band = `Lv ${t.levelRange[0]}-${t.levelRange[1]}`;
+    return isOpeningAccessible(t.settings?.milestones, effectiveLevel)
+      ? `This campaign is made for ${band}; your party would start around Lv ${effectiveLevel}. The opening steps are within reach, and rumours in nearby towns will strengthen you for the deeper, level-gated chapters.`
+      : `This campaign is made for ${band}; your party would start around Lv ${effectiveLevel}. The opening itself is level-gated; a fresh party will find it brutal, but you may still try.`;
+  })();
 
   const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' };
 
   const renderTemplateTab = () => (
     <div className="form-section story-settings-section">
       <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-        Pick a starter adventure to begin. Click a card for details.
+        Pick an adventure to begin. Starter tales suit fresh heroes; the
+        higher-tier campaigns further down expect seasoned parties. Click a card for details.
       </p>
       {waterTownNote && (
         <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
@@ -696,6 +729,48 @@ const NewGame = () => {
           <div style={gridStyle}>
             {premiumStarterTemplates.map((t) => renderTemplateCard(t))}
           </div>
+        </div>
+      )}
+
+      {seasonedTemplates.length > 0 && (
+        <div style={{ marginTop: '28px' }} data-testid="seasoned-section">
+          <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
+            🛡️ Seasoned Parties (Tier 2)
+          </h3>
+          <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+            The chapters that usually follow a starter adventure. A fresh party may
+            begin one, but the opening will be rough and deeper chapters are level-gated.
+          </p>
+          <div style={gridStyle}>
+            {seasonedTemplates.map((t) => renderTemplateCard(t))}
+          </div>
+        </div>
+      )}
+
+      {legendaryTemplates.length > 0 && (
+        <div style={{ marginTop: '28px' }} data-testid="legendary-section">
+          <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
+            🐲 Legendary Campaigns (Tier 3)
+          </h3>
+          <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+            The realm's greatest tales, made for heroes of Lv 5 and beyond.
+          </p>
+          <div style={gridStyle}>
+            {legendaryTemplates.map((t) => renderTemplateCard(t))}
+          </div>
+        </div>
+      )}
+
+      {higherTierNote && (
+        <div
+          data-testid="higher-tier-note"
+          style={{
+            marginTop: '20px', padding: '10px 14px',
+            background: 'rgba(255, 152, 0, 0.15)', border: '1px solid #ff9800',
+            borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text)',
+          }}
+        >
+          <strong style={{ color: '#ff9800' }}>⚠ Seasoned campaign:</strong> {higherTierNote}
         </div>
       )}
     </div>

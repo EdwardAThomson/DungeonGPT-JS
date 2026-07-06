@@ -10,6 +10,7 @@ import { resolveProfilePicture } from '../utils/assetHelper';
 import { createLogger } from '../utils/logger';
 import OnboardingSteps from '../components/OnboardingSteps';
 import { validateHero } from '../game/heroValidation';
+import { getLevelFitNotice } from '../game/campaignChain';
 
 const logger = createLogger('hero-selection');
 
@@ -67,12 +68,32 @@ const HeroSelection = () => {
     navigate('/hero-creation', { state: { returnToHeroSelection: true, settingsData: settings } });
   };
 
-  // Level warning: check if selected party is below the campaign's recommended level
-  const levelRange = settings?.levelRange;
-  const partyMaxLevel = selectedHeroes.length > 0
-    ? Math.max(...selectedHeroes.map(h => h.heroLevel || 1))
-    : 0;
-  const isBelowRecommended = levelRange && partyMaxLevel > 0 && partyMaxLevel < levelRange[0];
+  // Level warning: the campaign's authored band vs the CHOSEN party (soft warning
+  // only, Start stays enabled; engine minLevel gates already protect deep
+  // milestones). Same honesty class as the continue-legend picker: when the
+  // campaign's opening milestone is ungated we say the opening is within reach,
+  // otherwise that it may be deadly.
+  const levelNotice = getLevelFitNotice(settings || {}, selectedHeroes);
+
+  const levelWarningBanner = levelNotice && (
+    <div style={{
+      background: 'rgba(255, 152, 0, 0.15)',
+      border: '1px solid #ff9800',
+      borderRadius: '8px',
+      padding: '12px 16px',
+      marginBottom: '16px',
+      color: 'var(--text)',
+      fontSize: '0.9rem',
+      width: '100%',
+      boxSizing: 'border-box',
+    }}>
+      <strong style={{ color: '#ff9800' }}>Level Warning:</strong>{' '}
+      This adventure is made for Lv {levelNotice.levelRange[0]}-{levelNotice.levelRange[1]}; your party is Lv {levelNotice.partyLevel}.{' '}
+      {levelNotice.openingAccessible
+        ? 'The opening steps are within your reach, and rumours in nearby towns will strengthen you for the deeper chapters.'
+        : 'The opening may be deadly, but you may still try.'}
+    </div>
+  );
 
   const handleNext = () => {
     if (selectedHeroes.length === 0 || selectedHeroes.length > 4) {
@@ -124,19 +145,7 @@ const HeroSelection = () => {
         </div>
       </div>
 
-      {isBelowRecommended && (
-        <div style={{
-          background: 'rgba(255, 152, 0, 0.15)',
-          border: '1px solid #ff9800',
-          borderRadius: '8px',
-          padding: '12px 16px',
-          marginBottom: '16px',
-          color: 'var(--text)',
-          fontSize: '0.9rem',
-        }}>
-          <strong style={{ color: '#ff9800' }}>Level Warning:</strong> This adventure is designed for levels {levelRange[0]}-{levelRange[1]}, but your highest-level hero is level {partyMaxLevel}. Your party may struggle with encounters.
-        </div>
-      )}
+      {levelWarningBanner}
 
       {heroes.length > 0 && (
         <div className="party-counter">
@@ -214,21 +223,7 @@ const HeroSelection = () => {
       )}
 
       <div className="form-actions hero-selection-actions">
-        {isBelowRecommended && (
-          <div style={{
-            background: 'rgba(255, 152, 0, 0.15)',
-            border: '1px solid #ff9800',
-            borderRadius: '8px',
-            padding: '12px 16px',
-            marginBottom: '12px',
-            color: 'var(--text)',
-            fontSize: '0.9rem',
-            width: '100%',
-            boxSizing: 'border-box',
-          }}>
-            <strong style={{ color: '#ff9800' }}>Level Warning:</strong> This adventure is designed for levels {levelRange[0]}-{levelRange[1]}, but your highest-level hero is level {partyMaxLevel}. Your party may struggle with encounters.
-          </div>
-        )}
+        {levelWarningBanner}
         {selectionError && <p className="error-message">{selectionError}</p>}
         <button onClick={handleBack} className="back-button">
           ← Back to Story Setup

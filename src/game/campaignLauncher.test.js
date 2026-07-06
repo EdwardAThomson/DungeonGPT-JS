@@ -10,7 +10,7 @@ import {
   resolveMilestoneCoords,
   mintGameSessionId,
 } from './campaignLauncher';
-import { storyTemplates } from '../data/storyTemplates';
+import { storyTemplates, registerPremiumTemplates } from '../data/storyTemplates';
 import { generateMapData } from '../utils/mapGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
 import { analyzeTownWater, getTownRoadEdges } from '../utils/townWater';
@@ -169,6 +169,107 @@ describe('premium backstop', () => {
     localStorage.setItem(PREMIUM_DEV_OVERRIDE_KEY, 'true');
     const desert = storyTemplates.find((t) => t.id === 'desert-expedition-t1');
     expect(() => launchCampaign(specFromTemplate(desert), { seed: SEED })).not.toThrow();
+  });
+});
+
+// #72: tier-2/3 templates are now selectable on New Game, always launching as a
+// FRESH world through this same pipeline (the in-save chaining path is separate,
+// see campaignChain.js). These pin that higher-tier launches place their authored
+// geography and stamp tier/levelRange correctly.
+describe('higher-tier launches from New Game (#72)', () => {
+  afterEach(() => localStorage.removeItem(PREMIUM_DEV_OVERRIDE_KEY));
+
+  const nameOf = (e) => (typeof e === 'string' ? e : e.name);
+  const townsOnMap = (mapData) => {
+    const names = new Set();
+    mapData.forEach((row) => row.forEach((t) => { if (t.poi === 'town' && t.townName) names.add(t.townName); }));
+    return names;
+  };
+  const mountainsOnMap = (mapData) => {
+    const names = new Set();
+    mapData.forEach((row) => row.forEach((t) => { if (t.mountainName) names.add(t.mountainName); }));
+    return names;
+  };
+
+  it('launches a free t2 as a fresh world with its authored geography and band', () => {
+    const t2 = storyTemplates.find((t) => t.id === 'heroic-fantasy-t2');
+    const launch = launchCampaign(specFromTemplate(t2), { seed: SEED });
+    expect(launch.settings.tier).toBe(2);
+    expect(launch.settings.levelRange).toEqual([3, 5]);
+    const towns = townsOnMap(launch.mapData);
+    t2.customNames.towns.map(nameOf).forEach((n) => expect(towns.has(n)).toBe(true));
+    // Milestones authored in towns resolve to coordinates on the fresh map.
+    launch.settings.milestones
+      .filter((m) => m.location && towns.has(m.location))
+      .forEach((m) => {
+        expect(typeof m.mapX).toBe('number');
+        expect(typeof m.mapY).toBe('number');
+      });
+  });
+
+  it('launches a premium t2 (desert) once unlocked, with theme and geography intact', () => {
+    localStorage.setItem(PREMIUM_DEV_OVERRIDE_KEY, 'true');
+    const t2 = storyTemplates.find((t) => t.id === 'desert-expedition-t2');
+    const launch = launchCampaign(specFromTemplate(t2), { seed: SEED });
+    expect(launch.settings.tier).toBe(2);
+    expect(launch.settings.theme).toBe('desert');
+    const towns = townsOnMap(launch.mapData);
+    t2.customNames.towns.map(nameOf).forEach((n) => expect(towns.has(n)).toBe(true));
+  });
+
+  // A tier-3 flagship as the server delivers it (#40): registered at runtime,
+  // premium-flagged, carrying its own customNames. Built by re-skinning the real
+  // heroic-fantasy-t2 authoring onto new geography so every milestone shape is
+  // production-real.
+  const makeDeliveredT3 = () => {
+    const base = storyTemplates.find((t) => t.id === 'heroic-fantasy-t2');
+    const renames = [
+      ['Willowdale', 'Bellhaven'],
+      ['Briarwood', 'Tidemoor'],
+      ['Thornfield', 'Saltmarsh'],
+      ['Millhaven', 'Drownedgate'],
+      ['Greenridge Hills', 'The Sunken Reach'],
+    ];
+    let json = JSON.stringify(base);
+    renames.forEach(([from, to]) => { json = json.split(from).join(to); });
+    return {
+      ...JSON.parse(json),
+      id: 'test-delivered-t3',
+      tier: 3,
+      levelRange: [5, 7],
+      premium: true,
+      subtitle: 'Test Flagship',
+    };
+  };
+
+  it('launches a runtime-registered t3 with premium customNames placed on a fresh world', () => {
+    localStorage.setItem(PREMIUM_DEV_OVERRIDE_KEY, 'true');
+    const catalog = storyTemplates.map((t) => ({ ...t }));
+    registerPremiumTemplates([makeDeliveredT3()], catalog);
+    const t3 = catalog.find((t) => t.id === 'test-delivered-t3');
+    expect(t3).toBeDefined();
+
+    const launch = launchCampaign(specFromTemplate(t3), { seed: SEED });
+    expect(launch.settings.tier).toBe(3);
+    expect(launch.settings.levelRange).toEqual([5, 7]);
+    expect(launch.settings.templateId).toBe('test-delivered-t3');
+
+    const towns = townsOnMap(launch.mapData);
+    ['Bellhaven', 'Tidemoor', 'Saltmarsh', 'Drownedgate'].forEach((n) => expect(towns.has(n)).toBe(true));
+    expect(mountainsOnMap(launch.mapData).has('The Sunken Reach')).toBe(true);
+
+    // Its towns are pre-generated with the quest buildings baked in, like any launch.
+    ['Bellhaven', 'Tidemoor', 'Saltmarsh', 'Drownedgate'].forEach((n) => {
+      expect(launch.townMapsCache[n]).toBeDefined();
+    });
+    launch.settings.milestones
+      .filter((m) => m.location && towns.has(m.location))
+      .forEach((m) => expect(typeof m.mapX).toBe('number'));
+  });
+
+  it('refuses the delivered premium t3 for a free user (backstop intact)', () => {
+    const t3 = makeDeliveredT3();
+    expect(() => launchCampaign(specFromTemplate(t3), { seed: SEED })).toThrow(/Premium/);
   });
 });
 

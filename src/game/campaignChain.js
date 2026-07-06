@@ -50,6 +50,35 @@ export const getPartyLevel = (party) => {
   return Math.max(...party.map((h) => h?.level || h?.heroLevel || 1));
 };
 
+// Campaigns ramp internally: early milestones are often ungated while deep
+// chapters carry minLevel, so an under-leveled party can still legitimately
+// START such a quest and grow into it via rumours. True when the campaign's
+// FIRST milestone is reachable at `partyLevel` (no minLevel, or already met).
+// Shared by the continue-legend picker, the New Game higher-tier note and the
+// hero-selection level warning, so all three tell the same truth.
+export const isOpeningAccessible = (milestones, partyLevel) => {
+  const first = (milestones || [])[0];
+  return !!first && (!first.minLevel || partyLevel >= first.minLevel);
+};
+
+/**
+ * Level-fit notice for a chosen party against a campaign's authored band
+ * (settings.levelRange + settings.milestones). Soft-warn data, never a block:
+ * null when there is nothing to warn about (no band, no party, or the party
+ * reaches the band); otherwise { levelRange, partyLevel, openingAccessible }
+ * for the "made for Lv X-Y; your party is Lv Z" banner class.
+ */
+export const getLevelFitNotice = ({ levelRange, milestones } = {}, party) => {
+  if (!Array.isArray(levelRange) || !Array.isArray(party) || party.length === 0) return null;
+  const partyLevel = getPartyLevel(party);
+  if (partyLevel >= levelRange[0]) return null;
+  return {
+    levelRange,
+    partyLevel,
+    openingAccessible: isOpeningAccessible(milestones, partyLevel),
+  };
+};
+
 // Every location the template's map generation would need: authored customNames
 // merged with milestone location names (exactly what a fresh launch would inject).
 const templateLocationNames = (template) => {
@@ -103,14 +132,9 @@ export const getNextCampaignOptions = ({ settings, party, worldMap = null } = {}
       sameGenre: !!genre && template.theme === genre,
       premiumLocked: !canUseTemplate(template),
       underLeveled: !!(template.levelRange && partyLevel < template.levelRange[0]),
-      // Campaigns ramp internally (early milestones are often ungated while deep
-      // chapters carry minLevel); an under-leveled party can still legitimately
-      // START such a quest and grow into it via rumours. Lets the picker tell
-      // the truth instead of only warning "may be deadly".
-      openingAccessible: (() => {
-        const first = (template.settings?.milestones || [])[0];
-        return !!first && (!first.minLevel || partyLevel >= first.minLevel);
-      })(),
+      // Lets the picker tell the truth instead of only warning "may be deadly"
+      // (see isOpeningAccessible above).
+      openingAccessible: isOpeningAccessible(template.settings?.milestones, partyLevel),
       compatible: isTemplateCompatibleWithWorld(template, worldMap),
     }));
 
