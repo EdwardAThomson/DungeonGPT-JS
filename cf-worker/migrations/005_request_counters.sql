@@ -10,10 +10,10 @@
 -- fails OPEN if the table is missing, so a missed migration degrades to "no
 -- throttling", never to an outage):
 --   On the box:
---     ssh octonion-games
+--     (connect to the games box; connection details live in the private ops notes)
 --     psql -U dungeongpt -d dungeongpt -f 005_request_counters.sql
 --   Or through the local dev tunnel (port 5433, per wrangler.toml):
---     psql "postgresql://dungeongpt:<pw>@localhost:5433/dungeongpt" \
+--     psql "<tunnel connection string, see private ops notes>" \
 --       -f cf-worker/migrations/005_request_counters.sql
 --
 -- HOW IT IS USED (cf-worker/src/middleware/rateLimit.ts owns the mechanics):

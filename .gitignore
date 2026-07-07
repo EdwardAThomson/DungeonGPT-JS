@@ -28,9 +28,7 @@ node_modules/
 *.sqlite
 *.sqlite3
 src/game.db
-# Allow migration SQL files
 *.sql
-!cf-worker/migrations/*.sql
 
 # Logs
 npm-debug.log*
@@ -77,10 +75,11 @@ wrangler.toml
 cf-worker/migrations/*
 # Post-cutover Postgres migrations are code (DDL + runbook) and must ship in the repo;
 # only the legacy D1-era contents of migrations/ stay local. Negate new ones explicitly.
-!cf-worker/migrations/002_account_tiers.sql
-!cf-worker/migrations/003_conversation_rev.sql
-!cf-worker/migrations/004_premium_templates.sql
-!cf-worker/migrations/005_request_counters.sql
+# Track ALL numbered migrations by default (a per-file list silently dropped 006
+# and blinded the CI migration guard, 2026-07-07); only the legacy D1-era 001
+# stays local.
+!cf-worker/migrations/0*.sql
+cf-worker/migrations/001_*.sql
 
 # Local-only archive of stale docs (preserved on disk, not tracked)
 docs/archive/

@@ -26,7 +26,7 @@ Browser (dungeongpt.xyz)
                             |-- /api/ai, /api/embed, /api/image  -> Workers AI binding
                             |-- /api/db/* (requireAuth: JWT verified against hub JWKS)
                             '------ Hyperdrive -----> self-hosted Postgres
-                                                      Hetzner box (`ssh octonion-games`)
+                                                      Hetzner box (ssh alias in your local ssh config)
                                                       db: dungeongpt, app role: dungeongpt
 ```
 
@@ -81,7 +81,7 @@ Work top-down; each check isolates one layer.
 
 ### Database down (saves failing, 500s from /api/db/*)
 
-1. `ssh octonion-games`
+1. `ssh <games-box>`
 2. `systemctl status postgresql` (and `sudo journalctl -u postgresql -n 100`).
 3. `sudo -u postgres psql -d dungeongpt -c 'SELECT 1;'`
 4. Disk: `df -h` (a full disk is the classic silent killer; backups in
@@ -119,7 +119,7 @@ old Worker never names the new field.
 2. New migration in the change? Apply it on the box first, per the runbook in
    the migration file's header:
    ```
-   ssh octonion-games
+   ssh <games-box>
    psql -U dungeongpt -d dungeongpt -f 00X_the_migration.sql
    ```
    Verify (e.g. `\d+ <table>`), then deploy.
@@ -275,16 +275,16 @@ Scripts (in the repo; copy them to the box):
 
 ```bash
 # From the repo, ship the scripts:
-ssh octonion-games 'sudo install -d -m 755 /opt/dungeongpt/ops'
+ssh <games-box> 'sudo install -d -m 755 /opt/dungeongpt/ops'
 scp scripts/ops/backup-postgres.sh scripts/ops/restore-postgres.sh \
-    octonion-games:/tmp/
-ssh octonion-games 'sudo install -m 755 /tmp/backup-postgres.sh /tmp/restore-postgres.sh /opt/dungeongpt/ops/'
+    <games-box>:/tmp/
+ssh <games-box> 'sudo install -m 755 /tmp/backup-postgres.sh /tmp/restore-postgres.sh /opt/dungeongpt/ops/'
 
 # Backup directory owned by postgres (peer auth, no password anywhere):
-ssh octonion-games 'sudo install -d -o postgres -g postgres -m 700 /var/backups/dungeongpt'
+ssh <games-box> 'sudo install -d -o postgres -g postgres -m 700 /var/backups/dungeongpt'
 
 # First run, by hand, to prove the pipeline before scheduling it:
-ssh octonion-games 'sudo -u postgres /opt/dungeongpt/ops/backup-postgres.sh'
+ssh <games-box> 'sudo -u postgres /opt/dungeongpt/ops/backup-postgres.sh'
 ```
 
 No env file is needed when running as `postgres` on the box. If credentials
@@ -375,9 +375,9 @@ journalctl -u dungeongpt-backup.service -n 50     # check it
 Weekly-ish eyeball (or fold into the restore drill, section 7):
 
 ```bash
-ssh octonion-games 'ls -lht /var/backups/dungeongpt/daily | head -5'
-ssh octonion-games 'sudo -u postgres rclone ls r2:dungeongpt-backups/daily | tail -3'
-ssh octonion-games 'journalctl -u dungeongpt-backup.service --since -8d | grep -E "complete|FAIL|error" | tail'
+ssh <games-box> 'ls -lht /var/backups/dungeongpt/daily | head -5'
+ssh <games-box> 'sudo -u postgres rclone ls r2:dungeongpt-backups/daily | tail -3'
+ssh <games-box> 'journalctl -u dungeongpt-backup.service --since -8d | grep -E "complete|FAIL|error" | tail'
 ```
 
 A dump dated yesterday or today, of a plausible size (compare against the
@@ -395,7 +395,7 @@ Record every drill in the log table at the bottom of this file.
 ### The drill, exactly
 
 ```bash
-ssh octonion-games
+ssh <games-box>
 
 # 1. Restore the newest daily dump into dungeongpt_drill (drops/recreates it):
 sudo -u postgres /opt/dungeongpt/ops/restore-postgres.sh --to-scratch-db
@@ -429,7 +429,7 @@ real too.
 Only in an actual data-loss incident:
 
 ```bash
-ssh octonion-games
+ssh <games-box>
 sudo -u postgres /opt/dungeongpt/ops/restore-postgres.sh --to-production [dump-file]
 ```
 
@@ -452,7 +452,7 @@ stops being acceptable).
 | Hyperdrive connection string | Contains the `dungeongpt` DB role password | Inside the Cloudflare Hyperdrive config (created via `wrangler hyperdrive create`); never in the repo. Local dev uses `WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` + ssh tunnel (recipe in `cf-worker/wrangler.toml`) |
 | `CF_API_TOKEN` (GitHub Actions) | SEPARATE CI-only token, Workers Scripts:Edit, for `wrangler deploy` | `gh secret set CF_API_TOKEN` (repo Actions secret) |
 | `CF_ACCOUNT_ID`, `PROD_WORKER_URL` | Not secret; deploy workflow config | GitHub Actions repo variables |
-| Postgres role passwords (`dungeongpt`, `postgres`) | DB auth on the box | In Postgres on the box; box login is ssh-key only (`ssh octonion-games`) |
+| Postgres role passwords (`dungeongpt`, `postgres`) | DB auth on the box | In Postgres on the box; box login is ssh-key only (`ssh <games-box>`) |
 | `/etc/dungeongpt/backup.env` | Optional PG* creds for backup/restore scripts | On the box, chmod 600 (scripts refuse it otherwise) |
 | rclone R2 credentials | Offsite backup bucket keys (Object Read & Write, one bucket) | `~postgres/.config/rclone/rclone.conf` on the box, chmod 600 |
 | `REACT_APP_SUPABASE_URL` / `_ANON_KEY`, `REACT_APP_CF_WORKER_URL` | Frontend build-time config (anon key is public by design) | Pages build environment; local `.env` |

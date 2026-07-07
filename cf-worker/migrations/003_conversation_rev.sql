@@ -7,10 +7,10 @@
 --
 -- RUNBOOK (manual apply, never run automatically):
 --   On the box:
---     ssh octonion-games
+--     (connect to the games box; connection details live in the private ops notes)
 --     psql -U dungeongpt -d dungeongpt -f 003_conversation_rev.sql
 --   Or through the local dev tunnel (port 5433, per wrangler.toml):
---     psql "postgresql://dungeongpt:<pw>@localhost:5433/dungeongpt" \
+--     psql "<tunnel connection string, see private ops notes>" \
 --       -f cf-worker/migrations/003_conversation_rev.sql
 --
 -- ORDER OF OPERATIONS (important): apply this migration BEFORE deploying the Worker

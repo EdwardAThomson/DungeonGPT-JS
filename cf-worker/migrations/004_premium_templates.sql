@@ -7,10 +7,10 @@
 --
 -- RUNBOOK (manual apply, never run automatically):
 --   On the box:
---     ssh octonion-games
+--     (connect to the games box; connection details live in the private ops notes)
 --     psql -U dungeongpt -d dungeongpt -f 004_premium_templates.sql
 --   Or through the local dev tunnel (port 5433, per wrangler.toml):
---     psql "postgresql://dungeongpt:<pw>@localhost:5433/dungeongpt" \
+--     psql "<tunnel connection string, see private ops notes>" \
 --       -f cf-worker/migrations/004_premium_templates.sql
 --
 -- LOADING A TEMPLATE (the only write path until an admin endpoint lands; content is

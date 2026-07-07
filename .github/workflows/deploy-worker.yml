@@ -70,7 +70,7 @@ jobs:
             echo ""
             echo "To proceed:"
             echo "  1. Apply the migration on the box, per the runbook in the file header:"
-            echo "       ssh octonion-games"
+            echo "       (connect to the games box; see the private ops notes)"
             echo "       psql -U dungeongpt -d dungeongpt -f <migration file>"
             echo "  2. Re-run this workflow manually (Actions -> Deploy Worker -> Run"
             echo "     workflow), which skips this guard, or:"
