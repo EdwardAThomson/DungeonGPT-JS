@@ -14,6 +14,7 @@ deleted. When the code and a doc disagree, the code wins.
 - `DEPLOYMENT_ARCHITECTURE.md` — current prod stack (CF Pages + Worker + self-hosted Postgres via Hyperdrive)
 - `OPS_RUNBOOK.md` — incidents, rollbacks, BACKUPS (post-cutover: self-hosted PG), deploy CI, drills
 - `CF_WORKER_GUIDE.md` — production Worker reference (model lineup: code wins over the doc)
+- `REDEMPTION_CODES.md` — redemption codes: schema, redeem endpoint, effective-tier rule, code lifecycle (#6 first slice)
 - `authentication_plan.md` — Octonion-hub auth / JWT verification
 
 ## System references (shipped, live systems)

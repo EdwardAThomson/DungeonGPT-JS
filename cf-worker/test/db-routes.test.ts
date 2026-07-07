@@ -50,22 +50,35 @@ beforeEach(() => {
 });
 
 describe("GET /entitlements", () => {
-  it("reports 'free' when the account has no tier row", async () => {
+  it("reports 'free' when the account has no tier row and no grants", async () => {
     const res = await call("/entitlements");
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ tier: "free", updatedAt: null });
+    expect(await res.json()).toEqual({ tier: "free", updatedAt: null, expiresAt: null });
     expect(sql.lastCall()?.values).toContain(USER);
     expect(sql.ended).toBe(true);
   });
 
-  it("reports the stored tier when a row exists", async () => {
+  it("reports the stored tier when a base row exists (no expiry: not time-boxed)", async () => {
     sql.onQuery(/FROM account_tiers/, () => [
-      { tier: "member", updated_at: "2026-07-01T00:00:00Z" },
+      { src: "base", tier: "member", ts: "2026-07-01T00:00:00Z" },
     ]);
     const res = await call("/entitlements");
     expect(await res.json()).toEqual({
       tier: "member",
       updatedAt: "2026-07-01T00:00:00Z",
+      expiresAt: null,
+    });
+  });
+
+  it("reports the grant tier + expiresAt when a code grant raises the tier", async () => {
+    sql.onQuery(/FROM account_tiers/, () => [
+      { src: "grant", tier: "member", ts: "2026-08-05T00:00:00.000Z" },
+    ]);
+    const res = await call("/entitlements");
+    expect(await res.json()).toEqual({
+      tier: "member",
+      updatedAt: null,
+      expiresAt: "2026-08-05T00:00:00.000Z",
     });
   });
 

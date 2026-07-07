@@ -18,6 +18,9 @@
 //     postgres.js queries are lazy, execution happens on await)
 //   - sql.json(v):               jsonb marker; the raw value lands in `values`
 //   - sql.end():                 resolves, records that it was called
+//   - sql.begin(fn):             runs fn with the same fake as the transaction
+//     client and counts on `begins`; a throw propagates (postgres.js rolls the
+//     real transaction back on throw; the fake has no state to roll back)
 //
 // Tests register handlers against a regex over the normalized query text (single
 // spaces, no newlines). First matching handler wins; a handler may throw to
@@ -58,6 +61,10 @@ export interface FakeSql {
   (strings: TemplateStringsArray, ...vals: unknown[]): unknown;
   json(v: unknown): unknown;
   end(): Promise<void>;
+  /** Transaction seam: fn runs against this same fake; throws propagate. */
+  begin<T>(fn: (tx: FakeSql) => T | Promise<T>): Promise<T>;
+  /** Number of begin() transactions started. */
+  begins: number;
   /** Queries that actually executed (fragments excluded), in order. */
   calls: FakeQueryCall[];
   /** Register a handler; first regex match wins. Throw inside to simulate errors. */
@@ -117,6 +124,11 @@ export function createFakeSql(): FakeSql {
   }) as FakeSql;
 
   sql.json = (v: unknown): JsonWrapped => ({ [JSON_MARKER]: true, value: v });
+  sql.begins = 0;
+  sql.begin = async <T>(fn: (tx: FakeSql) => T | Promise<T>): Promise<T> => {
+    sql.begins += 1;
+    return fn(sql);
+  };
   sql.ended = false;
   sql.end = async () => {
     sql.ended = true;
