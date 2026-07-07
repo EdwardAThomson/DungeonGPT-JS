@@ -5,6 +5,7 @@ import SettingsContext from '../contexts/SettingsContext';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
 import { hasTier } from '../game/entitlements';
+import AiPoolPills from './AiPoolPills';
 import {
   getPreferredPool, setPreferredPool,
   getLastPoolOutcome, subscribeAiPool
@@ -180,47 +181,7 @@ export const AiEngineSettings = ({
           for guests/free exactly as before. The Worker enforces tier + a daily
           premium allowance server-side; over-allowance responses quietly fall back
           to the free pool (notice below). */}
-      <div style={{ marginBottom: premiumActive ? '8px' : '20px', display: 'flex', gap: '8px' }} role="radiogroup" aria-label="AI pool">
-        <button
-          type="button"
-          role="radio"
-          aria-checked={!premiumActive}
-          onClick={() => setPreferredPool('free')}
-          style={!premiumActive
-            ? { flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px solid var(--primary)', background: 'var(--surface)', color: 'var(--primary)', fontWeight: 700, cursor: 'default' }
-            : { flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontWeight: 400, cursor: 'pointer' }}
-        >
-          ⚡ Free AI
-          <div style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-secondary)', marginTop: '2px' }}>Cloudflare open-weights pool — included for everyone</div>
-        </button>
-        {premiumUnlocked ? (
-          <button
-            type="button"
-            role="radio"
-            aria-checked={premiumActive}
-            onClick={() => setPreferredPool('premium')}
-            title="Premium AI: stronger models, included with Membership"
-            style={premiumActive
-              ? { flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px solid var(--primary)', background: 'var(--surface)', color: 'var(--primary)', fontWeight: 700, cursor: 'default' }
-              : { flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontWeight: 400, cursor: 'pointer' }}
-          >
-            ✨ Premium AI
-            <div style={{ fontSize: '0.72rem', fontWeight: 400, marginTop: '2px' }}>Stronger models · included with Membership</div>
-          </button>
-        ) : (
-          <button
-            type="button"
-            role="radio"
-            aria-checked="false"
-            disabled
-            title="Premium AI models arrive with Membership"
-            style={{ flex: 1, padding: '10px 12px', borderRadius: '8px', border: '2px dashed var(--border)', background: 'transparent', color: 'var(--text-secondary)', opacity: 0.65, cursor: 'not-allowed' }}
-          >
-            🔒 Premium AI
-            <div style={{ fontSize: '0.72rem', fontWeight: 400, marginTop: '2px' }}>Stronger models · Members</div>
-          </button>
-        )}
-      </div>
+      <AiPoolPills style={{ marginBottom: premiumActive ? '8px' : '20px' }} />
       {/* Active-engine resolver: DEV ONLY. Locally the provider dropdown and the
           pool pills can disagree (a non-cf-workers provider routes to the Express
           dev server and bypasses the pool), so this line states what will

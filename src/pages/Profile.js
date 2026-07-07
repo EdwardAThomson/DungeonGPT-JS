@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { redeemCode } from '../services/redemptionApi';
+import AiPoolPills from '../components/AiPoolPills';
 
 // Friendly copy for the redeem endpoint's error contract (redemptionApi.js).
 // 'code_invalid' is deliberately one line for every dead-code flavour (unknown,
@@ -140,6 +141,14 @@ const Profile = () => {
                 <span className="tier-note"> · active until {formatDate(tierExpiresAt)}</span>
               )}
             </p>
+          </div>
+
+          <div className="profile-field">
+            <label>AI narration</label>
+            {/* Members pick their pool here too, not only from the in-game AI tab
+                (maintainer 2026-07-07). Shares the aiPool service with the game, so
+                the choice is one and the same. */}
+            <AiPoolPills style={{ marginTop: '4px' }} />
           </div>
 
           <div className="profile-field">
