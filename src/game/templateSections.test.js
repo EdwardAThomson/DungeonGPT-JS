@@ -26,7 +26,7 @@ describe('getTemplateSections against the shipped catalog', () => {
       'arcane-renaissance-t1', 'grimdark-survival-t1', 'heroic-fantasy-t1',
     ]);
     expect(sections.premiumStarters.map((t) => t.id).sort()).toEqual([
-      'desert-expedition-t1', 'eldritch-horror-t1', 'frozen-frontier-t1',
+      'desert-expedition-t1', 'eldritch-horror-t1', 'frozen-frontier-t1', 'tidewater-t1',
     ]);
   });
 
@@ -36,7 +36,7 @@ describe('getTemplateSections against the shipped catalog', () => {
     ]);
     // Premium t2s are segregated (maintainer 2026-07-06)
     expect(sections.premiumSeasoned.map((t) => t.id).sort()).toEqual([
-      'desert-expedition-t2', 'eldritch-horror-t2', 'frozen-frontier-t2',
+      'desert-expedition-t2', 'eldritch-horror-t2', 'frozen-frontier-t2', 'tidewater-t2',
     ]);
     sections.seasoned.forEach((t) => expect(t.comingSoon).toBeUndefined());
   });
@@ -94,7 +94,9 @@ describe('server-delivered higher-tier templates (registerPremiumTemplates then 
       settings: { milestones: [] },
     }], catalog);
     const { premiumLegendary } = getTemplateSections(catalog);
-    expect(premiumLegendary.map((t) => t.id)).toEqual(['heroic-fantasy-t3']);
+    // The shipped catalog now carries the tidewater-t3 shop-window stub, so
+    // Legendary holds it alongside the freshly delivered entry.
+    expect(premiumLegendary.map((t) => t.id).sort()).toEqual(['heroic-fantasy-t3', 'tidewater-t3']);
     // The remaining stubs stay excluded.
     expect(premiumLegendary.map((t) => t.id)).not.toContain('eldritch-horror-t3');
   });

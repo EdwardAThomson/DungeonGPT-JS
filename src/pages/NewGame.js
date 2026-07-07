@@ -287,6 +287,12 @@ const NewGame = () => {
       setFormError('This is a Premium adventure. Premium unlock is coming soon; pick a free adventure to begin.');
       return;
     }
+    if (selTpl && selTpl.teaser === true) {
+      // Teaser stub reached submit: entitled tier but the server delivery has
+      // not replaced the stub this session; there is no campaign to launch.
+      setFormError('This adventure loads with your account content at sign-in. Sign out and back in (or refresh) and it will be playable.');
+      return;
+    }
     if (!premiumUnlocked && isThemePremium(worldTheme)) {
       setFormError('Desert and snow adventures are a Premium feature (coming soon). Choose a temperate setting to continue.');
       return;
@@ -383,7 +389,7 @@ const NewGame = () => {
   const renderTemplateModal = () => {
     if (!previewTemplate) return null;
     const t = previewTemplate;
-    const ms = t.settings.milestones || [];
+    const ms = t.settings?.milestones || []; // teaser stubs carry no settings
     const isSelected = selectedTemplate === t.id;
     const isPremiumLocked = !canUseTemplate(t);
 
@@ -583,6 +589,11 @@ const NewGame = () => {
     // (canUseTemplate also honours per-template minTier, e.g. premium-only
     // server-delivered campaigns).
     const isPremiumLocked = !template.comingSoon && !canUseTemplate(template);
+    // Teaser stub: the public bundle carries only the card face (shop window,
+    // maintainer 2026-07-07); the playable campaign arrives by server delivery,
+    // which REPLACES the stub by id at sign-in. Reaching this branch entitled
+    // means the delivery has not landed in this session.
+    const isTeaserOnly = !isPremiumLocked && template.teaser === true;
     const isLocked = template.comingSoon || isPremiumLocked;
     return (
       <div
@@ -592,7 +603,9 @@ const NewGame = () => {
           template.comingSoon ? undefined
             : isPremiumLocked
               ? () => setFormError('This is a Premium adventure. Premium unlock is coming soon — pick a free adventure to begin.')
-              : () => applyTemplate(template)
+              : isTeaserOnly
+                ? () => setFormError('This adventure loads with your account content at sign-in. Sign out and back in (or refresh) and it will be playable.')
+                : () => applyTemplate(template)
         }
         style={{
           background: 'var(--surface)',

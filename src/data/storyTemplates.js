@@ -1338,6 +1338,76 @@ export const storyTemplates = [
 // them, so a playtester's in-progress local copy is never clobbered by the shipped
 // server version of the same campaign.
 
+// ---------------------------------------------------------------------------
+// SHOP-WINDOW TEASER STUBS (maintainer decision 2026-07-07): the public bundle
+// carries only the card FACE of each server-delivered campaign: id, names,
+// tier, level band, blurb, art (already in public/assets/templates/). The
+// playable content (milestones, customNames, NPCs, rewards) lives ONLY in the
+// premium_templates table and arrives by delivery at sign-in, REPLACING the
+// stub by id (registerPremiumTemplates below). Guests and below-tier accounts
+// therefore see the full ladder as locked cards with zero network calls; a
+// stub is never startable (teaser guards in NewGame) because it has no
+// settings. This replaced the PR #53 endpoint-teaser design: one mental model,
+// "the bundle is everything you may SEE; the database is everything you may
+// PLAY."
+const SHOP_WINDOW_STUBS = [
+    {
+        id: 'tidewater-t1',
+        theme: 'tidewater',
+        tier: 1,
+        levelRange: [1, 2],
+        name: 'Tidewater',
+        subtitle: 'The Backward Tide',
+        icon: '🔔',
+        shortDescription: 'A Gullwash fishing crew has hauled up a barnacled bell fragment, and ever since, the tide past the flats has run the wrong way. Follow the backward tide to its source and put what pulls it to rest.',
+        premium: true,
+        minTier: 'premium',
+        teaser: true,
+    },
+    {
+        id: 'tidewater-t2',
+        theme: 'tidewater',
+        tier: 2,
+        levelRange: [3, 5],
+        name: 'Tidewater',
+        subtitle: 'The First Bell',
+        icon: '🔔',
+        shortDescription: 'The ebb off Eelford runs out too far and has bared a drowned bell tower on the flats. At every dead low, its bell rings. Find who tolls it and still the first bell.',
+        premium: true,
+        minTier: 'premium',
+        teaser: true,
+    },
+    {
+        id: 'tidewater-t3',
+        theme: 'tidewater',
+        tier: 3,
+        levelRange: [4, 6],
+        name: 'Tidewater',
+        subtitle: 'The Drowned Bells',
+        icon: '🔔',
+        shortDescription: 'The canal city of Vespermere is built above its own drowned first quarter, and the sunken bell towers have begun to ring again. Find what tolls beneath the lagoon and silence it before the living city is pulled down to join the dead one.',
+        premium: true,
+        minTier: 'premium',
+        teaser: true,
+    },
+    {
+        id: 'heroic-fantasy-t3',
+        theme: 'heroic-fantasy',
+        tier: 3,
+        levelRange: [5, 7],
+        name: 'Heroic Fantasy',
+        subtitle: 'The Shattered Throne',
+        icon: '👑',
+        shortDescription: 'The realm is won, but the throne it rests on is broken, and every claimant to its shards raises an army. End the succession war before the kingdom your heroes saved tears itself apart.',
+        premium: true,
+        minTier: 'member',
+        teaser: true,
+    },
+];
+SHOP_WINDOW_STUBS.forEach((stub) => {
+    if (!storyTemplates.some((t) => t.id === stub.id)) storyTemplates.push(stub);
+});
+
 // ids merged from the LOCAL slot; server delivery never overrides these.
 const localSlotIds = new Set();
 

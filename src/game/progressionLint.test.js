@@ -109,16 +109,13 @@ const KNOWN_GAPS = {
   // Add a pin here only for future intentionally-unbalanced content.
   bossBalance: {},
 
-  // (d) Part I §2: no t2 world's authored XP reaches the t3 entry threshold
-  // (Lv 5 = 6,500 XP). Totals ~3,800-4,600 after the #45/#50 pool expansion.
-  worldsBelowXpBudget: [
-    'heroic-fantasy-t2',
-    'grimdark-survival-t2',
-    'arcane-renaissance-t2',
-    'eldritch-horror-t2',
-    'desert-expedition-t2',
-    'frozen-frontier-t2'
-  ],
+  // (d) HISTORY: Part I §2 pinned that no t2 world's XP reached the t3 entry
+  // (Lv 5 = 6,500 XP; totals ~3,800-4,600 after #45/#50). GAP CLOSED
+  // 2026-07-07: tidewater-t3 (The Drowned Bells, a Lv 4-entry bridge t3)
+  // joined the catalog as a shop-window stub, lowering the tier's entry target
+  // to Lv 4 (2,700 XP), which every t2 budget already covers. Pins removed per
+  // the pin's own instruction.
+  worldsBelowXpBudget: [],
 
   // (f) 'gemstone' was rewarded with no ITEM_CATALOG entry (nameless zero-value
   // item) — FIXED 2026-07-03 by splitting the drops onto existing items
@@ -143,7 +140,10 @@ const HEALTHY = {
 
 // ---------------------------------------------------------------------------------
 // Shared live-data derivations
-const playableTemplates = storyTemplates.filter((t) => !t.comingSoon);
+// Teaser stubs are card faces for server-delivered campaigns (2026-07-07):
+// their playable content lives in premium_templates and is validated by the
+// deploy pipeline + the private repo's sim records, not this public lint.
+const playableTemplates = storyTemplates.filter((t) => !t.comingSoon && !t.teaser);
 const maxReachableTier = Math.max(...playableTemplates.map((t) => t.tier || 1));
 
 const bossEntries = playableTemplates

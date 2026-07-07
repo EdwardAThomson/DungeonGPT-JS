@@ -125,7 +125,7 @@ export const getNextCampaignOptions = ({ settings, party, worldMap = null } = {}
   const fits = (t) => !!(t.levelRange && partyLevel >= t.levelRange[0] && partyLevel <= t.levelRange[1]);
 
   const options = storyTemplates
-    .filter((t) => !t.comingSoon && !played.has(t.id))
+    .filter((t) => !t.comingSoon && !t.teaser && !played.has(t.id)) // teaser stubs: card faces only, content undelivered
     .map((template) => ({
       template,
       recommended: !!genre && template.theme === genre && template.tier === currentTier + 1,
