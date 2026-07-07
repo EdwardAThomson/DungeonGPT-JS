@@ -1,4 +1,4 @@
-import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, OFF_MAP, jettyTile, jettyInfo, POI_EMOJI } from './townTileArt';
+import { tileBackground, sampleTiles, wallVariant, buildingTile, canalTile, canalBridgeTile, quayVariant, waterwayMask, OFF_MAP, jettyTile, jettyInfo, POI_EMOJI, BUILDING_TYPES } from './townTileArt';
 import PINS from './townTileArt.pins.json';
 
 const TYPES = ['grass', 'dirt_path', 'stone_path', 'town_square', 'farm_field', 'water', 'bridge', 'wall', 'keep_wall', 'building'];
@@ -108,10 +108,11 @@ describe('townTileArt', () => {
 // (cache keys and data-URIs both) and that old saves with no theme marker re-render
 // byte-identically.
 describe('townTileArt theme palettes', () => {
-  const SNOW_CAP_D = "M5 12.5"; // the snow roof band's path signature
+  const SNOW_CAP_D = "M8 12.2"; // the snow roof band's path signature (shrunk 2026-07-07)
   // strip every colour so only geometry remains; silhouettes must survive theming
   const geometry = (bg) => decode(bg)
-    .replace(/<path d='M5 12\.5[^/]*\/>/, '')            // drop the snow cap overlay
+    .replace(/<path d='M8 12\.2[^/]*\/>/, '')            // drop the snow cap overlay
+    .replace(/<rect x='3\.1' y='16\.8'.*?stroke-linecap='round'\/>/, '') // drop the snow identity signboard
     .replace(/<defs><filter[\s\S]*?<\/filter><\/defs>/, '') // drop the outline-halo filter
     .replace(/<g filter='url\(#bo\)'>/, '').replace(/<\/g>/, '') // unwrap the halo group
     .replace(/(fill|stroke)='[^']*'/g, "$1=''");
@@ -252,6 +253,82 @@ describe('townTileArt tier-2 architecture flavour', () => {
     expect(buildingTile('house', 'desert')).toBe(buildingTile('house', 'desert'));
     expect(buildingTile('house', 'snow')).toBe(buildingTile('house', 'snow'));
     expect(buildingTile('inn', 'snow')).toBe(buildingTile('inn', 'snow'));
+  });
+});
+
+// Snow legibility pass (playtest 2026-07-07: "the snow buildings are not readable with
+// the snow caps... hard to tell one building from another"). Three art-layer fixes, no
+// generation/tile-data change: the roof tint softened (0.35 -> 0.2) so per-type roof
+// colours survive, the shared snow cap shrank to a crest patch so it no longer hides
+// the roof, and every non-house building gains an identity signboard carrying its
+// UNTINTED temperate roof colour, the one per-type colour snow never covers.
+describe('townTileArt snow legibility pass', () => {
+  const SIGN = "x='1.4' y='18.6'"; // the identity signboard's board rect
+  // The venue types story templates use for quest buildings (storyTemplates.js:
+  // trading-post warehouses, inns, taverns, temples, archives, guilds, barracks,
+  // alchemists, workshops) plus shop as a commerce control; each must show its
+  // untinted temperate roof colour (ROOFS) on the signboard.
+  const QUEST_VENUE_ACCENTS = {
+    warehouse: '7a5230', inn: 'b5762d', tavern: 'b3672f', temple: 'c9b04a',
+    archives: '6a5a3a', guild: '5a6fae', barracks: '566069', alchemist: '7a5a9c',
+    workshop: '4a8c8c', shop: '3f7d6e',
+  };
+
+  test('the shared snow cap is the shrunk crest patch, not the old full-width band', () => {
+    const svg = decode(buildingTile('house', 'snow'));
+    expect(svg).toContain('M8 12.2');
+    expect(svg).not.toContain('M5 12.5');
+  });
+
+  test('every quest-venue type carries a signboard in its untinted identity colour', () => {
+    Object.entries(QUEST_VENUE_ACCENTS).forEach(([b, hex]) => {
+      const svg = decode(buildingTile(b, 'snow'));
+      expect(svg).toContain(SIGN);
+      expect(svg).toContain(hex); // the temperate roof colour, un-tinted, below the snow line
+    });
+  });
+
+  test('every non-house type is signed; houses (the filler stock) are not', () => {
+    BUILDING_TYPES.filter((b) => b !== 'house').forEach((b) => {
+      expect(decode(buildingTile(b, 'snow'))).toContain(SIGN);
+    });
+    expect(decode(buildingTile('house', 'snow'))).not.toContain(SIGN);
+  });
+
+  test('temperate and desert buildings carry no signboard (snow-only dressing)', () => {
+    ['inn', 'warehouse', 'temple'].forEach((b) => {
+      expect(decode(buildingTile(b))).not.toContain(SIGN);
+      expect(decode(buildingTile(b, 'desert'))).not.toContain(SIGN);
+    });
+  });
+
+  test('all snow building types render pairwise-distinct art', () => {
+    const svgs = BUILDING_TYPES.map((b) => buildingTile(b, 'snow'));
+    expect(new Set(svgs).size).toBe(BUILDING_TYPES.length);
+  });
+
+  test('softened tint: the snow roof is closer to its temperate hue than the old mix', () => {
+    // inn temperate roof #b5762d; at 0.2 toward #4a4038 the red channel stays > 0x9a,
+    // where the old 0.35 mix dropped it to ~0x90: assert the tinted hex present now
+    const svg = decode(buildingTile('inn', 'snow'));
+    expect(svg).toContain('#a06b2f'); // mix('#b5762d', '#4a4038', 0.2)
+  });
+
+  test('signboards are deterministic and memo-safe (keyed by type + theme, not coords)', () => {
+    expect(buildingTile('warehouse', 'snow')).toBe(buildingTile('warehouse', 'snow'));
+    const a = tileBackground({ type: 'building', buildingType: 'warehouse' }, {}, 3, 3, 'snow');
+    const b = tileBackground({ type: 'building', buildingType: 'warehouse' }, {}, 9, 9, 'snow');
+    expect(a).toBe(b);
+  });
+
+  test('a building tile missing its buildingType renders as the keyed fallback (house)', () => {
+    // the memo key already normalises a missing type to 'house'; the ART must match it
+    // in every theme so cache-fill order can never change what a save renders.
+    // buildingTile() bypasses the cache, so this compares the generated strings, not
+    // one cache entry with itself.
+    ['grassland', 'desert', 'snow'].forEach((theme) => {
+      expect(buildingTile(undefined, theme)).toBe(buildingTile('house', theme));
+    });
   });
 });
 

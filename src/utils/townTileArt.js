@@ -76,13 +76,21 @@ const THEME_MATERIALS = {
   // lands every building in an unmistakable adobe/tan family (walls follow,
   // they are shaded from the roof) while lightness still separates the types.
   desert: { tint: '#c47a4a', amount: 0.55, outline: '#4a3626' },
-  // dark timber tint so buildings sit as darker wood against the white ground; the
-  // cap flag adds a white snow band across the roofline (palette-level dressing, not
-  // a new shape: it is invisible where it overhangs the already-white snow ground)
-  snow: { tint: '#4a4038', amount: 0.35, cap: true, outline: '#33404c' },
+  // frosted timber tint so buildings sit darker against the white ground; the cap
+  // flag adds a white snow band across the roofline (palette-level dressing, not a
+  // new shape: it is invisible where it overhangs the already-white snow ground).
+  // The tint started at 0.35, but that converged every per-type roof colour into the
+  // same grey-brown and the buildings read alike (playtest 2026-07-07); 0.2 keeps the
+  // winter mood while a snow-dusted red roof still reads red, teal still reads teal.
+  snow: { tint: '#4a4038', amount: 0.2, cap: true, outline: '#33404c' },
 };
 // One shared roofline band for snow towns, drawn over the finished building body.
-const SNOW_CAP = `<path d='M5 12.5 q11 -5 22 0 l0 2.8 q-11 -5 -22 0 z' fill='#ffffff' opacity='0.75'/>`;
+// Shrunk from the original full-width band (x5-27, 2.8 tall): stamped across y≈10-15
+// it sat exactly where every shape carries its distinctive roof colour, and with the
+// tint underneath it made all buildings read alike (playtest 2026-07-07). The crest
+// patch (x8-24, 2 tall) keeps the roofs visibly snowed while most of each roof's
+// colour survives around it.
+const SNOW_CAP = `<path d='M8 12.2 q8 -3.6 16 0 l0 2 q-8 -3.6 -16 0 z' fill='#ffffff' opacity='0.75'/>`;
 
 // Mix two '#rrggbb' colours; t is the weight of the tint (t=0 returns the base).
 const mix = (base, tint, t) => {
@@ -907,9 +915,9 @@ const icicleFringe = (type) => {
   const h = hash(type);
   let out = '';
   for (let i = 0; i < 5; i++) {
-    const x = 7.5 + i * 4.4 + ((h >> (i * 3)) & 3) * 0.4; // per-type jitter, deterministic
-    const t = (x - 16) / 11;
-    const y = 12.9 + 2.4 * t * t; // follows the SNOW_CAP band's lower curve
+    const x = 8.8 + i * 3.5 + ((h >> (i * 3)) & 3) * 0.4; // per-type jitter, deterministic
+    const t = (x - 16) / 8;
+    const y = 12.6 + 1.8 * t * t; // follows the SNOW_CAP band's lower curve
     const len = 2 + ((h >> (i * 2)) & 3) * 0.5;
     out += `<polygon points='${(x - 0.8).toFixed(1)},${y.toFixed(1)} ${(x + 0.8).toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${(y + len).toFixed(1)}' fill='#dceefc' opacity='0.9'/>`;
   }
@@ -917,14 +925,32 @@ const icicleFringe = (type) => {
 };
 const SNOW_ICICLES = new Set(['house', 'shop', 'temple', 'inn']);
 
+// Per-type identity signboard for snow towns (playtest 2026-07-07: "hard to tell one
+// building from another" under the roof tint + snow caps). A post-and-board sign at
+// the building's front-left carries the UNTINTED temperate roof colour, the per-type
+// identity colour (see ROOFS: "kept distinct for readability") in the one place snow
+// never covers, so every venue keeps its colour at a glance and quest buildings
+// (warehouse trading posts, inns, taverns, temples, archives, ...) stay findable.
+// Houses are the town's filler stock and deliberately carry no sign, so signed venues
+// pop against the housing. Drawn outside the outline halo with its own dark stroke;
+// the white dusting line along the board's top edge keeps the winter mood.
+const snowSign = (accent) =>
+  `<rect x='3.1' y='16.8' width='1.2' height='9.4' rx='0.4' fill='#3a3229' stroke='#232a31' stroke-width='0.5'/>` +
+  `<rect x='1.4' y='18.6' width='5.6' height='5.2' rx='0.7' fill='${accent}' stroke='#232a31' stroke-width='0.8'/>` +
+  `<path d='M1.9 18.9 h4.6' stroke='#ffffff' stroke-width='1' opacity='0.9' stroke-linecap='round'/>`;
+
 const building = (buildingType, ground = C.grass, theme = 'grassland') => {
+  // Normalise a missing type to 'house' so the art matches the cache key (which
+  // already falls back to 'house'): a keyed-as-house tile must never render
+  // differently depending on which caller populated the cache first.
+  const type = buildingType || 'house';
   const mat = THEME_MATERIALS[theme];
-  const baseRoof = ROOFS[buildingType] || ROOFS.house;
+  const baseRoof = ROOFS[type] || ROOFS.house;
   // themed towns re-tint the material palette; temperate (or any unknown theme) uses
   // the roof colour untouched so existing saves render byte-identically
   const roof = mat ? mix(baseRoof, mat.tint, mat.amount) : baseRoof;
   // tier-2 desert flat-roof variants replace the shape for the allowlisted types only
-  const shape = (theme === 'desert' && DESERT_FLAT[buildingType]) || SHAPES[BUILDING_SHAPE[buildingType] || 'gable'];
+  const shape = (theme === 'desert' && DESERT_FLAT[type]) || SHAPES[BUILDING_SHAPE[type] || 'gable'];
   const body = shape(roof) + (mat && mat.cap ? SNOW_CAP : '');
   // Themed grounds are pale (sand/snow), which washes out building silhouettes
   // (maintainer 2026-07-05). A zero-offset drop-shadow halo re-cuts the outline
@@ -947,9 +973,12 @@ const building = (buildingType, ground = C.grass, theme = 'grassland') => {
   // smoke/ice would read as dirt, and temperate/desert never reach this branch
   let extras = '';
   if (theme === 'snow') {
-    if (SNOW_ICICLES.has(buildingType)) extras += icicleFringe(buildingType);
-    const smoke = SNOW_SMOKE[buildingType];
+    if (SNOW_ICICLES.has(type)) extras += icicleFringe(type);
+    const smoke = SNOW_SMOKE[type];
     if (smoke) extras += smoke();
+    // identity signboard on every venue (everything but the filler houses); it
+    // carries its own stroke, so it stays crisp without joining the halo's silhouette
+    if (type !== 'house') extras += snowSign(baseRoof);
   }
   return wrap(
     `<rect width='32' height='32' fill='${ground}'/>` +
