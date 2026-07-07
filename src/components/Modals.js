@@ -105,7 +105,7 @@ export const AiEngineSettings = ({
   // the client never selects it, so any model dropdown selection is ignored while
   // Premium is active. This label is informational only (kept vague on purpose:
   // "the pool is the choice", not the model).
-  const PREMIUM_MODEL_LABEL = 'a stronger model (server-selected)';
+  const PREMIUM_MODEL_LABEL = 'OpenRouter (default openai/gpt-5-mini; the server may fall back down the premium chain, then to the Free pool)';
 
   // Production coercion: any stored/legacy non-cf-workers provider is pinned back to
   // the one provider that actually works in prod (prevents silent AI breakage for
@@ -242,7 +242,7 @@ export const AiEngineSettings = ({
           >
             {onWorker ? (
               premiumActive ? (
-                <span><strong style={{ color: 'var(--text)' }}>Active engine:</strong> Cloudflare Worker, ✨ Premium pool, {PREMIUM_MODEL_LABEL}.<br />The model picker below is ignored while Premium is active.</span>
+                <span><strong style={{ color: 'var(--text)' }}>Active engine:</strong> ✨ Premium pool: {PREMIUM_MODEL_LABEL}. Requests route through the Cloudflare Worker to OpenRouter.<br />The provider/model pickers below are ignored while Premium is active.</span>
               ) : (
                 <span><strong style={{ color: 'var(--text)' }}>Active engine:</strong> Cloudflare Worker, ⚡ Free pool</span>
               )
