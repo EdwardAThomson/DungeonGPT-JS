@@ -41,10 +41,16 @@ describe('getTemplateSections against the shipped catalog', () => {
     sections.seasoned.forEach((t) => expect(t.comingSoon).toBeUndefined());
   });
 
-  it('excludes comingSoon stubs from the tier-3 section (empty until real t3 content ships)', () => {
-    // All four built-in t3s are comingSoon stubs, so with public data only the
-    // Legendary section is empty and NewGame hides it entirely.
-    expect(sections.legendary).toEqual([]);
+  it('excludes comingSoon stubs from the tier-3 section (only shop-window faces surface)', () => {
+    // Three built-in t3s remain comingSoon stubs and stay excluded. The
+    // heroic-fantasy-t3 SHOP_WINDOW_STUB now REPLACES its comingSoon built-in
+    // (maintainer ruling 2026-07-07) and, being a free-tier teaser (ruling B),
+    // it lands in the free legendary bucket.
+    expect(sections.legendary.map((t) => t.id)).toEqual(['heroic-fantasy-t3']);
+    ['grimdark-survival-t3', 'arcane-renaissance-t3', 'eldritch-horror-t3'].forEach((id) => {
+      expect(sections.legendary.map((t) => t.id)).not.toContain(id);
+      expect(sections.premiumLegendary.map((t) => t.id)).not.toContain(id);
+    });
   });
 
   it('every playable template lands in exactly one section', () => {
@@ -80,7 +86,9 @@ describe('server-delivered higher-tier templates (registerPremiumTemplates then 
 
   it('a delivered t3 appears in the Legendary section after registration (no reload needed)', () => {
     const catalog = makeCatalog();
-    expect(getTemplateSections(catalog).legendary).toEqual([]);
+    // Pre-delivery the shipped catalog's only tier-3 non-comingSoon entries are
+    // the shop-window stubs (free heroic + premium tidewater).
+    expect(getTemplateSections(catalog).legendary.map((t) => t.id)).toEqual(['heroic-fantasy-t3']);
     registerPremiumTemplates([drownedBells], catalog);
     const { premiumLegendary } = getTemplateSections(catalog);
     expect(premiumLegendary.map((t) => t.id)).toEqual(['tidewater-t3']);

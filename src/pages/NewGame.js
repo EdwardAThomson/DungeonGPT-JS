@@ -14,8 +14,10 @@ import { llmService } from "../services/llmService";
 import { createLogger } from "../utils/logger";
 import { QUEST_ENEMIES, getEnemiesByTierAndTheme } from "../data/questEnemies";
 import { QUEST_BUILDINGS, NPC_ROLES, POI_TYPES, THEME_DEFAULTS, THEME_NAMES, getCustomQuestItems } from "../data/questPickerData";
-import { isPremium, isThemePremium, isTemplatePremium, canUseTemplate, canUseTheme } from "../game/entitlements";
-import { getTemplateSections, TIER_LEVEL_BANDS, tierBandLabel } from "../game/templateSections";
+import { isPremium, hasTier, isThemePremium, isTemplatePremium, canUseTemplate, canUseTheme } from "../game/entitlements";
+import { TIER_LEVEL_BANDS, tierBandLabel } from "../game/templateSections";
+import { getStoryArcs, getArcSections, healTeaserChapter, TEASER_SIGN_IN_COPY } from "../game/storyArcs";
+import ArcDetailModal, { chapterChip } from "../components/ArcDetailModal";
 import { isOpeningAccessible } from "../game/campaignChain";
 import { resolveWaterTownAccess, waterTownWorldGenOptions } from "../game/waterTowns";
 
@@ -132,6 +134,13 @@ const NewGame = () => {
     // nudge instead of applying.
     if (template && !canUseTemplate(template)) {
       setFormError('That adventure is part of Membership. Pick a free adventure below, or check the Premium page.');
+      return;
+    }
+    // Teaser stubs have no settings to apply (shop-window card faces only);
+    // applying one would crash. The continue-legend picker filters them out,
+    // but never trust the navigation state: explain instead of applying.
+    if (template && template.teaser === true) {
+      setFormError(TEASER_SIGN_IN_COPY);
       return;
     }
     if (template) applyTemplate(template);
@@ -355,8 +364,13 @@ const NewGame = () => {
   // Tab state
   const [activeTab, setActiveTab] = useState('templates');
 
-  // Template detail modal
-  const [previewTemplate, setPreviewTemplate] = useState(null);
+  // Arc detail modal (#73 phase 1): which arc's chapter ladder is open, which
+  // chapter row is expanded, plus the in-modal notice line and the teaser
+  // self-heal loading marker (maintainer ruling A, 2026-07-07).
+  const [previewArcId, setPreviewArcId] = useState(null);
+  const [previewChapterId, setPreviewChapterId] = useState(null);
+  const [arcModalNotice, setArcModalNotice] = useState(null);
+  const [retryingChapterId, setRetryingChapterId] = useState(null);
 
   // Party max level for level warnings on templates
   const partyMaxLevel = heroes.length > 0
@@ -370,263 +384,117 @@ const NewGame = () => {
     narrative: '💬',
   };
 
-  const tierColors = { 1: '#4caf50', 2: '#ff9800', 3: '#f44336' };
+  // ── Arc grouping (#73 phase 1, docs/ARC_CARDS_AND_NARRATIVE_PLAN.md) ──────
+  // One card per campaign ARC (theme), derived from the LIVE storyTemplates
+  // array every render: server-delivered chapters, teaser stubs turning
+  // playable, and brand-new themes all flow in mid-session (AuthContext's
+  // premiumContentReady flip re-renders this page). The old Seasoned Parties /
+  // Legendary Campaigns sections are absorbed by the detail modal's chapter
+  // picker (decision 3); templateSections.js remains for other consumers.
+  const arcs = getStoryArcs(storyTemplates);
+  const arcSections = getArcSections(arcs);
+  const previewArc = previewArcId ? arcs.find((a) => a.id === previewArcId) : null;
 
-  const tierBadge = (tier, levelRange) => (
-    <span style={{
-      display: 'inline-block',
-      padding: '2px 8px',
-      borderRadius: '10px',
-      fontSize: '0.7rem',
-      fontWeight: 'bold',
-      color: '#fff',
-      background: tierColors[tier] || '#888',
-    }}>
-      Tier {tier} (Lv {levelRange[0]}-{levelRange[1]})
-    </span>
-  );
-
-  const renderTemplateModal = () => {
-    if (!previewTemplate) return null;
-    const t = previewTemplate;
-    const ms = t.settings?.milestones || []; // teaser stubs carry no settings
-    const isSelected = selectedTemplate === t.id;
-    const isPremiumLocked = !canUseTemplate(t);
-
-    return (
-      <div className="modal-overlay" onClick={() => setPreviewTemplate(null)}>
-        <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
-          maxWidth: '600px', width: '90%', maxHeight: '85vh', padding: 0, overflow: 'hidden',
-          display: 'flex', flexDirection: 'column', borderRadius: '12px',
-        }}>
-          {/* Header image */}
-          <div style={{
-            height: '260px',
-            background: `url(/assets/templates/${t.id}.webp) center top/cover no-repeat, linear-gradient(135deg, var(--surface), var(--bg))`,
-            position: 'relative',
-            flexShrink: 0,
-          }}>
-            <div style={{
-              position: 'absolute', bottom: 0, left: 0, right: 0,
-              background: 'linear-gradient(transparent, rgba(0,0,0,0.85))',
-              padding: '40px 20px 16px',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', marginBottom: '2px' }}>
-                    {t.icon} {t.name}
-                  </div>
-                  <div style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#fff', fontFamily: 'var(--header-font)' }}>
-                    {t.subtitle}
-                  </div>
-                </div>
-                {tierBadge(t.tier, t.levelRange)}
-              </div>
-            </div>
-            <button
-              onClick={() => setPreviewTemplate(null)}
-              style={{
-                position: 'absolute', top: 8, right: 8,
-                background: 'rgba(0,0,0,0.5)', border: 'none', color: '#fff',
-                width: 28, height: 28, borderRadius: '50%', cursor: 'pointer',
-                fontSize: '0.85rem', lineHeight: 1, padding: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >x</button>
-          </div>
-
-          {/* Body */}
-          <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
-            <p style={{ margin: '0 0 16px', fontSize: '0.9rem', color: 'var(--text)', lineHeight: 1.5 }}>
-              {t.settings.shortDescription}
-            </p>
-
-            <div style={{ marginBottom: '16px', padding: '10px 14px', background: 'var(--bg)', borderRadius: '8px', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 700 }}>Campaign Goal</div>
-              <div style={{ fontSize: '0.9rem', color: 'var(--text)', fontStyle: 'italic' }}>{t.settings.campaignGoal}</div>
-            </div>
-
-            {/* Milestones */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 700 }}>
-                Quest Milestones ({ms.length})
-              </div>
-              {ms.map((m, i) => (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '8px',
-                  padding: '8px 10px', background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)',
-                }}>
-                  <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>{milestoneTypeIcon[m.type] || '?'}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text)' }}>{m.text}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                      {m.type}{m.location ? ` \u2022 ${m.location}` : ''}
-                      {m.requires?.length > 0 ? ` \u2022 needs #${m.requires.join(', #')}` : ''}
-                      {m.rewards ? ` \u2022 ${m.rewards.xp} XP, ${m.rewards.gold} gold` : ''}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Total rewards summary */}
-            {ms.length > 0 && (() => {
-              let totalXp = 0;
-              for (const m of ms) {
-                if (m.rewards?.xp) totalXp += m.rewards.xp;
-                if (m.encounter?.rewards?.xp) totalXp += m.encounter.rewards.xp;
-              }
-              return totalXp > 0 ? (
-                <div style={{
-                  fontSize: '0.75rem', color: 'var(--text-secondary)',
-                  marginBottom: '16px', padding: '6px 10px',
-                  background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)',
-                  display: 'flex', gap: '12px',
-                }}>
-                  <span><strong>Total XP:</strong> {totalXp}</span>
-                  <span><strong>Milestones:</strong> {ms.length}</span>
-                  <span><strong>Boss fights:</strong> {ms.filter(m => m.type === 'combat').length}</span>
-                </div>
-              ) : null;
-            })()}
-
-            {/* Tone Tags */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px' }}>
-              {[
-                { label: 'Grimness', value: t.settings.grimnessLevel },
-                { label: 'Darkness', value: t.settings.darknessLevel },
-                { label: 'Magic', value: t.settings.magicLevel },
-                { label: 'Technology', value: t.settings.technologyLevel },
-                { label: 'Narration', value: t.settings.responseVerbosity },
-              ].map((tag, i) => (
-                <span key={i} style={{
-                  padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem',
-                  background: 'var(--bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)',
-                }}>
-                  <strong>{tag.label}:</strong> {tag.value}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Level warning */}
-          {partyMaxLevel > 0 && t.levelRange && partyMaxLevel < t.levelRange[0] && (
-            <div style={{
-              margin: '0 20px 0', padding: '10px 14px',
-              background: 'rgba(255, 152, 0, 0.15)', border: '1px solid #ff9800',
-              borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text)',
-            }}>
-              <strong style={{ color: '#ff9800' }}>Level Warning:</strong> Your highest hero is level {partyMaxLevel}, but this adventure requires level {t.levelRange[0]}+.
-            </div>
-          )}
-
-          {/* Footer */}
-          <div style={{
-            padding: '14px 20px', borderTop: '1px solid var(--border)',
-            display: 'flex', justifyContent: 'flex-end', gap: '10px',
-          }}>
-            <button
-              onClick={() => setPreviewTemplate(null)}
-              style={{
-                padding: '8px 20px', background: 'transparent', border: '1px solid var(--border)',
-                borderRadius: '8px', color: 'var(--text)', cursor: 'pointer', fontSize: '0.9rem',
-              }}
-            >{isSelected ? 'Back' : 'Cancel'}</button>
-            {isPremiumLocked ? (
-              <button
-                disabled
-                title="Premium unlock is coming soon"
-                style={{
-                  padding: '8px 24px',
-                  background: 'linear-gradient(135deg, #b8860b, #ffd700)',
-                  border: 'none', borderRadius: '8px', color: '#2b1d00',
-                  cursor: 'not-allowed', fontSize: '0.9rem', fontWeight: 'bold', opacity: 0.9,
-                }}
-              >
-                🔒 Unlock with Premium (coming soon)
-              </button>
-            ) : isSelected ? (
-              <button
-                onClick={() => {
-                  setPreviewTemplate(null);
-                  // Map is generated automatically in handleSubmit — go straight on.
-                  setTimeout(() => handleSubmit(), 100);
-                }}
-                style={{
-                  padding: '8px 24px',
-                  background: 'var(--primary)',
-                  border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer',
-                  fontSize: '0.9rem', fontWeight: 'bold',
-                }}
-              >
-                Next: Select Heroes
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  applyTemplate(t);
-                  setPreviewTemplate(null);
-                }}
-                style={{
-                  padding: '8px 24px',
-                  background: 'var(--primary)',
-                  border: 'none', borderRadius: '8px', color: '#fff', cursor: 'pointer',
-                  fontSize: '0.9rem', fontWeight: 'bold',
-                }}
-              >
-                Select Adventure
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
+  const openArcModal = (arc) => {
+    setArcModalNotice(null);
+    const defaultChapter = arc.chapters.find((c) => c.startable) || arc.chapters[0];
+    setPreviewChapterId(defaultChapter?.id || null);
+    setPreviewArcId(arc.id);
   };
 
-  const renderTemplateCard = (template, isFirst = false) => {
-    const isSelected = selectedTemplate === template.id;
-    // Premium-locked = a paid adventure the current user's tier can't start yet
-    // (canUseTemplate also honours per-template minTier, e.g. premium-only
-    // server-delivered campaigns).
-    const isPremiumLocked = !template.comingSoon && !canUseTemplate(template);
-    // Teaser stub: the public bundle carries only the card face (shop window,
-    // maintainer 2026-07-07); the playable campaign arrives by server delivery,
-    // which REPLACES the stub by id at sign-in. Reaching this branch entitled
-    // means the delivery has not landed in this session.
-    const isTeaserOnly = !isPremiumLocked && template.teaser === true;
-    const isLocked = template.comingSoon || isPremiumLocked;
+  const closeArcModal = () => {
+    setPreviewArcId(null);
+    setPreviewChapterId(null);
+    setArcModalNotice(null);
+  };
+
+  const lockedChapterCopy = (chapter) =>
+    chapter.gateTier === 'premium' || chapter.gateTier === 'elite'
+      ? 'This chapter is a Premium unlock (coming soon). Preview the arc freely; a Premium account is needed to play it.'
+      : 'This chapter comes with Membership (coming soon). Pick a free chapter to begin.';
+
+  // Teaser self-heal (maintainer ruling A, 2026-07-07): a teaser-stub chapter
+  // click never dead-ends. Signed out, the fix IS signing in (delivery
+  // requires auth), so say that. Signed in, retry the delivery: if the stub
+  // was replaced, apply the now-playable chapter; only if it is STILL a
+  // teaser show the explanation. The clicked row shows a loading state while
+  // the retry is in flight.
+  const handleTeaserChapter = async (chapter, { fromModal = false } = {}) => {
+    const notify = fromModal ? setArcModalNotice : setFormError;
+    if (retryingChapterId) return;
+    if (!user) {
+      notify(TEASER_SIGN_IN_COPY);
+      return;
+    }
+    notify('');
+    setRetryingChapterId(chapter.id);
+    let result;
+    try {
+      result = await healTeaserChapter(chapter.template, { isSignedIn: true });
+    } finally {
+      setRetryingChapterId(null);
+    }
+    if (result?.status === 'delivered') {
+      applyTemplate(result.template);
+      if (fromModal) setPreviewChapterId(result.template.id);
+    } else if (result) {
+      notify(result.message);
+    }
+  };
+
+  // Clicking an arc card begins its entry chapter (the arc card is
+  // presentation, not a new save type: decision 2). Locked entries explain,
+  // teaser entries self-heal, comingSoon entries are inert.
+  const handleArcCardClick = (arc) => {
+    const entry = arc.chapters[0];
+    if (entry.comingSoon) return;
+    if (entry.locked) {
+      setFormError(lockedChapterCopy(entry));
+      return;
+    }
+    if (entry.teaser) {
+      handleTeaserChapter(entry);
+      return;
+    }
+    applyTemplate(entry.template);
+  };
+
+  const ARC_BADGE_LABEL = { member: '🔒 MEMBERS', premium: '🔒 PREMIUM', elite: '🔒 ELITE' };
+
+  const renderArcCard = (arc, isFirst = false) => {
+    const entry = arc.chapters[0];
+    const isSelected = arc.chapters.some((c) => c.id === selectedTemplate);
+    const isLockedArc = entry.locked;
     return (
       <div
-        key={template.id}
+        key={arc.id}
+        data-testid={`arc-card-${arc.id}`}
         data-tour={isFirst ? 'first-adventure' : undefined}
-        onClick={
-          template.comingSoon ? undefined
-            : isPremiumLocked
-              ? () => setFormError('This is a Premium adventure. Premium unlock is coming soon — pick a free adventure to begin.')
-              : isTeaserOnly
-                ? () => setFormError('This adventure loads with your account content at sign-in. Sign out and back in (or refresh) and it will be playable.')
-                : () => applyTemplate(template)
-        }
+        onClick={() => handleArcCardClick(arc)}
         style={{
           background: 'var(--surface)',
           border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
           borderRadius: '12px',
           overflow: 'hidden',
-          cursor: template.comingSoon ? 'default' : 'pointer',
+          cursor: entry.comingSoon ? 'default' : 'pointer',
           transition: 'all 0.2s',
           boxShadow: isSelected ? '0 0 0 1px var(--primary), 0 4px 12px var(--shadow)' : 'none',
-          opacity: isLocked ? (isPremiumLocked ? 0.75 : 0.5) : 1,
-          filter: isLocked ? 'grayscale(0.5)' : 'none',
+          opacity: isLockedArc ? 0.75 : 1,
+          filter: isLockedArc ? 'grayscale(0.5)' : 'none',
         }}
       >
-        {/* Card image */}
+        {/* Card art: the entry chapter's card until bespoke arc art lands (phase 2) */}
         <div style={{
           height: '120px',
-          background: `url(/assets/templates/${template.id}.webp) center/cover no-repeat, linear-gradient(135deg, var(--surface), var(--bg))`,
+          background: `url(${arc.art}) center/cover no-repeat, linear-gradient(135deg, var(--surface), var(--bg))`,
           position: 'relative',
         }}>
-          <div style={{ position: 'absolute', top: 8, right: 8 }}>
-            {tierBadge(template.tier, template.levelRange)}
+          <div style={{
+            position: 'absolute', top: 8, right: 8,
+            background: 'rgba(0,0,0,0.6)', color: '#fff',
+            padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
+          }}>
+            {arc.chapterCount} {arc.chapterCount === 1 ? 'chapter' : 'chapters'} · Lv {arc.levelSpan[0]}-{arc.levelSpan[1]}
           </div>
           {isSelected && (
             <div style={{
@@ -635,81 +503,64 @@ const NewGame = () => {
               padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
             }}>SELECTED</div>
           )}
-          {isPremiumLocked && (
+          {isLockedArc && (
             <div style={{
               position: 'absolute', top: 8, left: 8,
               background: 'linear-gradient(135deg, #b8860b, #ffd700)', color: '#2b1d00',
               padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
-            }}>🔒 PREMIUM</div>
-          )}
-          {template.comingSoon && (
-            <div style={{
-              position: 'absolute', bottom: 8, left: 0, right: 0, textAlign: 'center',
-              fontSize: '0.7rem', fontWeight: 'bold', color: '#fff',
-              textShadow: '0 1px 4px rgba(0,0,0,0.8)',
-            }}>COMING SOON</div>
+            }}>{ARC_BADGE_LABEL[arc.minTierToEnter] || '🔒 MEMBERS'}</div>
           )}
         </div>
-        {/* Card text */}
+        {/* Card text: arc name, one-line tease, chapter ladder */}
         <div style={{ padding: '10px 12px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2px' }}>
             <div style={{ fontSize: '0.9rem', fontWeight: 'bold', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
-              {template.subtitle}
+              {arc.icon} {arc.name}
             </div>
-            {!template.comingSoon && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setPreviewTemplate(template); }}
-                style={{
-                  background: 'none', border: 'none', color: 'var(--text-secondary)',
-                  cursor: 'pointer', fontSize: '0.7rem', padding: '2px 0', whiteSpace: 'nowrap',
-                  textDecoration: 'underline', flexShrink: 0,
-                }}
-              >details</button>
-            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); openArcModal(arc); }}
+              style={{
+                background: 'none', border: 'none', color: 'var(--text-secondary)',
+                cursor: 'pointer', fontSize: '0.7rem', padding: '2px 0', whiteSpace: 'nowrap',
+                textDecoration: 'underline', flexShrink: 0,
+              }}
+            >details</button>
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>
-            {template.description}
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.3, marginBottom: '8px' }}>
+            {arc.tagline}
           </div>
-          {!isLocked && partyMaxLevel > 0 && template.levelRange && partyMaxLevel < template.levelRange[0] && (
+          {/* Chapter ladder: titles + level bands + status chips, never milestones (decision 1) */}
+          <div>
+            {arc.chapters.map((chapter, i) => {
+              const chip = chapterChip(chapter, {
+                isSignedIn: !!user,
+                isRetrying: retryingChapterId === chapter.id,
+              });
+              return (
+                <div key={chapter.id} style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  fontSize: '0.72rem', padding: '3px 0',
+                  color: chapter.comingSoon ? 'var(--text-secondary)' : 'var(--text)',
+                  opacity: chapter.comingSoon ? 0.6 : 1,
+                }}>
+                  <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>{i + 1}.</span>
+                  <span style={{
+                    flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>{chapter.subtitle}</span>
+                  <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>{chip.label}</span>
+                </div>
+              );
+            })}
+          </div>
+          {!isLockedArc && entry.startable && partyMaxLevel > 0 && entry.levelRange && partyMaxLevel < entry.levelRange[0] && (
             <div style={{ fontSize: '0.7rem', color: '#ff9800', marginTop: '6px', fontWeight: 600 }}>
-              ⚠ Requires Lv {template.levelRange[0]}+ (your highest: Lv {partyMaxLevel})
+              ⚠ Requires Lv {entry.levelRange[0]}+ (your highest: Lv {partyMaxLevel})
             </div>
           )}
         </div>
       </div>
     );
   };
-
-  // Picker sections (#72, see src/game/templateSections.js): tier-1 starters keep
-  // their free/premium split; tier 2 ("Seasoned Parties") and tier 3+ ("Legendary
-  // Campaigns") are listed too so higher-tier content is discoverable from day one
-  // instead of only surfacing in the continue-legend picker. Recomputed every
-  // render on purpose: server-delivered premium templates register into the live
-  // storyTemplates array mid-session and AuthContext's premiumContentReady flip
-  // re-renders this page.
-  const {
-    freeStarters: freeStarterTemplates,
-    premiumStarters: premiumStarterTemplates,
-    seasoned: seasonedTemplates,
-    premiumSeasoned: premiumSeasonedTemplates,
-    legendary: legendaryTemplates,
-    premiumLegendary: premiumLegendaryTemplates,
-  } = getTemplateSections(storyTemplates);
-
-  // Shared gold "✨ Premium" sub-heading for the tier 2/3 sections, mirroring the
-  // tier-1 Premium Adventures treatment (maintainer 2026-07-06: premium cards
-  // must be segregated within every tier, never mixed into the free grid).
-  const premiumSubheading = (label) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '14px 0 10px' }}>
-      <h4 style={{ margin: 0, fontSize: '0.9rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
-        ✨ {label}
-      </h4>
-      <span style={{
-        background: 'linear-gradient(135deg, #b8860b, #ffd700)', color: '#2b1d00',
-        padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
-      }}>{premiumUnlocked ? 'UNLOCKED' : 'MEMBERS'}</span>
-    </div>
-  );
 
   // Honest note when a higher-tier (t2/t3) template is SELECTED and the roster
   // can't reach its band yet: same class of soft warning the continue-legend
@@ -734,8 +585,9 @@ const NewGame = () => {
   const renderTemplateTab = () => (
     <div className="form-section story-settings-section">
       <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-        Pick an adventure to begin. Starter tales suit fresh heroes; the
-        higher-tier campaigns further down expect seasoned parties. Click a card for details.
+        Each card below is a full campaign arc. Pick one to begin its first
+        chapter; later chapters unlock as your legend grows. Click a card to
+        begin, or "details" for the chapter ladder.
       </p>
       {waterTownNote && (
         <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
@@ -744,79 +596,50 @@ const NewGame = () => {
       )}
 
       <div style={gridStyle}>
-        {freeStarterTemplates.map((t, i) => renderTemplateCard(t, i === 0))}
+        {arcSections.free.map((a, i) => renderArcCard(a, i === 0))}
       </div>
 
-      {premiumStarterTemplates.length > 0 && (
-        <div style={{ marginTop: '28px' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px',
-          }}>
+      {arcSections.member.length > 0 && (
+        <div style={{ marginTop: '28px' }} data-testid="member-arcs-section">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
             <h3 style={{ margin: 0, fontSize: '1rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
-              ✨ Premium Adventures
+              ✨ Members' Arcs
             </h3>
             <span style={{
               background: 'linear-gradient(135deg, #b8860b, #ffd700)', color: '#2b1d00',
               padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
-            }}>{premiumUnlocked ? 'UNLOCKED' : 'COMING SOON'}</span>
+            }}>{premiumUnlocked ? 'UNLOCKED' : 'MEMBERS'}</span>
           </div>
           {!premiumUnlocked && (
             <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-              Eldritch, desert and snow campaigns are a Members unlock (coming soon). Preview them below.
+              Eldritch, desert and snow arcs are a Members unlock (coming soon). Preview them below.
             </p>
           )}
           <div style={gridStyle}>
-            {premiumStarterTemplates.map((t) => renderTemplateCard(t))}
+            {arcSections.member.map((a) => renderArcCard(a))}
           </div>
         </div>
       )}
 
-      {(seasonedTemplates.length > 0 || premiumSeasonedTemplates.length > 0) && (
-        <div style={{ marginTop: '28px' }} data-testid="seasoned-section">
-          <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
-            🛡️ Seasoned Parties (Tier 2)
-          </h3>
-          <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-            The chapters that usually follow a starter adventure. A fresh party may
-            begin one, but the opening will be rough and deeper chapters are level-gated.
-          </p>
-          {seasonedTemplates.length > 0 && (
-            <div style={gridStyle}>
-              {seasonedTemplates.map((t) => renderTemplateCard(t))}
-            </div>
+      {arcSections.premium.length > 0 && (
+        <div style={{ marginTop: '28px' }} data-testid="premium-arcs-section">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+            <h3 style={{ margin: 0, fontSize: '1rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
+              🔱 Premium Arcs
+            </h3>
+            <span style={{
+              background: 'linear-gradient(135deg, #b8860b, #ffd700)', color: '#2b1d00',
+              padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
+            }}>{hasTier('premium') ? 'UNLOCKED' : 'PREMIUM'}</span>
+          </div>
+          {!hasTier('premium') && (
+            <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
+              The realm's flagship arcs, a Premium unlock (coming soon). Preview them below.
+            </p>
           )}
-          {premiumSeasonedTemplates.length > 0 && (
-            <div data-testid="seasoned-premium">
-              {premiumSubheading('Premium Chapters')}
-              <div style={gridStyle}>
-                {premiumSeasonedTemplates.map((t) => renderTemplateCard(t))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {(legendaryTemplates.length > 0 || premiumLegendaryTemplates.length > 0) && (
-        <div style={{ marginTop: '28px' }} data-testid="legendary-section">
-          <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
-            🐲 Legendary Campaigns (Tier 3)
-          </h3>
-          <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-            The realm's greatest tales, made for heroes of Lv {TIER_LEVEL_BANDS[3][0]} and beyond.
-          </p>
-          {legendaryTemplates.length > 0 && (
-            <div style={gridStyle}>
-              {legendaryTemplates.map((t) => renderTemplateCard(t))}
-            </div>
-          )}
-          {premiumLegendaryTemplates.length > 0 && (
-            <div data-testid="legendary-premium">
-              {premiumSubheading('Premium Legends')}
-              <div style={gridStyle}>
-                {premiumLegendaryTemplates.map((t) => renderTemplateCard(t))}
-              </div>
-            </div>
-          )}
+          <div style={gridStyle}>
+            {arcSections.premium.map((a) => renderArcCard(a))}
+          </div>
         </div>
       )}
 
@@ -834,6 +657,7 @@ const NewGame = () => {
       )}
     </div>
   );
+
 
   // Shared tone settings grid used by both Custom and Freeform tabs
   const renderToneSettings = ({ showThemeReset = false } = {}) => {
@@ -1573,8 +1397,28 @@ const NewGame = () => {
       {activeTab === 'custom' && renderCustomTab()}
       {activeTab === 'freeform' && renderFreeformTab()}
 
-      {/* Template Detail Modal */}
-      {renderTemplateModal()}
+      {/* Arc Detail Modal (chapter ladder + picker, #73 phase 1) */}
+      {previewArc && (
+        <ArcDetailModal
+          arc={previewArc}
+          selectedChapterId={previewChapterId}
+          onSelectChapter={(id) => { setPreviewChapterId(id); setArcModalNotice(null); }}
+          selectedTemplateId={selectedTemplate}
+          partyMaxLevel={partyMaxLevel}
+          isSignedIn={!!user}
+          retryingChapterId={retryingChapterId}
+          notice={arcModalNotice}
+          onTeaserChapterClick={(chapter) => handleTeaserChapter(chapter, { fromModal: true })}
+          onLockedChapterClick={(chapter) => setArcModalNotice(lockedChapterCopy(chapter))}
+          onApplyChapter={(template) => { applyTemplate(template); closeArcModal(); }}
+          onSubmit={() => {
+            closeArcModal();
+            // Map is generated automatically in handleSubmit; go straight on.
+            setTimeout(() => handleSubmit(), 100);
+          }}
+          onClose={closeArcModal}
+        />
+      )}
 
       {/* World Map Generation Section — hidden for Ready-Made adventures (the map
           is generated automatically on submit); shown for Custom/Freeform. */}

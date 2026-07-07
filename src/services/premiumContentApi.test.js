@@ -8,6 +8,7 @@
 import {
   fetchPremiumTemplates,
   loadPremiumTemplates,
+  retryPremiumTemplates,
   clearPremiumTemplates,
   _resetPremiumContentForTests,
   PREMIUM_TEMPLATES_CACHE_KEY,
@@ -200,6 +201,49 @@ describe('premiumContentApi', () => {
       fetchDelivers([]);
       await expect(loadPremiumTemplates()).resolves.toEqual([]);
       expect(JSON.parse(sessionStorage.getItem(PREMIUM_TEMPLATES_CACHE_KEY))).toEqual([]);
+    });
+  });
+
+  describe('retryPremiumTemplates (teaser self-heal, maintainer ruling 2026-07-07)', () => {
+    it('resets the once-per-session memo: a second fetch really happens', async () => {
+      sessionPresent();
+      fetchDelivers([]); // first load: nothing delivered (the teaser dead-end state)
+      await loadPremiumTemplates();
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+
+      fetchDelivers([TPL]); // the row landed server-side in the meantime
+      await expect(retryPremiumTemplates()).resolves.toEqual([TPL]);
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(registerPremiumTemplates).toHaveBeenLastCalledWith([TPL]);
+      expect(JSON.parse(sessionStorage.getItem(PREMIUM_TEMPLATES_CACHE_KEY))).toEqual([TPL]);
+    });
+
+    it('keeps the same-session cache (last good delivery) rather than clearing like sign-out', async () => {
+      sessionPresent();
+      fetchDelivers([TPL]);
+      await loadPremiumTemplates();
+
+      fetchFails(); // the retry itself fails
+      await expect(retryPremiumTemplates()).resolves.toEqual([TPL]); // hydrated from cache
+      expect(JSON.parse(sessionStorage.getItem(PREMIUM_TEMPLATES_CACHE_KEY))).toEqual([TPL]);
+    });
+
+    it('never rejects, even when the retry fetch fails with no cache', async () => {
+      sessionPresent();
+      fetchFails();
+      await loadPremiumTemplates();
+      await expect(retryPremiumTemplates()).resolves.toEqual([]);
+      expect(console.error).not.toHaveBeenCalled();
+    });
+
+    it('re-memoises: calls after a retry reuse the retried load until the next reset', async () => {
+      sessionPresent();
+      fetchDelivers([TPL]);
+      await retryPremiumTemplates();
+      const fetches = global.fetch.mock.calls.length;
+      await loadPremiumTemplates();
+      await loadPremiumTemplates();
+      expect(global.fetch.mock.calls.length).toBe(fetches);
     });
   });
 

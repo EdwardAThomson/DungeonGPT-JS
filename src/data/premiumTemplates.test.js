@@ -54,14 +54,51 @@ describe('premium local-template merge mechanism', () => {
     expect(base).toEqual(makeBase());
   });
 
-  it('under Jest the merge never runs: storyTemplates is public data, the t3 stub stays comingSoon', () => {
+  it('under Jest the merge never runs: storyTemplates is public data, stubs carry no settings', () => {
     // require.context is a webpack-only API; its absence here is exactly what keeps
     // the progression lint and structural tests pinned to PUBLIC content.
     expect(typeof require.context).not.toBe('function');
     const t3 = storyTemplates.find((t) => t.id === 'heroic-fantasy-t3');
     expect(t3).toBeDefined();
-    expect(t3.comingSoon).toBe(true);
-    expect(t3.settings).toBeUndefined();
+    expect(t3.settings).toBeUndefined(); // playable content never ships in the bundle
+    expect(t3.teaser).toBe(true);
+  });
+
+  // Maintainer ruling 2026-07-07: a shop-window stub REPLACES a comingSoon
+  // built-in with the same id (the built-in's face is strictly less
+  // information, and letting it win hid The Shattered Throne from guests).
+  // The other comingSoon built-ins, with no stub claiming their id, survive.
+  describe('shop-window stubs vs comingSoon built-ins (bundle-time precedence)', () => {
+    it('the heroic-fantasy-t3 stub replaced its comingSoon built-in in the live array', () => {
+      const t3 = storyTemplates.find((t) => t.id === 'heroic-fantasy-t3');
+      expect(t3.teaser).toBe(true);
+      expect(t3.comingSoon).toBeUndefined();
+      // Ruling B (free arcs complete for signed-in accounts): the chapter is
+      // free-gated; guests see "sign in to play", never a tier upsell.
+      expect(t3.minTier).toBe('free');
+      expect(t3.premium).toBeUndefined();
+      // The real card face survived the replacement.
+      expect(t3.subtitle).toBe('The Shattered Throne');
+      expect(t3.shortDescription).toMatch(/succession war/i);
+    });
+
+    it('no id is duplicated by the stub merge', () => {
+      const ids = storyTemplates.map((t) => t.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('comingSoon built-ins without a stub keep their comingSoon face', () => {
+      ['grimdark-survival-t3', 'arcane-renaissance-t3', 'eldritch-horror-t3'].forEach((id) => {
+        expect(storyTemplates.find((t) => t.id === id).comingSoon).toBe(true);
+      });
+    });
+
+    it('tidewater stubs (no comingSoon built-in) were appended as before', () => {
+      ['tidewater-t1', 'tidewater-t2', 'tidewater-t3'].forEach((id) => {
+        const stub = storyTemplates.find((t) => t.id === id);
+        expect(stub).toMatchObject({ teaser: true, minTier: 'premium' });
+      });
+    });
   });
 
   it('the tracked example file exports the documented shape (an empty array by default)', () => {

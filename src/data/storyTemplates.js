@@ -1399,13 +1399,24 @@ const SHOP_WINDOW_STUBS = [
         subtitle: 'The Shattered Throne',
         icon: '👑',
         shortDescription: 'The realm is won, but the throne it rests on is broken, and every claimant to its shards raises an army. End the succession war before the kingdom your heroes saved tears itself apart.',
-        premium: true,
-        minTier: 'member',
+        // Free-tier chapter (maintainer ruling 2026-07-07: free arcs are complete
+        // for signed-in accounts; the premium_templates row delivers this to every
+        // authenticated tier). Guests cap at t2 naturally: delivery requires auth,
+        // so a signed-out click resolves to "sign in to play", never a tier upsell.
+        minTier: 'free',
         teaser: true,
     },
 ];
 SHOP_WINDOW_STUBS.forEach((stub) => {
-    if (!storyTemplates.some((t) => t.id === stub.id)) storyTemplates.push(stub);
+    // A stub REPLACES a comingSoon entry with the same id (maintainer ruling
+    // 2026-07-07): a comingSoon built-in is strictly less information than the
+    // shop-window card face, and letting it win kept guests from ever seeing
+    // The Shattered Throne's real face. Anything else already holding the id
+    // (a real built-in, or the bundle-time local dev slot merged below) wins
+    // over the stub, and runtime delivery replaces the stub by id as before.
+    const i = storyTemplates.findIndex((t) => t.id === stub.id);
+    if (i < 0) storyTemplates.push(stub);
+    else if (storyTemplates[i].comingSoon === true) storyTemplates[i] = stub;
 });
 
 // ids merged from the LOCAL slot; server delivery never overrides these.

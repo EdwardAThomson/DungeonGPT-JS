@@ -109,6 +109,22 @@ export function loadPremiumTemplates() {
 }
 
 /**
+ * Teaser self-heal (maintainer ruling 2026-07-07): a fresh delivery attempt on
+ * demand. Resets ONLY the once-per-session memo (the sessionStorage cache stays:
+ * it is this session's last good delivery and the fetch overwrites it on
+ * success), then runs the normal load pipeline again: refetch, re-register,
+ * re-cache. Used when a player clicks a teaser-stub chapter that should have
+ * been delivered (entitled tier, content missing this session), so the click
+ * can resolve itself instead of dead-ending in "sign out and back in".
+ * Never rejects, like loadPremiumTemplates.
+ * @returns {Promise<Array<object>>} the freshly delivered templates
+ */
+export function retryPremiumTemplates() {
+  loadPromise = null;
+  return loadPremiumTemplates();
+}
+
+/**
  * Sign-out (or account switch): drop the sessionStorage cache and the once-per-session
  * memo, so the next account on this device fetches its own delivery and never warm
  * starts from a previous account's content. Already-registered templates stay in the

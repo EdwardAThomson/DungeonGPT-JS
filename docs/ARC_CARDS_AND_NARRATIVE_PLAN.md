@@ -1,6 +1,29 @@
 # Arc Cards & Overarching Narrative Plan (#73)
 
-Status: **DRAFT design proposal, 2026-07-07. No code yet; design before code.**
+Status: **Phase 1 SHIPPED, pending review (2026-07-07).** Decisions 1-4 approved by the
+maintainer 2026-07-07; decision 5 resolved to framing B (for the later phases); phases
+2-4 remain future work. Phase 1 as shipped: `src/game/storyArcs.js` (derivation +
+`ARC_META` placeholder + teaser self-heal), `src/components/ArcDetailModal.js` (arc
+detail + chapter picker, stub-tolerant by construction), the NewGame Ready-Made tab
+rendering 7 arc cards grouped by entry gate (Seasoned/Legendary sections absorbed;
+`templateSections.js` kept for other consumers), and
+`retryPremiumTemplates()` in `premiumContentApi.js`.
+
+Two maintainer rulings (2026-07-07) implemented in phase 1:
+
+- **A. Teaser self-heal.** Clicking a teaser-stub chapter never dead-ends: signed out
+  it explains that sign-in delivers the content; signed in it triggers a fresh
+  delivery attempt (`retryPremiumTemplates()` resets the once-per-session memo,
+  refetches, re-registers) with a loading state on the clicked row, applies the
+  chapter if the stub was replaced, and only if it is STILL a teaser shows the
+  explanation.
+- **B. Free arcs are complete for signed-in accounts.** `heroic-fantasy-t3`'s
+  shop-window stub is gated `minTier: 'free'` (the server row delivers it to every
+  authenticated tier); guests cap at t2 naturally because delivery requires auth, and
+  a signed-out stub row says "sign in to play", never a tier upsell. Additionally the
+  stub-merge now lets a shop-window stub REPLACE a `comingSoon` built-in with the same
+  id (the comingSoon face was shadowing The Shattered Throne's real card for guests);
+  the local dev slot still wins over both.
 Related: `OUTSTANDING_ISSUES.md` #73 (this), #72 (tiered New Game discovery, the state
 this plan reshapes), #40 (server-delivered premium content channel, live),
 `src/game/templateSections.js` (current section grouping), `src/game/campaignChain.js`
@@ -303,7 +326,7 @@ geography, or milestones; it only ensures the phase 3 copy leaves the door open.
 
 | Phase | What | Size | Depends on |
 |---|---|---|---|
-| 1 | Derived arc grouping UI: `getStoryArcs()`, 7 arc cards + chapter ladder chips, detail modal chapter picker (absorbs Seasoned/Legendary + their honest level notes), derived taglines as fallback, tests | M | decisions 1-4 |
+| 1 | **SHIPPED pending review (2026-07-07).** Derived arc grouping UI: `getStoryArcs()`, 7 arc cards + chapter ladder chips, detail modal chapter picker (absorbs Seasoned/Legendary + their honest level notes), derived taglines as fallback, teaser self-heal (ruling A), free heroic finale + stub-replaces-comingSoon (ruling B), tests | M | decisions 1-4 |
 | 2 | Authored arc metadata: `ARC_META` taglines, spans-tiers upsell line copy, optional bespoke arc card art (art queue) | S | 1 |
 | 3 | Meta-narrative retrofit: mythos naming note (public doc + private-repo note), 7 taglines/mythosLines rewritten against the chosen framing, one framing line in intro/prologue composers, spoiler-light audit | S | 2, decision 5 |
 | 4 | Capstone campaign: private-repo authoring, server delivery, convergence surfacing in the continue picker | L (future, not scheduled) | 3, decision 6 |
