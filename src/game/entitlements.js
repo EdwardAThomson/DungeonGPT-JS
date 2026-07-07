@@ -60,6 +60,11 @@ const DEV_OVERRIDE_ENABLED =
 
 let sessionTier = null;   // tier resolved THIS page session (null = not resolved yet)
 let fetchPromise = null;  // in-flight/settled once-per-session fetch memo
+// When the effective tier comes from a time-boxed grant (redemption codes, #6),
+// the entitlements endpoint reports the grant's end date; null when the stored
+// tier already covers it. Session-only (no mirror): it is display metadata for
+// the Profile page, never a gate input.
+let sessionTierExpiresAt = null;
 
 function readMirror() {
     try {
@@ -115,6 +120,7 @@ export function setUserTier(tier) {
  */
 export function clearUserTier() {
     sessionTier = 'free';
+    sessionTierExpiresAt = null;
     fetchPromise = null;
     try {
         localStorage.removeItem(TIER_MIRROR_KEY);
@@ -135,10 +141,14 @@ export async function getUserTier() {
     if (!fetchPromise) {
         fetchPromise = (async () => {
             try {
-                const { tier } = await fetchEntitlements();
+                const { tier, expiresAt } = await fetchEntitlements();
                 setUserTier(tier);
+                // expiresAt is additive on the endpoint (#6); older Workers simply
+                // omit it and the display falls back to "no end date".
+                sessionTierExpiresAt = typeof expiresAt === 'string' ? expiresAt : null;
             } catch {
                 sessionTier = 'free';
+                sessionTierExpiresAt = null;
             }
         })();
     }
@@ -146,9 +156,31 @@ export async function getUserTier() {
     return getCurrentTier();
 }
 
+/**
+ * Force a re-resolve of the account tier (drops the once-per-session memo and
+ * fetches again). Used after a successful code redemption so gates unlock without
+ * a re-login; the sign-in path keeps using getUserTier().
+ * @returns {Promise<string>} one of TIER_LADDER
+ */
+export async function refreshUserTier() {
+    fetchPromise = null;
+    return getUserTier();
+}
+
+/**
+ * End date (ISO string) of the grant backing the current tier, when the effective
+ * tier comes from a time-boxed grant; null for stored tiers, guests and unresolved
+ * sessions. Display metadata only: never use this in a gate.
+ * @returns {string|null}
+ */
+export function getTierExpiresAt() {
+    return sessionTierExpiresAt;
+}
+
 /** Test hook: reset all module state (cache, fetch memo). Not for app code. */
 export function _resetEntitlementsForTests() {
     sessionTier = null;
+    sessionTierExpiresAt = null;
     fetchPromise = null;
 }
 

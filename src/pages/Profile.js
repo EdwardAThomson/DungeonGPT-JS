@@ -1,16 +1,66 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { redeemCode } from '../services/redemptionApi';
+
+// Friendly copy for the redeem endpoint's error contract (redemptionApi.js).
+// 'code_invalid' is deliberately one line for every dead-code flavour (unknown,
+// expired, disabled, fully claimed): the server does not say which, so a scanner
+// cannot probe, and the copy has to cover all of them honestly.
+const REDEEM_ERROR_COPY = {
+  code_invalid: 'That code is not valid. Check it for typos; it may also have expired or been fully claimed.',
+  already_redeemed: 'You have already redeemed this code on this account.',
+  rate_limited: 'Too many attempts today. Please try again tomorrow.',
+};
+const REDEEM_ERROR_FALLBACK = 'Something went wrong redeeming the code. Please try again later.';
+
+const formatDate = (iso) => {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString();
+};
+
+const tierLabel = (tier) => (tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : '');
 
 const Profile = () => {
-  const { user, signOut, tier } = useAuth();
+  const { user, signOut, tier, tierExpiresAt, refreshTier } = useAuth();
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [codeInput, setCodeInput] = useState('');
+  const [redeeming, setRedeeming] = useState(false);
+  // { kind: 'success', tier, expiresAt } | { kind: 'error', message }
+  const [redeemResult, setRedeemResult] = useState(null);
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
     await signOut();
     navigate('/');
+  };
+
+  const handleRedeem = async (e) => {
+    e.preventDefault();
+    if (!codeInput.trim() || redeeming) return;
+    setRedeeming(true);
+    setRedeemResult(null);
+    try {
+      const { tier: grantedTier, expiresAt } = await redeemCode(codeInput.trim());
+      // Re-resolve entitlements the same way sign-in does, so tier gates unlock
+      // immediately without a re-login. Best effort: the grant is already stored
+      // server-side, so a refresh hiccup only delays the UI, never the membership.
+      try {
+        await refreshTier();
+      } catch {
+        // Next sign-in resolves the fresh tier anyway.
+      }
+      setRedeemResult({ kind: 'success', tier: grantedTier, expiresAt });
+      setCodeInput('');
+    } catch (err) {
+      setRedeemResult({
+        kind: 'error',
+        message: REDEEM_ERROR_COPY[err?.code] || REDEEM_ERROR_FALLBACK,
+      });
+    } finally {
+      setRedeeming(false);
+    }
   };
 
   if (!user) {
@@ -84,7 +134,47 @@ const Profile = () => {
               {(!tier || tier === 'free') && (
                 <span className="tier-badge tier-free">⚡ Free <span className="tier-note">· Membership coming soon</span></span>
               )}
+              {/* Time-boxed grants (redeemed codes, #6) carry an end date; stored
+                  tiers do not, so the row stays as before for them. */}
+              {tier && tier !== 'free' && tierExpiresAt && formatDate(tierExpiresAt) && (
+                <span className="tier-note"> · active until {formatDate(tierExpiresAt)}</span>
+              )}
             </p>
+          </div>
+
+          <div className="profile-field">
+            <label htmlFor="redeem-code-input">Redeem a code</label>
+            <form className="redeem-form" onSubmit={handleRedeem}>
+              <input
+                id="redeem-code-input"
+                type="text"
+                placeholder="XXXX-XXXX-XXXX"
+                value={codeInput}
+                onChange={(e) => setCodeInput(e.target.value)}
+                disabled={redeeming}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button type="submit" disabled={redeeming || !codeInput.trim()}>
+                {redeeming ? 'Redeeming...' : 'Redeem'}
+              </button>
+            </form>
+            <p className="redeem-hint">
+              Have a playtest or promo code? Redeem it here to activate membership time.
+            </p>
+            {redeemResult?.kind === 'success' && (
+              <p className="redeem-status redeem-success" role="status">
+                Code redeemed: {tierLabel(redeemResult.tier)} unlocked.
+                {formatDate(redeemResult.expiresAt)
+                  ? ` Membership active until ${formatDate(redeemResult.expiresAt)}.`
+                  : ''}
+              </p>
+            )}
+            {redeemResult?.kind === 'error' && (
+              <p className="redeem-status redeem-error" role="alert">
+                {redeemResult.message}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -122,6 +212,38 @@ const Profile = () => {
         .tier-premium { border-color: #4169e1; color: #4169e1; }
         .tier-elite { border-color: #b8860b; color: #b8860b; }
         .tier-note { font-weight: 400; font-size: 0.8rem; color: var(--text-secondary); }
+
+        .redeem-form {
+          display: flex;
+          gap: 8px;
+          margin: 4px 0;
+        }
+        .redeem-form input {
+          flex: 1;
+          min-width: 0;
+          padding: 6px 10px;
+          font-family: var(--font-ui);
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          background: var(--bg);
+          color: var(--text);
+          border: 1px solid var(--border);
+          border-radius: 4px;
+        }
+        .redeem-form button {
+          padding: 6px 16px;
+        }
+        .redeem-hint {
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+          margin: 4px 0 0;
+        }
+        .redeem-status {
+          font-size: 0.85rem;
+          margin: 8px 0 0;
+        }
+        .redeem-success { color: #2e8b57; }
+        .redeem-error { color: var(--state-danger); }
 
         .profile-avatar-large {
           width: 80px;

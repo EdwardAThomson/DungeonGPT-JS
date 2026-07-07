@@ -86,6 +86,18 @@ export const PREMIUM_MONTHLY_LIMITS: Record<string, number> = {
   elite: 4000,
 };
 
+// Redemption-code attempts (backlog #6 first slice), same counter table, 1-day
+// window, enforced at the call site in routes/db.ts, NOT via the middleware above.
+// That is deliberate: unlike the AI limiter this bucket fails CLOSED. Rate limiting
+// here is the brute-force guard on a money surface (codes are guessable secrets;
+// letting a counter outage disable the guard would open unmetered code scanning),
+// whereas an AI-limiter outage merely risks some free compute. 10 attempts per UTC
+// day is generous for a human mistyping a code and useless for scanning a 32^12
+// keyspace.
+export const REDEEM_CODE_BUCKET = 'redeem-code';
+export const REDEEM_CODE_WINDOW_SECONDS = 86400;
+export const REDEEM_CODE_DAILY_LIMIT = 10;
+
 export interface CounterResult {
   count: number;
   retryAfterSeconds: number;

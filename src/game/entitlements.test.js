@@ -6,6 +6,8 @@ import {
     WATER_TOWN_ARCHETYPES,
     getCurrentTier,
     getUserTier,
+    refreshUserTier,
+    getTierExpiresAt,
     setUserTier,
     clearUserTier,
     hasTier,
@@ -139,6 +141,50 @@ describe('entitlements', () => {
         it('an unknown tier from the server collapses to free', async () => {
             fetchEntitlements.mockResolvedValue({ tier: 'platinum', updatedAt: null });
             await expect(getUserTier()).resolves.toBe('free');
+        });
+    });
+
+    describe('grant expiry + refresh (redemption codes, #6)', () => {
+        it('captures expiresAt when the effective tier is grant-backed', async () => {
+            fetchEntitlements.mockResolvedValue({
+                tier: 'member',
+                updatedAt: null,
+                expiresAt: '2026-08-06T12:00:00.000Z',
+            });
+            await getUserTier();
+            expect(getTierExpiresAt()).toBe('2026-08-06T12:00:00.000Z');
+        });
+
+        it('expiresAt is null for stored tiers and for older Workers that omit it', async () => {
+            fetchEntitlements.mockResolvedValue({ tier: 'premium', updatedAt: '2026-07-01' });
+            await getUserTier();
+            expect(getTierExpiresAt()).toBe(null);
+        });
+
+        it('refreshUserTier drops the memo and re-fetches (post-redeem unlock without re-login)', async () => {
+            fetchEntitlements.mockResolvedValue({ tier: 'free', updatedAt: null });
+            await expect(getUserTier()).resolves.toBe('free');
+
+            fetchEntitlements.mockResolvedValue({
+                tier: 'member',
+                updatedAt: null,
+                expiresAt: '2026-08-06T12:00:00.000Z',
+            });
+            await expect(refreshUserTier()).resolves.toBe('member');
+            expect(fetchEntitlements).toHaveBeenCalledTimes(2);
+            expect(getCurrentTier()).toBe('member');
+            expect(getTierExpiresAt()).toBe('2026-08-06T12:00:00.000Z');
+        });
+
+        it('clearUserTier forgets the grant expiry too', async () => {
+            fetchEntitlements.mockResolvedValue({
+                tier: 'member',
+                updatedAt: null,
+                expiresAt: '2026-08-06T12:00:00.000Z',
+            });
+            await getUserTier();
+            clearUserTier();
+            expect(getTierExpiresAt()).toBe(null);
         });
     });
 

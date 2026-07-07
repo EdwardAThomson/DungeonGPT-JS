@@ -1,7 +1,13 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { markHadAccount } from '../services/accountFlag';
-import { getUserTier, clearUserTier, getCurrentTier } from '../game/entitlements';
+import {
+  getUserTier,
+  refreshUserTier,
+  clearUserTier,
+  getCurrentTier,
+  getTierExpiresAt,
+} from '../game/entitlements';
 import { loadPremiumTemplates, clearPremiumTemplates } from '../services/premiumContentApi';
 
 const HUB_URL = process.env.REACT_APP_HUB_URL || 'https://octonion.io';
@@ -17,6 +23,9 @@ export const AuthProvider = ({ children }) => {
   // once per session via getUserTier(). Held in state so the tree re-renders when the
   // tier lands and synchronous gates (isPremium/hasTier) get re-read.
   const [tier, setTier] = useState(getCurrentTier);
+  // End date of the grant backing the tier when it comes from a redeemed code (#6);
+  // null for stored tiers and free accounts. Display metadata for the Profile page.
+  const [tierExpiresAt, setTierExpiresAt] = useState(null);
   // Premium content delivery (#40). True once this session's server-delivered
   // templates are registered into storyTemplates. The state flip matters even when
   // the tier value itself is unchanged (localStorage warm start): setTier alone would
@@ -43,6 +52,7 @@ export const AuthProvider = ({ children }) => {
           .then((resolvedTier) => loadPremiumTemplates().then(() => resolvedTier))
           .then((resolvedTier) => {
             setTier(resolvedTier);
+            setTierExpiresAt(getTierExpiresAt());
             setPremiumContentReady(true);
           })
           .catch(() => setTier('free'));
@@ -51,6 +61,7 @@ export const AuthProvider = ({ children }) => {
         clearPremiumTemplates();
         setPremiumContentReady(false);
         setTier('free');
+        setTierExpiresAt(null);
       }
     };
 
@@ -82,6 +93,19 @@ export const AuthProvider = ({ children }) => {
     window.location.href = `${HUB_URL}/auth/login?redirect=${encodeURIComponent(CALLBACK_URL)}`;
   };
 
+  // Re-resolve the tier mid-session, the same way sign-in does (tier fetch, then the
+  // premium-template delivery, then publish state so gates re-render). Used after a
+  // successful code redemption (#6) so the new membership unlocks without re-login.
+  const refreshTier = async () => {
+    const resolvedTier = await refreshUserTier();
+    clearPremiumTemplates();
+    await loadPremiumTemplates();
+    setTier(resolvedTier);
+    setTierExpiresAt(getTierExpiresAt());
+    setPremiumContentReady(true);
+    return resolvedTier;
+  };
+
   const signOut = async () => {
     if (!supabase) {
       return { error: null };
@@ -96,7 +120,9 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     tier,
+    tierExpiresAt,
     premiumContentReady,
+    refreshTier,
     redirectToLogin,
     signOut,
   };
