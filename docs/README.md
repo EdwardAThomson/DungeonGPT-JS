@@ -41,6 +41,7 @@ deleted. When the code and a doc disagree, the code wins.
 - `SAVE_SYNC_PLAN.md` — local-first saves, honest offline fallback, divergence-safe multi-device reconcile (#54; Phases 1-3 shipped 2026-07-04/05, incl. the Phase 3 rev protocol with fork detection + ledger-union merge)
 - `LARGER_WORLDS_PLAN.md` — chunked generation, flat storage, growable saves for paid tiers (#60; step 2 viewport shipped dark 2026-07-05, step 3 chunk-assembly prototype shipped debug-only behind `/debug/large-world`)
 - `WATER_TOWNS_PLAN.md`: canal city + river city as water-typed hub-and-spoke variants, premium (#65; Phases 1-4 + 6 shipped 2026-07-05/06 along with the #67-69 river doctrine wave, Phase 5 packaging remains)
+- `T3_CAMPAIGNS_PLAN.md` — Tier 3 campaign program (implemented in waves 2026-07-03/04; body kept as the planning record, per-row status in `OUTSTANDING_ISSUES.md`)
 
 ## Art & assets
 - `IMAGE_GENERATION_PROMPTS.md` — art-gen prompt library + style guide

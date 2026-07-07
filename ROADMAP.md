@@ -45,19 +45,20 @@ backlog; see the `docs/` design docs for each system.
 - [x] Entitlements service (#39): account tiers (free / member / premium / elite) in Postgres behind a worker endpoint, tier-aware client gates, Membership badge on the profile page; server-delivered premium story templates to entitled accounts (#40) with per-template `minTier` (#70)
 - [x] Water towns (#65, `docs/WATER_TOWNS_PLAN.md`): river-city and canal-city archetypes with directional canal tile art, estuary world-gen + once-per-save tier-gated stamping, boathouse/Boatwright, six dockside side quests; river doctrine wave (#67-69): water-biased settlement placement, riverside one-bank towns, coastal forks, open river mouths
 - [x] Themed town building palettes (#64): desert adobe + snow timber with tier-2 details (flat roofs, chimney smoke, icicles, jetty docks); world-map viewport with stepped zoom + tile culling, shipped dark for worlds above 10x10 (#60 step 2)
+- [x] Rate limiting on `/api/ai`, `/api/embed`, and `/api/db/*` writes (#12) + premium AI pool via OpenRouter for member+ tiers with daily/monthly allowances (#7)
+- [x] Ops hardening (#11/#19-21): automated Worker deploy CI with prod smoke test, Postgres backup/restore scripts, ops runbook (`docs/OPS_RUNBOOK.md`)
 
 ## Next
 
 - [ ] Fix magic-link email template (OTP token shown but no UI input) — critical quick fix
-- [ ] Rate limiting on `/api/ai` and `/api/db/*` (abuse prevention)
-- [ ] Add missing assets (building interiors incl. `workshop` — Henry #26; quest-item icons)
+- [ ] Add missing assets (quest-item icons; the `workshop` building interior (Henry #26) is delivered)
 - [ ] Replace fragile keyword-based encounter-engagement detection
 - [ ] Mobile UI fixes (sign-in/nav overlap, How-To-Play layout)
 - [ ] Guest conversion: prompt at a high-intent moment (e.g. first milestone), beyond the persistent banner
 
 ## Backlog
 
-- [ ] Billing + credit system (Lemon Squeezy) + AI usage tracking → unlocks OpenRouter premium tier
+- [ ] Billing + credit system (Lemon Squeezy) + AI usage tracking (the OpenRouter premium pool itself shipped with #7; tier grants are still manual via psql)
 - [ ] Tiered narration — local templated prose for routine moves, AI for notable moments, as a cost/latency lever; subsumes guest movement narration / Guest Mode B3 (`docs/TIERED_NARRATION_PLAN.md`)
 - [ ] Streaming AI responses
 - [ ] Dungeon sub-maps (procedural caves / dungeons)
@@ -65,5 +66,5 @@ backlog; see the `docs/` design docs for each system.
 - [ ] AI-generated world-map image tiles (AI loot narration de-scoped to a richer templated loot line, see OUTSTANDING_ISSUES #8)
 - [ ] Cloudflare D1 / R2 / KV migration (data Postgres is already off Supabase, self-hosted via Hyperdrive)
 - [ ] SSO expansion (Google, GitHub, Discord) + magic-link sign-in
-- [ ] Monitoring (Sentry), structured logging, automated Worker deploy, ops runbook
+- [ ] Monitoring (Sentry), structured logging (automated Worker deploy + ops runbook shipped, see above)
 - [ ] Graph-enhanced RAG for long-context quests (basic RAG shipped; see `docs/RAG_GRAPH_ENHANCEMENT_PLAN.md`)

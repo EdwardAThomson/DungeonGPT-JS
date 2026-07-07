@@ -26,7 +26,7 @@
 | `POST /api/image/generate`| `routes/image.ts`    | Yes* | Image generation (8 models; FLUX.2 uses REST API, others use AI binding) |
 | `/api/db/*`            | `routes/db.ts`          | Yes  | Postgres CRUD proxy via Hyperdrive (heroes, saves, etc.) |
 | `GET  /api/db/entitlements` | `routes/db.ts`     | Yes  | Caller's account tier: `{ tier, updatedAt }`, no row = `free`. Read-only (grants via psql, see `cf-worker/migrations/002_account_tiers.sql`); smoke test: `scripts/test-cf-entitlements.mjs` |
-| `GET  /api/db/premium-templates` | `routes/db.ts` | Yes  | Server-delivered premium story templates (#40): `{ templates: [...] }` with only enabled `premium_templates` rows whose `min_tier` the caller's tier covers; free/no-row accounts get an empty list, never an error. Read-only (content loaded/disabled via psql, see the `cf-worker/migrations/004_premium_templates.sql` runbook); smoke test: `scripts/test-cf-premium.mjs` (manual, not auto-run) |
+| `GET  /api/db/premium-templates` | `routes/db.ts` | Yes  | Server-delivered premium story templates (#40): `{ templates: [...] }` with all enabled `premium_templates` rows: the full template when the caller's tier covers `min_tier`, otherwise a marketing-safe **teaser** (card-face metadata only: id, name, subtitle, tier, levelRange, shortDescription, theme, minTier, `teaser: true`; authored content (settings, milestones, customNames, NPCs, rewards) never leaves the server below tier). Free/no-row accounts get teasers, never an error. Read-only (content loaded/disabled via psql, see the `cf-worker/migrations/004_premium_templates.sql` runbook); smoke test: `scripts/test-cf-premium.mjs` (manual, not auto-run) |
 
 *Image generate currently has `requireAuth` commented out (TODO in code).
 
@@ -46,7 +46,7 @@ Fixed-window per-user counters in the `request_counters` Postgres table (migrati
 | `ai-generate` | 5 min | 30 free / 60 member+ | `POST /api/ai/generate` |
 | `embed` | 5 min | 60 | `POST /api/embed` |
 | `db-write` | 5 min | 120 | `POST/PUT/PATCH/DELETE /api/db/*` |
-| `ai-premium-daily` | 1 day (UTC) | 120 member / 300 premium+ | premium-pool generations (checked in `routes/ai.ts`, not middleware) |
+| `ai-premium-daily` | 1 day (UTC) | 100 member / 200 premium / 300 elite | premium-pool generations (checked in `routes/ai.ts`, not middleware) |
 
 **Worst-case premium cost math (2026-07-06, gpt-5-mini default at ~$0.25/M input, ~$2/M output):** input capped at 32k chars (~8k tokens) and output at 800 tokens gives a ceiling of ~$0.0036 per generation. The MONTHLY allowance is the revenue-aligned bound: member 800/month (~$2.90 worst case against $5), premium 2000 (~$7.20 against $10), elite 4000 (~$14.40 against $20); daily caps (100/200/300) are burst protection within it. Typical generations (~3k in / 500 out) cost under $0.002, so realistic heavy play runs well under a dollar a month. Haiku 4.5 stays in the fallback chain for quality diversity. Player model choice is removed entirely: the premium pool always runs the server default chain.
 
@@ -59,7 +59,7 @@ Fixed-window per-user counters in the `request_counters` Postgres table (migrati
 **Premium request contract:**
 
 - Tier gate: `account_tiers` must rank member+ → otherwise `403 { error, code: 'premium_required' }`.
-- Daily allowance: `ai-premium-daily` bucket (120/day member, 300/day premium+ (calibrated 2026-07-06 against worst-case cost: see below)) → over-allowance is `429 { error, code: 'premium_cap', retryAfterSeconds }`.
+- Daily allowance: `ai-premium-daily` bucket (100/day member, 200/day premium, 300/day elite (calibrated 2026-07-06 against worst-case cost: see below)) → over-allowance is `429 { error, code: 'premium_cap', retryAfterSeconds }`.
 - Success: `200 { text, pool: 'premium' }`.
 - OpenRouter failure (or missing `OPENROUTER_API_KEY`, or a DB error during the tier/allowance check): generation **falls back to the free pool automatically** — never a dead generation — and the response is marked: `200 { text, pool: 'free', fallbackFrom: 'premium', fallbackReason: 'premium_error' }`. A DB error never opens the paid pool.
 - Free requests always answer `200 { text, pool: 'free' }` (the `pool` field is new; older clients simply ignore it).
@@ -68,8 +68,8 @@ Fixed-window per-user counters in the `request_counters` Postgres table (migrati
 
 | Model ID | Display Name | Notes |
 |----------|--------------|-------|
-| `anthropic/claude-haiku-4.5` | Claude Haiku 4.5 | **DEFAULT_PREMIUM_MODEL_ID** — best prose per dollar of the class |
-| `openai/gpt-5-mini` | GPT-5 Mini | Very cheap, reliable workhorse fallback |
+| `openai/gpt-5-mini` | GPT-5 Mini | **DEFAULT_PREMIUM_MODEL_ID**: very cheap, reliable workhorse |
+| `anthropic/claude-haiku-4.5` | Claude Haiku 4.5 | First fallback, prose-quality diversity |
 | `google/gemini-3.5-flash` | Gemini 3.5 Flash | Lab-diversity fallback, long context |
 
 The pool is the choice in production: clients send their free-pool model id and the premium default carries the pool (only ids present in `PREMIUM_MODEL_REGISTRY` are honored; everything else resolves to the premium default). The client side lives in `src/services/aiPool.js` (persisted preference, tier-gated request pool, pool-outcome notices), `src/services/llmService.js` (sends `pool`, retries once on `premium_cap`/`premium_required`), and the pool chips in `src/components/Modals.js`.

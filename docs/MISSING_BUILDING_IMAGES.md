@@ -33,9 +33,6 @@ Newly-added building types (generated + now wired into map gen + icons + legend)
 
 ## Missing images
 
-| Building | File needed | Appears in | Priority |
-|----------|-------------|------------|----------|
-| Workshop | `workshop.webp` | Quest building (e.g. Tinker-Row, Arcane Renaissance campaign) — injected via `injectQuestBuildings`, not in the normal roster | Medium |
-
-Until `workshop.webp` exists, a placed workshop shows the BuildingModal placeholder and
-renders with the fallback house icon on the town map.
+None. The last gap, `workshop.webp` (quest building, e.g. Tinker-Row in the Arcane
+Renaissance campaign, injected via `injectQuestBuildings`), was delivered and lives at
+`public/assets/buildings/workshop.webp`.

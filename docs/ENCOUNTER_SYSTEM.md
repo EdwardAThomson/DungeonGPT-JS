@@ -145,8 +145,8 @@ on the first move away, then silent expiry; a failed Look-around re-parks the ho
 - Dice notation parsing (`3d10`, `2d6+5`) for gold drops.
 - Item drop chance parsing (`healing_potion:50%`).
 
-### Loot Narration (Not Shipped)
-- AI-narrated loot acquisition was planned but not implemented. Currently rewards are applied silently via `encounterController.js` with text messages (`+50 XP`, `+12 gold`).
+### Loot Narration (Shipped 2026-07-06 as templated prose, #8)
+- AI narration was considered and de-scoped (not worth the API cost). Instead, reward lines are narrated by `src/game/rewardNarrator.js`: seeded, content-templated sentences over the same reward data (the flat `+50 XP`, `+12 gold` lines are rewritten for display only; the underlying `rewardMessages` arrays and reward application in `encounterController.js` are unchanged).
 
 ---
 
@@ -306,4 +306,4 @@ Encounter outcomes shift faction relationships. Factions influence which encount
 3. **Support bonus scaling with level.** Current team design uses flat stat modifiers. Should proficiency bonus be added at higher levels?
 4. **Analyze role and enemy HP.** Should the Analyze support role reveal exact enemy HP numbers, or just the morale percentage?
 5. **Narrative encounters in team combat.** Support roles could map to social equivalents (Guard = "Watch the exits", Inspire = "Back up the speaker") but this needs design work.
-6. **Loot narration priority.** AI-narrated loot was planned in Phase 4 but deferred. Is this worth the API cost, or are text-only reward messages sufficient?
+6. **Loot narration priority.** Resolved 2026-07-06 (#8): de-scoped to seeded templated prose (`src/game/rewardNarrator.js`), no AI cost.
