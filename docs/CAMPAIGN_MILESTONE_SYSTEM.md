@@ -529,7 +529,7 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [x] Add `QUEST_BUILDINGS` (14 types), `NPC_ROLES` (9 roles), `THEME_NAMES`, `THEME_DEFAULTS` registries
 - [x] Per-slot town/mountain name selection feeding into `customNames` for map generation
 - [x] Template modal contextual progression buttons (Generate Map → Hero Selection)
-- [x] Entity validation at campaign creation time — pickers prevent invalid picks; `validateCustomSlots()` catches partial slots and requires ≥1 complete milestone; `shortDescription` auto-generated from selections
+- [x] Entity validation at campaign creation time — pickers prevent invalid picks; `validateCustomSlots()` catches partial slots and requires ≥2 complete milestone slots (raised from 1 on 2026-07-06); `shortDescription` auto-generated from selections
 - [x] Design team/party encounter system — Lead + Support model, see [`TEAM_ENCOUNTER_DESIGN.md`](TEAM_ENCOUNTER_DESIGN.md)
 - [ ] Implement team encounter system (support roles, formation UI, team damage/rewards)
 - [ ] Add encounter images for quest bosses

@@ -29,6 +29,7 @@ npm run test:e2e:headed        # Playwright headed
 npm run test:e2e:express       # single spec: express-smoke-new-game-save-reload
 npm run test:e2e:supabase      # single spec: supabase-hero-save
 npm run test:supabase          # scripts/test-supabase-local.sh
+npm run test:worker            # cf-worker vitest suite (in-runtime; branch-gated premium tests included)
 ```
 
 Unit tests are colocated (`src/**/*.test.js`), heaviest in `src/game/` and `src/utils/`. There is no separate lint script; ESLint runs through `react-scripts` (config: `react-app`, `react-app/jest`).
@@ -38,7 +39,7 @@ Unit tests are colocated (`src/**/*.test.js`), heaviest in `src/game/` and `src/
 There are **two separate backends** and they are not interchangeable:
 
 1. **`src/server.js`** — local-dev-only Express server. SQLite persistence (`src/game.db`) and **direct** LLM SDK calls (`src/llm/llmBackend.js` → OpenAI / Gemini / Claude using server-side env keys). This is a convenience harness for local development; **it is not deployed**.
-2. **`cf-worker/`** — the real production backend. Hono + TypeScript on Cloudflare Workers (`dungeongpt-api`). Entry `cf-worker/src/index.ts` mounts four route groups: `/api/ai` (text gen via Workers AI binding), `/api/embed` (768-dim BGE embeddings), `/api/image`, and `/api/db/*` (Postgres CRUD proxy over the `HYPERDRIVE` binding, the only authed-by-default group). AI runs on the `[ai]` Workers AI binding — curated open-weights models (GPT-OSS, Llama, Gemma); **no API keys** needed for text/embeddings.
+2. **`cf-worker/`** — the real production backend. Hono + TypeScript on Cloudflare Workers (`dungeongpt-api`). Entry `cf-worker/src/index.ts` mounts four route groups: `/api/ai` (text gen via Workers AI binding), `/api/embed` (768-dim BGE embeddings), `/api/image`, and `/api/db/*` (Postgres CRUD proxy over the `HYPERDRIVE` binding, the only authed-by-default group). Free-pool AI runs on the `[ai]` Workers AI binding — curated open-weights models (GPT-OSS, Llama, Gemma); **no API keys** needed for free text/embeddings. A member+ premium text pool (`cf-worker/src/services/openrouter.ts`, requested via `pool: 'premium'`) calls OpenRouter and needs the `OPENROUTER_API_KEY` secret; it falls back to the free pool on any failure.
 
 The frontend chooses at request time: provider `cf-workers` routes to `CF_WORKER_URL` (`src/services/llmService.js`); other providers route to `API_BASE_URL` (the Express server). In production only `cf-workers` is wired up. When changing AI behavior, know which path you're touching — `cf-worker/src/services/ai.ts` (prod) vs `src/llm/llmBackend.js` (dev) are independent implementations that must be kept in sync conceptually.
 
@@ -70,7 +71,7 @@ Two milestone kinds: **mechanical** (item/combat/location/talk) are engine-detec
 
 ## CF Worker model handling
 
-`cf-worker/src/services/models.ts` holds `MODEL_REGISTRY`, `DEFAULT_MODEL_ID`, and a `FALLBACK_MAP`. Unknown model IDs silently fall back to the default; on generation failure `ai.ts` retries down a fallback chain. Reasoning models need special handling. Model test harnesses: `scripts/test-cf-models*.mjs` (incl. a 10-turn multi-turn scenario) and `scripts/test-cf-worker-auth.mjs`. `docs/CF_WORKER_GUIDE.md` is the detailed reference (code wins over the doc when they disagree).
+`cf-worker/src/services/models.ts` holds `MODEL_REGISTRY` and `DEFAULT_MODEL_ID`; there is no hand-maintained fallback map, `getFallbackCandidates()` derives the chain from registry order. Unknown model IDs silently fall back to the default; on generation failure `ai.ts` retries down that chain. The premium pool has a parallel registry in `cf-worker/src/services/openrouter.ts` (`PREMIUM_MODEL_REGISTRY`, `DEFAULT_PREMIUM_MODEL_ID`). Reasoning models need special handling. Model test harnesses: `scripts/test-cf-models*.mjs` (incl. a 10-turn multi-turn scenario) and `scripts/test-cf-worker-auth.mjs`. `docs/CF_WORKER_GUIDE.md` is the detailed reference (code wins over the doc when they disagree).
 
 ## Environment
 

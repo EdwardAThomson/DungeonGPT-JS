@@ -2,7 +2,7 @@
 
 **🎮 Live App:** https://dungeongpt.xyz/
 
-This is a web application built with React that allows users to create detailed characters for role-playing games, manage them, and use them in an interactive game session powered by an AI dungeon master. The live app currently runs on Cloudflare Workers AI with a curated set of open-weights models (including GPT-OSS, Llama, and Gemma); premium models via OpenRouter are planned for a future paid tier.
+This is a web application built with React that allows users to create detailed characters for role-playing games, manage them, and use them in an interactive game session powered by an AI dungeon master. The live app runs on Cloudflare Workers AI with a curated set of open-weights models (including GPT-OSS, Llama, and Gemma); members additionally get a premium model pool served via OpenRouter.
 
 This project is based upon the [Python version of the same name](https://github.com/EdwardAThomson/DungeonGPT).
 
@@ -35,7 +35,7 @@ YouTube Videos 🎥:
 *   **Conversation Memory (RAG):** The AI recalls earlier story beats via on-device retrieval over embedded history.
 *   **Guest / Local-First Play:** Try the game without an account; heroes and saves live in the browser and sync to the cloud on sign-in.
 *   **Onboarding:** A guided tour and a 27-point-buy hero creator.
-*   **AI Models:** Runs on Cloudflare Workers AI with a curated 5-model lineup (GPT-OSS 120B/20B, Llama 4 Scout, Gemma 3 12B, Llama 3.1 8B Fast). Local development additionally supports OpenAI, Gemini, and Claude. Premium models via OpenRouter are planned.
+*   **AI Models:** Runs on Cloudflare Workers AI with a curated 5-model lineup (GPT-OSS 120B/20B, Llama 4 Scout, Gemma 3 12B, Llama 3.1 8B Fast). Local development additionally supports OpenAI, Gemini, and Claude. Member+ accounts get a premium model pool via OpenRouter (server-side, with a daily allowance and automatic fallback to the free pool).
 *   **User Authentication:** Secure sign-in via Octonion hub (centralized auth across games).
 *   **Membership Tiers:** Account tiers (Free / Member / Premium / Elite) stored server-side; premium story templates are delivered from the server to entitled accounts, and the profile page shows the current tier.
 *   **Persistent Sessions:** Characters and game sessions saved to a self-hosted PostgreSQL database, accessed through the CF Worker (via Cloudflare Hyperdrive) with row-level access enforcement.
@@ -49,7 +49,7 @@ YouTube Videos 🎥:
 *   **Backend:** Cloudflare Workers (TypeScript with Hono framework)
 *   **Database:** Self-hosted PostgreSQL, reached from the CF Worker via Cloudflare Hyperdrive (row-level access enforced in the Worker)
 *   **Authentication:** Octonion hub (centralized auth at octonion.io)
-*   **AI Providers:** Cloudflare Workers AI in production. Local development also supports OpenAI, Gemini, and Claude (server-side only, no exposed keys). OpenRouter integration planned for premium tier.
+*   **AI Providers:** Cloudflare Workers AI in production, plus an OpenRouter-backed premium pool for member+ tiers (rate-limited in the Worker). Local development also supports OpenAI, Gemini, and Claude (server-side only, no exposed keys).
 
 ## Project Structure
 
