@@ -121,6 +121,15 @@ Raw notes captured during a play session. Three items already fixed: hero cards 
 
 ---
 
+## Playtest feedback — maintainer (2026-07-07, frozen-frontier-t1 on live)
+
+| # | Issue | Source | Size | Decision |
+|---|---|---|---|---|
+| 74 | ~~**Quest-blocking: "no Trading Post building" in the milestone town.**~~ **FIXED 2026-07-07.** Root cause: New Game hands its optional preview map to `launchCampaign` verbatim (`options.mapData`), and `applyTemplate` never invalidated a preview built under different customNames/theme; a world previewed BEFORE picking Frozen Frontier has no Hearthmere on it, so `spawnWorldMapEntities` could not anchor milestone 1's `warehouse` venue ("The Hearthmere Trading Post") to any town and the quest building (plus all milestone POIs/NPCs) silently never spawned. Same latent hole applied to every template (desert, eldritch, delivered tidewater) via the same stale-preview path. Fix: (a) `launchCampaign` now validates a provided map with `findMissingMilestoneLocations` (milestoneSpawner) and discards + regenerates any map missing a milestone location, mirroring campaignChain's `isTemplateCompatibleWithWorld`; compatible previews are kept byte-identical; (b) `applyTemplate` drops the stale preview (seed kept so "Build Map from Seed" reproduces it under the new names). Pinned by `questBuildingIntegrity.test.js`: the exact playtest repro, a seed-invariant sweep of every launchable template's building milestones on fresh AND stale-preview launches, the kept-valid-preview case, and the server-delivered mechanism (authored venue names, unknown building type). | Playtest 2026-07-07 | S | Done |
+| 75 | ~~**Start Adventure button vanished after the first start call failed.**~~ **FIXED 2026-07-07.** `handleStartAdventure` set `hasAdventureStarted` TRUE before the AI call; on failure (the maxTokens-1600 worker 400, fixed separately in `0a63969`) the catch surfaced an error but never reset the gate, and GameMainPanel hides the Start button once `hasAdventureStarted` is true, so the fail permanently removed the button (the guard at the top of the handler also blocked retries). Fix: a failed initial generation (thrown error OR empty AI response) resets `hasAdventureStarted` to false, keeps the error surfaced, and leaves the button in place so a retry runs the full start flow. Covered by `useGameInteraction.startAdventure.test.js` (rejecting AI call → gate stays false + retry fires; empty response; success unchanged). | Playtest 2026-07-07 | XS | Done |
+
+---
+
 ## Combat-system depth (competitor-analysis gaps, 2026-06-20)
 
 Surfaced while positioning DungeonGPT against group-2 ("real mechanics") AI-GM competitors — see [ai-game-master-competitor-analysis.md](../ai-game-master-competitor-analysis.md). Combat is already on the defensible *deterministic* side (rolls/damage computed in code, AI does not decide outcomes), but the rules layer is thinner than the combat-fidelity leaders (LoreKeeper, Friends & Fables). Each item below is "fix, or do a thorough check of current behaviour and decide deliberately" — not all are wanted.

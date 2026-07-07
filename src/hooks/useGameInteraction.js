@@ -436,7 +436,11 @@ const useGameInteraction = (
             }
 
             if (!aiResponse || !aiResponse.trim()) {
-                logger.warn('Empty AI response received at adventure start, skipping');
+                // An empty opening is a failed start: keep the adventure un-started so
+                // the Start Adventure button stays and the player can retry.
+                logger.warn('Empty AI response received at adventure start; keeping the start available for retry');
+                setHasAdventureStarted(false);
+                setError('The Dungeon Master gave no reply. Please try starting the adventure again.');
                 return;
             }
             const aiMessage = { role: 'ai', content: aiResponse };
@@ -455,6 +459,11 @@ const useGameInteraction = (
             setCurrentSummary(updatedSummary);
         } catch (error) {
             logger.error('Failed to fetch initial AI response', error);
+            // A failed start must NOT count as started (playtest 2026-07-07: the first
+            // start call 400'd and the Start Adventure button vanished forever, since
+            // GameMainPanel hides it once hasAdventureStarted is true). Reset the gate
+            // so the button stays and a retry runs the full start flow again.
+            setHasAdventureStarted(false);
             setError(`Error starting adventure: ${error.message}`);
             setConversation(prev => [...prev, { role: 'ai', content: `Error: Could not start the adventure. ${error.message}` }]);
         } finally {

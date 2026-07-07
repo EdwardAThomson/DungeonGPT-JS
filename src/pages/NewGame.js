@@ -117,6 +117,13 @@ const NewGame = () => {
     setMilestones(template.settings.milestones || []);
     setCustomNames(template.customNames || { towns: [], mountains: [] });
     setWorldTheme(template.settings.theme || 'grassland');
+    // A previously generated preview map belongs to the OLD customNames/theme; keeping
+    // it would launch the campaign on a world without its milestone towns (the missing
+    // Hearthmere trading post, playtest 2026-07-07). Drop it; the seed is kept so
+    // "Build Map from Seed" reproduces the same world under the new template's names.
+    // launchCampaign also guards against incompatible provided maps as a backstop.
+    setGeneratedMap(null);
+    setShowMapPreview(false);
   };
 
   // Preselect a template when handed one via navigation state (the "Continue your

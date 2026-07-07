@@ -80,6 +80,34 @@ const findNearbyPlacement = (mapData, targetX, targetY) => {
 };
 
 /**
+ * Which milestone-required location names are missing from a world map?
+ *
+ * Collects every location a campaign's milestones anchor content to (the milestone's
+ * own `location`, its quest building's `location`, and its spawn's `location`) and
+ * returns the names findLocationOnMap cannot resolve on `mapData`. An empty result
+ * means the map can host the campaign.
+ *
+ * Used by launchCampaign as a guard on PROVIDED maps (New Game's preview): a preview
+ * generated under different customNames (playtest 2026-07-07: a pre-template preview
+ * had no Hearthmere, so "The Hearthmere Trading Post" never existed anywhere) must be
+ * discarded and regenerated, mirroring campaignChain's isTemplateCompatibleWithWorld
+ * check on the continuation path.
+ *
+ * @param {Array} mapData - 2D world map array
+ * @param {Array} milestones - campaign milestones
+ * @returns {Array<string>} missing location names (empty when the map is compatible)
+ */
+export const findMissingMilestoneLocations = (mapData, milestones) => {
+    const names = new Set();
+    for (const m of milestones || []) {
+        if (m.location) names.add(m.location);
+        if (m.building?.location) names.add(m.building.location);
+        if (m.spawn?.location) names.add(m.spawn.location);
+    }
+    return [...names].filter((name) => !findLocationOnMap(mapData, name));
+};
+
+/**
  * Process milestone spawn requirements and modify the world map.
  *
  * - Adds milestone POIs to world map tiles (e.g., shadow_fortress)

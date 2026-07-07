@@ -20,7 +20,7 @@ import { generateTownMap } from '../utils/townMapGenerator';
 import { getTownWaterContext, getTownRoadEdges } from '../utils/townWater';
 import { selectSideQuests } from './questEngine';
 import { populateTown } from '../utils/npcGenerator';
-import { spawnWorldMapEntities, injectQuestBuildings } from './milestoneSpawner';
+import { spawnWorldMapEntities, injectQuestBuildings, findMissingMilestoneLocations } from './milestoneSpawner';
 import { getMilestoneLocationNames, getMilestoneNpcsForTown } from './milestoneEngine';
 import { isPremium, isThemePremium, isTemplatePremium } from './entitlements';
 import { resolveWaterTownAccess, waterTownWorldGenOptions, stampWaterTowns } from './waterTowns';
@@ -147,7 +147,25 @@ export const launchCampaign = (spec, options = {}) => {
     // save then carries the decision forever (lapsed subscribers keep their water
     // towns). Free/guest tiers get empty options and no stamps: byte-identical worlds.
     const waterAccess = resolveWaterTownAccess();
-    const mapData = providedMap
+
+    // Guard on PROVIDED maps (New Game's optional preview): the preview may have been
+    // built under DIFFERENT customNames/theme (previewed before picking the template,
+    // or under another template), in which case the milestone towns simply do not
+    // exist on it and every quest building/POI/NPC anchored to them would silently
+    // never spawn (playtest 2026-07-07: frozen-frontier-t1 started over a stale
+    // pre-template preview had no Hearthmere, so its trading post never existed).
+    // A map that cannot host the campaign is discarded and regenerated from the same
+    // seed with the campaign's own names; a compatible preview is kept byte-identical.
+    // Mirrors campaignChain's isTemplateCompatibleWithWorld on the continuation path.
+    let mapToUse = providedMap;
+    if (mapToUse && milestones.length > 0) {
+        const missing = findMissingMilestoneLocations(mapToUse, milestones);
+        if (missing.length > 0) {
+            logger.warn(`Provided preview map is missing milestone locations (${missing.join(', ')}); regenerating the world for this campaign.`);
+            mapToUse = null;
+        }
+    }
+    const mapData = mapToUse
         || generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme, waterTownWorldGenOptions(waterAccess));
     stampWaterTowns(mapData, seedToUse, waterAccess);
 
