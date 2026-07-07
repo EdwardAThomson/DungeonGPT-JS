@@ -9,6 +9,7 @@ import {
   getTierExpiresAt,
 } from '../game/entitlements';
 import { loadPremiumTemplates, clearPremiumTemplates } from '../services/premiumContentApi';
+import { autoSelectPoolForTier } from '../services/aiPool';
 
 const HUB_URL = process.env.REACT_APP_HUB_URL || 'https://octonion.io';
 const CALLBACK_URL = `${window.location.origin}/auth/callback`;
@@ -53,6 +54,7 @@ export const AuthProvider = ({ children }) => {
           .then((resolvedTier) => {
             setTier(resolvedTier);
             setTierExpiresAt(getTierExpiresAt());
+            autoSelectPoolForTier(); // membership visibly delivers premium AI (2026-07-07)
             setPremiumContentReady(true);
           })
           .catch(() => setTier('free'));
@@ -102,6 +104,7 @@ export const AuthProvider = ({ children }) => {
     await loadPremiumTemplates();
     setTier(resolvedTier);
     setTierExpiresAt(getTierExpiresAt());
+    autoSelectPoolForTier(); // a redeemed code upgrades the pool on the spot
     setPremiumContentReady(true);
     return resolvedTier;
   };

@@ -75,6 +75,25 @@ export function setPreferredPool(pool) {
 }
 
 /**
+ * Auto-select the premium pool when an account GAINS member+ standing, unless
+ * the player ever explicitly chose a pool themselves (maintainer 2026-07-07:
+ * "even though I'm now a member, the game doesn't automatically bump me to
+ * Premium AI"). Membership should visibly deliver its value without a trip to
+ * the AI tab. Explicit choice is exactly the presence of the localStorage key:
+ * a player who deliberately picked Free keeps Free forever; an untouched
+ * default upgrades once, and from then on counts as chosen.
+ * Called whenever the tier resolves (sign-in, redemption refresh).
+ */
+export function autoSelectPoolForTier() {
+    try {
+        if (localStorage.getItem(AI_POOL_KEY) !== null) return; // explicit choice: respect it
+    } catch {
+        return; // no storage, no auto-bump: the default read path stays 'free'
+    }
+    if (hasTier('member')) setPreferredPool('premium');
+}
+
+/**
  * The pool to actually send on a cf-workers request, right now: the preference
  * gated by entitlement. A 'premium' preference without member+ standing sends
  * 'free' (the preference itself is kept, so regaining the tier re-arms it).

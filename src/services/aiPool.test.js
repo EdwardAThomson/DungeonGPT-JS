@@ -3,6 +3,7 @@
 
 import {
     AI_POOL_KEY,
+    autoSelectPoolForTier,
     getPreferredPool,
     setPreferredPool,
     getRequestPool,
@@ -115,4 +116,35 @@ describe('aiPool', () => {
             expect(good).toHaveBeenCalledTimes(1);
         });
     });
+});
+
+describe('autoSelectPoolForTier (auto-bump on gaining member+, 2026-07-07)', () => {
+  afterEach(() => {
+    localStorage.clear();
+    _resetAiPoolForTests();
+    clearUserTier();
+  });
+
+  it('an untouched default upgrades to premium when member+', () => {
+    setUserTier('member');
+    localStorage.removeItem(AI_POOL_KEY);
+    _resetAiPoolForTests();
+    autoSelectPoolForTier();
+    expect(getPreferredPool()).toBe('premium');
+  });
+
+  it('an explicit Free choice is never overridden', () => {
+    setUserTier('member');
+    localStorage.setItem(AI_POOL_KEY, 'free'); // the player chose Free on purpose
+    _resetAiPoolForTests();
+    autoSelectPoolForTier();
+    expect(getPreferredPool()).toBe('free');
+  });
+
+  it('a free-tier account is never bumped', () => {
+    localStorage.removeItem(AI_POOL_KEY);
+    _resetAiPoolForTests();
+    autoSelectPoolForTier();
+    expect(getPreferredPool()).toBe('free');
+  });
 });
