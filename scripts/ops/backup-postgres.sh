@@ -4,7 +4,7 @@
 # Backlog #20. See docs/OPS_RUNBOOK.md ("Backups") for install (cron or systemd
 # timer), the offsite rclone/R2 recipe, and the monthly restore drill.
 #
-# WHERE IT RUNS: on the database box itself (ssh octonion-games), scheduled by
+# WHERE IT RUNS: on the database box itself (the games box; alias in your local ssh config), scheduled by
 # cron or a systemd timer, ideally as the `postgres` OS user so peer auth works
 # and no password is needed. It is NOT run from CI and never from a laptop.
 #

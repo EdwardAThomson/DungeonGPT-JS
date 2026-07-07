@@ -4,7 +4,7 @@
 # database. Backlog #20. See docs/OPS_RUNBOOK.md ("Restore drill") for the
 # monthly drill procedure and the drill log.
 #
-# WHERE IT RUNS: on the database box (ssh octonion-games), as a role that can
+# WHERE IT RUNS: on the database box (the games box; alias in your local ssh config), as a role that can
 # CREATE DATABASE. The simplest invocation is via the postgres superuser:
 #   sudo -u postgres bash scripts/ops/restore-postgres.sh --to-scratch-db
 #
