@@ -29,6 +29,32 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
   if (!townMapData) return null;
 
   const discoveredBuildings = townMapData.discoveredBuildings || [];
+
+  // Findability pass (maintainer 2026-07-07: "I can't tell what these are"):
+  // a quest building carries an evocative name (The Icemoor Sanctuary) that hides
+  // its type (a temple). Show name AND type, mark the active-quest venue, and glow
+  // it. A quest building whose milestone is already complete stops glowing.
+  const prettyType = (type) => {
+    if (!type) return 'Building';
+    return String(type)
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+  // Milestones with a named building tell us completion; if the component gets no
+  // such data (e.g. debug pages), fall back to glowing every quest tile.
+  const buildingMilestones = (milestones || []).filter((m) => m && m.building && m.building.name);
+  const haveMilestoneData = buildingMilestones.length > 0;
+  const activeQuestBuildingNames = new Set(
+    buildingMilestones
+      .filter((m) => m.status !== 'completed' && !m.completed)
+      .map((m) => String(m.building.name).toLowerCase())
+  );
+  const isActiveQuestTile = (tile) =>
+    !!tile.questBuilding &&
+    (haveMilestoneData
+      ? activeQuestBuildingNames.has(String(tile.buildingName || '').toLowerCase())
+      : true); // no completion info at all: glow every quest building (safe default)
+
   const { width, height, mapData } = townMapData;
   // Biome theme drives the ground palette (sand for desert). Older cached town maps
   // lack this field and fall back to grassland — unchanged rendering.
@@ -75,6 +101,12 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
 
   return (
     <div>
+      <style>{`
+        @keyframes questPulse {
+          0%, 100% { box-shadow: 0 0 3px 1px rgba(255, 210, 90, 0.65), inset 0 0 4px rgba(255, 210, 90, 0.5); }
+          50%      { box-shadow: 0 0 10px 4px rgba(255, 225, 130, 0.95), inset 0 0 7px rgba(255, 225, 130, 0.75); }
+        }
+      `}</style>
       <div style={{
         position: 'relative',
         display: 'grid',
@@ -122,6 +154,9 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
                 outline: (isPlayer || tile.isEntry) ? '2px solid yellow' : 'none',
                 outlineOffset: '-2px',
                 cursor: isClickable ? 'pointer' : 'default',
+                ...(isBuilding && isActiveQuestTile(tile)
+                  ? { animation: 'questPulse 1.6s ease-in-out infinite', zIndex: 3, borderRadius: 3 }
+                  : {}),
               }}
               onClick={() => {
                 if (isBuilding) {
@@ -130,8 +165,14 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
                   onTileClick(col, row);
                 }
               }}
-              title={`(${tile.x}, ${tile.y}) - ${displayName}${isInRange ? ` [${distance} tiles away]` : ''}${isDiscovered ? ' (Discovered)' : ''}`}
+              title={`(${tile.x}, ${tile.y}) - ${displayName}${isBuilding && tile.buildingType ? ` (${prettyType(tile.buildingType)})` : ''}${isBuilding && isActiveQuestTile(tile) ? ' — QUEST' : ''}${isInRange ? ` [${distance} tiles away]` : ''}${isDiscovered ? ' (Discovered)' : ''}`}
             >
+              {isBuilding && isActiveQuestTile(tile) && (
+                <span style={{
+                  position: 'absolute', top: -6, right: -4, zIndex: 4, fontSize: 13,
+                  filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.6))', pointerEvents: 'none',
+                }} aria-label="quest objective">❗</span>
+              )}
               {poiEmoji && (
                 <span style={{ position: 'relative', zIndex: 2, fontSize: 18, filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.45))' }}>
                   {poiEmoji}

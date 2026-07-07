@@ -227,7 +227,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                             textTransform: 'uppercase',
                             fontFamily: 'var(--header-font)'
                         }}>
-                            {building.buildingName || building.buildingType.charAt(0).toUpperCase() + building.buildingType.slice(1)}
+                            {building.buildingName ? building.buildingName : (building.buildingType.charAt(0).toUpperCase() + building.buildingType.slice(1))}{building.buildingName && building.buildingType ? ` (${building.buildingType.charAt(0).toUpperCase() + building.buildingType.slice(1)})` : ''}
                         </h2>
                         <div style={{
                             fontSize: '14px',
@@ -1160,7 +1160,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                             letterSpacing: '1px',
                             textShadow: '2px 2px 4px rgba(0,0,0,0.5)'
                         }}>
-                            {building.buildingName || building.buildingType.charAt(0).toUpperCase() + building.buildingType.slice(1)}
+                            {building.buildingName ? building.buildingName : (building.buildingType.charAt(0).toUpperCase() + building.buildingType.slice(1))}{building.buildingName && building.buildingType ? ` (${building.buildingType.charAt(0).toUpperCase() + building.buildingType.slice(1)})` : ''}
                         </div>
                     </div>
                 </div>

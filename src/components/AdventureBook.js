@@ -159,8 +159,13 @@ const CampaignTab = ({ settings, onContinueLegend }) => (
                         // (e.g. "Moorland Herbs · Grey Moors"). Milestones without
                         // spawn/building data render nothing.
                         const who = (m.spawn?.type === 'npc' || m.spawn?.type === 'item') ? m.spawn.name : null;
+                        // Name the building's TYPE alongside its flavour name so the
+                        // player can find it on the map (maintainer 2026-07-07: "The
+                        // Icemoor Sanctuary" alone does not say it is a temple).
+                        const prettyType = (t) => t ? String(t).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '';
                         const where = m.building?.name
-                          || (m.spawn?.type === 'npc' || m.spawn?.type === 'item' ? m.spawn.location : null);
+                          ? `${m.building.name}${m.building.type ? ` (${prettyType(m.building.type)})` : ''}`
+                          : (m.spawn?.type === 'npc' || m.spawn?.type === 'item' ? m.spawn.location : null);
                         const sub = [who, where].filter(Boolean).join(' · ');
                         if (!sub) return null;
                         return (
