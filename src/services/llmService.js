@@ -37,6 +37,11 @@ export const llmService = {
      * Standard text generation (non-streaming)
      */
     async generateText({ provider, model, prompt, maxTokens, temperature, systemPrompt }) {
+        // The worker's schema hard-caps maxTokens at 1500 and REJECTS (zod 400)
+        // anything above it, which took down every AI call when a caller passed
+        // 1600 (playtest 2026-07-07). Clamp at the seam: a stray future value
+        // should shorten the reply, never fail the request.
+        if (typeof maxTokens === 'number') maxTokens = Math.min(maxTokens, 1500);
         // Route CF Workers requests to the CF Worker endpoint
         if (provider === 'cf-workers') {
             const cfHeaders = { 'Content-Type': 'application/json' };

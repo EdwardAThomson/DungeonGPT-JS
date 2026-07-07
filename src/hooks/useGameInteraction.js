@@ -341,7 +341,7 @@ const useGameInteraction = (
             provider: resolved.provider,
             model: resolved.model,
             prompt: fullPrompt,
-            maxTokens: 1600,
+            maxTokens: 1500, // server caps at 1500 (cf-worker ai.ts schema); 1600 made zod 400 every request (playtest 2026-07-07)
             temperature: 0.7
         });
     };
