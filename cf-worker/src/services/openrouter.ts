@@ -37,32 +37,36 @@ export interface PremiumModelDefinition {
  *                               class, strong instruction-following for the strict
  *                               DM protocol.
  *   openai/gpt-5-mini           very cheap, reliable, excellent availability; the
- *                               workhorse fallback.
- *   google/gemini-3.5-flash     fast, cheap, long context; diversity fallback so a
- *                               single-lab outage never empties the pool.
+ *   anthropic/claude-haiku-4.5  default: best name-grounding of the three in play.
+ *   openai/gpt-5-mini           cheap workhorse fallback.
+ *   google/gemini-3.5-flash     fast, long context; diversity fallback so a single-
+ *                               lab outage never empties the pool.
  */
 export const PREMIUM_MODEL_REGISTRY: readonly PremiumModelDefinition[] = [
   {
-    id: 'openai/gpt-5-mini',
-    displayName: 'GPT-4o Mini',
-    maxTokens: 800,
+    id: 'anthropic/claude-haiku-4.5',
+    displayName: 'Claude Haiku 4.5',
+    maxTokens: 1500,
   },
   {
-    id: 'anthropic/claude-haiku-4.5',
-    displayName: 'Claude 3.5 Haiku',
-    maxTokens: 800,
+    id: 'openai/gpt-5-mini',
+    displayName: 'GPT-5 Mini',
+    maxTokens: 1500,
   },
   {
     id: 'google/gemini-3.5-flash',
-    displayName: 'Gemini 2.5 Flash',
-    maxTokens: 800,
+    displayName: 'Gemini 3.5 Flash',
+    maxTokens: 1500,
   },
 ];
 
-export const DEFAULT_PREMIUM_MODEL_ID = 'openai/gpt-5-mini';
-// Cost calibration 2026-07-06: gpt-5-mini (~$0.25/M in, ~$2/M out) is the default
-// so worst-case monthly spend stays well under subscription revenue; Haiku 4.5
-// remains in the chain for quality fallback. See CF_WORKER_GUIDE cost math.
+// Default flipped to Haiku 4.5 (2026-07-07): in playtest gpt-5-mini conflated the
+// town name with character names and ran terse; Haiku follows the name-grounding
+// prompt better and reads richer. gpt-5-mini stays next in the chain as the cheap
+// fallback. Output cap raised 800 -> 1500 for parity with the free pool (premium
+// reading SHORTER than free was backwards); worst-case output cost roughly doubles
+// per call but stays fractions of a cent, bounded overall by the monthly allowance.
+export const DEFAULT_PREMIUM_MODEL_ID = 'anthropic/claude-haiku-4.5';
 // Registry verified against the LIVE OpenRouter catalog on 2026-07-06 (the first
 // draft named claude-3.5-haiku, which no longer exists there at all): re-verify
 // ids against https://openrouter.ai/api/v1/models when touching this list.

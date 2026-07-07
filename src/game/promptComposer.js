@@ -69,7 +69,9 @@ export const buildRegionThemeInfo = (theme) => REGION_THEME_DESCRIPTIONS[theme] 
 export const buildLocationInfo = ({ tile, coords, isNewArea }) => {
   let locationInfo = `Player has moved to coordinates (${coords.x}, ${coords.y}) in a ${tile.biome} biome.`;
   if (tile.poi === 'town' && tile.townName) {
-    locationInfo += ` The party has arrived at ${tile.townName}, a ${tile.townSize || 'settlement'}. They are standing at the edge of the town.`;
+    // Name the settlement AS a place, explicitly (playtest 2026-07-07: weaker
+    // models personified the town name or reused it as a character's name).
+    locationInfo += ` The party has arrived at the ${tile.townSize || 'settlement'} named "${tile.townName}" (this is the name of the PLACE, not a person). They are standing at the edge of town.`;
   } else if (tile.poi) {
     locationInfo += ` POI: ${tile.poi}.`;
   }
