@@ -38,9 +38,9 @@ describe.skipIf(!or)("premium model registry", () => {
     expect(or.getPremiumModelById(or.DEFAULT_PREMIUM_MODEL_ID)).toBeDefined();
   });
 
-  it("caps every premium model's output at 800 tokens (cost ceiling)", () => {
+  it("caps every premium model's output at 1500 tokens (parity with free pool)", () => {
     for (const model of or.PREMIUM_MODEL_REGISTRY) {
-      expect(model.maxTokens).toBe(800);
+      expect(model.maxTokens).toBe(1500);
     }
   });
 
@@ -81,10 +81,10 @@ describe.skipIf(!or)("generatePremiumText", () => {
     expect((stub.requests[0].json as any).model).toBe(or.DEFAULT_PREMIUM_MODEL_ID);
   });
 
-  it("clamps client maxTokens to the registry's 800-token output cap", async () => {
+  it("clamps client maxTokens to the registry's 1500-token output cap", async () => {
     const stub = new FetchStub().install().on(OPENROUTER_URL, () => okBody("ok"));
     await or.generatePremiumText(orEnv(), { prompt: "hi", maxTokens: 5000 });
-    expect((stub.requests[0].json as any).max_tokens).toBe(800);
+    expect((stub.requests[0].json as any).max_tokens).toBe(1500);
   });
 
   it("sends the API key as a bearer Authorization header", async () => {
