@@ -336,7 +336,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
           ...(culling ? { gridColumn: tile.x + 1, gridRow: tile.y + 1 } : {}),
         }}
         onClick={() => handleTileClick(tile.x, tile.y)}
-        title={`${tile.townName || tile.mountainName || `(${tile.x}, ${tile.y})`} - ${tile.biome}${tile.poi && !isSiteHidden ? ` (${tile.poi})` : ''}${tile.townSize ? ` [${tile.townSize}]` : ''}${tile.isExplored ? ' (Explored)' : ''}`} // Tooltip
+        title={`${tile.townName || tile.mountainName || `(${tile.x}, ${tile.y})`} - ${tile.biome}${tile.poi && !isSiteHidden && !isMilestoneHidden ? ` (${tile.poi})` : ''}${tile.townSize ? ` [${tile.townSize}]` : ''}${tile.isExplored ? ' (Explored)' : ''}`} // Tooltip
       >
         {/* Render river overlay (below POI) */}
         {renderRiverOverlay(tile)}
