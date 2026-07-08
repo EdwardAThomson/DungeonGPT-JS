@@ -20,12 +20,13 @@
 |------------------------|-------------------------|------|---------|
 | `GET  /health`         | `index.ts`              | No   | Liveness check |
 | `GET  /api/ai/models`  | `routes/ai.ts`          | Yes  | List registered text models + default |
-| `POST /api/ai/generate`| `routes/ai.ts`          | Yes  | Text generation (model, prompt, systemPrompt, maxTokens, temperature, optional `pool: 'free' \| 'premium'` — see AI Pools below). Rate-limited (`ai-generate` bucket) |
+| `POST /api/ai/generate`| `routes/ai.ts`          | Yes  | Text generation (model, prompt, systemPrompt, `maxTokens` (schema-capped at **1500**; a larger value 400s), temperature, optional `pool: 'free' \| 'premium'` — see AI Pools below). Rate-limited (`ai-generate` bucket) |
 | `POST /api/embed`      | `routes/embed.ts`       | Yes  | Text embeddings (`@cf/baai/bge-base-en-v1.5`, 768-dim, max 100 texts) |
 | `GET  /api/image/models`| `routes/image.ts`      | Yes  | List image models |
 | `POST /api/image/generate`| `routes/image.ts`    | Yes* | Image generation (8 models; FLUX.2 uses REST API, others use AI binding) |
 | `/api/db/*`            | `routes/db.ts`          | Yes  | Postgres CRUD proxy via Hyperdrive (heroes, saves, etc.) |
-| `GET  /api/db/entitlements` | `routes/db.ts`     | Yes  | Caller's account tier: `{ tier, updatedAt }`, no row = `free`. Read-only (grants via psql, see `cf-worker/migrations/002_account_tiers.sql`); smoke test: `scripts/test-cf-entitlements.mjs` |
+| `GET  /api/db/entitlements` | `routes/db.ts`     | Yes  | Caller's **effective** account tier: `{ tier, updatedAt, expiresAt }`, no row = `free`. Effective tier = base `account_tiers` row MAX any unexpired `tier_grants` (see `services/tiers.ts`); `expiresAt` is the grant end date when a grant supplies the tier (additive, `null` when the base row covers it). Read-only (base grants via psql `002_account_tiers.sql`; time-boxed grants also arrive via `POST /api/db/redeem-code`); smoke test: `scripts/test-cf-entitlements.mjs` |
+| `POST /api/db/redeem-code` | `routes/db.ts`      | Yes  | Redeem a membership code (billing MVP #6, migration `006_redemption_codes.sql`): body `{ code }`, success `200 { tier, expiresAt }` grants a time-boxed `tier_grants` row atomically. Generic `400 code_invalid` for any dead code, `409 already_redeemed`, per-user `429 rate_limited` (10/day, fails CLOSED). See `docs/REDEMPTION_CODES.md` |
 | `GET  /api/db/premium-templates` | `routes/db.ts` | Yes  | Server-delivered premium story templates (#40): `{ templates: [...] }` with all enabled `premium_templates` rows: the full template when the caller's tier covers `min_tier`, otherwise a marketing-safe **teaser** (card-face metadata only: id, name, subtitle, tier, levelRange, shortDescription, theme, minTier, `teaser: true`; authored content (settings, milestones, customNames, NPCs, rewards) never leaves the server below tier). Free/no-row accounts get teasers, never an error. Read-only (content loaded/disabled via psql, see the `cf-worker/migrations/004_premium_templates.sql` runbook); smoke test: `scripts/test-cf-premium.mjs` (manual, not auto-run) |
 
 *Image generate currently has `requireAuth` commented out (TODO in code).
@@ -35,7 +36,7 @@
 - **`services/models.ts`** — `MODEL_REGISTRY`, `DEFAULT_MODEL_ID`, `getFallbackCandidates()`, lookup helpers (free pool).
 - **`services/ai.ts`** — `generateText()` orchestrates: resolve model (unknown IDs fall back to default), call Workers AI, handle response format variants, try fallback on failure, sanitize output (strips leaked prompt markers; `sanitizeResponse` is exported so the premium pool reuses the exact same pass).
 - **`services/openrouter.ts`** — premium pool (#7): `PREMIUM_MODEL_REGISTRY`, `DEFAULT_PREMIUM_MODEL_ID`, `generatePremiumText()` (OpenRouter chat completions, same resolve/clamp/fallback/sanitize shape as `ai.ts`).
-- **`services/pg.ts` / `services/tiers.ts`** — shared per-request postgres.js client (Hyperdrive) and the tier ladder + `getAccountTier()` lookup, used by `routes/db.ts`, the rate limiter, and the premium gate.
+- **`services/pg.ts` / `services/tiers.ts`** — shared per-request postgres.js client (Hyperdrive) and the tier ladder + `getAccountTier()` lookup, used by `routes/db.ts`, the rate limiter, and the premium gate. `getAccountTier()` returns the **effective** tier = base `account_tiers` row MAX any unexpired `tier_grants` (redemption-code grants, #6); expiry is passive and a grant never lowers the base, so premium-templates / premium-AI / allowances all honour grants with no further changes.
 
 ### Rate limiting (`middleware/rateLimit.ts`, backlog #12)
 
@@ -48,7 +49,7 @@ Fixed-window per-user counters in the `request_counters` Postgres table (migrati
 | `db-write` | 5 min | 120 | `POST/PUT/PATCH/DELETE /api/db/*` |
 | `ai-premium-daily` | 1 day (UTC) | 100 member / 200 premium / 300 elite | premium-pool generations (checked in `routes/ai.ts`, not middleware) |
 
-**Worst-case premium cost math (2026-07-06, gpt-5-mini default at ~$0.25/M input, ~$2/M output):** input capped at 32k chars (~8k tokens) and output at 800 tokens gives a ceiling of ~$0.0036 per generation. The MONTHLY allowance is the revenue-aligned bound: member 800/month (~$2.90 worst case against $5), premium 2000 (~$7.20 against $10), elite 4000 (~$14.40 against $20); daily caps (100/200/300) are burst protection within it. Typical generations (~3k in / 500 out) cost under $0.002, so realistic heavy play runs well under a dollar a month. Haiku 4.5 stays in the fallback chain for quality diversity. Player model choice is removed entirely: the premium pool always runs the server default chain.
+**Worst-case premium cost math:** input is capped at 32k chars (~8k tokens) and output at **1500 tokens** (raised from 800 for free-pool parity, 2026-07-07). Raising the output cap roughly doubles the worst-case cost per call, but it stays fractions of a cent; the default model flipped from `gpt-5-mini` to `claude-haiku-4.5` at the same time (better name-grounding, gpt-5-mini stays next in the chain as the cheap workhorse). The MONTHLY allowance is the revenue-aligned bound: member 800/month, premium 2000, elite 4000 generations; daily caps (100/200/300) are burst protection within it. Realistic heavy play still runs well under a dollar a month. Player model choice is removed entirely: the premium pool always runs the server default chain.
 
 `GET /api/db/*` (entitlements, premium-templates, saves reads) is deliberately **unthrottled**: reads are cheap and a counter upsert per read would roughly double their DB cost. The member-tier allowance lookup is lazy: the tier is only queried once a user is already past the free limit inside the current window. 429 responses carry `{ error, code: 'rate_limited', bucket, retryAfterSeconds }` plus a `Retry-After` header. Limits are constants in `rateLimit.ts` (`RATE_LIMITS`, `PREMIUM_DAILY_LIMITS`); tuning them is a code deploy, never a migration.
 
@@ -68,9 +69,11 @@ Fixed-window per-user counters in the `request_counters` Postgres table (migrati
 
 | Model ID | Display Name | Notes |
 |----------|--------------|-------|
-| `openai/gpt-5-mini` | GPT-5 Mini | **DEFAULT_PREMIUM_MODEL_ID**: very cheap, reliable workhorse |
-| `anthropic/claude-haiku-4.5` | Claude Haiku 4.5 | First fallback, prose-quality diversity |
+| `anthropic/claude-haiku-4.5` | Claude Haiku 4.5 | **DEFAULT_PREMIUM_MODEL_ID**: better name-grounding and richer prose |
+| `openai/gpt-5-mini` | GPT-5 Mini | First fallback: very cheap, reliable workhorse |
 | `google/gemini-3.5-flash` | Gemini 3.5 Flash | Lab-diversity fallback, long context |
+
+Every rung caps output at **1500 tokens** (raised from 800 for parity with the free pool); the registry enforces the cap even against a client-requested `maxTokens`.
 
 The pool is the choice in production: clients send their free-pool model id and the premium default carries the pool (only ids present in `PREMIUM_MODEL_REGISTRY` are honored; everything else resolves to the premium default). The client side lives in `src/services/aiPool.js` (persisted preference, tier-gated request pool, pool-outcome notices), `src/services/llmService.js` (sends `pool`, retries once on `premium_cap`/`premium_required`), and the pool chips in `src/components/Modals.js`.
 
