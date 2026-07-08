@@ -34,6 +34,8 @@ const getEncounterBiome = (tile) => {
   if (tile.biome === 'forest') return 'forest';
   if (tile.biome === 'mountain') return 'mountain';
   if (tile.biome === 'plains') return 'plains';
+  if (tile.biome === 'snow') return 'snow';
+  if (tile.biome === 'desert') return 'desert';
 
   // Default fallback
   return 'plains';
@@ -193,9 +195,27 @@ export const rollEnvironmentalEncounter = (tile, settings) => {
   const adjustedChance = chance * (grimnessModifier[settings?.grimnessLevel] || 1.0);
   
   if (Math.random() > adjustedChance) return null;
-  
-  const roll = weightedRandom(environmentalEncounterTable);
-  
+
+  // Determine the current climate from the campaign theme (primary) then the
+  // tile biome, so climate-inappropriate hazards can be suppressed.
+  //   snow -> cold, desert -> hot, everything else -> temperate.
+  let climate = 'temperate';
+  if (settings?.theme === 'snow' || biome === 'snow') climate = 'cold';
+  else if (settings?.theme === 'desert' || biome === 'desert') climate = 'hot';
+
+  // Filter to climate-compatible entries. Untagged templates and those tagged
+  // 'any' are ALWAYS eligible (backwards-compatible with older/untagged saves);
+  // a tagged template only survives if its climate matches the current climate.
+  const climateTable = environmentalEncounterTable.filter((entry) => {
+    if (entry.template === 'none') return true;
+    const template = encounterTemplates[entry.template];
+    const tag = template?.climate;
+    if (!tag || tag === 'any') return true;
+    return tag === climate;
+  });
+
+  const roll = weightedRandom(climateTable);
+
   if (roll.template === 'none') return null;
   
   const template = encounterTemplates[roll.template];
