@@ -112,6 +112,7 @@ function makeRedactor(key) {
 // ---------------------------------------------------------------------------
 const FLAG_DEFAULTS = {
   campaign: 'heroic-fantasy-t1',
+  mode: 'ai',
   steps: 1,
   model: DEFAULT_MODEL,
   'max-tokens': 400,
@@ -129,18 +130,23 @@ const FLAG_DEFAULTS = {
 };
 
 function parseArgs(argv) {
-  const opts = { ...FLAG_DEFAULTS, live: false, yes: false, help: false };
+  const opts = {
+    ...FLAG_DEFAULTS, live: false, yes: false, help: false,
+    all: false, simulate: false, _modeExplicit: false
+  };
   const numeric = new Set([
     'steps', 'max-tokens', 'max-prompt-tokens', 'tpm', 'rpm',
     'max-requests', 'max-total-tokens', 'max-usd', 'price-in', 'price-out', 'temperature'
   ]);
-  const stringFlags = new Set(['campaign', 'model', 'on-limit', 'key-file']);
+  const stringFlags = new Set(['campaign', 'mode', 'model', 'on-limit', 'key-file']);
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--help' || arg === '-h') { opts.help = true; continue; }
     if (arg === '--live') { opts.live = true; continue; }
     if (arg === '--yes') { opts.yes = true; continue; }
+    if (arg === '--all') { opts.all = true; continue; }
+    if (arg === '--simulate') { opts.simulate = true; continue; }
     if (!arg.startsWith('--')) throw new Error(`Unexpected argument: ${arg}`);
     const name = arg.slice(2);
     if (!(name in FLAG_DEFAULTS)) throw new Error(`Unknown flag: ${arg} (try --help)`);
@@ -152,7 +158,25 @@ function parseArgs(argv) {
       opts[name] = n;
     } else if (stringFlags.has(name)) {
       opts[name] = value;
+      if (name === 'mode') opts._modeExplicit = true;
     }
+  }
+
+  // --simulate is an alias for the deterministic guest-vs-member comparison, unless
+  // an explicit --mode was also given.
+  if (opts.simulate && !opts._modeExplicit) opts.mode = 'both';
+  // --campaign all (or --all) implies the deterministic sim; the AI path is single-campaign.
+  if ((opts.all || opts.campaign === 'all') && !opts._modeExplicit && opts.mode === 'ai') {
+    opts.mode = 'both';
+  }
+  if (opts.all) opts.campaign = 'all';
+
+  const VALID_MODES = new Set(['ai', 'guest', 'member', 'both']);
+  if (!VALID_MODES.has(opts.mode)) {
+    throw new Error(`--mode must be one of ai|guest|member|both, got "${opts.mode}"`);
+  }
+  if (opts.mode === 'ai' && opts.campaign === 'all') {
+    throw new Error('--campaign all / --all is only supported for the deterministic sim (--mode guest|member|both).');
   }
 
   if (opts['on-limit'] !== 'abort' && opts['on-limit'] !== 'wait') {
@@ -169,20 +193,42 @@ function parseArgs(argv) {
 function printHelp() {
   const d = FLAG_DEFAULTS;
   console.log(`
-quest-harness.mjs — headless quest-prompt tester (DRY-RUN by default)
+quest-harness.mjs - headless quest tester (DRY-RUN / deterministic by default)
 
 USAGE
   node scripts/quest-harness.mjs [flags]
 
-SAFETY
+MODES (--mode, default: ${d.mode})
+  ai       Compose the REAL new-game AI prompts and (only with --live --yes) send
+           them to the OpenRouter premium pool. This is the original behaviour and
+           is unchanged. DRY-RUN unless BOTH --live AND --yes are passed.
+  guest    Deterministic simulation of GUEST / no-AI play. Prints the real no-AI
+           opening (introComposer.composeIntro), then walks the campaign's
+           milestones to completion using ONLY the game engine: it fires each
+           mechanical milestone's deterministic event (item/combat/location/talk)
+           through the REAL checkMilestoneCompletion. NARRATIVE milestones need the
+           AI [COMPLETE_MILESTONE] marker, so a guest can NEVER complete them: they
+           block. NO network call, NO API key.
+  member   Same deterministic walk, but narrative milestones ARE completed (via the
+           engine's completeNarrativeMilestone, simulating the AI marker a signed-in
+           member's DM would emit). NO network call, NO API key.
+  both     Run guest AND member and report the divergence (which campaigns a member
+           can finish but a guest cannot, and exactly which milestones block guests).
+           This is the default when --simulate, --all, or --campaign all is used.
+
+SAFETY (ai mode only)
   DRY-RUN unless you pass BOTH --live AND --yes. In dry-run it builds and prints
   every prompt, estimates tokens, and shows the guard preflight — but makes NO
   network request. A live spend therefore always needs two explicit flags.
   The OpenRouter key is read only from OPENROUTER_API_KEY or --key-file, and is
-  never printed or written anywhere.
+  never printed or written anywhere. guest/member/both modes never touch the
+  network and never read a key at all.
 
 FLAGS
-  --campaign <id>          Story template id                 (default: ${d.campaign})
+  --mode <ai|guest|member|both>  Run mode (see above)         (default: ${d.mode})
+  --simulate               Alias for --mode both (deterministic guest vs member)
+  --all                    Run the sim across ALL playable campaigns (= --campaign all)
+  --campaign <id|all>      Story template id, or "all"        (default: ${d.campaign})
   --steps <N>              Turns to compose: 1 = opening only (default: ${d.steps})
                            Each extra step adds one follow-up turn.
   --model <id>             OpenRouter model id               (default: ${d.model})
@@ -203,7 +249,10 @@ FLAGS
   --help                   This message
 
 EXAMPLES
-  node scripts/quest-harness.mjs --campaign heroic-fantasy-t1      # dry-run
+  node scripts/quest-harness.mjs --campaign heroic-fantasy-t1      # ai dry-run
+  node scripts/quest-harness.mjs --mode guest --campaign heroic-fantasy-t1
+  node scripts/quest-harness.mjs --mode both --all                # sim every campaign
+  node scripts/quest-harness.mjs --simulate --all                 # same, alias
   OPENROUTER_API_KEY=sk-or-... node scripts/quest-harness.mjs --live --yes
 `);
 }
@@ -217,7 +266,21 @@ async function loadAppData() {
   const outfile = path.join(os.tmpdir(), `dungeongpt-quest-harness.${process.pid}.mjs`);
   await build({
     stdin: {
-      contents: `export { storyTemplates } from './storyTemplates.js';\nexport { DM_PROTOCOL } from './prompts.js';\n`,
+      // The simulation exercises the REAL engine (milestoneEngine.js) and the REAL
+      // no-AI opening (introComposer.composeIntro), bundled the same way as the
+      // storyTemplates so guest mode is testing production code, not a copy.
+      contents:
+        `export { storyTemplates } from './storyTemplates.js';\n` +
+        `export { DM_PROTOCOL } from './prompts.js';\n` +
+        `export { composeIntro } from '../game/introComposer.js';\n` +
+        `export {\n` +
+        `  areRequirementsMet,\n` +
+        `  getMilestoneState,\n` +
+        `  getCampaignProgress,\n` +
+        `  checkMilestoneCompletion,\n` +
+        `  completeNarrativeMilestone,\n` +
+        `  getMilestoneRewards\n` +
+        `} from '../game/milestoneEngine.js';\n`,
       resolveDir: path.join(repoRoot, 'src', 'data'),
       loader: 'js'
     },
@@ -349,6 +412,181 @@ function composeRequests(template, DM_PROTOCOL, steps) {
   }
 
   return requests;
+}
+
+// ===========================================================================
+// DETERMINISTIC SIMULATION (guest / member) - exercises the REAL engine.
+//
+// No network, no key. For a campaign, starting from all milestones incomplete,
+// we repeatedly advance every ACTIVE milestone (requirements met, not completed):
+//   * mechanical (item/combat/location/talk): fire its deterministic completion
+//     event through the real checkMilestoneCompletion and apply the result.
+//   * narrative: needs the AI [COMPLETE_MILESTONE] marker. In GUEST mode it can
+//     never fire, so it BLOCKS. In MEMBER mode we simulate the marker by calling
+//     the engine's completeNarrativeMilestone.
+// We loop until the campaign is complete (OK) or a full pass makes no progress
+// (STUCK) - then we report the stuck set and why.
+//
+// The deterministic event shape for each mechanical type is read straight from
+// doesEventMatchTrigger in milestoneEngine.js:
+//   item     -> { type: 'item_acquired',    itemId:     trigger.item }
+//   combat   -> { type: 'enemy_defeated',   enemyId:    trigger.enemy }
+//   location -> { type: 'location_visited', locationId: trigger.location }
+//   talk     -> { type: 'npc_talked',       npcId:      trigger.npc }
+// Level gates (minLevel) are NOT simulated (currentLevel=null, so the engine's
+// level check is skipped): this harness tests the milestone GRAPH's completability
+// and the guest-vs-member divergence, not XP/level pacing.
+// ===========================================================================
+
+const MECHANICAL_TYPES = new Set(['item', 'combat', 'location', 'talk']);
+
+// Build the deterministic completion event for a mechanical milestone, mirroring
+// doesEventMatchTrigger. Returns { event } or { malformed: <reason> } when the
+// trigger field the engine keys on is missing (which would make the milestone
+// impossible to complete - a real authoring bug).
+function buildEventForMilestone(m) {
+  const t = m.trigger || null;
+  switch (m.type) {
+    case 'item':
+      if (!t || t.item == null) return { malformed: 'item milestone has no trigger.item' };
+      return { event: { type: 'item_acquired', itemId: t.item } };
+    case 'combat':
+      if (!t || t.enemy == null) return { malformed: 'combat milestone has no trigger.enemy' };
+      return { event: { type: 'enemy_defeated', enemyId: t.enemy } };
+    case 'location':
+      if (!t || t.location == null) return { malformed: 'location milestone has no trigger.location' };
+      return { event: { type: 'location_visited', locationId: t.location } };
+    case 'talk':
+      if (!t || t.npc == null) return { malformed: 'talk milestone has no trigger.npc' };
+      return { event: { type: 'npc_talked', npcId: t.npc } };
+    default:
+      return { malformed: `unknown mechanical type "${m.type}"` };
+  }
+}
+
+const shortText = (m) => `#${m.id} [${m.type || 'untyped'}] "${m.text || ''}"`;
+
+// Run one deterministic walk. `completeNarrative` decides guest (false) vs member (true).
+// Returns { status, completedOrder, blockers, bugs, log }.
+function simulateWalk(engine, rawMilestones, completeNarrative) {
+  // Fresh, deep-ish clone with completed:false - never mutate the template.
+  let milestones = rawMilestones.map((m) => ({ ...m, completed: false }));
+  const completedOrder = [];
+  const bugs = [];
+  const log = [];
+
+  let safety = milestones.length * 4 + 8; // generous; a healthy walk needs <= length passes
+  while (safety-- > 0) {
+    const progress = engine.getCampaignProgress(milestones);
+    if (progress.isComplete) break;
+
+    const active = progress.active;
+    let progressed = false;
+
+    for (const m of active) {
+      if (m.completed) continue; // (defensive; getCampaignProgress already excludes)
+
+      if (m.type === 'narrative' || !MECHANICAL_TYPES.has(m.type)) {
+        // Narrative (or untyped legacy) milestones only complete via the AI marker.
+        if (m.type === 'narrative' && completeNarrative) {
+          const res = engine.completeNarrativeMilestone(milestones, m.id);
+          if (res && res.type === 'completed') {
+            milestones = res.updatedMilestones;
+            completedOrder.push(m);
+            log.push(`  completed ${shortText(m)}  via completeNarrativeMilestone (simulated AI marker)`);
+            progressed = true;
+          } else {
+            bugs.push(`${shortText(m)}: completeNarrativeMilestone returned no completion (unexpected)`);
+          }
+        }
+        // guest mode (or untyped): cannot complete here - leave it to block.
+        continue;
+      }
+
+      // Mechanical: fire the exact deterministic event the engine consumes.
+      const built = buildEventForMilestone(m);
+      if (built.malformed) {
+        bugs.push(`${shortText(m)}: ${built.malformed} - deterministic event can never complete it`);
+        continue;
+      }
+      const res = engine.checkMilestoneCompletion(milestones, built.event, null);
+      if (res && res.type === 'completed' && res.milestoneId === m.id) {
+        milestones = res.updatedMilestones;
+        completedOrder.push(m);
+        log.push(`  completed ${shortText(m)}  via event ${JSON.stringify(built.event)}`);
+        progressed = true;
+      } else if (res && res.type === 'completed') {
+        // The event completed a DIFFERENT milestone than the one we fired it for
+        // (two milestones share a trigger). Apply it and note it.
+        milestones = res.updatedMilestones;
+        completedOrder.push(res.milestone);
+        log.push(`  completed #${res.milestoneId} (fired for ${shortText(m)} - shared trigger)`);
+        bugs.push(`${shortText(m)}: its own event completed #${res.milestoneId} instead (duplicate/shared trigger)`);
+        progressed = true;
+      } else {
+        // The milestone's own deterministic event did not complete it though it is
+        // active. That is a mechanical authoring bug (trigger does not match).
+        bugs.push(`${shortText(m)}: active, but its deterministic event ${JSON.stringify(built.event)} did not complete it (checkMilestoneCompletion -> ${res ? res.type : 'null'})`);
+      }
+    }
+
+    if (!progressed) break; // STUCK - a full pass changed nothing.
+  }
+
+  const progress = engine.getCampaignProgress(milestones);
+  const status = progress.isComplete ? 'OK' : 'STUCK';
+  const blockers = progress.isComplete
+    ? []
+    // Everything still incomplete: active ones are the immediate blockers; locked
+    // ones are downstream of them.
+    : milestones.filter((m) => !m.completed);
+  return { status, completedOrder, blockers, bugs, log, milestones, progress };
+}
+
+// Simulate a campaign in guest and member mode and diff them.
+function simulateCampaign(engine, template) {
+  const milestones = Array.isArray(template.settings?.milestones)
+    ? template.settings.milestones
+    : null;
+  if (!milestones || milestones.length === 0) {
+    return { id: template.id, playable: false };
+  }
+  const guest = simulateWalk(engine, milestones, false);
+  const member = simulateWalk(engine, milestones, true);
+
+  // Guest blockers that a member cleared = the divergence. These are the milestones
+  // a member can finish but a guest cannot.
+  const memberCompletedIds = new Set(member.completedOrder.map((m) => m.id));
+  const divergence = guest.blockers.filter(
+    (m) => memberCompletedIds.has(m.id) || (member.status === 'OK')
+  ).filter((m) => {
+    // Only report as divergence milestones the guest failed to complete but the
+    // member did (or that are downstream and would clear once narrative clears).
+    return !guest.completedOrder.some((c) => c.id === m.id);
+  });
+
+  return {
+    id: template.id,
+    name: template.name,
+    subtitle: template.subtitle,
+    playable: true,
+    total: milestones.length,
+    guest,
+    member,
+    divergence
+  };
+}
+
+// Classify a blocker for readable reporting.
+function classifyBlocker(m, allMilestones, engine) {
+  const active = engine.areRequirementsMet(m, allMilestones);
+  if (m.type === 'narrative') {
+    return active
+      ? 'narrative - needs AI [COMPLETE_MILESTONE] marker (no deterministic event)'
+      : 'narrative - locked behind an earlier blocker';
+  }
+  if (!active) return 'locked - a prerequisite milestone never completed';
+  return 'active but did not complete on its own event (see bugs)';
 }
 
 // ---------------------------------------------------------------------------
@@ -487,6 +725,163 @@ const truncate = (s, n = 700) => {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------------------------------------------------------------------------
+// Deterministic sim runner (mode: guest | member | both). No network, no key.
+// ---------------------------------------------------------------------------
+async function runSimMode(opts) {
+  let mod;
+  try {
+    mod = await loadAppData();
+  } catch (err) {
+    console.error(`Failed to load app data / engine: ${err.message}`);
+    process.exit(5);
+  }
+  const { storyTemplates, composeIntro } = mod;
+  const engine = {
+    areRequirementsMet: mod.areRequirementsMet,
+    getCampaignProgress: mod.getCampaignProgress,
+    checkMilestoneCompletion: mod.checkMilestoneCompletion,
+    completeNarrativeMilestone: mod.completeNarrativeMilestone,
+    getMilestoneRewards: mod.getMilestoneRewards
+  };
+
+  // Which templates to run: one, or every PLAYABLE template (has settings.milestones).
+  let templates;
+  if (opts.campaign === 'all') {
+    templates = storyTemplates.filter((t) => Array.isArray(t.settings?.milestones) && t.settings.milestones.length);
+  } else {
+    const t = storyTemplates.find((x) => x.id === opts.campaign);
+    if (!t) {
+      console.error(`Campaign "${opts.campaign}" not found. Available ids:`);
+      for (const x of storyTemplates) console.error(`  - ${x.id}${Array.isArray(x.settings?.milestones) ? '' : '  (stub - no milestones)'}`);
+      process.exit(6);
+    }
+    templates = [t];
+  }
+
+  const showGuest = opts.mode === 'guest' || opts.mode === 'both';
+  const showMember = opts.mode === 'member' || opts.mode === 'both';
+
+  console.log('');
+  console.log('============================================================');
+  console.log(`quest-harness - DETERMINISTIC SIM (mode: ${opts.mode})`);
+  console.log('  no network request, no API key - pure game-engine walk');
+  console.log('============================================================');
+
+  const results = [];
+  for (const template of templates) {
+    const r = simulateCampaign(engine, template);
+    results.push(r);
+    if (!r.playable) continue;
+
+    // Detailed per-campaign block (always for single-campaign; compact for --all below).
+    if (opts.campaign !== 'all') {
+      console.log('');
+      console.log(`Campaign: ${template.id}  (${template.name || 'unnamed'}${template.subtitle ? ' - ' + template.subtitle : ''})`);
+      console.log(`Milestones: ${r.total}`);
+
+      // The guest opening - the real no-AI intro a guest actually sees.
+      const startTown = template.customNames?.towns?.[0];
+      const startTownName = typeof startTown === 'object' ? startTown?.name : startTown;
+      const currentTile = startTownName ? { poi: 'town', townName: startTownName } : null;
+      const intro = composeIntro(template.settings || {}, SAMPLE_PARTY, currentTile);
+      console.log('\n----- Guest opening (introComposer.composeIntro, no AI) -----');
+      console.log(intro.split('\n').map((l) => '  ' + l).join('\n'));
+
+      if (showGuest) {
+        console.log('\n----- GUEST walk (narrative milestones BLOCKED) -----');
+        for (const line of r.guest.log) console.log(line);
+        console.log(`  => ${r.guest.status}  (${r.guest.completedOrder.length}/${r.total} completed)`);
+        if (r.guest.status === 'STUCK') {
+          for (const m of r.guest.blockers) {
+            console.log(`     BLOCKED ${shortText(m)} - ${classifyBlocker(m, r.guest.milestones, engine)}`);
+          }
+        }
+      }
+      if (showMember) {
+        console.log('\n----- MEMBER walk (narrative completed via simulated AI marker) -----');
+        for (const line of r.member.log) console.log(line);
+        console.log(`  => ${r.member.status}  (${r.member.completedOrder.length}/${r.total} completed)`);
+        if (r.member.status === 'STUCK') {
+          for (const m of r.member.blockers) {
+            console.log(`     BLOCKED ${shortText(m)} - ${classifyBlocker(m, r.member.milestones, engine)}`);
+          }
+        }
+      }
+      const allBugs = [...new Set([...r.guest.bugs, ...r.member.bugs])];
+      if (allBugs.length) {
+        console.log('\n  MECHANICAL BUGS:');
+        for (const b of allBugs) console.log(`     - ${b}`);
+      }
+    }
+  }
+
+  // ---- Summary table (always) ----
+  const playable = results.filter((r) => r.playable);
+  console.log('');
+  console.log('============================================================');
+  console.log('SUMMARY - per-campaign completability');
+  console.log('============================================================');
+  const pad = (s, n) => String(s).padEnd(n);
+  console.log(`  ${pad('campaign', 24)} ${pad('guest', 8)} ${pad('member', 8)} blockers`);
+  console.log(`  ${pad('--------', 24)} ${pad('-----', 8)} ${pad('------', 8)} --------`);
+  for (const r of playable) {
+    const guestBlock = r.guest.status === 'STUCK'
+      ? r.guest.blockers.filter((m) => !r.guest.completedOrder.some((c) => c.id === m.id)).map((m) => `#${m.id}[${m.type}]`).join(',')
+      : '-';
+    console.log(`  ${pad(r.id, 24)} ${pad(r.guest.status, 8)} ${pad(r.member.status, 8)} ${guestBlock}`);
+  }
+
+  // ---- Guest vs member divergence ----
+  const diverged = playable.filter((r) => r.guest.status !== r.member.status);
+  console.log('');
+  console.log('GUEST vs MEMBER DIVERGENCE (member can finish, guest cannot):');
+  if (diverged.length === 0) {
+    console.log('  none - guest and member reach the same outcome on every campaign.');
+  } else {
+    for (const r of diverged) {
+      console.log(`  ${r.id}: member=${r.member.status}, guest=${r.guest.status}`);
+      const rootBlockers = r.guest.blockers.filter((m) => engine.areRequirementsMet(m, r.guest.milestones));
+      for (const m of rootBlockers) {
+        console.log(`     guest blocked by ${shortText(m)} - ${classifyBlocker(m, r.guest.milestones, engine)}`);
+      }
+      const downstream = r.guest.blockers.filter((m) => !engine.areRequirementsMet(m, r.guest.milestones));
+      if (downstream.length) {
+        console.log(`     (downstream locked: ${downstream.map((m) => `#${m.id}[${m.type}]`).join(', ')})`);
+      }
+    }
+  }
+
+  // ---- Mechanical bugs / both-mode soft-locks ----
+  const bothStuck = playable.filter((r) => r.guest.status === 'STUCK' && r.member.status === 'STUCK');
+  const withBugs = playable.filter((r) => r.guest.bugs.length || r.member.bugs.length);
+  console.log('');
+  console.log('MECHANICAL BUGS / SOFT-LOCKS FOR BOTH MODES:');
+  if (bothStuck.length === 0 && withBugs.length === 0) {
+    console.log('  none - every mechanical milestone completes on its deterministic event,');
+    console.log('  and every campaign is completable by a member.');
+  } else {
+    for (const r of bothStuck) {
+      console.log(`  ${r.id}: STUCK for guest AND member (graph cannot complete).`);
+    }
+    for (const r of withBugs) {
+      for (const b of [...new Set([...r.guest.bugs, ...r.member.bugs])]) {
+        console.log(`  ${r.id}: ${b}`);
+      }
+    }
+  }
+
+  const skipped = storyTemplates.filter((t) => !Array.isArray(t.settings?.milestones) || !t.settings.milestones.length);
+  if (opts.campaign === 'all' && skipped.length) {
+    console.log('');
+    console.log(`Skipped ${skipped.length} non-playable stub/teaser template(s) (no settings.milestones): ${skipped.map((t) => t.id).join(', ')}`);
+  }
+  console.log('');
+  console.log('(deterministic - no network request, no API key used)');
+  console.log('============================================================');
+  console.log('');
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
@@ -499,6 +894,12 @@ async function main() {
   }
 
   if (opts.help) { printHelp(); process.exit(0); }
+
+  // Deterministic sim modes short-circuit the AI path entirely: no key, no network.
+  if (opts.mode !== 'ai') {
+    await runSimMode(opts);
+    return;
+  }
 
   const isLive = opts.live;
 
