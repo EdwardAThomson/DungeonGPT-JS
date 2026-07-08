@@ -185,7 +185,8 @@ export const environmentalEncounterTable = [
 
   // Narrative
   { template: 'thick_fog', weight: 20, hostile: false },
-  { template: 'heat_wave', weight: 12, hostile: false },
+  { template: 'heat_wave', weight: 12, hostile: false },   // climate: 'hot' (filtered out of cold campaigns)
+  { template: 'cold_snap', weight: 12, hostile: false },   // climate: 'cold' (filtered out of hot campaigns)
   { template: 'strange_lights', weight: 15, hostile: false },
 
   { template: 'none', weight: 33 }
@@ -208,6 +209,7 @@ export const environmentalEncounterChance = {
   'mountain': 0.20,
   'beach': 0.12,
   'desert': 0.25,   // deserts have more environmental hazards
+  'snow': 0.20,     // arctic/frozen tiles have frequent cold hazards (mirrors mountain)
   'swamp': 0.18,
   'town': 0.05      // minimal environmental encounters in towns
 };

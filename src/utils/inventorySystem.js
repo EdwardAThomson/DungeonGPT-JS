@@ -208,6 +208,7 @@ export const ITEM_CATALOG = {
   'rainwater': { name: 'Collected Rainwater', rarity: 'common', value: 5, stackable: true, icon: 'assets/icons/items/rainwater.webp' },
   'fog_essence': { name: 'Fog Essence', rarity: 'uncommon', value: 60, icon: 'assets/icons/items/fog_essence.webp' },
   'desert_flower': { name: 'Desert Flower', rarity: 'uncommon', value: 35, icon: 'assets/icons/items/desert_flower.webp' },
+  'frost_flower': { name: 'Frost Flower', rarity: 'uncommon', value: 35, icon: 'assets/icons/items/frost_flower.webp' },
   'wisp_essence': { name: 'Wisp Essence', rarity: 'rare', value: 120, icon: 'assets/icons/items/wisp_essence.webp' },
   'cave_fish': { name: 'Cave Fish', rarity: 'common', value: 8, stackable: true, icon: 'assets/icons/items/cave_fish.webp' },
   'beast_hide': { name: 'Beast Hide', rarity: 'common', value: 20, icon: 'assets/icons/items/beast_hide.webp' },

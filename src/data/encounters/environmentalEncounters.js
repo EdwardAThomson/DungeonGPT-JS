@@ -1,4 +1,11 @@
 // Environmental encounters
+//
+// Optional `climate` field scopes an encounter to a climate so the roll can
+// suppress inappropriate hazards (see rollEnvironmentalEncounter). Vocabulary:
+//   'hot'  - hot/arid campaigns (desert theme, snow tiles excluded)
+//   'cold' - cold campaigns (snow theme)
+//   'any'  - or simply untagged: fires everywhere (default, backwards-compatible)
+// Leave genuinely universal hazards untagged so older saves keep working.
 
 export const ENVIRONMENTAL_ENCOUNTERS = {
   'sudden_storm': {
@@ -77,6 +84,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     icon: '🔥',
     encounterTier: 'narrative',
     environmental: true,
+    climate: 'hot',
     narrativeHook: 'the air shimmering with intense heat',
     aiContext: 'An oppressive heat wave makes travel dangerous. Dehydration and heat exhaustion threaten the party. Finding water and shade becomes critical.',
     description: 'The sun beats down mercilessly, the air so hot it shimmers. Every step is exhausting.',
@@ -94,6 +102,32 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
       success: 'You manage the heat effectively.',
       failure: 'The heat saps your strength - travel is slower.',
       criticalFailure: 'Someone collapses from heat exhaustion.'
+    }
+  },
+
+  'cold_snap': {
+    name: 'Bitter Cold',
+    icon: '❄️',
+    encounterTier: 'narrative',
+    environmental: true,
+    climate: 'cold',
+    narrativeHook: 'the air turning brutally, bone-deep cold',
+    aiContext: 'A savage cold snap descends on the party. Frostbite and hypothermia threaten anyone caught in the open. Finding shelter and warmth becomes critical.',
+    description: 'The temperature plummets and a biting wind cuts through every layer. Each breath fogs and freezes.',
+    image: '/assets/encounters/cold_snap.webp',
+    difficulty: 'medium',
+    suggestedActions: [
+      { label: 'Find Shelter', skill: 'Survival', description: 'Locate cover from the wind' },
+      { label: 'Build a Fire', skill: 'Survival', description: 'Kindle warmth against the cold' },
+      { label: 'Bundle Up', skill: 'Survival', description: 'Improvise extra insulation' },
+      { label: 'Push Through', skill: 'Constitution', description: 'Endure the freezing cold' }
+    ],
+    rewards: { xp: 30, gold: '0', items: ['herbal_remedy:60%', 'frost_flower:30%'] },
+    consequences: {
+      criticalSuccess: 'You find a sheltered hollow with dry wood and a warming spring.',
+      success: 'You manage the cold effectively.',
+      failure: 'The cold saps your strength - travel is slower.',
+      criticalFailure: 'Someone succumbs to the cold and risks frostbite.'
     }
   },
 
