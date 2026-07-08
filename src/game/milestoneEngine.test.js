@@ -3,6 +3,7 @@ import {
   checkMilestoneCompletion,
   completeNarrativeMilestone,
   findMarkerMilestoneIndex,
+  resolveTalkMarkerMilestone,
   getMilestoneBossForTile,
   isMilestoneItemClaimed,
   getMilestoneItemForTile
@@ -167,6 +168,102 @@ describe('findMarkerMilestoneIndex (AI [COMPLETE_MILESTONE] guard)', () => {
     expect(findMarkerMilestoneIndex(ms, '')).toBe(-1);
     expect(findMarkerMilestoneIndex(ms, '   ')).toBe(-1);
     expect(findMarkerMilestoneIndex([{ id: 9, completed: false }], 'anything')).toBe(-1); // no text
+  });
+
+  it('refuses a locked narrative milestone whose text leaks into the prompt (hardening)', () => {
+    const gated = [
+      { id: 1, text: 'Recover the seal', type: 'narrative', completed: false },
+      { id: 2, text: 'Convince the elders to evacuate the valley', type: 'narrative', completed: false, requires: [1] }
+    ];
+    // #2 is locked (requires #1, not done): the marker must NOT complete it.
+    expect(findMarkerMilestoneIndex(gated, 'convince the elders')).toBe(-1);
+    // Once #1 is done, #2 becomes eligible.
+    const unlocked = gated.map(m => (m.id === 1 ? { ...m, completed: true } : m));
+    expect(findMarkerMilestoneIndex(unlocked, 'convince the elders')).toBe(1);
+  });
+});
+
+describe('resolveTalkMarkerMilestone (talk dual-completion, fail-closed)', () => {
+  // Two active talk objectives with distinct NPCs, plus a narrative milestone.
+  const base = [
+    {
+      id: 1,
+      text: 'Speak with Captain Ulric about the raids',
+      type: 'talk',
+      completed: false,
+      requires: [],
+      trigger: { npc: 'militia_captain', action: 'talk' },
+      spawn: { type: 'npc', id: 'militia_captain', name: 'Captain Ulric', role: 'Guard' }
+    },
+    {
+      id: 2,
+      text: 'Consult the sage Ellara at the archive',
+      type: 'talk',
+      completed: false,
+      requires: [],
+      trigger: { npc: 'sage_ellara', action: 'talk' },
+      spawn: { type: 'npc', id: 'sage_ellara', name: 'Ellara', role: 'Sage' }
+    },
+    { id: 3, text: 'Convince the elders to evacuate', type: 'narrative', completed: false }
+  ];
+
+  it('resolves the active talk objective when its NPC is present and text matches', () => {
+    const m = resolveTalkMarkerMilestone(base, 'Speak with Captain Ulric about the raids', ['militia_captain']);
+    expect(m).not.toBeNull();
+    expect(m.id).toBe(1);
+    expect(m.trigger.npc).toBe('militia_captain');
+  });
+
+  it('matches fuzzily (marker is a substring of the milestone text)', () => {
+    const m = resolveTalkMarkerMilestone(base, 'speak with captain ulric', ['militia_captain']);
+    expect(m?.id).toBe(1);
+  });
+
+  it('returns null when the NPC is NOT present (party elsewhere)', () => {
+    // Text matches milestone #1, but Ulric is not among the present NPCs.
+    expect(resolveTalkMarkerMilestone(base, 'Speak with Captain Ulric', ['sage_ellara'])).toBeNull();
+    expect(resolveTalkMarkerMilestone(base, 'Speak with Captain Ulric', [])).toBeNull();
+  });
+
+  it('returns null when prerequisites are unmet (locked talk milestone)', () => {
+    const gated = base.map(m => (m.id === 1 ? { ...m, requires: [99] } : m)); // 99 never completes
+    expect(resolveTalkMarkerMilestone(gated, 'Speak with Captain Ulric', ['militia_captain'])).toBeNull();
+  });
+
+  it('returns null when ambiguous: two active talk milestones both text-match', () => {
+    const ambiguous = [
+      { id: 1, text: 'Speak with the captain', type: 'talk', completed: false, requires: [], trigger: { npc: 'cap_a' } },
+      { id: 2, text: 'Speak with the captain', type: 'talk', completed: false, requires: [], trigger: { npc: 'cap_b' } }
+    ];
+    // Both NPCs present, both texts match the marker => ambiguous => fail closed.
+    expect(resolveTalkMarkerMilestone(ambiguous, 'Speak with the captain', ['cap_a', 'cap_b'])).toBeNull();
+  });
+
+  it('does not resolve a narrative milestone (talk-only)', () => {
+    expect(resolveTalkMarkerMilestone(base, 'Convince the elders to evacuate', ['militia_captain'])).toBeNull();
+  });
+
+  it('does not resolve an already-completed talk milestone', () => {
+    const done = base.map(m => (m.id === 1 ? { ...m, completed: true } : m));
+    expect(resolveTalkMarkerMilestone(done, 'Speak with Captain Ulric', ['militia_captain'])).toBeNull();
+  });
+
+  it('tolerates bad input', () => {
+    expect(resolveTalkMarkerMilestone(null, 'x', ['a'])).toBeNull();
+    expect(resolveTalkMarkerMilestone(base, '', ['militia_captain'])).toBeNull();
+    expect(resolveTalkMarkerMilestone(base, '   ', ['militia_captain'])).toBeNull();
+    expect(resolveTalkMarkerMilestone(base, 'Speak with Captain Ulric', null)).toBeNull();
+  });
+
+  it('idempotency + reward parity: findMarkerMilestoneIndex never claims a talk milestone; talk goes through the resolver only', () => {
+    // The narrative marker path (findMarkerMilestoneIndex) must ignore talk milestones,
+    // so a talk objective can ONLY complete via resolveTalkMarkerMilestone -> npc_talked.
+    expect(findMarkerMilestoneIndex(base, 'Speak with Captain Ulric about the raids')).toBe(-1);
+    const m = resolveTalkMarkerMilestone(base, 'Speak with Captain Ulric about the raids', ['militia_captain']);
+    expect(m?.trigger.npc).toBe('militia_captain');
+    // The engine event is idempotent: once completed, a second npc_talked returns null.
+    const after = base.map(x => (x.id === 1 ? { ...x, completed: true } : x));
+    expect(checkMilestoneCompletion(after, { type: 'npc_talked', npcId: 'militia_captain' })).toBeNull();
   });
 });
 

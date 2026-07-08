@@ -3,7 +3,7 @@ import { getTile } from '../utils/mapGenerator';
 import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
 import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver';
-import { areRequirementsMet, findMarkerMilestoneIndex } from '../game/milestoneEngine';
+import { areRequirementsMet, findMarkerMilestoneIndex, resolveTalkMarkerMilestone } from '../game/milestoneEngine';
 import { getStepHint } from '../game/questHints';
 import { formatPartyInfo } from '../game/promptComposer';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
@@ -69,7 +69,7 @@ const formatMilestonePromptText = (milestoneStatus) => {
 
     let text = '';
     if (active.length > 0) {
-        text += '\nActive Milestones: ' + active.map(m => {
+        text += '\nActive Milestones: ' + active.map((m, i) => {
             const typeTag = m.type ? ` [${m.type}]` : '';
             const levelTag = m.minLevel ? ` (Lv.${m.minLevel}+)` : '';
             let line = `${m.text}${typeTag}${levelTag}`;
@@ -80,6 +80,12 @@ const formatMilestonePromptText = (milestoneStatus) => {
                 const where = m.building?.name || m.spawn.location;
                 line += ` — speak with ${who}${where ? ` at ${where}` : ''}`;
                 if (m.spawn.personality) line += `; ${m.spawn.personality}`;
+            }
+            // Dual-completion cue: ONLY the current (first) active talk objective invites
+            // an AI [COMPLETE_MILESTONE] mark. Never annotate later/locked talk objectives.
+            if (i === 0 && m.type === 'talk') {
+                const who = m.spawn?.name || 'this person';
+                line += ` (you may mark this complete once the party finishes speaking with ${who})`;
             }
             return line;
         }).join('; ');
@@ -335,7 +341,8 @@ const useGameInteraction = (
     setHasAdventureStarted,
     locationContext = {},
     sessionId = null,
-    aiAvailable = true
+    aiAvailable = true,
+    onNpcTalked = null
 ) => {
     const [userInput, setUserInput] = useState('');
     const [conversation, setConversation] = useState(loadedConversation?.conversation_data || []);
@@ -593,11 +600,12 @@ const useGameInteraction = (
                 // update — a `{ ...settings }` spread would silently revert every settings
                 // change made during the generation (accepted side quests, engine-completed
                 // milestones, renames). That stale-spread bug ate a player's side quest.
-                const matched = normalizeMilestones(settings.milestones)[
-                    findMarkerMilestoneIndex(normalizeMilestones(settings.milestones), milestoneText)
-                ];
+                const normalized = normalizeMilestones(settings.milestones);
+                const matched = normalized[findMarkerMilestoneIndex(normalized, milestoneText)];
 
                 if (matched) {
+                    // Narrative (or legacy untyped) path — unchanged. Completed locally via a
+                    // functional setSettings; narrative milestones carry no engine rewards.
                     setSettings(prev => {
                         const prevNormalized = normalizeMilestones(prev.milestones);
                         const idx = findMarkerMilestoneIndex(prevNormalized, milestoneText);
@@ -614,9 +622,26 @@ const useGameInteraction = (
                         content: `🎉 Milestone Achieved! 🎉\n${matched.text}`
                     };
                     setConversation(prev => [...prev, celebrationMsg]);
+                } else {
+                    // Dual-completion for 'talk' milestones: ONLY if the narrative path found
+                    // nothing. Strict, fail-closed resolver — the marker completes a talk
+                    // objective only when its authored NPC is actually present in the current
+                    // scene, prerequisites are met, and exactly one talk milestone qualifies.
+                    // Completion is routed through the SAME engine event as the Talk button
+                    // (onNpcTalked -> checkMilestoneEvent) so rewards/codex/ledger/save/message
+                    // are identical and idempotent; we do NOT flip `completed` locally here
+                    // (that path skips rewards).
+                    const npcs = locationContext?.currentTownMap?.npcs;
+                    const presentNpcIds = Array.isArray(npcs)
+                        ? npcs.map(n => n?.milestoneNpcId).filter(Boolean)
+                        : [];
+                    const talkMilestone = resolveTalkMarkerMilestone(normalized, milestoneText, presentNpcIds);
+                    if (talkMilestone && typeof onNpcTalked === 'function') {
+                        onNpcTalked(talkMilestone.trigger?.npc);
+                    }
                 }
 
-                // Remove the tool call from display
+                // Remove the tool call from display (always, whether or not anything completed)
                 aiResponse = aiResponse.replace(milestoneMatch[0], '').trim();
             }
 
