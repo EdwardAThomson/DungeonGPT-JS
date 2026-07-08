@@ -2420,6 +2420,19 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
     return generator();
   };
 
+  // Deterministic, per-tile index into a name pool that does NOT draw from the
+  // shared PRNG. The older "headline" building types (blacksmith, archives, …)
+  // consume rng() for their names, and that draw order is baked into every saved
+  // world and the fixture pins. These newer, previously-unnamed types must add
+  // their names without perturbing that stream (a single extra rng() call would
+  // shift every downstream placement on a given seed), so they key off the
+  // tile's own coordinates instead. Same tile → same name, forever, and the map
+  // geometry stays byte-identical to a name-less generation.
+  const tileNameIndex = (tile, poolLen) => {
+    const h = (((tile.x | 0) * 73856093) ^ ((tile.y | 0) * 19349663)) >>> 0;
+    return h % poolLen;
+  };
+
   // Helper: assign a generated name to a building tile based on its type
   const assignBuildingName = (tile, buildingType) => {
     if (buildingType === 'tavern' || buildingType === 'inn') {
@@ -2449,6 +2462,49 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
     } else if (buildingType === 'warehouse') {
       const warehouseNames = ["The Storehouse", "Trade Depot", "The Granary", "Merchant's Cache", "The Vault", "Supply Hold"];
       tile.buildingName = uniqueName(() => warehouseNames[Math.floor(rng() * warehouseNames.length)]);
+    } else if (buildingType === 'apothecary') {
+      const apothecaryNames = ["The Frostbitten Apothecary", "Old Greta's Remedies", "The Healer's Hand", "Willowbark & Balm", "The Bitter Root", "Motherwort Apothecary", "The Poultice"];
+      tile.buildingName = apothecaryNames[tileNameIndex(tile, apothecaryNames.length)];
+    } else if (buildingType === 'tailor') {
+      const tailorNames = ["The Golden Thread", "Needle & Cloth", "The Silk Sleeve", "Warp & Weft", "The Cutter's Bench", "Fine Stitchery", "The Velvet Seam"];
+      tile.buildingName = tailorNames[tileNameIndex(tile, tailorNames.length)];
+    } else if (buildingType === 'fletcher') {
+      const fletcherNames = ["The Straight Arrow", "Ash & Feather", "The Bowyer's Yard", "Nock & String", "The Broadhead", "Yew and Sinew", "The Quiver"];
+      tile.buildingName = fletcherNames[tileNameIndex(tile, fletcherNames.length)];
+    } else if (buildingType === 'stables') {
+      const stablesNames = ["The Iron Horseshoe", "Wayfarer's Rest Stables", "The Bridle Path", "Hoof & Halter", "The Coaching Yard", "Greymane Stables", "The Paddock"];
+      tile.buildingName = stablesNames[tileNameIndex(tile, stablesNames.length)];
+    } else if (buildingType === 'mill') {
+      const millNames = ["The Old Millstone", "Greywater Mill", "The Turning Wheel", "Chaffield Mill", "The Grinding Stone", "Brookrace Mill", "The Meal House"];
+      tile.buildingName = millNames[tileNameIndex(tile, millNames.length)];
+    } else if (buildingType === 'shrine') {
+      const shrineNames = ["The Wayside Shrine", "Shrine of the Quiet Saint", "The Candle Nook", "The Kneeling Stone", "Shrine of the Pale Lady", "The Votive Alcove", "The Lantern Shrine"];
+      tile.buildingName = shrineNames[tileNameIndex(tile, shrineNames.length)];
+    } else if (buildingType === 'barn') {
+      const barnNames = ["The Great Barn", "Harvestholt Barn", "The Threshing Barn", "Hayloft & Byre", "The Long Barn", "Goldsheaf Barn", "The Grange"];
+      tile.buildingName = barnNames[tileNameIndex(tile, barnNames.length)];
+    } else if (buildingType === 'magetower') {
+      const magetowerNames = ["The Azure Spire", "The Arcanum", "Tower of Whispers", "The Runed Pinnacle", "The Starlit Spire", "The Grey Obelisk", "The Ember Tower"];
+      tile.buildingName = magetowerNames[tileNameIndex(tile, magetowerNames.length)];
+    } else if (buildingType === 'townhall') {
+      const townhallNames = ["The Town Hall", "Moot Hall", "The Council House", "The Guildmoot", "The Assembly Hall", "The Burgher's Hall", "The Common House"];
+      tile.buildingName = townhallNames[tileNameIndex(tile, townhallNames.length)];
+    } else if (buildingType === 'jail') {
+      const jailNames = ["The Old Gaol", "Ironhold Cells", "The Lockup", "The Stone Cages", "The Dungeon Gate", "Blackbar Gaol", "The Holdfast"];
+      tile.buildingName = jailNames[tileNameIndex(tile, jailNames.length)];
+    } else if (buildingType === 'harbormaster') {
+      const harbormasterNames = ["The Harbormaster's Office", "Tide & Ledger", "The Dock Warden", "The Quay House", "Anchor & Manifest", "The Portmaster's Post", "The Wharf Office"];
+      tile.buildingName = harbormasterNames[tileNameIndex(tile, harbormasterNames.length)];
+    } else if (buildingType === 'boathouse') {
+      const boathouseNames = ["The Boathouse", "Keel & Timber", "The Oar Shed", "Hull & Rope", "The Slipway", "Driftwood Boathouse", "The Cradle Dock"];
+      tile.buildingName = boathouseNames[tileNameIndex(tile, boathouseNames.length)];
+    } else if (buildingType && buildingType !== 'house') {
+      // Safety net: no placeable building type should ever regress to a bare type
+      // label. Title-case the type as a sensible generic name. ('house' stays
+      // intentionally anonymous, and is never routed through here anyway.)
+      tile.buildingName = buildingType
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
     }
   };
 
