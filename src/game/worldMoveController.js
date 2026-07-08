@@ -64,7 +64,23 @@ export const buildPoiEncounter = (targetTile) => {
     goblin_hideout: '/assets/encounters/goblin_hideout.webp',
     mountain: '/assets/encounters/mountain_site_arrival.webp',
     forest: '/assets/encounters/forest_site_arrival.webp',
-    hills: '/assets/encounters/hills_site_arrival.webp'
+    hills: '/assets/encounters/hills_site_arrival.webp',
+    shadow_fortress: '/assets/encounters/shadow_fortress_arrival.webp',
+    sandstorm_hideout: '/assets/encounters/sandstorm_hideout_arrival.webp',
+    sunken_spire: '/assets/encounters/sunken_spire_arrival.webp',
+    glacier_hollow: '/assets/encounters/glacier_hollow_arrival.webp',
+    silent_steading: '/assets/encounters/silent_steading_arrival.webp',
+    famine_barrow: '/assets/encounters/famine_barrow_arrival.webp',
+    abandoned_well: '/assets/encounters/abandoned_well_arrival.webp',
+    grimstead_cellar: '/assets/encounters/grimstead_cellar_arrival.webp',
+    ironhold_ruins: '/assets/encounters/ironhold_ruins_arrival.webp',
+    rot_tunnels: '/assets/encounters/rot_tunnels_arrival.webp',
+    gear_end_sewers: '/assets/encounters/gear_end_sewers_arrival.webp',
+    coghill_foundry: '/assets/encounters/coghill_foundry_arrival.webp',
+    desecrated_shrine: '/assets/encounters/desecrated_shrine_arrival.webp',
+    cult_meeting_place: '/assets/encounters/cult_meeting_place_arrival.webp',
+    corrupted_lighthouse: '/assets/encounters/corrupted_lighthouse_arrival.webp',
+    mourn_peak_summit: '/assets/encounters/mourn_peak_summit_arrival.webp'
   };
   // Milestone POIs carry their authored display name on the tile (poiName); named mountain
   // ranges show their range name ("the Grey Moors", not "the Mountains"); the raw poi id
