@@ -35,6 +35,7 @@
     "start": "react-scripts start",
     "build": "CI=false react-scripts build",
     "audit": "node scripts/content-audit.mjs",
+    "harness": "node scripts/quest-harness.mjs",
     "docs:campaigns": "node scripts/gen-campaign-milestones.mjs",
     "test": "react-scripts test",
     "test:worker": "npm --prefix cf-worker test",
