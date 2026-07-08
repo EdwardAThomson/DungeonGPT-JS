@@ -430,6 +430,295 @@ const milestone = () => wrap(
   `<polygon points='20.8,7 32,11.5 20.8,16' fill='#b23b3b'/>`
 );
 
+// --- distinctive milestone-POI sprites ---------------------------------------
+// One builder per authored milestone spawn id, so each named location gets its
+// own world-map motif instead of the shared generic red flag. Same idiom as the
+// biome/POI builders above: transparent 40x40 canvas (the biome shows through),
+// deterministic, ground near y=34. Reuse the module's own wrap/shade/C/ROOF.
+
+// gear ring helper (brass cog): teeth + hub — used by the Arcane-Renaissance POIs
+const gear = (cx, cy, r, teeth = 8, face = '#b5843a', hub = '#8a5f22') => {
+  let g = '';
+  for (let k = 0; k < teeth; k++) {
+    g += `<rect x='${(cx - 1.1).toFixed(1)}' y='${(cy - r - 1.8).toFixed(1)}' width='2.2' height='2.8' fill='${face}' transform='rotate(${(k * 360 / teeth).toFixed(1)} ${cx} ${cy})'/>`;
+  }
+  g += `<circle cx='${cx}' cy='${cy}' r='${r}' fill='${face}'/>`;
+  g += `<circle cx='${cx}' cy='${cy}' r='${(r * 0.42).toFixed(1)}' fill='${hub}'/>`;
+  return g;
+};
+
+// goblin_hideout — palisade of pointed stakes + a skull totem + a cookfire.
+const goblin_hideout = () => {
+  const wood = C.trunk, woodD = '#4f3620', woodL = '#7d5836';
+  const totem =
+    `<rect x='19.2' y='8' width='1.6' height='15' fill='${woodD}'/>` +
+    `<circle cx='20' cy='8' r='3.2' fill='#e8e4d6'/>` +
+    `<circle cx='18.7' cy='8' r='0.8' fill='#241a10'/><circle cx='21.3' cy='8' r='0.8' fill='#241a10'/>` +
+    `<rect x='18.6' y='9.8' width='2.8' height='1.3' fill='#241a10'/>`;
+  let stakes = '';
+  for (let i = 0; i < 6; i++) {
+    const x = 5 + i * 5;
+    stakes += `<rect x='${x}' y='22' width='3.4' height='12' fill='${wood}'/>` +
+      `<polygon points='${x},22 ${(x + 1.7).toFixed(1)},18 ${x + 3.4},22' fill='${woodL}'/>` +
+      `<rect x='${x}' y='22' width='1.2' height='12' fill='${woodL}' opacity='0.55'/>`;
+  }
+  const fire = `<polygon points='30,32 32,26 34,32' fill='#e6843a'/>` +
+    `<polygon points='31,32 32,28.5 33,32' fill='#f2c23a'/>`;
+  return wrap(totem + stakes + fire);
+};
+
+// shadow_fortress — dark crenellated keep wreathed in a violet shadow aura.
+const shadow_fortress = () => {
+  const stone = '#3a3242', stoneD = '#241d2e', stoneL = '#4d4358', glow = '#7b57a6';
+  let s = `<ellipse cx='20' cy='23' rx='17' ry='15' fill='${glow}' opacity='0.20'/>`;
+  s += `<rect x='7' y='18' width='6' height='16' fill='${stoneD}'/>`;
+  s += `<rect x='27' y='18' width='6' height='16' fill='${stoneD}'/>`;
+  s += `<rect x='7' y='15' width='2' height='3' fill='${stoneD}'/><rect x='11' y='15' width='2' height='3' fill='${stoneD}'/>`;
+  s += `<rect x='27' y='15' width='2' height='3' fill='${stoneD}'/><rect x='31' y='15' width='2' height='3' fill='${stoneD}'/>`;
+  s += `<rect x='11' y='14' width='18' height='20' fill='${stone}'/>`;
+  s += `<rect x='11' y='14' width='18' height='2' fill='${stoneL}' opacity='0.6'/>`;
+  for (let mx = 11; mx <= 26; mx += 5) s += `<rect x='${mx}' y='11' width='3' height='4' fill='${stone}'/>`;
+  s += `<rect x='17' y='25' width='6' height='9' fill='#0d0a12'/>`;
+  s += `<rect x='13.5' y='18' width='2' height='3' fill='${glow}'/><rect x='24.5' y='18' width='2' height='3' fill='${glow}'/>`;
+  return wrap(s);
+};
+
+// sandstorm_hideout — red-rock cleft with a dark entrance, tattered awning, blowing sand.
+const sandstorm_hideout = () => {
+  const rock = '#b5603a', rockD = '#8a4326', rockL = '#cd7a4a';
+  let s = `<path d='M4 34 L7 16 Q20 9 33 16 L36 34 Z' fill='${rock}'/>`;
+  s += `<path d='M20 12 Q33 16 36 34 L24 34 Z' fill='${rockD}'/>`;
+  s += `<path d='M7 16 Q20 9 33 16' fill='none' stroke='${rockL}' stroke-width='1.3' opacity='0.7'/>`;
+  s += `<path d='M14 34 Q14 22 20 22 Q26 22 26 34 Z' fill='#1a0f0a'/>`;
+  s += `<rect x='12' y='19.4' width='16' height='1.4' fill='#8a7a58'/>`;
+  s += `<path d='M12 20.8 L16 24 L18 20.8 L22 24 L24 20.8 L28 24 L28 20.8 Z' fill='#c9b48a'/>`;
+  s += `<path d='M2 12 q8 -1.5 14 0' stroke='#e6c98a' stroke-width='1.2' fill='none' opacity='0.6'/>`;
+  s += `<path d='M24 9 q8 -1.5 13 0' stroke='#e6c98a' stroke-width='1.2' fill='none' opacity='0.55'/>`;
+  return wrap(s);
+};
+
+// sunken_spire — the tip of a tapered stone tower jutting from burying dunes.
+const sunken_spire = () => {
+  const stone = '#c9b98f', stoneD = '#a08a5c', stoneL = '#e2d3aa', dune = '#d9c58f', duneD = '#c2ad78';
+  let s = `<polygon points='16,10 24,10 22,32 18,32' fill='${stone}'/>`;
+  s += `<polygon points='20,10 24,10 22,32 20,32' fill='${stoneD}'/>`;
+  s += `<rect x='16.5' y='15' width='7' height='1.4' fill='${stoneD}'/>`;
+  s += `<rect x='16.9' y='20' width='6.2' height='1.4' fill='${stoneD}'/>`;
+  s += `<rect x='18' y='11' width='4' height='4' fill='#2a2313'/>`;
+  s += `<rect x='16' y='8.6' width='1.8' height='2.4' fill='${stoneL}'/><rect x='22.2' y='8.6' width='1.8' height='2.4' fill='${stoneL}'/>`;
+  s += `<path d='M0 34 Q10 24 20 28 Q30 24 40 34 Z' fill='${dune}'/>`;
+  s += `<path d='M0 34 Q12 28 24 30 Q32 28 40 34 Z' fill='${duneD}' opacity='0.7'/>`;
+  return wrap(s);
+};
+
+// glacier_hollow — blue ice cave, glowing cyan mouth, hanging icicles.
+const glacier_hollow = () => {
+  const ice = '#a9dcf0', iceD = '#6fbfe0', iceL = '#d6f1fb', glow = '#9af0ff';
+  let s = `<path d='M4 34 L8 16 Q20 8 32 16 L36 34 Z' fill='${ice}'/>`;
+  s += `<path d='M20 11 Q32 16 36 34 L24 34 Z' fill='${iceD}'/>`;
+  s += `<path d='M8 16 Q20 8 32 16' fill='none' stroke='${iceL}' stroke-width='1.4' opacity='0.85'/>`;
+  s += `<path d='M13 34 Q13 20 20 20 Q27 20 27 34 Z' fill='${glow}' opacity='0.55'/>`;
+  s += `<path d='M15 34 Q15 24 20 24 Q25 24 25 34 Z' fill='#3a86b0'/>`;
+  for (const [x, h] of [[15, 4], [18, 5.5], [21, 4.5], [24, 5]])
+    s += `<polygon points='${x},20.5 ${x + 1.4},20.5 ${(x + 0.7).toFixed(1)},${(20.5 + h).toFixed(1)}' fill='${iceL}'/>`;
+  s += `<path d='M11 20 l2 3 M28 19 l-2 3' stroke='${iceL}' stroke-width='1' opacity='0.7'/>`;
+  return wrap(s);
+};
+
+// silent_steading — snow-laden longhouse, dark door ajar, no smoke, empty windows.
+const silent_steading = () => {
+  const wall = '#8a7256', wallD = '#6b573f', roof = '#cfe0ec', roofSnow = '#ffffff', door = '#241a12';
+  let s = `<rect x='9' y='20' width='22' height='14' fill='${wall}'/>`;
+  s += `<rect x='9' y='20' width='22' height='2' fill='${wallD}'/>`;
+  s += `<polygon points='6,21 20,10 34,21' fill='${roofSnow}'/>`;
+  s += `<polygon points='8,20 20,13 32,20' fill='${roof}' opacity='0.6'/>`;
+  s += `<rect x='17' y='24' width='6' height='10' fill='${door}'/>`;
+  s += `<rect x='20' y='24' width='3' height='10' fill='#3a2c1e'/>`;
+  s += `<rect x='11.5' y='24' width='3' height='3' fill='${door}'/><rect x='25.5' y='24' width='3' height='3' fill='${door}'/>`;
+  s += `<path d='M4 34 Q20 31 36 34 Z' fill='#ffffff' opacity='0.85'/>`;
+  return wrap(s);
+};
+
+// famine_barrow — grassy/snow burial mound with a bold megalithic trilithon door.
+// (Bolder trilithon-doorway version approved by the maintainer over the draft.)
+const famine_barrow = () => wrap(
+  "<path d='M2 34 Q20 10 38 34 Z' fill='#9aa58c'/>" +
+  "<path d='M20 12 Q38 24 38 34 L22 34 Z' fill='#7a856e' opacity='0.6'/>" +
+  "<path d='M9 23 q11 -6 22 0' stroke='#eef2f4' stroke-width='2.2' fill='none' opacity='0.5'/>" +
+  // left post
+  "<rect x='12' y='21' width='4.2' height='13' fill='#a49e94'/>" +
+  "<rect x='12' y='21' width='1.4' height='13' fill='#c8c2b8'/>" +
+  // right post
+  "<rect x='23.8' y='21' width='4.2' height='13' fill='#a49e94'/>" +
+  "<rect x='23.8' y='21' width='1.4' height='13' fill='#c8c2b8'/>" +
+  // lintel
+  "<rect x='10.5' y='17' width='19' height='4.6' fill='#a49e94'/>" +
+  "<rect x='10.5' y='17' width='19' height='1.3' fill='#c8c2b8'/>" +
+  // doorway: stone jamb framing a near-black opening
+  "<rect x='15.6' y='21.4' width='8.8' height='12.6' fill='#5a554c'/>" +
+  "<rect x='16.6' y='22.4' width='6.8' height='11.6' fill='#0a0806'/>"
+);
+
+// abandoned_well (The Poisoned Well) — stone well, wooden roof, black/green foul water.
+const abandoned_well = () => {
+  const stone = '#a9a08c', stoneD = '#7d7460', stoneL = '#c2b9a2', wood = C.trunk, foul = '#3a5a2a', foulL = '#5f8a34';
+  let s = `<rect x='12' y='22' width='16' height='12' rx='1' fill='${stone}'/>`;
+  s += `<line x1='12' y1='26' x2='28' y2='26' stroke='${stoneD}' stroke-width='0.8'/>`;
+  s += `<line x1='12' y1='30' x2='28' y2='30' stroke='${stoneD}' stroke-width='0.8'/>`;
+  s += `<line x1='20' y1='22' x2='20' y2='34' stroke='${stoneD}' stroke-width='0.6' opacity='0.5'/>`;
+  s += `<rect x='12' y='22' width='16' height='12' rx='1' fill='none' stroke='${stoneD}' stroke-width='1'/>`;
+  s += `<ellipse cx='20' cy='22' rx='9' ry='3' fill='${stoneL}'/>`;
+  s += `<ellipse cx='20' cy='22' rx='6.5' ry='2' fill='${foul}'/>`;
+  s += `<ellipse cx='20' cy='21.7' rx='4' ry='1.1' fill='${foulL}' opacity='0.7'/>`;
+  s += `<rect x='12.5' y='10' width='1.6' height='12' fill='${wood}'/>`;
+  s += `<rect x='25.9' y='10' width='1.6' height='12' fill='${wood}'/>`;
+  s += `<polygon points='10,12 20,5 30,12' fill='#7a3a2a'/>`;
+  s += `<polygon points='11,12 20,7 29,12' fill='#8a4a34' opacity='0.6'/>`;
+  return wrap(s);
+};
+
+// grimstead_cellar — sunken arched cellar doorway with descending steps + fungus.
+const grimstead_cellar = () => {
+  const stone = '#7d7466', stoneD = '#554f45', stoneL = '#9a9182', dark = '#0d0b09', step = '#6b6357', fungus = '#b9c8a0';
+  let s = `<path d='M6 34 L9 18 L31 18 L34 34 Z' fill='${stone}'/>`;
+  s += `<path d='M9 18 L31 18 L34 34 L20 34 Z' fill='${stoneD}' opacity='0.5'/>`;
+  s += `<path d='M10 22 Q20 14 30 22 L30 20 Q20 12 10 20 Z' fill='${stoneL}'/>`;
+  s += `<path d='M13 34 L13 21 Q20 15.5 27 21 L27 34 Z' fill='${dark}'/>`;
+  for (let i = 0; i < 3; i++) {
+    const y = 26 + i * 2.6;
+    s += `<rect x='${(15 + i * 1.2).toFixed(1)}' y='${y}' width='${(10 - i * 2.4).toFixed(1)}' height='1.3' fill='${step}' opacity='${(0.85 - i * 0.2).toFixed(2)}'/>`;
+  }
+  s += `<circle cx='11' cy='24' r='1.1' fill='${fungus}'/><circle cx='29' cy='25' r='0.9' fill='${fungus}'/><circle cx='12.5' cy='29' r='0.8' fill='${fungus}'/>`;
+  return wrap(s);
+};
+
+// ironhold_ruins — broken crenellated fortress wall + jagged tower stump, rust streaks.
+const ironhold_ruins = () => {
+  const stone = '#8a8175', stoneD = '#5f594e', stoneL = '#a39a89', rust = '#7a4a34', dark = '#1c1814';
+  let s = `<ellipse cx='20' cy='33' rx='16' ry='3' fill='#000' opacity='0.15'/>`;
+  s += `<path d='M5 34 L5 20 L9 20 L9 16 L14 16 L14 22 L19 22 L19 18 L24 18 L24 34 Z' fill='${stone}' stroke='${stoneD}' stroke-width='0.8'/>`;
+  s += `<path d='M5 20 L9 20 L9 16 L14 16 L14 22 L19 22 L19 18 L24 18' fill='none' stroke='${stoneL}' stroke-width='0.9' opacity='0.6'/>`;
+  s += `<rect x='26' y='14' width='9' height='20' fill='${stone}' stroke='${stoneD}' stroke-width='0.8'/>`;
+  s += `<polygon points='26,14 30,10 35,14' fill='${stone}' stroke='${stoneD}' stroke-width='0.8'/>`;
+  s += `<rect x='9' y='26' width='6' height='8' fill='${dark}'/>`;
+  s += `<rect x='27.5' y='22' width='1.6' height='6' fill='${rust}' opacity='0.7'/>`;
+  s += `<circle cx='20' cy='32' r='2' fill='${stone}' stroke='${stoneD}' stroke-width='0.6'/>`;
+  return wrap(s);
+};
+
+// rot_tunnels — dark tunnel mouth in a rotting mound, slime drips, pale fungus, glow.
+const rot_tunnels = () => {
+  const soil = '#4f4636', soilD = '#372f22', dark = '#0a0906', slime = '#5f7a2a', fung = '#c8d6a8', fungP = '#d9b9e0';
+  let s = `<path d='M3 34 Q20 14 37 34 Z' fill='${soil}'/>`;
+  s += `<path d='M20 16 Q37 24 37 34 L22 34 Z' fill='${soilD}' opacity='0.6'/>`;
+  s += `<path d='M12 34 Q12 22 20 22 Q28 22 28 34 Z' fill='${dark}'/>`;
+  s += `<ellipse cx='20' cy='31' rx='2.6' ry='2' fill='${slime}' opacity='0.5'/>`;
+  s += `<path d='M13.5 24 q1 4 0 6 M20 22.5 q1 5 0 8 M26.5 24 q-1 4 0 6' stroke='${slime}' stroke-width='1.4' fill='none' opacity='0.85'/>`;
+  s += `<circle cx='9' cy='27' r='1.4' fill='${fung}'/><circle cx='31' cy='26' r='1.2' fill='${fung}'/>`;
+  s += `<circle cx='7' cy='31' r='1' fill='${fungP}'/><circle cx='33' cy='30' r='1.1' fill='${fungP}'/>`;
+  return wrap(s);
+};
+
+// gear_end_sewers — brick sewer arch with a barred grate, a brass cog, a spilling pipe.
+const gear_end_sewers = () => {
+  const brick = '#6b5f52', brickD = '#4a4136', dark = '#0d0d10', bar = '#3a3a40', water = '#3a5a4a', brassD = '#8a5f22';
+  let s = `<path d='M8 34 L8 20 Q20 12 32 20 L32 34 Z' fill='${brick}'/>`;
+  s += `<path d='M8 20 Q20 12 32 20' fill='none' stroke='${brickD}' stroke-width='1.4'/>`;
+  s += `<path d='M12 34 L12 22 Q20 16 28 22 L28 34 Z' fill='${dark}'/>`;
+  for (let i = 0; i < 4; i++) s += `<rect x='${14 + i * 3.4}' y='20' width='1.5' height='14' fill='${bar}'/>`;
+  s += `<rect x='12' y='24' width='16' height='1.6' fill='${bar}'/>`;
+  s += gear(9, 10, 4);
+  s += `<rect x='27' y='7' width='6' height='4' rx='1' fill='${brassD}'/>`;
+  s += `<rect x='29.5' y='10.5' width='2' height='6' fill='${water}' opacity='0.75'/>`;
+  return wrap(s);
+};
+
+// coghill_foundry (Destroyed Foundry) — brick works, blown-open roof, smokestack + smoke, big cog, embers.
+const coghill_foundry = () => {
+  const brick = '#8a4a34', brickD = '#5f3020', roof = '#4a4036', smoke = '#8a8a8a', spark = '#f2a83a';
+  let s = `<rect x='7' y='22' width='22' height='12' fill='${brick}'/>`;
+  s += `<rect x='7' y='22' width='22' height='12' fill='none' stroke='${brickD}' stroke-width='0.8'/>`;
+  s += `<polygon points='7,22 12,17 16,21 21,15 25,20 29,22' fill='${roof}'/>`;
+  s += `<rect x='23' y='8' width='6' height='16' fill='${brickD}'/>`;
+  s += `<rect x='22.5' y='7' width='7' height='2.4' fill='${brick}'/>`;
+  s += `<circle cx='26' cy='5' r='3' fill='${smoke}' opacity='0.5'/><circle cx='29' cy='2.5' r='2.2' fill='${smoke}' opacity='0.4'/><circle cx='23' cy='2.4' r='2' fill='${smoke}' opacity='0.35'/>`;
+  s += gear(14, 28, 5);
+  s += `<circle cx='19' cy='30' r='0.8' fill='${spark}'/><circle cx='11' cy='21' r='0.7' fill='${spark}'/>`;
+  return wrap(s);
+};
+
+// desecrated_shrine — cracked stone altar, guttering candles, a floating sickly-green sigil.
+const desecrated_shrine = () => {
+  const stone = '#8a8578', stoneD = '#5f5b50', stoneL = '#a39d8e', dark = '#2a2620', sigil = '#7fd94a', candle = '#e8d98a', flame = '#bfe86a';
+  let s = `<ellipse cx='20' cy='32' rx='14' ry='3' fill='#000' opacity='0.18'/>`;
+  s += `<ellipse cx='20' cy='14.5' rx='6.5' ry='5' fill='${sigil}' opacity='0.14'/>`;
+  s += `<rect x='11' y='22' width='18' height='10' fill='${stone}'/>`;
+  s += `<rect x='11' y='22' width='18' height='2' fill='${stoneL}'/>`;
+  s += `<polygon points='19,22 21,22 20.5,32 19.5,32' fill='${dark}'/>`;
+  s += `<rect x='11' y='22' width='18' height='10' fill='none' stroke='${stoneD}' stroke-width='0.8'/>`;
+  s += `<polygon points='20,10 25,18 15,18' fill='none' stroke='${sigil}' stroke-width='1.4'/>`;
+  s += `<circle cx='20' cy='15.3' r='1.6' fill='${sigil}' opacity='0.85'/>`;
+  s += `<rect x='12.5' y='18.5' width='1.6' height='4' fill='${candle}'/><polygon points='13.3,15.5 12.3,18.5 14.3,18.5' fill='${flame}'/>`;
+  s += `<rect x='25.9' y='18.5' width='1.6' height='4' fill='${candle}'/><polygon points='26.7,15.5 25.7,18.5 27.7,18.5' fill='${flame}'/>`;
+  return wrap(s);
+};
+
+// cult_meeting_place (The Barrow Circle) — a ring of standing stones on a misty grassy barrow.
+const cult_meeting_place = () => {
+  const stone = '#8f8a80', stoneD = '#5f5b52', stoneL = '#a8a294', grass = '#6f8a5a', mist = '#9ac0d6';
+  const megalith = (x, y, w, h, f) =>
+    `<rect x='${x}' y='${y}' width='${w}' height='${h}' rx='1.4' fill='${f}'/>` +
+    `<rect x='${x}' y='${y}' width='${(w * 0.4).toFixed(1)}' height='${h}' rx='1.4' fill='${stoneL}' opacity='0.5'/>`;
+  let s = `<ellipse cx='20' cy='31' rx='18' ry='7' fill='${grass}'/>`;
+  s += `<ellipse cx='20' cy='31' rx='18' ry='7' fill='none' stroke='#5a7248' stroke-width='0.8' opacity='0.5'/>`;
+  s += `<ellipse cx='20' cy='28' rx='12' ry='4' fill='${mist}' opacity='0.25'/>`;
+  s += megalith(14, 9, 4, 12, stone) + megalith(22, 9, 4, 12, stone);
+  s += megalith(7, 15, 4, 11, stoneD) + megalith(29, 15, 4, 11, stoneD);
+  s += megalith(11, 22, 4, 9, stone) + megalith(25, 22, 4, 9, stone);
+  return wrap(s);
+};
+
+// corrupted_lighthouse — banded lighthouse on sea rocks, lantern room + sickly green twin beams.
+const corrupted_lighthouse = () => {
+  const tower = '#c9c2b4', towerD = '#8f887a', band = '#7a3a3a', dark = '#241f1a', beam = '#7fe0a0', lantern = '#8fffb0', rock = '#5f5a52';
+  let s = `<polygon points='23,10 40,4 40,14' fill='${beam}' opacity='0.32'/>`;
+  s += `<polygon points='17,10 0,4 0,14' fill='${beam}' opacity='0.26'/>`;
+  s += `<path d='M4 34 L9 28 L16 31 L24 28 L31 31 L36 34 Z' fill='${rock}'/>`;
+  s += `<polygon points='16,12 24,12 26,32 14,32' fill='${tower}'/>`;
+  s += `<polygon points='20,12 24,12 26,32 20,32' fill='${towerD}' opacity='0.5'/>`;
+  s += `<polygon points='15.2,18 24.8,18 25.1,21 14.9,21' fill='${band}'/>`;
+  s += `<polygon points='14.6,25 25.4,25 25.7,28 14.3,28' fill='${band}'/>`;
+  s += `<rect x='16' y='7' width='8' height='6' fill='${dark}'/>`;
+  s += `<rect x='16.5' y='8' width='7' height='4' fill='${lantern}'/>`;
+  s += `<polygon points='15,7 25,7 20,3' fill='${towerD}'/>`;
+  return wrap(s);
+};
+
+// mourn_peak_summit — a jagged dark peak with a violet cosmic rift tearing the sky above.
+const mourn_peak_summit = () => {
+  const rock = '#4a4652', rockD = '#2f2b38', snowCap = '#d6d2df', rift = '#8a5fd0', star = '#e0d0ff';
+  let s = `<ellipse cx='21' cy='9' rx='8' ry='6' fill='${rift}' opacity='0.16'/>`;
+  s += `<polygon points='20,4 34,34 6,34' fill='${rock}'/>`;
+  s += `<polygon points='20,4 34,34 22,34' fill='${rockD}'/>`;
+  s += `<polygon points='20,4 26,15 22,13 20,17 17,12 14,15' fill='${snowCap}'/>`;
+  s += `<polygon points='9,20 17,34 1,34' fill='${rockD}'/>`;
+  s += `<polygon points='20,4 34,34 6,34' fill='none' stroke='#1a1720' stroke-width='1'/>`;
+  s += `<polygon points='20,3 24,9 21,12 25,15 19,14 17,9' fill='${rift}' opacity='0.85'/>`;
+  s += `<circle cx='20' cy='6' r='0.7' fill='${star}'/><circle cx='23' cy='10' r='0.6' fill='${star}'/><circle cx='19' cy='11' r='0.5' fill='${star}'/>`;
+  return wrap(s);
+};
+
+// Every milestone-POI spawn id that has a distinctive builder above. A milestone
+// POI whose tile.poi is NOT one of these keys still renders the generic flag
+// (renderer-tolerance / backward-compat: unknown ids must keep working). Mirrored
+// by POI_SPRITE_TYPES in src/audits/context.js (MAP-02 coverage check).
+const MILESTONE_POI_SPRITES = {
+  goblin_hideout, shadow_fortress, sandstorm_hideout, sunken_spire, glacier_hollow,
+  silent_steading, famine_barrow, abandoned_well, grimstead_cellar, ironhold_ruins,
+  rot_tunnels, gear_end_sewers, coghill_foundry, desecrated_shrine, cult_meeting_place,
+  corrupted_lighthouse, mourn_peak_summit,
+};
+
 // --- public API (memoised) ---------------------------------------------------
 const _bgCache = new Map();
 const _poiCache = new Map();
@@ -481,7 +770,13 @@ export function poiSprite(tile) {
   }
   else if (tile.poi === 'cave_entrance') { key = 'cave'; build = cave; }
   else if (tile.poi === 'ruins') { key = 'ruins'; build = ruins; }
-  else if (tile.milestonePoi) { key = 'milestone'; build = milestone; }
+  else if (MILESTONE_POI_SPRITES[tile.poi]) {
+    // Distinctive per-location sprite for an authored milestone POI (keyed on the
+    // spawn id stamped into tile.poi). Cache key is the id — each builder is
+    // parameterless and deterministic.
+    key = `mpoi|${tile.poi}`; build = MILESTONE_POI_SPRITES[tile.poi];
+  }
+  else if (tile.milestonePoi) { key = 'milestone'; build = milestone; } // fallback: unknown milestone POI id -> generic flag
   else return null;
   let s = _poiCache.get(key);
   if (s === undefined) { s = build(); _poiCache.set(key, s); }
@@ -518,4 +813,22 @@ export const samplePois = {
   town: () => townSprite('town'),
   city: () => townSprite('city'),
   milestone: () => milestone(),
+  // distinctive milestone-POI sprites (one per authored spawn id)
+  goblin_hideout: () => goblin_hideout(),
+  shadow_fortress: () => shadow_fortress(),
+  sandstorm_hideout: () => sandstorm_hideout(),
+  sunken_spire: () => sunken_spire(),
+  glacier_hollow: () => glacier_hollow(),
+  silent_steading: () => silent_steading(),
+  famine_barrow: () => famine_barrow(),
+  abandoned_well: () => abandoned_well(),
+  grimstead_cellar: () => grimstead_cellar(),
+  ironhold_ruins: () => ironhold_ruins(),
+  rot_tunnels: () => rot_tunnels(),
+  gear_end_sewers: () => gear_end_sewers(),
+  coghill_foundry: () => coghill_foundry(),
+  desecrated_shrine: () => desecrated_shrine(),
+  cult_meeting_place: () => cult_meeting_place(),
+  corrupted_lighthouse: () => corrupted_lighthouse(),
+  mourn_peak_summit: () => mourn_peak_summit(),
 };

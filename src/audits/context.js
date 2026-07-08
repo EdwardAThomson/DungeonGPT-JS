@@ -113,10 +113,17 @@ export const BIOME_ART_CASES = Object.freeze([
 
 // tile.poi values poiSprite draws a DISTINCTIVE world-map sprite for. A milestone
 // POI whose tile.poi is not one of these (tile.poi is stamped with the spawn id,
-// e.g. 'shadow_fortress') falls through to the generic red milestone flag.
-// Source: src/utils/worldTileArt.js poiSprite.
+// e.g. 'shadow_fortress') falls through to the generic red milestone flag. The
+// generic tile kinds (town/forest/mountain/hills/cave_entrance/ruins) plus the 17
+// authored milestone spawn ids, each with its own poiSprite builder (mirrors
+// MILESTONE_POI_SPRITES). Source: src/utils/worldTileArt.js poiSprite.
 export const POI_SPRITE_TYPES = Object.freeze([
-  'town', 'forest', 'mountain', 'hills', 'cave_entrance', 'ruins'
+  'town', 'forest', 'mountain', 'hills', 'cave_entrance', 'ruins',
+  'goblin_hideout', 'shadow_fortress', 'sandstorm_hideout', 'sunken_spire',
+  'glacier_hollow', 'silent_steading', 'famine_barrow', 'abandoned_well',
+  'grimstead_cellar', 'ironhold_ruins', 'rot_tunnels', 'gear_end_sewers',
+  'coghill_foundry', 'desecrated_shrine', 'cult_meeting_place',
+  'corrupted_lighthouse', 'mourn_peak_summit'
 ]);
 
 // Keys of the POI_IMAGES map that supplies the ARRIVAL art shown in the POI

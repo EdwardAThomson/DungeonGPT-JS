@@ -77,7 +77,7 @@ what the app sees. Jest runs the same modules directly through its Babel pipelin
 | ENC-05 | encounters | error | implemented | When an encounter defines a `consequences` block, every roll tier (criticalSuccess/success/failure/criticalFailure) has non-blank outcome text. |
 | ENC-06 | encounters | warn | implemented | Any `climate` tag is from the valid `hot`/`cold`/`any` vocabulary (a typo never matches the selector), and `suggestedActions` is a non-empty list. |
 | MAP-01 | map | error | implemented | Every milestone POI id (every `type:'poi'` spawn) has an ARRIVAL image in `POI_IMAGES` (`worldMoveController.js`). Passes via real coverage (all 16 milestone POIs now ship arrival art); the debt allowlist is empty and it fails on any NEW POI shipped without arrival art. |
-| MAP-02 | map | warn | implemented | Every milestone POI id has a DISTINCTIVE world sprite in `poiSprite` (`worldTileArt.js`) rather than the generic milestone flag. Currently all 17 fall through to the flag (world-sprite debt). |
+| MAP-02 | map | warn | implemented | Every milestone POI id has a DISTINCTIVE world sprite in `poiSprite` (`worldTileArt.js`) rather than the generic milestone flag. Passes via real coverage (all 17 milestone POIs now ship a dedicated sprite); it warns on any NEW POI added without a `poiSprite` case, and the generic flag stays as the fallback for unknown ids. |
 | MAP-03 | map | error | implemented | Every biome the production generator can stamp (`plains`/`desert`/`snow`/`water`/`beach`) has a `getEncounterBiome` case (else it collapses to the plains table) AND `biomeBackground` tile art. Theme parity across plains/desert/snow. |
 | MAP-04 | map | warn | implemented | Every milestone POI has an authored display `name`, so arrival never falls back to a title-cased raw id. Complements DISP-01. |
 | DISP-01 | display | error | implemented | No player-facing authored label is blank/null/undefined or a raw underscored id: encounter `name`s, and the raw-id angle on milestone POI display names. (NPC names → NPC-03; item names → ITEM-01/04; POI-name absence → MAP-04.) |
@@ -127,10 +127,10 @@ what the app sees. Jest runs the same modules directly through its Babel pipelin
   fails on any NEW art-less POI; MAP-03 confirms all five producible biomes have both a
   `getEncounterBiome` case and tile art (the snow/desert cases are present, closing the
   collapse-to-plains gap); MAP-04 and DISP-01 pass because every milestone POI carries an
-  authored `name` and every encounter `name` is a human-readable label.
-- **MAP-02** surfaces **17 warnings** — every milestone POI renders the generic red
-  milestone flag on the world map because `poiSprite` has no distinctive branch keyed
-  to their spawn ids (world-sprite debt, see below).
+  authored `name` and every encounter `name` is a human-readable label. MAP-02 now
+  passes via REAL coverage: all 17 milestone POIs ship a dedicated `poiSprite` builder
+  keyed to their spawn id (`MILESTONE_POI_SPRITES` in `worldTileArt.js`), so none fall
+  through to the generic flag; it warns only if a NEW POI is added without a sprite.
 
 ### Known accepted gaps / debt
 
@@ -147,12 +147,16 @@ these down and shrink the allowlist.
   `docs/IMAGE_GENERATION_PROMPTS.md`); to add a new POI, drop its `.webp` into
   `POI_IMAGES` and mirror the key in `POI_ARRIVAL_IMAGE_KEYS` (`src/audits/context.js`).
 
-- **MAP-02 POI world-sprite debt** (advisory, no allowlist needed — it is a `warn`).
-  `poiSprite` (`worldTileArt.js`) only draws distinctive world-map sprites for the
-  generic tile kinds (`town`/`forest`/`mountain`/`hills`/`cave_entrance`/`ruins`); a
-  milestone POI stamps `tile.poi` with its spawn id, so ALL **17** milestone POIs
-  (the 16 above plus `goblin_hideout`) fall through to the generic red milestone
-  flag on the world map. MAP-02 lists them every run so the debt stays visible.
+- **MAP-02 POI world-sprite debt: RESOLVED.** `poiSprite` (`worldTileArt.js`) now
+  draws a distinctive world-map sprite for every authored milestone spawn id via a
+  per-id builder in `MILESTONE_POI_SPRITES` (all **17**: the 16 above plus
+  `goblin_hideout`), in addition to the generic tile kinds
+  (`town`/`forest`/`mountain`/`hills`/`cave_entrance`/`ruins`). The generic red
+  milestone flag is kept as the fallback for any unknown/absent milestone POI id
+  (renderer-tolerance), so MAP-02 now passes via real coverage and warns only when a
+  NEW milestone POI ships without a sprite. Coverage is mirrored by `POI_SPRITE_TYPES`
+  (`src/audits/context.js`); to add a new POI, add a builder + `MILESTONE_POI_SPRITES`
+  entry and mirror the id there.
 
 - **NPC-06 mis-typed-talk candidates** (advisory, no allowlist — it is a `warn`).
   Resolved: the two authored milestones that spawned an NPC and read like a

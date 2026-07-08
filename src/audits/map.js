@@ -59,10 +59,13 @@ const map01 = {
 /**
  * MAP-02 (warn): every milestone POI id has a DISTINCTIVE world-map sprite in
  * poiSprite (worldTileArt.js), rather than falling through to the generic red
- * milestone flag. poiSprite only branches on generic tile.poi kinds
- * (town/forest/mountain/hills/cave_entrance/ruins); a milestone POI stamps
- * tile.poi with its spawn id, so it currently always renders the generic flag.
- * Advisory (does not fail CI): this is the world-sprite debt surface.
+ * milestone flag. poiSprite branches on the generic tile.poi kinds
+ * (town/forest/mountain/hills/cave_entrance/ruins) PLUS a per-id builder for each
+ * authored milestone spawn id (MILESTONE_POI_SPRITES). All 17 authored milestone
+ * POIs now ship a dedicated sprite, so this passes via real coverage; it warns the
+ * moment a NEW milestone POI is added without a poiSprite case (it would render the
+ * generic flag). The generic flag is preserved as the fallback for unknown ids.
+ * Advisory (does not fail CI).
  */
 const map02 = {
   id: 'MAP-02',
