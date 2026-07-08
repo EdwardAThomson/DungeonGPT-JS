@@ -12,18 +12,14 @@ const DOMAIN = 'buildings';
 // -----------------------------------------------------------------------------
 // KNOWN ACCEPTED DEBT (CI-green ratchet).
 //
-// These placeable building types have NO branch in assignBuildingName
-// (townMapGenerator.js), so a plain generated instance renders a bare type label
-// ("Apothecary") instead of a proper name — the apothecary-name bug. This is
-// PRE-EXISTING content debt, not a regression, so BLD-03 (error) allowlists it:
-// the gate stays green today but FAILS the moment a NEW placeable type ships
-// without a name generator. BLD-06 (warn) prints the same list every run so the
-// debt stays visible until it is burned down. Documented in docs/CONTENT_AUDIT.md
-// under "Known accepted gaps / debt".
-export const NAME_GENERATOR_DEBT_ALLOWLIST = Object.freeze([
-  'barn', 'shrine', 'mill', 'stables', 'tailor', 'fletcher', 'apothecary',
-  'townhall', 'magetower', 'jail', 'harbormaster', 'boathouse'
-]);
+// This allowlist is the escape hatch for placeable building types that have NO
+// branch in assignBuildingName (townMapGenerator.js) and would render a bare type
+// label instead of a proper name. It is currently EMPTY: every placeable type now
+// has an explicit name-generator branch (plus a generic title-case safety net), so
+// BLD-03 passes via real coverage rather than via the allowlist. The ratchet stays
+// in place so BLD-03 still FAILS the moment a NEW placeable type ships without a
+// name generator; add such a type here only as a deliberate, documented exception.
+export const NAME_GENERATOR_DEBT_ALLOWLIST = Object.freeze([]);
 
 /**
  * BLD-01 (error): every milestone `building.type` is a building type the town
@@ -78,11 +74,12 @@ const bld02 = {
 };
 
 /**
- * BLD-03 (error, allowlisted): every placeable building type has a name-generator
- * branch in assignBuildingName, so a generated instance shows a real name rather
- * than its bare type. `house` is exempt (anonymous by design). Known pre-existing
- * gaps are absorbed by NAME_GENERATOR_DEBT_ALLOWLIST so the gate stays green on
- * today's debt but fails on any NEW placeable-without-a-name type.
+ * BLD-03 (error): every placeable building type has a name-generator branch in
+ * assignBuildingName, so a generated instance shows a real name rather than its
+ * bare type. `house` is exempt (anonymous by design). Every placeable type is now
+ * covered directly, so this passes via real coverage; NAME_GENERATOR_DEBT_ALLOWLIST
+ * is an empty escape hatch that would let a deliberately-deferred NEW type through
+ * while still failing on accidental gaps.
  */
 const bld03 = {
   id: 'BLD-03',
@@ -155,11 +152,11 @@ const bld05 = {
 };
 
 /**
- * BLD-06 (warn): name-generator coverage debt. Lists the placeable building types
- * that currently render a bare type label because assignBuildingName has no branch
- * (the BLD-03 allowlist). Non-blocking on purpose: this is the visibility surface
- * for the known debt so `npm run audit` prints it every run while BLD-03 stops
- * new gaps. Burn the list down and BLD-03's allowlist shrinks with it.
+ * BLD-06 (warn): name-generator coverage debt. Lists any placeable building type
+ * that would render a bare type label because assignBuildingName has no branch for
+ * it. Non-blocking visibility surface for the debt. It is currently EMPTY: every
+ * placeable type now has a name-generator branch, so nothing prints here until a
+ * new uncovered type is added.
  */
 const bld06 = {
   id: 'BLD-06',

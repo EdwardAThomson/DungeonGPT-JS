@@ -49,12 +49,17 @@ export const PLACEABLE_BUILDING_TYPES = Object.freeze([
 ]);
 
 // Building types with a dedicated name-generator branch in assignBuildingName
-// (src/utils/townMapGenerator.js ~L2424-2453). assignBuildingName is a closure
+// (src/utils/townMapGenerator.js ~L2437-2509). assignBuildingName is a closure
 // inside placeBuildings and is NOT exported, so this mirrors its if-chain.
-// `house` is intentionally absent everywhere: houses are anonymous by design.
+// Every placeable type now has an explicit branch, and a generic title-case
+// safety net (`buildingType && buildingType !== 'house'`) catches anything else,
+// so no placeable type can regress to a bare type label. `house` is intentionally
+// absent everywhere: houses are anonymous by design.
 export const BUILDING_NAME_GENERATOR_TYPES = Object.freeze([
   'tavern', 'inn', 'guild', 'bank', 'shop', 'market', 'blacksmith', 'manor',
-  'keep', 'temple', 'archives', 'library', 'alchemist', 'foundry', 'warehouse'
+  'keep', 'temple', 'archives', 'library', 'alchemist', 'foundry', 'warehouse',
+  'apothecary', 'tailor', 'fletcher', 'stables', 'mill', 'shrine', 'barn',
+  'magetower', 'townhall', 'jail', 'harbormaster', 'boathouse'
 ]);
 
 // Building types that open a shop UI in-game. Mirrors SHOP_BUILDING_TYPES in
