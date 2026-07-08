@@ -93,6 +93,27 @@ const formatMilestonePromptText = (milestoneStatus) => {
     return text;
 };
 
+// Format ONLY the current milestone as a grounded objective line for the new-game
+// opening. Unlike formatMilestonePromptText (which dumps every active/completed/locked
+// milestone), this returns a single line for the one immediate step, plus the real
+// destination it lives in so the opening can frame it as somewhere ELSEWHERE to travel
+// to rather than part of the starting scene. Mirrors introComposer's grounded style.
+const formatStartObjective = (current) => {
+    if (!current) return { line: '', destination: '' };
+    const typeTag = current.type ? ` [${current.type}]` : '';
+    let line = `${current.text}${typeTag}`;
+    const destination = current.building?.location || current.spawn?.location || current.location || '';
+    if (current.spawn?.type === 'npc' && current.spawn.name) {
+        const who = current.spawn.role ? `${current.spawn.name} (${current.spawn.role})` : current.spawn.name;
+        const where = current.building?.name || current.spawn.location;
+        line += `: speak with ${who}${where ? ` at ${where}` : ''}`;
+        if (current.spawn.personality) line += `; ${current.spawn.personality}`;
+    } else if (current.building?.name) {
+        line += ` at ${current.building.name}`;
+    }
+    return { line, destination };
+};
+
 // Ground ACTIVE side quests in the prompt so the DM narrates their real sources instead
 // of inventing locations ("the herbalist in the next valley") for quest items. Compact:
 // title + current step + the factual questHints source line, capped at a few quests.
@@ -392,34 +413,68 @@ const useGameInteraction = (
         // Ideally useGameMap handles the 'explored' bit, here we just do the AI part.
 
         // Construct Prompt
+        // Two-stage opening (playtest 2026-07-07: a single under-grounded prompt that
+        // dumped ALL active milestones conflated the start town with a future town it
+        // named a venue/NPC from). Stage 1 grounds the scene to HERE only (reusing the
+        // same buildLocationContext/formatTownNpcs the movement path uses, so the
+        // current town's OWN placed NPCs are named). Stage 2 points at ONLY the current
+        // milestone, framed as somewhere elsewhere to travel to.
         const partyInfo = formatPartyInfo(selectedHeroes);
         const currentTile = getTile(worldMap, playerPosition.x, playerPosition.y);
 
-        let locationInfo = `Player starts at coordinates (${playerPosition.x}, ${playerPosition.y}) in a ${currentTile?.biome || 'Unknown Area'} biome.`;
-        if (currentTile?.poi === 'town' && currentTile?.townName) {
-            locationInfo += ` The party is standing OUTSIDE at the edge of ${currentTile.townName}, a ${currentTile.townSize || 'settlement'}. They have not yet entered the town.`;
-        } else if (currentTile?.poi) {
-            locationInfo += ` POI: ${currentTile.poi}.`;
-        }
+        // Stage 1: Scene, grounded to the current location only.
+        const locationInfo = buildLocationContext(currentTile, playerPosition, locationContext, worldMap);
+        const sceneContext = `Setting: ${settings.shortDescription || 'A mystery fantasy world'}. Mood: ${settings.grimnessLevel || 'Normal'} Intensity. Magic: ${settings.magicLevel || 'Standard'}. Tech: ${settings.technologyLevel || 'Medieval'}.\n${locationInfo}. Party: ${partyInfo}.`;
 
+        const scenePrompt = `[ADVENTURE START - SCENE]\n\n[CONTEXT]\n${sceneContext}\n\n[TASK]\nDescribe the arrival of the party and the immediate atmosphere of THIS location only. Describe ONLY the location, buildings, and people named in the context above. Do not name, place, or invent any building or NPC that is not listed here, and do not reference other towns as if they are part of this scene. Begin your response directly with the narrative description.`;
 
-        const goalInfo = settings.campaignGoal ? `\nGoal of the Campaign: ${settings.campaignGoal}` : '';
-
-        // Get milestone status
+        // Stage 2: Objective/hook, using ONLY the current milestone (not the full active
+        // array). This is the core of the fix: the opening must not surface every active
+        // milestone's venue/NPC as if it were nearby.
         const milestoneStatus = getMilestoneStatus(settings.milestones);
-        const milestonesInfo = formatMilestonePromptText(milestoneStatus);
-        const sideQuestsInfo = formatSideQuestPromptText(settings.sideQuests);
-
-        const gameContext = `Setting: ${settings.shortDescription || 'A mystery fantasy world'}. Mood: ${settings.grimnessLevel || 'Normal'} Intensity. Magic: ${settings.magicLevel || 'Standard'}. Tech: ${settings.technologyLevel || 'Medieval'}.${goalInfo}${milestonesInfo}${sideQuestsInfo}\n${locationInfo}. Party: ${partyInfo}.`;
-
-        const prompt = `[ADVENTURE START]\n\n[CONTEXT]\n${gameContext}\n\nCurrent Summary: ${currentSummary || 'They stand ready at the journey\'s beginning.'}\n\n[TASK]\nDescribe the arrival of the party and the immediate atmosphere of the scene. Present the initial situation to the players. Use the context provided to set the stage. Begin your response directly with the narrative description.`;
+        const current = milestoneStatus.current;
+        const { line: objectiveLine, destination: objectiveDest } = formatStartObjective(current);
+        const currentPlaceName = locationContext?.currentTownTile?.townName
+            || (currentTile?.poi === 'town' ? currentTile?.townName : null)
+            || currentTile?.biome
+            || 'this place';
 
         try {
-            let aiResponse = await generateResponse(model, prompt);
+            // Sequential calls: scene first, then the objective hook. Both go through the
+            // same generateResponse (DM_PROTOCOL + style directive) + cleanAIResponse path.
+            let sceneText = await generateResponse(model, scenePrompt);
+            sceneText = cleanAIResponse(sceneText, sceneContext);
 
-            // Clean the response: remove any echoed context/task instructions
-            // The AI sometimes echoes the entire prompt, so we need to extract just the narrative
-            aiResponse = cleanAIResponse(aiResponse, gameContext);
+            if (!sceneText || !sceneText.trim()) {
+                // An empty opening is a failed start: keep the adventure un-started so
+                // the Start Adventure button stays and the player can retry.
+                logger.warn('Empty AI scene response at adventure start; keeping the start available for retry');
+                setHasAdventureStarted(false);
+                setError('The Dungeon Master gave no reply. Please try starting the adventure again.');
+                return;
+            }
+
+            // Objective stage: best-effort. If it fails or returns nothing, fall back to a
+            // deterministic objective line rather than dropping the hook or crashing.
+            let objectiveText = '';
+            if (current && objectiveLine) {
+                const goalInfo = settings.campaignGoal ? `Campaign goal: ${settings.campaignGoal}.\n` : '';
+                const objectiveContext = `${goalInfo}The party's current location: ${currentPlaceName}.\nThe party's immediate objective (the ONLY next step): ${objectiveLine}.${objectiveDest ? `\nThat objective lies in ${objectiveDest}, a place elsewhere the party must travel to.` : ''}`;
+                const objectivePrompt = `[ADVENTURE START - OBJECTIVE]\n\n[CONTEXT]\n${objectiveContext}\n\n[TASK]\nIn one short paragraph (2-3 sentences), point the party toward this immediate objective. Any destination named here is a place ELSEWHERE the party must travel to; never describe it, its buildings, or its people as part of the current scene at ${currentPlaceName}. Do not invent NPCs or places beyond those named above. Close on the concrete next step by its real name. Begin your response directly with the narrative.`;
+                try {
+                    let objRaw = await generateResponse(model, objectivePrompt);
+                    objectiveText = cleanAIResponse(objRaw, objectiveContext).trim();
+                } catch (objErr) {
+                    logger.warn('Objective stage failed at adventure start; using deterministic hook', objErr);
+                }
+                if (!objectiveText) {
+                    // Deterministic fallback mirrors introComposer's "First steps" line.
+                    objectiveText = `**First steps:** ${current.text}${objectiveDest ? ` (travel to ${objectiveDest})` : ''}`;
+                }
+            }
+
+            // Combine the two stages into the single opening message the player sees.
+            let aiResponse = objectiveText ? `${sceneText}\n\n${objectiveText}` : sceneText;
 
             // Parse for Triggers
             const match = aiResponse.match(TRIGGER_REGEX);
