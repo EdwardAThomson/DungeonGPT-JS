@@ -3,7 +3,7 @@ import { resolveProfilePicture } from '../utils/assetHelper';
 import { getIndexStatus, backfill } from '../game/ragEngine';
 import { ragStore } from '../services/ragStore';
 
-const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate, formatProvider, formatModel }) => {
+const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate }) => {
   const [ragStatus, setRagStatus] = useState(null); // { status, indexed, total }
   const [isRebuilding, setIsRebuilding] = useState(false);
   const [rebuildProgress, setRebuildProgress] = useState(null);
@@ -96,8 +96,11 @@ const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate, form
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.9rem' }}>
             <p><strong>Date Saved:</strong> {formatDate(conversation.timestamp)}</p>
             <p><strong>Session ID:</strong> <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{conversation.sessionId}</span></p>
-            <p><strong>AI Provider:</strong> {formatProvider(conversation.provider)}</p>
-            <p><strong>AI Model:</strong> {formatModel(conversation.model)}</p>
+            {/* Campaign arc name is stamped into settings at save time; older
+                saves predating campaign tracking omit it gracefully. */}
+            {settings?.templateName && (
+              <p style={{ gridColumn: '1 / -1' }}><strong>Campaign:</strong> {settings.templateName}</p>
+            )}
             <p><strong>Location:</strong> {getLocationString()}</p>
           </div>
         </div>
