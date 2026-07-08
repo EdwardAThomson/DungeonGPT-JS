@@ -54,10 +54,10 @@ what the app sees. Jest runs the same modules directly through its Babel pipelin
 | ITEM-04 | items | warn | implemented | Every `ITEM_CATALOG` entry has the required display fields (`name`, `icon`, `rarity`, `value`, `type`) so nothing renders blank. |
 | BLD-01 | buildings | error | implemented | Every milestone `building.type` is a known building type (placed by the generator or in `townTileArt`'s `BUILDING_TYPES`; covers inject-only venues like `barracks`/`workshop`). |
 | BLD-02 | buildings | error | implemented | Every milestone `building.location` names a town the campaign generates (its `customNames.towns` or a milestone `location`). |
-| BLD-03 | buildings | error | implemented | Every placeable building type has a name generator branch in `assignBuildingName` (else it renders a bare type label). Known pre-existing gaps are allowlisted (see Known accepted gaps); fails on any NEW gap. |
+| BLD-03 | buildings | error | implemented | Every placeable building type has a name generator branch in `assignBuildingName` (else it renders a bare type label). All placeable types are now covered directly; the allowlist is empty and it fails on any NEW gap. |
 | BLD-04 | buildings | warn | implemented | Every placeable building type has town tile art (a silhouette in `townTileArt`'s `BUILDING_TYPES`), so it never renders the gable fallback. Currently passes. |
 | BLD-05 | buildings | error | implemented | Every shop building type (`BuildingModal`'s `SHOP_BUILDING_TYPES`) has stock in `shopStock.js` (an empty store fails silently). Currently passes. |
-| BLD-06 | buildings | warn | implemented | Name-generator coverage debt: lists placeable types that render a bare type label (the BLD-03 allowlist), so the debt stays visible every run. |
+| BLD-06 | buildings | warn | implemented | Name-generator coverage debt: lists any placeable type that would render a bare type label. Currently empty (every placeable type has a name-generator branch). |
 | NPC-01 | npcs | error | implemented | Every milestone NPC spawn has a non-blank `name` and a resolvable venue (`spawn.location` or `building.location`) — the fields `getMilestoneNpcsForTown` needs, or the NPC is silently skipped. |
 | NPC-02 | npcs | error | implemented | Every `talk`-type milestone's `trigger.npc` matches an npc `spawn.id` in the same template (pairs with the Talk-button `npc_talked` mechanic). |
 | NPC-03 | npcs | warn | implemented | NPC completeness: `role`/`personality` present, and no raw underscored id leaks into the display `name`. |
@@ -93,29 +93,27 @@ what the app sees. Jest runs the same modules directly through its Babel pipelin
   in `src/audits/items.js` to `name`/`icon`/`rarity`/`value` (all of which pass) —
   no other change needed.
 - **buildings / npcs / milestones**: every `error`-severity check passes today
-  (0 failures). The only building debt is the name-generator gap below (BLD-03
-  allowlisted, surfaced by BLD-06). All milestone `requires` graphs are sound DAGs
-  and every campaign is completable; all NPC spawns and talk-milestone references
-  resolve. **NPC-05** passes: every `talk` milestone (including the fixed Warden
-  Sigrun objective in `frozen-frontier-t1`) is fully click-completable — its
-  `trigger.npc` matches a placed npc spawn in a generated town, so the Talk button
-  renders.
-- **NPC-06** surfaces **2 warnings** — non-talk milestones that spawn an NPC and read
-  like a "go talk to them" objective (the Sigrun class), so they get no Talk button
-  and can only be completed by free-text guessing. Both are `type: 'narrative'` with a
-  null trigger and are worth an author review (see debt below):
-  - `heroic-fantasy-t2` / milestone 2: *"Convince the Thornfield Guard to join the
-    resistance"* (spawns Captain Aldric in the Thornfield Guard Barracks).
-  - `desert-expedition-t1` / milestone 2: *"Win the trust of the well-keeper at Oasis
-    Karn"* (spawns Keeper Najwa in The Last Drop).
-- **BLD-06** surfaces **12 warnings** — the placeable building types that render a
-  bare type label because `assignBuildingName` has no branch (see Known accepted
-  gaps). This is the visibility surface for the BLD-03 debt.
-- **MS-06** surfaces **13 warnings** — non-first milestones with empty `requires`
+  (0 failures) with no remaining building debt: every placeable building type now
+  has a name-generator branch, so BLD-03 passes via real coverage (empty allowlist)
+  and BLD-06 warns nothing. All milestone `requires` graphs are sound DAGs and every
+  campaign is completable; all NPC spawns and talk-milestone references resolve.
+  **NPC-05** passes: every `talk` milestone (including the fixed Warden Sigrun
+  objective in `frozen-frontier-t1`, plus the two retyped talk beats below) is fully
+  click-completable — its `trigger.npc` matches a placed npc spawn in a generated
+  town, so the Talk button renders.
+- **NPC-06** surfaces **0 warnings**. The two former mis-typed-talk candidates were
+  retyped from `type: 'narrative'` (null trigger) to `type: 'talk'` with a
+  `trigger.npc` matching their spawn id, so they now render a Talk button and are
+  guarded by NPC-05: `heroic-fantasy-t2` milestone 2 (*Convince the Thornfield
+  Guard*, Captain Aldric) and `desert-expedition-t1` milestone 2 (*Win the trust of
+  the well-keeper*, Keeper Najwa).
+- **BLD-06** surfaces **0 warnings** — every placeable building type has a
+  name-generator branch, so nothing renders a bare type label.
+- **MS-06** surfaces **12 warnings** — non-first milestones with empty `requires`
   that are co-active from turn 1. These are the templates' intended parallel opening
-  objectives (e.g. find-the-map AND meet-the-captain). Note `frozen-frontier-t2`
-  opens with THREE co-active milestones (ids 2 and 3 both parallel to 1); worth a
-  design confirmation. All are advisory.
+  objectives (e.g. find-the-map AND meet-the-captain). `frozen-frontier-t2` was
+  brought to house style (two co-active openers, ids 1 and 2, then id 3 gates on
+  `[1, 2]`), so it no longer opens with three co-active milestones. All are advisory.
 - **encounters**: every `error`-severity check passes (0 failures). All 48 encounter
   templates have `name`/`image`/`icon`/`difficulty`/`rewards`/`consequences`/
   `suggestedActions`; all 108 reward item ids resolve in `ITEM_CATALOG`; no encounter
@@ -139,19 +137,10 @@ Pre-existing content gaps that `error`-class checks explicitly allowlist so the 
 gate stays green on today's debt while still failing on any NEW regression. Burn
 these down and shrink the allowlist.
 
-- **BLD-03 name-generator debt** (`NAME_GENERATOR_DEBT_ALLOWLIST` in
-  `src/audits/buildings.js`). These 12 placeable building types have no branch in
-  `assignBuildingName` (`townMapGenerator.js`), so a generated instance renders its
-  bare type as a name (the apothecary bug):
-  `barn`, `shrine`, `mill`, `stables`, `tailor`, `fletcher`, `apothecary`,
-  `townhall`, `magetower`, `jail`, `harbormaster`, `boathouse`.
-  (`house` is intentionally anonymous and is not counted.) Fixing a type = adding an
-  `assignBuildingName` branch and removing it from the allowlist; BLD-03 then guards
-  it going forward and BLD-06 stops warning about it.
-
 - **MAP-01 POI arrival-art debt** (`POI_ARRIVAL_IMAGE_DEBT_ALLOWLIST` in
   `src/audits/map.js`). POI arrival art is generated externally (a Gemini image
-  pipeline) and dropped into `POI_IMAGES` (`worldMoveController.js`) over time. Only
+  pipeline; prompts in `docs/IMAGE_GENERATION_PROMPTS.md`) and dropped into
+  `POI_IMAGES` (`worldMoveController.js`) over time. Only
   `goblin_hideout` has shipped; the other **16** milestone POIs arrive with no art
   and are allowlisted so MAP-01 (error) stays green on this known debt while FAILING
   the moment a NEW milestone POI ships without arrival art (the single most important
@@ -171,15 +160,14 @@ these down and shrink the allowlist.
   flag on the world map. MAP-02 lists them every run so the debt stays visible.
 
 - **NPC-06 mis-typed-talk candidates** (advisory, no allowlist — it is a `warn`).
-  Two authored milestones spawn an NPC and read like a conversation objective but are
-  `type: 'narrative'` with a null trigger, so they render no Talk button and the
-  player can only complete them by guessing free text (exactly the Warden Sigrun bug
-  that motivated NPC-05/06): `heroic-fantasy-t2` milestone 2 (*Convince the Thornfield
-  Guard*, Captain Aldric) and `desert-expedition-t1` milestone 2 (*Win the trust of
-  the well-keeper*, Keeper Najwa). Author review: if the intent is click-to-talk,
-  retype to `type: 'talk'` with `trigger.npc` matching the spawn.id (then NPC-05 guards
-  it and NPC-06 stops warning). If they are meant to be AI-judged narrative beats, leave
-  them — NPC-06 is advisory precisely for that case.
+  Resolved: the two authored milestones that spawned an NPC and read like a
+  conversation objective but were `type: 'narrative'` with a null trigger have been
+  retyped to `type: 'talk'` with a `trigger.npc` matching the spawn.id, so they now
+  render a Talk button (button-only completion, the Warden Sigrun precedent) and are
+  guarded by NPC-05: `heroic-fantasy-t2` milestone 2 (*Convince the Thornfield Guard*,
+  Captain Aldric) and `desert-expedition-t1` milestone 2 (*Win the trust of the
+  well-keeper*, Keeper Najwa). NPC-06 stays as the advisory surface for any FUTURE
+  narrative-typed milestone that reads like a click-to-talk objective.
 
 - **ENC-03 climate-neutral env. encounters** (`CLIMATE_NEUTRAL_ALLOWLIST` in
   `src/audits/encounters.js`). Four environmental encounters are intentionally
