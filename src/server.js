@@ -895,11 +895,13 @@ app.put('/api/conversations/:sessionId/name', (req, res) => {
   if (validationErrors.length > 0) {
     return buildValidationError(res, validationErrors);
   }
-  const { conversationName } = req.body;
+  const { conversationName, saveName } = req.body;
 
-  const query = `UPDATE conversations SET conversation_name = ? WHERE sessionId = ?`;
-
-  db.run(query, [conversationName.trim(), sessionId], function (err) {
+  // Persist BOTH the display name and the editable root (game_settings.saveName) so the
+  // next autosave, which re-derives the display name from the root, cannot revert the
+  // rename. game_settings is TEXT holding a JSON object; json_set merges saveName in
+  // place. Guard against a missing saveName (older client) so we never null out a root.
+  const done = function (err) {
     if (err) {
       logger.error('Error updating conversation name', err);
       return sendError(res, 500, 'Server error updating conversation name');
@@ -908,7 +910,15 @@ app.put('/api/conversations/:sessionId/name', (req, res) => {
     } else {
       res.json({ message: 'Conversation name updated successfully' });
     }
-  });
+  };
+
+  if (typeof saveName === 'string') {
+    const query = `UPDATE conversations SET conversation_name = ?, game_settings = json_set(COALESCE(game_settings, '{}'), '$.saveName', ?) WHERE sessionId = ?`;
+    db.run(query, [conversationName.trim(), saveName, sessionId], done);
+  } else {
+    const query = `UPDATE conversations SET conversation_name = ? WHERE sessionId = ?`;
+    db.run(query, [conversationName.trim(), sessionId], done);
+  }
 });
 
 // Delete a conversation

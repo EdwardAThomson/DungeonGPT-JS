@@ -368,6 +368,19 @@ const NewGame = () => {
     navigate('/hero-selection', { state: { heroes, generatedMap: launch.mapData, worldSeed: launch.worldSeed, gameSessionId: launch.gameSessionId, townMapsCache: launch.townMapsCache } });
   };
 
+  // Ready-Made "Begin This Campaign": applyTemplate's state updates (selected
+  // template, tone, milestones, theme) must flush before handleSubmit reads
+  // them. The modal's Begin button applies the template and raises this flag;
+  // we launch from an effect on the next render, when handleSubmit closes over
+  // the freshly-applied state (a direct call would use the pre-apply closure).
+  const [pendingCampaignLaunch, setPendingCampaignLaunch] = useState(false);
+  useEffect(() => {
+    if (!pendingCampaignLaunch) return;
+    setPendingCampaignLaunch(false);
+    handleSubmit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingCampaignLaunch]);
+
   // Tab state
   const [activeTab, setActiveTab] = useState('templates');
 
@@ -1417,7 +1430,14 @@ const NewGame = () => {
           notice={arcModalNotice}
           onTeaserChapterClick={(chapter) => handleTeaserChapter(chapter, { fromModal: true })}
           onLockedChapterClick={(chapter) => setArcModalNotice(lockedChapterCopy(chapter))}
-          onApplyChapter={(template) => { applyTemplate(template); closeArcModal(); }}
+          onApplyChapter={(template) => {
+            // Apply the picked chapter, close the modal, then advance to hero
+            // selection once the applied state has flushed (see the
+            // pendingCampaignLaunch effect above).
+            applyTemplate(template);
+            closeArcModal();
+            setPendingCampaignLaunch(true);
+          }}
           onSubmit={() => {
             closeArcModal();
             // Map is generated automatically in handleSubmit; go straight on.

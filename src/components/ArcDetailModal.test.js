@@ -97,7 +97,7 @@ describe('chapter picker behaviour', () => {
     expect(screen.getByText('Coming soon')).toBeInTheDocument();
   });
 
-  it('a startable selected chapter offers Begin This Chapter, and Next once applied', () => {
+  it('a startable selected chapter offers Begin This Campaign, and Next once applied', () => {
     const arc = arcFor('heroic-fantasy');
     const onApplyChapter = jest.fn();
     const { rerender } = render(
@@ -109,7 +109,7 @@ describe('chapter picker behaviour', () => {
         onClose={() => {}}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: /Begin This Chapter/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Begin This Campaign/i }));
     expect(onApplyChapter).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'heroic-fantasy-t1' })
     );

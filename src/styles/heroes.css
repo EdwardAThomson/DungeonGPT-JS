@@ -464,6 +464,29 @@
   color: var(--primary);
 }
 
+/* Top-of-page back link: mirrors the bottom .back-button styling so the page
+   has a back affordance without scrolling past the roster. */
+.hero-selection-top-nav {
+  margin-bottom: 16px;
+}
+
+.hero-selection-top-nav .back-button {
+  background-color: transparent;
+  padding: 10px 20px;
+  border: 1px solid var(--primary);
+  border-radius: 4px;
+  color: var(--primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--header-font);
+  letter-spacing: 0.05em;
+}
+
+.hero-selection-top-nav .back-button:hover {
+  background-color: var(--primary);
+  color: var(--bg);
+}
+
 .hero-item {
   cursor: pointer;
   position: relative;

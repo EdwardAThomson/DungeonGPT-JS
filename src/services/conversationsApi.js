@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient';
 import { localGameStore, isUnsyncedLocalRow, isValidBaseRev, rowToPayload } from './localGameStore';
 import { ragStore } from './ragStore';
 import { unionLedgers } from '../game/heroLedger';
+import { buildSaveName } from '../game/saveController';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('conversations-api');
@@ -90,10 +91,13 @@ const cfWorkerConversationsApi = {
     });
   },
 
-  async updateName(sessionId, conversationName) {
+  async updateName(sessionId, root) {
+    // Persist BOTH the editable root (game_settings.saveName, the source of truth that
+    // future saves re-derive the display name from) and the derived display name, so the
+    // rename survives the next autosave and shows its "<root> - <date> <time>" form now.
     return cfFetch(`/api/db/conversations/${sessionId}/name`, {
       method: 'PUT',
-      body: JSON.stringify({ conversationName }),
+      body: JSON.stringify({ conversationName: buildSaveName(root), saveName: root }),
     });
   },
 
@@ -149,11 +153,13 @@ const expressConversationsApi = {
     return response.json();
   },
 
-  async updateName(sessionId, conversationName) {
+  async updateName(sessionId, root) {
+    // See the CF Worker note above: persist the editable root into game_settings.saveName
+    // as well as the derived display name, so the next save cannot revert the rename.
     const response = await apiFetch(`/api/conversations/${sessionId}/name`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversationName }),
+      body: JSON.stringify({ conversationName: buildSaveName(root), saveName: root }),
     });
 
     if (!response.ok) {
@@ -484,10 +490,12 @@ export const conversationsApi = {
     return localRow ? { ...localRow, storage: 'local', pendingCloudSync: !!localRow.pending_cloud_sync } : localRow;
   },
 
-  async updateName(sessionId, conversationName) {
+  async updateName(sessionId, root) {
+    // `root` is the player-editable base name (NOT the full display name). Both stores
+    // derive "<root> - <date> <time>" and persist the root in game_settings.saveName.
     const route = await resolveRoute();
-    if (!route.useCloud) return localGameStore.updateName(sessionId, conversationName);
-    const result = await backend.updateName(sessionId, conversationName);
+    if (!route.useCloud) return localGameStore.updateName(sessionId, root);
+    const result = await backend.updateName(sessionId, root);
     // Keep an UNSYNCED local copy's name in step: the cloud rename stamps the cloud
     // row newer, and without this the next reconcile would park real local progress
     // as a "diverged" fork over a mere rename. Synced local copies stay untouched
@@ -496,7 +504,7 @@ export const conversationsApi = {
     try {
       const localRow = await localGameStore.getById(sessionId);
       if (localRow && isUnsyncedLocalRow(localRow)) {
-        await localGameStore.updateName(sessionId, conversationName);
+        await localGameStore.updateName(sessionId, root);
       }
     } catch (e) {
       logger.warn('Local rename skipped', e);

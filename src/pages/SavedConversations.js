@@ -115,29 +115,6 @@ const SavedConversations = () => {
     return new Date(timestamp).toLocaleString();
   };
 
-  const formatProvider = (provider) => {
-    if (!provider) return 'Not set';
-    const providerMap = {
-      'openai': 'OpenAI',
-      'gemini': 'Gemini',
-      'claude': 'Claude'
-    };
-    return providerMap[provider.toLowerCase()] || provider;
-  };
-
-  const formatModel = (model) => {
-    if (!model) return 'Not set';
-    const modelMap = {
-      'gpt-5': 'GPT-5',
-      'gpt-5-mini': 'GPT-5 Mini',
-      'o4-mini': 'O4 Mini',
-      'gemini-2.5-pro': 'Gemini 2.5 Pro',
-      'gemini-2.5-flash': 'Gemini 2.5 Flash',
-      'claude-sonnet-4-5-20250929': 'Claude Sonnet 4.5'
-    };
-    return modelMap[model] || model;
-  };
-
   if (loading) {
     return <div className="page-container">Loading conversations...</div>;
   }
@@ -285,6 +262,14 @@ const SavedConversations = () => {
                         )}
                       </div>
                     )}
+                    {/* Campaign arc name (settings.templateName is stamped at save
+                        time by campaignLauncher/NewGame). Older saves predating
+                        campaign tracking simply omit this line. */}
+                    {settings?.templateName && (
+                      <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                        <strong>Campaign:</strong> {settings.templateName}
+                      </p>
+                    )}
                     {settings?.shortDescription && (
                       <p style={{ margin: '8px 0', fontSize: '0.9rem', lineHeight: '1.5', color: 'var(--text)' }}>
                         {settings.shortDescription.length > 120
@@ -343,8 +328,6 @@ const SavedConversations = () => {
           }}
           conversation={selectedConversation}
           formatDate={formatDate}
-          formatProvider={formatProvider}
-          formatModel={formatModel}
         />
       </Suspense>
 

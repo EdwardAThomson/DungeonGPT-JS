@@ -351,11 +351,23 @@ dbRoutes.put('/conversations/:sessionId/name', async (c) => {
   try {
     const userId = c.get('userId');
     const sessionId = c.req.param('sessionId');
-    const { conversationName } = await c.req.json();
+    const { conversationName, saveName } = await c.req.json();
 
+    // Persist BOTH the display name and the editable root (game_settings.saveName). The
+    // root is the source of truth every save re-derives the display name from, so updating
+    // conversation_name alone would let the next autosave clobber the rename. Guard against
+    // a missing saveName (older client) so we never null out an existing root.
     const [row] = await sql`
       UPDATE conversations SET
         conversation_name = ${conversationName},
+        game_settings = CASE
+          WHEN ${saveName ?? null}::text IS NULL THEN game_settings
+          ELSE jsonb_set(
+            COALESCE(game_settings, '{}'::jsonb),
+            '{saveName}',
+            to_jsonb(${saveName ?? null}::text)
+          )
+        END,
         updated_at = ${new Date().toISOString()}
       WHERE session_id = ${sessionId} AND user_id = ${userId}
       RETURNING *`;
