@@ -318,13 +318,44 @@ export const getMilestoneBossForTile = (milestones, tile) => {
 };
 
 /**
+ * Shared fuzzy text comparison for AI [COMPLETE_MILESTONE: <text>] markers.
+ *
+ * Both the narrative marker path (findMarkerMilestoneIndex) and the talk marker path
+ * (resolveTalkMarkerMilestone) MUST use identical matching so their behaviour cannot
+ * drift. The rule is a lowercased, either-contains test: the marker text contains the
+ * milestone text, or the milestone text contains the marker text.
+ *
+ * @param {string} milestoneText - The milestone's authored text
+ * @param {string} needle - The already-lowercased, trimmed marker text
+ * @returns {boolean}
+ */
+const markerTextMatches = (milestoneText, needle) => {
+    const text = (milestoneText || '').toLowerCase();
+    if (!text || !needle) return false;
+    return text.includes(needle) || needle.includes(text);
+};
+
+/**
+ * Normalize a marker's captured text to the lowercased, trimmed needle used for
+ * matching. Returns '' for empty/blank input so callers can bail out.
+ *
+ * @param {string} markerText
+ * @returns {string}
+ */
+const toMarkerNeedle = (markerText) => {
+    if (!markerText) return '';
+    return String(markerText).toLowerCase().trim();
+};
+
+/**
  * Find the milestone an AI [COMPLETE_MILESTONE: <text>] marker refers to.
  *
  * Fuzzy text match (either string contains the other), restricted to milestones the
  * AI is allowed to complete: `type: 'narrative'`, or legacy untyped milestones (old
  * saves stored milestones as bare strings, normalized without a type). Mechanical
  * types (item / combat / location / talk) are engine-detected and must never be
- * completed by a stray marker.
+ * completed by a stray marker. A locked narrative milestone (prerequisites unmet)
+ * whose text leaks into the prompt is also rejected.
  *
  * @param {Array} milestones - Normalized milestone objects ({ text, type?, completed? })
  * @param {string} markerText - The text captured from the marker
@@ -332,15 +363,57 @@ export const getMilestoneBossForTile = (milestones, tile) => {
  */
 export const findMarkerMilestoneIndex = (milestones, markerText) => {
     if (!Array.isArray(milestones) || !markerText) return -1;
-    const needle = String(markerText).toLowerCase().trim();
+    const needle = toMarkerNeedle(markerText);
     if (!needle) return -1;
     return milestones.findIndex(m => {
         if (!m || m.completed) return false;
         if (m.type && m.type !== 'narrative') return false;
-        const text = (m.text || '').toLowerCase();
-        if (!text) return false;
-        return text.includes(needle) || needle.includes(text);
+        if (!areRequirementsMet(m, milestones)) return false;
+        return markerTextMatches(m.text, needle);
     });
+};
+
+/**
+ * Resolve the single talk milestone an AI [COMPLETE_MILESTONE: <text>] marker should
+ * complete during free-text play (the "dual completion" path for talk milestones).
+ *
+ * This is the anti-flakiness core: it is deliberately strict and fails closed. A talk
+ * milestone qualifies ONLY if ALL of the following hold:
+ *   - it is not completed and has `type: 'talk'`
+ *   - its prerequisites are met (never a locked/future objective)
+ *   - the marker text fuzzy-matches its text using the SAME either-contains test that
+ *     findMarkerMilestoneIndex uses (shared markerTextMatches helper)
+ *   - its NPC is actually present in the current scene: presentNpcIds includes
+ *     `trigger.npc` (presentNpcIds = the milestoneNpcIds of NPCs placed in the town)
+ *
+ * The milestone is returned ONLY when EXACTLY ONE candidate qualifies. Zero or more
+ * than one qualifying candidate returns null (ambiguity => no completion). Actual
+ * completion + rewards are still routed through the engine's npc_talked event; this
+ * function only decides which (if any) talk milestone the marker legitimately targets.
+ *
+ * @param {Array} milestones - All campaign milestones (normalized objects)
+ * @param {string} markerText - The text captured from the [COMPLETE_MILESTONE] marker
+ * @param {Array<string>} presentNpcIds - milestoneNpcIds of NPCs present in the scene
+ * @returns {Object|null} The single qualifying talk milestone, or null (fail closed)
+ */
+export const resolveTalkMarkerMilestone = (milestones, markerText, presentNpcIds) => {
+    if (!Array.isArray(milestones)) return null;
+    const needle = toMarkerNeedle(markerText);
+    if (!needle) return null;
+    const present = Array.isArray(presentNpcIds) ? presentNpcIds : [];
+    if (present.length === 0) return null;
+
+    const candidates = milestones.filter(m =>
+        m &&
+        !m.completed &&
+        m.type === 'talk' &&
+        areRequirementsMet(m, milestones) &&
+        markerTextMatches(m.text, needle) &&
+        present.includes(m.trigger?.npc)
+    );
+
+    // Single-candidate rule: exactly one qualifier, or nothing (fail closed).
+    return candidates.length === 1 ? candidates[0] : null;
 };
 
 /**

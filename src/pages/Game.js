@@ -350,7 +350,12 @@ const Game = ({ resumeConversation = null }) => {
       townPlayerPosition: mapHook.townPlayerPosition
     },
     sessionId,
-    aiAvailable
+    aiAvailable,
+    // Talk-milestone dual completion: when the AI marker resolves a present talk NPC,
+    // route it through the SAME engine event as the Talk button so rewards/codex/ledger/
+    // save/message and idempotency are identical. checkMilestoneEvent is defined below;
+    // this wrapper defers the reference so the hoisted binding is used at call time.
+    (npcId) => checkMilestoneEvent({ type: 'npc_talked', npcId }, selectedHeroes)
   );
   const { performSave } = useGamePersistence({
     sessionId,
