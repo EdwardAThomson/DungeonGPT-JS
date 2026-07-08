@@ -126,7 +126,11 @@ const FLAG_DEFAULTS = {
   'price-out': 5.00,  // Haiku 4.5 output $/1M — VERIFY against openrouter.ai pricing
   temperature: 0.7,
   'on-limit': 'abort',
-  'key-file': null
+  'key-file': null,
+  // Optional directory of external (private-repo) campaign templates to ALSO
+  // simulate in guest/member/both mode. No default path: omit the flag and the
+  // harness behaves exactly as before. See loadPremiumTemplates + --help.
+  'premium-dir': null
 };
 
 function parseArgs(argv) {
@@ -138,7 +142,7 @@ function parseArgs(argv) {
     'steps', 'max-tokens', 'max-prompt-tokens', 'tpm', 'rpm',
     'max-requests', 'max-total-tokens', 'max-usd', 'price-in', 'price-out', 'temperature'
   ]);
-  const stringFlags = new Set(['campaign', 'mode', 'model', 'on-limit', 'key-file']);
+  const stringFlags = new Set(['campaign', 'mode', 'model', 'on-limit', 'key-file', 'premium-dir']);
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -244,6 +248,16 @@ FLAGS
   --temperature <N>        Sampling temperature              (default: ${d.temperature})
   --on-limit <abort|wait>  Rate-window breach behaviour      (default: ${d['on-limit']})
   --key-file <path>        Read OPENROUTER_API_KEY=... line from this file
+  --premium-dir <path>     Directory of EXTERNAL campaign template *.js files to
+                           ALSO simulate in guest/member/both mode. Each file is an
+                           ESM module exporting a template object (the first export
+                           with an id + settings.milestones is used); files without
+                           milestones (teaser stubs) are skipped like built-in stubs.
+                           Deterministic: NO network, NO key (same as the guest sim).
+                           Omit the flag and behaviour is unchanged (built-ins only).
+                           Typical value: the private premium-content repo's
+                           campaigns/ dir, e.g.
+                           /home/edward/Projects/dungeongpt-premium-content/campaigns
   --live                   Enable real OpenRouter calls (requires --yes too)
   --yes                    Confirm a live run (guard against an accidental --live)
   --help                   This message
@@ -253,6 +267,7 @@ EXAMPLES
   node scripts/quest-harness.mjs --mode guest --campaign heroic-fantasy-t1
   node scripts/quest-harness.mjs --mode both --all                # sim every campaign
   node scripts/quest-harness.mjs --simulate --all                 # same, alias
+  node scripts/quest-harness.mjs --mode both --all --premium-dir <path>  # + external templates
   OPENROUTER_API_KEY=sk-or-... node scripts/quest-harness.mjs --live --yes
 `);
 }
@@ -295,6 +310,64 @@ async function loadAppData() {
   } finally {
     fs.rm(outfile, { force: true }, () => {});
   }
+}
+
+// ---------------------------------------------------------------------------
+// Load EXTERNAL campaign templates from a --premium-dir. These live in a
+// SEPARATE repo (never in this one); we only read them at runtime by path. Each
+// file is an ESM module exporting a template object of the same shape as a
+// src/data/storyTemplates.js entry. We reuse the same esbuild-bundle technique
+// as loadAppData (bundle each file to a temp module, dynamic-import it, take the
+// first exported value that looks like a template: has an id + settings.milestones).
+// Purely deterministic: no network, no key.
+// ---------------------------------------------------------------------------
+function looksLikeTemplate(v) {
+  return v && typeof v === 'object' && v.id != null &&
+    (Array.isArray(v.milestones) || Array.isArray(v.settings?.milestones));
+}
+
+async function loadPremiumTemplates(dir) {
+  let entries;
+  try {
+    entries = fs.readdirSync(dir).filter((f) => f.endsWith('.js'));
+  } catch (err) {
+    throw new Error(`Could not read --premium-dir "${dir}": ${err.code || err.message}`);
+  }
+  entries.sort();
+  const templates = [];
+  for (const file of entries) {
+    const abs = path.join(dir, file);
+    const outfile = path.join(
+      os.tmpdir(),
+      `dungeongpt-quest-harness-ext.${process.pid}.${templates.length}.${Date.now()}.mjs`
+    );
+    await build({
+      entryPoints: [abs],
+      bundle: true,
+      format: 'esm',
+      platform: 'node',
+      outfile,
+      logLevel: 'silent'
+    });
+    let mod;
+    try {
+      mod = await import(pathToFileURL(outfile).href + `?t=${Date.now()}`);
+    } finally {
+      fs.rm(outfile, { force: true }, () => {});
+    }
+    // Prefer a default export if it is template-shaped; else the first named
+    // export that is. An exported array (e.g. a `premiumTemplates` list) has no
+    // `.id`, so it is naturally skipped by looksLikeTemplate.
+    const picked = (looksLikeTemplate(mod.default) && mod.default) ||
+      Object.values(mod).find(looksLikeTemplate) || null;
+    if (picked) {
+      templates.push(picked);
+    } else {
+      // A teaser stub (no milestones) or non-template module: skip, like built-in stubs.
+      console.warn(`[premium-dir] ${file}: no template export with id + milestones; skipped.`);
+    }
+  }
+  return templates;
 }
 
 // ---------------------------------------------------------------------------
@@ -758,6 +831,20 @@ async function runSimMode(opts) {
     templates = [t];
   }
 
+  // Fold in any external (--premium-dir) templates. They are simulated with the
+  // exact same guest/member walk; a stub with no milestones is skipped in the loader.
+  if (opts['premium-dir']) {
+    let premium;
+    try {
+      premium = await loadPremiumTemplates(opts['premium-dir']);
+    } catch (err) {
+      console.error(`Failed to load --premium-dir templates: ${err.message}`);
+      process.exit(7);
+    }
+    console.log(`[premium-dir] loaded ${premium.length} external template(s) from ${opts['premium-dir']}`);
+    templates = templates.concat(premium);
+  }
+
   const showGuest = opts.mode === 'guest' || opts.mode === 'both';
   const showMember = opts.mode === 'member' || opts.mode === 'both';
 
@@ -902,6 +989,10 @@ async function main() {
   }
 
   const isLive = opts.live;
+
+  if (opts['premium-dir']) {
+    console.warn('[premium-dir] ignored in --mode ai (it only affects the guest/member/both sim).');
+  }
 
   // --live requires --yes: a live spend is never a single accidental flag.
   if (isLive && !opts.yes) {
