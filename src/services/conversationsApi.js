@@ -218,9 +218,20 @@ export const _resetAuthStateForTests = () => {
 const sessionBaseRev = new Map();
 const forkRedirects = new Map();
 
+// Per-session save serialization (SAVE_SYNC_PLAN §6.1 hardening). Value is the
+// "tail" promise of the most recently queued save for a logical session id; each
+// new save chains onto it so two saves for the same id are never in flight at
+// once (see conversationsApi.save). Without this, overlapping same-device saves
+// race the rev counter and one spuriously forks a "(diverged on this device)"
+// copy. Keyed on the ORIGINAL incoming id (before any fork redirect) so a forked
+// session's saves stay serialized together. Entries are deleted when the queue
+// drains, so the map never grows unbounded.
+const saveQueues = new Map();
+
 export const _resetRevStateForTests = () => {
   sessionBaseRev.clear();
   forkRedirects.clear();
+  saveQueues.clear();
 };
 
 // Tolerant settings accessor: game_settings may arrive as an object (worker,
@@ -275,6 +286,92 @@ const localIsNewer = (cloudRow, localRow) => {
   const local = rowTime(localRow);
   return Number.isFinite(local) && (!Number.isFinite(cloud) || local > cloud);
 };
+
+// The actual save body, run behind the per-session queue in conversationsApi.save.
+// Because it is serialized, it reads expectedRev FRESH on every invocation, so a
+// save that waited its turn sees the fast-forwarded sessionBaseRev of the save
+// ahead of it and cannot false-fork a same-device race.
+//
+// Write path (Phase 2, §4): local-first write-through. The full row lands in
+// IndexedDB FIRST, unconditionally, stamped synced:false; the cloud push follows
+// when auth is present and flips the flag on success. Results surface WHERE the
+// durable copy is via `storage` ('cloud' | 'local') plus `pendingCloudSync: true`
+// when an account-holder's save is still device-only (auth absent OR the push
+// failed), so useGamePersistence can report an honest 'savedLocal'. The call only
+// throws when even the local write failed (or a cloud-only attempt with no local
+// copy failed). Guests: the local write IS the save.
+//
+// Phase 3 (§6): the cloud push is revision-guarded. expectedRev is the base_rev
+// riding on the local write-ahead row (seeded from sessionBaseRev at load time);
+// on success the response's new rev becomes the row's base_rev (fast-forward).
+// A 409 is a REAL FORK: another device advanced the cloud row past our common
+// ancestor. The local timeline is parked as its own save, the cloud row is
+// adopted as current, hero-progression ledgers are unioned, and the result says
+// `forked: true` so the save UI can be honest (see forkLocalTimeline). Rows and
+// sessions without any rev knowledge (legacy saves, guests, pre-migration
+// backends) keep today's unconditional push: divergence is never invented.
+async function runSave(payload) {
+  const originalSessionId = payload.sessionId || payload.session_id;
+  const redirect = forkRedirects.get(originalSessionId);
+  if (redirect) {
+    // This live session forked earlier: its timeline continues in the parked
+    // copy. The suffix keeps the fork date visible in the saves list.
+    payload = {
+      ...payload,
+      sessionId: redirect.sessionId,
+      conversationName: `${payload.conversationName || 'Adventure'}${redirect.suffix}`,
+    };
+  }
+  const sessionId = payload.sessionId || payload.session_id;
+  const route = await resolveRoute();
+
+  let localRow = null;
+  let localWriteError = null;
+  try {
+    const opts = { synced: false, pendingCloudSync: route.pendingCloudSync };
+    const loadBaseRev = sessionBaseRev.get(sessionId);
+    if (isValidBaseRev(loadBaseRev)) opts.baseRev = loadBaseRev;
+    localRow = await localGameStore.save(payload, opts);
+  } catch (e) {
+    localWriteError = e;
+    logger.error('Local write-ahead save failed', e);
+  }
+
+  if (route.useCloud) {
+    const expectedRev = isValidBaseRev(localRow?.base_rev)
+      ? localRow.base_rev
+      : sessionBaseRev.get(sessionId);
+    try {
+      const result = await backend.save(payload, { expectedRev });
+      const newRev = revOf(result);
+      if (newRev !== undefined) sessionBaseRev.set(sessionId, newRev);
+      if (localRow) {
+        // Confirmed in the account: flip the dirty flag (guarded so a save that
+        // rewrote the row mid-push keeps its synced:false) and advance the
+        // row's lineage to the rev the cloud row now carries.
+        try {
+          const mark = { ifUpdatedAt: localRow.updated_at };
+          if (newRev !== undefined) mark.baseRev = newRev;
+          await localGameStore.markSynced(localRow.session_id, mark);
+        } catch (e) {
+          logger.warn('markSynced failed (row stays pending, reconcile will retry)', e);
+        }
+      }
+      return { ...(result || {}), storage: 'cloud' };
+    } catch (e) {
+      if (e && e.status === 409) {
+        logger.warn(`Rev conflict on ${sessionId} (cloud rev ${e.rev}); forking the local timeline`, e);
+        return forkLocalTimeline(sessionId, payload);
+      }
+      if (!localRow) throw e; // nothing landed anywhere: a real save error
+      logger.warn('Cloud push failed; the save is on this device pending sync', e);
+      return { ...localRow, storage: 'local', pendingCloudSync: true };
+    }
+  }
+
+  if (!localRow) throw localWriteError;
+  return { ...localRow, storage: 'local', pendingCloudSync: !!localRow.pending_cloud_sync };
+}
 
 export const conversationsApi = {
   // Merged saved-games list (Phase 2, §4): the union of both stores by session_id,
@@ -363,85 +460,43 @@ export const conversationsApi = {
     return localIsNewer(cloudRow, localRow) ? adopt(localRow, false) : adopt(cloudRow, true);
   },
 
-  // Write path (Phase 2, §4): local-first write-through. The full row lands in
-  // IndexedDB FIRST, unconditionally, stamped synced:false; the cloud push follows
-  // when auth is present and flips the flag on success. Results surface WHERE the
-  // durable copy is via `storage` ('cloud' | 'local') plus `pendingCloudSync: true`
-  // when an account-holder's save is still device-only (auth absent OR the push
-  // failed), so useGamePersistence can report an honest 'savedLocal'. The call only
-  // throws when even the local write failed (or a cloud-only attempt with no local
-  // copy failed). Guests: the local write IS the save.
-  //
-  // Phase 3 (§6): the cloud push is revision-guarded. expectedRev is the base_rev
-  // riding on the local write-ahead row (seeded from sessionBaseRev at load time);
-  // on success the response's new rev becomes the row's base_rev (fast-forward).
-  // A 409 is a REAL FORK: another device advanced the cloud row past our common
-  // ancestor. The local timeline is parked as its own save, the cloud row is
-  // adopted as current, hero-progression ledgers are unioned, and the result says
-  // `forked: true` so the save UI can be honest (see forkLocalTimeline). Rows and
-  // sessions without any rev knowledge (legacy saves, guests, pre-migration
-  // backends) keep today's unconditional push: divergence is never invented.
-  async save(payload) {
+  // Write path (Phase 2/3). The heavy lifting lives in runSave (see its doc for the
+  // write-through + rev-guard contract); this wrapper only serializes saves per
+  // logical session so overlapping same-device saves cannot race the rev counter.
+  save(payload) {
+    // Serialize saves per logical session (SAVE_SYNC_PLAN §6.1 hardening). Every
+    // action schedules a debounced save, and there are also 30s-autosave, unmount
+    // and manual saves with no in-flight guard, so two saves overlap routinely.
+    // Overlapping saves both capture the same expectedRev: the first commits
+    // (rev R -> R+1) and fast-forwards sessionBaseRev, the second still carries the
+    // now-stale R, 409s, and spuriously forks a "(diverged on this device)" copy
+    // even though NO other device is involved (and re-collides recursively). By
+    // chaining each save behind the previous one for the same id, the second runs
+    // only after the first has settled and reads expectedRev FRESH, so it matches
+    // the server and never false-forks. After serialization a 409 can only mean a
+    // genuine other-device advance, so real divergence detection is preserved.
+    //
+    // Keyed on the ORIGINAL incoming id (before any forkRedirects redirection) so a
+    // legitimately-forked session's saves stay serialized with each other too. The
+    // recursive parked-copy save inside forkLocalTimeline carries a fresh id, a
+    // different key, so it cannot deadlock against the queue it runs within.
     const originalSessionId = payload.sessionId || payload.session_id;
-    const redirect = forkRedirects.get(originalSessionId);
-    if (redirect) {
-      // This live session forked earlier: its timeline continues in the parked
-      // copy. The suffix keeps the fork date visible in the saves list.
-      payload = {
-        ...payload,
-        sessionId: redirect.sessionId,
-        conversationName: `${payload.conversationName || 'Adventure'}${redirect.suffix}`,
-      };
-    }
-    const sessionId = payload.sessionId || payload.session_id;
-    const route = await resolveRoute();
+    if (!originalSessionId) return runSave(payload);
 
-    let localRow = null;
-    let localWriteError = null;
-    try {
-      const opts = { synced: false, pendingCloudSync: route.pendingCloudSync };
-      const loadBaseRev = sessionBaseRev.get(sessionId);
-      if (isValidBaseRev(loadBaseRev)) opts.baseRev = loadBaseRev;
-      localRow = await localGameStore.save(payload, opts);
-    } catch (e) {
-      localWriteError = e;
-      logger.error('Local write-ahead save failed', e);
-    }
-
-    if (route.useCloud) {
-      const expectedRev = isValidBaseRev(localRow?.base_rev)
-        ? localRow.base_rev
-        : sessionBaseRev.get(sessionId);
-      try {
-        const result = await backend.save(payload, { expectedRev });
-        const newRev = revOf(result);
-        if (newRev !== undefined) sessionBaseRev.set(sessionId, newRev);
-        if (localRow) {
-          // Confirmed in the account: flip the dirty flag (guarded so a save that
-          // rewrote the row mid-push keeps its synced:false) and advance the
-          // row's lineage to the rev the cloud row now carries.
-          try {
-            const mark = { ifUpdatedAt: localRow.updated_at };
-            if (newRev !== undefined) mark.baseRev = newRev;
-            await localGameStore.markSynced(localRow.session_id, mark);
-          } catch (e) {
-            logger.warn('markSynced failed (row stays pending, reconcile will retry)', e);
-          }
-        }
-        return { ...(result || {}), storage: 'cloud' };
-      } catch (e) {
-        if (e && e.status === 409) {
-          logger.warn(`Rev conflict on ${sessionId} (cloud rev ${e.rev}); forking the local timeline`, e);
-          return forkLocalTimeline(sessionId, payload);
-        }
-        if (!localRow) throw e; // nothing landed anywhere: a real save error
-        logger.warn('Cloud push failed; the save is on this device pending sync', e);
-        return { ...localRow, storage: 'local', pendingCloudSync: true };
-      }
-    }
-
-    if (!localRow) throw localWriteError;
-    return { ...localRow, storage: 'local', pendingCloudSync: !!localRow.pending_cloud_sync };
+    const prev = saveQueues.get(originalSessionId) || Promise.resolve();
+    // Run our body only after the prior save SETTLES (success or failure), so two
+    // saves for the same id are never in flight together.
+    const run = prev.then(() => runSave(payload), () => runSave(payload));
+    // Guard the STORED tail so a rejected save cannot permanently wedge the chain;
+    // the caller still receives the real result/rejection via `run`.
+    const tail = run.catch(() => {});
+    saveQueues.set(originalSessionId, tail);
+    // Drop the map entry once the queue drains so it never grows unbounded (only if
+    // no newer save has since taken over the slot).
+    tail.then(() => {
+      if (saveQueues.get(originalSessionId) === tail) saveQueues.delete(originalSessionId);
+    });
+    return run;
   },
 
   // Same write-through contract as save(), for the message-only update path. When
