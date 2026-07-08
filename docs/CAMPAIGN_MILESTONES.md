@@ -202,11 +202,11 @@ Genre `arcane-renaissance`. Access: free. Chapters do not share geography (fresh
 | # | Type | Objective | Requires | Spawn (item/NPC/POI/enemy) | Building / Venue | Rewards |
 |---|---|---|---|---|---|---|
 | 1 | item | Find the control rod in the Tinker-Row workshop | - | item: Automaton Control Rod | Tinker-Row Workshop (workshop, Tinker-Row) | 25 XP / 1d6 |
-| 2 | narrative | Interview the artificer's apprentice at Brasswick | - | npc: Pip Gearsley (Merchant) | Gearsley's Parts Shop (workshop, Brasswick) | 25 XP / 1d6 / journal_page |
+| 2 | talk | Interview the artificer's apprentice at Brasswick | - | npc: Pip Gearsley (Merchant) | Gearsley's Parts Shop (workshop, Brasswick) | 25 XP / 1d6 / journal_page |
 | 3 | location | Locate the automaton's lair in the Gear-End sewers | 1, 2 | poi: Gear-End Sewers | - | 50 XP / 1d10 |
 | 4 | combat | Disable the Rogue Automaton | 3 | enemy: Rogue Automaton (HP 35, medium) | - | boss loot: rare_ore (75 XP / 2d10) |
 
-**Parallelism:** M1 (item) and M2 (narrative) open immediately. M3 requires [1, 2]; M4 requires [3]. 2 parallel openers, then a chain.
+**Parallelism:** M1 (item) and M2 (talk) open immediately. M3 requires [1, 2]; M4 requires [3]. 2 parallel openers, then a chain.
 
 ### arcane-renaissance-t2: "Herald of the Old Gods"
 
@@ -217,7 +217,7 @@ Genre `arcane-renaissance`. Access: free. Chapters do not share geography (fresh
 |---|---|---|---|---|---|---|
 | 1 | location | Investigate the explosion at the Cog-Hill foundry | - | poi: Destroyed Foundry | The Cog-Hill Foundry (foundry, Cog-Hill) | 100 XP / 2d10 / journal_page |
 | 2 | item | Retrieve the stolen blueprints from the Aether-Gate syndicate | - | item: Stolen Aether Blueprints | Syndicate Warehouse (warehouse, Aether-Gate) | 125 XP / 2d20 |
-| 3 | narrative | Consult the Oracle of Steam in the depths of Steam-Wharf | 1, 2 | npc: The Oracle of Steam (Merchant) | The Steam Sanctum (temple, Steam-Wharf) | 150 XP / 1d20 / hermit_wisdom |
+| 3 | talk | Consult the Oracle of Steam in the depths of Steam-Wharf | 1, 2 | npc: The Oracle of Steam (Merchant) | The Steam Sanctum (temple, Steam-Wharf) | 150 XP / 1d20 / hermit_wisdom |
 | 4 | combat | Banish the Herald of the Old Gods at Ironpeak Range | 3 | enemy: Herald of the Old Gods (HP 200, deadly, DC 19) | - | boss loot: stormbound_ring (450 XP / 4d20) |
 
 **Parallelism:** M1 (location) and M2 (item) open immediately. M3 requires [1, 2]; M4 requires [3]. 2 parallel openers, then a chain.
