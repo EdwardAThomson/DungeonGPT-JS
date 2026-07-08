@@ -85,8 +85,7 @@ export const AiEngineSettings = ({
   selectedProvider, setSelectedProvider,
   selectedModel, setSelectedModel,
   assistantProvider, setAssistantProvider,
-  assistantModel, setAssistantModel,
-  showActiveStatus = false
+  assistantModel, setAssistantModel
 }) => {
   const AVAILABLE_MODELS = getAvailableModels();
 
@@ -234,7 +233,9 @@ export const AiEngineSettings = ({
       {/* Production shows NO provider/model dropdowns (maintainer decision: too many
           choices — the pool IS the choice). The free pool runs on managed cf-workers
           models; Premium (#7) adds the OpenRouter pool later. Dev keeps the pickers. */}
-      {SHOW_PROVIDER_CHOICE ? (
+      {/* Production hides the provider/model pickers entirely: the pool pills above
+          are the only AI choice, so no dropdowns and no active-model readout here. */}
+      {SHOW_PROVIDER_CHOICE && (
         <div style={premiumActive ? { opacity: 0.5, pointerEvents: 'none' } : undefined} aria-disabled={premiumActive}>
           {premiumActive && (
             <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginBottom: '6px', fontStyle: 'italic' }}>
@@ -243,33 +244,6 @@ export const AiEngineSettings = ({
           )}
           {renderPicker('Narrative DM', 'game', selectedProvider, selectedModel, setSelectedModel)}
           {renderPicker('OOC Assistant', 'assistant', assistantProvider || selectedProvider, assistantModel || selectedModel, setAssistantModel)}
-        </div>
-      ) : (
-        <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '0 0 4px' }}>
-          The Dungeon Master runs on the free pool automatically — no setup needed.
-        </p>
-      )}
-      {showActiveStatus && (
-        <div style={{ marginTop: '20px', background: 'var(--surface)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Active Model:</span>
-            <span style={{ marginLeft: '8px', fontSize: '0.9rem', color: 'var(--text)', fontWeight: 'bold' }}>{selectedModel}</span>
-            <span style={{ marginLeft: '4px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>({selectedProvider.toUpperCase()})</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span
-              style={{
-                width: '10px',
-                height: '10px',
-                borderRadius: '50%',
-                background: ['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider) ? '#9b59b6' : '#2ecc71'
-              }}
-              title={['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider) ? 'CLI Mode' : 'Cloud API'}
-            />
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-              {['codex', 'claude-cli', 'gemini-cli'].includes(selectedProvider) ? 'CLI Mode' : 'Cloud API'}
-            </span>
-          </div>
         </div>
       )}
     </div>

@@ -352,7 +352,6 @@ const AdventureBook = ({
             setAssistantProvider={setAssistantProvider}
             assistantModel={assistantModel}
             setAssistantModel={setAssistantModel}
-            showActiveStatus
           />
         )}
       </div>
