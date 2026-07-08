@@ -166,7 +166,12 @@ const CampaignTab = ({ settings, onContinueLegend }) => (
                         const where = m.building?.name
                           ? `${m.building.name}${m.building.type ? ` (${prettyType(m.building.type)})` : ''}`
                           : (m.spawn?.type === 'npc' || m.spawn?.type === 'item' ? m.spawn.location : null);
-                        const sub = [who, where].filter(Boolean).join(' · ');
+                        // For item milestones, spell out the relationship ("found at")
+                        // so the sub-line reads as an instruction (you FIND the item AT
+                        // the venue), not two disconnected labels joined by a middot.
+                        const sub = (m.type === 'item' && who && where)
+                          ? `${who} - found at ${where}`
+                          : [who, where].filter(Boolean).join(' · ');
                         if (!sub) return null;
                         return (
                           <span style={{

@@ -259,7 +259,25 @@ export const ITEM_CATALOG = {
   'medical_journal': { name: 'Medical Journal', rarity: 'uncommon', value: 30, icon: 'assets/icons/items/medical_journal.webp' },
   'medicine_kit': { name: 'Medicine Kit', rarity: 'uncommon', value: 45, effect: 'heal', amount: '2d4', icon: 'assets/icons/items/medicine_kit.webp' },
   'uncovered_ruins': { name: 'Ruins Map Fragment', rarity: 'uncommon', value: 50, type: 'quest_item', icon: 'assets/icons/items/uncovered_ruins.webp' },
-  'map_fragment': { name: 'Map Fragment', rarity: 'uncommon', value: 25, icon: 'assets/icons/items/map_fragment.webp' }
+  'map_fragment': { name: 'Map Fragment', rarity: 'uncommon', value: 25, icon: 'assets/icons/items/map_fragment.webp' },
+
+  // Campaign quest items — each is a UNIQUE, campaign-specific objective item, kept
+  // distinct from the generic loot ids above (map_fragment, treasure_map, ...) so a
+  // random loot drop of the generic item can never complete a quest milestone. Value
+  // is 0 (quest items are not a gold source) and each reuses its generic sibling's
+  // icon since the art fits. Their type is 'quest_item' like treasure_map.
+  'goblin_scouts_map': { name: 'Goblin Scout\'s Map', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/map_fragment.webp' },
+  'hidden_map': { name: 'Hidden Map', rarity: 'rare', value: 0, type: 'quest_item', icon: 'assets/icons/items/treasure_map.webp' },
+  'caravan_ledger': { name: 'Caravan Ledger', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/map_fragment.webp' },
+  'sun_kings_star_chart': { name: 'Sun-Kings\' Star-Chart', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/ancient_scroll.webp' },
+  'frostbound_ledger': { name: 'Frostbound Ledger', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/map_fragment.webp' },
+  'famine_winter_saga': { name: 'The Famine-Winter Saga', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/history_tome.webp' },
+  'moorland_herbs': { name: 'Moorland Herbs', rarity: 'common', value: 0, type: 'quest_item', icon: 'assets/icons/items/healing_herbs.webp' },
+  'mutated_specimen': { name: 'Mutated Specimen', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/venom_sac.webp' },
+  'automaton_control_rod': { name: 'Automaton Control Rod', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/enchanted_trinket.webp' },
+  'stolen_aether_blueprints': { name: 'Stolen Aether Blueprints', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/ancient_scroll.webp' },
+  'cult_journal': { name: 'Cult Journal', rarity: 'common', value: 0, type: 'quest_item', icon: 'assets/icons/items/journal_page.webp' },
+  'forbidden_ritual_text': { name: 'Forbidden Ritual Text', rarity: 'rare', value: 0, type: 'quest_item', icon: 'assets/icons/items/dark_tome.webp' }
 };
 
 // --- Rarity-by-tier loot gating ---------------------------------------------

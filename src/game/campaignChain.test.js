@@ -265,7 +265,7 @@ describe('buildInSaveContinuation: cached-town retro-injection', () => {
     const archives = findBuilding(millhaven, (t) => t.buildingName === 'The Great Archives');
     expect(archives).toBeTruthy();
     expect(archives.questBuilding).toBe(true);
-    expect(archives.questItemId).toBe('treasure_map');
+    expect(archives.questItemId).toBe('hidden_map');
   });
 
   it('adds the milestone NPC to the cached town roster, bound to its venue', () => {
@@ -341,7 +341,7 @@ describe('buildInSaveContinuation: cached-town retro-injection', () => {
 
 describe('shared-venue conflicts (maintainer supplement)', () => {
   it('re-stamps a reused quest building with the NEW campaign item (old stamp overwritten)', () => {
-    // t1 stamped Willowdale's tavern (The Crooked Pint) with map_fragment. A later
+    // t1 stamped Willowdale's tavern (The Crooked Pint) with goblin_scouts_map. A later
     // campaign (t3 deliberately reuses the venue) must overwrite the stamp.
     const { launch } = completedT1Save();
     const cache = retroInjectQuestContent({
@@ -359,7 +359,7 @@ describe('shared-venue conflicts (maintainer supplement)', () => {
       }
     }
     expect(pint).toBeTruthy();
-    expect(pint.questItemId).toBe('quest_letter'); // overwritten, not map_fragment
+    expect(pint.questItemId).toBe('quest_letter'); // overwritten, not goblin_scouts_map
     // the LIVE cache still carries the old stamp (copy-on-write)
     let livePint = null;
     for (const row of launch.townMapsCache['Willowdale'].mapData) {
@@ -367,7 +367,7 @@ describe('shared-venue conflicts (maintainer supplement)', () => {
         if (tile.type === 'building' && tile.buildingName === 'The Crooked Pint') livePint = tile;
       }
     }
-    expect(livePint.questItemId).toBe('map_fragment');
+    expect(livePint.questItemId).toBe('goblin_scouts_map');
   });
 
   it('REPLACES a prior campaign\'s milestone NPC in the same building (one Ulric, promoted)', () => {
@@ -506,12 +506,12 @@ describe('derived-state conflicts after the swap (maintainer supplement)', () =>
   it('stale quest-item stamps are NOT searchable; the new campaign\'s are', () => {
     const { next } = continued();
     // t1's tavern stamp: matches nothing current -> hidden, never resurfaces
-    expect(isQuestItemSearchable(next.milestones, 'map_fragment')).toBe(false);
+    expect(isQuestItemSearchable(next.milestones, 'goblin_scouts_map')).toBe(false);
     // t2's archives stamp: current + uncompleted -> searchable
-    expect(isQuestItemSearchable(next.milestones, 'treasure_map')).toBe(true);
+    expect(isQuestItemSearchable(next.milestones, 'hidden_map')).toBe(true);
     // once completed -> claimed, hidden again
     const done = next.milestones.map((m) => (m.id === 1 ? { ...m, completed: true } : m));
-    expect(isQuestItemSearchable(done, 'treasure_map')).toBe(false);
+    expect(isQuestItemSearchable(done, 'hidden_map')).toBe(false);
     // tolerant of junk
     expect(isQuestItemSearchable(null, 'x')).toBe(false);
     expect(isQuestItemSearchable(next.milestones, null)).toBe(false);
