@@ -60,6 +60,9 @@ new_temp/
 *.gemini-sandbox
 temp/server1.js
 
+# Quest-harness recorded playthrough transcripts (local eval artifacts)
+harness-transcripts/
+
 # Cloudflare Workers
 cf-worker/.wrangler/
 cf-worker/.dev.vars
