@@ -669,6 +669,107 @@ describe('rev protocol: guarded push, fork-on-conflict, ledger union (Phase 3)',
   });
 });
 
+describe('save serialization: same-device races do not false-fork (§6.1)', () => {
+  const sessionAlways = () =>
+    getSession.mockResolvedValue({ data: { session: { access_token: 'tok' } } });
+
+  const postBodies = () =>
+    apiFetch.mock.calls
+      .filter(([, options]) => options?.method === 'POST')
+      .map(([, options]) => JSON.parse(options.body));
+
+  // A stateful backend that enforces the SAME optimistic-concurrency guard the
+  // worker does: the upsert only commits (and bumps the row's rev) when the
+  // incoming expectedRev matches the row's CURRENT rev; otherwise it 409s carrying
+  // the current rev. GET returns the current row so a fork's ledger read works.
+  const guardedBackend = (initialRev, row = {}) => {
+    let currentRev = initialRev;
+    apiFetch.mockImplementation(async (path, options = {}) => {
+      const method = options.method || 'GET';
+      if (method === 'GET') {
+        return { ok: true, json: async () => ({ session_id: 's1', ...row, rev: currentRev }) };
+      }
+      const body = JSON.parse(options.body);
+      // A brand-new (parked) id has no lineage: unconditional push, always ok.
+      if (!('expectedRev' in body)) {
+        return { ok: true, json: async () => ({ sessionId: body.sessionId, rev: 1 }) };
+      }
+      if (body.expectedRev !== currentRev) {
+        return { ok: false, status: 409, json: async () => ({ code: 'rev_conflict', rev: currentRev }) };
+      }
+      currentRev += 1;
+      return { ok: true, json: async () => ({ sessionId: body.sessionId, rev: currentRev }) };
+    });
+    return {
+      advanceExternally: () => { currentRev += 1; }, // a DIFFERENT writer (another device)
+    };
+  };
+
+  test('two overlapping saves for the same session BOTH commit, neither forks', async () => {
+    sessionAlways();
+    guardedBackend(5);
+
+    // Establish this session's lineage at rev 5 (adopt the cloud copy on load).
+    await conversationsApi.getById('s1');
+    apiFetch.mockClear();
+
+    // Fire two saves WITHOUT awaiting the first: the classic same-device race.
+    // Pre-fix, both capture expectedRev=5, the first commits (5->6), the second
+    // 409s on its now-stale ancestor and forks a "(diverged on this device)" copy.
+    const p1 = conversationsApi.save({ sessionId: 's1', conversationName: 'Adventure' });
+    const p2 = conversationsApi.save({ sessionId: 's1', conversationName: 'Adventure' });
+    const [r1, r2] = await Promise.all([p1, p2]);
+
+    // Both succeed as clean cloud saves.
+    expect(r1.storage).toBe('cloud');
+    expect(r2.storage).toBe('cloud');
+    expect(r1.forked).toBeUndefined();
+    expect(r2.forked).toBeUndefined();
+
+    // Serialization means they pushed sequentially: 5 then 6, both accepted.
+    const bodies = postBodies();
+    expect(bodies).toHaveLength(2);
+    expect(bodies.map((b) => b.expectedRev)).toEqual([5, 6]);
+
+    // No fork happened: no parked "-local-" copy, no "(diverged...)" name, and the
+    // local shadow of s1 was never dropped (forkLocalTimeline was NOT invoked).
+    expect(bodies.some((b) => /-local-/.test(b.sessionId))).toBe(false);
+    expect(bodies.some((b) => /diverged on this device/.test(b.conversationName || ''))).toBe(false);
+    expect(localGameStore.remove).not.toHaveBeenCalled();
+  });
+
+  test('a genuine other-device advance STILL forks (real divergence detection intact)', async () => {
+    sessionAlways();
+    const backend = guardedBackend(5, {
+      conversation_name: 'Adventure',
+      conversation_data: [{ role: 'user', content: 'cloud timeline' }],
+      game_settings: { saveName: 'Adventure' },
+      updated_at: '2026-07-05T12:00:00.000Z',
+    });
+
+    await conversationsApi.getById('s1'); // lineage adopted at rev 5
+    apiFetch.mockClear();
+
+    // A DIFFERENT writer (another device) advances the cloud row without going
+    // through this client's queue: now our expectedRev=5 is genuinely stale.
+    backend.advanceExternally(); // rev 5 -> 6
+
+    const result = await conversationsApi.save({
+      sessionId: 's1',
+      conversationName: 'Adventure',
+      gameSettings: { saveName: 'Adventure' },
+    });
+
+    // Real divergence: the local timeline is parked and the fork is announced.
+    expect(result.forked).toBe(true);
+    expect(result.parkedSessionId).toMatch(/^s1-local-[a-z0-9]+$/);
+    const bodies = postBodies();
+    expect(bodies.some((b) => /-local-/.test(b.sessionId))).toBe(true);
+    expect(bodies.some((b) => /diverged on this device/.test(b.conversationName || ''))).toBe(true);
+    expect(localGameStore.remove).toHaveBeenCalledWith('s1');
+  });
+});
+
 describe('auth-check hardening (failed getSession is not "guest")', () => {
   test('throw after a confirmed sign-in: routes local but stamps pending, last known state kept', async () => {
     sessionPresent();
