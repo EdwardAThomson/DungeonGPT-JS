@@ -1,0 +1,242 @@
+# Content Integrity Audit
+
+A static audit that cross-checks the game's **authored data** (story templates,
+item catalog, building / NPC / encounter / art tables) against the code's
+**capability tables**, so silent content failures are caught at author time
+instead of surfacing as a blank tooltip, a generic flag sprite, or a quest that
+completes off a random loot drop.
+
+It runs two ways:
+
+- **`npm run audit`** — a friendly, always-green report that shows what is
+  passing *and* what is failing / warning, grouped by domain. Exit code is always
+  0; this is the human view. (`scripts/content-audit.mjs`)
+- **Jest CI gate** — `src/audits/contentAudit.test.js` runs the same audit and
+  **fails the build on any `error`-severity result**. Warnings are printed but do
+  not fail CI.
+
+```bash
+npm run audit                                   # friendly report
+CI=true npx react-scripts test --watchAll=false src/audits/contentAudit.test.js   # CI gate
+```
+
+## error vs warn
+
+- **error** — a real defect that can break play or a reward (a missing item id, a
+  quest item reused as a loot drop, a milestone pointing at a POI with no sprite).
+  Fails the Jest gate.
+- **warn** — a polish / completeness gap that degrades display but does not corrupt
+  a save (a catalog entry missing an optional display field). Reported, never
+  blocks CI.
+
+The runner turns each check into a `CheckResult` whose `status` is `pass` (no
+violations), else `fail` (severity `error`) or `warn` (severity `warn`). See
+`src/audits/types.js` for the full contract.
+
+## How it loads app modules
+
+The audit modules live in `src/audits/` and use ESM `import`; the app data they
+read (`storyTemplates.js`, `inventorySystem.js`, `data/encounters/*`) is authored
+as CRA/Babel ESM `.js`, which plain Node cannot import (no `"type":"module"`, and
+`storyTemplates.js` uses webpack's `require.context`). The report script therefore
+lets **esbuild** (already a transitive dependency) bundle `src/audits/index.js` —
+a pure, JSX-free, dependency-light subgraph — into a temp ESM file and dynamically
+imports it. The guarded `require.context` is inert off webpack, so the load matches
+what the app sees. Jest runs the same modules directly through its Babel pipeline.
+
+## Check registry
+
+| ID | Domain | Severity | Status | What it verifies |
+|----|--------|----------|--------|------------------|
+| ITEM-01 | items | error | implemented | Every item id referenced by a milestone `spawn` (item), `trigger.item`, milestone/encounter reward list, or encounter loot table exists in `ITEM_CATALOG`. |
+| ITEM-02 | items | error | implemented | Every quest-item id (`trigger.item`) is unique across all templates (no two milestones share one). |
+| ITEM-03 | items | error | implemented | No quest-item id appears in any encounter loot table (the "random drop completes the wrong milestone" bug). |
+| ITEM-04 | items | warn | implemented | Every `ITEM_CATALOG` entry has the required display fields (`name`, `icon`, `rarity`, `value`, `type`) so nothing renders blank. |
+| BLD-01 | buildings | error | implemented | Every milestone `building.type` is a known building type (placed by the generator or in `townTileArt`'s `BUILDING_TYPES`; covers inject-only venues like `barracks`/`workshop`). |
+| BLD-02 | buildings | error | implemented | Every milestone `building.location` names a town the campaign generates (its `customNames.towns` or a milestone `location`). |
+| BLD-03 | buildings | error | implemented | Every placeable building type has a name generator branch in `assignBuildingName` (else it renders a bare type label). Known pre-existing gaps are allowlisted (see Known accepted gaps); fails on any NEW gap. |
+| BLD-04 | buildings | warn | implemented | Every placeable building type has town tile art (a silhouette in `townTileArt`'s `BUILDING_TYPES`), so it never renders the gable fallback. Currently passes. |
+| BLD-05 | buildings | error | implemented | Every shop building type (`BuildingModal`'s `SHOP_BUILDING_TYPES`) has stock in `shopStock.js` (an empty store fails silently). Currently passes. |
+| BLD-06 | buildings | warn | implemented | Name-generator coverage debt: lists placeable types that render a bare type label (the BLD-03 allowlist), so the debt stays visible every run. |
+| NPC-01 | npcs | error | implemented | Every milestone NPC spawn has a non-blank `name` and a resolvable venue (`spawn.location` or `building.location`) — the fields `getMilestoneNpcsForTown` needs, or the NPC is silently skipped. |
+| NPC-02 | npcs | error | implemented | Every `talk`-type milestone's `trigger.npc` matches an npc `spawn.id` in the same template (pairs with the Talk-button `npc_talked` mechanic). |
+| NPC-03 | npcs | warn | implemented | NPC completeness: `role`/`personality` present, and no raw underscored id leaks into the display `name`. |
+| NPC-04 | npcs | warn | implemented | Every milestone NPC venue is a town the campaign generates (else its town is never created and the NPC never matches). |
+| NPC-05 | npcs | error | implemented | Talk-button completability: every `talk` milestone's full click-to-complete path is wired — `trigger.npc` set, matching an npc `spawn.id`, and that spawn placed in a venue town the campaign generates. The authoritative Talk-button check; intentionally ties NPC-01/02/04 together and reports only the missing link. |
+| NPC-06 | npcs | warn | implemented | Sigrun-class detector: flags a NON-talk milestone that spawns an NPC and whose `text` reads like a conversation objective (talk/speak/win the trust/convince/persuade/ask/meet/seek out), so it will not get a Talk button. Advisory (some are legitimately narrative). |
+| MS-01 | milestones | error | implemented | Every milestone has a valid `type` (`item`/`combat`/`location`/`talk`/`narrative`). |
+| MS-02 | milestones | error | implemented | Type/trigger agreement: `item`→`trigger.item` matches an item spawn.id; `talk`→`trigger.npc` an npc spawn.id; `location`→`trigger.location` a poi spawn.id; `combat`→`trigger.enemy` an enemy spawn.id. Combat is verified structurally only (see Approximations). |
+| MS-03 | milestones | error | implemented | `requires` references exist in the same template and form a DAG (no cycles, no dangling ids). |
+| MS-04 | milestones | error | implemented | Campaign is completable: every milestone reachable through `requires`, final milestone in particular reachable, no orphans. |
+| MS-05 | milestones | error | implemented | No null/undefined in required milestone fields (`id`/`text`/`type` always; type-appropriate `trigger` field + `spawn` for mechanical types). |
+| MS-06 | milestones | warn | implemented | Flags a non-first milestone with empty `requires` (co-active from turn 1) — usually intentional parallel design, so advisory. |
+| ENC-01 | encounters | error | implemented | Every encounter reward item id (in any encounter template's `rewards.items`) exists in `ITEM_CATALOG`. (Encounters-domain restatement of the encounter half of ITEM-01.) |
+| ENC-02 | encounters | error | implemented | Every `template` key in every weighted encounter table (`encounterTables.js`) resolves to a defined `encounterTemplates` entry (`none` exempt); no dangling table keys. |
+| ENC-03 | encounters | warn | implemented | Every encounter has `name`, a visual (`image` OR `icon`), and a valid `difficulty`; environmental encounters carry a `climate` tag (climate-neutral ones allowlisted). |
+| ENC-04 | encounters | error | implemented | Rewards are always STATED: a fully-absent `rewards` field renders a blank reward area (`result.rewards` gate + `generateLoot` returns null), so absence is a violation; an explicit object (even `{}`) is a stated "none" and passes. |
+| ENC-05 | encounters | error | implemented | When an encounter defines a `consequences` block, every roll tier (criticalSuccess/success/failure/criticalFailure) has non-blank outcome text. |
+| ENC-06 | encounters | warn | implemented | Any `climate` tag is from the valid `hot`/`cold`/`any` vocabulary (a typo never matches the selector), and `suggestedActions` is a non-empty list. |
+| MAP-01 | map | error | implemented | Every milestone POI id (every `type:'poi'` spawn) has an ARRIVAL image in `POI_IMAGES` (`worldMoveController.js`). Known artless POIs are allowlisted (see Known accepted gaps); fails on any NEW POI shipped without arrival art. |
+| MAP-02 | map | warn | implemented | Every milestone POI id has a DISTINCTIVE world sprite in `poiSprite` (`worldTileArt.js`) rather than the generic milestone flag. Currently all 17 fall through to the flag (world-sprite debt). |
+| MAP-03 | map | error | implemented | Every biome the production generator can stamp (`plains`/`desert`/`snow`/`water`/`beach`) has a `getEncounterBiome` case (else it collapses to the plains table) AND `biomeBackground` tile art. Theme parity across plains/desert/snow. |
+| MAP-04 | map | warn | implemented | Every milestone POI has an authored display `name`, so arrival never falls back to a title-cased raw id. Complements DISP-01. |
+| DISP-01 | display | error | implemented | No player-facing authored label is blank/null/undefined or a raw underscored id: encounter `name`s, and the raw-id angle on milestone POI display names. (NPC names → NPC-03; item names → ITEM-01/04; POI-name absence → MAP-04.) |
+| DISP-02 | display | warn | implemented | Display-side companion to ENC-04/ENC-05: flags an encounter whose `rewards` object is present but has nothing to grant (no xp/gold/items/healing), so the reward section can render an empty area. |
+
+### Current findings
+
+- **ITEM-04** surfaces **87 warnings**, every one of them the single field `type`.
+  All 87 items have `name`/`icon`/`rarity`/`value`; `type` is absent on typeless
+  consumable / loot / lore entries by design (it drives equip behavior, not
+  rendering). This is the intended demonstration of the non-blocking warn path. If
+  the maintainer treats typeless items as acceptable, narrow `REQUIRED_DISPLAY_FIELDS`
+  in `src/audits/items.js` to `name`/`icon`/`rarity`/`value` (all of which pass) —
+  no other change needed.
+- **buildings / npcs / milestones**: every `error`-severity check passes today
+  (0 failures). The only building debt is the name-generator gap below (BLD-03
+  allowlisted, surfaced by BLD-06). All milestone `requires` graphs are sound DAGs
+  and every campaign is completable; all NPC spawns and talk-milestone references
+  resolve. **NPC-05** passes: every `talk` milestone (including the fixed Warden
+  Sigrun objective in `frozen-frontier-t1`) is fully click-completable — its
+  `trigger.npc` matches a placed npc spawn in a generated town, so the Talk button
+  renders.
+- **NPC-06** surfaces **2 warnings** — non-talk milestones that spawn an NPC and read
+  like a "go talk to them" objective (the Sigrun class), so they get no Talk button
+  and can only be completed by free-text guessing. Both are `type: 'narrative'` with a
+  null trigger and are worth an author review (see debt below):
+  - `heroic-fantasy-t2` / milestone 2: *"Convince the Thornfield Guard to join the
+    resistance"* (spawns Captain Aldric in the Thornfield Guard Barracks).
+  - `desert-expedition-t1` / milestone 2: *"Win the trust of the well-keeper at Oasis
+    Karn"* (spawns Keeper Najwa in The Last Drop).
+- **BLD-06** surfaces **12 warnings** — the placeable building types that render a
+  bare type label because `assignBuildingName` has no branch (see Known accepted
+  gaps). This is the visibility surface for the BLD-03 debt.
+- **MS-06** surfaces **13 warnings** — non-first milestones with empty `requires`
+  that are co-active from turn 1. These are the templates' intended parallel opening
+  objectives (e.g. find-the-map AND meet-the-captain). Note `frozen-frontier-t2`
+  opens with THREE co-active milestones (ids 2 and 3 both parallel to 1); worth a
+  design confirmation. All are advisory.
+- **encounters**: every `error`-severity check passes (0 failures). All 48 encounter
+  templates have `name`/`image`/`icon`/`difficulty`/`rewards`/`consequences`/
+  `suggestedActions`; all 108 reward item ids resolve in `ITEM_CATALOG`; no encounter
+  table has a dangling `template` key; every `consequences` block fills all four
+  tiers; the only `climate` tags (`heat_wave`→`hot`, `cold_snap`→`cold`) are valid.
+  ENC-03 surfaces **0 warnings** after the climate-neutral allowlist (the four
+  intentionally-untagged environmental hazards).
+- **map / display**: every `error`-severity check passes (0 failures). MAP-01 passes
+  because the 16 currently-artless milestone POIs are allowlisted as accepted art debt
+  (see below); MAP-03 confirms all five producible biomes have both a `getEncounterBiome`
+  case and tile art (the snow/desert cases are present, closing the collapse-to-plains
+  gap); MAP-04 and DISP-01 pass because every milestone POI carries an authored `name`
+  and every encounter `name` is a human-readable label.
+- **MAP-02** surfaces **17 warnings** — every milestone POI renders the generic red
+  milestone flag on the world map because `poiSprite` has no distinctive branch keyed
+  to their spawn ids (world-sprite debt, see below).
+
+### Known accepted gaps / debt
+
+Pre-existing content gaps that `error`-class checks explicitly allowlist so the CI
+gate stays green on today's debt while still failing on any NEW regression. Burn
+these down and shrink the allowlist.
+
+- **BLD-03 name-generator debt** (`NAME_GENERATOR_DEBT_ALLOWLIST` in
+  `src/audits/buildings.js`). These 12 placeable building types have no branch in
+  `assignBuildingName` (`townMapGenerator.js`), so a generated instance renders its
+  bare type as a name (the apothecary bug):
+  `barn`, `shrine`, `mill`, `stables`, `tailor`, `fletcher`, `apothecary`,
+  `townhall`, `magetower`, `jail`, `harbormaster`, `boathouse`.
+  (`house` is intentionally anonymous and is not counted.) Fixing a type = adding an
+  `assignBuildingName` branch and removing it from the allowlist; BLD-03 then guards
+  it going forward and BLD-06 stops warning about it.
+
+- **MAP-01 POI arrival-art debt** (`POI_ARRIVAL_IMAGE_DEBT_ALLOWLIST` in
+  `src/audits/map.js`). POI arrival art is generated externally (a Gemini image
+  pipeline) and dropped into `POI_IMAGES` (`worldMoveController.js`) over time. Only
+  `goblin_hideout` has shipped; the other **16** milestone POIs arrive with no art
+  and are allowlisted so MAP-01 (error) stays green on this known debt while FAILING
+  the moment a NEW milestone POI ships without arrival art (the single most important
+  guard: no new location may silently ship art-less). The 16:
+  `shadow_fortress`, `sandstorm_hideout`, `sunken_spire`, `glacier_hollow`,
+  `silent_steading`, `famine_barrow`, `abandoned_well`, `grimstead_cellar`,
+  `ironhold_ruins`, `rot_tunnels`, `gear_end_sewers`, `coghill_foundry`,
+  `desecrated_shrine`, `cult_meeting_place`, `corrupted_lighthouse`,
+  `mourn_peak_summit`. Add the `.webp` to `POI_IMAGES` and drop the id from the
+  allowlist to burn it down.
+
+- **MAP-02 POI world-sprite debt** (advisory, no allowlist needed — it is a `warn`).
+  `poiSprite` (`worldTileArt.js`) only draws distinctive world-map sprites for the
+  generic tile kinds (`town`/`forest`/`mountain`/`hills`/`cave_entrance`/`ruins`); a
+  milestone POI stamps `tile.poi` with its spawn id, so ALL **17** milestone POIs
+  (the 16 above plus `goblin_hideout`) fall through to the generic red milestone
+  flag on the world map. MAP-02 lists them every run so the debt stays visible.
+
+- **NPC-06 mis-typed-talk candidates** (advisory, no allowlist — it is a `warn`).
+  Two authored milestones spawn an NPC and read like a conversation objective but are
+  `type: 'narrative'` with a null trigger, so they render no Talk button and the
+  player can only complete them by guessing free text (exactly the Warden Sigrun bug
+  that motivated NPC-05/06): `heroic-fantasy-t2` milestone 2 (*Convince the Thornfield
+  Guard*, Captain Aldric) and `desert-expedition-t1` milestone 2 (*Win the trust of
+  the well-keeper*, Keeper Najwa). Author review: if the intent is click-to-talk,
+  retype to `type: 'talk'` with `trigger.npc` matching the spawn.id (then NPC-05 guards
+  it and NPC-06 stops warning). If they are meant to be AI-judged narrative beats, leave
+  them — NPC-06 is advisory precisely for that case.
+
+- **ENC-03 climate-neutral env. encounters** (`CLIMATE_NEUTRAL_ALLOWLIST` in
+  `src/audits/encounters.js`). Four environmental encounters are intentionally
+  climate-neutral (fire in every climate) and so are deliberately untagged:
+  `sudden_storm`, `thick_fog`, `earthquake`, `strange_lights`. They are allowlisted
+  so the ENC-03 climate advisory only surfaces a NEW environmental encounter that
+  forgot to consider climate. This is a `warn`, so it never blocks CI regardless.
+
+### Approximations / introspection limits
+
+- **MS-02 combat bosses**: there is no global boss/enemy registry to validate a
+  combat milestone against — a boss is authored inline in the milestone's `spawn`
+  (+ its `encounter` block). MS-02 therefore checks combat coherence *structurally*
+  (`trigger.enemy` resolves to an enemy `spawn.id` in the same template), not against
+  a canonical bestiary. A boss id misspelled *consistently* in both `trigger` and
+  `spawn` would pass; catching that needs a boss catalog the audit does not yet have.
+- **Maintained mirrors** (`src/audits/context.js`): `BUILDING_CONFIG`, the
+  `assignBuildingName` if-chain, and `BuildingModal`'s `SHOP_BUILDING_TYPES` are
+  module-private (or JSX-bound), so the audit mirrors the three small lists
+  (`PLACEABLE_BUILDING_TYPES`, `BUILDING_NAME_GENERATOR_TYPES`, `SHOP_BUILDING_TYPES`)
+  with a comment pointing at each source, rather than importing them (which would
+  either not export the data or pull JSX into the esbuild bundle). Keep them in sync
+  when those tables change.
+- **Map/display maintained mirrors** (`src/audits/context.js`): the world-render
+  capability keys are equally un-importable — `getEncounterBiome`'s if-chain is
+  module-private (`encounterGenerator.js`), `POI_IMAGES`/`NICE_NAMES` are
+  function-local consts inside `buildPoiEncounter` (`worldMoveController.js`), and
+  `biomeBackground`/`poiSprite` are exported render FUNCTIONS whose branch keys
+  cannot be read by importing the function. So the audit mirrors five small key
+  lists (`PRODUCIBLE_BIOMES`, `ENCOUNTER_BIOME_CASES`, `BIOME_ART_CASES`,
+  `POI_SPRITE_TYPES`, `POI_ARRIVAL_IMAGE_KEYS`) with a source-pointing comment
+  each. Keep them in sync when those tables change. (`encounterTables.js` is pure
+  data and IS imported directly for ENC-02.)
+- **Producible biomes = production generator only** (MAP-03). `PRODUCIBLE_BIOMES`
+  lists what `generateMapData` (fixed 10x10, no edge constraints) can stamp:
+  `plains`/`desert`/`snow`/`water`/`beach`. `woodland` is a latent land biome (it
+  appears in `applyEdgeConstraints`' `LAND_BIOMES` set) but no generator sets
+  `landBiome` to it today, and edge constraints are debug-only
+  (`worldAssembler.js`, `/debug/large-world`), so it is treated as not currently
+  producible. NOTE the latent gap: `biomeBackground` already renders `woodland`
+  but `getEncounterBiome` has no `woodland` case, so if it ever becomes producible
+  its encounters would collapse to the plains table — add it to `PRODUCIBLE_BIOMES`
+  when that day comes and MAP-03 will flag the missing case.
+
+## How to add a check
+
+1. Pick the domain module in `src/audits/` (or add a new one and register it in
+   `src/audits/index.js`'s `DOMAIN_CHECKS`). Follow the fully-worked pattern in
+   `src/audits/items.js`.
+2. Author a `Check` object — `{ id, domain, title, severity, run(ctx) }` — and push
+   it onto the module's default-exported array. `run(ctx)` returns `Violation[]`
+   (`{ message, location }`); an empty array is a pass. Give every violation a
+   message that names the offending id and a `location` that points at the source.
+3. If the check needs data not yet on the context, add it in
+   `src/audits/context.js` (keep it pure — data only, no React/DOM/network).
+4. Add a row to the table above (flip the domain's rows from `planned` to
+   `implemented`).
+
+The check then auto-appears in `npm run audit` and is enforced by the Jest gate
+if its severity is `error`. Nothing else needs wiring.
