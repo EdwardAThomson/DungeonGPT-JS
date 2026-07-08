@@ -34,6 +34,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "CI=false react-scripts build",
+    "audit": "node scripts/content-audit.mjs",
     "test": "react-scripts test",
     "test:worker": "npm --prefix cf-worker test",
     "test:e2e": "npx playwright test",
