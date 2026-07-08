@@ -53,7 +53,14 @@
 // a campaign — the opening, then ONE scripted player turn per milestone (in
 // completion order, respecting `requires`) that would drive that milestone — so a
 // maintainer can read the real premium-AI prompts and responses end to end without
-// playing turn by turn. Each milestone turn REPLICATES the in-game turn the app
+// playing turn by turn. The OPENING is faithful to handleStartAdventure: it uses the
+// REAL shared introComposer.composeIntro (imported, not replicated) to build the
+// authored opening, records it deterministically (no request), then makes the single
+// opening REQUEST the bounded [ADVENTURE START - POLISH] reword pass, whose result is
+// judged by a REPLICATED isPolishSafe (accept => show polished; reject => fall back to
+// the authored text). The polish prompt + isPolishSafe are still copied from the hook
+// and CAN DRIFT (a future refactor should share them too). Each milestone turn REPLICATES
+// the in-game turn the app
 // sends in useGameInteraction.handleSubmit: the `[CONTEXT] … [SUMMARY] … [PLAYER
 // ACTION] … [NARRATE]` body (gameContext = Setting/Mood/Goal + formatMilestonePromptText
 // grounding + location context + party), wrapped by generateResponse's
@@ -322,7 +329,7 @@ async function loadAppData() {
       contents:
         `export { storyTemplates } from './storyTemplates.js';\n` +
         `export { DM_PROTOCOL } from './prompts.js';\n` +
-        `export { composeIntro } from '../game/introComposer.js';\n` +
+        `export { composeIntro, formatStartObjective } from '../game/introComposer.js';\n` +
         `export {\n` +
         `  areRequirementsMet,\n` +
         `  getMilestoneState,\n` +
@@ -455,6 +462,21 @@ function formatStartObjective(current) {
     line += ` at ${current.building.name}`;
   }
   return { line, destination };
+}
+
+// Replica of isPolishSafe from useGameInteraction.js (the polish-pass validation guard:
+// length band + start-town-name presence + destination-name presence). REPLICATED here
+// (drift risk); a future refactor should extract it alongside the polish prompt so the
+// hook and this harness share one. The hook runs it on cleanAIResponse(...).trim(); the
+// harness applies it to the trimmed raw response (documented approximation).
+function isPolishSafeReplica(polished, authored, { startPlaceName, destination }) {
+  if (!polished || !polished.trim()) return false;
+  const lo = authored.length * 0.4;
+  const hi = authored.length * 1.6;
+  if (polished.length < lo || polished.length > hi) return false;
+  if (startPlaceName && startPlaceName !== 'this place' && !polished.includes(startPlaceName)) return false;
+  if (destination && destination !== startPlaceName && !polished.includes(destination)) return false;
+  return true;
 }
 
 // Replica of generateResponse's DM_PROTOCOL + style-directive wrap.
@@ -644,14 +666,54 @@ function buildMinimalLocationContext(m) {
 // Build the full recorded playthrough: opening (reuse composeRequests steps=1) then
 // one in-game turn per milestone in completion order. Each returned request carries
 // { label, prompt, playerInput?, milestone? } — playerInput/milestone only for turns.
-function composePlaythroughRequests(template, DM_PROTOCOL) {
+function composePlaythroughRequests(template, DM_PROTOCOL, { composeIntro, formatStartObjective }) {
   const settings = template.settings || {};
   const requests = [];
 
-  // Opening: exactly the SCENE + OBJECTIVE the existing AI mode composes (steps=1).
-  for (const r of composeRequests(template, DM_PROTOCOL, 1)) {
-    requests.push({ label: r.label, prompt: r.prompt });
-  }
+  // ---- OPENING (authored + bounded polish) — faithful to handleStartAdventure ----
+  // The app builds the opening from the REAL introComposer.composeIntro (imported here via
+  // the esbuild bundle) and, for signed-in players, runs ONE tightly-bounded
+  // [ADVENTURE START - POLISH] reword-only pass over that authored text, validated by
+  // isPolishSafe (falling back to the authored text verbatim on reject). We reproduce that
+  // exactly: the authored opening is recorded as a DETERMINISTIC entry (no request), and
+  // the single opening REQUEST is the polish pass.
+  const startTownRaw = template.customNames?.towns?.[0];
+  const startTown = (startTownRaw && typeof startTownRaw === 'object') ? startTownRaw.name : startTownRaw;
+  // Settlement size may be pinned on a size-tagged customName; otherwise it is unknown
+  // headless (the real size comes from the generated map the harness never builds).
+  const startSize = (startTownRaw && typeof startTownRaw === 'object') ? (startTownRaw.size || null) : null;
+  const openingMilestone = getCurrentMilestone(settings.milestones);
+
+  // The same opts handleStartAdventure passes composeIntro. placedNpcs is empty (the
+  // harness builds no town map, matching the app's no-NPC-grounded start case); biome is
+  // unknown headless (null -> composeIntro's default atmosphere). Documented approximation.
+  const authoredOpening = composeIntro(settings, SAMPLE_PARTY, {
+    startPlaceName: startTown,
+    isTown: !!startTown,
+    startSize,
+    biome: null,
+    currentMilestone: openingMilestone,
+    placedNpcs: [],
+  });
+  const { destination: openingDest } = formatStartObjective(openingMilestone);
+
+  requests.push({
+    label: 'Opening (authored)',
+    isAuthored: true,
+    authoredText: authoredOpening,
+  });
+
+  // The polish prompt is REPLICATED VERBATIM from handleStartAdventure (drift risk noted
+  // in the file header; a future refactor should share the prompt + isPolishSafe).
+  const polishPrompt = `[ADVENTURE START - POLISH]\n\n[OPENING]\n${authoredOpening}\n\n[TASK]\nLightly reword and vary the phrasing of the opening above for freshness. You MUST NOT change any facts, add or rename any person, place, building, item, or objective, introduce any character not already present, or change the destination or next step. Do not add new sentences or content. Return the same opening, same structure and same facts, only rephrased. Begin your response directly with the reworded opening.`;
+  requests.push({
+    label: 'Opening (polish)',
+    prompt: wrapWithProtocol(DM_PROTOCOL, polishPrompt, settings),
+    isPolish: true,
+    authored: authoredOpening,
+    startPlaceName: startTown,
+    destination: openingDest,
+  });
 
   const milestones = Array.isArray(settings.milestones) ? settings.milestones : [];
   const order = computeCompletionOrder(milestones);
@@ -1234,10 +1296,15 @@ function fmtGuards(opts) {
   ];
 }
 
-async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact }) {
-  const requests = composePlaythroughRequests(template, DM_PROTOCOL);
+async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact }, appExports) {
+  const requests = composePlaythroughRequests(template, DM_PROTOCOL, appExports);
   const startedAt = new Date();
   const stamp = startedAt.toISOString().replace(/[:.]/g, '-');
+
+  // The authored opening is a deterministic entry, NOT a request. Network requests =
+  // 1 opening polish + one turn per milestone.
+  const milestoneCount = requests.filter((r) => r.milestone).length;
+  const networkRequests = requests.filter((r) => !r.isAuthored).length;
 
   // ---- Preflight (console) ----
   console.log('');
@@ -1246,7 +1313,7 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
   console.log('============================================================');
   console.log(`Campaign:        ${template.id}  (${template.name || 'unnamed'})`);
   console.log(`Model:           ${opts.model}`);
-  console.log(`Composed turns:  ${requests.length} request(s) (opening + ${requests.length - 2} milestone turn(s))`);
+  console.log(`Composed:        1 authored opening (no request) + ${networkRequests} request(s): 1 opening polish + ${milestoneCount} milestone turn(s)`);
   console.log(`Key source:      ${isLive ? (process.env.OPENROUTER_API_KEY ? 'env OPENROUTER_API_KEY (redacted)' : '--key-file (redacted)') : 'n/a (dry-run)'}`);
   console.log('Guards (enforced before each request):');
   for (const g of fmtGuards(opts)) console.log(`  ${g}`);
@@ -1259,6 +1326,29 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
 
   for (let i = 0; i < requests.length; i++) {
     const req = requests[i];
+
+    // Deterministic authored opening: recorded verbatim, NEVER sent (no request, no
+    // guards, no network). This is exactly what the app shows guests and uses as the base
+    // for the polish request that follows.
+    if (req.isAuthored) {
+      turns.push({
+        label: req.label,
+        playerInput: null,
+        prompt: null,
+        authoredText: req.authoredText,
+        isAuthored: true,
+        estPrompt: 0,
+        sent: false,
+        response: null,
+        promptTokens: null,
+        completionTokens: null,
+        flags: ['deterministic: authored opening (no request)']
+      });
+      console.log(`----- Entry ${i + 1}/${requests.length}: ${req.label} (deterministic; no request) -----`);
+      console.log('');
+      continue;
+    }
+
     const estPrompt = estimateTokens(req.prompt);
     const estCompletion = opts['max-tokens'];
     const rec = {
@@ -1317,6 +1407,11 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
       guard.record(estPrompt, estCompletion);
       rec.response = '[dry-run] not sent';
       rec.flags.push('dry-run: not sent');
+      if (req.isPolish) {
+        // No response to evaluate in dry-run; the app would run isPolishSafe on the live
+        // polished text and fall back to the authored opening on reject.
+        rec.polishVerdict = 'n/a (dry-run: nothing sent; app would evaluate isPolishSafe on the live polished response)';
+      }
       turns.push(rec);
       console.log(`  [dry-run] would send. running tallies: requests=${guard.requestsMade}, tokens≈${guard.promptTokensTotal + guard.completionTokensTotal}, cost≈$${guard.costUsd().toFixed(4)}`);
       console.log('');
@@ -1336,6 +1431,17 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
       rec.promptTokens = promptTokens;
       rec.completionTokens = completionTokens;
       rec.flags = runResponseChecks(text);
+      if (req.isPolish) {
+        // Replicate the hook's accept/reject decision on the polished opening.
+        const polished = (text || '').trim();
+        const accepted = isPolishSafeReplica(polished, req.authored, {
+          startPlaceName: req.startPlaceName, destination: req.destination
+        });
+        rec.polishVerdict = accepted
+          ? 'ACCEPT (app would show this polished opening)'
+          : 'REJECT (app would fall back to the authored opening verbatim)';
+        rec.flags.push(accepted ? 'polish:ACCEPT' : 'polish:REJECT');
+      }
       turns.push(rec);
       console.log(`  [${req.label}] response recorded (${completionTokens} completion tokens). flags: ${rec.flags.join(', ')}`);
       console.log(`  usage: prompt=${promptTokens}, completion=${completionTokens}. running: requests=${guard.requestsMade}, tokens=${guard.promptTokensTotal + guard.completionTokensTotal}, cost≈$${guard.costUsd().toFixed(4)}`);
@@ -1355,7 +1461,7 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
   let out;
   try {
     fs.mkdirSync(TRANSCRIPT_DIR, { recursive: true });
-    out = buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, guard, stoppedBy, redact });
+    out = buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, guard, stoppedBy, redact, networkRequests, milestoneCount });
     fs.writeFileSync(transcriptPath, out, 'utf8');
   } catch (err) {
     console.error(redact(`Failed to write transcript: ${err.message}`));
@@ -1365,7 +1471,7 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
   console.log('============================================================');
   console.log('PLAYTHROUGH SUMMARY');
   console.log(`  mode:            ${isLive ? 'LIVE' : 'DRY-RUN'}`);
-  console.log(`  requests ${isLive ? 'made' : 'simulated'}: ${guard.requestsMade} / ${requests.length} composed`);
+  console.log(`  requests ${isLive ? 'made' : 'simulated'}: ${guard.requestsMade} / ${networkRequests} composed (+ 1 authored opening, no request)`);
   console.log(`  tokens (in/out): ${guard.promptTokensTotal} / ${guard.completionTokensTotal}`);
   console.log(`  est. cost:       $${guard.costUsd().toFixed(4)}`);
   console.log(`  stopped by:      ${stoppedBy || 'nothing (composed all turns)'}`);
@@ -1377,7 +1483,7 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
 
 // Build the Markdown transcript string. The prompt/response are recorded IN FULL
 // (redacted); only the console output truncates.
-function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, guard, stoppedBy, redact }) {
+function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, guard, stoppedBy, redact, networkRequests, milestoneCount }) {
   const L = [];
   L.push(`# Quest-harness playthrough transcript`);
   L.push('');
@@ -1385,16 +1491,21 @@ function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, 
   L.push(`- **Model:** ${opts.model}`);
   L.push(`- **Mode:** ${isLive ? 'LIVE (sent to OpenRouter)' : 'DRY-RUN (no network call; responses not sent)'}`);
   L.push(`- **Timestamp:** ${startedAt.toISOString()}`);
-  L.push(`- **Composed turns:** ${requests.length} (opening + ${Math.max(0, requests.length - 2)} milestone turn(s))`);
+  L.push(`- **Composed:** 1 authored opening (no request) + ${networkRequests} request(s): 1 opening polish + ${milestoneCount} milestone turn(s)`);
   L.push('');
   L.push('### Guard settings');
   for (const g of fmtGuards(opts)) L.push(`- ${g}`);
   L.push('');
-  L.push('> Prompt composition is REPLICATED from src/hooks/useGameInteraction.js');
-  L.push('> (opening = handleStartAdventure SCENE+OBJECTIVE; each milestone turn = handleSubmit');
-  L.push('> gameContext + [CONTEXT]/[SUMMARY]/[PLAYER ACTION]/[NARRATE] wrapped by DM_PROTOCOL +');
-  L.push('> style directive). It is a copy and CAN DRIFT from the app. Location context is a');
-  L.push('> minimal stand-in (the harness generates no town maps); summary/RAG are omitted.');
+  L.push('> The OPENING now uses the REAL shared introComposer.composeIntro (imported, not');
+  L.push('> replicated): the authored opening is recorded deterministically (no request) and');
+  L.push('> the single opening request is the bounded [ADVENTURE START - POLISH] reword pass,');
+  L.push('> whose result is judged by a REPLICATED isPolishSafe (accept = show polished;');
+  L.push('> reject = fall back to authored). The polish prompt + isPolishSafe are still copied');
+  L.push('> from src/hooks/useGameInteraction.js and CAN DRIFT (a future refactor should share');
+  L.push('> them too). Each milestone turn is REPLICATED from handleSubmit (gameContext +');
+  L.push('> [CONTEXT]/[SUMMARY]/[PLAYER ACTION]/[NARRATE] wrapped by DM_PROTOCOL + style');
+  L.push('> directive) and CAN DRIFT. Location context is a minimal stand-in (the harness');
+  L.push('> generates no town maps); summary/RAG are omitted.');
   L.push('');
   L.push('---');
   L.push('');
@@ -1403,6 +1514,24 @@ function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, 
     const t = turns[i];
     L.push(`## Turn ${i + 1}: ${t.label}`);
     L.push('');
+
+    // Deterministic authored opening: recorded verbatim, never a request.
+    if (t.isAuthored) {
+      L.push('_Deterministic authored opening (introComposer.composeIntro). No request, no network: the app shows this to guests verbatim and uses it as the base for the polish pass below._');
+      L.push('');
+      L.push('### Authored opening');
+      L.push('');
+      L.push('```text');
+      L.push(redact(t.authoredText || '(empty)'));
+      L.push('```');
+      L.push('');
+      L.push(`**Automated checks:** ${t.flags.length ? t.flags.join(', ') : '(none)'}`);
+      L.push('');
+      L.push('---');
+      L.push('');
+      continue;
+    }
+
     if (t.playerInput) {
       L.push(`**Scripted player input:** ${t.playerInput}`);
       L.push('');
@@ -1429,6 +1558,10 @@ function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, 
       L.push('```');
     }
     L.push('');
+    if (t.polishVerdict) {
+      L.push(`**isPolishSafe verdict:** ${t.polishVerdict}`);
+      L.push('');
+    }
     L.push(`**Automated checks:** ${t.flags.length ? t.flags.join(', ') : '(none)'}`);
     L.push('');
     L.push('---');
@@ -1437,7 +1570,7 @@ function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, 
 
   L.push('## Summary');
   L.push('');
-  L.push(`- **Requests ${isLive ? 'made' : 'simulated'}:** ${guard.requestsMade} / ${requests.length} composed`);
+  L.push(`- **Requests ${isLive ? 'made' : 'simulated'}:** ${guard.requestsMade} / ${networkRequests} composed (+ 1 authored opening, no request)`);
   L.push(`- **Tokens (in/out):** ${guard.promptTokensTotal} / ${guard.completionTokensTotal}`);
   L.push(`- **Estimated cost:** $${guard.costUsd().toFixed(4)}`);
   L.push(`- **Stopped by:** ${stoppedBy || 'nothing (composed all turns)'}`);
@@ -1483,10 +1616,11 @@ async function main() {
   // Enforce --live/--yes and resolve the key (never printed). Shared with playthrough.
   const { isLive, key, redact } = resolveLiveKey(opts);
 
-  // Load app data + compose the prompts.
-  let storyTemplates, DM_PROTOCOL;
+  // Load app data + compose the prompts. composeIntro/formatStartObjective are the REAL
+  // shared authored-opening builders (used by the playthrough opening).
+  let storyTemplates, DM_PROTOCOL, composeIntro, formatStartObjectiveReal;
   try {
-    ({ storyTemplates, DM_PROTOCOL } = await loadAppData());
+    ({ storyTemplates, DM_PROTOCOL, composeIntro, formatStartObjective: formatStartObjectiveReal } = await loadAppData());
   } catch (err) {
     console.error(redact(`Failed to load app data (storyTemplates / DM_PROTOCOL): ${err.message}`));
     process.exit(5);
@@ -1501,7 +1635,8 @@ async function main() {
 
   // Recorded playthrough extends AI mode: same guards + key path, transcript output.
   if (opts.playthrough) {
-    await runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact });
+    await runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact },
+      { composeIntro, formatStartObjective: formatStartObjectiveReal });
     return;
   }
 
