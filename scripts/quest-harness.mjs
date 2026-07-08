@@ -48,6 +48,27 @@
 // prompt strings + formatStartObjective + generateResponse's DM_PROTOCOL/style
 // wrap) and from getMilestoneStatus. This is a copy, so it CAN DRIFT from the
 // hook. A future refactor should extract a shared pure builder both consume.
+//
+// RECORDED PLAYTHROUGH (--playthrough): composes and RECORDS the whole "spine" of
+// a campaign — the opening, then ONE scripted player turn per milestone (in
+// completion order, respecting `requires`) that would drive that milestone — so a
+// maintainer can read the real premium-AI prompts and responses end to end without
+// playing turn by turn. The OPENING is faithful to handleStartAdventure: it uses the
+// REAL shared introComposer.composeIntro (imported, not replicated) to build the
+// authored opening, records it deterministically (no request), then makes the single
+// opening REQUEST the bounded [ADVENTURE START - POLISH] reword pass, whose result is
+// judged by a REPLICATED isPolishSafe (accept => show polished; reject => fall back to
+// the authored text). The polish prompt + isPolishSafe are still copied from the hook
+// and CAN DRIFT (a future refactor should share them too). Each milestone turn REPLICATES
+// the in-game turn the app
+// sends in useGameInteraction.handleSubmit: the `[CONTEXT] … [SUMMARY] … [PLAYER
+// ACTION] … [NARRATE]` body (gameContext = Setting/Mood/Goal + formatMilestonePromptText
+// grounding + location context + party), wrapped by generateResponse's
+// DM_PROTOCOL + style directive. Because this is a COPY of the hook's composition,
+// it CAN DRIFT from the app (a future refactor should extract one shared builder the
+// hook and this harness both call). It obeys every guard exactly like AI mode and is
+// DRY-RUN unless BOTH --live AND --yes are passed. Every prompt + response is written
+// to a timestamped Markdown transcript under harness-transcripts/ (gitignored).
 // ============================================================================
 
 import { build } from 'esbuild';
@@ -136,7 +157,7 @@ const FLAG_DEFAULTS = {
 function parseArgs(argv) {
   const opts = {
     ...FLAG_DEFAULTS, live: false, yes: false, help: false,
-    all: false, simulate: false, _modeExplicit: false
+    all: false, simulate: false, playthrough: false, _modeExplicit: false
   };
   const numeric = new Set([
     'steps', 'max-tokens', 'max-prompt-tokens', 'tpm', 'rpm',
@@ -151,6 +172,7 @@ function parseArgs(argv) {
     if (arg === '--yes') { opts.yes = true; continue; }
     if (arg === '--all') { opts.all = true; continue; }
     if (arg === '--simulate') { opts.simulate = true; continue; }
+    if (arg === '--playthrough') { opts.playthrough = true; continue; }
     if (!arg.startsWith('--')) throw new Error(`Unexpected argument: ${arg}`);
     const name = arg.slice(2);
     if (!(name in FLAG_DEFAULTS)) throw new Error(`Unknown flag: ${arg} (try --help)`);
@@ -181,6 +203,15 @@ function parseArgs(argv) {
   }
   if (opts.mode === 'ai' && opts.campaign === 'all') {
     throw new Error('--campaign all / --all is only supported for the deterministic sim (--mode guest|member|both).');
+  }
+  if (opts.playthrough) {
+    if (opts._modeExplicit && opts.mode !== 'ai') {
+      throw new Error('--playthrough extends AI mode; it is not compatible with --mode guest|member|both.');
+    }
+    opts.mode = 'ai';
+    if (opts.campaign === 'all') {
+      throw new Error('--playthrough runs a single campaign; --campaign all / --all is not supported.');
+    }
   }
 
   if (opts['on-limit'] !== 'abort' && opts['on-limit'] !== 'wait') {
@@ -233,8 +264,17 @@ FLAGS
   --simulate               Alias for --mode both (deterministic guest vs member)
   --all                    Run the sim across ALL playable campaigns (= --campaign all)
   --campaign <id|all>      Story template id, or "all"        (default: ${d.campaign})
+  --playthrough            Extend AI mode into a RECORDED, scripted playthrough of the
+                           campaign spine: the opening plus ONE scripted player turn per
+                           milestone (in completion order) that drives it. Composes the
+                           full in-game turn prompt (DM_PROTOCOL + milestone grounding +
+                           location + player action + style) for each, sends it (only with
+                           --live --yes), runs light automated checks, and writes every
+                           prompt + response to a timestamped Markdown transcript under
+                           harness-transcripts/ (gitignored). DRY-RUN by default. Ignores
+                           --steps (the turn count is opening + milestones).
   --steps <N>              Turns to compose: 1 = opening only (default: ${d.steps})
-                           Each extra step adds one follow-up turn.
+                           Each extra step adds one follow-up turn. (Ignored with --playthrough.)
   --model <id>             OpenRouter model id               (default: ${d.model})
   --max-tokens <N>         Per-request output cap            (default: ${d['max-tokens']}, hard ceiling ${HARD_MAX_TOKENS_CEILING})
   --max-prompt-tokens <N>  Per-request input cap (estimate)  (default: ${d['max-prompt-tokens']})
@@ -264,6 +304,8 @@ FLAGS
 
 EXAMPLES
   node scripts/quest-harness.mjs --campaign heroic-fantasy-t1      # ai dry-run
+  node scripts/quest-harness.mjs --playthrough --campaign heroic-fantasy-t1  # recorded dry-run
+  OPENROUTER_API_KEY=sk-or-... node scripts/quest-harness.mjs --playthrough --live --yes
   node scripts/quest-harness.mjs --mode guest --campaign heroic-fantasy-t1
   node scripts/quest-harness.mjs --mode both --all                # sim every campaign
   node scripts/quest-harness.mjs --simulate --all                 # same, alias
@@ -287,7 +329,7 @@ async function loadAppData() {
       contents:
         `export { storyTemplates } from './storyTemplates.js';\n` +
         `export { DM_PROTOCOL } from './prompts.js';\n` +
-        `export { composeIntro } from '../game/introComposer.js';\n` +
+        `export { composeIntro, formatStartObjective } from '../game/introComposer.js';\n` +
         `export {\n` +
         `  areRequirementsMet,\n` +
         `  getMilestoneState,\n` +
@@ -422,6 +464,21 @@ function formatStartObjective(current) {
   return { line, destination };
 }
 
+// Replica of isPolishSafe from useGameInteraction.js (the polish-pass validation guard:
+// length band + start-town-name presence + destination-name presence). REPLICATED here
+// (drift risk); a future refactor should extract it alongside the polish prompt so the
+// hook and this harness share one. The hook runs it on cleanAIResponse(...).trim(); the
+// harness applies it to the trimmed raw response (documented approximation).
+function isPolishSafeReplica(polished, authored, { startPlaceName, destination }) {
+  if (!polished || !polished.trim()) return false;
+  const lo = authored.length * 0.4;
+  const hi = authored.length * 1.6;
+  if (polished.length < lo || polished.length > hi) return false;
+  if (startPlaceName && startPlaceName !== 'this place' && !polished.includes(startPlaceName)) return false;
+  if (destination && destination !== startPlaceName && !polished.includes(destination)) return false;
+  return true;
+}
+
 // Replica of generateResponse's DM_PROTOCOL + style-directive wrap.
 function wrapWithProtocol(DM_PROTOCOL, prompt, settings) {
   const style = VERBOSITY_DIRECTIVE[settings?.responseVerbosity] || VERBOSITY_DIRECTIVE.Moderate;
@@ -485,6 +542,227 @@ function composeRequests(template, DM_PROTOCOL, steps) {
   }
 
   return requests;
+}
+
+// ===========================================================================
+// RECORDED PLAYTHROUGH composition — REPLICATED from useGameInteraction.js
+// (handleSubmit: gameContext + [CONTEXT]/[SUMMARY]/[PLAYER ACTION]/[NARRATE] body,
+// getMilestoneStatus + formatMilestonePromptText grounding, generateResponse's
+// DM_PROTOCOL + style wrap). This is a COPY of the hook and CAN DRIFT; a future
+// refactor should extract one shared pure builder the hook and this harness share.
+// ===========================================================================
+
+// Replica of getMilestoneStatus (useGameInteraction.js): current/completed/active/
+// locked derived from the milestones' own `completed` flags + requires graph.
+function getMilestoneStatusReplica(milestones) {
+  const list = Array.isArray(milestones) ? milestones : [];
+  const reqMet = (m) => {
+    const reqs = Array.isArray(m.requires) ? m.requires : [];
+    return reqs.every((id) => list.find((x) => x.id === id)?.completed);
+  };
+  const completed = list.filter((m) => m.completed);
+  const remaining = list.filter((m) => !m.completed);
+  const active = remaining.filter((m) => reqMet(m));
+  const locked = remaining.filter((m) => !reqMet(m));
+  return { current: active[0] || null, completed, remaining, active, locked, all: list };
+}
+
+// Replica of formatMilestonePromptText (useGameInteraction.js). Kept character-for-
+// character (including the em dash the app uses) so the harness prompt matches the
+// real in-game prompt; do not "clean up" the punctuation or it drifts.
+function formatMilestonePromptTextReplica(milestoneStatus) {
+  const { completed, active, locked } = milestoneStatus;
+  if (completed.length === 0 && active.length === 0 && locked.length === 0) return '';
+  let text = '';
+  if (active.length > 0) {
+    text += '\nActive Milestones: ' + active.map((m, i) => {
+      const typeTag = m.type ? ` [${m.type}]` : '';
+      const levelTag = m.minLevel ? ` (Lv.${m.minLevel}+)` : '';
+      let line = `${m.text}${typeTag}${levelTag}`;
+      if (m.spawn?.type === 'npc' && m.spawn.name) {
+        const who = m.spawn.role ? `${m.spawn.name} (${m.spawn.role})` : m.spawn.name;
+        const where = m.building?.name || m.spawn.location;
+        line += ` — speak with ${who}${where ? ` at ${where}` : ''}`;
+        if (m.spawn.personality) line += `; ${m.spawn.personality}`;
+      }
+      if (i === 0 && m.type === 'talk') {
+        const who = m.spawn?.name || 'this person';
+        line += ` (you may mark this complete once the party finishes speaking with ${who})`;
+      }
+      return line;
+    }).join('; ');
+  }
+  if (completed.length > 0) {
+    text += '\nCompleted: ' + completed.map((m) => m.text).join('; ');
+  }
+  if (locked.length > 0) {
+    text += '\nLocked (prerequisites not met): ' + locked.map((m) => m.text).join('; ');
+  }
+  return text;
+}
+
+// Topological completion order: repeatedly take the first milestone (in authored
+// order) whose `requires` are all already completed. Mirrors the order the engine
+// walk would complete them in. Stops if the graph cannot progress (unreachable).
+function computeCompletionOrder(milestones) {
+  const list = Array.isArray(milestones) ? milestones : [];
+  const done = new Set();
+  const order = [];
+  let guard = list.length * 2 + 4;
+  while (order.length < list.length && guard-- > 0) {
+    const next = list.find((m) =>
+      !done.has(m.id) && (Array.isArray(m.requires) ? m.requires : []).every((r) => done.has(r))
+    );
+    if (!next) break;
+    done.add(next.id);
+    order.push(next);
+  }
+  return order;
+}
+
+// Compose ONE short, neutral scripted player input that would drive a milestone,
+// derived from the milestone's own fields (see task spec templates per type).
+function buildScriptedPlayerTurn(m) {
+  const b = m.building || {};
+  const s = m.spawn || {};
+  const loc = b.location || s.location || m.location || 'the objective';
+  switch (m.type) {
+    case 'item': {
+      const where = b.name || loc;
+      const item = s.name || m.trigger?.item || 'the quest item';
+      return `We travel to ${b.location || loc} and search ${where} for ${item}.`;
+    }
+    case 'talk': {
+      const who = s.name || 'the contact';
+      const where = b.name || loc;
+      return `We go to ${where} in ${b.location || loc} and speak with ${who}.`;
+    }
+    case 'location': {
+      const target = s.name || m.trigger?.location || m.location || 'the destination';
+      return `We travel to ${target} in ${m.location || loc}.`;
+    }
+    case 'combat': {
+      const foe = s.name || m.encounter?.name || m.trigger?.enemy || 'the enemy';
+      return `We confront and fight ${foe} at ${m.location || loc}.`;
+    }
+    default:
+      return `We act on our objective: ${m.text || 'advance the quest'}.`;
+  }
+}
+
+// Minimal location context for a milestone turn, standing in for buildLocationContext
+// (the harness generates no town maps). Inside-town for building milestones; a plain
+// wilderness line otherwise. Documented approximation; noted in the transcript.
+function buildMinimalLocationContext(m) {
+  const b = m.building || {};
+  const s = m.spawn || {};
+  if (b.name && (b.location || s.location)) {
+    return `The party is INSIDE ${b.location || s.location}, a settlement. They are at ${b.name}.`;
+  }
+  const wild = m.location || s.location || 'the wilds';
+  return `The party is traveling through the ${wild} area.`;
+}
+
+// Build the full recorded playthrough: opening (reuse composeRequests steps=1) then
+// one in-game turn per milestone in completion order. Each returned request carries
+// { label, prompt, playerInput?, milestone? } — playerInput/milestone only for turns.
+function composePlaythroughRequests(template, DM_PROTOCOL, { composeIntro, formatStartObjective }) {
+  const settings = template.settings || {};
+  const requests = [];
+
+  // ---- OPENING (authored + bounded polish) — faithful to handleStartAdventure ----
+  // The app builds the opening from the REAL introComposer.composeIntro (imported here via
+  // the esbuild bundle) and, for signed-in players, runs ONE tightly-bounded
+  // [ADVENTURE START - POLISH] reword-only pass over that authored text, validated by
+  // isPolishSafe (falling back to the authored text verbatim on reject). We reproduce that
+  // exactly: the authored opening is recorded as a DETERMINISTIC entry (no request), and
+  // the single opening REQUEST is the polish pass.
+  const startTownRaw = template.customNames?.towns?.[0];
+  const startTown = (startTownRaw && typeof startTownRaw === 'object') ? startTownRaw.name : startTownRaw;
+  // Settlement size may be pinned on a size-tagged customName; otherwise it is unknown
+  // headless (the real size comes from the generated map the harness never builds).
+  const startSize = (startTownRaw && typeof startTownRaw === 'object') ? (startTownRaw.size || null) : null;
+  const openingMilestone = getCurrentMilestone(settings.milestones);
+
+  // The same opts handleStartAdventure passes composeIntro. placedNpcs is empty (the
+  // harness builds no town map, matching the app's no-NPC-grounded start case); biome is
+  // unknown headless (null -> composeIntro's default atmosphere). Documented approximation.
+  const authoredOpening = composeIntro(settings, SAMPLE_PARTY, {
+    startPlaceName: startTown,
+    isTown: !!startTown,
+    startSize,
+    biome: null,
+    currentMilestone: openingMilestone,
+    placedNpcs: [],
+  });
+  const { destination: openingDest } = formatStartObjective(openingMilestone);
+
+  requests.push({
+    label: 'Opening (authored)',
+    isAuthored: true,
+    authoredText: authoredOpening,
+  });
+
+  // The polish prompt is REPLICATED VERBATIM from handleStartAdventure (drift risk noted
+  // in the file header; a future refactor should share the prompt + isPolishSafe).
+  const polishPrompt = `[ADVENTURE START - POLISH]\n\n[OPENING]\n${authoredOpening}\n\n[TASK]\nLightly reword and vary the phrasing of the opening above for freshness. You MUST NOT change any facts, add or rename any person, place, building, item, or objective, introduce any character not already present, or change the destination or next step. Do not add new sentences or content. Return the same opening, same structure and same facts, only rephrased. Begin your response directly with the reworded opening.`;
+  requests.push({
+    label: 'Opening (polish)',
+    prompt: wrapWithProtocol(DM_PROTOCOL, polishPrompt, settings),
+    isPolish: true,
+    authored: authoredOpening,
+    startPlaceName: startTown,
+    destination: openingDest,
+  });
+
+  const milestones = Array.isArray(settings.milestones) ? settings.milestones : [];
+  const order = computeCompletionOrder(milestones);
+  // Progressive working copy: each turn's context reflects milestones completed on
+  // prior turns (so the driven milestone shows as Active, its predecessors Completed).
+  const working = milestones.map((m) => ({ ...m, completed: false }));
+  const partyInfo = formatPartyInfo(SAMPLE_PARTY);
+  const goalInfo = settings.campaignGoal ? `\nGoal: ${settings.campaignGoal}` : '';
+
+  for (const m of order) {
+    const status = getMilestoneStatusReplica(working);
+    const milestonesInfo = formatMilestonePromptTextReplica(status);
+    const playerInput = buildScriptedPlayerTurn(m);
+    const locationInfo = buildMinimalLocationContext(m);
+    const gameContext = `Setting: ${settings.shortDescription || 'Fantasy Realm'}. Mood: ${settings.grimnessLevel || 'Normal'}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
+    // Mirror handleSubmit's body. No RAG/summary in a headless harness: the summary
+    // is the app's default seed and ragContext is empty (documented approximation).
+    const body = `[CONTEXT]\n${gameContext}\n\n[SUMMARY]\nThe tale unfolds.\n\n[PLAYER ACTION]\n${playerInput}\n\n[NARRATE]`;
+    requests.push({
+      label: `Milestone #${m.id} [${m.type || 'untyped'}]`,
+      prompt: wrapWithProtocol(DM_PROTOCOL, body, settings),
+      playerInput,
+      milestone: m
+    });
+    const w = working.find((x) => x.id === m.id);
+    if (w) w.completed = true;
+  }
+
+  return requests;
+}
+
+// Light automated CHECKS on a response — flags for the maintainer, NOT pass/fail and
+// NOT acted upon. Empty / refusal / prompt-echo are blocking signals; markers are
+// reported for presence only.
+function runResponseChecks(text) {
+  const flags = [];
+  const t = (text || '').trim();
+  if (!t) { flags.push('BLOCK:empty'); return flags; }
+  if (/\b(I'm sorry|I am sorry|I cannot|I can't|I can not|as an AI|I am unable|I'm unable|I won't be able)\b/i.test(t)) {
+    flags.push('BLOCK:possible-refusal');
+  }
+  if (/\[STRICT DUNGEON MASTER PROTOCOL\]|\[TASK\]|\[CONTEXT\]|\[NARRATE\]|\[PLAYER ACTION\]|\[SUMMARY\]|\[ADVENTURE START/i.test(t)) {
+    flags.push('BLOCK:prompt-echo');
+  }
+  if (/\[COMPLETE_MILESTONE/i.test(t)) flags.push('marker:COMPLETE_MILESTONE');
+  if (/\[COMPLETE_CAMPAIGN\]/i.test(t)) flags.push('marker:COMPLETE_CAMPAIGN');
+  if (/\[(CHECK|ROLL):/i.test(t)) flags.push('marker:CHECK/ROLL');
+  if (flags.length === 0) flags.push('ok');
+  return flags;
 }
 
 // ===========================================================================
@@ -969,6 +1247,349 @@ async function runSimMode(opts) {
 }
 
 // ---------------------------------------------------------------------------
+// Live-mode gate + key resolution. Shared by AI mode and the playthrough. Enforces
+// --live requires --yes, reads the key ONLY from env / --key-file, never prints it.
+// Exits the process on a misconfigured live run. Returns { isLive, key, redact }.
+// ---------------------------------------------------------------------------
+function resolveLiveKey(opts) {
+  const isLive = opts.live;
+  if (isLive && !opts.yes) {
+    console.error('Refusing to run live: --live requires an explicit --yes as well.');
+    console.error('Re-run with:  --live --yes   (this will spend real OpenRouter credit).');
+    process.exit(3);
+  }
+  let key = null;
+  let redact = (s) => s;
+  if (isLive) {
+    try {
+      key = readKey(opts['key-file']);
+    } catch (err) {
+      console.error(`Error reading key: ${err.message}`);
+      process.exit(4);
+    }
+    if (!key) {
+      console.error('No OpenRouter key found. Supply it via one of:');
+      console.error('  * environment: OPENROUTER_API_KEY=sk-or-...');
+      console.error('  * file:        --key-file <path>  (file has a line OPENROUTER_API_KEY=sk-or-...)');
+      console.error('The key is never printed or written anywhere.');
+      process.exit(4);
+    }
+    redact = makeRedactor(key);
+  }
+  return { isLive, key, redact };
+}
+
+// ---------------------------------------------------------------------------
+// Recorded playthrough runner. Composes the opening + one turn per milestone,
+// runs the SAME guarded request loop as AI mode, records every prompt/response +
+// automated check flags to a timestamped Markdown transcript under harness-transcripts/,
+// and prints a short console summary pointing at that file. DRY-RUN unless live.
+// ---------------------------------------------------------------------------
+const TRANSCRIPT_DIR = path.join(repoRoot, 'harness-transcripts');
+
+function fmtGuards(opts) {
+  return [
+    `per-request: max-tokens=${opts['max-tokens']} (ceiling ${HARD_MAX_TOKENS_CEILING}), max-prompt-tokens=${opts['max-prompt-tokens']}`,
+    `rate (60s): tpm=${opts.tpm}, rpm=${opts.rpm}, on-limit=${opts['on-limit']}`,
+    `per-run: max-requests=${opts['max-requests']}, max-total-tokens=${opts['max-total-tokens']}, max-usd=$${opts['max-usd']}`,
+    `pricing: $${opts['price-in']}/1M in, $${opts['price-out']}/1M out (Haiku 4.5 defaults — VERIFY)`
+  ];
+}
+
+async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact }, appExports) {
+  const requests = composePlaythroughRequests(template, DM_PROTOCOL, appExports);
+  const startedAt = new Date();
+  const stamp = startedAt.toISOString().replace(/[:.]/g, '-');
+
+  // The authored opening is a deterministic entry, NOT a request. Network requests =
+  // 1 opening polish + one turn per milestone.
+  const milestoneCount = requests.filter((r) => r.milestone).length;
+  const networkRequests = requests.filter((r) => !r.isAuthored).length;
+
+  // ---- Preflight (console) ----
+  console.log('');
+  console.log('============================================================');
+  console.log(`quest-harness — RECORDED PLAYTHROUGH — ${isLive ? 'LIVE' : 'DRY-RUN (no network requests)'}`);
+  console.log('============================================================');
+  console.log(`Campaign:        ${template.id}  (${template.name || 'unnamed'})`);
+  console.log(`Model:           ${opts.model}`);
+  console.log(`Composed:        1 authored opening (no request) + ${networkRequests} request(s): 1 opening polish + ${milestoneCount} milestone turn(s)`);
+  console.log(`Key source:      ${isLive ? (process.env.OPENROUTER_API_KEY ? 'env OPENROUTER_API_KEY (redacted)' : '--key-file (redacted)') : 'n/a (dry-run)'}`);
+  console.log('Guards (enforced before each request):');
+  for (const g of fmtGuards(opts)) console.log(`  ${g}`);
+  console.log('============================================================');
+  console.log('');
+
+  const guard = new GuardState(opts);
+  let stoppedBy = null;
+  const turns = []; // { label, playerInput, prompt, estPrompt, sent, response, promptTokens, completionTokens, flags }
+
+  for (let i = 0; i < requests.length; i++) {
+    const req = requests[i];
+
+    // Deterministic authored opening: recorded verbatim, NEVER sent (no request, no
+    // guards, no network). This is exactly what the app shows guests and uses as the base
+    // for the polish request that follows.
+    if (req.isAuthored) {
+      turns.push({
+        label: req.label,
+        playerInput: null,
+        prompt: null,
+        authoredText: req.authoredText,
+        isAuthored: true,
+        estPrompt: 0,
+        sent: false,
+        response: null,
+        promptTokens: null,
+        completionTokens: null,
+        flags: ['deterministic: authored opening (no request)']
+      });
+      console.log(`----- Entry ${i + 1}/${requests.length}: ${req.label} (deterministic; no request) -----`);
+      console.log('');
+      continue;
+    }
+
+    const estPrompt = estimateTokens(req.prompt);
+    const estCompletion = opts['max-tokens'];
+    const rec = {
+      label: req.label,
+      playerInput: req.playerInput || null,
+      prompt: req.prompt,
+      estPrompt,
+      sent: false,
+      response: null,
+      promptTokens: null,
+      completionTokens: null,
+      flags: []
+    };
+
+    console.log(`----- Request ${i + 1}/${requests.length}: ${req.label} -----`);
+    console.log(`  est. prompt tokens: ~${estPrompt}   (est. completion cap: ${estCompletion})`);
+
+    // Guard 1: per-request input cap.
+    const inputReason = guard.checkInputCap(estPrompt);
+    if (inputReason) {
+      console.log(`  [GUARD] refusing this request: ${inputReason}`);
+      stoppedBy = `input cap (${inputReason})`;
+      rec.flags.push(`GUARD:${inputReason}`);
+      turns.push(rec);
+      break;
+    }
+
+    // Guard 2: per-run budget.
+    const budgetReason = guard.checkRunBudget(estPrompt, estCompletion);
+    if (budgetReason) {
+      console.log(`  [GUARD] hard-abort run: ${budgetReason}`);
+      stoppedBy = `run budget (${budgetReason})`;
+      rec.flags.push(`GUARD:${budgetReason}`);
+      turns.push(rec);
+      break;
+    }
+
+    // Guard 3: sliding-window rate limit.
+    const now = Date.now();
+    const rate = guard.checkRate(estPrompt + estCompletion, now);
+    if (!rate.ok) {
+      if (opts['on-limit'] === 'wait') {
+        console.log(`  [GUARD] rate window: ${rate.reason}; waiting ~${Math.ceil(rate.waitMs / 1000)}s ...`);
+        if (isLive && rate.waitMs > 0) await sleep(rate.waitMs);
+      } else {
+        console.log(`  [GUARD] rate window: ${rate.reason}; aborting (--on-limit abort)`);
+        stoppedBy = `rate limit (${rate.reason})`;
+        rec.flags.push(`GUARD:${rate.reason}`);
+        turns.push(rec);
+        break;
+      }
+    }
+
+    if (!isLive) {
+      // DRY-RUN: account with estimates, do NOT fetch. Record the prompt only.
+      guard.record(estPrompt, estCompletion);
+      rec.response = '[dry-run] not sent';
+      rec.flags.push('dry-run: not sent');
+      if (req.isPolish) {
+        // No response to evaluate in dry-run; the app would run isPolishSafe on the live
+        // polished text and fall back to the authored opening on reject.
+        rec.polishVerdict = 'n/a (dry-run: nothing sent; app would evaluate isPolishSafe on the live polished response)';
+      }
+      turns.push(rec);
+      console.log(`  [dry-run] would send. running tallies: requests=${guard.requestsMade}, tokens≈${guard.promptTokensTotal + guard.completionTokensTotal}, cost≈$${guard.costUsd().toFixed(4)}`);
+      console.log('');
+      continue;
+    }
+
+    // LIVE: send, record actual usage + response + checks.
+    try {
+      const { text, usage } = await callOpenRouter(
+        key, opts.model, req.prompt, opts['max-tokens'], opts.temperature, redact
+      );
+      const promptTokens = Number.isFinite(usage.prompt_tokens) ? usage.prompt_tokens : estPrompt;
+      const completionTokens = Number.isFinite(usage.completion_tokens) ? usage.completion_tokens : estimateTokens(text);
+      guard.record(promptTokens, completionTokens);
+      rec.sent = true;
+      rec.response = text || '';
+      rec.promptTokens = promptTokens;
+      rec.completionTokens = completionTokens;
+      rec.flags = runResponseChecks(text);
+      if (req.isPolish) {
+        // Replicate the hook's accept/reject decision on the polished opening.
+        const polished = (text || '').trim();
+        const accepted = isPolishSafeReplica(polished, req.authored, {
+          startPlaceName: req.startPlaceName, destination: req.destination
+        });
+        rec.polishVerdict = accepted
+          ? 'ACCEPT (app would show this polished opening)'
+          : 'REJECT (app would fall back to the authored opening verbatim)';
+        rec.flags.push(accepted ? 'polish:ACCEPT' : 'polish:REJECT');
+      }
+      turns.push(rec);
+      console.log(`  [${req.label}] response recorded (${completionTokens} completion tokens). flags: ${rec.flags.join(', ')}`);
+      console.log(`  usage: prompt=${promptTokens}, completion=${completionTokens}. running: requests=${guard.requestsMade}, tokens=${guard.promptTokensTotal + guard.completionTokensTotal}, cost≈$${guard.costUsd().toFixed(4)}`);
+      console.log('');
+    } catch (err) {
+      console.error(`  [error] ${redact(err.message)}`);
+      stoppedBy = `request error (${redact(err.message)})`;
+      rec.flags.push('BLOCK:request-error');
+      rec.response = `[error] ${redact(err.message)}`;
+      turns.push(rec);
+      break;
+    }
+  }
+
+  // ---- Write the transcript ----
+  const transcriptPath = path.join(TRANSCRIPT_DIR, `playthrough-${template.id}-${stamp}.md`);
+  let out;
+  try {
+    fs.mkdirSync(TRANSCRIPT_DIR, { recursive: true });
+    out = buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, guard, stoppedBy, redact, networkRequests, milestoneCount });
+    fs.writeFileSync(transcriptPath, out, 'utf8');
+  } catch (err) {
+    console.error(redact(`Failed to write transcript: ${err.message}`));
+  }
+
+  // ---- Console summary ----
+  console.log('============================================================');
+  console.log('PLAYTHROUGH SUMMARY');
+  console.log(`  mode:            ${isLive ? 'LIVE' : 'DRY-RUN'}`);
+  console.log(`  requests ${isLive ? 'made' : 'simulated'}: ${guard.requestsMade} / ${networkRequests} composed (+ 1 authored opening, no request)`);
+  console.log(`  tokens (in/out): ${guard.promptTokensTotal} / ${guard.completionTokensTotal}`);
+  console.log(`  est. cost:       $${guard.costUsd().toFixed(4)}`);
+  console.log(`  stopped by:      ${stoppedBy || 'nothing (composed all turns)'}`);
+  console.log(`  transcript:      ${transcriptPath}`);
+  if (!isLive) console.log('  (no network request was made — dry-run; responses are "[dry-run] not sent")');
+  console.log('============================================================');
+  console.log('');
+}
+
+// Build the Markdown transcript string. The prompt/response are recorded IN FULL
+// (redacted); only the console output truncates.
+function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, guard, stoppedBy, redact, networkRequests, milestoneCount }) {
+  const L = [];
+  L.push(`# Quest-harness playthrough transcript`);
+  L.push('');
+  L.push(`- **Campaign:** ${template.id} (${template.name || 'unnamed'}${template.subtitle ? ` — ${template.subtitle}` : ''})`);
+  L.push(`- **Model:** ${opts.model}`);
+  L.push(`- **Mode:** ${isLive ? 'LIVE (sent to OpenRouter)' : 'DRY-RUN (no network call; responses not sent)'}`);
+  L.push(`- **Timestamp:** ${startedAt.toISOString()}`);
+  L.push(`- **Composed:** 1 authored opening (no request) + ${networkRequests} request(s): 1 opening polish + ${milestoneCount} milestone turn(s)`);
+  L.push('');
+  L.push('### Guard settings');
+  for (const g of fmtGuards(opts)) L.push(`- ${g}`);
+  L.push('');
+  L.push('> The OPENING now uses the REAL shared introComposer.composeIntro (imported, not');
+  L.push('> replicated): the authored opening is recorded deterministically (no request) and');
+  L.push('> the single opening request is the bounded [ADVENTURE START - POLISH] reword pass,');
+  L.push('> whose result is judged by a REPLICATED isPolishSafe (accept = show polished;');
+  L.push('> reject = fall back to authored). The polish prompt + isPolishSafe are still copied');
+  L.push('> from src/hooks/useGameInteraction.js and CAN DRIFT (a future refactor should share');
+  L.push('> them too). Each milestone turn is REPLICATED from handleSubmit (gameContext +');
+  L.push('> [CONTEXT]/[SUMMARY]/[PLAYER ACTION]/[NARRATE] wrapped by DM_PROTOCOL + style');
+  L.push('> directive) and CAN DRIFT. Location context is a minimal stand-in (the harness');
+  L.push('> generates no town maps); summary/RAG are omitted.');
+  L.push('');
+  L.push('---');
+  L.push('');
+
+  for (let i = 0; i < turns.length; i++) {
+    const t = turns[i];
+    L.push(`## Turn ${i + 1}: ${t.label}`);
+    L.push('');
+
+    // Deterministic authored opening: recorded verbatim, never a request.
+    if (t.isAuthored) {
+      L.push('_Deterministic authored opening (introComposer.composeIntro). No request, no network: the app shows this to guests verbatim and uses it as the base for the polish pass below._');
+      L.push('');
+      L.push('### Authored opening');
+      L.push('');
+      L.push('```text');
+      L.push(redact(t.authoredText || '(empty)'));
+      L.push('```');
+      L.push('');
+      L.push(`**Automated checks:** ${t.flags.length ? t.flags.join(', ') : '(none)'}`);
+      L.push('');
+      L.push('---');
+      L.push('');
+      continue;
+    }
+
+    if (t.playerInput) {
+      L.push(`**Scripted player input:** ${t.playerInput}`);
+      L.push('');
+    }
+    L.push(`**Est. prompt tokens:** ~${t.estPrompt}`);
+    L.push('');
+    L.push('### Prompt sent');
+    L.push('');
+    L.push('```text');
+    L.push(redact(t.prompt));
+    L.push('```');
+    L.push('');
+    L.push('### Response');
+    L.push('');
+    if (t.sent) {
+      L.push('```text');
+      L.push(redact(t.response || '(empty)'));
+      L.push('```');
+      L.push('');
+      L.push(`**Token usage:** prompt=${t.promptTokens}, completion=${t.completionTokens}`);
+    } else {
+      L.push('```text');
+      L.push(redact(t.response || '[dry-run] not sent'));
+      L.push('```');
+    }
+    L.push('');
+    if (t.polishVerdict) {
+      L.push(`**isPolishSafe verdict:** ${t.polishVerdict}`);
+      L.push('');
+    }
+    L.push(`**Automated checks:** ${t.flags.length ? t.flags.join(', ') : '(none)'}`);
+    L.push('');
+    L.push('---');
+    L.push('');
+  }
+
+  L.push('## Summary');
+  L.push('');
+  L.push(`- **Requests ${isLive ? 'made' : 'simulated'}:** ${guard.requestsMade} / ${networkRequests} composed (+ 1 authored opening, no request)`);
+  L.push(`- **Tokens (in/out):** ${guard.promptTokensTotal} / ${guard.completionTokensTotal}`);
+  L.push(`- **Estimated cost:** $${guard.costUsd().toFixed(4)}`);
+  L.push(`- **Stopped by:** ${stoppedBy || 'nothing (composed all turns)'}`);
+  L.push('');
+  L.push('### Per-turn flags overview');
+  L.push('');
+  L.push('| # | Turn | Flags |');
+  L.push('|---|------|-------|');
+  for (let i = 0; i < turns.length; i++) {
+    const t = turns[i];
+    L.push(`| ${i + 1} | ${t.label} | ${t.flags.length ? t.flags.join(', ') : '(none)'} |`);
+  }
+  L.push('');
+  if (!isLive) L.push('_(dry-run: no network request was made; responses were not sent)_');
+  L.push('');
+  return L.join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
@@ -988,43 +1609,18 @@ async function main() {
     return;
   }
 
-  const isLive = opts.live;
-
   if (opts['premium-dir']) {
     console.warn('[premium-dir] ignored in --mode ai (it only affects the guest/member/both sim).');
   }
 
-  // --live requires --yes: a live spend is never a single accidental flag.
-  if (isLive && !opts.yes) {
-    console.error('Refusing to run live: --live requires an explicit --yes as well.');
-    console.error('Re-run with:  --live --yes   (this will spend real OpenRouter credit).');
-    process.exit(3);
-  }
+  // Enforce --live/--yes and resolve the key (never printed). Shared with playthrough.
+  const { isLive, key, redact } = resolveLiveKey(opts);
 
-  // Resolve the key ONLY for live runs. Never print it.
-  let key = null;
-  let redact = (s) => s;
-  if (isLive) {
-    try {
-      key = readKey(opts['key-file']);
-    } catch (err) {
-      console.error(`Error reading key: ${err.message}`);
-      process.exit(4);
-    }
-    if (!key) {
-      console.error('No OpenRouter key found. Supply it via one of:');
-      console.error('  * environment: OPENROUTER_API_KEY=sk-or-...');
-      console.error('  * file:        --key-file <path>  (file has a line OPENROUTER_API_KEY=sk-or-...)');
-      console.error('The key is never printed or written anywhere.');
-      process.exit(4);
-    }
-    redact = makeRedactor(key);
-  }
-
-  // Load app data + compose the prompts.
-  let storyTemplates, DM_PROTOCOL;
+  // Load app data + compose the prompts. composeIntro/formatStartObjective are the REAL
+  // shared authored-opening builders (used by the playthrough opening).
+  let storyTemplates, DM_PROTOCOL, composeIntro, formatStartObjectiveReal;
   try {
-    ({ storyTemplates, DM_PROTOCOL } = await loadAppData());
+    ({ storyTemplates, DM_PROTOCOL, composeIntro, formatStartObjective: formatStartObjectiveReal } = await loadAppData());
   } catch (err) {
     console.error(redact(`Failed to load app data (storyTemplates / DM_PROTOCOL): ${err.message}`));
     process.exit(5);
@@ -1035,6 +1631,13 @@ async function main() {
     console.error(`Campaign "${opts.campaign}" not found. Available ids:`);
     for (const t of storyTemplates) console.error(`  - ${t.id}`);
     process.exit(6);
+  }
+
+  // Recorded playthrough extends AI mode: same guards + key path, transcript output.
+  if (opts.playthrough) {
+    await runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact },
+      { composeIntro, formatStartObjective: formatStartObjectiveReal });
+    return;
   }
 
   const requests = composeRequests(template, DM_PROTOCOL, opts.steps);
