@@ -76,7 +76,7 @@ what the app sees. Jest runs the same modules directly through its Babel pipelin
 | ENC-04 | encounters | error | implemented | Rewards are always STATED: a fully-absent `rewards` field renders a blank reward area (`result.rewards` gate + `generateLoot` returns null), so absence is a violation; an explicit object (even `{}`) is a stated "none" and passes. |
 | ENC-05 | encounters | error | implemented | When an encounter defines a `consequences` block, every roll tier (criticalSuccess/success/failure/criticalFailure) has non-blank outcome text. |
 | ENC-06 | encounters | warn | implemented | Any `climate` tag is from the valid `hot`/`cold`/`any` vocabulary (a typo never matches the selector), and `suggestedActions` is a non-empty list. |
-| MAP-01 | map | error | implemented | Every milestone POI id (every `type:'poi'` spawn) has an ARRIVAL image in `POI_IMAGES` (`worldMoveController.js`). Known artless POIs are allowlisted (see Known accepted gaps); fails on any NEW POI shipped without arrival art. |
+| MAP-01 | map | error | implemented | Every milestone POI id (every `type:'poi'` spawn) has an ARRIVAL image in `POI_IMAGES` (`worldMoveController.js`). Passes via real coverage (all 16 milestone POIs now ship arrival art); the debt allowlist is empty and it fails on any NEW POI shipped without arrival art. |
 | MAP-02 | map | warn | implemented | Every milestone POI id has a DISTINCTIVE world sprite in `poiSprite` (`worldTileArt.js`) rather than the generic milestone flag. Currently all 17 fall through to the flag (world-sprite debt). |
 | MAP-03 | map | error | implemented | Every biome the production generator can stamp (`plains`/`desert`/`snow`/`water`/`beach`) has a `getEncounterBiome` case (else it collapses to the plains table) AND `biomeBackground` tile art. Theme parity across plains/desert/snow. |
 | MAP-04 | map | warn | implemented | Every milestone POI has an authored display `name`, so arrival never falls back to a title-cased raw id. Complements DISP-01. |
@@ -122,11 +122,12 @@ what the app sees. Jest runs the same modules directly through its Babel pipelin
   ENC-03 surfaces **0 warnings** after the climate-neutral allowlist (the four
   intentionally-untagged environmental hazards).
 - **map / display**: every `error`-severity check passes (0 failures). MAP-01 passes
-  because the 16 currently-artless milestone POIs are allowlisted as accepted art debt
-  (see below); MAP-03 confirms all five producible biomes have both a `getEncounterBiome`
-  case and tile art (the snow/desert cases are present, closing the collapse-to-plains
-  gap); MAP-04 and DISP-01 pass because every milestone POI carries an authored `name`
-  and every encounter `name` is a human-readable label.
+  via REAL coverage: all 16 milestone POIs now ship a dedicated arrival `.webp` in
+  `POI_IMAGES` (`worldMoveController.js`), so the debt allowlist is empty and MAP-01
+  fails on any NEW art-less POI; MAP-03 confirms all five producible biomes have both a
+  `getEncounterBiome` case and tile art (the snow/desert cases are present, closing the
+  collapse-to-plains gap); MAP-04 and DISP-01 pass because every milestone POI carries an
+  authored `name` and every encounter `name` is a human-readable label.
 - **MAP-02** surfaces **17 warnings** — every milestone POI renders the generic red
   milestone flag on the world map because `poiSprite` has no distinctive branch keyed
   to their spawn ids (world-sprite debt, see below).
@@ -137,20 +138,14 @@ Pre-existing content gaps that `error`-class checks explicitly allowlist so the 
 gate stays green on today's debt while still failing on any NEW regression. Burn
 these down and shrink the allowlist.
 
-- **MAP-01 POI arrival-art debt** (`POI_ARRIVAL_IMAGE_DEBT_ALLOWLIST` in
-  `src/audits/map.js`). POI arrival art is generated externally (a Gemini image
-  pipeline; prompts in `docs/IMAGE_GENERATION_PROMPTS.md`) and dropped into
-  `POI_IMAGES` (`worldMoveController.js`) over time. Only
-  `goblin_hideout` has shipped; the other **16** milestone POIs arrive with no art
-  and are allowlisted so MAP-01 (error) stays green on this known debt while FAILING
-  the moment a NEW milestone POI ships without arrival art (the single most important
-  guard: no new location may silently ship art-less). The 16:
-  `shadow_fortress`, `sandstorm_hideout`, `sunken_spire`, `glacier_hollow`,
-  `silent_steading`, `famine_barrow`, `abandoned_well`, `grimstead_cellar`,
-  `ironhold_ruins`, `rot_tunnels`, `gear_end_sewers`, `coghill_foundry`,
-  `desecrated_shrine`, `cult_meeting_place`, `corrupted_lighthouse`,
-  `mourn_peak_summit`. Add the `.webp` to `POI_IMAGES` and drop the id from the
-  allowlist to burn it down.
+- **MAP-01 POI arrival-art debt: RESOLVED.** All **16** milestone POIs now ship a
+  dedicated arrival `.webp` in `POI_IMAGES` (`worldMoveController.js`), so MAP-01 passes
+  via real coverage and `POI_ARRIVAL_IMAGE_DEBT_ALLOWLIST` (`src/audits/map.js`) is now
+  an empty frozen ratchet. It fails the moment a NEW milestone POI ships without arrival
+  art (the single most important guard: no new location may silently ship art-less). POI
+  arrival art is generated externally (a Gemini image pipeline; prompts in
+  `docs/IMAGE_GENERATION_PROMPTS.md`); to add a new POI, drop its `.webp` into
+  `POI_IMAGES` and mirror the key in `POI_ARRIVAL_IMAGE_KEYS` (`src/audits/context.js`).
 
 - **MAP-02 POI world-sprite debt** (advisory, no allowlist needed — it is a `warn`).
   `poiSprite` (`worldTileArt.js`) only draws distinctive world-map sprites for the

@@ -122,10 +122,17 @@ export const POI_SPRITE_TYPES = Object.freeze([
 // Keys of the POI_IMAGES map that supplies the ARRIVAL art shown in the POI
 // arrival modal (image = POI_IMAGES[poiType], poiType = tile.poiType || tile.poi).
 // Milestone POIs stamp tile.poi with the spawn id, so a spawn id absent here
-// arrives with no art. Source: src/game/worldMoveController.js buildPoiEncounter
-// (function-local POI_IMAGES const).
+// arrives with no art. The generic-kind keys (cave_entrance/cave/ruins/mountain/
+// forest/hills) plus goblin_hideout cover procedural + legacy POIs; the remaining
+// 16 are the authored milestone spawn ids, each with its own arrival .webp. Source:
+// src/game/worldMoveController.js buildPoiEncounter (function-local POI_IMAGES const).
 export const POI_ARRIVAL_IMAGE_KEYS = Object.freeze([
-  'cave_entrance', 'cave', 'ruins', 'goblin_hideout', 'mountain', 'forest', 'hills'
+  'cave_entrance', 'cave', 'ruins', 'goblin_hideout', 'mountain', 'forest', 'hills',
+  'shadow_fortress', 'sandstorm_hideout', 'sunken_spire', 'glacier_hollow',
+  'silent_steading', 'famine_barrow', 'abandoned_well', 'grimstead_cellar',
+  'ironhold_ruins', 'rot_tunnels', 'gear_end_sewers', 'coghill_foundry',
+  'desecrated_shrine', 'cult_meeting_place', 'corrupted_lighthouse',
+  'mourn_peak_summit'
 ]);
 
 /**

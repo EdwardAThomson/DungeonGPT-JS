@@ -12,21 +12,14 @@ const DOMAIN = 'map';
 // KNOWN ACCEPTED DEBT (CI-green ratchet, MAP-01).
 //
 // Milestone POI ids that have NO entry in POI_IMAGES (worldMoveController.js), so
-// arriving at them shows no arrival art. This is PRE-EXISTING, intentionally-held
-// debt: POI arrival art is generated externally (a Gemini image pipeline) and
-// dropped in over time; only `goblin_hideout` has shipped so far. MAP-01 (error)
-// allowlists the 16 currently-artless POIs so the gate stays green on today's
-// debt but FAILS the moment a NEW milestone POI ships without arrival art — the
-// single most important guard here: no new location may silently ship art-less.
-// MAP-02 (warn) additionally lists the world-sprite gap. Documented in
-// docs/CONTENT_AUDIT.md under "Known accepted gaps / debt".
-export const POI_ARRIVAL_IMAGE_DEBT_ALLOWLIST = Object.freeze([
-  'shadow_fortress', 'sandstorm_hideout', 'sunken_spire', 'glacier_hollow',
-  'silent_steading', 'famine_barrow', 'abandoned_well', 'grimstead_cellar',
-  'ironhold_ruins', 'rot_tunnels', 'gear_end_sewers', 'coghill_foundry',
-  'desecrated_shrine', 'cult_meeting_place', 'corrupted_lighthouse',
-  'mourn_peak_summit'
-]);
+// arriving at them shows no arrival art. Now EMPTY: every authored milestone POI
+// has shipped a dedicated arrival .webp, so MAP-01 passes via REAL coverage rather
+// than allowlisted debt. Kept as an empty frozen ratchet so any NEW milestone POI
+// added without arrival art fails MAP-01 immediately — the single most important
+// guard here: no new location may silently ship art-less. MAP-02 (warn) still lists
+// the world-sprite gap (distinctive sprites are a separate, still-open surface).
+// Documented in docs/CONTENT_AUDIT.md.
+export const POI_ARRIVAL_IMAGE_DEBT_ALLOWLIST = Object.freeze([]);
 
 // A display name that is really a raw id (all lower snake_case, no spaces).
 const looksLikeRawId = (s) => typeof s === 'string' && /^[a-z0-9]+(_[a-z0-9]+)+$/.test(s.trim());
