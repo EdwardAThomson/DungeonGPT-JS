@@ -7,7 +7,7 @@ import { areRequirementsMet, findMarkerMilestoneIndex, resolveTalkMarkerMileston
 import { getStepHint } from '../game/questHints';
 import { formatPartyInfo } from '../game/promptComposer';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
-import { composeIntro } from '../game/introComposer';
+import { composeIntro, formatStartObjective } from '../game/introComposer';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-interaction');
@@ -99,25 +99,24 @@ const formatMilestonePromptText = (milestoneStatus) => {
     return text;
 };
 
-// Format ONLY the current milestone as a grounded objective line for the new-game
-// opening. Unlike formatMilestonePromptText (which dumps every active/completed/locked
-// milestone), this returns a single line for the one immediate step, plus the real
-// destination it lives in so the opening can frame it as somewhere ELSEWHERE to travel
-// to rather than part of the starting scene. Mirrors introComposer's grounded style.
-const formatStartObjective = (current) => {
-    if (!current) return { line: '', destination: '' };
-    const typeTag = current.type ? ` [${current.type}]` : '';
-    let line = `${current.text}${typeTag}`;
-    const destination = current.building?.location || current.spawn?.location || current.location || '';
-    if (current.spawn?.type === 'npc' && current.spawn.name) {
-        const who = current.spawn.role ? `${current.spawn.name} (${current.spawn.role})` : current.spawn.name;
-        const where = current.building?.name || current.spawn.location;
-        line += `: speak with ${who}${where ? ` at ${where}` : ''}`;
-        if (current.spawn.personality) line += `; ${current.spawn.personality}`;
-    } else if (current.building?.name) {
-        line += ` at ${current.building.name}`;
-    }
-    return { line, destination };
+// formatStartObjective now lives in introComposer.js (imported above) so the
+// destination-naming logic (#69) sits with the authored opening it grounds.
+
+// Validate a polished opening before trusting it. The polish pass may ONLY reword the
+// authored text: it must not drop the grounded facts or balloon with invented content.
+// Returns true only when the polished text is safe to show; otherwise the caller falls
+// back to the authored opening verbatim.
+const isPolishSafe = (polished, authored, { startPlaceName, destination }) => {
+    if (!polished || !polished.trim()) return false;
+    // Gross-size guard against added (or dropped) content: a reword stays close in length.
+    const lo = authored.length * 0.4;
+    const hi = authored.length * 1.6;
+    if (polished.length < lo || polished.length > hi) return false;
+    // Must still name the start place (when it is a real name, not the generic fallback).
+    if (startPlaceName && startPlaceName !== 'this place' && !polished.includes(startPlaceName)) return false;
+    // Must still name the destination settlement when the objective is elsewhere.
+    if (destination && destination !== startPlaceName && !polished.includes(destination)) return false;
+    return true;
 };
 
 // Ground ACTIVE side quests in the prompt so the DM narrates their real sources instead
@@ -405,84 +404,70 @@ const useGameInteraction = (
         setIsLoading(true);
         setError(null);
 
-        // Guests (no AI): open with a local templated intro instead of calling the AI.
+        // The opening is now AUTHORED and grounded for EVERYONE (playtest 2026-07-07: an
+        // LLM composing the scene from scratch kept inventing the wrong town and NPCs the
+        // player could then chase, which the in-game AI had no record of). composeIntro
+        // builds a good two-part opening (scene + objective) purely from campaign data,
+        // referencing ONLY the start town, its atmosphere, any REAL placed NPCs, and the
+        // real current milestone + its destination. Signed-in players get a tightly-bounded
+        // LLM POLISH pass over that authored text; the model never composes from scratch,
+        // so it can never introduce a chaseable figure.
+        const currentTile = getTile(worldMap, playerPosition.x, playerPosition.y);
+        const milestoneStatus = getMilestoneStatus(settings.milestones);
+        const current = milestoneStatus.current;
+
+        const startPlaceName = locationContext?.currentTownTile?.townName
+            || (currentTile?.poi === 'town' ? currentTile?.townName : null)
+            || currentTile?.biome
+            || 'this place';
+        const isStartTown = !!(locationContext?.currentTownTile?.townName
+            || (currentTile?.poi === 'town' && currentTile?.townName));
+        const startSize = locationContext?.currentTownTile?.townSize || currentTile?.townSize || null;
+
+        // Only surface NPCs that are REALLY placed at the start (present when the party
+        // begins inside an already-populated town). Never invent anyone.
+        const placedNpcs = (locationContext?.isInsideTown && Array.isArray(locationContext?.currentTownMap?.npcs))
+            ? locationContext.currentTownMap.npcs.map(n => ({ name: n.name, role: n.job || n.title || n.role }))
+            : [];
+
+        const authoredOpening = composeIntro(settings, selectedHeroes, {
+            startPlaceName,
+            isTown: isStartTown,
+            startSize,
+            biome: currentTile?.biome,
+            currentMilestone: current,
+            placedNpcs,
+        });
+
+        // Guests (no AI): use the authored opening verbatim, plus the sign-in nudge.
         if (!aiAvailable) {
-            const startTile = getTile(worldMap, playerPosition.x, playerPosition.y);
-            const introText = composeIntro(settings, selectedHeroes, startTile);
+            const introText = `${authoredOpening}\n\n*Explore the map, face what you find, and forge your path. Sign in any time to wake the AI Dungeon Master for full narration and free-form actions.*`;
             setConversation(prev => [...prev, { role: 'ai', content: introText }]);
             setIsLoading(false);
             return;
         }
 
         const model = getCurrentModel();
-
-        // Note: marking tile as explored is handled in Game.js/useGameMap, or we assume starting town is explored.
-        // Ideally useGameMap handles the 'explored' bit, here we just do the AI part.
-
-        // Construct Prompt
-        // Two-stage opening (playtest 2026-07-07: a single under-grounded prompt that
-        // dumped ALL active milestones conflated the start town with a future town it
-        // named a venue/NPC from). Stage 1 grounds the scene to HERE only (reusing the
-        // same buildLocationContext/formatTownNpcs the movement path uses, so the
-        // current town's OWN placed NPCs are named). Stage 2 points at ONLY the current
-        // milestone, framed as somewhere elsewhere to travel to.
-        const partyInfo = formatPartyInfo(selectedHeroes);
-        const currentTile = getTile(worldMap, playerPosition.x, playerPosition.y);
-
-        // Stage 1: Scene, grounded to the current location only.
-        const locationInfo = buildLocationContext(currentTile, playerPosition, locationContext, worldMap);
-        const sceneContext = `Setting: ${settings.shortDescription || 'A mystery fantasy world'}. Mood: ${settings.grimnessLevel || 'Normal'} Intensity. Magic: ${settings.magicLevel || 'Standard'}. Tech: ${settings.technologyLevel || 'Medieval'}.\n${locationInfo}. Party: ${partyInfo}.`;
-
-        const scenePrompt = `[ADVENTURE START - SCENE]\n\n[CONTEXT]\n${sceneContext}\n\n[TASK]\nDescribe the arrival of the party and the immediate atmosphere of THIS location only. Describe ONLY the location, buildings, and people named in the context above. Do not name, place, or invent any building or NPC that is not listed here, and do not reference other towns as if they are part of this scene. Do not introduce, describe, or imply any person, figure, or character who is not listed in the context: if no people are listed, describe only the place, its structures, and the atmosphere (weather, light, sound, mood), with no individuals present at all. Begin your response directly with the narrative description.`;
-
-        // Stage 2: Objective/hook, using ONLY the current milestone (not the full active
-        // array). This is the core of the fix: the opening must not surface every active
-        // milestone's venue/NPC as if it were nearby.
-        const milestoneStatus = getMilestoneStatus(settings.milestones);
-        const current = milestoneStatus.current;
-        const { line: objectiveLine, destination: objectiveDest } = formatStartObjective(current);
-        const currentPlaceName = locationContext?.currentTownTile?.townName
-            || (currentTile?.poi === 'town' ? currentTile?.townName : null)
-            || currentTile?.biome
-            || 'this place';
+        const { destination: objectiveDest } = formatStartObjective(current);
 
         try {
-            // Sequential calls: scene first, then the objective hook. Both go through the
-            // same generateResponse (DM_PROTOCOL + style directive) + cleanAIResponse path.
-            let sceneText = await generateResponse(model, scenePrompt);
-            sceneText = cleanAIResponse(sceneText, sceneContext);
-
-            if (!sceneText || !sceneText.trim()) {
-                // An empty opening is a failed start: keep the adventure un-started so
-                // the Start Adventure button stays and the player can retry.
-                logger.warn('Empty AI scene response at adventure start; keeping the start available for retry');
-                setHasAdventureStarted(false);
-                setError('The Dungeon Master gave no reply. Please try starting the adventure again.');
-                return;
-            }
-
-            // Objective stage: best-effort. If it fails or returns nothing, fall back to a
-            // deterministic objective line rather than dropping the hook or crashing.
-            let objectiveText = '';
-            if (current && objectiveLine) {
-                const goalInfo = settings.campaignGoal ? `Campaign goal: ${settings.campaignGoal}.\n` : '';
-                const elsewhere = objectiveDest && objectiveDest !== currentPlaceName;
-                const objectiveContext = `${goalInfo}The party's current location: ${currentPlaceName}.\nThe party's immediate objective (the ONLY next step): ${objectiveLine}.${elsewhere ? `\nThe objective's location is in ${objectiveDest}, a DIFFERENT settlement the party has NOT reached and must travel to from ${currentPlaceName}.` : ''}`;
-                const objectivePrompt = `[ADVENTURE START - OBJECTIVE]\n\n[CONTEXT]\n${objectiveContext}\n\n[TASK]\nIn one short paragraph (2-3 sentences), point the party toward this immediate objective.${elsewhere ? ` You MUST name the destination settlement (${objectiveDest}) explicitly and make clear the party has to travel there to reach it; the objective and its building are in ${objectiveDest}, NOT in ${currentPlaceName}. Never imply the objective can be reached or begun without leaving ${currentPlaceName}, and never place ${objectiveDest}'s buildings or people in the current scene.` : ''} Do not invent NPCs or places beyond those named above. Close on the concrete next step, naming its destination. Begin your response directly with the narrative.`;
-                try {
-                    let objRaw = await generateResponse(model, objectivePrompt);
-                    objectiveText = cleanAIResponse(objRaw, objectiveContext).trim();
-                } catch (objErr) {
-                    logger.warn('Objective stage failed at adventure start; using deterministic hook', objErr);
+            // POLISH PASS (the only LLM involvement): the model may ONLY reword the
+            // authored opening for freshness. It must not change any fact, add or rename
+            // any entity, or alter the destination/next step. On empty/unsafe/error, fall
+            // back to the authored text verbatim so the opening is always grounded.
+            let aiResponse = authoredOpening;
+            const polishPrompt = `[ADVENTURE START - POLISH]\n\n[OPENING]\n${authoredOpening}\n\n[TASK]\nLightly reword and vary the phrasing of the opening above for freshness. You MUST NOT change any facts, add or rename any person, place, building, item, or objective, introduce any character not already present, or change the destination or next step. Do not add new sentences or content. Return the same opening, same structure and same facts, only rephrased. Begin your response directly with the reworded opening.`;
+            try {
+                let polished = await generateResponse(model, polishPrompt);
+                polished = cleanAIResponse(polished, authoredOpening).trim();
+                if (isPolishSafe(polished, authoredOpening, { startPlaceName, destination: objectiveDest })) {
+                    aiResponse = polished;
+                } else {
+                    logger.warn('Opening polish pass rejected (empty/unsafe/dropped a grounded name); using authored opening verbatim');
                 }
-                if (!objectiveText) {
-                    // Deterministic fallback mirrors introComposer's "First steps" line.
-                    objectiveText = `**First steps:** ${current.text}${objectiveDest ? ` (travel to ${objectiveDest})` : ''}`;
-                }
+            } catch (polishErr) {
+                logger.warn('Opening polish pass failed; using authored opening verbatim', polishErr);
             }
-
-            // Combine the two stages into the single opening message the player sees.
-            let aiResponse = objectiveText ? `${sceneText}\n\n${objectiveText}` : sceneText;
 
             // Parse for Triggers
             const match = aiResponse.match(TRIGGER_REGEX);
