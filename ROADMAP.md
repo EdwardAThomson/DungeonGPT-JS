@@ -1,6 +1,6 @@
 # Roadmap — DungeonGPT (JS)
 
-_Status: active · updated 2026-07-06_
+_Status: active · updated 2026-07-08_
 
 The production rewrite of DungeonGPT — a React web app for creating fantasy
 characters and playing AI-narrated RPG campaigns. Deployed at dungeongpt.xyz on
@@ -58,7 +58,7 @@ backlog; see the `docs/` design docs for each system.
 
 ## Backlog
 
-- [ ] Billing + credit system (Lemon Squeezy) + AI usage tracking (the OpenRouter premium pool itself shipped with #7; tier grants are still manual via psql)
+- [ ] Billing + credit system (Lemon Squeezy) + AI usage tracking (the OpenRouter premium pool itself shipped with #7; redemption codes shipped the first slice — time-boxed tier grants via `POST /api/db/redeem-code` + a Profile redeem flow, `docs/REDEMPTION_CODES.md`; payment rails and usage/credit accounting remain)
 - [ ] Tiered narration — local templated prose for routine moves, AI for notable moments, as a cost/latency lever; subsumes guest movement narration / Guest Mode B3 (`docs/TIERED_NARRATION_PLAN.md`)
 - [ ] Streaming AI responses
 - [ ] Dungeon sub-maps (procedural caves / dungeons)

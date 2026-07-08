@@ -37,7 +37,7 @@ YouTube Videos 🎥:
 *   **Onboarding:** A guided tour and a 27-point-buy hero creator.
 *   **AI Models:** Runs on Cloudflare Workers AI with a curated 5-model lineup (GPT-OSS 120B/20B, Llama 4 Scout, Gemma 3 12B, Llama 3.1 8B Fast). Local development additionally supports OpenAI, Gemini, and Claude. Member+ accounts get a premium model pool via OpenRouter (server-side, with a daily allowance and automatic fallback to the free pool).
 *   **User Authentication:** Secure sign-in via Octonion hub (centralized auth across games).
-*   **Membership Tiers:** Account tiers (Free / Member / Premium / Elite) stored server-side; premium story templates are delivered from the server to entitled accounts, and the profile page shows the current tier.
+*   **Membership Tiers:** Account tiers (Free / Member / Premium / Elite) stored server-side; premium story templates are delivered from the server to entitled accounts, and the profile page shows the current tier. Members can redeem a code on the Profile page for time-boxed membership (with the active-until date shown) and pick their AI pool (Free / Premium) there too.
 *   **Persistent Sessions:** Characters and game sessions saved to a self-hosted PostgreSQL database, accessed through the CF Worker (via Cloudflare Hyperdrive) with row-level access enforcement.
 *   **Save/Load System:** Manual and auto-save with confirmation modals; saves are written locally first (IndexedDB) and synced to the cloud, with honest "on this device" status in the saved-games list when a cloud push is pending.
 
