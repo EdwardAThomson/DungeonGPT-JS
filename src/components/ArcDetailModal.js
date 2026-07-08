@@ -175,7 +175,7 @@ const ArcDetailModal = ({
                     fontSize: '0.9rem', fontWeight: 'bold',
                 }}
             >
-                Begin This Chapter
+                Begin This Campaign
             </button>
         );
     };

@@ -130,6 +130,11 @@ const HeroSelection = () => {
           so step 2 is done and the player is on the final step: marking step 2 as
           active here read as "you still need to choose a quest" (playtest 2026-07-06). */}
       <OnboardingSteps currentStep={3} completedSteps={heroes.length > 0 ? [1, 2] : [2]} />
+      <div className="hero-selection-top-nav">
+        <button onClick={handleBack} className="back-button">
+          ← Back to Story Setup
+        </button>
+      </div>
       <div className="page-header">
         <div className="page-header-titles">
           <h2>Select Your Party</h2>
