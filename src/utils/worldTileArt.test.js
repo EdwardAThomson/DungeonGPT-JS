@@ -91,4 +91,38 @@ describe('worldTileArt', () => {
     Object.values(sampleBiomes).forEach((fn) => decode(fn()));
     Object.values(samplePois).forEach((fn) => decode(fn()));
   });
+
+  const MILESTONE_POI_IDS = [
+    'goblin_hideout', 'shadow_fortress', 'sandstorm_hideout', 'sunken_spire',
+    'glacier_hollow', 'silent_steading', 'famine_barrow', 'abandoned_well',
+    'grimstead_cellar', 'ironhold_ruins', 'rot_tunnels', 'gear_end_sewers',
+    'coghill_foundry', 'desecrated_shrine', 'cult_meeting_place',
+    'corrupted_lighthouse', 'mourn_peak_summit',
+  ];
+
+  test('every authored milestone POI id renders a distinctive, well-formed sprite', () => {
+    const generic = poiSprite({ milestonePoi: true });
+    const seen = new Set();
+    MILESTONE_POI_IDS.forEach((poi) => {
+      const svg = decode(poiSprite({ poi, milestonePoi: true })); // non-null + valid data-URI
+      const s = poiSprite({ poi, milestonePoi: true });
+      expect(s).not.toBe(generic);   // distinct from the generic flag
+      expect(svg.length).toBeGreaterThan(20);
+      seen.add(s);
+    });
+    expect(seen.size).toBe(MILESTONE_POI_IDS.length); // all 17 distinct from each other
+  });
+
+  test('milestone POI sprites are deterministic (memoised per id)', () => {
+    MILESTONE_POI_IDS.forEach((poi) => {
+      expect(poiSprite({ poi, milestonePoi: true })).toBe(poiSprite({ poi, milestonePoi: true }));
+    });
+  });
+
+  test('unknown milestone POI id falls back to the generic flag (backward-compat)', () => {
+    const generic = poiSprite({ milestonePoi: true });
+    const unknown = poiSprite({ poi: 'totally_new_milestone_poi', milestonePoi: true });
+    decode(unknown);
+    expect(unknown).toBe(generic);
+  });
 });
