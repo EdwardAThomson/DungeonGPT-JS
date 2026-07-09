@@ -358,10 +358,17 @@ const useGameInteraction = (
         return resolveProviderAndModel(selectedProvider, selectedModel).model;
     };
 
-    const generateResponse = async (model, prompt) => {
+    const generateResponse = async (model, prompt, opts = {}) => {
         // Append the player's Narrative Style directive so it actually affects the narration.
-        const style = VERBOSITY_DIRECTIVE[settings?.responseVerbosity] || VERBOSITY_DIRECTIVE.Moderate;
-        const fullPrompt = `${DM_PROTOCOL}${prompt}\n\nStyle directive (shapes how you write; do not repeat it): ${style}`;
+        // opts.style overrides the player's setting for this one call (the opening polish pass
+        // passes a "match the original length" directive so it is NOT told to write richly and
+        // expand, which used to fight the reword-only guard). An empty override omits the line.
+        const style = opts.style !== undefined
+            ? opts.style
+            : (VERBOSITY_DIRECTIVE[settings?.responseVerbosity] || VERBOSITY_DIRECTIVE.Moderate);
+        const fullPrompt = style
+            ? `${DM_PROTOCOL}${prompt}\n\nStyle directive (shapes how you write; do not repeat it): ${style}`
+            : `${DM_PROTOCOL}${prompt}`;
         setLastPrompt(fullPrompt);
         const resolved = resolveProviderAndModel(selectedProvider, model);
         return await llmService.generateUnified({
@@ -458,7 +465,7 @@ const useGameInteraction = (
             let aiResponse = authoredOpening;
             const polishPrompt = `[ADVENTURE START - POLISH]\n\n[OPENING]\n${authoredOpening}\n\n[TASK]\nLightly reword and vary the phrasing of the opening above for freshness. You MUST NOT change any facts, add or rename any person, place, building, item, or objective, introduce any character not already present, or change the destination or next step. Do not add new sentences or content. Return the same opening, same structure and same facts, only rephrased. Begin your response directly with the reworded opening.`;
             try {
-                let polished = await generateResponse(model, polishPrompt);
+                let polished = await generateResponse(model, polishPrompt, { style: 'Match the length and paragraph count of the original exactly. Do not expand, add sentences, or add detail; only rephrase what is there.' });
                 polished = cleanAIResponse(polished, authoredOpening).trim();
                 if (isPolishSafe(polished, authoredOpening, { startPlaceName, destination: objectiveDest })) {
                     aiResponse = polished;

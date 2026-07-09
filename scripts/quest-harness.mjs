@@ -480,9 +480,15 @@ function isPolishSafeReplica(polished, authored, { startPlaceName, destination }
 }
 
 // Replica of generateResponse's DM_PROTOCOL + style-directive wrap.
-function wrapWithProtocol(DM_PROTOCOL, prompt, settings) {
-  const style = VERBOSITY_DIRECTIVE[settings?.responseVerbosity] || VERBOSITY_DIRECTIVE.Moderate;
-  return `${DM_PROTOCOL}${prompt}\n\nStyle directive (shapes how you write; do not repeat it): ${style}`;
+function wrapWithProtocol(DM_PROTOCOL, prompt, settings, styleOverride) {
+  // styleOverride lets a specific call replace the player's verbosity directive (the opening
+  // polish pass passes a "match the original length" directive so it is not told to expand).
+  const style = styleOverride !== undefined
+    ? styleOverride
+    : (VERBOSITY_DIRECTIVE[settings?.responseVerbosity] || VERBOSITY_DIRECTIVE.Moderate);
+  return style
+    ? `${DM_PROTOCOL}${prompt}\n\nStyle directive (shapes how you write; do not repeat it): ${style}`
+    : `${DM_PROTOCOL}${prompt}`;
 }
 
 // Build the list of composed requests for a template.
@@ -708,7 +714,7 @@ function composePlaythroughRequests(template, DM_PROTOCOL, { composeIntro, forma
   const polishPrompt = `[ADVENTURE START - POLISH]\n\n[OPENING]\n${authoredOpening}\n\n[TASK]\nLightly reword and vary the phrasing of the opening above for freshness. You MUST NOT change any facts, add or rename any person, place, building, item, or objective, introduce any character not already present, or change the destination or next step. Do not add new sentences or content. Return the same opening, same structure and same facts, only rephrased. Begin your response directly with the reworded opening.`;
   requests.push({
     label: 'Opening (polish)',
-    prompt: wrapWithProtocol(DM_PROTOCOL, polishPrompt, settings),
+    prompt: wrapWithProtocol(DM_PROTOCOL, polishPrompt, settings, 'Match the length and paragraph count of the original exactly. Do not expand, add sentences, or add detail; only rephrase what is there.'),
     isPolish: true,
     authored: authoredOpening,
     startPlaceName: startTown,
