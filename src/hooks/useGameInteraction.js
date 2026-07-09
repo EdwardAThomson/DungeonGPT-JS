@@ -85,7 +85,7 @@ const formatMilestonePromptText = (milestoneStatus) => {
             // an AI [COMPLETE_MILESTONE] mark. Never annotate later/locked talk objectives.
             if (i === 0 && m.type === 'talk') {
                 const who = m.spawn?.name || 'this person';
-                line += ` (you may mark this complete once the party finishes speaking with ${who})`;
+                line += ` (once your conversation with ${who} reaches its natural conclusion and its purpose is met, mark this objective complete with the [COMPLETE_MILESTONE] marker; do not mark it while the conversation is still ongoing)`;
             }
             return line;
         }).join('; ');
