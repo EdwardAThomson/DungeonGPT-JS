@@ -69,6 +69,16 @@
 // hook and this harness both call). It obeys every guard exactly like AI mode and is
 // DRY-RUN unless BOTH --live AND --yes are passed. Every prompt + response is written
 // to a timestamped Markdown transcript under harness-transcripts/ (gitignored).
+//
+// SWEEP (--playthrough --all): runs the recorded playthrough for EVERY playable campaign
+// (and every premium template when --premium-dir is given), writing one transcript per
+// campaign plus a single aggregate sweep-summary. The guards are enforced CUMULATIVELY
+// across the whole sweep (the running request/token/USD tallies carry across campaigns),
+// so it hard-stops the instant the next request would cross --max-requests /
+// --max-total-tokens / --max-usd and marks the remaining campaigns skipped. The aggregate
+// summary + all console output stay STRUCTURAL for premium campaigns (ids, counts, flags,
+// marker yes/no) — no premium prose leaks; premium prose only ever lands in the local,
+// gitignored per-campaign transcript. Dry-run projects the full-sweep request count + cost.
 // ============================================================================
 
 import { build } from 'esbuild';
@@ -151,19 +161,24 @@ const FLAG_DEFAULTS = {
   // Optional directory of external (private-repo) campaign templates to ALSO
   // simulate in guest/member/both mode. No default path: omit the flag and the
   // harness behaves exactly as before. See loadPremiumTemplates + --help.
-  'premium-dir': null
+  'premium-dir': null,
+  // Optional NAME for a --playthrough --all sweep. A sweep with a name persists a
+  // resumable JSON state file (harness-transcripts/<name>.sweep-state.json) so it can
+  // span multiple invocations (chunks). Omit and an auto name (sweep-<timestamp>) is used.
+  'sweep-name': null
 };
 
 function parseArgs(argv) {
   const opts = {
     ...FLAG_DEFAULTS, live: false, yes: false, help: false,
-    all: false, simulate: false, playthrough: false, _modeExplicit: false
+    all: false, simulate: false, playthrough: false, _modeExplicit: false,
+    resume: false, resumeName: null
   };
   const numeric = new Set([
     'steps', 'max-tokens', 'max-prompt-tokens', 'tpm', 'rpm',
     'max-requests', 'max-total-tokens', 'max-usd', 'price-in', 'price-out', 'temperature'
   ]);
-  const stringFlags = new Set(['campaign', 'mode', 'model', 'on-limit', 'key-file', 'premium-dir']);
+  const stringFlags = new Set(['campaign', 'mode', 'model', 'on-limit', 'key-file', 'premium-dir', 'sweep-name']);
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -173,6 +188,14 @@ function parseArgs(argv) {
     if (arg === '--all') { opts.all = true; continue; }
     if (arg === '--simulate') { opts.simulate = true; continue; }
     if (arg === '--playthrough') { opts.playthrough = true; continue; }
+    // --resume [name]: resume a sweep. Optional value: if the next argument is not
+    // another flag, it is the sweep NAME; otherwise resume the MOST RECENT sweep.
+    if (arg === '--resume') {
+      opts.resume = true;
+      const nxt = argv[i + 1];
+      if (nxt !== undefined && !nxt.startsWith('--')) { opts.resumeName = nxt; i++; }
+      continue;
+    }
     if (!arg.startsWith('--')) throw new Error(`Unexpected argument: ${arg}`);
     const name = arg.slice(2);
     if (!(name in FLAG_DEFAULTS)) throw new Error(`Unknown flag: ${arg} (try --help)`);
@@ -188,11 +211,20 @@ function parseArgs(argv) {
     }
   }
 
+  // --resume is a sweep continuation: it always means --playthrough over ALL campaigns
+  // (the campaign list comes from the saved state, not the CLI). Normalize before the
+  // rest of the mode/all logic runs so isSweep is true downstream.
+  if (opts.resume) {
+    opts.playthrough = true;
+    opts.all = true;
+  }
+
   // --simulate is an alias for the deterministic guest-vs-member comparison, unless
   // an explicit --mode was also given.
   if (opts.simulate && !opts._modeExplicit) opts.mode = 'both';
-  // --campaign all (or --all) implies the deterministic sim; the AI path is single-campaign.
-  if ((opts.all || opts.campaign === 'all') && !opts._modeExplicit && opts.mode === 'ai') {
+  // --campaign all (or --all) implies the deterministic sim, EXCEPT under --playthrough,
+  // which sweeps every playable campaign in AI mode (a recorded live playthrough of each).
+  if (!opts.playthrough && (opts.all || opts.campaign === 'all') && !opts._modeExplicit && opts.mode === 'ai') {
     opts.mode = 'both';
   }
   if (opts.all) opts.campaign = 'all';
@@ -201,17 +233,32 @@ function parseArgs(argv) {
   if (!VALID_MODES.has(opts.mode)) {
     throw new Error(`--mode must be one of ai|guest|member|both, got "${opts.mode}"`);
   }
-  if (opts.mode === 'ai' && opts.campaign === 'all') {
-    throw new Error('--campaign all / --all is only supported for the deterministic sim (--mode guest|member|both).');
+  if (!opts.playthrough && opts.mode === 'ai' && opts.campaign === 'all') {
+    throw new Error('--campaign all / --all is only supported for the deterministic sim (--mode guest|member|both), or with --playthrough (a recorded AI sweep of every campaign).');
   }
   if (opts.playthrough) {
     if (opts._modeExplicit && opts.mode !== 'ai') {
       throw new Error('--playthrough extends AI mode; it is not compatible with --mode guest|member|both.');
     }
     opts.mode = 'ai';
-    if (opts.campaign === 'all') {
-      throw new Error('--playthrough runs a single campaign; --campaign all / --all is not supported.');
-    }
+    // --playthrough --all / --campaign all sweeps every playable campaign (AI mode); allowed.
+    // A full sweep needs raised --max-requests / --max-usd / --max-total-tokens (the
+    // conservative defaults stop it early, on purpose): the guards are cumulative.
+  }
+
+  // Sweep name / resume validation.
+  const safeName = (n) => typeof n === 'string' && /^[A-Za-z0-9._-]+$/.test(n) && n !== '.' && n !== '..';
+  if (opts['sweep-name'] != null && !safeName(opts['sweep-name'])) {
+    throw new Error(`--sweep-name "${opts['sweep-name']}" must be a simple name (letters, digits, dot, dash, underscore).`);
+  }
+  if (opts.resumeName != null && !safeName(opts.resumeName)) {
+    throw new Error(`--resume "${opts.resumeName}" must be a simple name (letters, digits, dot, dash, underscore).`);
+  }
+  if (opts.resume && opts['sweep-name'] != null) {
+    throw new Error('--resume and --sweep-name are mutually exclusive (name a resume target with "--resume <name>").');
+  }
+  if (opts['sweep-name'] != null && !(opts.playthrough && opts.all)) {
+    throw new Error('--sweep-name only applies to a --playthrough --all sweep.');
   }
 
   if (opts['on-limit'] !== 'abort' && opts['on-limit'] !== 'wait') {
@@ -262,7 +309,10 @@ SAFETY (ai mode only)
 FLAGS
   --mode <ai|guest|member|both>  Run mode (see above)         (default: ${d.mode})
   --simulate               Alias for --mode both (deterministic guest vs member)
-  --all                    Run the sim across ALL playable campaigns (= --campaign all)
+  --all                    Run across ALL playable campaigns (= --campaign all). With the
+                           deterministic sim it walks every campaign; with --playthrough it
+                           SWEEPS a recorded playthrough of every campaign (and, with
+                           --premium-dir, every premium template too).
   --campaign <id|all>      Story template id, or "all"        (default: ${d.campaign})
   --playthrough            Extend AI mode into a RECORDED, scripted playthrough of the
                            campaign spine: the opening plus ONE scripted player turn per
@@ -273,6 +323,14 @@ FLAGS
                            prompt + response to a timestamped Markdown transcript under
                            harness-transcripts/ (gitignored). DRY-RUN by default. Ignores
                            --steps (the turn count is opening + milestones).
+                           With --all it sweeps EVERY playable campaign (one transcript per
+                           campaign) plus a single aggregate sweep-summary; the guards are
+                           enforced CUMULATIVELY across the whole sweep, so it hard-stops the
+                           moment the next request would cross --max-requests / --max-total-
+                           tokens / --max-usd (remaining campaigns are marked skipped). Honors
+                           --premium-dir (premium rows in the aggregate stay STRUCTURAL: ids,
+                           counts, flags only — no premium prose). A full live sweep needs
+                           those budgets raised; the dry-run PROJECTS the total requests/cost.
   --steps <N>              Turns to compose: 1 = opening only (default: ${d.steps})
                            Each extra step adds one follow-up turn. (Ignored with --playthrough.)
   --model <id>             OpenRouter model id               (default: ${d.model})
@@ -289,7 +347,8 @@ FLAGS
   --on-limit <abort|wait>  Rate-window breach behaviour      (default: ${d['on-limit']})
   --key-file <path>        Read OPENROUTER_API_KEY=... line from this file
   --premium-dir <path>     Directory of EXTERNAL campaign template *.js files to
-                           ALSO simulate in guest/member/both mode. Each file is an
+                           ALSO simulate in guest/member/both mode (and to ALSO sweep in
+                           --playthrough --all; premium rows there stay structural). Each file is an
                            ESM module exporting a template object (the first export
                            with an id + settings.milestones is used); files without
                            milestones (teaser stubs) are skipped like built-in stubs.
@@ -298,13 +357,42 @@ FLAGS
                            Typical value: the private premium-content repo's
                            campaigns/ dir, e.g.
                            /home/edward/Projects/dungeongpt-premium-content/campaigns
+  --sweep-name <name>      NAME a --playthrough --all sweep so it is RESUMABLE across
+                           several invocations (chunks). Writes a structural JSON state
+                           file harness-transcripts/<name>.sweep-state.json recording the
+                           ordered campaign list, which campaigns are DONE (with their
+                           structural result row + transcript pointer), and cumulative
+                           totals across chunks. Premium rows stay structural (ids/counts/
+                           flags only). Omit and an auto name (sweep-<timestamp>) is used.
+  --resume [name]          Resume a previously-started sweep instead of starting a new one.
+                           With a name, resumes harness-transcripts/<name>.sweep-state.json;
+                           without one, resumes the MOST RECENT sweep state (by updated time).
+                           Skips campaigns already DONE, runs the remaining PENDING ones
+                           under THIS invocation's budget, and updates the state. The
+                           campaign selection (and whether premium was included) comes from
+                           the saved state; do NOT re-pass --all / --campaign. If premium
+                           campaigns are still pending you must re-supply --premium-dir. If
+                           nothing is pending it prints "sweep <name> already complete".
   --live                   Enable real OpenRouter calls (requires --yes too)
   --yes                    Confirm a live run (guard against an accidental --live)
   --help                   This message
 
+CHUNKED SWEEPS (budget-per-invocation vs cumulative totals)
+  The full --playthrough --all sweep is best run in CHUNKS. The guard ceilings
+  (--max-requests / --max-total-tokens / --max-usd) bound the CURRENT invocation/chunk,
+  so you size each chunk. A named sweep persists progress; the next --resume continues the
+  remaining campaigns under a fresh chunk budget. The state file accumulates totals ACROSS
+  all chunks for reporting. A campaign cut off mid-way by the chunk budget stays PENDING and
+  re-runs whole on the next resume, so size each chunk to fit a few WHOLE campaigns.
+
 EXAMPLES
   node scripts/quest-harness.mjs --campaign heroic-fantasy-t1      # ai dry-run
   node scripts/quest-harness.mjs --playthrough --campaign heroic-fantasy-t1  # recorded dry-run
+  node scripts/quest-harness.mjs --playthrough --all                        # sweep every campaign (dry-run)
+  node scripts/quest-harness.mjs --playthrough --all --premium-dir <path>   # + premium templates
+  node scripts/quest-harness.mjs --playthrough --all --sweep-name run1 --max-requests 20  # chunk 1
+  node scripts/quest-harness.mjs --playthrough --resume run1 --max-requests 20            # chunk 2 (resume)
+  node scripts/quest-harness.mjs --playthrough --resume                     # resume most-recent sweep
   OPENROUTER_API_KEY=sk-or-... node scripts/quest-harness.mjs --playthrough --live --yes
   node scripts/quest-harness.mjs --mode guest --campaign heroic-fantasy-t1
   node scripts/quest-harness.mjs --mode both --all                # sim every campaign
@@ -480,9 +568,15 @@ function isPolishSafeReplica(polished, authored, { startPlaceName, destination }
 }
 
 // Replica of generateResponse's DM_PROTOCOL + style-directive wrap.
-function wrapWithProtocol(DM_PROTOCOL, prompt, settings) {
-  const style = VERBOSITY_DIRECTIVE[settings?.responseVerbosity] || VERBOSITY_DIRECTIVE.Moderate;
-  return `${DM_PROTOCOL}${prompt}\n\nStyle directive (shapes how you write; do not repeat it): ${style}`;
+function wrapWithProtocol(DM_PROTOCOL, prompt, settings, styleOverride) {
+  // styleOverride lets a specific call replace the player's verbosity directive (the opening
+  // polish pass passes a "match the original length" directive so it is not told to expand).
+  const style = styleOverride !== undefined
+    ? styleOverride
+    : (VERBOSITY_DIRECTIVE[settings?.responseVerbosity] || VERBOSITY_DIRECTIVE.Moderate);
+  return style
+    ? `${DM_PROTOCOL}${prompt}\n\nStyle directive (shapes how you write; do not repeat it): ${style}`
+    : `${DM_PROTOCOL}${prompt}`;
 }
 
 // Build the list of composed requests for a template.
@@ -650,6 +744,37 @@ function buildScriptedPlayerTurn(m) {
   }
 }
 
+// A short lowercase paraphrase of the milestone objective, used in the commit line of
+// the concluding talk turn ("we are ready to <objective>").
+function paraphraseObjective(m) {
+  const raw = (m.text || 'take up the quest').trim().replace(/[.!?]+$/, '');
+  return raw ? raw.charAt(0).toLowerCase() + raw.slice(1) : 'take up the quest';
+}
+
+// Compose the CONCLUDING player turn for a `talk` milestone. The party has BEEN
+// speaking with the NPC and now gives their answer and commits. This is the second of
+// the two talk turns; it exists so we can observe the dual-completion
+// [COMPLETE_MILESTONE] marker actually fire at a true conversation conclusion (the
+// single open turn typically ends with the NPC handing the decision back to the party,
+// so the marker correctly does NOT fire there).
+function buildTalkConcludePlayerTurn(m) {
+  const s = m.spawn || {};
+  const who = s.name || 'the contact';
+  return `We hear ${who} out and tell them we accept: we are ready to ${paraphraseObjective(m)}.`;
+}
+
+// The [SUMMARY] seed for the concluding talk turn. Unlike the default seed used for
+// other turns, this makes explicit that the party has already been in conversation with
+// the NPC and is now giving their final answer, so the model reads the exchange as
+// reaching its natural end (and may legitimately mark the talk milestone complete).
+function buildTalkConcludeSummary(m) {
+  const s = m.spawn || {};
+  const b = m.building || {};
+  const who = s.name || 'the contact';
+  const where = b.name || b.location || s.location || m.location || 'the meeting place';
+  return `The party has been speaking with ${who} at ${where}. The conversation is drawing to a close and the party is about to give their answer.`;
+}
+
 // Minimal location context for a milestone turn, standing in for buildLocationContext
 // (the harness generates no town maps). Inside-town for building milestones; a plain
 // wilderness line otherwise. Documented approximation; noted in the transcript.
@@ -708,7 +833,7 @@ function composePlaythroughRequests(template, DM_PROTOCOL, { composeIntro, forma
   const polishPrompt = `[ADVENTURE START - POLISH]\n\n[OPENING]\n${authoredOpening}\n\n[TASK]\nLightly reword and vary the phrasing of the opening above for freshness. You MUST NOT change any facts, add or rename any person, place, building, item, or objective, introduce any character not already present, or change the destination or next step. Do not add new sentences or content. Return the same opening, same structure and same facts, only rephrased. Begin your response directly with the reworded opening.`;
   requests.push({
     label: 'Opening (polish)',
-    prompt: wrapWithProtocol(DM_PROTOCOL, polishPrompt, settings),
+    prompt: wrapWithProtocol(DM_PROTOCOL, polishPrompt, settings, 'Match the length and paragraph count of the original exactly. Do not expand, add sentences, or add detail; only rephrase what is there.'),
     isPolish: true,
     authored: authoredOpening,
     startPlaceName: startTown,
@@ -726,18 +851,40 @@ function composePlaythroughRequests(template, DM_PROTOCOL, { composeIntro, forma
   for (const m of order) {
     const status = getMilestoneStatusReplica(working);
     const milestonesInfo = formatMilestonePromptTextReplica(status);
-    const playerInput = buildScriptedPlayerTurn(m);
     const locationInfo = buildMinimalLocationContext(m);
     const gameContext = `Setting: ${settings.shortDescription || 'Fantasy Realm'}. Mood: ${settings.grimnessLevel || 'Normal'}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
-    // Mirror handleSubmit's body. No RAG/summary in a headless harness: the summary
-    // is the app's default seed and ragContext is empty (documented approximation).
-    const body = `[CONTEXT]\n${gameContext}\n\n[SUMMARY]\nThe tale unfolds.\n\n[PLAYER ACTION]\n${playerInput}\n\n[NARRATE]`;
+    const isTalk = m.type === 'talk';
+
+    // OPEN turn: mirror handleSubmit's body. No RAG/summary in a headless harness: the
+    // summary is the app's default seed and ragContext is empty (documented approx).
+    const openInput = buildScriptedPlayerTurn(m);
+    const openBody = `[CONTEXT]\n${gameContext}\n\n[SUMMARY]\nThe tale unfolds.\n\n[PLAYER ACTION]\n${openInput}\n\n[NARRATE]`;
     requests.push({
-      label: `Milestone #${m.id} [${m.type || 'untyped'}]`,
-      prompt: wrapWithProtocol(DM_PROTOCOL, body, settings),
-      playerInput,
+      label: `Milestone #${m.id} [${m.type || 'untyped'}]${isTalk ? ' (open)' : ''}`,
+      prompt: wrapWithProtocol(DM_PROTOCOL, openBody, settings),
+      playerInput: openInput,
       milestone: m
     });
+
+    // CONCLUDE turn (talk only): a SECOND in-game turn whose scripted player input
+    // concludes the conversation and commits. The milestone stays ACTIVE for this turn
+    // (it is completed by the marker or the Talk button, never by the harness), so the
+    // context still presents it as the current talk objective and still carries the
+    // "you may mark this complete once the party finishes speaking with <name>" cue.
+    // This lets us observe dual-completion's positive path: the marker firing at a true
+    // conclusion, which the single open turn does not reach.
+    if (isTalk) {
+      const concludeInput = buildTalkConcludePlayerTurn(m);
+      const concludeBody = `[CONTEXT]\n${gameContext}\n\n[SUMMARY]\n${buildTalkConcludeSummary(m)}\n\n[PLAYER ACTION]\n${concludeInput}\n\n[NARRATE]`;
+      requests.push({
+        label: `Milestone #${m.id} [${m.type || 'untyped'}] (conclude)`,
+        prompt: wrapWithProtocol(DM_PROTOCOL, concludeBody, settings),
+        playerInput: concludeInput,
+        milestone: m,
+        isTalkConclude: true
+      });
+    }
+
     const w = working.find((x) => x.id === m.id);
     if (w) w.completed = true;
   }
@@ -763,6 +910,22 @@ function runResponseChecks(text) {
   if (/\[(CHECK|ROLL):/i.test(t)) flags.push('marker:CHECK/ROLL');
   if (flags.length === 0) flags.push('ok');
   return flags;
+}
+
+// One-line-per-talk-milestone note on whether the concluding talk turn's dual-completion
+// [COMPLETE_MILESTONE] marker fired, so a reader immediately knows whether the positive
+// path was exercised. Detection only; the marker is never acted upon (no state mutation).
+function talkMarkerNotes(turns, isLive) {
+  const notes = [];
+  for (const t of turns) {
+    if (!/\(conclude\)/.test(t.label || '')) continue;
+    const mid = (t.label.match(/#(\d+)/) || [])[1] || '?';
+    let outcome;
+    if (!t.sent) outcome = isLive ? 'no (not sent)' : 'n/a (dry-run: no request)';
+    else outcome = (t.flags || []).includes('marker:COMPLETE_MILESTONE') ? 'yes' : 'no';
+    notes.push(`talk-marker fired: ${outcome} (Milestone #${mid})`);
+  }
+  return notes;
 }
 
 // ===========================================================================
@@ -1296,31 +1459,13 @@ function fmtGuards(opts) {
   ];
 }
 
-async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact }, appExports) {
-  const requests = composePlaythroughRequests(template, DM_PROTOCOL, appExports);
-  const startedAt = new Date();
-  const stamp = startedAt.toISOString().replace(/[:.]/g, '-');
-
-  // The authored opening is a deterministic entry, NOT a request. Network requests =
-  // 1 opening polish + one turn per milestone.
-  const milestoneCount = requests.filter((r) => r.milestone).length;
-  const networkRequests = requests.filter((r) => !r.isAuthored).length;
-
-  // ---- Preflight (console) ----
-  console.log('');
-  console.log('============================================================');
-  console.log(`quest-harness — RECORDED PLAYTHROUGH — ${isLive ? 'LIVE' : 'DRY-RUN (no network requests)'}`);
-  console.log('============================================================');
-  console.log(`Campaign:        ${template.id}  (${template.name || 'unnamed'})`);
-  console.log(`Model:           ${opts.model}`);
-  console.log(`Composed:        1 authored opening (no request) + ${networkRequests} request(s): 1 opening polish + ${milestoneCount} milestone turn(s)`);
-  console.log(`Key source:      ${isLive ? (process.env.OPENROUTER_API_KEY ? 'env OPENROUTER_API_KEY (redacted)' : '--key-file (redacted)') : 'n/a (dry-run)'}`);
-  console.log('Guards (enforced before each request):');
-  for (const g of fmtGuards(opts)) console.log(`  ${g}`);
-  console.log('============================================================');
-  console.log('');
-
-  const guard = new GuardState(opts);
+// Run the guarded per-request loop for ONE campaign's composed requests against a
+// SHARED GuardState (so a sweep's request/token/USD tallies carry across campaigns and
+// the guards stay cumulative). Returns { turns, stoppedBy }. Mutates `guard`. Never
+// prints or records the key; the playthrough loop deliberately does NOT echo prompt or
+// response prose to the console (only structural counts/flags), so this is safe to run
+// over premium campaigns in a sweep.
+async function executePlaythroughTurns(opts, requests, { isLive, key, redact }, guard) {
   let stoppedBy = null;
   const turns = []; // { label, playerInput, prompt, estPrompt, sent, response, promptTokens, completionTokens, flags }
 
@@ -1456,16 +1601,92 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
     }
   }
 
-  // ---- Write the transcript ----
+  return { turns, stoppedBy };
+}
+
+// Snapshot the shared guard's cumulative tallies so a sweep can compute PER-CAMPAIGN
+// deltas (requests/tokens/cost this campaign added) from before/after snapshots.
+function guardSnapshot(guard) {
+  return {
+    requestsMade: guard.requestsMade,
+    promptTokens: guard.promptTokensTotal,
+    completionTokens: guard.completionTokensTotal
+  };
+}
+function accountingDelta(before, after, opts) {
+  const promptTokens = after.promptTokens - before.promptTokens;
+  const completionTokens = after.completionTokens - before.completionTokens;
+  return {
+    requestsMade: after.requestsMade - before.requestsMade,
+    promptTokens,
+    completionTokens,
+    cost: estimateCostUsd(promptTokens, completionTokens, opts)
+  };
+}
+
+// Write a single campaign's transcript to harness-transcripts/ and return its path.
+// `accounting` carries PER-CAMPAIGN numbers (from the shared guard's delta in a sweep,
+// or the whole guard for a single-campaign run).
+function writeCampaignTranscript({ opts, template, isLive, startedAt, stamp, requests, turns, accounting, stoppedBy, redact, networkRequests, milestoneCount }) {
   const transcriptPath = path.join(TRANSCRIPT_DIR, `playthrough-${template.id}-${stamp}.md`);
-  let out;
   try {
     fs.mkdirSync(TRANSCRIPT_DIR, { recursive: true });
-    out = buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, guard, stoppedBy, redact, networkRequests, milestoneCount });
+    const out = buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, accounting, stoppedBy, redact, networkRequests, milestoneCount });
     fs.writeFileSync(transcriptPath, out, 'utf8');
   } catch (err) {
-    console.error(redact(`Failed to write transcript: ${err.message}`));
+    console.error(redact(`Failed to write transcript for ${template.id}: ${err.message}`));
   }
+  return transcriptPath;
+}
+
+// A guard stop is "cumulative" (halts a whole sweep) when it is a run-budget / rate /
+// live-error stop — as opposed to a per-request input-cap refusal, which is specific to
+// that one oversized prompt and does not implicate the shared budget.
+function isCumulativeStop(stoppedBy) {
+  return !!stoppedBy && /^(run budget|rate limit|request error)/.test(stoppedBy);
+}
+
+// ---------------------------------------------------------------------------
+// Single-campaign recorded playthrough (unchanged behaviour). Builds its own guard.
+// ---------------------------------------------------------------------------
+async function runPlaythrough(opts, template, DM_PROTOCOL, liveKey, appExports) {
+  const { isLive, redact } = liveKey;
+  const requests = composePlaythroughRequests(template, DM_PROTOCOL, appExports);
+  const startedAt = new Date();
+  const stamp = startedAt.toISOString().replace(/[:.]/g, '-');
+
+  // The authored opening is a deterministic entry, NOT a request. Network requests =
+  // 1 opening polish + one turn per milestone.
+  const milestoneCount = requests.filter((r) => r.milestone).length;
+  const networkRequests = requests.filter((r) => !r.isAuthored).length;
+
+  // ---- Preflight (console) ----
+  console.log('');
+  console.log('============================================================');
+  console.log(`quest-harness — RECORDED PLAYTHROUGH — ${isLive ? 'LIVE' : 'DRY-RUN (no network requests)'}`);
+  console.log('============================================================');
+  console.log(`Campaign:        ${template.id}  (${template.name || 'unnamed'})`);
+  console.log(`Model:           ${opts.model}`);
+  console.log(`Composed:        1 authored opening (no request) + ${networkRequests} request(s): 1 opening polish + ${milestoneCount} milestone turn(s)`);
+  console.log(`Key source:      ${isLive ? (process.env.OPENROUTER_API_KEY ? 'env OPENROUTER_API_KEY (redacted)' : '--key-file (redacted)') : 'n/a (dry-run)'}`);
+  console.log('Guards (enforced before each request):');
+  for (const g of fmtGuards(opts)) console.log(`  ${g}`);
+  console.log('============================================================');
+  console.log('');
+
+  const guard = new GuardState(opts);
+  const { turns, stoppedBy } = await executePlaythroughTurns(opts, requests, liveKey, guard);
+
+  // ---- Write the transcript ----
+  const accounting = {
+    requestsMade: guard.requestsMade,
+    promptTokens: guard.promptTokensTotal,
+    completionTokens: guard.completionTokensTotal,
+    cost: guard.costUsd()
+  };
+  const transcriptPath = writeCampaignTranscript({
+    opts, template, isLive, startedAt, stamp, requests, turns, accounting, stoppedBy, redact, networkRequests, milestoneCount
+  });
 
   // ---- Console summary ----
   console.log('============================================================');
@@ -1475,6 +1696,7 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
   console.log(`  tokens (in/out): ${guard.promptTokensTotal} / ${guard.completionTokensTotal}`);
   console.log(`  est. cost:       $${guard.costUsd().toFixed(4)}`);
   console.log(`  stopped by:      ${stoppedBy || 'nothing (composed all turns)'}`);
+  for (const note of talkMarkerNotes(turns, isLive)) console.log(`  ${note}`);
   console.log(`  transcript:      ${transcriptPath}`);
   if (!isLive) console.log('  (no network request was made — dry-run; responses are "[dry-run] not sent")');
   console.log('============================================================');
@@ -1483,7 +1705,7 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
 
 // Build the Markdown transcript string. The prompt/response are recorded IN FULL
 // (redacted); only the console output truncates.
-function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, guard, stoppedBy, redact, networkRequests, milestoneCount }) {
+function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, accounting, stoppedBy, redact, networkRequests, milestoneCount }) {
   const L = [];
   L.push(`# Quest-harness playthrough transcript`);
   L.push('');
@@ -1570,10 +1792,11 @@ function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, 
 
   L.push('## Summary');
   L.push('');
-  L.push(`- **Requests ${isLive ? 'made' : 'simulated'}:** ${guard.requestsMade} / ${networkRequests} composed (+ 1 authored opening, no request)`);
-  L.push(`- **Tokens (in/out):** ${guard.promptTokensTotal} / ${guard.completionTokensTotal}`);
-  L.push(`- **Estimated cost:** $${guard.costUsd().toFixed(4)}`);
+  L.push(`- **Requests ${isLive ? 'made' : 'simulated'}:** ${accounting.requestsMade} / ${networkRequests} composed (+ 1 authored opening, no request)`);
+  L.push(`- **Tokens (in/out):** ${accounting.promptTokens} / ${accounting.completionTokens}`);
+  L.push(`- **Estimated cost:** $${accounting.cost.toFixed(4)}`);
   L.push(`- **Stopped by:** ${stoppedBy || 'nothing (composed all turns)'}`);
+  for (const note of talkMarkerNotes(turns, isLive)) L.push(`- **${note}**`);
   L.push('');
   L.push('### Per-turn flags overview');
   L.push('');
@@ -1587,6 +1810,345 @@ function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, 
   if (!isLive) L.push('_(dry-run: no network request was made; responses were not sent)_');
   L.push('');
   return L.join('\n');
+}
+
+// ===========================================================================
+// SWEEP STATE (resumable, chunked sweeps) — a named sweep persists a STRUCTURAL
+// JSON state file so it can span multiple invocations. Each invocation (chunk)
+// runs the remaining PENDING campaigns under ITS OWN guard budget; the state
+// accumulates totals across chunks. The state is STRUCTURAL ONLY (ids, kinds,
+// counts, flags, marker yes/no) — never any prose — so it is safe for premium.
+// ===========================================================================
+const SWEEP_STATE_SUFFIX = '.sweep-state.json';
+
+function sweepStatePath(name) {
+  return path.join(TRANSCRIPT_DIR, `${name}${SWEEP_STATE_SUFFIX}`);
+}
+
+function saveSweepState(statePath, state) {
+  state.updatedAt = new Date().toISOString();
+  fs.mkdirSync(TRANSCRIPT_DIR, { recursive: true });
+  fs.writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf8');
+}
+
+function loadSweepState(statePath) {
+  return JSON.parse(fs.readFileSync(statePath, 'utf8'));
+}
+
+// Locate the most-recently-updated sweep-state file under harness-transcripts/.
+// Returns { path, state } or null when none exist.
+function findMostRecentSweepState() {
+  let files;
+  try {
+    files = fs.readdirSync(TRANSCRIPT_DIR).filter((f) => f.endsWith(SWEEP_STATE_SUFFIX));
+  } catch {
+    return null;
+  }
+  let best = null;
+  for (const f of files) {
+    const p = path.join(TRANSCRIPT_DIR, f);
+    let state;
+    try { state = loadSweepState(p); } catch { continue; }
+    const t = Date.parse(state.updatedAt || '') || (() => { try { return fs.statSync(p).mtimeMs; } catch { return 0; } })();
+    if (!best || t > best.t) best = { t, path: p, state };
+  }
+  return best ? { path: best.path, state: best.state } : null;
+}
+
+// Build a fresh sweep-state object from the ordered entry list ({ template, isPremium }).
+// STRUCTURAL only: we persist ids + kind + status, never any template prose.
+function buildFreshSweepState(name, entries, opts, isLive) {
+  return {
+    sweepName: name,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    model: opts.model,
+    includesPremium: entries.some((e) => e.isPremium),
+    startedDryRun: !isLive,
+    campaigns: entries.map((e) => ({
+      id: e.template.id,
+      kind: e.isPremium ? 'premium' : 'built-in',
+      status: 'pending',       // pending | done
+      result: null,            // structural result row once done
+      transcript: null,        // pointer to the per-campaign transcript file
+      doneAt: null
+    })),
+    // Cumulative tallies ACROSS all chunks (each chunk's guard is per-invocation).
+    totals: { requestsMade: 0, promptTokens: 0, completionTokens: 0, cost: 0 }
+  };
+}
+
+// ===========================================================================
+// RECORDED PLAYTHROUGH SWEEP (--playthrough --all) — run the recorded playthrough
+// for EVERY playable campaign (+ premium templates when --premium-dir is given).
+// The guard budget bounds THIS invocation (chunk); a named/resumable sweep carries
+// cumulative totals across chunks in its state file. One per-campaign transcript each
+// (prose allowed — those files are local/gitignored), plus one aggregate sweep-summary
+// (console + file) that stays STRUCTURAL for premium rows (id + counts + flags only).
+// ===========================================================================
+
+// The blocking check flags we surface in the aggregate (empty / refusal / prompt-echo
+// / request-error). Marker/ok/dry-run flags are not "blocking".
+function extractBlockFlags(turns) {
+  const out = [];
+  turns.forEach((t, idx) => {
+    for (const f of (t.flags || [])) {
+      if (f.startsWith('BLOCK:')) out.push(`turn ${idx + 1} ${f}`);
+    }
+  });
+  return out;
+}
+
+// Compact one campaign's talk-marker notes to "#<id>:yes|no|n/a" tokens for the row.
+function compactTalkNotes(notes) {
+  return notes.map((n) => {
+    const mid = (n.match(/#(\d+)/) || [])[1] || '?';
+    const outcome = /fired: yes/.test(n) ? 'yes' : /fired: no\b/.test(n) ? 'no' : 'n/a';
+    return `#${mid}:${outcome}`;
+  });
+}
+
+// Build the aggregate sweep-summary markdown from the STATE (the full picture across all
+// chunks) plus what THIS chunk did. Printed to the console verbatim — it is structural, so
+// it is safe even when premium campaigns are included. `doneThisChunk` is a Set of ids the
+// current invocation completed; `pendingProjection` is { requests, cost } for the campaigns
+// still pending (the budget a further resume needs).
+function buildSweepSummary({ opts, state, isLive, startedAt, guard, doneThisChunk, pendingProjection, stopInfo }) {
+  const L = [];
+  const campaigns = state.campaigns;
+  const premiumCount = campaigns.filter((c) => c.kind === 'premium').length;
+  const doneCount = campaigns.filter((c) => c.status === 'done').length;
+  const pendingCount = campaigns.filter((c) => c.status === 'pending').length;
+  const chunkTokens = guard.promptTokensTotal + guard.completionTokensTotal;
+
+  L.push('# Quest-harness playthrough SWEEP summary');
+  L.push('');
+  L.push(`- **Sweep name:** ${state.sweepName}`);
+  L.push(`- **Mode (this chunk):** ${isLive ? 'LIVE (sent to OpenRouter)' : 'DRY-RUN (no network call)'}`);
+  L.push(`- **Created:** ${state.createdAt}`);
+  L.push(`- **Updated:** ${state.updatedAt || startedAt.toISOString()}`);
+  L.push(`- **Model:** ${state.model || opts.model}`);
+  L.push(`- **Campaigns:** ${campaigns.length} (${campaigns.length - premiumCount} built-in, ${premiumCount} premium) — ${doneCount} done, ${pendingCount} pending`);
+  L.push(`- **This chunk completed:** ${doneThisChunk.size} campaign(s)`);
+  L.push(`- **Includes premium:** ${state.includesPremium ? 'yes' : 'no'}`);
+  L.push('');
+  L.push('### Guard budget (bounds THIS invocation / chunk; state totals accumulate across chunks)');
+  for (const g of fmtGuards(opts)) L.push(`- ${g}`);
+  L.push('');
+  if (stopInfo) {
+    L.push(`> **Chunk budget stop:** this chunk hit a cumulative guard while running campaign \`${stopInfo.id}\` (${stopInfo.stoppedBy}). That campaign stays PENDING (it re-runs whole on the next resume); campaigns after it were left pending. Raise --max-requests / --max-total-tokens / --max-usd for a bigger chunk, or run \`--resume ${state.sweepName}\` again.`);
+  } else if (pendingCount === 0) {
+    L.push('> Sweep COMPLETE: every campaign is done across the chunks run so far.');
+  } else {
+    L.push(`> This chunk completed all campaigns it could within budget; ${pendingCount} campaign(s) remain pending. Run \`--resume ${state.sweepName}\` to continue.`);
+  }
+  L.push('');
+  L.push('### Per-campaign rows (full picture across all chunks)');
+  L.push('');
+  L.push('_Premium rows are structural only: id + counts + flags, no premium prose. Full per-campaign prompts/responses live in the individual (gitignored, local-only) transcripts._');
+  L.push('');
+  L.push('| campaign | kind | milestones | requests (made/composed) | tokens in/out | est cost | blocking flags | talk-markers | status |');
+  L.push('|---|---|---|---|---|---|---|---|---|');
+  for (const c of campaigns) {
+    const r = c.result;
+    const mCell = r ? r.milestoneCount : '-';
+    const reqCell = r ? `${r.requestsMade}/${r.networkRequests}` : '-';
+    const tokCell = r ? `${r.promptTokens}/${r.completionTokens}` : '-';
+    const costCell = r ? `$${r.cost.toFixed(4)}` : '-';
+    const blockCell = r ? (r.blocks.length ? r.blocks.join('; ') : 'none') : '-';
+    const talkCell = r && r.talks.length ? r.talks.join(' ') : '-';
+    let status;
+    if (c.status === 'done') status = doneThisChunk.has(c.id) ? 'done (this chunk)' : 'done';
+    else status = 'pending';
+    L.push(`| ${c.id} | ${c.kind} | ${mCell} | ${reqCell} | ${tokCell} | ${costCell} | ${blockCell} | ${talkCell} | ${status} |`);
+  }
+  L.push('');
+  L.push('### Totals');
+  L.push('');
+  L.push(`- **Cumulative across all chunks (from state):** requests=${state.totals.requestsMade}, tokens=${state.totals.promptTokens}/${state.totals.completionTokens}, est cost=$${state.totals.cost.toFixed(4)}`);
+  L.push(`- **This chunk:** requests ${isLive ? 'made' : 'simulated'}=${guard.requestsMade}, tokens=${guard.promptTokensTotal}/${guard.completionTokensTotal} (${chunkTokens} total), est cost=$${guard.costUsd().toFixed(4)}`);
+  L.push('');
+  if (pendingCount > 0) {
+    L.push('### Remaining pending (budget a further resume needs)');
+    L.push('');
+    L.push(`- **Pending campaigns:** ${pendingCount}`);
+    L.push(`- **Projected requests (remaining):** ${pendingProjection.requests}`);
+    L.push(`- **Projected est cost (remaining):** $${pendingProjection.cost.toFixed(4)}  (worst-case ${opts['max-tokens']}-token completions at $${opts['price-in']}/1M in, $${opts['price-out']}/1M out)`);
+    L.push(`- To finish in one more chunk: \`--resume ${state.sweepName} --max-requests ${pendingProjection.requests} --max-usd ${(Math.ceil(pendingProjection.cost * 100) / 100 + 0.01).toFixed(2)}\` (plus headroom).`);
+    L.push('');
+  }
+  if (!isLive) L.push('_(dry-run: no network request was made; premium rows carry no prose.)_');
+  L.push('');
+  return L.join('\n');
+}
+
+// Project the request count + worst-case cost for a set of state-campaign entries by
+// composing (locally, no network) each one's playthrough requests. Used to tell the user
+// the budget a further resume of the PENDING campaigns needs.
+function projectPending(campaigns, resolver, opts, DM_PROTOCOL, appExports) {
+  let requests = 0;
+  let cost = 0;
+  for (const c of campaigns) {
+    const resolved = resolver(c.id);
+    if (!resolved) continue; // unresolvable (e.g. premium without --premium-dir) — skip in projection
+    const reqs = composePlaythroughRequests(resolved.template, DM_PROTOCOL, appExports);
+    for (const r of reqs) {
+      if (r.isAuthored) continue;
+      requests += 1;
+      cost += estimateCostUsd(estimateTokens(r.prompt), opts['max-tokens'], opts);
+    }
+  }
+  return { requests, cost };
+}
+
+// Run ONE CHUNK of a (possibly resumed) sweep: iterate the state's campaigns, skip those
+// already DONE, and run the PENDING ones under THIS invocation's guard budget. Persists the
+// state after each campaign completes. `resolver(id)` -> { template, isPremium } | null.
+async function runPlaythroughSweep(opts, state, statePath, resolver, DM_PROTOCOL, liveKey, appExports) {
+  const { isLive, redact } = liveKey;
+  const startedAt = new Date();
+  const stamp = startedAt.toISOString().replace(/[:.]/g, '-');
+  const guard = new GuardState(opts); // FRESH guard per INVOCATION => this chunk's budget.
+
+  const campaigns = state.campaigns;
+  const premiumCount = campaigns.filter((c) => c.kind === 'premium').length;
+  const alreadyDone = campaigns.filter((c) => c.status === 'done').length;
+  const pendingAtStart = campaigns.filter((c) => c.status === 'pending').length;
+
+  console.log('');
+  console.log('============================================================');
+  console.log(`quest-harness — RECORDED PLAYTHROUGH SWEEP — ${isLive ? 'LIVE' : 'DRY-RUN (no network requests)'}`);
+  console.log('============================================================');
+  console.log(`Sweep name:      ${state.sweepName}`);
+  console.log(`Campaigns:       ${campaigns.length} (${campaigns.length - premiumCount} built-in, ${premiumCount} premium) — ${alreadyDone} done, ${pendingAtStart} pending`);
+  console.log(`State file:      ${statePath}`);
+  console.log(`Model:           ${opts.model}`);
+  console.log(`Key source:      ${isLive ? (process.env.OPENROUTER_API_KEY ? 'env OPENROUTER_API_KEY (redacted)' : '--key-file (redacted)') : 'n/a (dry-run)'}`);
+  console.log('Guard budget (bounds THIS invocation / chunk; state carries totals across chunks):');
+  for (const g of fmtGuards(opts)) console.log(`  ${g}`);
+  console.log('============================================================');
+  console.log('');
+
+  // Already complete? Nothing to run: print and refresh the summary.
+  if (pendingAtStart === 0) {
+    console.log(`sweep ${state.sweepName} already complete`);
+    console.log('');
+    const summary = buildSweepSummary({
+      opts, state, isLive, startedAt, guard,
+      doneThisChunk: new Set(), pendingProjection: { requests: 0, cost: 0 }, stopInfo: null
+    });
+    const summaryPath = path.join(TRANSCRIPT_DIR, `sweep-summary-${state.sweepName}.md`);
+    try { fs.writeFileSync(summaryPath, summary, 'utf8'); } catch (err) { console.error(redact(`Failed to write sweep summary: ${err.message}`)); }
+    console.log(summary);
+    console.log(`Aggregate sweep summary written to: ${summaryPath}`);
+    console.log('============================================================');
+    console.log('');
+    return;
+  }
+
+  const doneThisChunk = new Set();
+  let chunkStopped = false;
+  let stopInfo = null;
+
+  for (const c of campaigns) {
+    if (c.status === 'done') continue;       // completed on a prior chunk — skip.
+    if (chunkStopped) break;                  // budget hit — leave the rest pending.
+
+    const resolved = resolver(c.id);
+    if (!resolved) {
+      // Should be prevented by the up-front premium reconciliation, but stay defensive.
+      console.error(`----- ${c.id} (${c.kind}): cannot resolve template (missing --premium-dir?) — left PENDING -----`);
+      continue;
+    }
+    const template = resolved.template;
+    const requests = composePlaythroughRequests(template, DM_PROTOCOL, appExports);
+    const milestoneCount = requests.filter((r) => r.milestone).length;
+    const networkRequests = requests.filter((r) => !r.isAuthored).length;
+
+    console.log(`----- Campaign: ${c.id} (${c.kind}) — ${milestoneCount} milestone(s), ${networkRequests} request(s) -----`);
+    const before = guardSnapshot(guard);
+    const { turns, stoppedBy } = await executePlaythroughTurns(opts, requests, liveKey, guard);
+    const accounting = accountingDelta(before, guardSnapshot(guard), opts);
+    const isStop = isCumulativeStop(stoppedBy);
+
+    if (isStop) {
+      // A cumulative (budget/rate/error) stop cut this campaign off before it finished all
+      // its turns. Leave it PENDING so the next resume runs it WHOLE; its partial chunk
+      // spend stays in this chunk's guard tally but is NOT persisted to the cumulative
+      // state totals (which only accrue completed campaigns). No transcript for a partial.
+      chunkStopped = true;
+      stopInfo = { id: c.id, stoppedBy, turn: turns.length, label: (turns[turns.length - 1] || {}).label || '?' };
+      console.log(`  -> STOPPED mid-campaign (${stoppedBy}); ${c.id} stays PENDING and will re-run whole on the next resume.`);
+      console.log(`     Raise --max-requests / --max-total-tokens / --max-usd for a bigger chunk.`);
+      console.log('');
+      break;
+    }
+
+    // Completed all turns this chunk (a non-cumulative input-cap refusal still counts as
+    // done — that one oversized prompt is skipped, the rest ran, mirroring single-campaign
+    // behaviour — but it is noted in the result so it is not silently lost).
+    const transcriptPath = writeCampaignTranscript({
+      opts, template, isLive, startedAt, stamp, requests, turns, accounting, stoppedBy, redact, networkRequests, milestoneCount
+    });
+    const talkNotes = talkMarkerNotes(turns, isLive);
+    c.status = 'done';
+    c.result = {
+      milestoneCount,
+      networkRequests,
+      requestsMade: accounting.requestsMade,
+      promptTokens: accounting.promptTokens,
+      completionTokens: accounting.completionTokens,
+      cost: accounting.cost,
+      blocks: extractBlockFlags(turns),
+      talks: compactTalkNotes(talkNotes),
+      stoppedBy: stoppedBy || null,
+      state: isLive ? 'done' : 'done-dry'
+    };
+    c.transcript = transcriptPath;
+    c.doneAt = new Date().toISOString();
+    // Accumulate cumulative totals across chunks, then persist immediately.
+    state.totals.requestsMade += accounting.requestsMade;
+    state.totals.promptTokens += accounting.promptTokens;
+    state.totals.completionTokens += accounting.completionTokens;
+    state.totals.cost += accounting.cost;
+    saveSweepState(statePath, state);
+    doneThisChunk.add(c.id);
+
+    console.log(`  -> DONE${isLive ? '' : ' (dry-run)'}: ${accounting.requestsMade}/${networkRequests} request(s); chunk running: requests=${guard.requestsMade}, tokens=${guard.promptTokensTotal + guard.completionTokensTotal}, cost≈$${guard.costUsd().toFixed(4)}${stoppedBy ? `; note: ${stoppedBy}` : ''}`);
+    console.log(`     transcript: ${transcriptPath}`);
+    console.log('');
+  }
+
+  // Persist once more (refreshes updatedAt even if the chunk stopped without a completion).
+  saveSweepState(statePath, state);
+
+  // ---- Aggregate summary (full picture from state; console + per-name file) ----
+  const stillPending = campaigns.filter((c) => c.status === 'pending');
+  const pendingProjection = projectPending(stillPending, resolver, opts, DM_PROTOCOL, appExports);
+  const summary = buildSweepSummary({
+    opts, state, isLive, startedAt, guard, doneThisChunk, pendingProjection, stopInfo
+  });
+  const summaryPath = path.join(TRANSCRIPT_DIR, `sweep-summary-${state.sweepName}.md`);
+  try {
+    fs.mkdirSync(TRANSCRIPT_DIR, { recursive: true });
+    fs.writeFileSync(summaryPath, summary, 'utf8');
+  } catch (err) {
+    console.error(redact(`Failed to write sweep summary: ${err.message}`));
+  }
+
+  console.log('============================================================');
+  console.log(summary);
+  console.log('============================================================');
+  console.log(`State file:               ${statePath}`);
+  console.log(`Aggregate sweep summary:  ${summaryPath}`);
+  if (stillPending.length > 0) {
+    console.log(`${stillPending.length} campaign(s) still pending — run:  node scripts/quest-harness.mjs --playthrough --resume ${state.sweepName}${state.includesPremium ? ' --premium-dir <path>' : ''}`);
+  } else {
+    console.log(`Sweep ${state.sweepName} is COMPLETE.`);
+  }
+  if (!isLive) console.log('(no network request was made — dry-run)');
+  console.log('============================================================');
+  console.log('');
 }
 
 // ---------------------------------------------------------------------------
@@ -1609,8 +2171,12 @@ async function main() {
     return;
   }
 
-  if (opts['premium-dir']) {
-    console.warn('[premium-dir] ignored in --mode ai (it only affects the guest/member/both sim).');
+  const isSweep = opts.playthrough && opts.campaign === 'all';
+
+  // --premium-dir affects the guest/member/both sim (handled in runSimMode) and the
+  // --playthrough --all sweep. It is ignored in single-campaign AI / playthrough runs.
+  if (opts['premium-dir'] && !isSweep) {
+    console.warn('[premium-dir] ignored here (it only affects the guest/member/both sim and the --playthrough --all sweep).');
   }
 
   // Enforce --live/--yes and resolve the key (never printed). Shared with playthrough.
@@ -1625,6 +2191,108 @@ async function main() {
     console.error(redact(`Failed to load app data (storyTemplates / DM_PROTOCOL): ${err.message}`));
     process.exit(5);
   }
+  const appExports = { composeIntro, formatStartObjective: formatStartObjectiveReal };
+
+  // Recorded playthrough SWEEP: every playable built-in campaign (+ premium templates
+  // when --premium-dir is given). One transcript per campaign + one aggregate summary.
+  // The guard budget bounds THIS invocation; a NAMED sweep persists resumable state so
+  // it can span multiple chunks. --resume continues an existing sweep from its state.
+  if (isSweep) {
+    // Resolve built-in playable templates + any --premium-dir templates. Both a fresh
+    // start and a resume may need these to compose the pending campaigns' turns.
+    const builtinPlayable = storyTemplates
+      .filter((t) => Array.isArray(t.settings?.milestones) && t.settings.milestones.length);
+    const builtinById = new Map(builtinPlayable.map((t) => [t.id, t]));
+
+    let premiumTemplates = [];
+    if (opts['premium-dir']) {
+      try {
+        premiumTemplates = await loadPremiumTemplates(opts['premium-dir']);
+      } catch (err) {
+        console.error(redact(`Failed to load --premium-dir templates: ${err.message}`));
+        process.exit(7);
+      }
+      console.log(`[premium-dir] loaded ${premiumTemplates.length} external template(s) from ${opts['premium-dir']}`);
+    }
+    const premiumById = new Map(premiumTemplates.map((t) => [t.id, t]));
+
+    // resolver(id) -> { template, isPremium } | null (premium unresolvable without --premium-dir).
+    const resolver = (id) => {
+      if (builtinById.has(id)) return { template: builtinById.get(id), isPremium: false };
+      if (premiumById.has(id)) return { template: premiumById.get(id), isPremium: true };
+      return null;
+    };
+
+    let state, statePath;
+
+    if (opts.resume) {
+      // ---- RESUME an existing sweep ----
+      if (opts.resumeName) {
+        statePath = sweepStatePath(opts.resumeName);
+        if (!fs.existsSync(statePath)) {
+          console.error(`No sweep state found for "${opts.resumeName}" (expected ${statePath}).`);
+          process.exit(8);
+        }
+        try { state = loadSweepState(statePath); } catch (err) {
+          console.error(`Could not read sweep state ${statePath}: ${err.message}`); process.exit(8);
+        }
+      } else {
+        const recent = findMostRecentSweepState();
+        if (!recent) {
+          console.error(`No sweep state files found under ${TRANSCRIPT_DIR} to resume. Start one with --playthrough --all --sweep-name <name>.`);
+          process.exit(8);
+        }
+        state = recent.state;
+        statePath = recent.path;
+        console.log(`[resume] most recent sweep: ${state.sweepName} (${statePath})`);
+      }
+
+      // Premium reconciliation: if any PENDING campaign is premium, --premium-dir must be
+      // supplied and must actually provide that template.
+      const pendingPremium = state.campaigns.filter((c) => c.status === 'pending' && c.kind === 'premium');
+      if (pendingPremium.length > 0) {
+        if (!opts['premium-dir']) {
+          console.error(`Sweep "${state.sweepName}" has ${pendingPremium.length} pending premium campaign(s); re-supply --premium-dir to resume them.`);
+          console.error(`  pending premium: ${pendingPremium.map((c) => c.id).join(', ')}`);
+          process.exit(9);
+        }
+        const missing = pendingPremium.filter((c) => !premiumById.has(c.id)).map((c) => c.id);
+        if (missing.length > 0) {
+          console.error(`--premium-dir "${opts['premium-dir']}" does not provide pending premium campaign(s): ${missing.join(', ')}`);
+          process.exit(9);
+        }
+      }
+    } else {
+      // ---- START a new sweep ----
+      const builtinEntries = builtinPlayable.map((t) => ({ template: t, isPremium: false }));
+      const premiumEntries = premiumTemplates.map((t) => ({ template: t, isPremium: true }));
+      const entries = [...builtinEntries, ...premiumEntries];
+      if (entries.length === 0) {
+        console.error('No playable campaigns found to sweep (none have settings.milestones).');
+        process.exit(6);
+      }
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const name = opts['sweep-name'] || `sweep-${stamp}`;
+      statePath = sweepStatePath(name);
+      // Refuse to clobber an existing, unfinished named sweep — point at --resume instead.
+      if (fs.existsSync(statePath)) {
+        let existing = null;
+        try { existing = loadSweepState(statePath); } catch { /* corrupt — allow overwrite below */ }
+        const pending = existing ? existing.campaigns.filter((c) => c.status === 'pending').length : 0;
+        if (existing && pending > 0) {
+          console.error(`A sweep named "${name}" already exists (${statePath}) with ${pending} campaign(s) pending.`);
+          console.error(`Resume it with:  node scripts/quest-harness.mjs --playthrough --resume ${name}   (or choose a different --sweep-name).`);
+          process.exit(10);
+        }
+      }
+      state = buildFreshSweepState(name, entries, opts, isLive);
+      saveSweepState(statePath, state);
+      console.log(`[sweep] started "${name}" — ${entries.length} campaign(s), state at ${statePath}`);
+    }
+
+    await runPlaythroughSweep(opts, state, statePath, resolver, DM_PROTOCOL, { isLive, key, redact }, appExports);
+    return;
+  }
 
   const template = storyTemplates.find((t) => t.id === opts.campaign);
   if (!template) {
@@ -1635,8 +2303,7 @@ async function main() {
 
   // Recorded playthrough extends AI mode: same guards + key path, transcript output.
   if (opts.playthrough) {
-    await runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact },
-      { composeIntro, formatStartObjective: formatStartObjectiveReal });
+    await runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact }, appExports);
     return;
   }
 
