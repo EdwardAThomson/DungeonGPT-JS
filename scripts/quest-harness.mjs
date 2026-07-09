@@ -172,8 +172,14 @@ function parseArgs(argv) {
   const opts = {
     ...FLAG_DEFAULTS, live: false, yes: false, help: false,
     all: false, simulate: false, playthrough: false, _modeExplicit: false,
-    resume: false, resumeName: null
+    resume: false, resumeName: null,
+    // --sweep-all is the "easy button": one flag that expands to a full, resumable,
+    // all-campaigns sweep with sweep-friendly defaults + premium auto-detection.
+    sweepAll: false, fresh: false, 'no-premium': false
   };
+  // Flags the user passed EXPLICITLY. The --sweep-all preset only fills in the flags
+  // the user did NOT pass, so an explicit flag always overrides the preset default.
+  const explicit = new Set();
   const numeric = new Set([
     'steps', 'max-tokens', 'max-prompt-tokens', 'tpm', 'rpm',
     'max-requests', 'max-total-tokens', 'max-usd', 'price-in', 'price-out', 'temperature'
@@ -188,6 +194,9 @@ function parseArgs(argv) {
     if (arg === '--all') { opts.all = true; continue; }
     if (arg === '--simulate') { opts.simulate = true; continue; }
     if (arg === '--playthrough') { opts.playthrough = true; continue; }
+    if (arg === '--sweep-all') { opts.sweepAll = true; continue; }
+    if (arg === '--fresh') { opts.fresh = true; continue; }
+    if (arg === '--no-premium') { opts['no-premium'] = true; continue; }
     // --resume [name]: resume a sweep. Optional value: if the next argument is not
     // another flag, it is the sweep NAME; otherwise resume the MOST RECENT sweep.
     if (arg === '--resume') {
@@ -205,8 +214,10 @@ function parseArgs(argv) {
       const n = Number(value);
       if (!Number.isFinite(n)) throw new Error(`Flag ${arg} expects a number, got "${value}"`);
       opts[name] = n;
+      explicit.add(name);
     } else if (stringFlags.has(name)) {
       opts[name] = value;
+      explicit.add(name);
       if (name === 'mode') opts._modeExplicit = true;
     }
   }
@@ -217,6 +228,30 @@ function parseArgs(argv) {
   if (opts.resume) {
     opts.playthrough = true;
     opts.all = true;
+  }
+
+  // --sweep-all: the "easy button" — expand to a full, resumable, all-campaigns sweep.
+  // It implies --playthrough --all and fills in sweep-friendly budget defaults SIZED to
+  // finish the whole 16-campaign set in one go without a premature stop (a full premium run
+  // is ~103 requests / ~$0.32 real; these ceilings leave generous headroom, and the guards
+  // account dry-run completions at the worst-case --max-tokens so the ceilings must exceed
+  // that worst case, not the real spend). Any EXPLICITLY-passed flag overrides the preset.
+  if (opts.sweepAll) {
+    opts.playthrough = true;
+    opts.all = true;
+    const SWEEP_ALL_PRESET = {
+      'max-tokens': 800,        // full premium output parity
+      'on-limit': 'wait',       // ride out a rate window instead of aborting the run
+      'max-requests': 150,      // ~103 needed; headroom for growth
+      'max-total-tokens': 400000, // worst-case (800-token) accounting for the full set + headroom
+      'max-usd': 0.75,          // ~$0.32 real; covers worst-case dry-run accounting too
+      rpm: 30                   // higher than the cautious default so the rate window never chokes
+    };
+    for (const [k, v] of Object.entries(SWEEP_ALL_PRESET)) {
+      if (!explicit.has(k)) opts[k] = v;
+    }
+    // Stable, resumable name so re-running --sweep-all continues the same sweep.
+    if (opts['sweep-name'] == null) opts['sweep-name'] = 'all';
   }
 
   // --simulate is an alias for the deterministic guest-vs-member comparison, unless
@@ -261,6 +296,9 @@ function parseArgs(argv) {
     throw new Error('--sweep-name only applies to a --playthrough --all sweep.');
   }
 
+  if (opts['no-premium'] && opts['premium-dir']) {
+    throw new Error('--no-premium and --premium-dir are mutually exclusive (choose one).');
+  }
   if (opts['on-limit'] !== 'abort' && opts['on-limit'] !== 'wait') {
     throw new Error(`--on-limit must be "abort" or "wait", got "${opts['on-limit']}"`);
   }
@@ -279,6 +317,32 @@ quest-harness.mjs - headless quest tester (DRY-RUN / deterministic by default)
 
 USAGE
   node scripts/quest-harness.mjs [flags]
+
+RECOMMENDED: TEST ALL CAMPAIGNS WITH ONE FLAG (--sweep-all)
+  --sweep-all is the "easy button". It expands to a full, resumable, all-campaigns
+  quality sweep so you do not have to assemble --playthrough --all --max-tokens ...
+  --on-limit wait --max-requests ... etc yourself. It:
+    * implies --playthrough --all and applies sweep-friendly budget defaults sized to
+      finish the whole set in one go (max-tokens 800, on-limit wait, max-requests 150,
+      max-total-tokens 400000, max-usd 0.75, rpm 30). Any flag you pass EXPLICITLY still
+      overrides the preset, so power users can tune it.
+    * AUTO-RESUMES: it uses a stable sweep name ("all" by default; override --sweep-name).
+      Just run it again to continue — it skips done campaigns, resumes pending ones, and
+      prints "already complete" once every campaign is done. No separate --resume needed.
+    * AUTO-INCLUDES PREMIUM if found (env HARNESS_PREMIUM_DIR, then the conventional
+      ../dungeongpt-premium-content/campaigns, then ~/Projects/...); otherwise it runs
+      built-in-only and tells you how to point at premium. --no-premium opts out; an
+      explicit --premium-dir overrides the auto-detection.
+    * stays DRY-RUN unless you also pass --live --yes (unchanged safety).
+
+  Start a real run (and re-run the EXACT same command to continue):
+    OPENROUTER_API_KEY=... npm run harness -- --sweep-all --live --yes
+  Preview it first (no network, no key):
+    npm run harness -- --sweep-all
+  Restart a named sweep from scratch (archives the old state, never deletes it):
+    npm run harness -- --sweep-all --fresh
+  Built-in campaigns only:
+    npm run harness -- --sweep-all --no-premium
 
 MODES (--mode, default: ${d.mode})
   ai       Compose the REAL new-game AI prompts and (only with --live --yes) send
@@ -331,6 +395,15 @@ FLAGS
                            --premium-dir (premium rows in the aggregate stay STRUCTURAL: ids,
                            counts, flags only — no premium prose). A full live sweep needs
                            those budgets raised; the dry-run PROJECTS the total requests/cost.
+  --sweep-all              EASY BUTTON (see the section above): expand to a full, resumable
+                           sweep of EVERY campaign with sweep-friendly defaults, auto-resume,
+                           and premium auto-detection. Re-run the same command to continue.
+                           Explicit flags override the preset; DRY-RUN unless --live --yes.
+  --fresh                  With --sweep-all, restart the named sweep from scratch: the old
+                           state file is ARCHIVED (renamed, never deleted), then a new sweep
+                           begins. No effect without a sweep.
+  --no-premium             With --sweep-all, run built-in campaigns only even if a premium
+                           dir is found (mutually exclusive with --premium-dir).
   --steps <N>              Turns to compose: 1 = opening only (default: ${d.steps})
                            Each extra step adds one follow-up turn. (Ignored with --playthrough.)
   --model <id>             OpenRouter model id               (default: ${d.model})
@@ -386,6 +459,10 @@ CHUNKED SWEEPS (budget-per-invocation vs cumulative totals)
   re-runs whole on the next resume, so size each chunk to fit a few WHOLE campaigns.
 
 EXAMPLES
+  npm run harness -- --sweep-all                                  # preview ALL campaigns (dry-run)
+  OPENROUTER_API_KEY=... npm run harness -- --sweep-all --live --yes   # real sweep; re-run to resume
+  npm run harness -- --sweep-all --fresh                         # restart the "all" sweep (archives old state)
+  npm run harness -- --sweep-all --no-premium                    # built-in campaigns only
   node scripts/quest-harness.mjs --campaign heroic-fantasy-t1      # ai dry-run
   node scripts/quest-harness.mjs --playthrough --campaign heroic-fantasy-t1  # recorded dry-run
   node scripts/quest-harness.mjs --playthrough --all                        # sweep every campaign (dry-run)
@@ -454,6 +531,37 @@ async function loadAppData() {
 function looksLikeTemplate(v) {
   return v && typeof v === 'object' && v.id != null &&
     (Array.isArray(v.milestones) || Array.isArray(v.settings?.milestones));
+}
+
+// Resolve the premium campaigns directory WITHOUT a hardcoded absolute path, for
+// --sweep-all's auto-include. Precedence:
+//   1. --no-premium       -> skip entirely (built-in only)
+//   2. explicit --premium-dir -> use it verbatim (overrides auto-detection)
+//   3. env HARNESS_PREMIUM_DIR
+//   4. ../dungeongpt-premium-content/campaigns   (conventional, relative to this repo)
+//   5. ~/Projects/dungeongpt-premium-content/campaigns
+// Returns { dir, source }; dir is null when premium is skipped or nothing was found.
+function resolvePremiumDir(opts) {
+  if (opts['no-premium']) return { dir: null, source: 'skipped (--no-premium)' };
+  if (opts['premium-dir']) return { dir: opts['premium-dir'], source: 'explicit --premium-dir' };
+  const candidates = [];
+  if (process.env.HARNESS_PREMIUM_DIR && process.env.HARNESS_PREMIUM_DIR.trim()) {
+    candidates.push({ p: process.env.HARNESS_PREMIUM_DIR.trim(), s: 'env HARNESS_PREMIUM_DIR' });
+  }
+  candidates.push({
+    p: path.resolve(repoRoot, '..', 'dungeongpt-premium-content', 'campaigns'),
+    s: 'conventional ../dungeongpt-premium-content/campaigns'
+  });
+  candidates.push({
+    p: path.join(os.homedir(), 'Projects', 'dungeongpt-premium-content', 'campaigns'),
+    s: '~/Projects/dungeongpt-premium-content/campaigns'
+  });
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(c.p) && fs.statSync(c.p).isDirectory()) return { dir: c.p, source: c.s };
+    } catch { /* ignore and try the next candidate */ }
+  }
+  return { dir: null, source: 'not found (auto-detect)' };
 }
 
 async function loadPremiumTemplates(dir) {
@@ -2142,7 +2250,14 @@ async function runPlaythroughSweep(opts, state, statePath, resolver, DM_PROTOCOL
   console.log(`State file:               ${statePath}`);
   console.log(`Aggregate sweep summary:  ${summaryPath}`);
   if (stillPending.length > 0) {
-    console.log(`${stillPending.length} campaign(s) still pending — run:  node scripts/quest-harness.mjs --playthrough --resume ${state.sweepName}${state.includesPremium ? ' --premium-dir <path>' : ''}`);
+    if (opts.sweepAll) {
+      const keyPrefix = opts.live ? 'OPENROUTER_API_KEY=... ' : '';
+      const liveFlags = opts.live ? ' --live --yes' : '';
+      console.log(`${stillPending.length} campaign(s) still pending — re-run the SAME command to continue:`);
+      console.log(`  ${keyPrefix}npm run harness -- --sweep-all${liveFlags}`);
+    } else {
+      console.log(`${stillPending.length} campaign(s) still pending — run:  node scripts/quest-harness.mjs --playthrough --resume ${state.sweepName}${state.includesPremium ? ' --premium-dir <path>' : ''}`);
+    }
   } else {
     console.log(`Sweep ${state.sweepName} is COMPLETE.`);
   }
@@ -2172,6 +2287,23 @@ async function main() {
   }
 
   const isSweep = opts.playthrough && opts.campaign === 'all';
+
+  // --sweep-all auto-detects the premium campaigns dir (unless --no-premium or an explicit
+  // --premium-dir is given) and folds it into the sweep by setting opts['premium-dir'] so
+  // the rest of the sweep code path is unchanged. Only --sweep-all auto-detects; plain
+  // --playthrough --all still requires an explicit --premium-dir (unchanged behaviour).
+  if (opts.sweepAll) {
+    const pr = resolvePremiumDir(opts);
+    if (pr.dir) {
+      opts['premium-dir'] = pr.dir;
+      console.log(`[sweep-all] premium: INCLUDED from ${pr.dir}  (${pr.source})`);
+    } else if (opts['no-premium']) {
+      console.log('[sweep-all] premium: SKIPPED (--no-premium) — built-in campaigns only.');
+    } else {
+      console.log('[sweep-all] premium: not found — running built-in campaigns only.');
+      console.log('[sweep-all]   to include premium, set HARNESS_PREMIUM_DIR=<dir> or pass --premium-dir <dir>.');
+    }
+  }
 
   // --premium-dir affects the guest/member/both sim (handled in runSimMode) and the
   // --playthrough --all sweep. It is ignored in single-campaign AI / playthrough runs.
@@ -2222,6 +2354,39 @@ async function main() {
       if (premiumById.has(id)) return { template: premiumById.get(id), isPremium: true };
       return null;
     };
+
+    // --sweep-all AUTO-RESUME: use the stable sweep name and, without the user having to
+    // pass --resume, decide start-vs-resume-vs-complete from the state file. --fresh archives
+    // an existing state (never silently deleted) and starts the named sweep over.
+    if (opts.sweepAll) {
+      const name = opts['sweep-name']; // 'all' by default
+      const sPath = sweepStatePath(name);
+      if (opts.fresh && fs.existsSync(sPath)) {
+        const bak = sPath.replace(/\.json$/, `.archived-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+        try {
+          fs.renameSync(sPath, bak);
+          console.log(`[sweep-all] --fresh: archived existing sweep "${name}" state to ${bak}`);
+        } catch (err) {
+          console.error(redact(`[sweep-all] --fresh: could not archive existing state: ${err.message}`));
+          process.exit(11);
+        }
+      }
+      if (!opts.fresh && fs.existsSync(sPath)) {
+        let existing = null;
+        try { existing = loadSweepState(sPath); } catch { existing = null; }
+        if (existing) {
+          const pending = existing.campaigns.filter((c) => c.status === 'pending').length;
+          if (pending === 0) {
+            console.log(`sweep ${name} already complete (use --fresh to restart)`);
+            return;
+          }
+          console.log(`[sweep-all] RESUMING sweep "${name}" — ${pending} campaign(s) pending.`);
+          opts.resume = true;
+          opts.resumeName = name;
+        }
+      }
+      if (!opts.resume) console.log(`[sweep-all] STARTING new sweep "${name}".`);
+    }
 
     let state, statePath;
 
