@@ -70,10 +70,19 @@ Rather than letting the AI freely decide if a narrative goal is met, we constrai
 > `trigger: { npc: '<spawn.id>', action: 'talk' }` completes on an `npc_talked` event, fired
 > by a "💬 Talk" button on the authored NPC (placed into its quest building by
 > `populateTown` via `getMilestoneNpcsForTown`), with a building-level "Ask for …" fallback.
-> The AI `[COMPLETE_MILESTONE]` marker is now guarded (`findMarkerMilestoneIndex`) to
+> The narrative `[COMPLETE_MILESTONE]` marker path (`findMarkerMilestoneIndex`) stays guarded to
 > `narrative`/legacy-untyped milestones only. Milestone boss fights launch from the POI
 > arrival modal via `getMilestoneBossForTile` (a "⚔️ Confront" action). Existing saves keep
 > their snapshotted `narrative` milestones and still complete via the marker.
+>
+> **Dual completion for `talk` (shipped 2026-07-08).** A `talk` milestone can now also be
+> completed by the AI `[COMPLETE_MILESTONE]` marker, not just the Talk button, via a separate
+> fail-closed resolver (`resolveTalkMarkerMilestone`). The marker completes a talk milestone
+> ONLY when exactly one active talk objective matches the marker text, its NPC is present in the
+> current town, and its `requires` are met; zero or multiple candidates complete nothing. Both
+> paths route through the same `checkMilestoneEvent('npc_talked')` flow as the button, so rewards,
+> codex/ledger, and idempotency are identical. `DM_PROTOCOL` permits the model to mark the current
+> talk objective under those constraints; `findMarkerMilestoneIndex` (narrative) is untouched.
 
 ---
 

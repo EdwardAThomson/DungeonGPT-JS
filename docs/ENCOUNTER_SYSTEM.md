@@ -67,7 +67,7 @@ Phase 1 (core encounters), Phase 2 (random generation + movement integration), a
 - **Biome-specific tables** in `encounterTables.js` with weighted random selection. Every biome (plains, forest, mountain, town, etc.) has its own table with hostile/non-hostile mix and a `none` entry for peaceful travel.
 - **Trigger formula:** Base chance per biome, multiplied by grimness modifier (Noble 0.8x to Grimdark 1.4x), reduced on revisited tiles, boosted after 3+ moves without encounter. Capped at 70%.
 - **POI encounters:** Separate tables for caves, ruins, groves, etc. POI type detected from tile data.
-- **Environmental encounters:** Weather, hazards, and discoveries as a separate encounter category.
+- **Environmental encounters:** Weather, hazards, and discoveries as a separate encounter category, rolled by `rollEnvironmentalEncounter()`. Each template may carry an optional `climate` tag (`'hot'` / `'cold'`); the current climate is derived from `settings.theme` first, then the tile biome (snow → cold, desert → hot, everything else → temperate), and the roll is filtered to that climate. Untagged templates are climate-agnostic and always eligible, so a snow campaign no longer draws "Scorching Heat" while backward-compatible content keeps rolling. `getEncounterBiome()` also resolves `snow` and `desert` tiles distinctly (previously collapsed to plains).
 
 ### Two-Tier Encounter System (Phase 2.4 -- In Progress)
 
