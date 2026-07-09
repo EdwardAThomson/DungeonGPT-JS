@@ -656,6 +656,37 @@ function buildScriptedPlayerTurn(m) {
   }
 }
 
+// A short lowercase paraphrase of the milestone objective, used in the commit line of
+// the concluding talk turn ("we are ready to <objective>").
+function paraphraseObjective(m) {
+  const raw = (m.text || 'take up the quest').trim().replace(/[.!?]+$/, '');
+  return raw ? raw.charAt(0).toLowerCase() + raw.slice(1) : 'take up the quest';
+}
+
+// Compose the CONCLUDING player turn for a `talk` milestone. The party has BEEN
+// speaking with the NPC and now gives their answer and commits. This is the second of
+// the two talk turns; it exists so we can observe the dual-completion
+// [COMPLETE_MILESTONE] marker actually fire at a true conversation conclusion (the
+// single open turn typically ends with the NPC handing the decision back to the party,
+// so the marker correctly does NOT fire there).
+function buildTalkConcludePlayerTurn(m) {
+  const s = m.spawn || {};
+  const who = s.name || 'the contact';
+  return `We hear ${who} out and tell them we accept: we are ready to ${paraphraseObjective(m)}.`;
+}
+
+// The [SUMMARY] seed for the concluding talk turn. Unlike the default seed used for
+// other turns, this makes explicit that the party has already been in conversation with
+// the NPC and is now giving their final answer, so the model reads the exchange as
+// reaching its natural end (and may legitimately mark the talk milestone complete).
+function buildTalkConcludeSummary(m) {
+  const s = m.spawn || {};
+  const b = m.building || {};
+  const who = s.name || 'the contact';
+  const where = b.name || b.location || s.location || m.location || 'the meeting place';
+  return `The party has been speaking with ${who} at ${where}. The conversation is drawing to a close and the party is about to give their answer.`;
+}
+
 // Minimal location context for a milestone turn, standing in for buildLocationContext
 // (the harness generates no town maps). Inside-town for building milestones; a plain
 // wilderness line otherwise. Documented approximation; noted in the transcript.
@@ -732,18 +763,40 @@ function composePlaythroughRequests(template, DM_PROTOCOL, { composeIntro, forma
   for (const m of order) {
     const status = getMilestoneStatusReplica(working);
     const milestonesInfo = formatMilestonePromptTextReplica(status);
-    const playerInput = buildScriptedPlayerTurn(m);
     const locationInfo = buildMinimalLocationContext(m);
     const gameContext = `Setting: ${settings.shortDescription || 'Fantasy Realm'}. Mood: ${settings.grimnessLevel || 'Normal'}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
-    // Mirror handleSubmit's body. No RAG/summary in a headless harness: the summary
-    // is the app's default seed and ragContext is empty (documented approximation).
-    const body = `[CONTEXT]\n${gameContext}\n\n[SUMMARY]\nThe tale unfolds.\n\n[PLAYER ACTION]\n${playerInput}\n\n[NARRATE]`;
+    const isTalk = m.type === 'talk';
+
+    // OPEN turn: mirror handleSubmit's body. No RAG/summary in a headless harness: the
+    // summary is the app's default seed and ragContext is empty (documented approx).
+    const openInput = buildScriptedPlayerTurn(m);
+    const openBody = `[CONTEXT]\n${gameContext}\n\n[SUMMARY]\nThe tale unfolds.\n\n[PLAYER ACTION]\n${openInput}\n\n[NARRATE]`;
     requests.push({
-      label: `Milestone #${m.id} [${m.type || 'untyped'}]`,
-      prompt: wrapWithProtocol(DM_PROTOCOL, body, settings),
-      playerInput,
+      label: `Milestone #${m.id} [${m.type || 'untyped'}]${isTalk ? ' (open)' : ''}`,
+      prompt: wrapWithProtocol(DM_PROTOCOL, openBody, settings),
+      playerInput: openInput,
       milestone: m
     });
+
+    // CONCLUDE turn (talk only): a SECOND in-game turn whose scripted player input
+    // concludes the conversation and commits. The milestone stays ACTIVE for this turn
+    // (it is completed by the marker or the Talk button, never by the harness), so the
+    // context still presents it as the current talk objective and still carries the
+    // "you may mark this complete once the party finishes speaking with <name>" cue.
+    // This lets us observe dual-completion's positive path: the marker firing at a true
+    // conclusion, which the single open turn does not reach.
+    if (isTalk) {
+      const concludeInput = buildTalkConcludePlayerTurn(m);
+      const concludeBody = `[CONTEXT]\n${gameContext}\n\n[SUMMARY]\n${buildTalkConcludeSummary(m)}\n\n[PLAYER ACTION]\n${concludeInput}\n\n[NARRATE]`;
+      requests.push({
+        label: `Milestone #${m.id} [${m.type || 'untyped'}] (conclude)`,
+        prompt: wrapWithProtocol(DM_PROTOCOL, concludeBody, settings),
+        playerInput: concludeInput,
+        milestone: m,
+        isTalkConclude: true
+      });
+    }
+
     const w = working.find((x) => x.id === m.id);
     if (w) w.completed = true;
   }
@@ -769,6 +822,22 @@ function runResponseChecks(text) {
   if (/\[(CHECK|ROLL):/i.test(t)) flags.push('marker:CHECK/ROLL');
   if (flags.length === 0) flags.push('ok');
   return flags;
+}
+
+// One-line-per-talk-milestone note on whether the concluding talk turn's dual-completion
+// [COMPLETE_MILESTONE] marker fired, so a reader immediately knows whether the positive
+// path was exercised. Detection only; the marker is never acted upon (no state mutation).
+function talkMarkerNotes(turns, isLive) {
+  const notes = [];
+  for (const t of turns) {
+    if (!/\(conclude\)/.test(t.label || '')) continue;
+    const mid = (t.label.match(/#(\d+)/) || [])[1] || '?';
+    let outcome;
+    if (!t.sent) outcome = isLive ? 'no (not sent)' : 'n/a (dry-run: no request)';
+    else outcome = (t.flags || []).includes('marker:COMPLETE_MILESTONE') ? 'yes' : 'no';
+    notes.push(`talk-marker fired: ${outcome} (Milestone #${mid})`);
+  }
+  return notes;
 }
 
 // ===========================================================================
@@ -1481,6 +1550,7 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
   console.log(`  tokens (in/out): ${guard.promptTokensTotal} / ${guard.completionTokensTotal}`);
   console.log(`  est. cost:       $${guard.costUsd().toFixed(4)}`);
   console.log(`  stopped by:      ${stoppedBy || 'nothing (composed all turns)'}`);
+  for (const note of talkMarkerNotes(turns, isLive)) console.log(`  ${note}`);
   console.log(`  transcript:      ${transcriptPath}`);
   if (!isLive) console.log('  (no network request was made — dry-run; responses are "[dry-run] not sent")');
   console.log('============================================================');
@@ -1580,6 +1650,7 @@ function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, 
   L.push(`- **Tokens (in/out):** ${guard.promptTokensTotal} / ${guard.completionTokensTotal}`);
   L.push(`- **Estimated cost:** $${guard.costUsd().toFixed(4)}`);
   L.push(`- **Stopped by:** ${stoppedBy || 'nothing (composed all turns)'}`);
+  for (const note of talkMarkerNotes(turns, isLive)) L.push(`- **${note}**`);
   L.push('');
   L.push('### Per-turn flags overview');
   L.push('');
