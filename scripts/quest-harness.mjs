@@ -69,6 +69,16 @@
 // hook and this harness both call). It obeys every guard exactly like AI mode and is
 // DRY-RUN unless BOTH --live AND --yes are passed. Every prompt + response is written
 // to a timestamped Markdown transcript under harness-transcripts/ (gitignored).
+//
+// SWEEP (--playthrough --all): runs the recorded playthrough for EVERY playable campaign
+// (and every premium template when --premium-dir is given), writing one transcript per
+// campaign plus a single aggregate sweep-summary. The guards are enforced CUMULATIVELY
+// across the whole sweep (the running request/token/USD tallies carry across campaigns),
+// so it hard-stops the instant the next request would cross --max-requests /
+// --max-total-tokens / --max-usd and marks the remaining campaigns skipped. The aggregate
+// summary + all console output stay STRUCTURAL for premium campaigns (ids, counts, flags,
+// marker yes/no) — no premium prose leaks; premium prose only ever lands in the local,
+// gitignored per-campaign transcript. Dry-run projects the full-sweep request count + cost.
 // ============================================================================
 
 import { build } from 'esbuild';
@@ -191,8 +201,9 @@ function parseArgs(argv) {
   // --simulate is an alias for the deterministic guest-vs-member comparison, unless
   // an explicit --mode was also given.
   if (opts.simulate && !opts._modeExplicit) opts.mode = 'both';
-  // --campaign all (or --all) implies the deterministic sim; the AI path is single-campaign.
-  if ((opts.all || opts.campaign === 'all') && !opts._modeExplicit && opts.mode === 'ai') {
+  // --campaign all (or --all) implies the deterministic sim, EXCEPT under --playthrough,
+  // which sweeps every playable campaign in AI mode (a recorded live playthrough of each).
+  if (!opts.playthrough && (opts.all || opts.campaign === 'all') && !opts._modeExplicit && opts.mode === 'ai') {
     opts.mode = 'both';
   }
   if (opts.all) opts.campaign = 'all';
@@ -201,17 +212,17 @@ function parseArgs(argv) {
   if (!VALID_MODES.has(opts.mode)) {
     throw new Error(`--mode must be one of ai|guest|member|both, got "${opts.mode}"`);
   }
-  if (opts.mode === 'ai' && opts.campaign === 'all') {
-    throw new Error('--campaign all / --all is only supported for the deterministic sim (--mode guest|member|both).');
+  if (!opts.playthrough && opts.mode === 'ai' && opts.campaign === 'all') {
+    throw new Error('--campaign all / --all is only supported for the deterministic sim (--mode guest|member|both), or with --playthrough (a recorded AI sweep of every campaign).');
   }
   if (opts.playthrough) {
     if (opts._modeExplicit && opts.mode !== 'ai') {
       throw new Error('--playthrough extends AI mode; it is not compatible with --mode guest|member|both.');
     }
     opts.mode = 'ai';
-    if (opts.campaign === 'all') {
-      throw new Error('--playthrough runs a single campaign; --campaign all / --all is not supported.');
-    }
+    // --playthrough --all / --campaign all sweeps every playable campaign (AI mode); allowed.
+    // A full sweep needs raised --max-requests / --max-usd / --max-total-tokens (the
+    // conservative defaults stop it early, on purpose): the guards are cumulative.
   }
 
   if (opts['on-limit'] !== 'abort' && opts['on-limit'] !== 'wait') {
@@ -262,7 +273,10 @@ SAFETY (ai mode only)
 FLAGS
   --mode <ai|guest|member|both>  Run mode (see above)         (default: ${d.mode})
   --simulate               Alias for --mode both (deterministic guest vs member)
-  --all                    Run the sim across ALL playable campaigns (= --campaign all)
+  --all                    Run across ALL playable campaigns (= --campaign all). With the
+                           deterministic sim it walks every campaign; with --playthrough it
+                           SWEEPS a recorded playthrough of every campaign (and, with
+                           --premium-dir, every premium template too).
   --campaign <id|all>      Story template id, or "all"        (default: ${d.campaign})
   --playthrough            Extend AI mode into a RECORDED, scripted playthrough of the
                            campaign spine: the opening plus ONE scripted player turn per
@@ -273,6 +287,14 @@ FLAGS
                            prompt + response to a timestamped Markdown transcript under
                            harness-transcripts/ (gitignored). DRY-RUN by default. Ignores
                            --steps (the turn count is opening + milestones).
+                           With --all it sweeps EVERY playable campaign (one transcript per
+                           campaign) plus a single aggregate sweep-summary; the guards are
+                           enforced CUMULATIVELY across the whole sweep, so it hard-stops the
+                           moment the next request would cross --max-requests / --max-total-
+                           tokens / --max-usd (remaining campaigns are marked skipped). Honors
+                           --premium-dir (premium rows in the aggregate stay STRUCTURAL: ids,
+                           counts, flags only — no premium prose). A full live sweep needs
+                           those budgets raised; the dry-run PROJECTS the total requests/cost.
   --steps <N>              Turns to compose: 1 = opening only (default: ${d.steps})
                            Each extra step adds one follow-up turn. (Ignored with --playthrough.)
   --model <id>             OpenRouter model id               (default: ${d.model})
@@ -289,7 +311,8 @@ FLAGS
   --on-limit <abort|wait>  Rate-window breach behaviour      (default: ${d['on-limit']})
   --key-file <path>        Read OPENROUTER_API_KEY=... line from this file
   --premium-dir <path>     Directory of EXTERNAL campaign template *.js files to
-                           ALSO simulate in guest/member/both mode. Each file is an
+                           ALSO simulate in guest/member/both mode (and to ALSO sweep in
+                           --playthrough --all; premium rows there stay structural). Each file is an
                            ESM module exporting a template object (the first export
                            with an id + settings.milestones is used); files without
                            milestones (teaser stubs) are skipped like built-in stubs.
@@ -305,6 +328,8 @@ FLAGS
 EXAMPLES
   node scripts/quest-harness.mjs --campaign heroic-fantasy-t1      # ai dry-run
   node scripts/quest-harness.mjs --playthrough --campaign heroic-fantasy-t1  # recorded dry-run
+  node scripts/quest-harness.mjs --playthrough --all                        # sweep every campaign (dry-run)
+  node scripts/quest-harness.mjs --playthrough --all --premium-dir <path>   # + premium templates
   OPENROUTER_API_KEY=sk-or-... node scripts/quest-harness.mjs --playthrough --live --yes
   node scripts/quest-harness.mjs --mode guest --campaign heroic-fantasy-t1
   node scripts/quest-harness.mjs --mode both --all                # sim every campaign
@@ -1371,31 +1396,13 @@ function fmtGuards(opts) {
   ];
 }
 
-async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact }, appExports) {
-  const requests = composePlaythroughRequests(template, DM_PROTOCOL, appExports);
-  const startedAt = new Date();
-  const stamp = startedAt.toISOString().replace(/[:.]/g, '-');
-
-  // The authored opening is a deterministic entry, NOT a request. Network requests =
-  // 1 opening polish + one turn per milestone.
-  const milestoneCount = requests.filter((r) => r.milestone).length;
-  const networkRequests = requests.filter((r) => !r.isAuthored).length;
-
-  // ---- Preflight (console) ----
-  console.log('');
-  console.log('============================================================');
-  console.log(`quest-harness — RECORDED PLAYTHROUGH — ${isLive ? 'LIVE' : 'DRY-RUN (no network requests)'}`);
-  console.log('============================================================');
-  console.log(`Campaign:        ${template.id}  (${template.name || 'unnamed'})`);
-  console.log(`Model:           ${opts.model}`);
-  console.log(`Composed:        1 authored opening (no request) + ${networkRequests} request(s): 1 opening polish + ${milestoneCount} milestone turn(s)`);
-  console.log(`Key source:      ${isLive ? (process.env.OPENROUTER_API_KEY ? 'env OPENROUTER_API_KEY (redacted)' : '--key-file (redacted)') : 'n/a (dry-run)'}`);
-  console.log('Guards (enforced before each request):');
-  for (const g of fmtGuards(opts)) console.log(`  ${g}`);
-  console.log('============================================================');
-  console.log('');
-
-  const guard = new GuardState(opts);
+// Run the guarded per-request loop for ONE campaign's composed requests against a
+// SHARED GuardState (so a sweep's request/token/USD tallies carry across campaigns and
+// the guards stay cumulative). Returns { turns, stoppedBy }. Mutates `guard`. Never
+// prints or records the key; the playthrough loop deliberately does NOT echo prompt or
+// response prose to the console (only structural counts/flags), so this is safe to run
+// over premium campaigns in a sweep.
+async function executePlaythroughTurns(opts, requests, { isLive, key, redact }, guard) {
   let stoppedBy = null;
   const turns = []; // { label, playerInput, prompt, estPrompt, sent, response, promptTokens, completionTokens, flags }
 
@@ -1531,16 +1538,92 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
     }
   }
 
-  // ---- Write the transcript ----
+  return { turns, stoppedBy };
+}
+
+// Snapshot the shared guard's cumulative tallies so a sweep can compute PER-CAMPAIGN
+// deltas (requests/tokens/cost this campaign added) from before/after snapshots.
+function guardSnapshot(guard) {
+  return {
+    requestsMade: guard.requestsMade,
+    promptTokens: guard.promptTokensTotal,
+    completionTokens: guard.completionTokensTotal
+  };
+}
+function accountingDelta(before, after, opts) {
+  const promptTokens = after.promptTokens - before.promptTokens;
+  const completionTokens = after.completionTokens - before.completionTokens;
+  return {
+    requestsMade: after.requestsMade - before.requestsMade,
+    promptTokens,
+    completionTokens,
+    cost: estimateCostUsd(promptTokens, completionTokens, opts)
+  };
+}
+
+// Write a single campaign's transcript to harness-transcripts/ and return its path.
+// `accounting` carries PER-CAMPAIGN numbers (from the shared guard's delta in a sweep,
+// or the whole guard for a single-campaign run).
+function writeCampaignTranscript({ opts, template, isLive, startedAt, stamp, requests, turns, accounting, stoppedBy, redact, networkRequests, milestoneCount }) {
   const transcriptPath = path.join(TRANSCRIPT_DIR, `playthrough-${template.id}-${stamp}.md`);
-  let out;
   try {
     fs.mkdirSync(TRANSCRIPT_DIR, { recursive: true });
-    out = buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, guard, stoppedBy, redact, networkRequests, milestoneCount });
+    const out = buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, accounting, stoppedBy, redact, networkRequests, milestoneCount });
     fs.writeFileSync(transcriptPath, out, 'utf8');
   } catch (err) {
-    console.error(redact(`Failed to write transcript: ${err.message}`));
+    console.error(redact(`Failed to write transcript for ${template.id}: ${err.message}`));
   }
+  return transcriptPath;
+}
+
+// A guard stop is "cumulative" (halts a whole sweep) when it is a run-budget / rate /
+// live-error stop — as opposed to a per-request input-cap refusal, which is specific to
+// that one oversized prompt and does not implicate the shared budget.
+function isCumulativeStop(stoppedBy) {
+  return !!stoppedBy && /^(run budget|rate limit|request error)/.test(stoppedBy);
+}
+
+// ---------------------------------------------------------------------------
+// Single-campaign recorded playthrough (unchanged behaviour). Builds its own guard.
+// ---------------------------------------------------------------------------
+async function runPlaythrough(opts, template, DM_PROTOCOL, liveKey, appExports) {
+  const { isLive, redact } = liveKey;
+  const requests = composePlaythroughRequests(template, DM_PROTOCOL, appExports);
+  const startedAt = new Date();
+  const stamp = startedAt.toISOString().replace(/[:.]/g, '-');
+
+  // The authored opening is a deterministic entry, NOT a request. Network requests =
+  // 1 opening polish + one turn per milestone.
+  const milestoneCount = requests.filter((r) => r.milestone).length;
+  const networkRequests = requests.filter((r) => !r.isAuthored).length;
+
+  // ---- Preflight (console) ----
+  console.log('');
+  console.log('============================================================');
+  console.log(`quest-harness — RECORDED PLAYTHROUGH — ${isLive ? 'LIVE' : 'DRY-RUN (no network requests)'}`);
+  console.log('============================================================');
+  console.log(`Campaign:        ${template.id}  (${template.name || 'unnamed'})`);
+  console.log(`Model:           ${opts.model}`);
+  console.log(`Composed:        1 authored opening (no request) + ${networkRequests} request(s): 1 opening polish + ${milestoneCount} milestone turn(s)`);
+  console.log(`Key source:      ${isLive ? (process.env.OPENROUTER_API_KEY ? 'env OPENROUTER_API_KEY (redacted)' : '--key-file (redacted)') : 'n/a (dry-run)'}`);
+  console.log('Guards (enforced before each request):');
+  for (const g of fmtGuards(opts)) console.log(`  ${g}`);
+  console.log('============================================================');
+  console.log('');
+
+  const guard = new GuardState(opts);
+  const { turns, stoppedBy } = await executePlaythroughTurns(opts, requests, liveKey, guard);
+
+  // ---- Write the transcript ----
+  const accounting = {
+    requestsMade: guard.requestsMade,
+    promptTokens: guard.promptTokensTotal,
+    completionTokens: guard.completionTokensTotal,
+    cost: guard.costUsd()
+  };
+  const transcriptPath = writeCampaignTranscript({
+    opts, template, isLive, startedAt, stamp, requests, turns, accounting, stoppedBy, redact, networkRequests, milestoneCount
+  });
 
   // ---- Console summary ----
   console.log('============================================================');
@@ -1559,7 +1642,7 @@ async function runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact
 
 // Build the Markdown transcript string. The prompt/response are recorded IN FULL
 // (redacted); only the console output truncates.
-function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, guard, stoppedBy, redact, networkRequests, milestoneCount }) {
+function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, turns, accounting, stoppedBy, redact, networkRequests, milestoneCount }) {
   const L = [];
   L.push(`# Quest-harness playthrough transcript`);
   L.push('');
@@ -1646,9 +1729,9 @@ function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, 
 
   L.push('## Summary');
   L.push('');
-  L.push(`- **Requests ${isLive ? 'made' : 'simulated'}:** ${guard.requestsMade} / ${networkRequests} composed (+ 1 authored opening, no request)`);
-  L.push(`- **Tokens (in/out):** ${guard.promptTokensTotal} / ${guard.completionTokensTotal}`);
-  L.push(`- **Estimated cost:** $${guard.costUsd().toFixed(4)}`);
+  L.push(`- **Requests ${isLive ? 'made' : 'simulated'}:** ${accounting.requestsMade} / ${networkRequests} composed (+ 1 authored opening, no request)`);
+  L.push(`- **Tokens (in/out):** ${accounting.promptTokens} / ${accounting.completionTokens}`);
+  L.push(`- **Estimated cost:** $${accounting.cost.toFixed(4)}`);
   L.push(`- **Stopped by:** ${stoppedBy || 'nothing (composed all turns)'}`);
   for (const note of talkMarkerNotes(turns, isLive)) L.push(`- **${note}**`);
   L.push('');
@@ -1664,6 +1747,203 @@ function buildTranscriptMarkdown({ opts, template, isLive, startedAt, requests, 
   if (!isLive) L.push('_(dry-run: no network request was made; responses were not sent)_');
   L.push('');
   return L.join('\n');
+}
+
+// ===========================================================================
+// RECORDED PLAYTHROUGH SWEEP (--playthrough --all) — run the recorded playthrough
+// for EVERY playable campaign (+ premium templates when --premium-dir is given),
+// with the guards enforced CUMULATIVELY across the whole sweep. One per-campaign
+// transcript each (prose allowed — those files are local/gitignored), plus one
+// aggregate sweep-summary (console + file) that stays STRUCTURAL for premium rows
+// (id + counts + flags only, no premium prose).
+// ===========================================================================
+
+// The blocking check flags we surface in the aggregate (empty / refusal / prompt-echo
+// / request-error). Marker/ok/dry-run flags are not "blocking".
+function extractBlockFlags(turns) {
+  const out = [];
+  turns.forEach((t, idx) => {
+    for (const f of (t.flags || [])) {
+      if (f.startsWith('BLOCK:')) out.push(`turn ${idx + 1} ${f}`);
+    }
+  });
+  return out;
+}
+
+// Compact one campaign's talk-marker notes to "#<id>:yes|no|n/a" tokens for the row.
+function compactTalkNotes(notes) {
+  return notes.map((n) => {
+    const mid = (n.match(/#(\d+)/) || [])[1] || '?';
+    const outcome = /fired: yes/.test(n) ? 'yes' : /fired: no\b/.test(n) ? 'no' : 'n/a';
+    return `#${mid}:${outcome}`;
+  });
+}
+
+// Build the aggregate sweep-summary markdown (also printed to the console verbatim —
+// it is structural, so it is safe to print even when premium campaigns are included).
+function buildSweepSummary({ opts, rows, isLive, startedAt, guard, projectedRequests, projectedCostUsd, stopInfo, premiumCount }) {
+  const L = [];
+  const totalCost = guard.costUsd();
+  const totalTokens = guard.promptTokensTotal + guard.completionTokensTotal;
+
+  L.push('# Quest-harness playthrough SWEEP summary');
+  L.push('');
+  L.push(`- **Mode:** ${isLive ? 'LIVE (sent to OpenRouter)' : 'DRY-RUN (no network call)'}`);
+  L.push(`- **Timestamp:** ${startedAt.toISOString()}`);
+  L.push(`- **Model:** ${opts.model}`);
+  L.push(`- **Campaigns swept:** ${rows.length} (${rows.length - premiumCount} built-in, ${premiumCount} premium)`);
+  L.push('');
+  L.push('### Guard settings (enforced CUMULATIVELY across the whole sweep)');
+  for (const g of fmtGuards(opts)) L.push(`- ${g}`);
+  L.push('');
+  if (stopInfo) {
+    L.push(`> **Budget stop:** the sweep hard-stopped at campaign \`${stopInfo.id}\` (turn ${stopInfo.turn}: ${stopInfo.label}) because the next request would cross a cumulative guard — ${stopInfo.stoppedBy}. Campaigns after it were SKIPPED (budget). Raise --max-requests / --max-total-tokens / --max-usd to sweep further.`);
+  } else {
+    L.push('> No cumulative guard was crossed: every campaign in the sweep composed all of its turns.');
+  }
+  L.push('');
+  L.push('### Per-campaign rows');
+  L.push('');
+  L.push('_Premium rows are structural only: id + counts + flags, no premium prose. Full per-campaign prompts/responses live in the individual (gitignored, local-only) transcripts._');
+  L.push('');
+  L.push('| campaign | kind | milestones | requests (made/composed) | tokens in/out | est cost | blocking flags | talk-markers | status |');
+  L.push('|---|---|---|---|---|---|---|---|---|');
+  for (const r of rows) {
+    const kind = r.isPremium ? 'premium' : 'built-in';
+    const reqCell = `${r.requestsMade}/${r.networkRequests}`;
+    const tokCell = r.skippedByBudget ? '-' : `${r.promptTokens}/${r.completionTokens}`;
+    const costCell = r.skippedByBudget ? '-' : `$${r.cost.toFixed(4)}`;
+    const blockCell = r.skippedByBudget ? '-' : (r.blocks.length ? r.blocks.join('; ') : 'none');
+    const talkCell = r.talks.length ? r.talks.join(' ') : '-';
+    let status;
+    if (r.skippedByBudget) status = 'SKIPPED (budget)';
+    else if (r.isStopRow) status = 'STOPPED HERE';
+    else if (r.stoppedBy) status = `stopped (${r.stoppedBy})`;
+    else status = isLive ? 'ok' : 'ok (dry-run)';
+    L.push(`| ${r.id} | ${kind} | ${r.milestoneCount} | ${reqCell} | ${tokCell} | ${costCell} | ${blockCell} | ${talkCell} | ${status} |`);
+  }
+  L.push('');
+  L.push('### Totals');
+  L.push('');
+  L.push(`- **Requests ${isLive ? 'made' : 'simulated'} (this run):** ${guard.requestsMade}`);
+  L.push(`- **Tokens (in/out, this run):** ${guard.promptTokensTotal} / ${guard.completionTokensTotal} (${totalTokens} total)`);
+  L.push(`- **Estimated cost (this run):** $${totalCost.toFixed(4)}`);
+  L.push('');
+  L.push('### Projection for a FULL live sweep (all campaigns, all turns, ignoring the run budget)');
+  L.push('');
+  L.push(`- **Projected requests:** ${projectedRequests}`);
+  L.push(`- **Projected est cost:** $${projectedCostUsd.toFixed(4)}  (at $${opts['price-in']}/1M in, $${opts['price-out']}/1M out, worst-case ${opts['max-tokens']}-token completions)`);
+  L.push(`- To run the full sweep live, set at least: --max-requests ${projectedRequests} --max-usd ${(Math.ceil(projectedCostUsd * 100) / 100 + 0.01).toFixed(2)} (plus headroom).`);
+  L.push('');
+  if (!isLive) L.push('_(dry-run: no network request was made; premium rows carry no prose.)_');
+  L.push('');
+  return L.join('\n');
+}
+
+async function runPlaythroughSweep(opts, entries, DM_PROTOCOL, liveKey, appExports) {
+  const { isLive, redact } = liveKey;
+  const startedAt = new Date();
+  const stamp = startedAt.toISOString().replace(/[:.]/g, '-');
+  const guard = new GuardState(opts); // ONE guard for the whole sweep => cumulative.
+
+  const premiumCount = entries.filter((e) => e.isPremium).length;
+
+  console.log('');
+  console.log('============================================================');
+  console.log(`quest-harness — RECORDED PLAYTHROUGH SWEEP — ${isLive ? 'LIVE' : 'DRY-RUN (no network requests)'}`);
+  console.log('============================================================');
+  console.log(`Campaigns:       ${entries.length} (${entries.length - premiumCount} built-in, ${premiumCount} premium)`);
+  console.log(`Model:           ${opts.model}`);
+  console.log(`Key source:      ${isLive ? (process.env.OPENROUTER_API_KEY ? 'env OPENROUTER_API_KEY (redacted)' : '--key-file (redacted)') : 'n/a (dry-run)'}`);
+  console.log('Guards (enforced CUMULATIVELY across the whole sweep):');
+  for (const g of fmtGuards(opts)) console.log(`  ${g}`);
+  console.log('============================================================');
+  console.log('');
+
+  const rows = [];
+  let sweepStopped = false;
+  let stopInfo = null;
+  // Full-sweep projection: independent of the run budget, so the user learns the budget
+  // a full LIVE sweep would need even when the dry-run stops early on the defaults.
+  let projectedRequests = 0;
+  let projectedCostUsd = 0;
+
+  for (const { template, isPremium } of entries) {
+    const requests = composePlaythroughRequests(template, DM_PROTOCOL, appExports);
+    const milestoneCount = requests.filter((r) => r.milestone).length;
+    const networkRequests = requests.filter((r) => !r.isAuthored).length;
+
+    // Projection accrues for EVERY campaign regardless of the run budget / sweep stop.
+    projectedRequests += networkRequests;
+    for (const r of requests) {
+      if (r.isAuthored) continue;
+      projectedCostUsd += estimateCostUsd(estimateTokens(r.prompt), opts['max-tokens'], opts);
+    }
+
+    if (sweepStopped) {
+      // Already over budget: record the campaign as skipped, compose nothing further.
+      rows.push({
+        id: template.id, isPremium, milestoneCount, networkRequests,
+        requestsMade: 0, promptTokens: 0, completionTokens: 0, cost: 0,
+        blocks: [], talks: [], stoppedBy: null, skippedByBudget: true, isStopRow: false
+      });
+      console.log(`----- ${template.id} (${isPremium ? 'premium' : 'built-in'}): SKIPPED — cumulative budget already reached -----`);
+      continue;
+    }
+
+    console.log(`----- Campaign: ${template.id} (${isPremium ? 'premium' : 'built-in'}) — ${milestoneCount} milestone(s), ${networkRequests} request(s) -----`);
+    const before = guardSnapshot(guard);
+    const { turns, stoppedBy } = await executePlaythroughTurns(opts, requests, liveKey, guard);
+    const accounting = accountingDelta(before, guardSnapshot(guard), opts);
+
+    // Per-campaign transcript (prose allowed — the file is local/gitignored).
+    const transcriptPath = writeCampaignTranscript({
+      opts, template, isLive, startedAt, stamp, requests, turns, accounting, stoppedBy, redact, networkRequests, milestoneCount
+    });
+
+    const talkNotes = talkMarkerNotes(turns, isLive);
+    const isStopRow = isCumulativeStop(stoppedBy);
+    rows.push({
+      id: template.id, isPremium, milestoneCount, networkRequests,
+      requestsMade: accounting.requestsMade,
+      promptTokens: accounting.promptTokens,
+      completionTokens: accounting.completionTokens,
+      cost: accounting.cost,
+      blocks: extractBlockFlags(turns),
+      talks: compactTalkNotes(talkNotes),
+      stoppedBy,
+      skippedByBudget: false,
+      isStopRow
+    });
+    console.log(`  -> ${accounting.requestsMade}/${networkRequests} request(s); running: requests=${guard.requestsMade}, tokens=${guard.promptTokensTotal + guard.completionTokensTotal}, cost≈$${guard.costUsd().toFixed(4)}${stoppedBy ? `; stopped by ${stoppedBy}` : ''}`);
+    console.log(`     transcript: ${transcriptPath}`);
+    console.log('');
+
+    if (isStopRow) {
+      sweepStopped = true;
+      stopInfo = { id: template.id, stoppedBy, turn: turns.length, label: (turns[turns.length - 1] || {}).label || '?' };
+    }
+  }
+
+  // ---- Aggregate summary (console + single file) ----
+  const summary = buildSweepSummary({
+    opts, rows, isLive, startedAt, guard, projectedRequests, projectedCostUsd, stopInfo, premiumCount
+  });
+  const summaryPath = path.join(TRANSCRIPT_DIR, `sweep-summary-${stamp}.md`);
+  try {
+    fs.mkdirSync(TRANSCRIPT_DIR, { recursive: true });
+    fs.writeFileSync(summaryPath, summary, 'utf8');
+  } catch (err) {
+    console.error(redact(`Failed to write sweep summary: ${err.message}`));
+  }
+
+  console.log('============================================================');
+  console.log(summary);
+  console.log('============================================================');
+  console.log(`Aggregate sweep summary written to: ${summaryPath}`);
+  if (!isLive) console.log('(no network request was made — dry-run; the projection above is what a FULL live sweep would cost)');
+  console.log('============================================================');
+  console.log('');
 }
 
 // ---------------------------------------------------------------------------
@@ -1686,8 +1966,12 @@ async function main() {
     return;
   }
 
-  if (opts['premium-dir']) {
-    console.warn('[premium-dir] ignored in --mode ai (it only affects the guest/member/both sim).');
+  const isSweep = opts.playthrough && opts.campaign === 'all';
+
+  // --premium-dir affects the guest/member/both sim (handled in runSimMode) and the
+  // --playthrough --all sweep. It is ignored in single-campaign AI / playthrough runs.
+  if (opts['premium-dir'] && !isSweep) {
+    console.warn('[premium-dir] ignored here (it only affects the guest/member/both sim and the --playthrough --all sweep).');
   }
 
   // Enforce --live/--yes and resolve the key (never printed). Shared with playthrough.
@@ -1702,6 +1986,35 @@ async function main() {
     console.error(redact(`Failed to load app data (storyTemplates / DM_PROTOCOL): ${err.message}`));
     process.exit(5);
   }
+  const appExports = { composeIntro, formatStartObjective: formatStartObjectiveReal };
+
+  // Recorded playthrough SWEEP: every playable built-in campaign (+ premium templates
+  // when --premium-dir is given). One transcript per campaign + one aggregate summary;
+  // guards are cumulative across the whole sweep.
+  if (isSweep) {
+    const builtinEntries = storyTemplates
+      .filter((t) => Array.isArray(t.settings?.milestones) && t.settings.milestones.length)
+      .map((t) => ({ template: t, isPremium: false }));
+    let premiumEntries = [];
+    if (opts['premium-dir']) {
+      let premium;
+      try {
+        premium = await loadPremiumTemplates(opts['premium-dir']);
+      } catch (err) {
+        console.error(redact(`Failed to load --premium-dir templates: ${err.message}`));
+        process.exit(7);
+      }
+      console.log(`[premium-dir] loaded ${premium.length} external template(s) from ${opts['premium-dir']}`);
+      premiumEntries = premium.map((t) => ({ template: t, isPremium: true }));
+    }
+    const entries = [...builtinEntries, ...premiumEntries];
+    if (entries.length === 0) {
+      console.error('No playable campaigns found to sweep (none have settings.milestones).');
+      process.exit(6);
+    }
+    await runPlaythroughSweep(opts, entries, DM_PROTOCOL, { isLive, key, redact }, appExports);
+    return;
+  }
 
   const template = storyTemplates.find((t) => t.id === opts.campaign);
   if (!template) {
@@ -1712,8 +2025,7 @@ async function main() {
 
   // Recorded playthrough extends AI mode: same guards + key path, transcript output.
   if (opts.playthrough) {
-    await runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact },
-      { composeIntro, formatStartObjective: formatStartObjectiveReal });
+    await runPlaythrough(opts, template, DM_PROTOCOL, { isLive, key, redact }, appExports);
     return;
   }
 
