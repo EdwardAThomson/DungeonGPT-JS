@@ -102,15 +102,34 @@ export const isTemplateCompatibleWithWorld = (template, worldMap) => {
   );
 };
 
+// Shared shape for one campaign option the picker can render.
+const describeOption = ({ template, partyLevel, worldMap }) => ({
+  template,
+  premiumLocked: !canUseTemplate(template),
+  underLeveled: !!(template.levelRange && partyLevel < template.levelRange[0]),
+  // Lets the picker tell the truth instead of only warning "may be deadly"
+  // (see isOpeningAccessible above).
+  openingAccessible: isOpeningAccessible(template.settings?.milestones, partyLevel),
+  compatible: isTemplateCompatibleWithWorld(template, worldMap),
+});
+
 /**
- * The picker's catalog: which campaigns can come NEXT after this save.
- * Same-genre next tier first ("recommended"), then everything else sorted by level
- * fit; comingSoon stubs and already-played campaigns are excluded; premium
- * templates are listed but flagged locked for free users. Under-levelled picks
- * warn, they never block. Each option carries `compatible`: whether it can
- * continue IN THIS SAVE's world (all locations resolve) or needs a new adventure.
+ * What the completion picker offers after a campaign is finished. Deliberately
+ * NOT a flat list of every tier of every campaign (that confused players): it is
+ *   - `nextTier`: the ONE natural continuation, the SAME campaign's next tier
+ *     (same theme, tier + 1). Continues IN THIS SAVE's world when compatible,
+ *     otherwise it is offered as a New Game. Null once the final authored tier is
+ *     done, or when that tier is not yet delivered.
+ *   - `freshStarts`: one card PER OTHER campaign (one theme = one campaign), each
+ *     represented by that campaign's entry point (its lowest playable tier).
+ *     These always begin a FRESH adventure (a normal New Game, new world), never
+ *     an in-save continuation, since a different campaign implies different lands.
  *
- * @returns {Array<{ template, recommended, sameGenre, premiumLocked, underLeveled, compatible }>}
+ * comingSoon / teaser stubs are excluded (content undelivered). Premium templates
+ * are still listed but flagged `premiumLocked` for un-entitled users (a nudge, not
+ * a launch). Under-levelled picks warn, they never block.
+ *
+ * @returns {{ nextTier: object|null, freshStarts: Array<object> }}
  */
 export const getNextCampaignOptions = ({ settings, party, worldMap = null } = {}) => {
   const currentId = resolveCompletedTemplateId(settings);
@@ -122,30 +141,35 @@ export const getNextCampaignOptions = ({ settings, party, worldMap = null } = {}
   );
   const partyLevel = getPartyLevel(party);
 
-  const fits = (t) => !!(t.levelRange && partyLevel >= t.levelRange[0] && partyLevel <= t.levelRange[1]);
+  // teaser stubs: card faces only, content undelivered (never launchable).
+  const playable = storyTemplates.filter((t) => !t.comingSoon && !t.teaser);
 
-  const options = storyTemplates
-    .filter((t) => !t.comingSoon && !t.teaser && !played.has(t.id)) // teaser stubs: card faces only, content undelivered
-    .map((template) => ({
-      template,
-      recommended: !!genre && template.theme === genre && template.tier === currentTier + 1,
-      sameGenre: !!genre && template.theme === genre,
-      premiumLocked: !canUseTemplate(template),
-      underLeveled: !!(template.levelRange && partyLevel < template.levelRange[0]),
-      // Lets the picker tell the truth instead of only warning "may be deadly"
-      // (see isOpeningAccessible above).
-      openingAccessible: isOpeningAccessible(template.settings?.milestones, partyLevel),
-      compatible: isTemplateCompatibleWithWorld(template, worldMap),
-    }));
+  // The single continuation: this campaign's next tier.
+  const nextTierTemplate = genre
+    ? playable.find(
+        (t) => t.theme === genre && t.tier === currentTier + 1 && !played.has(t.id)
+      )
+    : null;
+  const nextTier = nextTierTemplate
+    ? { ...describeOption({ template: nextTierTemplate, partyLevel, worldMap }), recommended: true }
+    : null;
 
-  const score = (o) =>
-    (o.recommended ? 0 : 100)
-    + (o.compatible ? 0 : 50)
-    + (fits(o.template) ? 0 : 10)
-    + (o.sameGenre ? 0 : 5)
-    + (o.template.tier || 0);
-  options.sort((a, b) => score(a) - score(b));
-  return options;
+  // Fresh-start cards: one per OTHER campaign (theme), at its lowest playable tier.
+  const entryByTheme = new Map();
+  playable
+    .filter((t) => t.theme && t.theme !== genre)
+    .forEach((t) => {
+      const existing = entryByTheme.get(t.theme);
+      if (!existing || (t.tier || 99) < (existing.tier || 99)) entryByTheme.set(t.theme, t);
+    });
+
+  const rank = (o) =>
+    (o.premiumLocked ? 100 : 0) + (o.underLeveled ? 10 : 0) + (o.template.tier || 0);
+  const freshStarts = [...entryByTheme.values()]
+    .map((template) => describeOption({ template, partyLevel, worldMap }))
+    .sort((a, b) => rank(a) - rank(b));
+
+  return { nextTier, freshStarts };
 };
 
 // Heal the party in place for the next chapter, per the standing "everything,

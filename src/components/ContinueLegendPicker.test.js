@@ -28,18 +28,19 @@ describe('ContinueLegendPicker', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('splits options: same-world sequels under "Continue here", others need a new adventure', () => {
+  it('offers the next tier to continue and other campaigns as fresh starts', () => {
     render(
       <ContinueLegendPicker isOpen onClose={() => {}} settings={completedSettings} party={party} worldMap={t1World} onPick={() => {}} />
     );
-    expect(screen.getByText(/Continue here/)).toBeInTheDocument();
-    expect(screen.getByText(/Requires a new adventure/)).toBeInTheDocument();
+    expect(screen.getByText(/Continue this campaign/)).toBeInTheDocument();
+    expect(screen.getByText(/Begin a different adventure/)).toBeInTheDocument();
     // the re-authored t2 continues in this world
     const t2Card = screen.getByTestId('legend-option-heroic-fantasy-t2');
     expect(within(t2Card).getByText(/Begin Chapter 2/)).toBeInTheDocument();
-    // grimdark is set in different lands: hands off to New Game
+    // grimdark is a different campaign: a fresh start (never a per-tier listing)
     const grimCard = screen.getByTestId('legend-option-grimdark-survival-t1');
-    expect(within(grimCard).getByText('Start as a New Game')).toBeInTheDocument();
+    expect(within(grimCard).getByText('Start Fresh Adventure')).toBeInTheDocument();
+    expect(screen.queryByTestId('legend-option-grimdark-survival-t2')).not.toBeInTheDocument();
   });
 
   it('recommends the same-genre next tier first', () => {
@@ -64,14 +65,14 @@ describe('ContinueLegendPicker', () => {
     expect(onNewAdventure).not.toHaveBeenCalled();
   });
 
-  it('picking an incompatible campaign hands off to New Game (onNewAdventure)', () => {
+  it('picking a different campaign hands off to New Game (onNewAdventure)', () => {
     const onPick = jest.fn();
     const onNewAdventure = jest.fn();
     render(
       <ContinueLegendPicker isOpen onClose={() => {}} settings={completedSettings} party={party} worldMap={t1World} onPick={onPick} onNewAdventure={onNewAdventure} />
     );
     const grimCard = screen.getByTestId('legend-option-grimdark-survival-t1');
-    fireEvent.click(within(grimCard).getByText('Start as a New Game'));
+    fireEvent.click(within(grimCard).getByText('Start Fresh Adventure'));
     expect(onNewAdventure).toHaveBeenCalledTimes(1);
     expect(onNewAdventure.mock.calls[0][0].id).toBe('grimdark-survival-t1');
     expect(onPick).not.toHaveBeenCalled();
