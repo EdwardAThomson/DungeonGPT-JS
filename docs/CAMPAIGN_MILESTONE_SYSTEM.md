@@ -81,8 +81,13 @@ Rather than letting the AI freely decide if a narrative goal is met, we constrai
 > ONLY when exactly one active talk objective matches the marker text, its NPC is present in the
 > current town, and its `requires` are met; zero or multiple candidates complete nothing. Both
 > paths route through the same `checkMilestoneEvent('npc_talked')` flow as the button, so rewards,
-> codex/ledger, and idempotency are identical. `DM_PROTOCOL` permits the model to mark the current
-> talk objective under those constraints; `findMarkerMilestoneIndex` (narrative) is untouched.
+> codex/ledger, and idempotency are identical. `DM_PROTOCOL` directs the model to mark the current
+> talk objective under those constraints: since 2026-07-09 the wording is a positive "SHOULD emit
+> the marker when the conversation clearly reaches its natural end with its purpose fulfilled"
+> rather than the original permissive "may mark, when in doubt don't" (a live eval showed a
+> conservative model narrating a concluded talk but never firing the marker). All anti-premature
+> guards remain (no marking mid-conversation, on mere mention, or with the NPC absent), the Talk
+> button stays the guaranteed path, and `findMarkerMilestoneIndex` (narrative) is untouched.
 
 ---
 
