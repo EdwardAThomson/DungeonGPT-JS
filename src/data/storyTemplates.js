@@ -885,7 +885,7 @@ export const storyTemplates = [
         description: 'A malfunctioning automaton is terrorizing the market district. Find out what went wrong and shut it down.',
         customNames: { towns: ['Cogsworth', 'Tinker-Row', 'Brasswick', 'Gear-End'], mountains: ['Copper Ridge'] },
         settings: {
-            shortDescription: 'An automaton has gone haywire in the streets of Cogsworth, smashing market stalls and attacking anyone who gets close. The artificer who built it has vanished from their workshop in Tinker-Row, and the town guard is outmatched.',
+            shortDescription: 'An automaton has gone haywire in the streets of Cogsworth, smashing market stalls and attacking anyone who gets close. The artificer who built it, Master Orin Sprocket, has vanished from his workshop in Tinker-Row, and the town guard is outmatched.',
             campaignGoal: 'Find the automaton\'s control rod and shut it down before it destroys the market district.',
             milestones: [
                 {
@@ -907,7 +907,7 @@ export const storyTemplates = [
                     type: 'talk',
                     requires: [],
                     trigger: { npc: 'artificer_apprentice', action: 'talk' },
-                    spawn: { type: 'npc', id: 'artificer_apprentice', name: 'Pip Gearsley', location: 'Brasswick', role: 'Merchant', personality: 'nervous, guilt-ridden, knows more than they let on' },
+                    spawn: { type: 'npc', id: 'artificer_apprentice', name: 'Pip Gearsley', location: 'Brasswick', role: 'Merchant', personality: 'nervous, guilt-ridden apprentice to the vanished artificer Master Orin Sprocket; knows more about the runaway automaton than they let on' },
                     building: { type: 'workshop', name: 'Gearsley\'s Parts Shop', location: 'Brasswick' },
                     rewards: { xp: 25, gold: '1d6', items: ['journal_page'] },
                     minLevel: null

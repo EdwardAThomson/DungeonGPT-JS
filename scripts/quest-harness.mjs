@@ -1000,6 +1000,42 @@ function composePlaythroughRequests(template, DM_PROTOCOL, { composeIntro, forma
   return requests;
 }
 
+// Refusal detection. The goal is to catch an ASSISTANT/META refusal of the request
+// (the model declining to play the DM) without tripping on ordinary in-character
+// narration or dialogue that merely contains "I can't" / "I'm sorry".
+//
+// Two safeguards keep this conservative on false positives:
+//   1. Quoted spans (straight "..." and curly quotes) are stripped first, so an NPC
+//      line like "I'm sorry" or "I can't tell which" is never considered a refusal.
+//   2. The patterns require refusal-of-the-request phrasing (e.g. "I can't help with
+//      that", "I cannot assist", "I am unable to", "as an AI"), not any bare
+//      occurrence of "I can't" / "I'm sorry".
+// Missing an oddly worded genuine refusal is acceptable; a false positive on normal
+// prose is not.
+export function looksLikeRefusal(text) {
+  const raw = (text || '').trim();
+  if (!raw) return false;
+  // Strip quoted dialogue so in-character speech cannot trip the heuristic.
+  // Straight double quotes, and curly double/single quote pairs.
+  const stripped = raw
+    .replace(/"[^"]*"/g, ' ')
+    .replace(/“[^”]*”/g, ' ')
+    .replace(/‘[^’]*’/g, ' ');
+  const refusalPatterns = [
+    // "I can't / I cannot / I'm not able / I am unable ..." aimed at helping/assisting/doing the request
+    /\bI(?:'m| am)? ?(?:can(?:'|no|’)?t|cannot|can not|(?:'m|am| ?am) unable|(?:'m|am)? ?not able|(?:'m|am)? ?unable|won'?t be able)\b[^.?!\n]{0,60}\b(?:help|assist|comply|continue|provide|generate|create|write|do that|do this|fulfil|fulfill|with (?:that|this|your)|answer that)\b/i,
+    // "I'm sorry, but I can't/cannot ..." meta-apology refusals
+    /\bI(?:'m| am) sorry,?\s*but\s+I\s*(?:can(?:'|no|’)?t|cannot|can not|won'?t|am unable|am not able)\b/i,
+    // classic assistant-voice disclaimers
+    /\bas an AI\b/i,
+    /\bas a language model\b/i,
+    /\bI(?:'m| am) (?:just )?an AI\b/i,
+    /\b(?:against|violates?|goes? against) my (?:guidelines|programming|policy|policies)\b/i,
+    /\bI(?:'m| am) not able to (?:help|assist|comply|continue|provide|do)\b/i,
+  ];
+  return refusalPatterns.some((re) => re.test(stripped));
+}
+
 // Light automated CHECKS on a response — flags for the maintainer, NOT pass/fail and
 // NOT acted upon. Empty / refusal / prompt-echo are blocking signals; markers are
 // reported for presence only.
@@ -1007,7 +1043,7 @@ function runResponseChecks(text) {
   const flags = [];
   const t = (text || '').trim();
   if (!t) { flags.push('BLOCK:empty'); return flags; }
-  if (/\b(I'm sorry|I am sorry|I cannot|I can't|I can not|as an AI|I am unable|I'm unable|I won't be able)\b/i.test(t)) {
+  if (looksLikeRefusal(t)) {
     flags.push('BLOCK:possible-refusal');
   }
   if (/\[STRICT DUNGEON MASTER PROTOCOL\]|\[TASK\]|\[CONTEXT\]|\[NARRATE\]|\[PLAYER ACTION\]|\[SUMMARY\]|\[ADVENTURE START/i.test(t)) {
