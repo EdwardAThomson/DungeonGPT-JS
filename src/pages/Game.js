@@ -21,6 +21,7 @@ import { replaceHeroInParty, normalizeParty, heroUid } from '../utils/partyUtils
 import { composeMovementNarrativePrompt, composeNpcMeetingPrompt } from '../game/promptComposer';
 import { composeLocalMovementNarrative, composeLocalAmbientNarrative, composeNpcMeeting } from '../game/localNarrator';
 import { composeRewardSentence, composeLootSentence, narrateRewardMessages } from '../game/rewardNarrator';
+import { getStepHint, getQuestObjectiveStep, summarizeQuestReward, describeTurnInTarget } from '../game/questHints';
 import { generateMovementNarrative } from '../game/movementController';
 import { buildSaveName } from '../game/saveController';
 import { conversationsApi } from '../services/conversationsApi';
@@ -169,12 +170,39 @@ const SaveConfirmationModal = () => {
 const QuestOfferModal = () => {
   const { data, close } = useModal('questOffer');
   const quest = data?.quest;
+  // Derive the informative bits from live quest data so an accept is an informed choice:
+  // the objective step + its "how do I do this?" hint (reused from the journal so the
+  // wording stays consistent), the giver's venue, and a full reward preview.
+  const objective = getQuestObjectiveStep(quest);
+  const objectiveHint = objective ? getStepHint(objective, quest) : '';
+  const giverLabel = describeTurnInTarget(quest?.giver?.building);
+  const rewardTotals = summarizeQuestReward(quest);
+  const rewardItemNames = (rewardTotals.items || []).map((id) => (ITEM_CATALOG[id]?.name) || id);
+  const rewardSentence = composeRewardSentence({
+    xp: rewardTotals.xp, gold: rewardTotals.gold, items: rewardItemNames, xpPartyWide: true
+  });
   return (
-    <ModalShell modalId="questOffer" ariaLabel="Quest Offer" style={{ maxWidth: '460px', textAlign: 'center' }}>
-      <h3 style={{ marginBottom: '10px', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>📜 A Rumour Reaches You</h3>
-      <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)', marginBottom: '12px' }}>"{quest?.giver?.hook || quest?.description}"</p>
-      <p style={{ fontWeight: 700, marginBottom: '18px', color: 'var(--text)' }}>{quest?.title}</p>
-      <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+    <ModalShell modalId="questOffer" ariaLabel="Quest Offer" style={{ maxWidth: '460px' }}>
+      <h3 className="rumour-heading">📜 A Rumour Reaches You</h3>
+      <p className="rumour-title">{quest?.title}</p>
+      {(quest?.giver?.hook || quest?.description) && (
+        <p className="rumour-hook">"{quest?.giver?.hook || quest?.description}"</p>
+      )}
+      <div className="rumour-details">
+        {giverLabel && (
+          <p className="rumour-detail"><span className="rumour-detail-label">From</span>{giverLabel}</p>
+        )}
+        {objective?.text && (
+          <p className="rumour-detail"><span className="rumour-detail-label">Objective</span>{objective.text}</p>
+        )}
+        {objectiveHint && (
+          <p className="rumour-detail"><span className="rumour-detail-label">Where</span>{objectiveHint}</p>
+        )}
+        {rewardSentence && (
+          <p className="rumour-detail"><span className="rumour-detail-label">Reward</span>{rewardSentence}</p>
+        )}
+      </div>
+      <div className="rumour-actions">
         <button className="primary-button" onClick={() => { data?.onAccept?.(); close(); }}>Accept the Quest</button>
         <button className="secondary-button" onClick={close}>Not now</button>
       </div>
