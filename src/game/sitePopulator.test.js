@@ -1,4 +1,4 @@
-import { populateSite, injectSiteObjective, LOOT, HOARD_BONUS, HARVEST_NODES } from './sitePopulator';
+import { populateSite, injectSiteObjective, injectHarvestResource, resourceDisplayFor, LOOT, HOARD_BONUS, HARVEST_NODES } from './sitePopulator';
 import { generateSiteMap } from '../utils/siteMapGenerator';
 import { ITEM_CATALOG, filterDropsByTier } from '../utils/inventorySystem';
 import { encounterTemplates } from '../data/encounters';
@@ -355,6 +355,91 @@ describe('populateSite', () => {
         .map((t) => [t.x, t.y, t.content.display, t.content.loot.items]));
       expect(sig(make('ruins', 77))).toBe(sig(make('ruins', 77)));
       expect(sig(make('cave', 77))).toBe(sig(make('cave', 77)));
+    });
+  });
+
+  describe('injectHarvestResource (gather resupply for an already-looted site)', () => {
+    const liveNodes = (site, itemId) => site.mapData.flat().filter((t) =>
+      t.content && t.content.kind === 'loot' && !t.content.consumed
+      && Array.isArray(t.content.loot && t.content.loot.items) && t.content.loot.items.includes(itemId));
+    const consumeAll = (site, itemId) => site.mapData.flat().forEach((t) => {
+      if (t.content && t.content.loot && (t.content.loot.items || []).includes(itemId)) t.content.consumed = true;
+    });
+
+    test('display mapping: every gather item maps to a real node key; spider_silk + unknowns fall back', () => {
+      expect(resourceDisplayFor('exposed_minerals')).toBe('ore');
+      expect(resourceDisplayFor('rare_ore')).toBe('ore');
+      expect(resourceDisplayFor('raw_gems')).toBe('crystal');
+      expect(resourceDisplayFor('cave_mushrooms')).toBe('mushroom');
+      expect(resourceDisplayFor('glowing_fungi')).toBe('mushroom');
+      expect(resourceDisplayFor('pine_resin')).toBe('tree');
+      expect(resourceDisplayFor('spider_silk')).toBe('mushroom'); // not in HARVEST_NODES -> borrows a node
+      expect(resourceDisplayFor('some_unknown_reagent')).toBe('ore'); // sensible fallback that renders
+    });
+
+    test('fresh site that already has enough nodes injects nothing (remaining <= 0)', () => {
+      const site = make('cave', 7); // caves guarantee >= 3 exposed_minerals nodes
+      const before = liveNodes(site, 'exposed_minerals').length;
+      expect(before).toBeGreaterThanOrEqual(3);
+      injectHarvestResource(site, [{ itemId: 'exposed_minerals', needed: 3 }]);
+      expect(liveNodes(site, 'exposed_minerals').length).toBe(before); // unchanged
+    });
+
+    test('re-supplies the shortfall once the original nodes are consumed', () => {
+      const site = make('cave', 7);
+      consumeAll(site, 'exposed_minerals'); // player looted the cave BEFORE taking the quest
+      expect(liveNodes(site, 'exposed_minerals').length).toBe(0);
+      injectHarvestResource(site, [{ itemId: 'exposed_minerals', needed: 3 }]);
+      const fresh = liveNodes(site, 'exposed_minerals');
+      expect(fresh.length).toBe(3);
+      fresh.forEach((t) => {
+        expect(t.content.kind).toBe('loot');
+        expect(t.content.display).toBe('ore');
+        expect(t.content.loot.gold).toBe(0);
+        expect(t.content.loot.items).toEqual(['exposed_minerals']);
+        expect(t.content.consumed).toBe(false);
+        expect(t.poi).toBeNull();
+        // tile selection: an empty, walkable floor tile with no reserved content slot
+        expect(t.walkable).toBe(true);
+        expect(t.type).not.toBe('entrance');
+        expect(t.contentSlot).toBeFalsy();
+      });
+    });
+
+    test('bounds strictly by shortfall: only tops up the missing count', () => {
+      const site = make('cave', 7);
+      const nodes = liveNodes(site, 'exposed_minerals');
+      nodes.slice(1).forEach((t) => { t.content.consumed = true; }); // leave exactly one un-consumed
+      expect(liveNodes(site, 'exposed_minerals').length).toBe(1);
+      injectHarvestResource(site, [{ itemId: 'exposed_minerals', needed: 3 }]);
+      expect(liveNodes(site, 'exposed_minerals').length).toBe(3); // 1 kept + 2 injected
+    });
+
+    test('idempotent: a second call injects nothing more (new nodes count against remaining)', () => {
+      const site = make('cave', 7);
+      consumeAll(site, 'exposed_minerals');
+      injectHarvestResource(site, [{ itemId: 'exposed_minerals', needed: 3 }]);
+      const after1 = liveNodes(site, 'exposed_minerals').length;
+      expect(after1).toBe(3);
+      injectHarvestResource(site, [{ itemId: 'exposed_minerals', needed: 3 }]);
+      expect(liveNodes(site, 'exposed_minerals').length).toBe(after1); // unchanged
+    });
+
+    test('respects tile selection: never overwrites content slots or the entrance', () => {
+      const site = make('ruins', 12);
+      const slotsBefore = site.contentSlots.map((s) => JSON.stringify(site.mapData[s.y][s.x].content));
+      const entrance = site.mapData.flat().find((t) => t.type === 'entrance');
+      // spider_silk is not a ruins node, so all 2 must land on FREE floor tiles.
+      injectHarvestResource(site, [{ itemId: 'spider_silk', needed: 2 }]);
+      const silk = liveNodes(site, 'spider_silk');
+      expect(silk.length).toBe(2);
+      silk.forEach((t) => {
+        expect(t.type).not.toBe('entrance');
+        expect(t.contentSlot).toBeFalsy();
+        expect(t.content.display).toBe('mushroom'); // spider_silk fallback
+      });
+      site.contentSlots.forEach((s, i) => expect(JSON.stringify(site.mapData[s.y][s.x].content)).toBe(slotsBefore[i]));
+      if (entrance) expect(entrance.content).toBeFalsy();
     });
   });
 

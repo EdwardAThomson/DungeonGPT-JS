@@ -149,6 +149,97 @@ function placeHarvestNodes(site, rng) {
   return placed;
 }
 
+// Collect walkable tiles free for content placement, in row-major order (deterministic).
+// Mirrors placeHarvestNodes' plain-tile filter EXACTLY: walkable, not the entrance, no
+// reserved contentSlot, no existing content, and no leftover decoration poi (so we never
+// overwrite a decorative tile). Floors are preferred; open ground (forest sites) is the
+// padding reserve, drawn only after floors.
+function collectFreeTiles(site) {
+  const floors = [];
+  const grounds = [];
+  (site.mapData || []).forEach((row) => Array.isArray(row) && row.forEach((tile) => {
+    if (!tile || !tile.walkable || tile.type === 'entrance' || tile.contentSlot || tile.content || tile.poi) return;
+    if (tile.type === 'floor') floors.push(tile);
+    else if (tile.type === 'ground') grounds.push(tile);
+  }));
+  return { floors, grounds };
+}
+
+// Map a gather item id to an existing HARVEST_NODES `display` key so the renderer needs no
+// new art (each key already draws a resource node). spider_silk (from alchemist_reagents) is
+// not a HARVEST_NODES item, so it borrows the 'mushroom' node (a cave-floor organic node
+// reads fine for silk); any other unmapped gather id falls back to 'ore', a plain floor node
+// that always renders.
+const RESOURCE_DISPLAY = {
+  exposed_minerals: 'ore',
+  rare_ore: 'ore',
+  raw_gems: 'crystal',
+  cave_mushrooms: 'mushroom',
+  glowing_fungi: 'mushroom',
+  pine_resin: 'tree',
+  storm_crystal: 'crystal',
+  mountain_crystal: 'crystal',
+  spider_silk: 'mushroom',
+};
+export const resourceDisplayFor = (itemId) => RESOURCE_DISPLAY[itemId] || 'ore';
+
+/**
+ * Re-supply a gather quest's harvest resource onto an already-generated (cached) site,
+ * ADDITIVELY and IDEMPOTENTLY. Gather steps source their item from the ORIGINAL harvest
+ * nodes placeHarvestNodes placed once; those are consumed on pickup and never regenerate, so
+ * a player who looted the site BEFORE taking the quest would find it stranded. For each
+ * { itemId, needed } this counts the site's un-consumed loot nodes already carrying itemId
+ * and tops up only the SHORTFALL (remaining = needed - have), converting that many free floor
+ * tiles (same selection placeHarvestNodes uses) into fresh harvest nodes. It NEVER regenerates
+ * the site, never touches consumed flags or the `populated` guard, and never removes anything.
+ *
+ * Idempotent across entries: the topped-up nodes are un-consumed and carry itemId, so they
+ * count against `remaining` next time and re-running injects nothing more. Fresh sites inject
+ * nothing (their original nodes already cover `needed`, so remaining <= 0). It reads the LIVE
+ * shortfall passed in, so once the quest is satisfied at one site, another site of the same
+ * type injects fewer/none. Callable like injectSiteObjective.
+ *
+ * @param {Object} site - a generated site (ideally populated); its cached grid is mutated in place.
+ * @param {Array<{ itemId: string, needed: number }>|Object} resources - per getActiveGatherResources.
+ * @returns {Object} the same site.
+ */
+export function injectHarvestResource(site, resources) {
+  const list = (Array.isArray(resources) ? resources : [resources]).filter(Boolean);
+  if (!site || list.length === 0 || !Array.isArray(site.mapData)) return site;
+
+  // Free tiles shared across every item so we never place two nodes on one tile; floors
+  // first, then open ground, row-major (deterministic; no rng needed for a top-up).
+  const free = collectFreeTiles(site);
+  const takeFree = () => free.floors.shift() || free.grounds.shift() || null;
+
+  list.forEach(({ itemId, needed }) => {
+    if (!itemId || !(needed > 0)) return;
+    // Count existing UN-consumed loot nodes already supplying this item (idempotence key).
+    let have = 0;
+    site.mapData.forEach((row) => Array.isArray(row) && row.forEach((tile) => {
+      const c = tile && tile.content;
+      if (c && c.kind === 'loot' && !c.consumed && Array.isArray(c.loot && c.loot.items) && c.loot.items.includes(itemId)) have += 1;
+    }));
+    let remaining = needed - have;
+    if (remaining <= 0) return;
+    const display = resourceDisplayFor(itemId);
+    let placed = 0;
+    while (remaining > 0) {
+      const tile = takeFree();
+      if (!tile) {
+        logger.warn(`[SITE] No free tile in "${site.name}" to inject gather resource "${itemId}" (${remaining} still short); a later visit tries again`);
+        break;
+      }
+      tile.poi = null; // the content overlay renders the node
+      tile.content = { kind: 'loot', display, loot: { gold: 0, items: [itemId] }, consumed: false };
+      remaining -= 1;
+      placed += 1;
+    }
+    if (placed > 0) logger.info(`[SITE] Injected ${placed} "${itemId}" harvest node(s) into "${site.name}" for a gather quest`);
+  });
+  return site;
+}
+
 const rollLoot = (type, rng, hoard) => {
   const pool = LOOT[type] || LOOT.cave;
   const pick = () => pool[Math.floor(rng() * pool.length)];

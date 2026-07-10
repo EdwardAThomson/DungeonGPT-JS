@@ -6,7 +6,7 @@ import { generateTownMap } from '../utils/townMapGenerator';
 // Cached towns are untouched: only first-visit generation reads the stamp.
 import { getTownWaterContext, getTownRoadEdges } from '../utils/townWater';
 import { generateSiteMap } from '../utils/siteMapGenerator';
-import { populateSite, injectSiteObjective } from '../game/sitePopulator';
+import { populateSite, injectSiteObjective, injectHarvestResource } from '../game/sitePopulator';
 import { populateTown } from '../utils/npcGenerator';
 import { injectQuestBuildings } from '../game/milestoneSpawner';
 import { getMilestoneNpcsForTown } from '../game/milestoneEngine';
@@ -14,7 +14,7 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('game-map');
 
-const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null, requiredBuildings = null, initialTownMapsCache = null, mapTheme = 'grassland', requiredSiteObjectives = null, milestones = null) => {
+const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError, worldSeed, generatedMap = null, requiredBuildings = null, initialTownMapsCache = null, mapTheme = 'grassland', requiredSiteObjectives = null, milestones = null, requiredGatherResources = null) => {
     // --- State Initialization --- //
 
     const [mapAndPosition] = useState(() => {
@@ -350,6 +350,20 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 injectSiteObjective(siteMap, objectiveList);
                 setSiteMapsCache(prev => ({ ...prev, [key]: siteMap }));
                 logger.info('Ensured quest objectives in site', { key, milestoneIds: objectiveList.map(o => o.milestoneId) });
+            }
+
+            // Gather side quests (e.g. "collect 3 exposed minerals") source their item from
+            // the site's ORIGINAL harvest nodes, which are consumed on pickup and never
+            // regenerate. If the player looted this site BEFORE taking the gather quest the
+            // resource is gone, so re-supply the shortfall onto empty floor tiles. Additive +
+            // idempotent (injectHarvestResource counts existing un-consumed nodes and bounds
+            // by count - progress), so re-entry / a fresh cave that already has enough injects
+            // nothing. Never regenerates the site or touches consumed flags.
+            const gatherResources = requiredGatherResources && requiredGatherResources[normType];
+            if (Array.isArray(gatherResources) && gatherResources.length > 0) {
+                injectHarvestResource(siteMap, gatherResources);
+                setSiteMapsCache(prev => ({ ...prev, [key]: siteMap }));
+                logger.info('Ensured gather resources in site', { key, items: gatherResources.map(r => r.itemId) });
             }
 
             setCurrentSiteMap(siteMap);

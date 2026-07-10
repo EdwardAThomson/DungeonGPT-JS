@@ -131,6 +131,58 @@ describe('questEngine: gather-quest site hints (playtest 2026-07-04)', () => {
   });
 });
 
+describe('questEngine: getActiveGatherResources (gather resupply source)', () => {
+  const { getActiveGatherResources } = require('./questEngine');
+  // Set a step's live progress on a specific active quest/milestone.
+  const withProgress = (sq, questId, mid, progress) => sq.map((q) => (q.id === questId
+    ? { ...q, milestones: q.milestones.map((m) => (m.id === mid ? { ...m, progress } : m)) }
+    : q));
+
+  test('per-site-type: a single-source gather step maps under its one source site', () => {
+    const storm = getActiveGatherResources(acceptSideQuest(initialSideQuests(), 'storm_crystals'));
+    expect(storm.mountain).toEqual([{ itemId: 'storm_crystal', needed: 3 }]);
+    expect(storm.cave).toBeUndefined();
+    const shrooms = getActiveGatherResources(acceptSideQuest(initialSideQuests(), 'tend_sick'));
+    expect(shrooms.cave).toEqual([{ itemId: 'cave_mushrooms', needed: 3 }]);
+  });
+
+  test('a multi-source gather step lists its item under EVERY source site', () => {
+    const res = getActiveGatherResources(acceptSideQuest(initialSideQuests(), 'rare_ore')); // cave/hills/mountain
+    ['cave', 'hills', 'mountain'].forEach((t) => expect(res[t]).toEqual([{ itemId: 'exposed_minerals', needed: 3 }]));
+  });
+
+  test('two active quests sharing an item use MAX shortfall, NOT SUM', () => {
+    // antidote_ingredients (an1) and rare_ore (ro1) both gather exposed_minerals x3.
+    let sq = acceptSideQuest(initialSideQuests(), 'antidote_ingredients');
+    sq = acceptSideQuest(sq, 'rare_ore');
+    expect(getActiveGatherResources(sq).cave).toEqual([{ itemId: 'exposed_minerals', needed: 3 }]); // MAX(3,3)=3, not 6
+  });
+
+  test('needed reads LIVE progress and takes the MAX shortfall of the sharing steps', () => {
+    let sq = acceptSideQuest(initialSideQuests(), 'antidote_ingredients');
+    sq = acceptSideQuest(sq, 'rare_ore');
+    // rare_ore advanced to 1 (needs 2); antidote untouched (needs 3) -> MAX 3
+    sq = withProgress(sq, 'rare_ore', 'ro1', 1);
+    expect(getActiveGatherResources(sq).cave).toEqual([{ itemId: 'exposed_minerals', needed: 3 }]);
+    // antidote advanced to 2 (needs 1); rare_ore still needs 2 -> MAX 2
+    sq = withProgress(sq, 'antidote_ingredients', 'an1', 2);
+    expect(getActiveGatherResources(sq).cave).toEqual([{ itemId: 'exposed_minerals', needed: 2 }]);
+  });
+
+  test('excludes inactive (available) and completed gather steps', () => {
+    expect(getActiveGatherResources(initialSideQuests())).toEqual({}); // merely available -> nothing
+    const done = acceptSideQuest(initialSideQuests(), 'tend_sick').map((q) => (q.id === 'tend_sick'
+      ? { ...q, milestones: q.milestones.map((m) => (m.id === 'ts1' ? { ...m, completed: true } : m)) }
+      : q));
+    expect(getActiveGatherResources(done).cave).toBeUndefined();
+  });
+
+  test('site-objective quests (m.site, not m.sites) are NOT included (they use the site-injection path)', () => {
+    const sq = acceptSideQuest(initialSideQuests(), 'lost_heirloom'); // siteItem: has m.site, no m.sites
+    expect(getActiveGatherResources(sq)).toEqual({});
+  });
+});
+
 describe('questEngine — return-to-giver (multi-step + turn-in)', () => {
   test('completing the objective advances the quest but does NOT finish it (turn-in remains)', () => {
     const sq = accept('lost_heirloom');
