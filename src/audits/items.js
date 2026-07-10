@@ -130,6 +130,93 @@ const item04 = {
   }
 };
 
-export const checks = [item01, item02, item03, item04];
+/**
+ * ITEM-05 (warn): tracked list of every catalog item whose icon is a BORROWED
+ * placeholder (`placeholderIcon: true`, set on the campaign quest items that reuse a
+ * lookalike sibling's .webp until dedicated art is generated, see
+ * docs/IMAGE_GENERATION_PROMPTS.md). Because the borrowed file exists on disk,
+ * artIntegrity and ITEM-01/04 all stay green, so this art debt would otherwise be
+ * invisible. This makes it a visible, greppable, tracked list. Purely informational:
+ * WARN so it never blocks the build while art is pending. It carries no allowlist:
+ * the `placeholderIcon` flag IS the opt-in, and every tagged item is expected to
+ * appear here until its dedicated art lands.
+ */
+const item05 = {
+  id: 'ITEM-05',
+  domain: DOMAIN,
+  title: 'Placeholder/borrowed icons are tracked (placeholderIcon: true)',
+  severity: SEVERITY.WARN,
+  run(ctx) {
+    const violations = [];
+    for (const [key, def] of Object.entries(ctx.itemCatalog || {})) {
+      if (!def || def.placeholderIcon !== true) continue;
+      violations.push({
+        message: `item '${key}' uses placeholder/borrowed art (icon '${def.icon}') until dedicated art is generated`,
+        location: `ITEM_CATALOG['${key}']`
+      });
+    }
+    return violations;
+  }
+};
+
+// The bare-filename catalog id an icon path is named after: the item that "owns"
+// the file. 'assets/icons/items/map_fragment.webp' -> 'map_fragment'. A quest item
+// whose id equals this is the namesake owner of its icon, not a borrower.
+const iconNamesake = (icon) =>
+  typeof icon === 'string' ? icon.split('/').pop().replace(/\.[^.]+$/, '') : '';
+
+/**
+ * ITEM-06 (error): catches the FUTURE silent case that placeholderIcon exists to
+ * prevent: a `quest_item` that BORROWS another item's icon (its icon file is also
+ * used by a different item id, and the item is not that icon's namesake owner) but
+ * is NOT tagged `placeholderIcon: true`. That is exactly how the 12 known placeholders
+ * shipped invisibly: the borrowed file exists, so nothing else complains.
+ *
+ * Scope guards against false positives:
+ *   - quest items only, so legitimately shared non-quest icons (armor variants
+ *     sharing dragon_scale.webp, the spell-scroll trio) never trip it;
+ *   - the namesake owner is exempt (icon basename === id), so treasure_map (whose
+ *     own icon hidden_map borrows) is not flagged for owning its file;
+ *   - tagged placeholders are exempt (they are surfaced by ITEM-05 instead).
+ *
+ * ERROR, not warn: an untagged borrow is a genuine NEW regression (silent art debt),
+ * and the author can clear it two ways: generate the dedicated .webp, or explicitly
+ * tag `placeholderIcon: true` (which downgrades it to the tracked ITEM-05 list). The
+ * flag is the ratchet, so this mirrors MAP-01/BLD-03: known debt is acknowledged,
+ * a new silent borrow fails the gate. All 12 current borrows are tagged, so today
+ * this passes with zero violations.
+ */
+const item06 = {
+  id: 'ITEM-06',
+  domain: DOMAIN,
+  title: 'No quest_item borrows another item\'s icon without placeholderIcon: true',
+  severity: SEVERITY.ERROR,
+  run(ctx) {
+    const catalog = ctx.itemCatalog || {};
+    // icon path -> set of item ids that use it
+    const idsByIcon = new Map();
+    for (const [id, def] of Object.entries(catalog)) {
+      if (!def || !def.icon) continue;
+      if (!idsByIcon.has(def.icon)) idsByIcon.set(def.icon, new Set());
+      idsByIcon.get(def.icon).add(id);
+    }
+    const violations = [];
+    for (const [id, def] of Object.entries(catalog)) {
+      if (!def || def.type !== 'quest_item' || !def.icon) continue;
+      if (def.placeholderIcon === true) continue; // tagged borrow, tracked by ITEM-05
+      const sharers = idsByIcon.get(def.icon);
+      if (!sharers || sharers.size <= 1) continue; // icon is unique to this item
+      if (iconNamesake(def.icon) === id) continue;  // this item owns the icon (namesake)
+      const others = [...sharers].filter((s) => s !== id).join(', ');
+      violations.push({
+        message: `quest_item '${id}' borrows icon '${def.icon}' (also used by ${others}) without placeholderIcon: true; tag it (or give it dedicated art)`,
+        location: `ITEM_CATALOG['${id}']`
+      });
+    }
+    return violations;
+  }
+};
+
+export const checks = [item01, item02, item03, item04, item05, item06];
 
 export default checks;

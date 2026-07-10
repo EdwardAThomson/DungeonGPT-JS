@@ -52,6 +52,8 @@ what the app sees. Jest runs the same modules directly through its Babel pipelin
 | ITEM-02 | items | error | implemented | Every quest-item id (`trigger.item`) is unique across all templates (no two milestones share one). |
 | ITEM-03 | items | error | implemented | No quest-item id appears in any encounter loot table (the "random drop completes the wrong milestone" bug). |
 | ITEM-04 | items | warn | implemented | Every `ITEM_CATALOG` entry has the required display fields (`name`, `icon`, `rarity`, `value`, `type`) so nothing renders blank. |
+| ITEM-05 | items | warn | implemented | Tracked list of every catalog item whose icon is a borrowed placeholder (`placeholderIcon: true`) so the art debt is visible instead of hidden behind an on-disk lookalike file. Informational; the flag is the opt-in, no allowlist. |
+| ITEM-06 | items | error | implemented | No `quest_item` borrows another item's icon (icon file shared with a different id, and this item is not the icon's namesake owner) WITHOUT being tagged `placeholderIcon: true`. Catches a new quest item shipping silently on a sibling's art. Scoped to quest items so legitimately shared non-quest icons never trip it; the namesake owner (e.g. `treasure_map`) is exempt. Passes today (all 12 known borrows are tagged). |
 | BLD-01 | buildings | error | implemented | Every milestone `building.type` is a known building type (placed by the generator or in `townTileArt`'s `BUILDING_TYPES`; covers inject-only venues like `barracks`/`workshop`). |
 | BLD-02 | buildings | error | implemented | Every milestone `building.location` names a town the campaign generates (its `customNames.towns` or a milestone `location`). |
 | BLD-03 | buildings | error | implemented | Every placeable building type has a name generator branch in `assignBuildingName` (else it renders a bare type label). All placeable types are now covered directly; the allowlist is empty and it fails on any NEW gap. |
@@ -92,6 +94,20 @@ what the app sees. Jest runs the same modules directly through its Babel pipelin
   the maintainer treats typeless items as acceptable, narrow `REQUIRED_DISPLAY_FIELDS`
   in `src/audits/items.js` to `name`/`icon`/`rarity`/`value` (all of which pass) —
   no other change needed.
+- **ITEM-05** surfaces **12 warnings**, one per campaign quest item that borrows a
+  lookalike sibling's icon until dedicated art ships (`goblin_scouts_map`,
+  `hidden_map`, `caravan_ledger`, `sun_kings_star_chart`, `frostbound_ledger`,
+  `famine_winter_saga`, `moorland_herbs`, `mutated_specimen`, `automaton_control_rod`,
+  `stolen_aether_blueprints`, `cult_journal`, `forbidden_ritual_text`). This is the
+  point of the check: the borrowed files exist on disk, so ITEM-01/04 and
+  `artIntegrity` stay green and the debt was previously invisible. The list clears as
+  each dedicated `.webp` from docs/IMAGE_GENERATION_PROMPTS.md lands (generate art,
+  repoint `icon`, drop the `placeholderIcon` flag). Non-blocking.
+- **ITEM-06** surfaces **0 violations** every one of those 12 borrows is tagged
+  `placeholderIcon: true`, so the error-severity untagged-borrow gate is green. It
+  fails the moment a NEW quest item is added pointing at a sibling's icon without the
+  flag, forcing the author to either ship dedicated art or explicitly tag the debt
+  (which moves it to the ITEM-05 list).
 - **buildings / npcs / milestones**: every `error`-severity check passes today
   (0 failures) with no remaining building debt: every placeable building type now
   has a name-generator branch, so BLD-03 passes via real coverage (empty allowlist)
