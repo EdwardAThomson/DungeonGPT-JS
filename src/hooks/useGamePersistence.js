@@ -1,5 +1,33 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { buildSaveFingerprint, buildSubMapsPayload, PENDING_LOCAL_SAVE_EVENT } from '../game/saveController';
+
+// Maps a performSave outcome to the always-present sync indicator state.
+// Indicator states: 'idle' | 'saving' | 'saved' | 'local' | 'error'.
+// This is the honest surfacing of the existing save ack (SAVE_SYNC_PLAN):
+//   'saved'      -> 'saved'  (state reached its home store)
+//   'savedLocal' -> 'local'  (account-holder fallback, pending cloud sync)
+//   'forked'     -> 'error'  (rev conflict; progress preserved, but not a clean save)
+//   'error'      -> 'error'  (even the local write-ahead failed)
+//   'nochange'   -> keep the prior 'saved'/'local' state (a durable save is already
+//                   on record); never flip to 'error' just because nothing changed
+//   'skipped'    -> keep whatever we were showing (nothing was attempted)
+export const deriveSaveIndicatorState = (status, prevState = 'idle') => {
+  switch (status) {
+    case 'saved':
+      return 'saved';
+    case 'savedLocal':
+      return 'local';
+    case 'forked':
+    case 'error':
+      return 'error';
+    case 'nochange':
+      return (prevState === 'saved' || prevState === 'local') ? prevState : 'saved';
+    case 'skipped':
+      return prevState;
+    default:
+      return prevState;
+  }
+};
 
 const useGamePersistence = ({
   sessionId,
@@ -40,6 +68,16 @@ const useGamePersistence = ({
   const isInsideSiteRef = useRef(mapHook.isInsideSite);
   const siteMapsCacheRef = useRef(mapHook.siteMapsCache);
   const lastSaveFingerprintRef = useRef(null);
+
+  // Always-present sync indicator: 'saving' while a write is in flight, then the
+  // resolved state. Fed by BOTH manual saves and every autosave (30s interval and
+  // the setTimeout(performSave) callers) because we track it inside the hook seam.
+  const [saveStatus, setSaveStatus] = useState('idle');
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState(null);
+  // Last RESOLVED indicator state (never 'saving'), read inside performSave without
+  // making it a dependency (which would churn the 30s interval / unmount effects).
+  const lastResolvedStatusRef = useRef('idle');
 
   useEffect(() => {
     conversationRef.current = interactionHook.conversation;
@@ -109,7 +147,7 @@ const useGamePersistence = ({
   //   'skipped'    - nothing to save yet (no session / adventure not started / no data)
   //   'error'      - even the local write-ahead failed (write-through means a cloud
   //                  failure alone is 'savedLocal', not 'error')
-  const performSave = useCallback(async (isUnmount = false) => {
+  const runSave = useCallback(async (isUnmount = false) => {
     if (!sessionIdRef.current) return 'skipped';
 
     if (!hasAdventureStartedRef.current) {
@@ -216,6 +254,26 @@ const useGamePersistence = ({
     return 'error';
   }, [loadedConversation?.game_settings, logger, saveConversationToBackend]);
 
+  // Public save entry point: runs the save and feeds the sync indicator. Returns the
+  // raw performSave status string unchanged, so the manual-save modal keeps working.
+  const performSave = useCallback(async (isUnmount = false) => {
+    setIsSaving(true);
+    setSaveStatus('saving');
+    let raw = 'error';
+    try {
+      raw = await runSave(isUnmount);
+    } finally {
+      setIsSaving(false);
+    }
+    const next = deriveSaveIndicatorState(raw, lastResolvedStatusRef.current);
+    lastResolvedStatusRef.current = next;
+    setSaveStatus(next);
+    if (raw === 'saved' || raw === 'savedLocal') {
+      setLastSavedAt(Date.now());
+    }
+    return raw;
+  }, [runSave]);
+
   useEffect(() => {
     if (!sessionId || !hasAdventureStarted) return;
     const interval = setInterval(() => {
@@ -232,7 +290,10 @@ const useGamePersistence = ({
   }, [performSave, logger]);
 
   return {
-    performSave
+    performSave,
+    saveStatus,
+    isSaving,
+    lastSavedAt
   };
 };
 

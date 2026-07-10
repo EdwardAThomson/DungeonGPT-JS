@@ -294,6 +294,51 @@
   transform: none;
 }
 
+/* Save sync indicator: compact, unobtrusive status next to the Save button.
+   Honestly surfaces whether progress is durably saved, only saved locally
+   (pending cloud sync), or having trouble. */
+.save-sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.save-sync-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.save-sync-saved {
+  color: var(--state-success);
+}
+
+.save-sync-local {
+  color: var(--state-warning, #e0a800);
+}
+
+.save-sync-error {
+  color: var(--state-error, #d9534f);
+}
+
+.save-sync-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .save-sync-spinner {
+    animation: none;
+  }
+}
+
 /* Map is the primary navigation action — make it stand out. */
 .view-map-button {
   background-color: var(--primary);
