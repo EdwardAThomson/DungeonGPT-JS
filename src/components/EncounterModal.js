@@ -90,18 +90,20 @@ const EncounterModal = () => {
                                 Enter {encounter.name}
                             </button>
                         )}
-                        <button className="secondary-button" onClick={close} aria-label="Continue journey">
-                            Continue Journey
-                        </button>
                         <button
                             className="secondary-button"
                             onClick={() => {
+                                // Continuing the journey should leave the player on the
+                                // world map to keep travelling, not drop them to the
+                                // adventure log. The encounter group's conflict rule closed
+                                // the map when this modal opened, so reopen it on dismiss
+                                // (same as the old, now redundant, View Map button did).
                                 close();
                                 if (onViewMap) onViewMap();
                             }}
-                            aria-label="View world map"
+                            aria-label="Continue journey"
                         >
-                            View Map
+                            Continue Journey
                         </button>
                     </div>
                     <p style={{ fontSize: '11px', color: 'var(--state-muted-strong)', marginTop: '10px', marginBottom: '0', fontStyle: 'italic' }}>
