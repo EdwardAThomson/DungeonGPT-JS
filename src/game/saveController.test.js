@@ -177,3 +177,47 @@ describe('fingerprint covers gear (playtest 2026-07-04: equip-only changes were 
     expect(buildSaveFingerprint(base())).toBe(buildSaveFingerprint(base()));
   });
 });
+
+describe('fingerprint covers map state (regression: a map-only change was skipped as "no change")', () => {
+  const base = () => ({
+    conversation: [{ role: 'user', content: 'hi' }],
+    playerPosition: { x: 1, y: 1 },
+    currentMapLevel: 'world',
+    isInsideTown: false,
+    settings: { storyTitle: 'T', milestones: [], sideQuests: [] },
+    selectedHeroes: [{ currentHP: 10, gold: 5, xp: 100, inventory: [], equipment: null }],
+    worldMap: [
+      [{ x: 0, y: 0, biome: 'plains' }, { x: 1, y: 0, biome: 'forest' }],
+      [{ x: 0, y: 1, biome: 'hills' }, { x: 1, y: 1, biome: 'plains' }],
+    ],
+    townMapsCache: { Oakrest: { seed: 1 } },
+    siteMapsCache: {},
+  });
+
+  it('changes when a NEW town is cached (no other state change)', () => {
+    const before = buildSaveFingerprint(base());
+    const withNewTown = base();
+    withNewTown.townMapsCache = { ...withNewTown.townMapsCache, Willowdale: { seed: 2 } };
+    expect(buildSaveFingerprint(withNewTown)).not.toBe(before);
+  });
+
+  it('changes when a NEW wilderness site is cached (no other state change)', () => {
+    const before = buildSaveFingerprint(base());
+    const withSite = base();
+    withSite.siteMapsCache = { 'cave-3-4': { seed: 9 } };
+    expect(buildSaveFingerprint(withSite)).not.toBe(before);
+  });
+
+  it('changes when a world tile is revealed (a POI becomes visible)', () => {
+    const before = buildSaveFingerprint(base());
+    const revealed = base();
+    revealed.worldMap[0][1] = { ...revealed.worldMap[0][1], poi: 'milestone', revealed: true };
+    expect(buildSaveFingerprint(revealed)).not.toBe(before);
+  });
+
+  it('is stable across identical map state and tolerates missing maps (old saves)', () => {
+    expect(buildSaveFingerprint(base())).toBe(buildSaveFingerprint(base()));
+    const noMaps = { ...base(), worldMap: undefined, townMapsCache: undefined, siteMapsCache: undefined };
+    expect(typeof buildSaveFingerprint(noMaps)).toBe('string');
+  });
+});

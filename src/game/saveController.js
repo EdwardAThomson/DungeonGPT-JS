@@ -25,6 +25,37 @@ export const parseSaveRoot = (name) => {
   return stripped || name.trim();
 };
 
+// Cheap content-sensitive signature for a procedural map (world grid): its
+// dimensions plus a count of "interesting" tiles (revealed POIs / explored /
+// discovered flags), so revealing a milestone POI or exploring a tile changes the
+// fingerprint. Never deep-serialises the grid: it walks the small fixed-size world
+// map once and only reads a handful of optional per-tile flags.
+const mapSignature = (map) => {
+  if (!Array.isArray(map)) return '0';
+  let tiles = 0;
+  let marked = 0;
+  for (const row of map) {
+    if (!Array.isArray(row)) continue;
+    tiles += row.length;
+    for (const tile of row) {
+      if (tile && (tile.poi || tile.milestonePoi || tile.discovered || tile.explored || tile.visible || tile.revealed)) {
+        marked += 1;
+      }
+    }
+  }
+  return `${map.length}:${tiles}:${marked}`;
+};
+
+// Cheap content-sensitive signature for a lazily-built map cache (town / site
+// maps keyed by name). A NEWLY cached town or site adds a key, changing the
+// signature, so a map-only change is no longer skipped as "no change". Keys only,
+// never the (large) cached grids themselves.
+const cacheSignature = (cache) => {
+  if (!cache || typeof cache !== 'object') return '0';
+  const keys = Object.keys(cache);
+  return `${keys.length}:${keys.sort().join(',')}`;
+};
+
 export const buildSaveFingerprint = ({
   conversation,
   playerPosition,
@@ -35,7 +66,13 @@ export const buildSaveFingerprint = ({
   settings,
   selectedHeroes,
   sitePlayerPosition,
-  isInsideSite
+  isInsideSite,
+  // Maps live in the save payload but were previously absent from the fingerprint,
+  // so a map-only change (a newly revealed world POI, a freshly cached town or
+  // wilderness site) was silently skipped as 'nochange' and never written.
+  worldMap,
+  townMapsCache,
+  siteMapsCache
 }) => {
   const heroes = selectedHeroes || [];
   return [
@@ -50,6 +87,11 @@ export const buildSaveFingerprint = ({
     sitePlayerPosition?.x,
     sitePlayerPosition?.y,
     currentSummary?.length || 0,
+    // Map state MUST be fingerprinted (playtest: a map-only change was skipped as
+    // "no change" and the new town/site or revealed POI evaporated on reload).
+    mapSignature(worldMap),
+    cacheSignature(townMapsCache),
+    cacheSignature(siteMapsCache),
     settings?.storyTitle || '',
     // Quest progress MUST be fingerprinted: without these, a milestone or side-quest
     // change with no other state change was skipped as "no change" and never saved.
