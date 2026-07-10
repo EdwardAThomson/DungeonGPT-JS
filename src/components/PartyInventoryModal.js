@@ -481,7 +481,12 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
               <p style={{ color: 'var(--bg)', opacity: 0.6, fontStyle: 'italic', textAlign: 'center', margin: 0 }}>
                 No heroes in the party.
               </p>
-            ) : party.map((hero) => (
+            ) : party.map((hero) => {
+              // Attribute each loadout card to its hero, matching the party-bar labelling
+              // (support legacy character* and new hero* field names, append class when known).
+              const heroName = hero.heroName || hero.characterName || hero.name || 'Unknown';
+              const heroClass = hero.heroClass || hero.characterClass || '';
+              return (
               <div key={heroUid(hero)} style={{
                 background: 'rgba(0,0,0,0.2)',
                 border: '1px solid var(--border)',
@@ -489,7 +494,7 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
                 padding: '12px 14px'
               }}>
                 <div style={{ fontWeight: 'bold', color: 'var(--primary)', marginBottom: '8px', fontFamily: 'var(--header-font)' }}>
-                  {hero.characterName || hero.name}
+                  {heroName}{heroClass ? ` (${heroClass})` : ''}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {EQUIP_SLOTS.map((slot) => {
@@ -542,7 +547,8 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
                   })}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
