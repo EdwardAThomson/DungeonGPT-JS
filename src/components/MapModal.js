@@ -41,7 +41,14 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <FocusTrap>
+            {/* allowOutsideClick lets a modal stacked ABOVE the map stay clickable.
+                The campaign-completion "Continue your legend" picker auto-opens over
+                the map that handleEncounterResolve reopens after a boss finale; without
+                this option focus-trap's capture-phase click listener preventDefault +
+                stopImmediatePropagation every click outside the map content, deadening
+                the picker on top until a hard refresh. ModalShell passes the same
+                option for exactly this reason. */}
+            <FocusTrap focusTrapOptions={{ allowOutsideClick: true }}>
                 <div 
                     ref={modalRef}
                     className="modal-content map-modal-content" 
