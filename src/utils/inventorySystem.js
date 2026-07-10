@@ -266,18 +266,25 @@ export const ITEM_CATALOG = {
   // random loot drop of the generic item can never complete a quest milestone. Value
   // is 0 (quest items are not a gold source) and each reuses its generic sibling's
   // icon since the art fits. Their type is 'quest_item' like treasure_map.
-  'goblin_scouts_map': { name: 'Goblin Scout\'s Map', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/map_fragment.webp' },
-  'hidden_map': { name: 'Hidden Map', rarity: 'rare', value: 0, type: 'quest_item', icon: 'assets/icons/items/treasure_map.webp' },
-  'caravan_ledger': { name: 'Caravan Ledger', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/map_fragment.webp' },
-  'sun_kings_star_chart': { name: 'Sun-Kings\' Star-Chart', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/ancient_scroll.webp' },
-  'frostbound_ledger': { name: 'Frostbound Ledger', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/map_fragment.webp' },
-  'famine_winter_saga': { name: 'The Famine-Winter Saga', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/history_tome.webp' },
-  'moorland_herbs': { name: 'Moorland Herbs', rarity: 'common', value: 0, type: 'quest_item', icon: 'assets/icons/items/healing_herbs.webp' },
-  'mutated_specimen': { name: 'Mutated Specimen', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/venom_sac.webp' },
-  'automaton_control_rod': { name: 'Automaton Control Rod', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/enchanted_trinket.webp' },
-  'stolen_aether_blueprints': { name: 'Stolen Aether Blueprints', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/ancient_scroll.webp' },
-  'cult_journal': { name: 'Cult Journal', rarity: 'common', value: 0, type: 'quest_item', icon: 'assets/icons/items/journal_page.webp' },
-  'forbidden_ritual_text': { name: 'Forbidden Ritual Text', rarity: 'rare', value: 0, type: 'quest_item', icon: 'assets/icons/items/dark_tome.webp' }
+  //
+  // `placeholderIcon: true` marks that the icon is BORROWED from another item until
+  // dedicated art is generated; see docs/IMAGE_GENERATION_PROMPTS.md ("dedicated
+  // quest-item icons" queue). It is a first-class, greppable flag: the content audit
+  // lists every placeholder (ITEM-05, warn) and fails (ITEM-06, error) on any NEW
+  // quest item that borrows another item's icon WITHOUT the flag. Clear a placeholder
+  // by generating the dedicated .webp, repointing `icon`, and removing this field.
+  'goblin_scouts_map': { name: 'Goblin Scout\'s Map', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/map_fragment.webp', placeholderIcon: true },
+  'hidden_map': { name: 'Hidden Map', rarity: 'rare', value: 0, type: 'quest_item', icon: 'assets/icons/items/treasure_map.webp', placeholderIcon: true },
+  'caravan_ledger': { name: 'Caravan Ledger', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/map_fragment.webp', placeholderIcon: true },
+  'sun_kings_star_chart': { name: 'Sun-Kings\' Star-Chart', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/ancient_scroll.webp', placeholderIcon: true },
+  'frostbound_ledger': { name: 'Frostbound Ledger', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/map_fragment.webp', placeholderIcon: true },
+  'famine_winter_saga': { name: 'The Famine-Winter Saga', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/history_tome.webp', placeholderIcon: true },
+  'moorland_herbs': { name: 'Moorland Herbs', rarity: 'common', value: 0, type: 'quest_item', icon: 'assets/icons/items/healing_herbs.webp', placeholderIcon: true },
+  'mutated_specimen': { name: 'Mutated Specimen', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/venom_sac.webp', placeholderIcon: true },
+  'automaton_control_rod': { name: 'Automaton Control Rod', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/enchanted_trinket.webp', placeholderIcon: true },
+  'stolen_aether_blueprints': { name: 'Stolen Aether Blueprints', rarity: 'uncommon', value: 0, type: 'quest_item', icon: 'assets/icons/items/ancient_scroll.webp', placeholderIcon: true },
+  'cult_journal': { name: 'Cult Journal', rarity: 'common', value: 0, type: 'quest_item', icon: 'assets/icons/items/journal_page.webp', placeholderIcon: true },
+  'forbidden_ritual_text': { name: 'Forbidden Ritual Text', rarity: 'rare', value: 0, type: 'quest_item', icon: 'assets/icons/items/dark_tome.webp', placeholderIcon: true }
 };
 
 // --- Rarity-by-tier loot gating ---------------------------------------------
