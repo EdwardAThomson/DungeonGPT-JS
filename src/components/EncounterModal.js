@@ -12,6 +12,8 @@ const EncounterModal = () => {
     const onFight = data?.onFight;
     const gather = data?.gather; // { itemId, name } — an active wilderness item milestone here
     const onGather = data?.onGather;
+    const search = data?.search; // { locationId, name }: an active location milestone here
+    const onSearch = data?.onSearch;
 
     if (!encounter) return null;
 
@@ -76,6 +78,18 @@ const EncounterModal = () => {
                                 aria-label={`Gather ${gather.name}`}
                             >
                                 🌿 Gather {gather.name}
+                            </button>
+                        )}
+                        {search && onSearch && (
+                            <button
+                                className="primary-button"
+                                onClick={() => {
+                                    close();
+                                    onSearch();
+                                }}
+                                aria-label={`Search ${search.name}`}
+                            >
+                                🔍 Search {search.name}
                             </button>
                         )}
                         {encounter.canEnter && (
