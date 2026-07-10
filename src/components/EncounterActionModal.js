@@ -356,6 +356,31 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
     ? getRoundActions(roundState)
     : encounter.suggestedActions;
 
+  // Enemy Morale + Your Advantage read-out. Shown both at the START of the fight
+  // (round 0 / before the first action) and inside each round result, so the player
+  // sees the computed STARTING lean (usually near zero, sometimes +/-) rather than
+  // first meeting it already reflecting a lost round 1.
+  const renderCombatStatus = () => roundState && (
+    <div className="combat-status">
+      <div className="status-bar">
+        <div className="status-label">Enemy Morale</div>
+        <div className="status-bar-container">
+          <div
+            className="status-bar-fill morale"
+            style={{ width: `${Math.max(0, roundState.enemyMorale)}%` }}
+          />
+        </div>
+        <span className="status-value">{Math.max(0, roundState.enemyMorale)}%</span>
+      </div>
+      <div className="status-bar">
+        <div className="status-label">Your Advantage</div>
+        <div className="advantage-indicator">
+          {roundState.playerAdvantage > 0 ? '+' : ''}{roundState.playerAdvantage}
+        </div>
+      </div>
+    </div>
+  );
+
   // Helper to ensure profile picture path is correct (legacy data support)
   const getProfilePicture = (path) => {
     if (!path) return '';
@@ -711,26 +736,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                   )}
                 </div>
 
-                {roundState && (
-                  <div className="combat-status">
-                    <div className="status-bar">
-                      <div className="status-label">Enemy Morale</div>
-                      <div className="status-bar-container">
-                        <div
-                          className="status-bar-fill morale"
-                          style={{ width: `${Math.max(0, roundState.enemyMorale)}%` }}
-                        />
-                      </div>
-                      <span className="status-value">{Math.max(0, roundState.enemyMorale)}%</span>
-                    </div>
-                    <div className="status-bar">
-                      <div className="status-label">Your Advantage</div>
-                      <div className="advantage-indicator">
-                        {roundState.playerAdvantage > 0 ? '+' : ''}{roundState.playerAdvantage}
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {renderCombatStatus()}
 
                 <div className="round-action-buttons">
                   <button className="primary-button fight-button" onClick={() => {
@@ -750,6 +756,8 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
             ) : (
               <>
                 <p className="encounter-description">{encounter.description}</p>
+
+                {isMultiRound && renderCombatStatus()}
 
                 {roundResults.length > 0 && (
                   <div className="round-history">

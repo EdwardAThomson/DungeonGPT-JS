@@ -10,6 +10,7 @@ import {
   heroSupportContribution,
   getSupportBonus,
   createMultiRoundEncounter,
+  computeStartingAdvantage,
   resolveRound,
   generateEncounterSummary
 } from './multiRoundEncounter';
@@ -122,6 +123,27 @@ describe('createMultiRoundEncounter', () => {
     expect(state.leadIndex).toBe(1);
     expect(state.supportBonus).toBe(1);
   });
+
+  test('starting advantage is a computed, varying lean (not a forced constant)', () => {
+    const capable = makeHero({ stats: { Strength: 14 } }); // best-stat +2, no gear
+    const medium = computeStartingAdvantage(makeBoss({ difficulty: 'medium' }), capable, 0);
+    const easy = computeStartingAdvantage(makeBoss({ difficulty: 'easy' }), capable, 0);
+    const hard = computeStartingAdvantage(makeBoss({ difficulty: 'hard' }), capable, 0);
+    // The lean VARIES with the match and is modest near a medium fight.
+    expect(medium).toBeGreaterThanOrEqual(-1);
+    expect(medium).toBeLessThanOrEqual(1);
+    // Easier fights lean the player's way; harder fights lean against.
+    expect(easy).toBeGreaterThan(medium);
+    expect(hard).toBeLessThan(medium);
+    // Clamped to a lean, never a decided outcome.
+    expect(computeStartingAdvantage(makeBoss({ difficulty: 'deadly' }), capable, 0)).toBeGreaterThanOrEqual(-2);
+    expect(computeStartingAdvantage({ ...makeBoss(), dc: 1 }, capable, 8)).toBeLessThanOrEqual(2);
+    // A party bonus (size) improves the lead's starting lean.
+    expect(computeStartingAdvantage(makeBoss({ difficulty: 'medium' }), capable, 6)).toBeGreaterThan(medium);
+    // It is wired into the created state.
+    const state = createMultiRoundEncounter(makeBoss({ difficulty: 'medium' }), capable, {});
+    expect(state.playerAdvantage).toBe(medium);
+  });
 });
 
 describe('resolveRound: flat enemy damage and incoming party damage', () => {
@@ -182,6 +204,7 @@ describe('resolveRound: flat enemy damage and incoming party damage', () => {
       makeHero({ heroId: 'c', heroName: 'Third', maxHP: 12 })
     ];
     const state = createMultiRoundEncounter(makeBoss(), party[0], {}, {}, party);
+    state.playerAdvantage = 0; // isolate the lead-swap mechanic from the rout floor
     const { roundResult, updatedState } = await resolveRound(state, 'Fight');
     expect(updatedState.party[0].currentHP).toBe(0);
     expect(updatedState.party[0].isDefeated).toBe(true);
@@ -214,12 +237,14 @@ describe('resolveRound: flat enemy damage and incoming party damage', () => {
     // Not bloodied: 300 HP pool, final round hit leaves 275
     const big = createMultiRoundEncounter(makeBoss({ enemyHP: 300 }), makeHero(), {});
     big.currentRound = big.maxRounds; // jump to the last round
+    big.playerAdvantage = 0; // isolate the timeout branch from the computed starting lean
     const { updatedState: stale } = await resolveRound(big, 'Fight');
     expect(stale.outcome).toBe('stalemate');
 
     // Bloodied + advantage > 0: same roll, enemy nearly dead
     const small = createMultiRoundEncounter(makeBoss({ enemyHP: 300 }), makeHero(), {});
     small.currentRound = small.maxRounds;
+    small.playerAdvantage = 0; // isolate the timeout branch; the success below lifts it to +1
     small.enemyCurrentHP = 60; // 25 dmg -> 35 left, <= 75 (25% of 300)
     const { updatedState: won } = await resolveRound(small, 'Fight');
     expect(won.outcome).toBe('victory');
