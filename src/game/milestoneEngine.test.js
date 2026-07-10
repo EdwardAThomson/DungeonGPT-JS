@@ -6,7 +6,8 @@ import {
   resolveTalkMarkerMilestone,
   getMilestoneBossForTile,
   isMilestoneItemClaimed,
-  getMilestoneItemForTile
+  getMilestoneItemForTile,
+  getMilestoneLocationForTile
 } from './milestoneEngine';
 
 // Mirrors the heroic-fantasy-t1 milestone #2 shape (authored NPC + quest building).
@@ -392,5 +393,56 @@ describe('getMilestoneItemForTile (wilderness item milestones)', () => {
     expect(getMilestoneItemForTile(null, moorTile)).toBeNull();
     expect(getMilestoneItemForTile([herbs()], null)).toBeNull();
     expect(getMilestoneItemForTile([herbs()], { poi: 'mountain' })).toBeNull();
+  });
+});
+
+describe('getMilestoneLocationForTile (searchable location milestones)', () => {
+  // Mirrors frozen-frontier-t2 milestone #2 ("Search the silent steading outside Frosthollow").
+  const steading = (overrides = {}) => ({
+    id: 2,
+    text: 'Search the silent steading outside Frosthollow',
+    location: 'Frosthollow',
+    type: 'location',
+    completed: false,
+    requires: [],
+    trigger: { location: 'silent_steading', action: 'visit' },
+    spawn: { type: 'poi', id: 'silent_steading', name: 'The Silent Steading', location: 'Frosthollow' },
+    building: null,
+    ...overrides
+  });
+  // The spawner stamps the poi id onto the tile as `tile.poi`.
+  const steadingTile = { poi: 'silent_steading', poiName: 'The Silent Steading', milestonePoi: true };
+
+  it('offers the search when the party stands on the milestone POI tile', () => {
+    const s = getMilestoneLocationForTile([steading()], steadingTile);
+    expect(s).toEqual({ locationId: 'silent_steading', name: 'The Silent Steading', milestoneId: 2 });
+  });
+
+  it('withholds once completed', () => {
+    expect(getMilestoneLocationForTile([steading({ completed: true })], steadingTile)).toBeNull();
+  });
+
+  it('withholds while prerequisites are unmet (locked location milestone)', () => {
+    const gated = [steading({ requires: [1] }), { id: 1, type: 'item', completed: false }];
+    expect(getMilestoneLocationForTile(gated, steadingTile)).toBeNull();
+    const met = [steading({ requires: [1] }), { id: 1, type: 'item', completed: true }];
+    expect(getMilestoneLocationForTile(met, steadingTile)).toBeTruthy();
+  });
+
+  it('does not fire on a different POI tile', () => {
+    expect(getMilestoneLocationForTile([steading()], { poi: 'famine_barrow' })).toBeNull();
+    expect(getMilestoneLocationForTile([steading()], { poi: 'mountain' })).toBeNull();
+  });
+
+  it('shows even for a minLevel-gated milestone (the click surfaces level_blocked)', () => {
+    // Level is checked at completion time, not visibility time (mirrors boss fights).
+    const s = getMilestoneLocationForTile([steading({ minLevel: 3 })], steadingTile);
+    expect(s).toBeTruthy();
+  });
+
+  it('tolerates bad input and unnamed tiles', () => {
+    expect(getMilestoneLocationForTile(null, steadingTile)).toBeNull();
+    expect(getMilestoneLocationForTile([steading()], null)).toBeNull();
+    expect(getMilestoneLocationForTile([steading()], {})).toBeNull();
   });
 });

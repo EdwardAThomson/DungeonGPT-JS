@@ -46,7 +46,7 @@ import {
 import { resolveProviderAndModel } from '../llm/modelResolver';
 import { appendLedgerEvents } from '../game/heroLedger';
 import { healPartyUpward, reconcileHeroWithLedger } from '../game/heroInvariants';
-import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile } from '../game/milestoneEngine';
+import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile, getMilestoneLocationForTile } from '../game/milestoneEngine';
 import { recordItemDiscoveries, recordEnemyDiscovery, seedCodexFromParty, getBestiaryEntries, findBestiaryMatch, slugify as slugifyCodexKey } from '../game/codexEngine';
 import { buyItem, sellItem } from '../game/shopController';
 import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, getActiveGatherResources, turnInQuest, getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
@@ -1086,7 +1086,16 @@ const Game = ({ resumeConversation = null }) => {
     const poiEncounter = tile ? buildPoiEncounter(tile) : null;
     if (!poiEncounter || isSiteHidden(tile)) return false;
     const ms = milestones || settings?.milestones || [];
-    const boss = getMilestoneBossForTile(ms, tile);
+    // Active location milestone at this POI: offers a Search action instead of the old
+    // silent auto-completion on arrival. It takes priority over a co-located boss so the
+    // location objective completes FIRST: a combat milestone that gates behind it (e.g.
+    // the Goblin Chieftain requires the hideout be found) only unlocks once the Search
+    // re-opens this modal with the location milestone completed. This also protects the
+    // rare tile where a POI and a directly-stamped milestone enemy coincide, where showing
+    // the boss first would let the party fight before completing the gating location and
+    // strand the combat milestone.
+    const search = getMilestoneLocationForTile(ms, tile);
+    const boss = search ? null : getMilestoneBossForTile(ms, tile);
     // Wilderness item milestone at this location (e.g. herbs in the Grey Moors) —
     // offers a Gather action; grantObjectiveItem fires item_acquired and completes it.
     const gather = getMilestoneItemForTile(ms, tile);
@@ -1095,7 +1104,9 @@ const Game = ({ resumeConversation = null }) => {
       encounter: poiEncounter,
       boss,
       gather,
+      search,
       onGather: gather ? () => grantObjectiveItem({ id: gather.itemId, name: gather.name }) : null,
+      onSearch: search ? () => searchMilestoneLocation(tile, search) : null,
       onFight: boss ? () => {
         mapHook.setIsMapModalOpen(false);
         reopenMapAfterEncounterRef.current = true;
@@ -1107,6 +1118,30 @@ const Game = ({ resumeConversation = null }) => {
       onViewMap: () => mapHook.setIsMapModalOpen(true)
     });
     return true;
+  };
+
+  // Search an active location milestone's POI. Fires the same location_visited event
+  // the arrival used to fire silently, so rewards/codex/ledger/save/idempotency all
+  // flow through checkMilestoneEvent exactly as before. Completion is idempotent (the
+  // engine ignores an already-completed milestone), so a stray double-click is safe.
+  // After a successful search we re-open the POI modal with the fresh milestone state
+  // so a now-unlocked boss fight (e.g. the Goblin Chieftain once the hideout is found)
+  // appears on the same visit, preserving the old arrive-and-confront flow.
+  const searchMilestoneLocation = (tile, search) => {
+    if (!search) return;
+    interactionHook.setConversation(prev => [...prev, { role: 'system', content: `🔍 You search ${search.name}...` }]);
+    const result = checkMilestoneEvent({ type: 'location_visited', locationId: search.locationId }, selectedHeroes);
+    if (result?.type === 'level_blocked') {
+      // Rare: only a minLevel-gated location milestone reaches here. Give feedback so the
+      // Search click isn't a silent dead end, then leave the button for a later attempt.
+      interactionHook.setConversation(prev => [...prev, {
+        role: 'system',
+        content: `You are not yet seasoned enough to press on here (Level ${result.requiredLevel} required). Return when you are stronger.`
+      }]);
+      return;
+    }
+    const freshMs = result?.updatedMilestones || settings?.milestones || [];
+    openPoiLocationModal(tile, freshMs);
   };
 
   // --- Map Movement Handler (Smart narration: local line per move, AI on demand) ---
@@ -1157,17 +1192,12 @@ const Game = ({ resumeConversation = null }) => {
       trackTownVisit: mapHook.trackTownVisit
     });
 
-    // Milestone check: location_visited. Fired BEFORE the POI modal so a location
-    // completion (e.g. finding the Goblin Hideout) unlocks its boss fight on the
-    // same arrival — the returned updatedMilestones are the fresh state.
-    let effectiveMilestones = settings?.milestones || [];
-    if (targetTile.poi || targetTile.townName) {
-      const locationId = targetTile.poi || targetTile.townName?.toLowerCase().replace(/\s+/g, '_');
-      if (locationId) {
-        const locResult = checkMilestoneEvent({ type: 'location_visited', locationId }, selectedHeroes);
-        if (locResult?.updatedMilestones) effectiveMilestones = locResult.updatedMilestones;
-      }
-    }
+    // Location milestones no longer auto-complete on arrival. Reaching the tile now
+    // offers a deliberate "Search this location" action in the POI modal (see
+    // getMilestoneLocationForTile / searchMilestoneLocation), so the player DOES
+    // something at the site instead of it completing silently. A co-located boss fight
+    // therefore unlocks only after the search, when the location milestone completes.
+    const effectiveMilestones = settings?.milestones || [];
 
     // POI Check (for location Modal — towns, etc.). Secret sites (caves/ruins) don't offer
     // an entrance until a quest has revealed them, so they read as plain ground until then.
