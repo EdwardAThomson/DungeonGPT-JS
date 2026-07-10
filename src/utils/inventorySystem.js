@@ -174,9 +174,10 @@ export const ITEM_CATALOG = {
   'glowing_fungi': { name: 'Glowing Cave Fungi', rarity: 'common', value: 10, stackable: true, description: 'Pale cave fungi that shed a soft, steady light.', icon: 'assets/icons/items/glowing_fungi.webp' },
   'rare_herb': { name: 'Rare Herb', rarity: 'uncommon', value: 40, description: 'A hard-to-find herb valued by healers and poisoners both.', icon: 'assets/icons/items/rare_herb.webp' },
   // Water towns Phase 6 (#65): boatwright gather target, tapped from forest trees
-  // (sitePopulator HARVEST_NODES.forest + LOOT.forest). Icon borrows rare_ingredient
-  // (an amber lump) so no new art is needed.
-  'pine_resin': { name: 'Pine Resin', rarity: 'common', value: 15, stackable: true, description: 'A sticky amber lump tapped from forest pine, prized by boatwrights.', icon: 'assets/icons/items/rare_ingredient.webp' },
+  // (sitePopulator HARVEST_NODES.forest + LOOT.forest). Icon BORROWS rare_ingredient
+  // (an amber lump) as a single-item stand-in until dedicated art lands; placeholderIcon
+  // tracks it in ITEM-05 and queues pine_resin.webp (docs/IMAGE_GENERATION_PROMPTS.md).
+  'pine_resin': { name: 'Pine Resin', rarity: 'common', value: 15, stackable: true, description: 'A sticky amber lump tapped from forest pine, prized by boatwrights.', icon: 'assets/icons/items/rare_ingredient.webp', placeholderIcon: true },
   'mountain_herbs': { name: 'Mountain Herbs', rarity: 'common', value: 15, description: 'Hardy alpine sprigs with a sharp, medicinal scent.', icon: 'assets/icons/items/mountain_herbs.webp' },
   'herbal_remedy': { name: 'Herbal Remedy', rarity: 'common', value: 15, effect: 'heal', amount: '1d4', description: 'A folk poultice that eases minor hurts.', icon: 'assets/icons/items/herbal_remedy.webp' },
   'elven_rations': { name: 'Elven Waybread', rarity: 'uncommon', value: 20, stackable: true, effect: 'heal', amount: '2d4', description: 'Wafers of elven waybread; a single bite restores the weary.', icon: 'assets/icons/items/elven_rations.webp' },
@@ -238,8 +239,12 @@ export const ITEM_CATALOG = {
   'rusty_dagger': { name: 'Rusty Dagger', rarity: 'common', value: 5, type: 'weapon', description: 'A pitted, neglected blade, barely better than none at all.', icon: 'assets/icons/items/rusty_dagger.webp' },
   'shortsword': { name: 'Shortsword', rarity: 'common', value: 25, type: 'weapon', bonus: '+1', description: 'A serviceable soldier\'s blade, well balanced and reliable.', icon: 'assets/icons/items/shortsword.webp' },
   'leather_armor': { name: 'Leather Armor', rarity: 'common', value: 30, type: 'armor', bonus: '+1 defense', description: 'Supple boiled-leather protection for those who value speed.', icon: 'assets/icons/items/leather_armor.webp' },
-  'studded_leather': { name: 'Studded Leather', rarity: 'uncommon', value: 90, type: 'armor', bonus: '+2 defense', description: 'Leather reinforced with iron studs, tougher without the weight of mail.', icon: 'assets/icons/items/hard_leather.webp' },
-  'hide_armor': { name: 'Hide Armor', rarity: 'uncommon', value: 80, type: 'armor', bonus: '+2 defense', description: 'Layered beast-hide armor, crude but surprisingly sturdy.', icon: 'assets/icons/items/beast_hide.webp' },
+  // Icon BORROWS hard_leather (a single-item stand-in) until dedicated armor art lands;
+  // placeholderIcon tracks it in ITEM-05 and queues studded_leather.webp.
+  'studded_leather': { name: 'Studded Leather', rarity: 'uncommon', value: 90, type: 'armor', bonus: '+2 defense', description: 'Leather reinforced with iron studs, tougher without the weight of mail.', icon: 'assets/icons/items/hard_leather.webp', placeholderIcon: true },
+  // Icon BORROWS beast_hide (a single-item stand-in) until dedicated armor art lands;
+  // placeholderIcon tracks it in ITEM-05 and queues hide_armor.webp.
+  'hide_armor': { name: 'Hide Armor', rarity: 'uncommon', value: 80, type: 'armor', bonus: '+2 defense', description: 'Layered beast-hide armor, crude but surprisingly sturdy.', icon: 'assets/icons/items/beast_hide.webp', placeholderIcon: true },
   'scale_mail': { name: 'Scale Mail', rarity: 'rare', value: 350, type: 'armor', bonus: '+3 defense', description: 'Overlapping metal scales that turn aside all but the hardest blows.', icon: 'assets/icons/items/dragon_scale.webp' },
   'dragonscale_plate': { name: 'Dragonscale Plate', rarity: 'very_rare', value: 1500, type: 'armor', bonus: '+4 defense', description: 'Armor forged from dragon scales, nearly impervious and light for its strength.', icon: 'assets/icons/items/dragon_scale.webp' },
   'artifact_fragment': { name: 'Artifact Fragment', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A broken piece of some greater relic, meaningless until made whole.', icon: 'assets/icons/items/artifact_fragment.webp' },
