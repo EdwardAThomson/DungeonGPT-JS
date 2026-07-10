@@ -119,6 +119,12 @@ const moveOneTile = async (page: Page) => {
       break;
     }
   }
+  // Continue Journey now reopens the world map by design; close it again so the
+  // helper leaves a clean (no-modal) state.
+  const reopenedMap = page.getByRole('button', { name: 'Close Map' });
+  if (await reopenedMap.isVisible()) {
+    await reopenedMap.click();
+  }
 };
 
 test('new game -> move -> save -> reload', async ({ page, request }) => {
