@@ -1,4 +1,4 @@
-import { addGold, addItem } from '../utils/inventorySystem';
+import { addGold, addItem, ITEM_CATALOG } from '../utils/inventorySystem';
 import { awardXP, getLevelUpSummary } from '../utils/progressionSystem';
 import { heroUid } from '../utils/partyUtils';
 
@@ -39,6 +39,10 @@ const applyEncounterRewards = (hero, rewards) => {
   }
 
   if (Array.isArray(rewards.items) && rewards.items.length > 0) {
+    // The "Found:" line is player-facing (side-quest completions surface it via the
+    // reward narrator), so show the catalog display name, not the raw id
+    // ("silver_dagger" -> "Silver Dagger"); fall back to the raw value if unknown.
+    const displayNames = [];
     for (const itemName of rewards.items) {
       const itemKey = itemName.replace(/ /g, '_').toLowerCase();
       updatedHero = {
@@ -46,8 +50,9 @@ const applyEncounterRewards = (hero, rewards) => {
         inventory: addItem(updatedHero.inventory || [], itemKey)
       };
       pushEvent({ kind: 'item', key: itemKey });
+      displayNames.push(ITEM_CATALOG[itemKey]?.name || itemName);
     }
-    messages.push(`Found: ${rewards.items.join(', ')}`);
+    messages.push(`Found: ${displayNames.join(', ')}`);
   }
 
   if (rewards.healing) {

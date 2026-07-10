@@ -777,8 +777,11 @@ const Game = ({ resumeConversation = null }) => {
       // Chat celebration message (also serves as context for the AI's next narration).
       // #8: seeded templated sentence instead of the flat "+50 XP +12 gold" line
       // (milestone XP is party-wide, #55, so the sentence says so).
+      // Resolve item ids to catalog display names so the celebration reads
+      // "the Quest Key", not "the quest_key" (mirrors the rumour offer + loot lines).
+      const rewardItemNames = (rewards.items || []).map((id) => (ITEM_CATALOG[id]?.name) || id);
       const rewardSentence = composeRewardSentence({
-        xp: rewards.xp, gold: rewards.gold, items: rewards.items, xpPartyWide: true
+        xp: rewards.xp, gold: rewards.gold, items: rewardItemNames, xpPartyWide: true
       });
       const rewardSummary = rewardSentence ? `\n${rewardSentence}` : '';
       const celebrationMsg = {
