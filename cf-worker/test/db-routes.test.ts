@@ -49,6 +49,13 @@ beforeEach(() => {
   pg.current = sql;
 });
 
+describe("Cache-Control", () => {
+  it("sets no-store on every /api/db response so renames/saves are never served stale", async () => {
+    const res = await call("/entitlements");
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+  });
+});
+
 describe("GET /entitlements", () => {
   it("reports 'free' when the account has no tier row and no grants", async () => {
     const res = await call("/entitlements");

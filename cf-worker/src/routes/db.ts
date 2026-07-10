@@ -16,6 +16,17 @@ import {
 
 const dbRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
+// Never let any cache store a DB response. This data is authenticated, per-user, and
+// mutable, so a rename / new save / delete must be visible on the very next request.
+// Without no-store the browser can heuristically cache a list GET and serve it stale
+// until a hard refresh (Cloudflare does not edge-cache authed API traffic, but the
+// browser's own HTTP cache will). no-store is the correct directive for private,
+// always-fresh API data; it applies to every /api/db response (reads and writes).
+dbRoutes.use('*', async (c, next) => {
+  await next();
+  c.header('Cache-Control', 'no-store');
+});
+
 // jsonb columns: postgres.js needs values wrapped in sql.json() on write (it auto-parses on read).
 // Pass through real null as SQL NULL (matches the previous supabase-js behaviour).
 const jsonb = (sql: Sql, v: unknown) => (v === undefined || v === null ? null : sql.json(v as any));
