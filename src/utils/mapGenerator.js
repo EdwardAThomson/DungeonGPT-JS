@@ -6,6 +6,7 @@
 import { generateTownName, generateMountainName } from './townNameGenerator';
 import { generateTownPaths, markPathTiles } from './pathfinding';
 import { createLogger } from './logger';
+import { theName } from './nameFormat';
 
 const logger = createLogger('map-generator');
 
@@ -802,7 +803,9 @@ function harmonizeMountainNames(mapData, rng, customMountainNames = []) {
     // Apply the chosen name to every tile in the cluster
     cluster.forEach((tile, j) => {
       tile.mountainName = chosenName;
-      tile.descriptionSeed = `The ${chosenName}`;
+      // theName() avoids "The The Rimefang Peaks" when the custom range name already
+      // carries its article; this seed also feeds any milestone POI placed on the range.
+      tile.descriptionSeed = theName(chosenName);
       tile.isFirstMountainInRange = (j === 0);
     });
 

@@ -1,4 +1,5 @@
 import { getTile } from '../utils/mapGenerator';
+import { theName } from '../utils/nameFormat';
 
 export const isAdjacentWorldMove = (currentPosition, clickedX, clickedY) => {
   const dx = Math.abs(clickedX - currentPosition.x);
@@ -85,7 +86,9 @@ export const buildPoiEncounter = (targetTile) => {
   // Milestone POIs carry their authored display name on the tile (poiName); named mountain
   // ranges show their range name ("the Grey Moors", not "the Mountains"); the raw poi id
   // is only ever a last resort and gets title-cased so it never renders underscored.
-  const rangeName = poiType === 'mountain' && targetTile.mountainName ? `the ${targetTile.mountainName}` : null;
+  // theName() prevents "the The Rimefang Peaks" when the authored range name already
+  // carries its article ("The Rimefang Peaks").
+  const rangeName = poiType === 'mountain' && targetTile.mountainName ? theName(targetTile.mountainName) : null;
   const displayName = targetTile.townName || targetTile.poiName || rangeName || NICE_NAMES[poiType] || titleCaseId(targetTile.poi);
   return {
     name: displayName,
