@@ -812,7 +812,19 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
           <>
             <div className="encounter-result">
               <div className="result-header">
-                <span className="encounter-icon">{encounter.icon}</span>
+                {/* Show the real encounter art (as a small thumbnail) in the result view too,
+                    not just the intro. The emoji icon is only a fallback for encounters that
+                    have no image, so an encounter like Earthquake (which has earthquake.webp)
+                    no longer drops to its emoji once the outcome is shown. */}
+                {encounter.image ? (
+                  <img
+                    src={encounter.image}
+                    alt={encounter.name}
+                    style={{ width: '44px', height: '44px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
+                  />
+                ) : (
+                  <span className="encounter-icon">{encounter.icon}</span>
+                )}
                 <h2>{encounter.name}</h2>
               </div>
 
