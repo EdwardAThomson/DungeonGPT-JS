@@ -320,17 +320,8 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
                     }}>
                       {item.name}
                     </span>
-                    {item.description && (
-                      <span style={{
-                        color: 'var(--text-secondary, #aaa)',
-                        fontSize: '0.75rem',
-                        fontStyle: 'italic',
-                        marginTop: '2px',
-                        opacity: 0.85
-                      }}>
-                        {item.description}
-                      </span>
-                    )}
+                    {/* Description lives in the item-detail modal (openItemDetail on
+                        click -> ItemDetailModal), not inline in this list. */}
                   </div>
                   {item.quantity > 1 && (
                     <span
