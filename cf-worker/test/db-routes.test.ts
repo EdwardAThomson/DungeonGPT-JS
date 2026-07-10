@@ -224,6 +224,66 @@ describe("POST /conversations (rev-guarded upsert, migration 003 semantics)", ()
   });
 });
 
+describe("POST /conversations (owner-scoped upsert: cross-user overwrite guard)", () => {
+  // A save whose body carries another user's session_id must not be able to overwrite
+  // or reassign that row. The conflict key is the client-supplied session_id, so the
+  // DO UPDATE arm is guarded by conversations.user_id = ${userId}.
+  const foreignPayload = {
+    sessionId: "sess-owned-by-someone-else",
+    conversationName: "Not yours",
+    conversation: [{ role: "user", content: "hi" }],
+  };
+
+  it("scopes the unconditional upsert to the owner and binds the caller's userId", async () => {
+    sql.onQuery(/INSERT INTO conversations/, () => [
+      { session_id: foreignPayload.sessionId, rev: 1 },
+    ]);
+    const res = await call("/conversations", {
+      method: "POST",
+      body: JSON.stringify(foreignPayload),
+    });
+    expect(res.status).toBe(201);
+    const q = sql.calls.find((c) => c.text.includes("INSERT INTO conversations"))!;
+    expect(q.text).toContain("WHERE conversations.user_id =");
+    expect(q.values).toContain(USER);
+  });
+
+  it("keeps BOTH the rev guard and the owner guard when expectedRev is present", async () => {
+    sql.onQuery(/INSERT INTO conversations/, () => [
+      { session_id: foreignPayload.sessionId, rev: 3 },
+    ]);
+    const res = await call("/conversations", {
+      method: "POST",
+      body: JSON.stringify({ ...foreignPayload, expectedRev: 2 }),
+    });
+    expect(res.status).toBe(201);
+    const q = sql.calls.find((c) => c.text.includes("INSERT INTO conversations"))!;
+    expect(q.text).toContain("conversations.rev =");
+    expect(q.text).toContain("conversations.user_id =");
+    expect(q.values).toContain(USER);
+  });
+
+  it("on a cross-user guard miss, the lineage lookup is owner-scoped so no foreign rev leaks", async () => {
+    // Upsert filtered away (the row belongs to another user): no row returned.
+    sql.onQuery(/INSERT INTO conversations/, () => []);
+    // Owner-scoped lookup finds nothing for this caller: no foreign lineage to report.
+    sql.onQuery(/SELECT rev, updated_at FROM conversations/, () => []);
+    const res = await call("/conversations", {
+      method: "POST",
+      body: JSON.stringify(foreignPayload),
+    });
+    expect(res.status).toBe(409);
+    const sel = sql.calls.find((c) =>
+      c.text.includes("SELECT rev, updated_at FROM conversations")
+    )!;
+    expect(sel.text).toContain("user_id");
+    expect(sel.values).toContain(USER);
+    const json = (await res.json()) as any;
+    expect(json.rev).toBeNull();
+    expect(json.updated_at).toBeNull();
+  });
+});
+
 describe("PUT /conversations/:sessionId (content write)", () => {
   it("bumps rev and scopes to the owner", async () => {
     sql.onQuery(/UPDATE conversations SET/, () => [{ session_id: "s", rev: 4 }]);

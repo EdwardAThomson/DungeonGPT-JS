@@ -218,6 +218,63 @@ export const _resetAuthStateForTests = () => {
 const sessionBaseRev = new Map();
 const forkRedirects = new Map();
 
+// forkRedirects MUST outlive the page session for the resume path (SAVE_SYNC_PLAN
+// §6.2 data-recovery fix): after a fork the live session's progress lives in the
+// PARKED copy, so a hard reload that reads only the ORIGINAL id would rehydrate the
+// abandoned ancestor and strand every post-fork turn. The redirect map is mirrored
+// into localStorage so `origId -> parkedId` survives the reload; getById does NOT
+// follow it (an explicit load of a copy is deliberate and clears the redirect),
+// only the live save path and the resume repoint below rely on it.
+const FORK_REDIRECT_STORAGE_KEY = 'dungeongpt:fork-redirects';
+
+const readLocalStorage = (key) => {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    return localStorage.getItem(key);
+  } catch (e) {
+    return null;
+  }
+};
+
+const writeLocalStorage = (key, value) => {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, value);
+  } catch (e) {
+    /* private-mode / quota: the in-memory map still works for this page session */
+  }
+};
+
+const persistForkRedirects = () => {
+  if (forkRedirects.size === 0) {
+    writeLocalStorage(FORK_REDIRECT_STORAGE_KEY, null);
+    return;
+  }
+  const obj = {};
+  for (const [orig, entry] of forkRedirects.entries()) obj[orig] = entry;
+  writeLocalStorage(FORK_REDIRECT_STORAGE_KEY, JSON.stringify(obj));
+};
+
+const hydrateForkRedirects = () => {
+  const raw = readLocalStorage(FORK_REDIRECT_STORAGE_KEY);
+  if (!raw) return;
+  try {
+    const obj = JSON.parse(raw);
+    if (obj && typeof obj === 'object') {
+      for (const [orig, entry] of Object.entries(obj)) {
+        if (entry && typeof entry.sessionId === 'string') forkRedirects.set(orig, entry);
+      }
+    }
+  } catch (e) {
+    /* corrupt entry: ignore, a fresh fork rewrites it */
+  }
+};
+
+// Rehydrate persisted redirects once at module load so a post-fork reload still
+// steers saves addressed to the original id into the parked copy.
+hydrateForkRedirects();
+
 // Per-session save serialization (SAVE_SYNC_PLAN §6.1 hardening). Value is the
 // "tail" promise of the most recently queued save for a logical session id; each
 // new save chains onto it so two saves for the same id are never in flight at
@@ -232,6 +289,7 @@ export const _resetRevStateForTests = () => {
   sessionBaseRev.clear();
   forkRedirects.clear();
   saveQueues.clear();
+  writeLocalStorage(FORK_REDIRECT_STORAGE_KEY, null);
 };
 
 // Tolerant settings accessor: game_settings may arrive as an object (worker,
@@ -310,6 +368,31 @@ const localIsNewer = (cloudRow, localRow) => {
 // `forked: true` so the save UI can be honest (see forkLocalTimeline). Rows and
 // sessions without any rev knowledge (legacy saves, guests, pre-migration
 // backends) keep today's unconditional push: divergence is never invented.
+// Flip the local write-ahead row to synced and advance its base_rev after a
+// confirmed cloud push. Retries once, because a silently-swallowed failure here was
+// a fork trigger: the row kept base_rev = R while the cloud sat at R+1, so the next
+// reconcile read R+1 > R and false-forked. The in-memory sessionBaseRev (set by the
+// caller BEFORE this runs) is the authoritative backstop the reconcile pass also
+// consults, so even a persistent local-write failure can no longer cause a false
+// fork; the retry just keeps the persisted row honest too. Returns nothing (best
+// effort): the durable cloud copy already landed.
+async function persistSyncedMark(sessionId, mark) {
+  try {
+    await localGameStore.markSynced(sessionId, mark);
+    return;
+  } catch (e) {
+    logger.warn('markSynced failed; retrying once', e);
+  }
+  try {
+    await localGameStore.markSynced(sessionId, mark);
+  } catch (e) {
+    logger.error(
+      'markSynced failed after retry (row stays pending; sessionBaseRev holds the committed rev so reconcile will not false-fork)',
+      e
+    );
+  }
+}
+
 async function runSave(payload) {
   const originalSessionId = payload.sessionId || payload.session_id;
   const redirect = forkRedirects.get(originalSessionId);
@@ -349,13 +432,9 @@ async function runSave(payload) {
         // Confirmed in the account: flip the dirty flag (guarded so a save that
         // rewrote the row mid-push keeps its synced:false) and advance the
         // row's lineage to the rev the cloud row now carries.
-        try {
-          const mark = { ifUpdatedAt: localRow.updated_at };
-          if (newRev !== undefined) mark.baseRev = newRev;
-          await localGameStore.markSynced(localRow.session_id, mark);
-        } catch (e) {
-          logger.warn('markSynced failed (row stays pending, reconcile will retry)', e);
-        }
+        const mark = { ifUpdatedAt: localRow.updated_at };
+        if (newRev !== undefined) mark.baseRev = newRev;
+        await persistSyncedMark(localRow.session_id, mark);
       }
       return { ...(result || {}), storage: 'cloud' };
     } catch (e) {
@@ -371,6 +450,106 @@ async function runSave(payload) {
 
   if (!localRow) throw localWriteError;
   return { ...localRow, storage: 'local', pendingCloudSync: !!localRow.pending_cloud_sync };
+}
+
+// Per-session serialization primitive (SAVE_SYNC_PLAN §6.1). Chains `task` behind
+// the most recently queued work for `sessionId` so two operations for the same
+// logical save are never in flight at once. Both save() and reconcileLocalRow()
+// share this queue so a live save and a reconcile pass for the same id are ordered,
+// never racing the rev counter. The stored tail swallows rejections so a failure
+// cannot wedge the chain; the caller still receives the real result/rejection.
+function enqueueForSession(sessionId, task) {
+  if (!sessionId) return task();
+  const prev = saveQueues.get(sessionId) || Promise.resolve();
+  const run = prev.then(task, task);
+  const tail = run.catch(() => {});
+  saveQueues.set(sessionId, tail);
+  tail.then(() => {
+    if (saveQueues.get(sessionId) === tail) saveQueues.delete(sessionId);
+  });
+  return run;
+}
+
+// The greater of the row's persisted base_rev and the in-memory sessionBaseRev for
+// this id. sessionBaseRev is set synchronously right after every successful push,
+// so it survives a lagged/failed local markSynced write: consulting it here closes
+// the false-fork window where a committed R->R+1 had not yet reached the local row.
+const authoritativeBaseRev = (sessionId, localRow) => {
+  let best;
+  for (const candidate of [localRow?.base_rev, sessionBaseRev.get(sessionId)]) {
+    if (isValidBaseRev(candidate) && (best === undefined || candidate > best)) best = candidate;
+  }
+  return best;
+};
+
+// Serialized reconcile of ONE local row against the cloud (SAVE_SYNC_PLAN §6.1
+// hardening, the reconcile counterpart of the save serialization). Runs INSIDE the
+// per-session queue and re-reads BOTH the local row and the cloud rev FRESH, right
+// before deciding, so a save that committed R->R+1 on this device (whether or not
+// its local markSynced has landed yet) can never be mistaken for a cross-device
+// divergence. A fork is raised only on a GENUINE advance (cloud rev strictly beyond
+// the rev this device last synced, or the legacy timestamp fallback), never on this
+// device's own in-flight lag. Returns a status the reconcile pass interprets:
+//   'gone'         - the row vanished while we waited (parked/pruned by the save ahead)
+//   'synced'       - already in the account (the save ahead marked it synced)
+//   'pendingLocal' - auth vanished mid-pass, or the upload routed back to local
+//   'failed'       - reading the local row failed
+//   'uploaded'     - pushed to the cloud (pruned here when non-live)
+//   'forked'       - genuine divergence: local timeline parked as its own save
+async function runReconcile(sessionId, { isLive } = {}) {
+  let localRow;
+  try {
+    localRow = await localGameStore.getById(sessionId);
+  } catch (e) {
+    logger.error(`Reconcile could not read local row ${sessionId}:`, e);
+    return { status: 'failed' };
+  }
+  if (!localRow) return { status: 'gone' };
+  if (localRow.synced === true) return { status: 'synced' };
+
+  const route = await resolveRoute();
+  if (!route.useCloud) return { status: 'pendingLocal' };
+
+  let cloudRow = null;
+  try {
+    cloudRow = await backend.getById(sessionId);
+  } catch (e) {
+    cloudRow = null; // 404 or fetch failure: no cloud copy this row must yield to
+  }
+
+  const cloudRev = revOf(cloudRow);
+  const knownBaseRev = authoritativeBaseRev(sessionId, localRow);
+
+  let diverged;
+  if (cloudRev !== undefined && knownBaseRev !== undefined) {
+    diverged = cloudRev > knownBaseRev; // genuine cross-device advance only
+  } else {
+    const cloudTime = cloudRow?.updated_at ? Date.parse(cloudRow.updated_at) : NaN;
+    const localTime = localRow.updated_at ? Date.parse(localRow.updated_at) : NaN;
+    diverged = Number.isFinite(cloudTime) && Number.isFinite(localTime) && cloudTime > localTime;
+  }
+
+  if (diverged) {
+    logger.warn(`Cloud copy of ${sessionId} advanced past this device; parking the local timeline`);
+    const forkResult = await forkLocalTimeline(sessionId, rowToPayload(localRow));
+    return { status: 'forked', ...forkResult };
+  }
+
+  // Cloud behind or absent: upload as-is under the same id. runSave (not save()) so
+  // we do not re-enter the queue we already hold; a genuine 409 inside still forks.
+  logger.info(`Uploading local game ${sessionId} (cloud copy ${cloudRow ? 'behind' : 'absent'})`);
+  const result = await runSave(rowToPayload(localRow));
+  if (result?.forked) return { status: 'forked', ...result };
+  if (result?.storage === 'local') return { status: 'pendingLocal' };
+  if (!isLive) {
+    // Pushed and this is not the live write-ahead copy: prune it.
+    try {
+      await localGameStore.remove(sessionId);
+    } catch (e) {
+      logger.warn(`Failed to prune synced local copy of ${sessionId}:`, e);
+    }
+  }
+  return { status: 'uploaded' };
 }
 
 export const conversationsApi = {
@@ -442,7 +621,9 @@ export const conversationsApi = {
     }
 
     const adopt = (row, fromCloud) => {
-      forkRedirects.delete(sessionId);
+      // An explicit load of this id supersedes any earlier fork: clear the redirect
+      // (and its persisted mirror) so future saves target this adopted row directly.
+      if (forkRedirects.delete(sessionId)) persistForkRedirects();
       const rev = fromCloud ? revOf(row) : undefined;
       if (rev !== undefined) {
         sessionBaseRev.set(sessionId, rev);
@@ -481,22 +662,18 @@ export const conversationsApi = {
     // recursive parked-copy save inside forkLocalTimeline carries a fresh id, a
     // different key, so it cannot deadlock against the queue it runs within.
     const originalSessionId = payload.sessionId || payload.session_id;
-    if (!originalSessionId) return runSave(payload);
+    return enqueueForSession(originalSessionId, () => runSave(payload));
+  },
 
-    const prev = saveQueues.get(originalSessionId) || Promise.resolve();
-    // Run our body only after the prior save SETTLES (success or failure), so two
-    // saves for the same id are never in flight together.
-    const run = prev.then(() => runSave(payload), () => runSave(payload));
-    // Guard the STORED tail so a rejected save cannot permanently wedge the chain;
-    // the caller still receives the real result/rejection via `run`.
-    const tail = run.catch(() => {});
-    saveQueues.set(originalSessionId, tail);
-    // Drop the map entry once the queue drains so it never grows unbounded (only if
-    // no newer save has since taken over the slot).
-    tail.then(() => {
-      if (saveQueues.get(originalSessionId) === tail) saveQueues.delete(originalSessionId);
-    });
-    return run;
+  // Reconcile ONE local row against the cloud, SERIALIZED under the same per-session
+  // queue as save() (SAVE_SYNC_PLAN §6.1 hardening). LocalGameSync's pass calls this
+  // instead of deciding divergence on data it read outside the lock: routing the
+  // check + any fork through the queue means an in-flight save's rev bump is settled
+  // (and re-read fresh) before any fork verdict, so a same-device R->R+1 can never be
+  // mistaken for a cross-device divergence. See runReconcile for the returned status.
+  reconcileLocalRow(sessionId, opts = {}) {
+    if (!sessionId) return Promise.resolve({ status: 'gone' });
+    return enqueueForSession(sessionId, () => runReconcile(sessionId, opts));
   },
 
   // Same write-through contract as save(), for the message-only update path. When
@@ -525,13 +702,9 @@ export const conversationsApi = {
         const newRev = revOf(result);
         if (newRev !== undefined) sessionBaseRev.set(sessionId, newRev);
         if (localRow) {
-          try {
-            const mark = { ifUpdatedAt: localRow.updated_at };
-            if (newRev !== undefined) mark.baseRev = newRev;
-            await localGameStore.markSynced(sessionId, mark);
-          } catch (e) {
-            logger.warn('markSynced failed (row stays pending, reconcile will retry)', e);
-          }
+          const mark = { ifUpdatedAt: localRow.updated_at };
+          if (newRev !== undefined) mark.baseRev = newRev;
+          await persistSyncedMark(sessionId, mark);
         }
         return { ...(result || {}), storage: 'cloud' };
       } catch (e) {
@@ -710,8 +883,27 @@ export const forkLocalTimeline = async (sessionId, payload) => {
   } catch (e) {
     logger.warn(`Could not drop the local shadow of ${sessionId} after forking`, e);
   }
+  // The live session's lineage now belongs to the PARKED copy (its base_rev was
+  // established by the parked save above), NOT the ancestor: clear the ancestor's
+  // sessionBaseRev so the union write-back's out-of-band rev bump on that row can
+  // never make a future save descend from a stale lineage. Redirect + persist so
+  // both this runtime's saves AND a subsequent reload steer to the parked copy.
   sessionBaseRev.delete(sessionId);
   forkRedirects.set(sessionId, { sessionId: parkedSessionId, suffix });
+  persistForkRedirects();
+
+  // Data-recovery keystone (SAVE_SYNC_PLAN §6.2): if the forked id is the one the
+  // app resumes on reload, repoint the resume pointer at the parked copy. Otherwise
+  // a hard reload would rehydrate the abandoned ancestor and strand every post-fork
+  // turn. Only the LIVE id is repointed; a reconcile parking some other stale copy
+  // must not hijack the active game's resume pointer.
+  try {
+    if (readLocalStorage('activeGameSessionId') === sessionId) {
+      writeLocalStorage('activeGameSessionId', parkedSessionId);
+    }
+  } catch (e) {
+    /* ignore: the in-memory redirect still covers this runtime's saves */
+  }
 
   const pendingCloudSync = parkedResult?.storage === 'local' || !!parkedResult?.pendingCloudSync;
   return {

@@ -10,8 +10,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { conversationsApi, forkLocalTimeline } from '../services/conversationsApi';
-import { localGameStore, rowToPayload, isValidBaseRev } from '../services/localGameStore';
+import { conversationsApi } from '../services/conversationsApi';
+import { localGameStore, rowToPayload } from '../services/localGameStore';
 import { supabase } from '../services/supabaseClient';
 import { PENDING_LOCAL_SAVE_EVENT } from '../game/saveController';
 import { createLogger } from '../utils/logger';
@@ -38,20 +38,14 @@ const getLiveSessionId = () => {
 // - Rows explicitly marked synced:true are already in the account: the LIVE
 //   session's copy is kept (write-ahead cache), any other is pruned (Phase 2, §4).
 // - Unsynced rows (synced:false, a Phase 1 pending stamp, or legacy rows with
-//   neither field: guest saves must still convert losslessly) are pushed under a
-//   divergence guard: if the cloud already holds a copy this row does NOT descend
-//   from, do NOT overwrite it (§6.2): the local copy is parked as a separate save
-//   ("(diverged on this device, <date>)", forkLocalTimeline) so both timelines
-//   survive. Otherwise (cloud behind or missing) upload as-is, same session_id.
-//   After a successful push the live session's row is marked synced and kept;
-//   other rows are removed.
-// - Phase 3 (§6.1): when both sides carry lineage (the cloud row has `rev`, the
-//   local row has `base_rev`) the rev comparison REPLACES the timestamp one:
-//   cloud rev beyond our base means fork, equal means fast-forward, and the push
-//   itself is still rev-guarded inside conversationsApi.save (a mid-pass race
-//   comes back as `forked`). The timestamp guard remains the fallback for legacy
-//   rows on either side; rows with no comparable signal at all upload as before
-//   (never invent divergence for old saves).
+//   neither field: guest saves must still convert losslessly) are handed to
+//   conversationsApi.reconcileLocalRow, which runs the WHOLE divergence check +
+//   upload/fork INSIDE the per-session save queue (SAVE_SYNC_PLAN §6.1 hardening).
+//   Deciding under the lock, on a FRESH re-read of the cloud rev and the local row,
+//   is what stops a live save's own in-flight R->R+1 from being mistaken for a
+//   cross-device divergence and false-forked. A genuine advance still parks the
+//   local timeline as its own "(diverged on this device)" save; cloud behind or
+//   missing uploads as-is under the same id.
 // Rows whose upload fails, or whose write routed back to local storage because auth
 // vanished again mid-pass, stay local for the next pass.
 export const runLocalGameSyncPass = async () => {
@@ -73,7 +67,8 @@ export const runLocalGameSyncPass = async () => {
     const isLive = row.session_id === liveSessionId;
     if (row.synced === true) {
       // Already in the account (write-through confirmed the push). Nothing to
-      // upload; prune the cache copy unless this is the live session.
+      // upload; prune the cache copy unless this is the live session. (Safe outside
+      // the lock: pruning a copy already in the cloud makes no fork decision.)
       if (!isLive) {
         try {
           await localGameStore.remove(row.session_id);
@@ -84,70 +79,31 @@ export const runLocalGameSyncPass = async () => {
       continue;
     }
     try {
-      // Divergence guard: never clobber a cloud row this local one does not
-      // descend from. Rev lineage when both sides have it, timestamps otherwise.
-      let cloudRow = null;
-      try {
-        cloudRow = await conversationsApi.getById(row.session_id);
-      } catch (e) {
-        cloudRow = null; // 404 or fetch failure: treat as "no cloud copy"
-      }
-
-      let diverged;
-      // getById returns the newer of the two copies; only a genuine CLOUD row
-      // carries `rev` (local rows carry `base_rev`), so a defined rev here means
-      // we are really looking at the cloud copy.
-      const cloudRev = Number.isInteger(cloudRow?.rev) && cloudRow.rev >= 0 ? cloudRow.rev : undefined;
-      if (cloudRev !== undefined && isValidBaseRev(row.base_rev)) {
-        diverged = cloudRev > row.base_rev;
-      } else {
-        const cloudTime = cloudRow?.updated_at ? Date.parse(cloudRow.updated_at) : NaN;
-        const localTime = row.updated_at ? Date.parse(row.updated_at) : NaN;
-        diverged = Number.isFinite(cloudTime) && Number.isFinite(localTime) && cloudTime > localTime;
-      }
-
-      if (diverged) {
-        // Fork, never merge, never overwrite (§6.2): park the local timeline as
-        // its own save and union hero progression into the adopted cloud row.
-        logger.warn(`Cloud copy of ${row.session_id} advanced past the local one; parking the local timeline`);
-        const forkResult = await forkLocalTimeline(row.session_id, rowToPayload(row));
-        if (forkResult?.pendingCloudSync) {
-          // The parked copy is still device-only (auth vanished mid-pass); it
-          // uploads on a later pass under its own id.
+      // The divergence check, the upload, and any fork all happen inside the
+      // per-session queue: no fork verdict is ever made on data read outside it.
+      const result = await conversationsApi.reconcileLocalRow(row.session_id, { isLive });
+      switch (result?.status) {
+        case 'uploaded':
+        case 'forked':
+          // Progress reached (or was parked into) the account. A parked copy that
+          // stayed device-only (auth vanished mid-pass) is not counted; it uploads
+          // under its own id on a later pass.
+          if (result.pendingCloudSync) failed = true;
+          else count += 1;
+          break;
+        case 'pendingLocal':
+        case 'failed':
+          // Auth vanished mid-pass, or the write routed back to local storage: keep
+          // the row and retry on the next auth tick.
           failed = true;
-        } else {
-          count += 1;
-        }
-        continue;
+          break;
+        case 'synced':
+        case 'gone':
+        default:
+          // Already synced by the save ahead of us, or the row was parked/pruned
+          // while we waited: nothing to do, nothing failed.
+          break;
       }
-
-      logger.info(`Uploading local game ${row.session_id} (cloud copy ${cloudRow ? 'behind' : 'absent'})`);
-      const result = await conversationsApi.save(rowToPayload(row));
-      if (result?.forked) {
-        // The guarded push lost a race mid-pass: conversationsApi.save already
-        // parked the local timeline and adopted the cloud row.
-        if (result.pendingCloudSync) failed = true;
-        else count += 1;
-        continue;
-      }
-      if (result?.storage === 'local') {
-        // Auth vanished between the trigger and this write; the save landed back in
-        // this store. Keep the original row and retry on the next auth tick.
-        logger.warn(`Sync of ${row.session_id} routed back to local storage; will retry`);
-        failed = true;
-        continue;
-      }
-      if (isLive) {
-        // The live session keeps its write-ahead copy. The write-through inside
-        // conversationsApi.save normally re-marks it synced already; this guarded
-        // mark covers save paths that skip the local store. ifUpdatedAt makes it a
-        // no-op whenever the row was rewritten since the pass listed it, so a
-        // fresher unsynced write never gets mislabelled as synced.
-        await localGameStore.markSynced(row.session_id, { ifUpdatedAt: row.updated_at });
-      } else {
-        await localGameStore.remove(row.session_id); // pushed: prune the local copy
-      }
-      count += 1;
     } catch (e) {
       logger.error(`Failed to sync local game ${row.session_id}:`, e);
       failed = true;

@@ -139,7 +139,12 @@ const useGamePersistence = ({
       settings: settingsRef.current,
       selectedHeroes: selectedHeroesRef.current,
       sitePlayerPosition: sitePlayerPositionRef.current,
-      isInsideSite: isInsideSiteRef.current
+      isInsideSite: isInsideSiteRef.current,
+      // Map state so a map-only change (new revealed POI, freshly cached town/site)
+      // is not skipped as 'nochange' and lost.
+      worldMap: worldMapRef.current,
+      townMapsCache: townMapsCacheRef.current,
+      siteMapsCache: siteMapsCacheRef.current
     });
 
     if (!isUnmount && fingerprint === lastSaveFingerprintRef.current) {
