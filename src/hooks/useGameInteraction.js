@@ -341,7 +341,8 @@ const useGameInteraction = (
     locationContext = {},
     sessionId = null,
     aiAvailable = true,
-    onNpcTalked = null
+    onNpcTalked = null,
+    authReady = true
 ) => {
     const [userInput, setUserInput] = useState('');
     const [conversation, setConversation] = useState(loadedConversation?.conversation_data || []);
@@ -402,6 +403,12 @@ const useGameInteraction = (
 
     const handleStartAdventure = async () => {
         if (hasAdventureStarted || isLoading) return;
+
+        // Auth may still be re-hydrating the Supabase session on a reload; committing
+        // now would take the guest (no-AI) branch below for a signed-in player. Defer
+        // without starting so the Start Adventure button stays and can be triggered
+        // again the moment auth resolves.
+        if (!authReady) return;
 
         if (!selectedHeroes || selectedHeroes.length === 0) {
             setError('Cannot start game without selecting heroes.'); return;

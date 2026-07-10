@@ -297,3 +297,28 @@ borrow pattern; their quest items need an equivalent sweep there.)
 | `stolen_aether_blueprints.webp` | A rolled set of stolen aether-tech blueprints on deep blue drafting paper, luminous cyan schematic lines diagramming a great machine, one corner curling open. Painterly digital fantasy art with rich paper and glowing-ink textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | medium (Arcane Renaissance T2, Herald of the Old Gods) |
 | `cult_journal.webp` | A small worn cultist's journal bound in dark frayed cloth, its curling pages scrawled with frantic handwriting and unsettling occult sigils, a leather cord wrapping the cover. Painterly digital fantasy art with rich cloth and ink textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | medium (Eldritch Horror T1, The Blackwood Cult) |
 | `forbidden_ritual_text.webp` | A forbidden grimoire bound in black leather and clasped with tarnished iron, warped eldritch runes glowing faintly sickly-green across its swollen cover. Painterly digital fantasy art with rich black leather and iron textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | medium (Eldritch Horror T2, The Great Dreamer) |
+
+## Generation queue (2026-07-10, Bitter Cold hazard)
+
+The climate-aware environmental encounters shipped a cold-climate hazard,
+`cold_snap` ("Bitter Cold"), as the Frozen Frontier counterpart to the
+hot-climate `heat_wave` ("Scorching Heat"), but its arrival art and its
+reward-drop icon were never generated. Scorching Heat resolves its art from
+`image: '/assets/encounters/heat_wave.webp'` (present on disk); Bitter Cold
+already declares `image: '/assets/encounters/cold_snap.webp'`
+(`src/data/encounters/environmentalEncounters.js`) the same way, so it is wired
+identically and just needs the file. Until then the encounter modal falls back to
+its ❄️ icon and the reward line shows no icon. Both paths are pinned in
+`src/data/artIntegrity.test.js` (`KNOWN_MISSING_ASSETS`); drop each file at the
+path below and delete its pin as the art lands. No further code change is needed —
+the paths are already declared in the data.
+
+### Encounter image (`public/assets/encounters/`)
+| File | Prompt | Priority |
+|---|---|---|
+| `public/assets/encounters/cold_snap.webp` | A brutal arctic cold snap tearing across a frozen wilderness, a bitter blizzard wind driving snow horizontally over a bleak white expanse, ice-crusted rocks and frost-rimed skeletal trees bent by the gale, a pale low sun behind racing grey cloud, the freezing air itself hazed with blowing snow and glittering frost. Frozen Frontier arctic hazard, the killing cold of the open frontier. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (cold counterpart to the existing heat_wave.webp; encounter currently falls back to its ❄️ icon) |
+
+### Reward icon (`public/assets/icons/items/`)
+| File | Prompt | Priority |
+|---|---|---|
+| `assets/icons/items/frost_flower.webp` | A delicate crystalline flower grown from pale blue ice, its petals formed of clear translucent frost with a faint inner shimmer and dusted with fine snow. Painterly digital fantasy art with rich ice and frost textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | low (Bitter Cold reward drop; reward line shows no icon until generated) |

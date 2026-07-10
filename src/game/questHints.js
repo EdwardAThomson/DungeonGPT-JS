@@ -103,7 +103,11 @@ export const getStepHint = (step, quest) => {
   // Site-bound objective: the site was revealed on the map when the quest was accepted.
   if (step.site) {
     const label = SITE_LABEL[step.site.type] || `a ${step.site.type}`;
-    return `In ${label} — marked on your world map`;
+    // Side quests only un-hide the site's sprite on the world map (a type-wide reveal);
+    // they draw no pin, glow, or label. "revealed" describes what actually happens, so
+    // neither the journal nor the AI (this string is fed straight into the prompt)
+    // promises a marker the map never renders.
+    return `In ${label}, now revealed on your world map`;
   }
 
   // Open bounty: any wilderness victory counts.
@@ -117,7 +121,7 @@ export const getStepHint = (step, quest) => {
     if (Array.isArray(step.sites) && step.sites.length > 0) {
       const labels = step.sites.map((t) => SITE_LABEL[t] || `a ${t}`);
       const marked = step.sites.some((t) => t === 'cave' || t === 'ruins')
-        ? ' (marked on your world map)' : '';
+        ? ' (revealed on your world map)' : '';
       return `Harvest in ${labels.join(' or ')}${marked}`;
     }
     return describeItemSources(step.trigger.item);

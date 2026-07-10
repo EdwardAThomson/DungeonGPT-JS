@@ -270,6 +270,52 @@ const Game = ({ resumeConversation = null }) => {
     setAssistantModel
   } = useContext(SettingsContext);
 
+  // Reload rehydration for an unsaved fresh game. On a hard reload the world map and
+  // gameSessionId survive because they ride router navigation state, but the campaign
+  // settings (milestones/story/goal/tone) live only in the in-memory SettingsContext
+  // and reset to {}. NewGame stashed the launch snapshot in sessionStorage keyed by
+  // the gameSessionId; when the context is empty AND we have a restored session/map
+  // but NO saved row (loadedConversation), read it back so the journal and the AI
+  // opening are grounded instead of falling back to a bare templated scene. Runs once;
+  // all sessionStorage access is guarded (storage can throw in private mode).
+  const launchRehydratedRef = useRef(false);
+  useEffect(() => {
+    if (launchRehydratedRef.current) return;
+    let gsId = stateGameSessionId;
+    try {
+      if (!gsId) gsId = localStorage.getItem('activeGameSessionId');
+    } catch (e) { /* private mode: no fallback id */ }
+    const hasRestoredSession = !!(gsId || stateGeneratedMap);
+    if (loadedConversation || !hasRestoredSession) return;
+    if (Object.keys(settings).length !== 0) return;
+    if (!gsId) return;
+    launchRehydratedRef.current = true;
+    try {
+      const raw = sessionStorage.getItem(`dgpt:launchSettings:${gsId}`);
+      if (raw) {
+        setSettings(JSON.parse(raw));
+      }
+    } catch (e) {
+      logger.warn('Could not rehydrate launch settings snapshot', e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings, loadedConversation]);
+
+  // Cleanup: once a real saved row is loaded, the launch snapshot for that session is
+  // stale (the save supersedes it), so drop it. Conservative on purpose: we never
+  // remove it merely because settings are non-empty in some render, since a reload
+  // before the first save still needs it.
+  useEffect(() => {
+    const gsId = loadedConversation?.sessionId || stateGameSessionId;
+    if (!loadedConversation || !gsId) return;
+    try {
+      sessionStorage.removeItem(`dgpt:launchSettings:${gsId}`);
+    } catch (e) {
+      logger.debug('Could not clear launch settings snapshot', e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // --- Modal Manager hooks ---
   const { open: openHowToPlay } = useModal('howToPlay');
   const { open: openHero } = useModal('hero');
@@ -309,8 +355,15 @@ const Game = ({ resumeConversation = null }) => {
 
   // The AI Dungeon Master requires auth; guests play the local mechanical loop
   // (exploration + deterministic combat) and the AI is the sign-in upsell.
-  const { user } = useAuth();
+  // authLoading is true until AuthContext's initial getSession() resolves. During a
+  // reload the Supabase session re-hydrates asynchronously, so `user` is briefly null
+  // even for a signed-in player; treating that window as "guest" would fire the no-AI
+  // opening. We keep aiAvailable a live !!user (guests really do lack AI), but pass
+  // authReady down so the Start Adventure action can defer committing to the guest
+  // path until auth has actually finished loading.
+  const { user, loading: authLoading } = useAuth();
   const aiAvailable = !!user;
+  const authReady = !authLoading;
   // Reopen the map after an encounter that interrupted exploration.
   const reopenMapAfterEncounterRef = useRef(false);
   // Guided tour: advance the in-game coachmarks (Start Adventure -> Map) as the
@@ -355,7 +408,8 @@ const Game = ({ resumeConversation = null }) => {
     // route it through the SAME engine event as the Talk button so rewards/codex/ledger/
     // save/message and idempotency are identical. checkMilestoneEvent is defined below;
     // this wrapper defers the reference so the hoisted binding is used at call time.
-    (npcId) => checkMilestoneEvent({ type: 'npc_talked', npcId }, selectedHeroes)
+    (npcId) => checkMilestoneEvent({ type: 'npc_talked', npcId }, selectedHeroes),
+    authReady
   );
   const { performSave } = useGamePersistence({
     sessionId,
@@ -1663,8 +1717,12 @@ const Game = ({ resumeConversation = null }) => {
           setSelectedHeroes(prev => replaceHeroInParty(prev, healedHero));
         }}
         onQuestItemFound={(itemId, itemName) => {
-          recordItemsInCodex([itemId]); // codex (#51)
-          checkMilestoneEvent({ type: 'item_acquired', itemId }, selectedHeroes);
+          // Route through grantObjectiveItem so the item actually lands in inventory:
+          // this handler previously only fired the milestone + codex and never called
+          // addItem, so town quest-building pickups (e.g. the Frostbound Ledger) ticked
+          // the milestone but never materialized. grantObjectiveItem also appends the
+          // grant ledger, records the codex, fires the milestone event, and saves.
+          grantObjectiveItem({ id: itemId, name: itemName });
         }}
         party={selectedHeroes}
         onResurrect={(heroId, goldCost) => {
