@@ -41,10 +41,11 @@ const HeroSelection = () => {
       }
     };
 
-    // Only fetch if heroes array is empty
-    if (heroes.length === 0) {
-      fetchHeroes();
-    }
+    // Fetch unconditionally on mount (mirrors AllHeroes). Fetching only when the
+    // shared HeroContext was empty could leave a just-created hero missing until a
+    // full reload; the cached context list still renders immediately below, so the
+    // refetch never causes a blank flash.
+    fetchHeroes();
   }, [setHeroes]);
 
   const toggleHeroSelection = (hero) => {
