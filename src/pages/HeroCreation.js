@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 
 import HeroContext from "../contexts/HeroContext";
 import { generateName } from "../utils/npcGenerator";
+import { sanitizeHeroName } from "../utils/validation";
 import { calculateMaxHP } from "../utils/healthSystem";
 import OnboardingSteps from "../components/OnboardingSteps";
 import PortraitPickerModal from "../components/PortraitPickerModal";
@@ -114,7 +115,9 @@ const HeroCreation = () => {
   const handleSubmit = async () => {
     const newHero = {
       heroId: heroToEdit?.heroId || uuidv4(),
-      heroName,
+      // Trim/collapse whitespace so the saved name is clean; validateHero below
+      // rejects any disallowed characters and shows the reason inline.
+      heroName: sanitizeHeroName(heroName),
       heroGender: selectedGender,
       profilePicture: selectedProfilePicture,
       heroRace: selectedRace,

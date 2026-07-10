@@ -7,6 +7,7 @@ import type { AuthVariables } from '../middleware/auth';
 import { getSql, type Sql } from '../services/pg';
 import { getAccountTier, getEffectiveTier, tierRank } from '../services/tiers';
 import { normalizeCode } from '../services/redemption';
+import { validateHeroName } from '../services/validation';
 import {
   bumpCounter,
   REDEEM_CODE_BUCKET,
@@ -71,6 +72,14 @@ dbRoutes.post('/heroes', async (c) => {
     const userId = c.get('userId');
     const hero = await c.req.json();
 
+    // Defense in depth: reject a name outside the safe allowlist even if the UI
+    // was bypassed. Persist the sanitized (trimmed) form.
+    const nameCheck = validateHeroName(hero.heroName);
+    if (!nameCheck.valid) {
+      return c.json({ error: nameCheck.reason, code: 'invalid_hero_name' }, 400);
+    }
+    hero.heroName = nameCheck.name;
+
     const [row] = await sql`
       INSERT INTO heroes (
         user_id, hero_id, hero_name, hero_gender, hero_race, hero_class,
@@ -111,6 +120,16 @@ dbRoutes.put('/heroes/:heroId', async (c) => {
     ];
     if (!updatable.some((k) => hero[k] !== undefined)) {
       return c.json({ error: 'No fields to update' }, 400);
+    }
+
+    // Defense in depth: only validate the name when this partial update carries
+    // one (leaving it undefined keeps the stored value via COALESCE).
+    if (hero.heroName !== undefined) {
+      const nameCheck = validateHeroName(hero.heroName);
+      if (!nameCheck.valid) {
+        return c.json({ error: nameCheck.reason, code: 'invalid_hero_name' }, 400);
+      }
+      hero.heroName = nameCheck.name;
     }
 
     // Partial update via COALESCE: a field left undefined keeps its current value.
