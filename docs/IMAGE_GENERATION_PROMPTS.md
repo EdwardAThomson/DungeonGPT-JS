@@ -264,3 +264,28 @@ The MAP-01 audit check clears for that POI once the key exists and the file is p
 | `public/assets/encounters/cult_meeting_place_arrival.webp` | A ring of ancient standing stones atop grassy burial barrows in The Barrows under a bruised twilight sky, cold blue mist pooling between the monoliths, faint carved eldritch symbols on the weathered stones, empty and waiting with an unnatural stillness in the air. Cosmic-horror atmosphere, ominous megalithic circle, dread and wrongness. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (MAP-01; Eldritch Horror T1, The Blackwood Cult) |
 | `public/assets/encounters/corrupted_lighthouse_arrival.webp` | A gaunt coastal lighthouse on a jagged sea cliff at Whisper-Cove, its beacon corrupted to cast a sickly non-euclidean green-purple light out over a churning black ocean, barnacle-crusted stone streaked with alien growths and writhing shadow, storm surf pounding the rocks below. Cosmic-horror seascape, drowned-god dread, oppressive and hallucinatory. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (MAP-01; Eldritch Horror T2, The Great Dreamer) |
 | `public/assets/encounters/mourn_peak_summit_arrival.webp` | A bleak, wind-scoured mountain summit above the clouds where the sky tears open into a yawning cosmic void, impossible stars and a vast dreaming presence bleeding through the rift over the barren rock, thin air, colorless stone, reality warping at the edges. Cosmic-horror sublime terror, vertiginous altitude, a vision of the Void breaking through. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (MAP-01; Eldritch Horror T2, The Great Dreamer) |
+
+## Generation queue (2026-07-10 — Bitter Cold hazard)
+
+The climate-aware environmental encounters shipped a cold-climate hazard,
+`cold_snap` ("Bitter Cold"), as the Frozen Frontier counterpart to the
+hot-climate `heat_wave` ("Scorching Heat"), but its arrival art and its
+reward-drop icon were never generated. Scorching Heat resolves its art from
+`image: '/assets/encounters/heat_wave.webp'` (present on disk); Bitter Cold
+already declares `image: '/assets/encounters/cold_snap.webp'`
+(`src/data/encounters/environmentalEncounters.js`) the same way, so it is wired
+identically and just needs the file. Until then the encounter modal falls back to
+its ❄️ icon and the reward line shows no icon. Both paths are pinned in
+`src/data/artIntegrity.test.js` (`KNOWN_MISSING_ASSETS`); drop each file at the
+path below and delete its pin as the art lands. No further code change is needed —
+the paths are already declared in the data.
+
+### Encounter image (`public/assets/encounters/`)
+| File | Prompt | Priority |
+|---|---|---|
+| `public/assets/encounters/cold_snap.webp` | A brutal arctic cold snap tearing across a frozen wilderness, a bitter blizzard wind driving snow horizontally over a bleak white expanse, ice-crusted rocks and frost-rimed skeletal trees bent by the gale, a pale low sun behind racing grey cloud, the freezing air itself hazed with blowing snow and glittering frost. Frozen Frontier arctic hazard, the killing cold of the open frontier. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (cold counterpart to the existing heat_wave.webp; encounter currently falls back to its ❄️ icon) |
+
+### Reward icon (`public/assets/icons/items/`)
+| File | Prompt | Priority |
+|---|---|---|
+| `assets/icons/items/frost_flower.webp` | A delicate crystalline flower grown from pale blue ice, its petals formed of clear translucent frost with a faint inner shimmer and dusted with fine snow. Painterly digital fantasy art with rich ice and frost textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | low (Bitter Cold reward drop; reward line shows no icon until generated) |
