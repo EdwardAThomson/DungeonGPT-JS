@@ -36,6 +36,32 @@ const combatPool = (type) => {
   return Object.values(table).filter((e) => e.encounterTier === 'immediate');
 };
 
+// Difficulty tiers a NON-QUEST random wilderness combat may use, by party level
+// (#combat-tuning). Low parties meet easy/medium foes, mid parties medium/hard;
+// `deadly` is reserved for authored quest/milestone bosses and is NEVER randomly
+// selected. When level is unknown (legacy callers / tests) the filter is skipped and
+// the full immediate pool is used, so sites cached before this feature are unaffected
+// and old behavior is preserved. This only decides SELECTION; authored/quest
+// difficulty (makeBossEncounter's forced hard, milestone bosses) is untouched.
+export const difficultyBandForLevel = (level) => {
+  if (!Number.isFinite(level)) return null;
+  const L = Math.max(1, Math.floor(level));
+  if (L <= 2) return ['easy', 'medium'];
+  if (L <= 4) return ['medium', 'hard'];
+  return ['hard'];
+};
+
+// Pick one random combat encounter matched to the party level. Consumes exactly one
+// rng() draw (as the old uniform pick did), so the downstream deterministic stream
+// (harvest nodes) is unshifted for a given seed. Falls back to the full pool if the
+// band yields nothing (or level is unknown).
+const pickCombatEncounter = (pool, rng, partyLevel) => {
+  const band = difficultyBandForLevel(partyLevel);
+  const eligible = band ? pool.filter((e) => band.includes(e.difficulty)) : pool;
+  const from = eligible.length > 0 ? eligible : pool;
+  return from[Math.floor(rng() * from.length)];
+};
+
 // Themed loot item keys (catalog keys from inventorySystem). Kept modest; the hoard slot
 // adds a chance at something rarer. Exported for questHints' derived "where do I find
 // this item?" text (read-only consumer).
@@ -258,9 +284,13 @@ const rollLoot = (type, rng, hoard) => {
  * Populate a site's content slots in place (idempotent — no-op if already populated).
  * @param {Object} site - the object from generateSiteMap (has mapData + contentSlots).
  * @param {number} seed - reproducible seed (pair with the site's generation seed).
+ * @param {number} [partyLevel] - the party's effective level at first entry, used to
+ *   level-match the NON-QUEST random combat slots (#combat-tuning). Baked into the
+ *   cached site once (never re-derived), so it stays backwards-compatible with the
+ *   map-persistence rules. Omit (legacy callers / tests) to keep the old full-pool pick.
  * @returns {Object} the same site, with tile.content set on each slot + site.populated.
  */
-export function populateSite(site, seed) {
+export function populateSite(site, seed, partyLevel) {
   if (!site || site.populated) return site;
   // Two SEPARATE pool keys (issue #49). Loot is themed per site type — forest/hills/
   // mountain have their own LOOT/HOARD_BONUS tables — but authored combat encounters
@@ -295,7 +325,7 @@ export function populateSite(site, seed) {
       const tile = site.mapData[slot.y] && site.mapData[slot.y][slot.x];
       if (!tile) return;
       if (kinds[i] === 'encounter' && pool.length > 0) {
-        const enc = clone(pool[Math.floor(rng() * pool.length)]);
+        const enc = clone(pickCombatEncounter(pool, rng, partyLevel));
         tile.content = { kind: 'encounter', encounter: enc, consumed: false };
       } else {
         tile.content = { kind: 'loot', loot: rollLoot(lootType, rng, i === deepestIdx), consumed: false };
@@ -318,12 +348,20 @@ export function populateSite(site, seed) {
 // (so the encounter shape is valid) but flagged so completion fires on defeat.
 function makeBossEncounter(objective, type) {
   const pool = combatPool(type);
-  const base = pool.length ? clone(pool[Math.floor(pool.length / 2)]) : {
+  // Borrow the SHAPE of a HARD-tier encounter (the classic boss shell). Filtering to
+  // 'hard' keeps this base identical to before the level-matched easy/medium fillers
+  // were added, so those never become a quest-boss base. Any `dc` override on the
+  // borrowed encounter is stripped so the forced difficulty:'hard' (DC 20) is what
+  // resolves, so quest-boss difficulty is unchanged (#combat-tuning).
+  const hardPool = pool.filter((e) => e.difficulty === 'hard');
+  const basePool = hardPool.length ? hardPool : pool;
+  const base = basePool.length ? clone(basePool[Math.floor(basePool.length / 2)]) : {
     icon: '👹',
     image: '/assets/encounters/cave_entrance.webp',
     suggestedActions: [{ label: 'Attack', skill: 'Athletics', description: 'Strike the foe down' }],
     consequences: { criticalSuccess: '', success: '', failure: '', criticalFailure: '' },
   };
+  delete base.dc; // never inherit a random-pool dc override; the forced hard label sets DC 20
   return {
     ...base,
     name: objective.name,

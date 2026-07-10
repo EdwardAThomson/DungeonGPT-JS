@@ -26,6 +26,63 @@ export const RUINS_ENCOUNTERS = {
     }
   },
 
+  // Level-matched filler (#combat-tuning): EASY + MEDIUM immediate ruins fights so
+  // a low-level party drawing a random wilderness slot meets a fair foe instead of
+  // the hard ghost / cultists. Selected by party level in sitePopulator (never for
+  // quest/milestone bosses). Explicit `dc` pins the sim-validated ~30-90% mid-gear
+  // band without inventing a new difficulty label.
+  'ruin_scavengers': {
+    name: 'Ruin Scavengers',
+    icon: '🗡️',
+    encounterTier: 'immediate',
+    poiType: 'ruins',
+    description: 'A ragged band of grave-robbers rounds on you, blades drawn to guard their haul!',
+    image: '/assets/encounters/ruin_cultists.webp',
+    difficulty: 'easy',
+    dc: 13,
+    dealsDamage: true,
+    suggestedActions: [
+      { label: 'Attack', skill: 'Athletics', description: 'Rush the scavengers' },
+      { label: 'Disarm', skill: 'Acrobatics', description: 'Knock their weapons aside' },
+      { label: 'Intimidate', skill: 'Intimidation', description: 'Warn them off their loot' },
+      { label: 'Bargain', skill: 'Persuasion', description: 'Talk your way past them' }
+    ],
+    rewards: { xp: 40, gold: '2d10', items: ['old_coins:60%', 'ancient_scroll:30%'] },
+    consequences: {
+      criticalSuccess: 'The scavengers flee, abandoning their pried-open cache to you.',
+      success: 'You see off the scavengers and claim the passage.',
+      failure: 'They snatch what they can and scatter, leaving you nicked and poorer.',
+      criticalFailure: 'The band overwhelms you and drives you out of the ruin.'
+    }
+  },
+
+  'ruin_animated_statue': {
+    name: 'Animated Sentinel',
+    icon: '🗿',
+    encounterTier: 'immediate',
+    poiType: 'ruins',
+    description: 'A weathered stone sentinel grinds to life and levels its cracked blade at you!',
+    image: '/assets/encounters/ruin_treasure_vault.webp',
+    difficulty: 'medium',
+    dc: 15,
+    dealsDamage: true,
+    multiRound: true,
+    enemyHP: 32,
+    suggestedActions: [
+      { label: 'Attack', skill: 'Athletics', description: 'Batter the stone guardian' },
+      { label: 'Shatter Joints', skill: 'Athletics', description: 'Strike where the stone is cracked' },
+      { label: 'Dodge', skill: 'Acrobatics', description: 'Weave past its heavy swings' },
+      { label: 'Dispel', skill: 'Arcana', description: 'Unravel the animating glyphs' }
+    ],
+    rewards: { xp: 55, gold: '2d12', items: ['old_coins:50%', 'ectoplasm:40%'] },
+    consequences: {
+      criticalSuccess: 'The sentinel crumbles, revealing a reliquary sealed in its chest.',
+      success: 'You topple the sentinel and continue deeper.',
+      failure: 'Its stone fists land hard before it finally falls still.',
+      criticalFailure: 'The sentinel hammers you back and you barely escape the chamber.'
+    }
+  },
+
   'ruin_ghost': {
     name: 'Restless Spirit',
     icon: '👻',
@@ -34,6 +91,11 @@ export const RUINS_ENCOUNTERS = {
     description: 'A spectral figure materializes among the ruins, its hollow eyes fixing upon you!',
     image: '/assets/encounters/ruin_ghost.webp',
     difficulty: 'hard',
+    // #combat-tuning: as a RANDOM wilderness slot this is only drawn by Lv 3+ parties;
+    // the explicit dc (just under the hard DC 20) keeps the Lv 3-4 mid-gear win rate a
+    // margin above the 30% floor. Quest bosses that borrow this shape strip `dc` and
+    // keep the forced hard DC 20 (see makeBossEncounter in sitePopulator).
+    dc: 19,
     dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 40,
@@ -92,6 +154,11 @@ export const RUINS_ENCOUNTERS = {
     description: 'Hooded figures chant around a glowing altar in the ruins - you\'ve stumbled upon a dark ritual!',
     image: '/assets/encounters/ruin_cultists.webp',
     difficulty: 'hard',
+    // #combat-tuning: as a RANDOM wilderness slot this is only drawn by Lv 3+ parties;
+    // the explicit dc (just under the hard DC 20) lifts the Lv 3-4 mid-gear win rate
+    // over the 30% floor. Quest bosses that borrow this shape strip `dc` and keep the
+    // forced hard DC 20 (see makeBossEncounter in sitePopulator).
+    dc: 19,
     dealsDamage: true, // #43 explicit damage flag (was keyword-matched or newly hostile)
     multiRound: true,
     enemyHP: 60,

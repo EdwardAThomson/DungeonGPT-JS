@@ -258,7 +258,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
 
     // --- Handlers --- //
 
-    const handleEnterLocation = (encounter, setConversation, conversation) => {
+    const handleEnterLocation = (encounter, setConversation, conversation, partyLevel) => {
         if (!encounter) return;
 
         logger.info('Entering location', encounter.name);
@@ -331,7 +331,9 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 // so unnamed procedural sites keep their flavorful pool name unchanged.
                 const name = tile.mountainName || tile.poiName || names[Math.abs(seed) % names.length];
                 siteMap = generateSiteMap(poiType, name, 'south', seed, { biome: tile.biome });
-                populateSite(siteMap, seed); // fill content slots with encounters + loot
+                // Level-match the non-quest random combat slots to the party's level at
+                // first entry (#combat-tuning); baked into the cached site (BC-safe).
+                populateSite(siteMap, seed, partyLevel); // fill content slots with encounters + loot
                 setSiteMapsCache(prev => ({ ...prev, [key]: siteMap }));
                 logger.info('Generated new site map', { poiType, name, key });
             } else {

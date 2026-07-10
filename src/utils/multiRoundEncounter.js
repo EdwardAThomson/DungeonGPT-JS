@@ -1,6 +1,8 @@
-import { resolveEncounter, clampPenaltyGold } from './encounterResolver';
+import { resolveEncounter, clampPenaltyGold, encounterDC } from './encounterResolver';
 import { calculateModifier } from './rules';
 import { applyDamage } from './healthSystem';
+import { getLevelBonus } from './progressionSystem';
+import { getEquippedBonuses } from '../game/equipment';
 
 /**
  * Multi-round encounter system for prolonged hostile encounters.
@@ -63,6 +65,41 @@ export const heroSupportContribution = (hero) => {
   return Math.max(1, Math.floor(bestMod / 2));
 };
 
+/** The lead's single best stat modifier (mirrors heroSupportContribution's basis). */
+const bestStatModifier = (hero) =>
+  Math.max(
+    ...Object.values(hero?.stats || {}).map((v) => calculateModifier(v || 10)),
+    calculateModifier(10)
+  );
+
+/**
+ * Computed STARTING advantage: a modest lean reflecting the party-vs-encounter match,
+ * so the "Your Advantage" the player sees from the intro VARIES: usually near zero
+ * (a fair fight), sometimes negative (the party is outmatched) or positive (the party
+ * has the edge). It is NOT a forced constant. Signals are all known at encounter start:
+ * the lead's best stat modifier + equipped attack + level bonus + a share of the party
+ * support bonus, versus the encounter's DC. Centered so a Lv 1 mid-gear hero against a
+ * medium (DC 15) fight scores ~0. Clamped to [-2, +2] so it is a lean, not a decided
+ * outcome (the defeat threshold and per-round updates are unchanged).
+ *
+ * Examples (Lv 1 mid-gear Fighter, best-stat +2, weapon +1):
+ *   - medium (DC 15): strength 0, difficulty 0  -> start  0 (matched)
+ *   - easy   (DC 10): strength 0, difficulty -1.7 -> start +2 (edge)
+ *   - hard   (DC 20): strength 0, difficulty +1.7 -> start -2 (outmatched)
+ */
+export const computeStartingAdvantage = (encounter, lead, supportBonus = 0) => {
+  const dc = Number.isFinite(encounterDC(encounter)) ? encounterDC(encounter) : 15;
+  const difficultyScore = (dc - 15) / 3; // medium DC 15 is the zero point; each ~3 DC ~= 1
+  const equip = getEquippedBonuses(lead || {});
+  const partyStrength =
+    bestStatModifier(lead) +
+    (equip.attack || 0) +
+    getLevelBonus(lead?.level) +
+    Math.floor((supportBonus || 0) / 2) -
+    3; // baseline: a Lv 1 solo mid-gear hero (best-stat +2, weapon +1) lands ~0 vs medium
+  return Math.max(-2, Math.min(2, Math.round(partyStrength - difficultyScore)));
+};
+
 /**
  * Phase 5 support bonus: every LIVING party member other than the lead adds their
  * contribution to the lead's roll.
@@ -97,6 +134,8 @@ export const createMultiRoundEncounter = (encounter, character, settings, llmCon
   const partyList = sourceParty.map((h) => ({ ...h }));
   const enemyHP = encounter.enemyHP || 20;
   const maxRounds = computeMaxRounds(enemyHP);
+  const supportBonus = getSupportBonus(partyList, leadIndex);
+  const startAdvantage = computeStartingAdvantage(encounter, partyList[leadIndex], supportBonus);
 
   return {
     encounter,
@@ -108,14 +147,16 @@ export const createMultiRoundEncounter = (encounter, character, settings, llmCon
     advantageDefeatThreshold: computeAdvantageDefeatThreshold(maxRounds),
     roundHistory: [],
     enemyMorale: 100, // Drops with successful player actions
-    playerAdvantage: 0, // Builds with successful tactics
+    // Computed, VARYING starting lean (usually near 0, sometimes +/-) instead of a
+    // forced constant; surfaced from the intro so the player sees the true match.
+    playerAdvantage: startAdvantage, // Builds with successful tactics
     enemyMaxHP: enemyHP,
     enemyCurrentHP: enemyHP,
     // --- Phase 5 team state ---
     party: partyList,
     leadIndex,
     isTeamEncounter: partyList.length > 1,
-    supportBonus: getSupportBonus(partyList, leadIndex),
+    supportBonus,
     teamDamageLog: [],
     isResolved: false,
     outcome: null
@@ -240,11 +281,13 @@ export const resolveRound = async (roundState, playerAction, rng = Math.random) 
     updatedState.playerAdvantage += 1;
   } else if (result.outcomeTier === 'failure') {
     enemyDamage = ENEMY_DAMAGE_BY_OUTCOME.failure;
-    updatedState.enemyMorale += 10;
+    // A player miss no longer RAISES enemy morale: morale starts and caps at 100, so
+    // the old +10/+20 nudge was a no-op that only made a losing streak feel worse and
+    // clawed back morale the player had chipped off. Morale falls only with real HP
+    // loss (below) and toward the rout-win path; a miss just costs the player advantage.
     updatedState.playerAdvantage -= 1;
   } else if (result.outcomeTier === 'criticalFailure') {
     enemyDamage = ENEMY_DAMAGE_BY_OUTCOME.criticalFailure;
-    updatedState.enemyMorale += 20;
     updatedState.playerAdvantage -= 2;
   }
 
@@ -252,8 +295,8 @@ export const resolveRound = async (roundState, playerAction, rng = Math.random) 
   updatedState.enemyCurrentHP = Math.max(0, updatedState.enemyCurrentHP - enemyDamage);
 
   // Morale loss tracks the HP fraction actually removed (a 300 HP horror does not
-  // rout because of two lucky hits; a goblin band breaks when gutted). Failure
-  // tiers still RESTORE morale (+10/+20 above).
+  // rout because of two lucky hits; a goblin band breaks when gutted). Failures do
+  // not restore morale (that backwards nudge was removed); morale only ever falls.
   if (enemyDamage > 0 && updatedState.enemyMaxHP > 0) {
     updatedState.enemyMorale -= Math.round((enemyDamage / updatedState.enemyMaxHP) * 100);
   }
