@@ -9,6 +9,7 @@ const MapModal = lazy(() => import('./MapModal'));
 const EncounterModal = lazy(() => import('./EncounterModal'));
 const EncounterActionModal = lazy(() => import('./EncounterActionModal'));
 const HeroModal = lazy(() => import('./HeroModal'));
+const ItemDetailModal = lazy(() => import('./ItemDetailModal'));
 const AiAssistantPanel = lazy(() => import('./AiAssistantPanel'));
 const DiceRoller = lazy(() => import('./DiceRoller'));
 
@@ -158,6 +159,9 @@ const GameModals = ({
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>
         <HeroModal />
+      </Suspense>
+      <Suspense fallback={<ModalLoadingFallback />}>
+        <ItemDetailModal />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>
         <EncounterActionModal

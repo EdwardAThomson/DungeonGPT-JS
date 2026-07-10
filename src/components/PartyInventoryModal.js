@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ITEM_CATALOG, rollDice, removeItem, getRarityColor } from '../utils/inventorySystem';
 import { applyHealing, getHPStatus } from '../utils/healthSystem';
 import { heroUid } from '../utils/partyUtils';
+import { useModal } from '../contexts/ModalContext';
 import {
   EQUIP_SLOTS,
   getEquippedItem,
@@ -28,6 +29,7 @@ const formatSlotBonus = (slot, bonusStr) => {
 // open-time snapshot), so external HP/inventory changes stay in sync.
 const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate }) => {
   const [selectedImage, setSelectedImage] = useState(null);
+  const { open: openItemDetail } = useModal('itemDetail'); // item-detail modal (child of adventureBook)
   const [useItemState, setUseItemState] = useState(null); // { itemKey } — hero picker
   const [useResults, setUseResults] = useState([]); // [{ heroName, itemName, rolled, healed, id }]
   const [activeTab, setActiveTab] = useState('items'); // 'items' | 'loadout'
@@ -64,11 +66,13 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
     const description = catalogEntry?.description || item.description || null;
     const effect = catalogEntry?.effect || null;
     const amount = catalogEntry?.amount || null;
+    const value = catalogEntry?.value ?? item.value ?? 0;
+    const type = catalogEntry?.type || item.type || null;
 
     if (itemMap[key]) {
       itemMap[key].quantity += quantity;
     } else {
-      itemMap[key] = { name, quantity, rarity, icon, description, effect, amount };
+      itemMap[key] = { key, name, quantity, rarity, icon, description, effect, amount, value, type };
     }
   }
 
@@ -286,13 +290,13 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    cursor: item.icon ? 'pointer' : 'default',
+                    cursor: 'pointer',
                     transition: 'all 0.2s ease',
                     position: 'relative',
                     boxShadow: `0 0 5px ${item.rarity !== 'common' ? (getRarityColor(item.rarity) + '33') : 'rgba(0,0,0,0.5)'}`
                   }}
-                  title={item.description || ''}
-                  onClick={item.icon ? () => setSelectedImage({ src: `/${item.icon}`, name: item.name, description: item.description }) : undefined}
+                  title="View item details"
+                  onClick={() => openItemDetail({ item })}
                 >
                   {item.icon && (
                     <img
