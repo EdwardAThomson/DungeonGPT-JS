@@ -102,10 +102,11 @@ const HeroSelection = () => {
       return;
     }
 
-    // Block starting a game with a structurally invalid character. Point-buy is
-    // not enforced here so heroes made before that rule aren't locked out.
+    // Block starting a game with a structurally invalid character. Point-buy and
+    // the name allowlist are not enforced here so heroes made before those rules
+    // aren't locked out.
     const invalidHeroes = selectedHeroes.filter(
-      (hero) => !validateHero(hero, { enforcePointBuy: false }).valid
+      (hero) => !validateHero(hero, { enforcePointBuy: false, enforceNameRules: false }).valid
     );
     if (invalidHeroes.length > 0) {
       const names = invalidHeroes.map((h) => h.heroName || 'Unnamed hero').join(', ');

@@ -16,6 +16,7 @@ import {
   heroRaces,
   alignmentOptions,
 } from '../data/heroData';
+import { validateHeroName } from '../utils/validation';
 
 export const scoreCost = (score) => POINT_BUY_COST[score] ?? null;
 
@@ -65,9 +66,18 @@ export const validateStats = (stats) => {
 
 // Structural checks: required fields present and enum values valid. These apply
 // to every character regardless of when it was made.
-const validateStructure = (hero) => {
+const validateStructure = (hero, { enforceNameRules = true } = {}) => {
   const reasons = [];
-  if (!hero.heroName || !hero.heroName.trim()) reasons.push('Name is required.');
+  if (!hero.heroName || !hero.heroName.trim()) {
+    reasons.push('Name is required.');
+  } else if (enforceNameRules) {
+    // Creation/edit only: hold the name to the safe allowlist (blocks quotes,
+    // semicolons, angle brackets and other injection-shaped characters). The
+    // play-time gate passes enforceNameRules:false so legacy heroes whose names
+    // predate this rule are never locked out of a campaign mid-flight.
+    const nameCheck = validateHeroName(hero.heroName);
+    if (!nameCheck.valid) reasons.push(nameCheck.reason);
+  }
   if (!hero.heroGender) reasons.push('Gender is required.');
   else if (!heroGenders.includes(hero.heroGender)) reasons.push('Gender is invalid.');
   if (!hero.profilePicture) reasons.push('Profile picture is required.');
@@ -88,13 +98,16 @@ const validateStructure = (hero) => {
  * @param {boolean} [opts.enforcePointBuy=true] - also enforce the level-1 point-buy
  *   budget. Pass false at the play-time gate so legacy heroes (created before the
  *   point-buy rule) aren't locked out of campaigns mid-flight.
+ * @param {boolean} [opts.enforceNameRules=true] - also enforce the safe-character
+ *   allowlist on the name. Pass false at the play-time gate so legacy heroes whose
+ *   names predate this rule still load and start games.
  * @returns {{ valid: boolean, reasons: string[] }}
  */
 export const validateHero = (hero, opts = {}) => {
-  const { enforcePointBuy = true } = opts;
+  const { enforcePointBuy = true, enforceNameRules = true } = opts;
   if (!hero) return { valid: false, reasons: ['No character data.'] };
 
-  const reasons = validateStructure(hero);
+  const reasons = validateStructure(hero, { enforceNameRules });
 
   // Point-buy is a creation-time rule (the level selector is fixed at 1 in the UI,
   // so we don't validate level here — that keeps legacy/premium higher-level
