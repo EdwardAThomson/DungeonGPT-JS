@@ -130,6 +130,38 @@ export const getStepHint = (step, quest) => {
   return '';
 };
 
+/**
+ * The objective step of a quest: the first non-turn-in milestone (its first "go do a
+ * thing" step). Falls back to the first milestone (courier quests are a single turn-in).
+ * Returns null when the quest has no milestones.
+ * @param {Object} quest
+ * @returns {Object|null}
+ */
+export const getQuestObjectiveStep = (quest) => {
+  const milestones = quest?.milestones || [];
+  return milestones.find((m) => !m.trigger?.turnIn) || milestones[0] || null;
+};
+
+/**
+ * Total advertised reward for a quest: every step reward summed with the final quest
+ * reward, so a rumour can preview the whole payout (objective XP + turn-in + quest
+ * bonus). Item ids are returned verbatim; the caller resolves display names.
+ * @param {Object} quest
+ * @returns {{ xp: number, gold: number, items: string[] }}
+ */
+export const summarizeQuestReward = (quest) => {
+  const total = { xp: 0, gold: 0, items: [] };
+  const add = (r) => {
+    if (!r) return;
+    total.xp += r.xp || 0;
+    total.gold += r.gold || 0;
+    (r.items || []).forEach((id) => { if (id) total.items.push(id); });
+  };
+  (quest?.milestones || []).forEach((m) => add(m.rewards));
+  add(quest?.rewards);
+  return total;
+};
+
 // A step is actionable/ready when all its prerequisite steps are complete.
 const isStepReady = (step, milestones) =>
   (step.requires || []).every((id) => (milestones || []).find((m) => m.id === id)?.completed);

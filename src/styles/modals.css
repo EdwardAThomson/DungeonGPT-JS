@@ -427,3 +427,60 @@
   color: var(--text-secondary);
   font-style: italic;
 }
+
+/* Rumour / side-quest offer modal (QuestOfferModal in Game.js). Header, title and the
+   spoken hook stay centred; the derived detail rows read left-aligned in a boxed list. */
+.rumour-heading {
+  margin-bottom: 8px;
+  text-align: center;
+  color: var(--primary);
+  font-family: var(--header-font);
+}
+
+.rumour-title {
+  margin-bottom: 8px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--text);
+}
+
+.rumour-hook {
+  margin-bottom: 16px;
+  text-align: center;
+  font-style: italic;
+  color: var(--text-secondary);
+}
+
+.rumour-details {
+  margin-bottom: 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  text-align: left;
+}
+
+.rumour-detail {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+.rumour-detail:last-child {
+  margin-bottom: 0;
+}
+
+.rumour-detail-label {
+  display: inline-block;
+  min-width: 78px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.rumour-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}

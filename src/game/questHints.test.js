@@ -3,6 +3,8 @@ import {
   describeTurnInTarget,
   formatStepProgress,
   getStepHint,
+  getQuestObjectiveStep,
+  summarizeQuestReward,
   isQuestReadyToTurnIn
 } from './questHints';
 
@@ -107,6 +109,42 @@ describe('getStepHint', () => {
 
   it('completed steps get no hint', () => {
     expect(getStepHint({ site: { type: 'cave' }, completed: true })).toBe('');
+  });
+});
+
+describe('getQuestObjectiveStep', () => {
+  it('returns the first non-turn-in step', () => {
+    const obj = { id: 'a', type: 'item', trigger: { item: 'x' } };
+    const turnin = { id: 'b', type: 'turnin', trigger: { turnIn: { building: 'inn' } } };
+    expect(getQuestObjectiveStep({ milestones: [obj, turnin] })).toBe(obj);
+  });
+
+  it('falls back to the sole turn-in step for a courier quest', () => {
+    const deliver = { id: 'd', type: 'turnin', trigger: { turnIn: { building: 'townhall' } } };
+    expect(getQuestObjectiveStep({ milestones: [deliver] })).toBe(deliver);
+  });
+
+  it('returns null when there are no milestones', () => {
+    expect(getQuestObjectiveStep({ milestones: [] })).toBeNull();
+    expect(getQuestObjectiveStep(null)).toBeNull();
+  });
+});
+
+describe('summarizeQuestReward', () => {
+  it('sums every step reward with the final quest reward', () => {
+    const quest = {
+      milestones: [
+        { rewards: { xp: 60, gold: 0, items: ['a'] } },
+        { rewards: { xp: 0, gold: 0, items: [] } }
+      ],
+      rewards: { xp: 40, gold: 120, items: ['b'] }
+    };
+    expect(summarizeQuestReward(quest)).toEqual({ xp: 100, gold: 120, items: ['a', 'b'] });
+  });
+
+  it('tolerates missing rewards and input', () => {
+    expect(summarizeQuestReward({ milestones: [{}], rewards: null })).toEqual({ xp: 0, gold: 0, items: [] });
+    expect(summarizeQuestReward(null)).toEqual({ xp: 0, gold: 0, items: [] });
   });
 });
 
