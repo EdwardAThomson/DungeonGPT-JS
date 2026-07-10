@@ -268,6 +268,39 @@ export const getMilestoneItemForTile = (milestones, tile) => {
 };
 
 /**
+ * Find the location milestone the party can SEARCH on a world tile, if any.
+ *
+ * Location milestones spawn a POI (`spawn.type === 'poi'`, `trigger.location` = the
+ * poi id, stamped on the tile as `tile.poi`). Reaching the tile no longer completes
+ * the milestone on its own; instead the arrival modal offers a "Search this location"
+ * action that fires the `location_visited` event. This resolver decides whether that
+ * action should appear: an active location milestone (not completed, prerequisites
+ * met) whose `trigger.location` matches the tile's poi id (or, defensively, a
+ * town-name-derived id, mirroring the movement handler's locationId derivation).
+ *
+ * The level gate (`minLevel`) is intentionally NOT applied here: the button still
+ * shows so the player can try; the engine returns `level_blocked` on the click and the
+ * handler surfaces a "not yet seasoned enough" line, matching the boss-fight behaviour.
+ *
+ * @param {Array} milestones - All campaign milestones
+ * @param {Object} tile - The world tile the party arrived at
+ * @returns {Object|null} { locationId, name, milestoneId } or null
+ */
+export const getMilestoneLocationForTile = (milestones, tile) => {
+    if (!Array.isArray(milestones) || !tile) return null;
+    const locationId = tile.poi
+        || (tile.townName ? String(tile.townName).toLowerCase().replace(/\s+/g, '_') : null);
+    if (!locationId) return null;
+
+    const m = milestones.find(m =>
+        m.type === 'location' && !m.completed && m.trigger?.location === locationId &&
+        areRequirementsMet(m, milestones)
+    );
+    if (!m) return null;
+    return { locationId: m.trigger.location, name: m.spawn?.name || m.location || m.trigger.location, milestoneId: m.id };
+};
+
+/**
  * Find the milestone boss fight waiting on a world tile, if any.
  *
  * Two ways a tile hosts a boss:
