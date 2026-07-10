@@ -268,6 +268,12 @@ dbRoutes.post('/conversations', async (c) => {
 
     // Two branches instead of an empty-fragment splice: postgres.js composes
     // sql`` fragments, but an explicit branch keeps the guarded shape readable.
+    // Both DO UPDATE arms carry `conversations.user_id = ${userId}`: the conflict
+    // key is the client-supplied session_id, so without an owner predicate a save
+    // carrying someone else's session_id would overwrite and reassign their row.
+    // With it, a cross-user write filters to zero rows and falls into the !row
+    // guard-miss branch (a generic 409, no data leaked). The legitimate owner
+    // already matches, so their saves are unaffected.
     const [row] =
       expectedRev === undefined
         ? await sql`
@@ -277,6 +283,7 @@ dbRoutes.post('/conversations', async (c) => {
               provider, model, timestamp, updated_at, rev
             ) VALUES ${values}
             ON CONFLICT (session_id) DO UPDATE SET ${updateSet}
+            WHERE conversations.user_id = ${userId}
             RETURNING *`
         : await sql`
             INSERT INTO conversations (
@@ -285,7 +292,7 @@ dbRoutes.post('/conversations', async (c) => {
               provider, model, timestamp, updated_at, rev
             ) VALUES ${values}
             ON CONFLICT (session_id) DO UPDATE SET ${updateSet}
-            WHERE conversations.rev = ${expectedRev}
+            WHERE conversations.rev = ${expectedRev} AND conversations.user_id = ${userId}
             RETURNING *`;
 
     if (!row) {
@@ -293,7 +300,7 @@ dbRoutes.post('/conversations', async (c) => {
       // current lineage so the client can decide (it needs rev AND updated_at).
       const [current] = await sql`
         SELECT rev, updated_at FROM conversations
-        WHERE session_id = ${payload.sessionId}
+        WHERE session_id = ${payload.sessionId} AND user_id = ${userId}
         LIMIT 1`;
       return c.json(
         {
