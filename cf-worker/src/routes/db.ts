@@ -176,8 +176,19 @@ dbRoutes.get('/conversations', async (c) => {
   try {
     const userId = c.get('userId');
 
+    // The save-list view only needs lightweight metadata (name, settings, party,
+    // timestamps, rev). It must NOT SELECT the heavy jsonb/text columns
+    // (conversation_data, world_map, sub_maps, summary): those are fetched per-save
+    // via getById when a save is actually loaded. Returning full rows for every save
+    // makes the response grow without bound (worsened by diverged-save copies), which
+    // can exceed the Worker response/time limits and fail the whole list, so the
+    // client falls back to showing local saves only. Selecting only the small columns
+    // keeps the list fast and reliable regardless of how many saves exist.
     const rows = await sql`
-      SELECT * FROM conversations
+      SELECT
+        session_id, user_id, conversation_name, game_settings, selected_heroes,
+        player_position, provider, model, timestamp, updated_at, rev
+      FROM conversations
       WHERE user_id = ${userId}
       ORDER BY updated_at DESC`;
 
