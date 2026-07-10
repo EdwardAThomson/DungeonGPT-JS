@@ -33,7 +33,9 @@ import { storyTemplates } from '../data/storyTemplates';
 import { SIDE_QUESTS, QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
 import { SHOP_STOCK } from '../data/shopStock';
 import { encounterTemplates } from '../data/encounters';
-import { populateSite, LOOT, HOARD_BONUS } from './sitePopulator';
+import { CAVE_ENCOUNTERS } from '../data/encounters/caveEncounters';
+import { RUINS_ENCOUNTERS } from '../data/encounters/ruinsEncounters';
+import { populateSite, LOOT, HOARD_BONUS, difficultyBandForLevel } from './sitePopulator';
 import { describeItemSources } from './questHints';
 import { effectivePartyLevel } from './questEngine';
 import {
@@ -512,5 +514,54 @@ describe('guard (f): reward integrity', () => {
     Object.values(QUEST_ITEM_ICON_FROM).forEach((key) => {
       expect(ITEM_CATALOG[key]).toBeDefined();
     });
+  });
+});
+
+// ===================================================================================
+// guard (g): NON-QUEST wilderness combat is level-matched into the mid-gear band
+// (#combat-tuning). The random `combatPool` slot combats (sitePopulator, drawn by
+// party level via difficultyBandForLevel) must land ~30-90% for the levels a party
+// can actually meet them at, so a low-level or small party is not routed into the
+// hard/deadly foes that used to dominate the pool. Authored quest/milestone bosses
+// keep their SET difficulty and are guarded by guard (c), not here.
+describe('guard (g): non-quest wilderness combat is level-matched into band', () => {
+  const WILDERNESS_BAND = [0.30, 0.90];
+  const LEVELS = [1, 2, 3, 4, 5, 6, 7];
+  const immediate = (table) => Object.entries(table).filter(([, e]) => e.encounterTier === 'immediate');
+  // cave/ruins are the two authored combat pools; forest/hills/mountain sites borrow
+  // the cave pool (sitePopulator combatType coercion), so cave coverage covers them.
+  const pools = { cave: immediate(CAVE_ENCOUNTERS), ruins: immediate(RUINS_ENCOUNTERS) };
+
+  // Reverse the selection map: the levels that can draw a given difficulty as a slot.
+  const metableLevels = (difficulty) =>
+    LEVELS.filter((L) => (difficultyBandForLevel(L) || []).includes(difficulty));
+
+  test('deadly is reserved for authored bosses, never a random wilderness slot', () => {
+    LEVELS.forEach((L) => expect(difficultyBandForLevel(L)).not.toContain('deadly'));
+  });
+
+  test('every party level can draw at least one in-band foe from each combat pool', () => {
+    for (const [, pool] of Object.entries(pools)) {
+      for (const L of LEVELS) {
+        const band = difficultyBandForLevel(L);
+        const eligible = pool.filter(([, e]) => band.includes(e.difficulty));
+        expect(eligible.length).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  // One case per (encounter x metable level). Deadly encounters produce zero cases
+  // (they are never randomly selected), so they are correctly excluded.
+  const cases = Object.entries(pools).flatMap(([type, pool]) =>
+    pool.flatMap(([key, enc]) =>
+      metableLevels(enc.difficulty).map((L) => [`${type}/${key} (${enc.difficulty}) @ L${L}`, enc, L])
+    )
+  );
+
+  test.each(cases)('%s sims inside the 30-90%% mid-gear band', async (label, enc, level) => {
+    const hero = buildSimHero({ level, loadout: 'mid', tier: 1 });
+    const result = await simulateEncounter(enc, hero, { trials: TRIALS, seed: SEED, settings: { tier: 1 } });
+    expect(result.winRate).toBeGreaterThanOrEqual(WILDERNESS_BAND[0]);
+    expect(result.winRate).toBeLessThanOrEqual(WILDERNESS_BAND[1]);
   });
 });
