@@ -9,7 +9,21 @@
 //   - Fully deterministic: same inputs, byte-identical prose. No Math.random(),
 //     no Date.now(), no AI call.
 
-import { formatPartyInfo } from './promptComposer';
+// A fresh chapter opens with the party rested, healed, and levelled (the standing
+// "everything, healed" continuation rule), so the roster line names heroes ONLY,
+// never combat-status tags like [badly wounded] or [DEFEATED]. We deliberately do
+// NOT reuse formatPartyInfo (which annotates HP for in-play prompts): this prologue
+// is composed from the party BEFORE the new-campaign heal lands in React state, and
+// a new adventure never opens describing heroes as wounded or downed.
+const formatHealedRoster = (party = []) =>
+  (party || [])
+    .map((hero) => {
+      const name = hero?.heroName || hero?.characterName || 'Unknown';
+      const charClass = hero?.heroClass || hero?.characterClass || '';
+      return charClass ? `${name} (${charClass})` : name;
+    })
+    .filter(Boolean)
+    .join(', ');
 
 /**
  * Compose the Chapter-n divider appended to the ONGOING conversation when the
@@ -22,7 +36,7 @@ import { formatPartyInfo } from './promptComposer';
  * @returns {string} deterministic markdown prologue
  */
 export const composeChapterPrologue = ({ spec = {}, chapter = 2, party = [] } = {}) => {
-  const partyLine = formatPartyInfo(party) || 'The party';
+  const partyLine = formatHealedRoster(party) || 'The party';
   // "Heroic Fantasy — Crown of Sunfire" -> "Crown of Sunfire" for the header.
   const label = spec.templateName || '';
   const title = label.includes('—') ? label.split('—').pop().trim() : label;
