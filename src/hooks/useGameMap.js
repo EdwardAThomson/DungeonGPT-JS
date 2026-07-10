@@ -324,7 +324,12 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                     mountain: ['The Jagged Pass', 'Stonepeak', 'The Cragged Heights', 'Frostspire Pass', 'Granite Ridge'],
                 };
                 const names = SITE_NAMES[poiType] || ['Cavern', 'Hollow Deep', 'The Undervault', 'Echo Hollow', 'Gloomcave'];
-                const name = names[Math.abs(seed) % names.length];
+                // Prefer the tile's authored name (a custom/milestone name stamped on the
+                // world tile, e.g. "The Rimefang Peaks" from a campaign template) so the
+                // interior title agrees with the world-map label and the arrival modal.
+                // Only mountains carry mountainName and only authored tiles carry poiName,
+                // so unnamed procedural sites keep their flavorful pool name unchanged.
+                const name = tile.mountainName || tile.poiName || names[Math.abs(seed) % names.length];
                 siteMap = generateSiteMap(poiType, name, 'south', seed, { biome: tile.biome });
                 populateSite(siteMap, seed); // fill content slots with encounters + loot
                 setSiteMapsCache(prev => ({ ...prev, [key]: siteMap }));
