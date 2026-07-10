@@ -17,6 +17,16 @@ const exists = (rel) => fs.existsSync(path.join(PUBLIC, rel.replace(/^\//, '')))
 // they currently render the gradient fallback).
 const KNOWN_MISSING_CARDS = [];
 
+// Data-declared art paths that are queued for generation in
+// docs/IMAGE_GENERATION_PROMPTS.md but not yet on disk. The maintainer generates
+// these via the Gemini pipeline and drops the file in; remove the entry as each
+// file lands. A NEW undeclared gap still fails immediately. Paths are matched
+// exactly as they appear in source (leading slash preserved where present).
+const KNOWN_MISSING_ASSETS = [
+  '/assets/encounters/cold_snap.webp',    // Bitter Cold hazard art (cold counterpart to heat_wave.webp)
+  'assets/icons/items/frost_flower.webp', // Bitter Cold reward-drop icon
+];
+
 // Data source files whose string literals declare art paths.
 const DATA_SOURCES = [
   'src/data/storyTemplates.js',
@@ -37,7 +47,8 @@ const extractPaths = (file) => {
 
 describe('art integrity — declared asset paths exist on disk', () => {
   test.each(DATA_SOURCES)('%s', (file) => {
-    const missing = [...new Set(extractPaths(file))].filter((p) => !exists(p));
+    const known = new Set(KNOWN_MISSING_ASSETS);
+    const missing = [...new Set(extractPaths(file))].filter((p) => !exists(p) && !known.has(p));
     expect(missing).toEqual([]);
   });
 
