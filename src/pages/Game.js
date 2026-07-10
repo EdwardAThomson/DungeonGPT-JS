@@ -1663,8 +1663,12 @@ const Game = ({ resumeConversation = null }) => {
           setSelectedHeroes(prev => replaceHeroInParty(prev, healedHero));
         }}
         onQuestItemFound={(itemId, itemName) => {
-          recordItemsInCodex([itemId]); // codex (#51)
-          checkMilestoneEvent({ type: 'item_acquired', itemId }, selectedHeroes);
+          // Route through grantObjectiveItem so the item actually lands in inventory:
+          // this handler previously only fired the milestone + codex and never called
+          // addItem, so town quest-building pickups (e.g. the Frostbound Ledger) ticked
+          // the milestone but never materialized. grantObjectiveItem also appends the
+          // grant ledger, records the codex, fires the milestone event, and saves.
+          grantObjectiveItem({ id: itemId, name: itemName });
         }}
         party={selectedHeroes}
         onResurrect={(heroId, goldCost) => {
