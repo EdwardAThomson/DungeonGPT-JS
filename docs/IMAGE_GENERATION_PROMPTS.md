@@ -322,3 +322,27 @@ the paths are already declared in the data.
 | File | Prompt | Priority |
 |---|---|---|
 | `assets/icons/items/frost_flower.webp` | A delicate crystalline flower grown from pale blue ice, its petals formed of clear translucent frost with a faint inner shimmer and dusted with fine snow. Painterly digital fantasy art with rich ice and frost textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | low (Bitter Cold reward drop; reward line shows no icon until generated) |
+
+## Generation queue (2026-07-10, non-quest borrowed item icons)
+
+The dedicated-quest-item sweep above covered the twelve `type: 'quest_item'` borrows.
+This queue covers the NON-quest catalog items (`ITEM_CATALOG`,
+`src/utils/inventorySystem.js`) that also BORROW a single specific sibling's icon rather
+than owning their own art. Each is a clean single-item stand-in (exactly one borrower of
+the target file), now tagged `placeholderIcon: true` so ITEM-05 tracks the debt. The
+borrowed files exist on disk, so `src/data/artIntegrity.test.js` stays green and these are
+NOT pinned in `KNOWN_MISSING_ASSETS`. (Deliberately excluded as legitimately shared art,
+per the ITEM-06 scope note in `src/audits/items.js`: the dragon_scale.webp armor variants
+`scale_mail`/`dragonscale_plate`, and the spell_scroll.webp trio `magic_item`/`magic_scroll`.)
+
+Wiring after generation (a separate, later change): save each file at the path below, then
+repoint that item's `icon:` in `ITEM_CATALOG` from the borrowed file to
+`assets/icons/items/<item_id>.webp` and remove its `placeholderIcon: true` flag. Do NOT
+repoint an icon before its file exists on disk or `artIntegrity.test.js` goes red.
+
+### Item icons (`public/assets/icons/items/`)
+| File | Prompt | Priority |
+|---|---|---|
+| `pine_resin.webp` | A sticky amber lump of fresh pine resin tapped from forest pine, glistening translucent gold with a few flecks of bark and a slow drip caught mid-fall. Painterly digital fantasy art with rich amber and sap textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | low (borrows rare_ingredient.webp; boatwright gather item) |
+| `studded_leather.webp` | A set of studded leather armor, a boiled-leather cuirass reinforced with rows of dark iron rivets and buckled straps, supple and battle-worn. Painterly digital fantasy art with rich leather and iron textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | low (borrows hard_leather.webp; +2 armor) |
+| `hide_armor.webp` | A crude suit of hide armor layered from thick beast pelts and rawhide lashings, fur still on the shoulders, rugged and primal. Painterly digital fantasy art with rich fur and rawhide textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | low (borrows beast_hide.webp; +2 armor) |
