@@ -352,3 +352,45 @@ export const getActiveSiteObjectives = (sideQuests) => {
   });
   return byType;
 };
+
+/**
+ * What each site type must SUPPLY for ACTIVE gather steps, keyed by site type. Parallel to
+ * getActiveSiteObjectives, but for gather steps, which carry a `sites` SOURCE HINT (not a
+ * `site` object) so getActiveSiteObjectives (and thus the injectSiteObjective path) excludes
+ * them. Their item is sourced purely from a site's original harvest nodes, which are consumed
+ * permanently on pickup and never regenerate, so a player who looted the site before taking
+ * the quest is stranded. The site-entry code feeds this to injectHarvestResource to re-supply
+ * the shortfall on the already-cached grid.
+ *
+ * For each (siteType, itemId), needed = MAX over the matching steps of (count - progress),
+ * floored at 0. MAX not SUM: a single pickup credits every matching step (checkSideQuestEvent
+ * advances one step per event, but successive pickups advance the rest), so summing would
+ * over-inject. Every site type listed in a step's `sites` gets that item.
+ * @returns {{ [siteType: string]: Array<{ itemId: string, needed: number }> }}
+ */
+export const getActiveGatherResources = (sideQuests) => {
+  // siteType -> itemId -> needed (max shortfall across matching active steps)
+  const byType = {};
+  getActiveSideQuests(sideQuests).forEach((q) => {
+    q.milestones.forEach((m) => {
+      if (m.completed) return;
+      if (!Array.isArray(m.sites) || m.sites.length === 0) return;
+      const itemId = m.trigger?.item;
+      const count = m.trigger?.count;
+      if (!itemId || !count) return;
+      const needed = Math.max(0, count - (m.progress || 0));
+      if (needed <= 0) return;
+      m.sites.forEach((siteType) => {
+        const items = (byType[siteType] = byType[siteType] || {});
+        items[itemId] = Math.max(items[itemId] || 0, needed);
+      });
+    });
+  });
+  // Normalize to an array of { itemId, needed } per type (array shape mirrors
+  // getActiveSiteObjectives so the site-entry code consumes both the same way).
+  const out = {};
+  Object.keys(byType).forEach((siteType) => {
+    out[siteType] = Object.keys(byType[siteType]).map((itemId) => ({ itemId, needed: byType[siteType][itemId] }));
+  });
+  return out;
+};
