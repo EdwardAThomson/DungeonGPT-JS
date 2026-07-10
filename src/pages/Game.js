@@ -439,7 +439,7 @@ const Game = ({ resumeConversation = null }) => {
     (npcId) => checkMilestoneEvent({ type: 'npc_talked', npcId }, selectedHeroes),
     authReady
   );
-  const { performSave } = useGamePersistence({
+  const { performSave, saveStatus, isSaving } = useGamePersistence({
     sessionId,
     hasAdventureStarted,
     loadedConversation,
@@ -1705,6 +1705,9 @@ const Game = ({ resumeConversation = null }) => {
             });
           }}
           canManualSave={!!sessionId}
+          saveStatus={saveStatus}
+          isSaving={isSaving}
+          signedIn={!!user}
           hasAdventureStarted={hasAdventureStarted}
           isLoading={interactionHook.isLoading}
           onStartAdventure={interactionHook.handleStartAdventure}

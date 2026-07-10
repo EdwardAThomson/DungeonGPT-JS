@@ -8,7 +8,7 @@
 // their local save IS the save).
 
 import { renderHook } from '@testing-library/react';
-import useGamePersistence from './useGamePersistence';
+import useGamePersistence, { deriveSaveIndicatorState } from './useGamePersistence';
 import { PENDING_LOCAL_SAVE_EVENT } from '../game/saveController';
 
 const noopLogger = { debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() };
@@ -154,5 +154,60 @@ describe('reconcile trigger on savedLocal (Phase 2)', () => {
     } finally {
       stop();
     }
+  });
+});
+
+// The always-present sync indicator is a pure surfacing of the performSave ack.
+// These tests pin the mapping from each performSave outcome to the indicator state
+// ('idle' | 'saving' | 'saved' | 'local' | 'error').
+describe('deriveSaveIndicatorState', () => {
+  test("'saved' (durable cloud write) -> 'saved'", () => {
+    expect(deriveSaveIndicatorState('saved', 'idle')).toBe('saved');
+    expect(deriveSaveIndicatorState('saved', 'local')).toBe('saved');
+    expect(deriveSaveIndicatorState('saved', 'error')).toBe('saved');
+  });
+
+  test("'savedLocal' (account-holder fallback) -> 'local'", () => {
+    expect(deriveSaveIndicatorState('savedLocal', 'idle')).toBe('local');
+    expect(deriveSaveIndicatorState('savedLocal', 'saved')).toBe('local');
+  });
+
+  test("'forked' (rev conflict) -> 'error'", () => {
+    expect(deriveSaveIndicatorState('forked', 'saved')).toBe('error');
+  });
+
+  test("'error' (local write-ahead failed) -> 'error'", () => {
+    expect(deriveSaveIndicatorState('error', 'saved')).toBe('error');
+  });
+
+  test("'nochange' keeps a prior 'saved' state", () => {
+    expect(deriveSaveIndicatorState('nochange', 'saved')).toBe('saved');
+  });
+
+  test("'nochange' keeps a prior 'local' state (does not upgrade to cloud)", () => {
+    expect(deriveSaveIndicatorState('nochange', 'local')).toBe('local');
+  });
+
+  test("'nochange' from a fresh load implies a durable save on record -> 'saved'", () => {
+    expect(deriveSaveIndicatorState('nochange', 'idle')).toBe('saved');
+  });
+
+  test("'nochange' never flips a prior 'error' into a red state", () => {
+    // A matched fingerprint means a prior write succeeded, so 'saved' is honest.
+    expect(deriveSaveIndicatorState('nochange', 'error')).toBe('saved');
+  });
+
+  test("'skipped' (nothing to save) preserves whatever was shown", () => {
+    expect(deriveSaveIndicatorState('skipped', 'idle')).toBe('idle');
+    expect(deriveSaveIndicatorState('skipped', 'saved')).toBe('saved');
+    expect(deriveSaveIndicatorState('skipped', 'local')).toBe('local');
+  });
+
+  test('an unknown status preserves the prior state', () => {
+    expect(deriveSaveIndicatorState('something-new', 'saved')).toBe('saved');
+  });
+
+  test('defaults prevState to idle when omitted', () => {
+    expect(deriveSaveIndicatorState('skipped')).toBe('idle');
   });
 });

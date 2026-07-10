@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import SafeMarkdownMessage from './SafeMarkdownMessage';
 import NarrativeHookChips from './NarrativeHookChips';
+import SaveSyncIndicator from './SaveSyncIndicator';
 
 // Player-action length guard (maintainer 2026-07-06): the worker rejects
 // composed prompts over 32k chars, of which the typed action is one slice
@@ -26,6 +27,10 @@ const GameMainPanel = ({
   onOpenSettings,
   onManualSave,
   canManualSave,
+  // Save sync indicator: surfaces the existing save ack (both manual + autosaves).
+  saveStatus = 'idle',
+  isSaving = false,
+  signedIn = false,
   hasAdventureStarted,
   isLoading,
   onStartAdventure,
@@ -86,6 +91,7 @@ const GameMainPanel = ({
             <button onClick={onManualSave} className="manual-save-button" disabled={!canManualSave} aria-label="Save game manually">
               <span aria-hidden="true">💾</span> Save
             </button>
+            <SaveSyncIndicator status={saveStatus} isSaving={isSaving} signedIn={signedIn} />
           </div>
         </div>
       </div>
