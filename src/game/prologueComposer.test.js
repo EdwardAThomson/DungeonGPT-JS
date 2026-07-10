@@ -40,4 +40,19 @@ describe('composeChapterPrologue (in-save chapter divider)', () => {
     expect(text).toContain('**Chapter 2**');
     expect(text).toContain('The party');
   });
+
+  it('names heroes only, no combat-status tags for the healed, fresh party', () => {
+    // The prologue is composed from the party's end-of-last-tier HP, before the
+    // new-campaign heal lands; a fresh adventure must never open on wounds.
+    const wounded = [
+      { heroName: 'Seraphina Evenfall', characterClass: 'Ranger', currentHP: 3, maxHP: 24, isDefeated: false },
+      { heroName: 'Cael Winterbourne', characterClass: 'Barbarian', currentHP: 0, maxHP: 30, isDefeated: true },
+    ];
+    const text = composeChapterPrologue({ spec: t2Spec(), chapter: 2, party: wounded });
+    expect(text).toContain('Seraphina Evenfall (Ranger)');
+    expect(text).toContain('Cael Winterbourne (Barbarian)');
+    expect(text).not.toMatch(/wounded/i);
+    expect(text).not.toMatch(/DEFEATED/i);
+    expect(text).not.toContain('[');
+  });
 });

@@ -1,16 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { getNextCampaignOptions, getPartyLevel } from '../game/campaignChain';
 
-// "Continue your legend" picker (in-save quest chaining). Lists the campaigns the
-// party can take on next, split by geography compatibility with the CURRENT world:
-//   - "Continue here": campaigns whose authored locations all resolve on this
-//     world map; picking one continues INSIDE this save (same world, same journal).
-//   - "Requires a new adventure": campaigns set in different lands; the entry
-//     hands off to New Game with the template preselected.
-// Same-genre next tier is recommended first. Premium templates respect the
-// existing entitlements gates (locked styling like NewGame's Premium Adventures).
-// Level-fit is a soft warning, never a block. A plain overlay (like NewGame's
-// template detail modal).
+// "Continue your legend" picker (in-save quest chaining). Offers exactly two kinds
+// of thing after a campaign is finished:
+//   - "Continue this campaign": the ONE natural continuation, this campaign's next
+//     tier. Continues INSIDE this save (same world, same journal) when the world can
+//     host it; otherwise it hands off to New Game with the template preselected.
+//   - "Begin a different adventure": one card PER OTHER campaign (theme), each at
+//     its entry point. These always begin a FRESH world (a normal New Game). No
+//     per-tier listing of other campaigns.
+// Premium templates respect the existing entitlements gates (locked styling like
+// NewGame's Premium Adventures). Level-fit is a soft warning, never a block. A plain
+// overlay (like NewGame's template detail modal).
 //
 // With `celebrate` it doubles as the campaign-complete celebration: trophy header +
 // the pick list, with "Keep exploring" as the dismissal.
@@ -34,6 +35,7 @@ const TierBadge = ({ tier, levelRange }) => (
 
 const OptionCard = ({
   option,
+  variant = 'fresh', // 'continue' = same-campaign next tier; 'fresh' = a different campaign
   partyLevel,
   nextChapter,
   launching,
@@ -42,6 +44,9 @@ const OptionCard = ({
   onPremiumNudge,
 }) => {
   const { template, recommended, premiumLocked, underLeveled, openingAccessible, compatible } = option;
+  // The next tier continues IN THIS SAVE when the world can host it; otherwise it
+  // falls back to a New Game. A different campaign ALWAYS begins fresh (new world).
+  const continueInSave = variant === 'continue' && compatible;
   return (
     <div
       key={template.id}
@@ -101,7 +106,7 @@ const OptionCard = ({
           >
             🔒 Unlock with Premium
           </button>
-        ) : compatible ? (
+        ) : continueInSave ? (
           <button
             onClick={() => onPick(template)}
             disabled={launching}
@@ -114,10 +119,10 @@ const OptionCard = ({
           <button
             onClick={() => onNewAdventure && onNewAdventure(template)}
             disabled={launching}
-            className="secondary-button"
+            className={variant === 'continue' ? 'primary-button' : 'secondary-button'}
             style={{ padding: '6px 16px', fontSize: '0.8rem', fontWeight: 'bold' }}
           >
-            Start as a New Game
+            {variant === 'continue' ? 'Start as a New Game' : 'Start Fresh Adventure'}
           </button>
         )}
       </div>
@@ -139,8 +144,8 @@ const ContinueLegendPicker = ({
 }) => {
   const [localError, setLocalError] = useState('');
 
-  const options = useMemo(
-    () => (isOpen ? getNextCampaignOptions({ settings, party, worldMap }) : []),
+  const { nextTier, freshStarts } = useMemo(
+    () => (isOpen ? getNextCampaignOptions({ settings, party, worldMap }) : { nextTier: null, freshStarts: [] }),
     [isOpen, settings, party, worldMap]
   );
 
@@ -151,8 +156,7 @@ const ContinueLegendPicker = ({
   // by the retired linked-save build.
   const nextChapter = (settings?.currentChapter || settings?.chain?.chapter || 1) + 1;
   const shownError = error || localError;
-  const compatibleOptions = options.filter((o) => o.compatible);
-  const incompatibleOptions = options.filter((o) => !o.compatible);
+  const hasAnything = !!nextTier || freshStarts.length > 0;
 
   const premiumNudge = () =>
     setLocalError('This is a Premium adventure. Premium unlock is coming soon; pick a free adventure to continue.');
@@ -198,8 +202,8 @@ const ContinueLegendPicker = ({
             ⚔️ Continue your legend
           </h3>
           <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            The next campaign continues right here: same world, same journal, and your
-            heroes keep everything they earned, fully rested.
+            Carry on into this campaign's next chapter, or set off on a brand new tale.
+            Either way your heroes keep everything they earned, fully rested.
           </p>
         </div>
 
@@ -209,32 +213,35 @@ const ContinueLegendPicker = ({
             <p style={{ textAlign: 'center', color: 'var(--text)', padding: '30px 0' }}>
               Preparing your next chapter…
             </p>
-          ) : options.length === 0 ? (
+          ) : !hasAnything ? (
             <p style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '30px 0' }}>
               No further campaigns are available yet. More chapters are coming soon!
             </p>
           ) : (
             <>
-              {compatibleOptions.length > 0 && (
+              {nextTier && (
                 <>
-                  <h4 style={{ margin: '0 0 10px', color: 'var(--text)', fontFamily: 'var(--header-font)', fontSize: '0.95rem' }}>
-                    🗺️ Continue here
-                  </h4>
-                  {compatibleOptions.map((option) => (
-                    <OptionCard key={option.template.id} option={option} {...cardProps} />
-                  ))}
-                </>
-              )}
-              {incompatibleOptions.length > 0 && (
-                <>
-                  <h4 style={{ margin: compatibleOptions.length > 0 ? '16px 0 6px' : '0 0 6px', color: 'var(--text)', fontFamily: 'var(--header-font)', fontSize: '0.95rem' }}>
-                    🧭 Requires a new adventure
+                  <h4 style={{ margin: '0 0 4px', color: 'var(--text)', fontFamily: 'var(--header-font)', fontSize: '0.95rem' }}>
+                    🗺️ Continue this campaign
                   </h4>
                   <p style={{ margin: '0 0 10px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                    These tales are set in different lands, so they begin as a fresh world (a normal New Game).
+                    {nextTier.compatible
+                      ? 'The next chapter picks up right here: same world, same journal, your heroes fully rested.'
+                      : 'The next chapter is set in different lands, so it begins as a fresh world (a normal New Game).'}
                   </p>
-                  {incompatibleOptions.map((option) => (
-                    <OptionCard key={option.template.id} option={option} {...cardProps} />
+                  <OptionCard option={nextTier} variant="continue" {...cardProps} />
+                </>
+              )}
+              {freshStarts.length > 0 && (
+                <>
+                  <h4 style={{ margin: nextTier ? '16px 0 6px' : '0 0 6px', color: 'var(--text)', fontFamily: 'var(--header-font)', fontSize: '0.95rem' }}>
+                    🧭 Begin a different adventure
+                  </h4>
+                  <p style={{ margin: '0 0 10px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                    Start another campaign from the beginning. Each is its own tale in a fresh world (a normal New Game).
+                  </p>
+                  {freshStarts.map((option) => (
+                    <OptionCard key={option.template.id} option={option} variant="fresh" {...cardProps} />
                   ))}
                 </>
               )}
