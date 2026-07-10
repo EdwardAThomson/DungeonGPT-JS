@@ -113,7 +113,12 @@ export const storyTemplates = [
                         rewards: { xp: 75, gold: '2d10', items: ['rusty_dagger'] }
                     },
                     rewards: { xp: 50, gold: '1d10', items: [] },
-                    minLevel: 2
+                    // Tier-1 finale: no level gate. A main-quest-focused party
+                    // reaches this boss at level 1 (~175 XP on the main path; level 2
+                    // needs 300), so a minLevel gate here would return level_blocked
+                    // when the boss is beaten and silently soft-lock the campaign.
+                    // Defeating the boss IS the qualification for a combat finale.
+                    minLevel: null
                 }
             ],
             grimnessLevel: 'Noble',
@@ -325,7 +330,12 @@ export const storyTemplates = [
                         rewards: { xp: 75, gold: '2d10', items: ['rusty_dagger'] }
                     },
                     rewards: { xp: 50, gold: '1d10', items: [] },
-                    minLevel: 2
+                    // Tier-1 finale: no level gate. A main-quest-focused party
+                    // reaches this boss at level 1 (~175 XP on the main path; level 2
+                    // needs 300), so a minLevel gate here would return level_blocked
+                    // when the boss is beaten and silently soft-lock the campaign.
+                    // Defeating the boss IS the qualification for a combat finale.
+                    minLevel: null
                 }
             ],
             grimnessLevel: 'Neutral',
@@ -543,7 +553,12 @@ export const storyTemplates = [
                         rewards: { xp: 75, gold: '2d10', items: ['storm_crystal'] }
                     },
                     rewards: { xp: 50, gold: '1d10', items: [] },
-                    minLevel: 2
+                    // Tier-1 finale: no level gate. A main-quest-focused party
+                    // reaches this boss at level 1 (~175 XP on the main path; level 2
+                    // needs 300), so a minLevel gate here would return level_blocked
+                    // when the boss is beaten and silently soft-lock the campaign.
+                    // Defeating the boss IS the qualification for a combat finale.
+                    minLevel: null
                 }
             ],
             grimnessLevel: 'Bleak',
@@ -766,7 +781,12 @@ export const storyTemplates = [
                         rewards: { xp: 50, gold: '1d10', items: ['antidote'] }
                     },
                     rewards: { xp: 50, gold: '1d10', items: [] },
-                    minLevel: 2
+                    // Tier-1 finale: no level gate. A main-quest-focused party
+                    // reaches this boss at level 1 (~175 XP on the main path; level 2
+                    // needs 300), so a minLevel gate here would return level_blocked
+                    // when the boss is beaten and silently soft-lock the campaign.
+                    // Defeating the boss IS the qualification for a combat finale.
+                    minLevel: null
                 }
             ],
             grimnessLevel: 'Grim',
@@ -957,7 +977,12 @@ export const storyTemplates = [
                         rewards: { xp: 75, gold: '2d10', items: ['rare_ore'] }
                     },
                     rewards: { xp: 50, gold: '1d10', items: [] },
-                    minLevel: 2
+                    // Tier-1 finale: no level gate. A main-quest-focused party
+                    // reaches this boss at level 1 (~175 XP on the main path; level 2
+                    // needs 300), so a minLevel gate here would return level_blocked
+                    // when the boss is beaten and silently soft-lock the campaign.
+                    // Defeating the boss IS the qualification for a combat finale.
+                    minLevel: null
                 }
             ],
             grimnessLevel: 'Neutral',
@@ -1155,7 +1180,12 @@ export const storyTemplates = [
                         rewards: { xp: 75, gold: '2d10', items: ['ritual_dagger'] }
                     },
                     rewards: { xp: 50, gold: '1d10', items: [] },
-                    minLevel: 2
+                    // Tier-1 finale: no level gate. A main-quest-focused party
+                    // reaches this boss at level 1 (~175 XP on the main path; level 2
+                    // needs 300), so a minLevel gate here would return level_blocked
+                    // when the boss is beaten and silently soft-lock the campaign.
+                    // Defeating the boss IS the qualification for a combat finale.
+                    minLevel: null
                 }
             ],
             grimnessLevel: 'Bleak',
