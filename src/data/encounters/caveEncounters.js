@@ -50,6 +50,38 @@ export const CAVE_ENCOUNTERS = {
     }
   },
 
+  // Level-matched filler (#combat-tuning): a MEDIUM immediate cave fight so a
+  // low-level party drawing a random wilderness slot meets a fair foe instead of
+  // the hard spider nest / deadly guardian. Selected by party level in
+  // sitePopulator (never for quest/milestone bosses). Explicit `dc` pins the
+  // sim-validated ~30-90% mid-gear band without inventing a new difficulty label.
+  'cave_giant_rats': {
+    name: 'Giant Rat Pack',
+    icon: '🐀',
+    encounterTier: 'immediate',
+    poiType: 'cave',
+    description: 'A scrabbling tide of dog-sized rats pours out of a side tunnel, teeth bared!',
+    image: '/assets/encounters/cave_bats.webp',
+    difficulty: 'medium',
+    dc: 17,
+    dealsDamage: true,
+    multiRound: true,
+    enemyHP: 40,
+    suggestedActions: [
+      { label: 'Attack', skill: 'Athletics', description: 'Cut through the pack' },
+      { label: 'Hold the Line', skill: 'Athletics', description: 'Fight them off at a chokepoint' },
+      { label: 'Dodge', skill: 'Acrobatics', description: 'Stay clear of the swarm' },
+      { label: 'Drive Off', skill: 'Intimidation', description: 'Scare them back into the dark' }
+    ],
+    rewards: { xp: 45, gold: '1d10', items: ['bat_guano:50%', 'raw_gems:30%'] },
+    consequences: {
+      criticalSuccess: 'You scatter the pack and find a gnawed pouch of coin among the nests.',
+      success: 'You beat the rats back and press on.',
+      failure: 'The rats nip and bite before fleeing, leaving you scratched.',
+      criticalFailure: 'The swarm overwhelms you - you retreat bleeding and short of supplies.'
+    }
+  },
+
   'cave_spider_nest': {
     name: 'Spider Nest',
     icon: '🕷️',

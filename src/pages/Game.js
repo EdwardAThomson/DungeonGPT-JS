@@ -1114,7 +1114,7 @@ const Game = ({ resumeConversation = null }) => {
         // enemy_defeated with the right id and the milestone completes.
         openEncounterAction({ encounter: { ...boss.encounter, enemyId: boss.enemyId } });
       } : null,
-      onEnterLocation: () => mapHook.handleEnterLocation(poiEncounter, interactionHook.setConversation, interactionHook.conversation),
+      onEnterLocation: () => mapHook.handleEnterLocation(poiEncounter, interactionHook.setConversation, interactionHook.conversation, effectivePartyLevel(selectedHeroes)),
       onViewMap: () => mapHook.setIsMapModalOpen(true)
     });
     return true;
