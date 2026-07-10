@@ -1361,6 +1361,11 @@ const Game = ({ resumeConversation = null }) => {
     );
     if (!milestone) return; // already completed / not active — no-op (button shouldn't render)
 
+    // Close the town map (and the building/NPC modal nested inside it) so the player is
+    // returned to the Adventure Log, where the milestone-completion message and the AI
+    // meeting narration land. Without this the response resolves silently behind the map.
+    mapHook.setIsMapModalOpen(false);
+
     checkMilestoneEvent({ type: 'npc_talked', npcId }, selectedHeroes);
     setTimeout(() => performSave(), 500);
 
