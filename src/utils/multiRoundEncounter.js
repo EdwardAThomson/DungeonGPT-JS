@@ -281,11 +281,13 @@ export const resolveRound = async (roundState, playerAction, rng = Math.random) 
     updatedState.playerAdvantage += 1;
   } else if (result.outcomeTier === 'failure') {
     enemyDamage = ENEMY_DAMAGE_BY_OUTCOME.failure;
-    updatedState.enemyMorale += 10;
+    // A player miss no longer RAISES enemy morale: morale starts and caps at 100, so
+    // the old +10/+20 nudge was a no-op that only made a losing streak feel worse and
+    // clawed back morale the player had chipped off. Morale falls only with real HP
+    // loss (below) and toward the rout-win path; a miss just costs the player advantage.
     updatedState.playerAdvantage -= 1;
   } else if (result.outcomeTier === 'criticalFailure') {
     enemyDamage = ENEMY_DAMAGE_BY_OUTCOME.criticalFailure;
-    updatedState.enemyMorale += 20;
     updatedState.playerAdvantage -= 2;
   }
 
@@ -293,8 +295,8 @@ export const resolveRound = async (roundState, playerAction, rng = Math.random) 
   updatedState.enemyCurrentHP = Math.max(0, updatedState.enemyCurrentHP - enemyDamage);
 
   // Morale loss tracks the HP fraction actually removed (a 300 HP horror does not
-  // rout because of two lucky hits; a goblin band breaks when gutted). Failure
-  // tiers still RESTORE morale (+10/+20 above).
+  // rout because of two lucky hits; a goblin band breaks when gutted). Failures do
+  // not restore morale (that backwards nudge was removed); morale only ever falls.
   if (enemyDamage > 0 && updatedState.enemyMaxHP > 0) {
     updatedState.enemyMorale -= Math.round((enemyDamage / updatedState.enemyMaxHP) * 100);
   }
