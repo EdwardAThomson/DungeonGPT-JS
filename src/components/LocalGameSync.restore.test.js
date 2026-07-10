@@ -32,7 +32,7 @@ jest.mock('../contexts/AuthContext', () => ({
 }));
 
 jest.mock('../services/conversationsApi', () => ({
-  conversationsApi: { save: jest.fn(), getById: jest.fn() },
+  conversationsApi: { save: jest.fn(), getById: jest.fn(), reconcileLocalRow: jest.fn() },
   forkLocalTimeline: jest.fn(),
 }));
 
@@ -67,6 +67,9 @@ beforeEach(() => {
   mockAuthEvents.callback = null;
   conversationsApi.getById.mockRejectedValue(new Error('404'));
   conversationsApi.save.mockResolvedValue({ storage: 'cloud' });
+  // The pass now delegates the per-row divergence check + upload/fork to the
+  // serialized reconcileLocalRow; an unsynced row uploads cleanly by default.
+  conversationsApi.reconcileLocalRow.mockResolvedValue({ status: 'uploaded' });
   localGameStore.remove.mockResolvedValue({ success: true });
 });
 

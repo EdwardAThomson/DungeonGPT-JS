@@ -770,6 +770,287 @@ describe('save serialization: same-device races do not false-fork (§6.1)', () =
   });
 });
 
+// SAVE_SYNC_PLAN §6.1/§6.2 data-loss hardening: the reconcile pass is serialized
+// under the SAME per-session queue as save() and re-reads the cloud rev fresh, so a
+// device's own in-flight R->R+1 can never be mistaken for a cross-device divergence;
+// after a genuine fork the player is never stranded on the ancestor (resume follows
+// origId -> parkedId); and a user-set saveName survives autosave + reconcile + fork.
+describe('reconcileLocalRow serialization, resume-after-fork, rename persistence (§6.1/§6.2)', () => {
+  const sessionAlways = () =>
+    getSession.mockResolvedValue({ data: { session: { access_token: 'tok' } } });
+
+  const postBodies = () =>
+    apiFetch.mock.calls
+      .filter(([, options]) => options?.method === 'POST')
+      .map(([, options]) => JSON.parse(options.body));
+
+  const parkedPost = () => postBodies().find((b) => /-local-/.test(b.sessionId || ''));
+
+  let ts = 0;
+  const nextTs = () => new Date(1_700_000_000_000 + (ts += 1000)).toISOString();
+
+  // Snake_case cloud/local row from a camelCase save payload (the persisted fields
+  // the assertions read back).
+  const bodyToRow = (body) => ({
+    conversation_name: body.conversationName ?? null,
+    conversation_data: body.conversation ?? body.conversationData ?? [],
+    game_settings: body.gameSettings ?? body.game_settings ?? null,
+    summary: body.currentSummary ?? null,
+    updated_at: nextTs(),
+  });
+
+  // A stateful, per-id cloud backend that mirrors the worker's rev-guarded upsert:
+  // a brand-new id INSERTs at rev 1; an UPDATE with a matching expectedRev bumps
+  // rev, a mismatch 409s with the current rev, and a missing expectedRev is an
+  // unconditional bump. GET returns the row (404 when absent). advance() simulates
+  // a DIFFERENT device writing the row out of band.
+  const installStatefulBackend = (seed = {}) => {
+    const rows = new Map();
+    for (const [sid, row] of Object.entries(seed)) rows.set(sid, { updated_at: nextTs(), ...row });
+    apiFetch.mockImplementation(async (path, options = {}) => {
+      const method = options.method || 'GET';
+      if (method === 'GET') {
+        const sid = path.split('/').pop();
+        const row = rows.get(sid);
+        if (!row) return { ok: false, status: 404, json: async () => ({ error: 'not found' }) };
+        return { ok: true, json: async () => ({ session_id: sid, sessionId: sid, ...row }) };
+      }
+      if (method === 'POST') {
+        const body = JSON.parse(options.body);
+        const sid = body.sessionId || body.session_id;
+        const existing = rows.get(sid);
+        if (!existing) {
+          rows.set(sid, { ...bodyToRow(body), rev: 1 });
+          return { ok: true, json: async () => ({ session_id: sid, sessionId: sid, rev: 1 }) };
+        }
+        if ('expectedRev' in body && body.expectedRev !== existing.rev) {
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({ code: 'rev_conflict', rev: existing.rev, updated_at: existing.updated_at }),
+          };
+        }
+        const rev = existing.rev + 1;
+        rows.set(sid, { ...existing, ...bodyToRow(body), rev });
+        return { ok: true, json: async () => ({ session_id: sid, sessionId: sid, rev }) };
+      }
+      return { ok: true, json: async () => ({ success: true }) };
+    });
+    return { rows, advance: (sid) => { const r = rows.get(sid); if (r) r.rev += 1; } };
+  };
+
+  // A stateful IndexedDB-shaped local store: preserves base_rev across rewrites
+  // (unless an explicit opts.baseRev supersedes it), and markSynced advances the
+  // row's base_rev even when the ifUpdatedAt guard skips the synced flip.
+  const installStatefulLocalStore = () => {
+    const rows = new Map();
+    localGameStore.save.mockImplementation(async (payload, opts = {}) => {
+      const sid = payload.sessionId || payload.session_id;
+      const existing = rows.get(sid);
+      const row = {
+        session_id: sid,
+        conversation_name: payload.conversationName ?? existing?.conversation_name ?? null,
+        conversation_data: payload.conversation ?? existing?.conversation_data ?? [],
+        game_settings: payload.gameSettings ?? existing?.game_settings ?? null,
+        updated_at: nextTs(),
+        synced: typeof opts.synced === 'boolean' ? opts.synced : existing?.synced,
+      };
+      if (Number.isInteger(opts.baseRev) && opts.baseRev >= 0) row.base_rev = opts.baseRev;
+      else if (existing && Number.isInteger(existing.base_rev)) row.base_rev = existing.base_rev;
+      if (opts.pendingCloudSync || existing?.pending_cloud_sync) row.pending_cloud_sync = true;
+      rows.set(sid, row);
+      return { ...row };
+    });
+    localGameStore.getById.mockImplementation(async (sid) => {
+      const r = rows.get(sid);
+      return r ? { ...r } : null;
+    });
+    localGameStore.markSynced.mockImplementation(async (sid, { ifUpdatedAt, baseRev } = {}) => {
+      const r = rows.get(sid);
+      if (!r) return null;
+      const applyRev = Number.isInteger(baseRev) && baseRev >= 0;
+      if (ifUpdatedAt && r.updated_at !== ifUpdatedAt) {
+        if (applyRev) { r.base_rev = baseRev; rows.set(sid, r); }
+        return null;
+      }
+      r.synced = true;
+      if (applyRev) r.base_rev = baseRev;
+      delete r.pending_cloud_sync;
+      rows.set(sid, r);
+      return { ...r };
+    });
+    localGameStore.remove.mockImplementation(async (sid) => { rows.delete(sid); return { success: true }; });
+    return { rows, seed: (sid, row) => rows.set(sid, { session_id: sid, ...row }) };
+  };
+
+  beforeEach(() => {
+    ts = 0;
+    localStorage.removeItem('activeGameSessionId');
+    localStorage.removeItem('dungeongpt:fork-redirects');
+  });
+
+  test('reconcile-pass race: a live save committing R->R+1 concurrent with a reconcile does NOT fork', async () => {
+    sessionAlways();
+    installStatefulBackend({ s1: { rev: 5, conversation_name: 'Adventure', game_settings: { saveName: 'Adventure' } } });
+    const store = installStatefulLocalStore();
+
+    await conversationsApi.getById('s1');           // adopt cloud rev 5 -> sessionBaseRev = 5
+    store.seed('s1', { synced: false, base_rev: 5, conversation_name: 'Adventure', game_settings: { saveName: 'Adventure' }, updated_at: nextTs() });
+    localStorage.setItem('activeGameSessionId', 's1');
+    apiFetch.mockClear();
+
+    // Fire a save and a reconcile pass WITHOUT awaiting the save first: the classic
+    // window the bug exploited. Serialization orders them on the shared 's1' queue,
+    // so the reconcile decides only AFTER the save settled (rev 6, row re-marked).
+    const pSave = conversationsApi.save({ sessionId: 's1', conversationName: 'Adventure', gameSettings: { saveName: 'Adventure' } });
+    const pRec = conversationsApi.reconcileLocalRow('s1', { isLive: true });
+    const [rSave, rRec] = await Promise.all([pSave, pRec]);
+
+    expect(rSave.storage).toBe('cloud');
+    expect(rSave.forked).toBeUndefined();
+    // The reconcile did NOT fork: no parked copy, the live shadow was never dropped.
+    expect(rRec.status).not.toBe('forked');
+    expect(parkedPost()).toBeUndefined();
+    expect(store.rows.has('s1')).toBe(true);
+  });
+
+  test('reconcile does not false-fork when the local markSynced write lagged (sessionBaseRev is the backstop)', async () => {
+    sessionAlways();
+    const backend = installStatefulBackend({ s1: { rev: 5, game_settings: { saveName: 'Adventure' } } });
+    const store = installStatefulLocalStore();
+
+    await conversationsApi.getById('s1'); // sessionBaseRev = 5
+    store.seed('s1', { synced: false, base_rev: 5, game_settings: { saveName: 'Adventure' }, updated_at: nextTs() });
+    localStorage.setItem('activeGameSessionId', 's1');
+
+    // A push commits 5->6 and advances sessionBaseRev, but every local markSynced
+    // write fails: the row is stranded at base_rev 5 while the cloud sits at 6.
+    localGameStore.markSynced.mockRejectedValue(new Error('IDB write failed'));
+    await conversationsApi.save({ sessionId: 's1', gameSettings: { saveName: 'Adventure' } });
+    expect(backend.rows.get('s1').rev).toBe(6);
+    expect(store.rows.get('s1').base_rev).toBe(5); // the lagged local lineage
+
+    apiFetch.mockClear();
+    // Pre-fix this reconcile read 6 > 5 and false-forked. Now knownBaseRev takes the
+    // greater of the row's base_rev (5) and sessionBaseRev (6), so 6 > 6 is false.
+    const rRec = await conversationsApi.reconcileLocalRow('s1', { isLive: true });
+
+    expect(rRec.status).toBe('uploaded');
+    expect(parkedPost()).toBeUndefined();
+  });
+
+  test('reconcile forks on a GENUINE other-device advance (real divergence still detected)', async () => {
+    sessionAlways();
+    const backend = installStatefulBackend({ s1: { rev: 5, conversation_name: 'Adventure', game_settings: { saveName: 'Adventure' } } });
+    const store = installStatefulLocalStore();
+
+    await conversationsApi.getById('s1'); // sessionBaseRev = 5
+    store.seed('s1', { synced: false, base_rev: 5, conversation_name: 'Adventure', game_settings: { saveName: 'Adventure' }, updated_at: nextTs() });
+
+    backend.advance('s1'); // another device: rev 5 -> 6, no local sync here
+    apiFetch.mockClear();
+
+    const rRec = await conversationsApi.reconcileLocalRow('s1', { isLive: false });
+
+    expect(rRec.status).toBe('forked');
+    expect(rRec.parkedSessionId).toMatch(/^s1-local-[a-z0-9]+$/);
+    expect(parkedPost()).toBeDefined();
+    expect(store.rows.has('s1')).toBe(false); // the local shadow was dropped
+  });
+
+  test('reconcile uploads under the same id when the cloud copy is absent (guest-to-account) and prunes when non-live', async () => {
+    sessionAlways();
+    const backend = installStatefulBackend(); // no cloud rows
+    const store = installStatefulLocalStore();
+    store.seed('s1', { synced: false, conversation_name: 'Adventure', game_settings: { saveName: 'Adventure' }, updated_at: nextTs() });
+
+    const rRec = await conversationsApi.reconcileLocalRow('s1', { isLive: false });
+
+    expect(rRec.status).toBe('uploaded');
+    expect(backend.rows.has('s1')).toBe(true);   // uploaded under the SAME id
+    expect(store.rows.has('s1')).toBe(false);    // non-live copy pruned after the push
+    expect(parkedPost()).toBeUndefined();
+  });
+
+  test('resume-after-fork: a fork repoints the resume pointer and getById loads the PARKED copy, not the ancestor', async () => {
+    sessionAlways();
+    const backend = installStatefulBackend({
+      s1: { rev: 5, conversation_name: 'Dragons - 7/9/2026', conversation_data: [{ role: 'user', content: 'ANCESTOR' }], game_settings: { saveName: 'Dragons' } },
+    });
+    const store = installStatefulLocalStore();
+
+    await conversationsApi.getById('s1'); // sessionBaseRev = 5
+    store.seed('s1', { synced: false, base_rev: 5, conversation_name: 'Dragons - 7/9/2026', conversation_data: [{ role: 'user', content: 'MY PROGRESS' }], game_settings: { saveName: 'Dragons' }, updated_at: nextTs() });
+    localStorage.setItem('activeGameSessionId', 's1');
+
+    backend.advance('s1'); // another device advances the ancestor: 5 -> 6
+
+    const forkResult = await conversationsApi.save({
+      sessionId: 's1',
+      conversationName: 'Dragons - 7/9/2026',
+      conversation: [{ role: 'user', content: 'MY PROGRESS' }],
+      gameSettings: { saveName: 'Dragons' },
+    });
+
+    expect(forkResult.forked).toBe(true);
+    const parkedId = forkResult.parkedSessionId;
+    // The resume pointer now targets the parked copy, so a reload rehydrates THIS
+    // device's progress, never the abandoned ancestor.
+    expect(localStorage.getItem('activeGameSessionId')).toBe(parkedId);
+
+    // Resume = GameResumeGate reads activeGameSessionId then getById(it).
+    const resumed = await conversationsApi.getById(localStorage.getItem('activeGameSessionId'));
+    expect(resumed.conversation_data).toEqual([{ role: 'user', content: 'MY PROGRESS' }]);
+    expect(resumed.conversation_data).not.toEqual([{ role: 'user', content: 'ANCESTOR' }]);
+    // Fix 6: the user-set root survived the fork onto the parked copy.
+    expect(resumed.game_settings.saveName).toBe('Dragons');
+    expect(resumed.conversation_name).toMatch(/^Dragons - 7\/9\/2026 \(diverged on this device, .+\)$/);
+  });
+
+  test('rename persistence: a user-set saveName survives an autosave + a reconcile pass + a fork', async () => {
+    sessionAlways();
+    const backend = installStatefulBackend({ s1: { rev: 5, conversation_name: 'Dragons - d', game_settings: { saveName: 'Dragons' } } });
+    const store = installStatefulLocalStore();
+
+    await conversationsApi.getById('s1'); // sessionBaseRev = 5
+    localStorage.setItem('activeGameSessionId', 's1');
+
+    // 1. Autosave with the user-set root.
+    await conversationsApi.save({ sessionId: 's1', conversationName: 'Dragons - d', gameSettings: { saveName: 'Dragons' } });
+    expect(backend.rows.get('s1').game_settings.saveName).toBe('Dragons');
+
+    // 2. A reconcile pass with no divergence must not disturb the name.
+    const rRec = await conversationsApi.reconcileLocalRow('s1', { isLive: true });
+    expect(rRec.status).not.toBe('forked');
+    expect(backend.rows.get('s1').game_settings.saveName).toBe('Dragons');
+
+    // 3. Another device advances the ancestor -> the next save forks; the parked
+    //    copy must carry the user's root (plus the diverged suffix), not lose it.
+    backend.advance('s1');
+    const forkResult = await conversationsApi.save({ sessionId: 's1', conversationName: 'Dragons - d', gameSettings: { saveName: 'Dragons' } });
+    expect(forkResult.forked).toBe(true);
+
+    const resumed = await conversationsApi.getById(localStorage.getItem('activeGameSessionId'));
+    expect(resumed.game_settings.saveName).toBe('Dragons');
+    expect(resumed.conversation_name).toMatch(/Dragons.*\(diverged on this device, .+\)$/);
+  });
+
+  test('persisted redirect survives a simulated reload: a fresh in-memory map still steers origId -> parked', async () => {
+    sessionAlways();
+    const backend = installStatefulBackend({ s1: { rev: 5, game_settings: { saveName: 'Adventure' } } });
+    const store = installStatefulLocalStore();
+    await conversationsApi.getById('s1');
+    store.seed('s1', { synced: false, base_rev: 5, game_settings: { saveName: 'Adventure' }, updated_at: nextTs() });
+    localStorage.setItem('activeGameSessionId', 's1');
+    backend.advance('s1');
+    const forkResult = await conversationsApi.save({ sessionId: 's1', gameSettings: { saveName: 'Adventure' } });
+
+    // The redirect was mirrored to localStorage (survives a reload's fresh module load).
+    const persisted = JSON.parse(localStorage.getItem('dungeongpt:fork-redirects'));
+    expect(persisted.s1.sessionId).toBe(forkResult.parkedSessionId);
+  });
+});
+
 describe('auth-check hardening (failed getSession is not "guest")', () => {
   test('throw after a confirmed sign-in: routes local but stamps pending, last known state kept', async () => {
     sessionPresent();
