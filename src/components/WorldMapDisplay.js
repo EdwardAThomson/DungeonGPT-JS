@@ -310,6 +310,10 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
     // POI sprite overlay (town/forest/mountain/hills/cave_entrance/ruins/milestone)
     const poi = (isMilestoneHidden || isSiteHidden) ? null : poiSprite(tile);
 
+    // A revealed milestone POI (objective) gets a warm glowing border for findability,
+    // mirroring the town quest-building glow. Hidden (locked) POIs stay unmarked.
+    const isVisibleMilestonePoi = !!tile.milestonePoi && !isMilestoneHidden;
+
     // Collect a name label for this tile if applicable
     const labelText = tile.townName
       || (tile.mountainName && tile.isFirstMountainInRange ? tile.mountainName : null)
@@ -326,7 +330,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
     return (
       <div
         key={`${tile.x}-${tile.y}`}
-        className={`map-tile ${isPlayerHere ? 'player-tile' : ''} ${!tile.isExplored ? 'unexplored' : ''}`}
+        className={`map-tile ${isPlayerHere ? 'player-tile' : ''} ${!tile.isExplored ? 'unexplored' : ''} ${isVisibleMilestonePoi ? 'milestone-poi-tile' : ''}`}
         style={{
           backgroundImage: biomeBackground(tile, tile.x, tile.y),
           backgroundSize: 'cover',
