@@ -116,9 +116,12 @@ describe('worldMoveController', () => {
     expect(bare.name).toBe('Goblin Hideout');
   });
 
-  it('names mountain tiles by their range ("the Grey Moors", not "the Mountains")', () => {
+  it('names mountain tiles by their range ("The Grey Moors", not "the Mountains")', () => {
     const named = buildPoiEncounter({ poi: 'mountain', poiType: 'mountain', mountainName: 'Grey Moors' });
-    expect(named.name).toBe('the Grey Moors');
+    expect(named.name).toBe('The Grey Moors');
+    // An authored range name that already carries its article is not doubled.
+    const preArticled = buildPoiEncounter({ poi: 'mountain', poiType: 'mountain', mountainName: 'The Rimefang Peaks' });
+    expect(preArticled.name).toBe('The Rimefang Peaks');
     // Unnamed mountains keep the generic label.
     const generic = buildPoiEncounter({ poi: 'mountain', poiType: 'mountain' });
     expect(generic.name).toBe('the Mountains');

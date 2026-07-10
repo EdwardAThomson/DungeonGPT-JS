@@ -177,6 +177,36 @@
   }
 }
 
+/* Visible milestone POI findability. Mirrors the warm amber glow the town quest
+ * building uses (feat/town quest-building findability): a revealed objective POI on
+ * the world map pulses a warm glowing border so the player can spot it among the
+ * biome tiles. Pure view layer, keyed only off the tile being a visible milestone
+ * POI, so it is retroactive on every save. */
+.map-tile.milestone-poi-tile {
+  z-index: 3;
+  border-radius: 3px;
+  animation: milestone-poi-glow 1.6s ease-in-out infinite;
+}
+
+@keyframes milestone-poi-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 3px 1px rgba(255, 210, 90, 0.65), inset 0 0 4px rgba(255, 210, 90, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 10px 4px rgba(255, 225, 130, 0.95), inset 0 0 7px rgba(255, 225, 130, 0.75);
+  }
+}
+
+/* Respect reduced-motion: keep a steady warm border, drop the pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .map-tile.milestone-poi-tile {
+    animation: none;
+    box-shadow: 0 0 6px 2px rgba(255, 218, 110, 0.85), inset 0 0 5px rgba(255, 218, 110, 0.6);
+  }
+}
+
 @keyframes bounce-in {
   0% {
     transform: scale(0) translateY(-20px);

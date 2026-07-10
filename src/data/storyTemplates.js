@@ -500,7 +500,7 @@ export const storyTemplates = [
                 },
                 {
                     id: 3,
-                    text: 'Climb to the wraith\'s lair among the Rimefang Peaks',
+                    text: 'Seek the wraith\'s lair in the shadow of the Rimefang Peaks',
                     location: 'The Rimefang Peaks',
                     type: 'location',
                     requires: [1, 2],

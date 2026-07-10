@@ -134,7 +134,7 @@ Genre `frozen-frontier`, world biome `snow`. Access: member / premium biome. Sha
 |---|---|---|---|---|---|---|
 | 1 | item | Recover the frozen survey ledger from the Hearthmere trading post | - | item: Frostbound Ledger | The Hearthmere Trading Post (warehouse, Hearthmere) | 25 XP / 1d6 |
 | 2 | talk | Win the trust of the pathfinder at Frosthollow | - | npc: Warden Sigrun (Guard) | The Frosthollow Lodge (inn, Frosthollow) | 25 XP / 1d6 / rations |
-| 3 | location | Climb to the wraith's lair among the Rimefang Peaks | 1, 2 | poi: The Glacier Hollow | - | 50 XP / 1d10 |
+| 3 | location | Seek the wraith's lair in the shadow of the Rimefang Peaks | 1, 2 | poi: The Glacier Hollow | - | 50 XP / 1d10 |
 | 4 | combat | Destroy the Hoarfrost Wraith | 3 | enemy: The Hoarfrost Wraith (HP 32, medium) | - | boss loot: storm_crystal (75 XP / 2d10) |
 
 **Parallelism:** M1 (item) and M2 (talk) open immediately. M3 requires [1, 2]; M4 requires [3]. 2 parallel openers, then a chain.
