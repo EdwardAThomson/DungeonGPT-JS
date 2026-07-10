@@ -89,19 +89,26 @@ describe('geography compatibility (data-driven)', () => {
     expect(isTemplateCompatibleWithWorld(t2(), [])).toBe(false);
   });
 
-  it('getNextCampaignOptions flags compatibility and still recommends the next tier', () => {
+  it('offers the same-campaign next tier as the continuation, other campaigns as fresh starts', () => {
     const { launch, settings } = completedT1Save();
-    const options = getNextCampaignOptions({ settings, party: party(), worldMap: launch.mapData });
-    const byId = Object.fromEntries(options.map((o) => [o.template.id, o]));
-    expect(options[0].template.id).toBe('heroic-fantasy-t2');
-    expect(options[0].recommended).toBe(true);
-    expect(byId['heroic-fantasy-t2'].compatible).toBe(true);
-    expect(byId['grimdark-survival-t1'].compatible).toBe(false);
-    // excluded: the completed campaign and comingSoon stubs
-    expect(byId['heroic-fantasy-t1']).toBeUndefined();
-    expect(byId['heroic-fantasy-t3']).toBeUndefined();
-    // premium stays listed but locked
-    expect(byId['desert-expedition-t1'].premiumLocked).toBe(true);
+    const { nextTier, freshStarts } = getNextCampaignOptions({ settings, party: party(), worldMap: launch.mapData });
+    // The ONE continuation: this campaign's next tier, in-save compatible.
+    expect(nextTier).not.toBeNull();
+    expect(nextTier.template.id).toBe('heroic-fantasy-t2');
+    expect(nextTier.recommended).toBe(true);
+    expect(nextTier.compatible).toBe(true);
+
+    const freshById = Object.fromEntries(freshStarts.map((o) => [o.template.id, o]));
+    // Other campaigns appear ONCE, at their entry point (tier 1); never per-tier.
+    expect(freshById['grimdark-survival-t1']).toBeDefined();
+    expect(freshById['grimdark-survival-t1'].compatible).toBe(false);
+    expect(freshById['grimdark-survival-t2']).toBeUndefined();
+    // Premium stays listed but locked.
+    expect(freshById['desert-expedition-t1'].premiumLocked).toBe(true);
+    // Never the completed campaign's own tiers, its next tier, or comingSoon stubs.
+    expect(freshById['heroic-fantasy-t1']).toBeUndefined();
+    expect(freshById['heroic-fantasy-t2']).toBeUndefined();
+    expect(freshById['heroic-fantasy-t3']).toBeUndefined();
   });
 
   it('buildInSaveContinuation refuses an incompatible template with a helpful error', () => {
@@ -630,16 +637,16 @@ describe('retro house-swap rehomes displaced cached NPCs (playtest 2026-07-04)',
 });
 
 describe('getNextCampaignOptions: openingAccessible (t1-to-t2 bridge, playtest 2026-07-04)', () => {
-  it('marks an under-leveled t2 as accessible when its opening milestone is ungated', () => {
-    const options = getNextCampaignOptions({
-      settings: { storyTemplateId: 'heroic-fantasy-t1' },
+  it('marks an under-leveled next tier as accessible when its opening milestone is ungated', () => {
+    const { nextTier } = getNextCampaignOptions({
+      settings: { templateId: 'heroic-fantasy-t1' },
       party: [{ level: 2 }, { level: 2 }, { level: 2 }],
       worldMap: null
     });
-    const t2 = options.find((o) => o.template.id === 'heroic-fantasy-t2');
-    expect(t2).toBeDefined();
-    expect(t2.underLeveled).toBe(true);
-    expect(t2.openingAccessible).toBe(true);
+    expect(nextTier).not.toBeNull();
+    expect(nextTier.template.id).toBe('heroic-fantasy-t2');
+    expect(nextTier.underLeveled).toBe(true);
+    expect(nextTier.openingAccessible).toBe(true);
   });
 });
 

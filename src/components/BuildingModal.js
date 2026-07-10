@@ -382,12 +382,12 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                                             if (!talkMs) return null;
                                                             return (
                                                                 <button
-                                                                    className="primary-button"
+                                                                    className="primary-button quest-talk-button"
                                                                     onClick={() => onTalkToNpc(npc.milestoneNpcId, npc)}
                                                                     style={{ padding: '4px 12px', fontWeight: 'bold', fontSize: '12px' }}
                                                                     title={talkMs.text}
                                                                 >
-                                                                    💬 Talk
+                                                                    📜 Quest: Talk to {npc.name}
                                                                 </button>
                                                             );
                                                         })()}
@@ -490,12 +490,12 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                     {fallbackTalkMilestones.map(m => (
                                         <button
                                             key={m.id}
-                                            className="primary-button"
+                                            className="primary-button quest-talk-button"
                                             onClick={() => onTalkToNpc(m.trigger.npc, null)}
                                             title={m.text}
                                             style={{ width: '100%', padding: '12px', fontWeight: 'bold', letterSpacing: '1px' }}
                                         >
-                                            💬 Ask for {m.spawn?.name || `the ${m.spawn?.role || 'contact'}`}
+                                            📜 Quest: Ask for {m.spawn?.name || `the ${m.spawn?.role || 'contact'}`}
                                         </button>
                                     ))}
                                 </div>

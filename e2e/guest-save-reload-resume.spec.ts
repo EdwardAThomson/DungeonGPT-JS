@@ -81,6 +81,8 @@ const moveOneTile = async (page: Page) => {
     const b = page.getByRole('button', { name }).first();
     if (await b.isVisible().catch(() => false)) { await b.click().catch(() => {}); break; }
   }
+  // Continue Journey now reopens the world map by design; close it again for a clean state.
+  if (await closeMap.isVisible().catch(() => false)) await closeMap.click();
   await page.waitForTimeout(600);
 };
 

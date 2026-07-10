@@ -484,3 +484,41 @@
   gap: 12px;
   justify-content: center;
 }
+
+/* Milestone 'talk' quest button. The Talk affordance on a milestone NPC (and its
+ * building-level "Ask for..." fallback) fires npc_talked to complete a talk/narrative
+ * quest, but it read as a plain chat button so players missed it. Give it the warm amber
+ * quest accent used by the quest-building glow and the milestone-POI glow (maps.css) so
+ * it clearly reads as the quest action. Label + view only: the npc_talked completion
+ * path is unchanged. */
+.quest-talk-button {
+  background: linear-gradient(135deg, #f0b429, #e8901c);
+  border: 1px solid rgba(255, 210, 90, 0.9);
+  color: #2a1a05;
+  box-shadow: 0 0 6px 1px rgba(255, 210, 90, 0.6);
+  animation: quest-talk-glow 1.6s ease-in-out infinite;
+}
+
+.quest-talk-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ffca3a, #f0a020);
+  color: #2a1a05;
+}
+
+@keyframes quest-talk-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 4px 1px rgba(255, 210, 90, 0.55);
+  }
+
+  50% {
+    box-shadow: 0 0 11px 3px rgba(255, 225, 130, 0.9);
+  }
+}
+
+/* Respect reduced-motion: keep the steady warm accent, drop the pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .quest-talk-button {
+    animation: none;
+    box-shadow: 0 0 6px 2px rgba(255, 218, 110, 0.8);
+  }
+}
