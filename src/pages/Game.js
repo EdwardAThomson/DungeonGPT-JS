@@ -355,8 +355,15 @@ const Game = ({ resumeConversation = null }) => {
 
   // The AI Dungeon Master requires auth; guests play the local mechanical loop
   // (exploration + deterministic combat) and the AI is the sign-in upsell.
-  const { user } = useAuth();
+  // authLoading is true until AuthContext's initial getSession() resolves. During a
+  // reload the Supabase session re-hydrates asynchronously, so `user` is briefly null
+  // even for a signed-in player; treating that window as "guest" would fire the no-AI
+  // opening. We keep aiAvailable a live !!user (guests really do lack AI), but pass
+  // authReady down so the Start Adventure action can defer committing to the guest
+  // path until auth has actually finished loading.
+  const { user, loading: authLoading } = useAuth();
   const aiAvailable = !!user;
+  const authReady = !authLoading;
   // Reopen the map after an encounter that interrupted exploration.
   const reopenMapAfterEncounterRef = useRef(false);
   // Guided tour: advance the in-game coachmarks (Start Adventure -> Map) as the
@@ -401,7 +408,8 @@ const Game = ({ resumeConversation = null }) => {
     // route it through the SAME engine event as the Talk button so rewards/codex/ledger/
     // save/message and idempotency are identical. checkMilestoneEvent is defined below;
     // this wrapper defers the reference so the hoisted binding is used at call time.
-    (npcId) => checkMilestoneEvent({ type: 'npc_talked', npcId }, selectedHeroes)
+    (npcId) => checkMilestoneEvent({ type: 'npc_talked', npcId }, selectedHeroes),
+    authReady
   );
   const { performSave } = useGamePersistence({
     sessionId,
