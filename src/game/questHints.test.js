@@ -80,7 +80,7 @@ describe('getStepHint', () => {
 
   it('site steps point at the revealed map site', () => {
     const step = { site: { type: 'cave' }, trigger: { item: 'silver_locket' }, completed: false };
-    expect(getStepHint(step)).toBe('In a cave — marked on your world map');
+    expect(getStepHint(step)).toBe('In a cave, now revealed on your world map');
   });
 
   it('open bounties say any victory counts', () => {
