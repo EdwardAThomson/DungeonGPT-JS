@@ -72,6 +72,7 @@ what the app sees. Jest runs the same modules directly through its Babel pipelin
 | MS-04 | milestones | error | implemented | Campaign is completable: every milestone reachable through `requires`, final milestone in particular reachable, no orphans. |
 | MS-05 | milestones | error | implemented | No null/undefined in required milestone fields (`id`/`text`/`type` always; type-appropriate `trigger` field + `spawn` for mechanical types). |
 | MS-06 | milestones | warn | implemented | Flags a non-first milestone with empty `requires` (co-active from turn 1) — usually intentional parallel design, so advisory. |
+| MS-07 | milestones | error | implemented | A `minLevel` gate must be reachable on the main-quest path: the XP a party is guaranteed at the gate (cumulative completion XP of every `requires` ancestor, plus the milestone's own boss `encounter.rewards.xp` granted before the gate fires) must meet `XP_THRESHOLDS[minLevel-1]`. Scoped to fresh-start campaigns (`levelRange[0] <= 1`, where the 0-XP baseline is provable); continuation chapters carry unbounded prior XP and are skipped. Side-quest XP is optional and not counted. Catches a finale gated above its own reachable level, which returns `level_blocked` and silently soft-locks the campaign. |
 | ENC-01 | encounters | error | implemented | Every encounter reward item id (in any encounter template's `rewards.items`) exists in `ITEM_CATALOG`. (Encounters-domain restatement of the encounter half of ITEM-01.) |
 | ENC-02 | encounters | error | implemented | Every `template` key in every weighted encounter table (`encounterTables.js`) resolves to a defined `encounterTemplates` entry (`none` exempt); no dangling table keys. |
 | ENC-03 | encounters | warn | implemented | Every encounter has `name`, a visual (`image` OR `icon`), and a valid `difficulty`; environmental encounters carry a `climate` tag (climate-neutral ones allowlisted). |
@@ -193,6 +194,16 @@ these down and shrink the allowlist.
 
 ### Approximations / introspection limits
 
+- **MS-07 reachability is main-quest-only, fresh-start-only**: side-quest and random-
+  encounter XP are optional, so MS-07 counts ONLY the main-quest milestone chain
+  (`requires` ancestors + the milestone's own pre-gate boss XP). It also asserts a gate
+  unreachable ONLY for fresh-start campaigns (`levelRange[0] <= 1`), where the party's
+  starting XP is provably 0. Continuation chapters (tier 2+) enter with unbounded
+  carried XP, so main-quest data alone cannot prove their gates unreachable; those
+  gates are skipped rather than flagged. Consequence: a tier-2+ finale gated above its
+  own main-quest reachable level is NOT caught here (it is covered by the balance-sim
+  world-XP-budget lint, `progressionLint.test.js` guard (d)); a fresh-start finale gated
+  above level 1 with too little main-quest XP IS caught.
 - **MS-02 combat bosses**: there is no global boss/enemy registry to validate a
   combat milestone against — a boss is authored inline in the milestone's `spawn`
   (+ its `encounter` block). MS-02 therefore checks combat coherence *structurally*

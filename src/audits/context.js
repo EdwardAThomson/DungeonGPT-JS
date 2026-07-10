@@ -10,6 +10,7 @@
 
 import { storyTemplates } from '../data/storyTemplates';
 import { ITEM_CATALOG } from '../utils/inventorySystem';
+import { XP_THRESHOLDS } from '../utils/progressionSystem';
 import { encounterTemplates } from '../data/encounters';
 import { BUILDING_TYPES as ART_BUILDING_TYPES } from '../utils/townTileArt';
 import { SHOP_STOCK } from '../data/shopStock';
@@ -314,7 +315,11 @@ export function buildAuditContext() {
   const campaigns = playableTemplates.map((t) => ({
     template: t.id || t.name || 'unknown-template',
     townNames: townNamesOf(t),
-    milestones: milestonesOf(t)
+    milestones: milestonesOf(t),
+    // Entry level band [floor, ceil]. The milestones domain uses the floor to decide
+    // whether a campaign is a fresh start (party provably at 0 XP) versus a
+    // continuation that carries unbounded prior XP. See MS-07.
+    levelRange: Array.isArray(t.levelRange) ? t.levelRange : null
   }));
 
   // Every milestone `building` block, tagged with its campaign's town set so a
@@ -368,8 +373,12 @@ export function buildAuditContext() {
     milestonesOf,
     townNamesOf,
 
+    // Progression thresholds (milestones domain, MS-07 level-gate reachability).
+    // XP_THRESHOLDS[level-1] is the cumulative XP a character needs to BE that level.
+    xpThresholds: XP_THRESHOLDS,
+
     // Campaign view (buildings / npcs / milestones domains)
-    campaigns,            // [{ template, townNames:Set, milestones:[] }]
+    campaigns,            // [{ template, townNames:Set, milestones:[], levelRange }]
     milestoneBuildings,   // [{ template, milestoneId, type, name, location, townNames, loc }]
     npcSpawns,            // [{ template, milestoneId, id, name, role, personality, venueTown, ... }]
 

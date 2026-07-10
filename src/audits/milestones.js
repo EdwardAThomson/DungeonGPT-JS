@@ -286,6 +286,100 @@ const ms06 = {
   }
 };
 
-export const checks = [ms01, ms02, ms03, ms04, ms05, ms06];
+/**
+ * The XP a milestone hands out on completion: its own `rewards.xp` plus, for a
+ * combat milestone, the boss `encounter.rewards.xp`. Both land in the party's
+ * ledger when the milestone completes.
+ */
+function completionXp(m) {
+  const own = m && m.rewards && typeof m.rewards.xp === 'number' ? m.rewards.xp : 0;
+  const boss = m && m.encounter && m.encounter.rewards && typeof m.encounter.rewards.xp === 'number'
+    ? m.encounter.rewards.xp : 0;
+  return own + boss;
+}
+
+/**
+ * The XP already banked at the instant a milestone's own level check fires. For a
+ * combat milestone the boss `encounter.rewards.xp` is granted on defeat, BEFORE the
+ * enemy_defeated event runs the level gate (see checkMilestoneCompletion), so it
+ * counts toward reaching the gate; the milestone's own `rewards.xp` is granted only
+ * AFTER completion, so it does NOT.
+ */
+function preCheckXp(m) {
+  return m && m.encounter && m.encounter.rewards && typeof m.encounter.rewards.xp === 'number'
+    ? m.encounter.rewards.xp : 0;
+}
+
+/** Transitive `requires` ancestors of a milestone (dangling refs / cycles are MS-03's job). */
+function ancestorIds(milestone, byId) {
+  const out = new Set();
+  const stack = [...(Array.isArray(milestone.requires) ? milestone.requires : [])];
+  while (stack.length) {
+    const id = stack.pop();
+    if (out.has(id)) continue;
+    const p = byId.get(id);
+    if (!p) continue; // dangling requirement (reported by MS-03)
+    out.add(id);
+    for (const r of (Array.isArray(p.requires) ? p.requires : [])) stack.push(r);
+  }
+  return out;
+}
+
+/**
+ * MS-07 (error): a milestone's `minLevel` gate must be reachable on the main-quest
+ * path. A milestone whose trigger matches but whose party is below `minLevel`
+ * returns `level_blocked` from checkMilestoneCompletion, the milestone silently
+ * never completes, and the campaign cannot be finished (the tier-1 finale soft-lock).
+ *
+ * REACHABILITY (main-quest-only, side quests excluded): the XP a party is GUARANTEED
+ * to have banked at the gate = the cumulative completion XP of every `requires`
+ * ancestor (each ancestor's `rewards.xp` + boss `encounter.rewards.xp`) plus this
+ * milestone's own boss `encounter.rewards.xp` (granted on defeat, before the gate
+ * fires). If `XP_THRESHOLDS[minLevel-1]` exceeds that, the gate is unreachable.
+ *
+ * SCOPE (fresh-start campaigns only): this asserts unreachability only when the
+ * campaign's entry level is 1 (`levelRange[0] <= 1`), where the party's starting XP
+ * is PROVABLY 0. Continuation chapters (tier 2+, `levelRange[0] > 1`) carry unbounded
+ * XP from the prior chapter, so main-quest data alone cannot prove their gates
+ * unreachable; they are skipped, not passed silently. Side-quest XP is optional and
+ * deliberately not counted (a main-quest-focused player must be able to finish).
+ */
+const ms07 = {
+  id: 'MS-07',
+  domain: DOMAIN,
+  title: 'minLevel gate is reachable on the main-quest path (no silent soft-lock)',
+  severity: SEVERITY.ERROR,
+  run(ctx) {
+    const violations = [];
+    const thresholds = Array.isArray(ctx.xpThresholds) ? ctx.xpThresholds : [];
+    const xpForLevel = (level) => {
+      if (!thresholds.length) return 0;
+      const i = Math.max(0, Math.min(thresholds.length - 1, level - 1));
+      return thresholds[i];
+    };
+    for (const c of ctx.campaigns) {
+      const entryLevel = (c.levelRange && typeof c.levelRange[0] === 'number') ? c.levelRange[0] : 1;
+      // Continuation chapters carry prior-chapter XP; only a fresh start (entry
+      // level 1) has a provably-known 0-XP baseline to reason against.
+      if (entryLevel > 1) continue;
+      const byId = new Map(c.milestones.filter((m) => m && m.id != null).map((m) => [m.id, m]));
+      for (const m of c.milestones) {
+        if (!m || typeof m.minLevel !== 'number' || m.minLevel <= 1) continue;
+        const requiredXp = xpForLevel(m.minLevel);
+        let reachableXp = preCheckXp(m);
+        for (const aid of ancestorIds(m, byId)) reachableXp += completionXp(byId.get(aid));
+        if (requiredXp > reachableXp) {
+          violations.push({
+            message: `milestone ${m.id} gates on minLevel ${m.minLevel} (needs ${requiredXp} XP) but only ${reachableXp} XP is reachable on the main-quest path from a fresh start; defeating it returns level_blocked and silently soft-locks the campaign; set minLevel: null or lower the gate`,
+            location: `${c.template} / milestone ${m.id} (${m.type})`
+          });
+        }
+      }
+    }
+    return violations;
+  }
+};
+
+export const checks = [ms01, ms02, ms03, ms04, ms05, ms06, ms07];
 
 export default checks;
