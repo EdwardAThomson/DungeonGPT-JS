@@ -17,6 +17,17 @@ import {
 
 const dbRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
+// Never let any cache store a DB response. This data is authenticated, per-user, and
+// mutable, so a rename / new save / delete must be visible on the very next request.
+// Without no-store the browser can heuristically cache a list GET and serve it stale
+// until a hard refresh (Cloudflare does not edge-cache authed API traffic, but the
+// browser's own HTTP cache will). no-store is the correct directive for private,
+// always-fresh API data; it applies to every /api/db response (reads and writes).
+dbRoutes.use('*', async (c, next) => {
+  await next();
+  c.header('Cache-Control', 'no-store');
+});
+
 // jsonb columns: postgres.js needs values wrapped in sql.json() on write (it auto-parses on read).
 // Pass through real null as SQL NULL (matches the previous supabase-js behaviour).
 const jsonb = (sql: Sql, v: unknown) => (v === undefined || v === null ? null : sql.json(v as any));
@@ -195,8 +206,19 @@ dbRoutes.get('/conversations', async (c) => {
   try {
     const userId = c.get('userId');
 
+    // The save-list view only needs lightweight metadata (name, settings, party,
+    // timestamps, rev). It must NOT SELECT the heavy jsonb/text columns
+    // (conversation_data, world_map, sub_maps, summary): those are fetched per-save
+    // via getById when a save is actually loaded. Returning full rows for every save
+    // makes the response grow without bound (worsened by diverged-save copies), which
+    // can exceed the Worker response/time limits and fail the whole list, so the
+    // client falls back to showing local saves only. Selecting only the small columns
+    // keeps the list fast and reliable regardless of how many saves exist.
     const rows = await sql`
-      SELECT * FROM conversations
+      SELECT
+        session_id, user_id, conversation_name, game_settings, selected_heroes,
+        player_position, provider, model, timestamp, updated_at, rev
+      FROM conversations
       WHERE user_id = ${userId}
       ORDER BY updated_at DESC`;
 
