@@ -364,6 +364,27 @@ const NewGame = () => {
     // Fresh game session ID for this new game
     localStorage.setItem('activeGameSessionId', launch.gameSessionId);
 
+    // Persist the launch snapshot so a hard reload before the first save cannot lose
+    // the campaign settings (milestones/story/goal/tone). The generated map already
+    // survives a reload because it rides router navigation state; settings otherwise
+    // live only in the in-memory SettingsContext and reset to {} on reload. Game.js
+    // rehydrates from this key when the context is empty and there is no saved row
+    // yet. Prune any earlier launch snapshots first so only the most recent unsaved
+    // launch is ever kept (bounds sessionStorage growth). All access is guarded since
+    // storage can throw in private mode.
+    try {
+      for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
+        const k = sessionStorage.key(i);
+        if (k && k.startsWith('dgpt:launchSettings:')) sessionStorage.removeItem(k);
+      }
+      sessionStorage.setItem(
+        `dgpt:launchSettings:${launch.gameSessionId}`,
+        JSON.stringify(launch.settings)
+      );
+    } catch (e) {
+      logger.warn('Could not persist launch settings snapshot', e);
+    }
+
     setSettings(launch.settings);
     navigate('/hero-selection', { state: { heroes, generatedMap: launch.mapData, worldSeed: launch.worldSeed, gameSessionId: launch.gameSessionId, townMapsCache: launch.townMapsCache } });
   };
