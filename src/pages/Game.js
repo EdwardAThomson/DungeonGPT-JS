@@ -806,6 +806,17 @@ const Game = ({ resumeConversation = null }) => {
       logger.debug(`[MILESTONE] Blocked: #${result.milestoneId} — needs: ${result.unmetRequirements.map(r => r.text).join(', ')}`);
     } else if (result.type === 'level_blocked') {
       logger.debug(`[MILESTONE] Level blocked: #${result.milestoneId} — needs Lv.${result.requiredLevel}, have Lv.${result.currentLevel}`);
+      // Never let a level-gated milestone vanish silently: the trigger matched but the
+      // party is under the required level, so completion returns level_blocked. Surface
+      // a brief player-facing system line instead of only a debug log (mirrors the
+      // milestone celebration path: chat message, plus a site notice when exploring a
+      // site). The gate semantics are unchanged; this only makes them visible.
+      const deedName = result.milestone.spawn?.name || result.milestone.text;
+      const gateMsg = `⚔️ You have bested ${deedName}, but your party must reach level ${result.requiredLevel} before this deed is recognized.`;
+      interactionHook.setConversation(prev => [...prev, { role: 'system', content: gateMsg }]);
+      if (mapHook.isInsideSite) {
+        mapHook.pushSiteNotice(gateMsg);
+      }
     }
     // Callers can chain on the result (e.g. a location completion unlocking a boss
     // fight on the same arrival) — setSettings above is async, so this is the only
