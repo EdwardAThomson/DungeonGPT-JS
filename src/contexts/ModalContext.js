@@ -18,6 +18,10 @@ const MODAL_REGISTRY = {
   saveConfirmation: { layer: 0, group: 'info' },
   building:         { layer: 2, group: 'child', parent: 'map' },
   questOffer:       { layer: 1, group: 'info' },
+  // Item detail view opened from the Adventure Book's Party tab. Child of
+  // `adventureBook` so it layers on top without closing the hub (the 'child'
+  // group has no conflict rule) and is torn down when the hub closes.
+  itemDetail:       { layer: 1, group: 'child', parent: 'adventureBook' },
 };
 
 // --- Conflict Rules ---
