@@ -1,7 +1,8 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { resolveEncounter } from '../utils/encounterResolver';
-import { createMultiRoundEncounter, resolveRound, getRoundActions, generateEncounterSummary, heroSupportContribution } from '../utils/multiRoundEncounter';
+import { createMultiRoundEncounter, resolveRound, getRoundActions, generateEncounterSummary, heroSupportContribution, getSupportBonus } from '../utils/multiRoundEncounter';
 import { applyDamage, getHPStatus } from '../utils/healthSystem';
+import { consumeHealingItem, isHealingConsumable } from '../utils/inventorySystem';
 import { effectiveActionModifier } from '../game/balanceSim';
 import SettingsContext from '../contexts/SettingsContext';
 import ClickableImage from './ClickableImage';
@@ -40,6 +41,13 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
   const [roundResults, setRoundResults] = useState([]);
   const [currentRoundResult, setCurrentRoundResult] = useState(null);
 
+  // In-combat item use (#: heal a hero mid-fight). `pendingItemKey` drives the
+  // two-step picker (pick item -> pick target); `itemUseResult` is the transient
+  // "restored N HP" banner shown until the next action/round.
+  const [showItemPicker, setShowItemPicker] = useState(false);
+  const [pendingItemKey, setPendingItemKey] = useState(null);
+  const [itemUseResult, setItemUseResult] = useState(null);
+
   // Suggest the hero with the highest effective modifier for this encounter as
   // the default lead (Phase 5 auto-assignment; the player can override).
   const suggestLeadIndex = (heroes, enc) => {
@@ -77,6 +85,9 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
         setSelectedAction(null);
         setRoundResults([]);
         setCurrentRoundResult(null);
+        setShowItemPicker(false);
+        setPendingItemKey(null);
+        setItemUseResult(null);
 
         // Determine if we need hero selection
         const needsHeroSelection = party && party.length > 1;
@@ -183,6 +194,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
     }
 
     setSelectedAction(action);
+    setItemUseResult(null);
     setIsResolving(true);
 
     try {
@@ -262,7 +274,114 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
   const handleNextRound = () => {
     setCurrentRoundResult(null);
     setSelectedAction(null);
+    setItemUseResult(null);
     // Don't reset hero selection - keep the same hero through all rounds
+  };
+
+  // The live combat party: the multi-round team while a boss fight is running,
+  // otherwise the passed party (or the lone acting hero for a solo single-round fight).
+  const combatParty = isMultiRound && roundState
+    ? roundState.party
+    : (Array.isArray(party) && party.length > 0 ? party : (currentCharacter ? [currentCharacter] : []));
+
+  const heroUidLocal = (h) => (h && (h.heroId || h.characterId)) || null;
+
+  // Healing consumables available across the (pooled) combat party, aggregated by key.
+  const usableConsumables = (() => {
+    const map = {};
+    combatParty.forEach((h) => (h.inventory || []).forEach((item) => {
+      const key = typeof item === 'string' ? item : (item && item.key);
+      if (!key || !isHealingConsumable(key)) return;
+      const qty = (typeof item === 'object' && item.quantity) ? item.quantity : 1;
+      map[key] = (map[key] || 0) + qty;
+    }));
+    return Object.entries(map).map(([key, quantity]) => ({
+      key, quantity, name: ITEM_CATALOG[key]?.name || key
+    }));
+  })();
+
+  const hasHealableHero = combatParty.some(
+    (h) => h && !h.isDefeated && h.currentHP > 0 && h.currentHP < h.maxHP
+  );
+  const canUseItemInCombat = usableConsumables.length > 0 && hasHealableHero;
+
+  // Use one healing consumable on a chosen hero DURING the fight. Reuses the SHARED
+  // consumeHealingItem path (identical roll/heal/decrement/pooled-owner handling as the
+  // Party inventory picker). In a multi-round fight this SPENDS THE ROUND (the party's
+  // action for the round is the heal, so no attack and no enemy-HP progress that turn);
+  // a single-round encounter has no round to advance, so it just heals + consumes.
+  const handleUseItemInCombat = (itemKey, targetIndex) => {
+    const target = combatParty[targetIndex];
+    if (!target) { setShowItemPicker(false); setPendingItemKey(null); return; }
+    // Owner may differ from target (pooled party inventory); consumeHealingItem removes the
+    // stack from the owner and heals the target.
+    const owner = combatParty.find((h) =>
+      (h.inventory || []).some((i) => (typeof i === 'string' ? i : i && i.key) === itemKey)
+    ) || target;
+
+    const res = consumeHealingItem(itemKey, target, owner);
+    if (!res.ok) { setShowItemPicker(false); setPendingItemKey(null); return; }
+
+    // Persist the healed target (and, if pooled, the owner whose stack shrank) up to
+    // the game state through the modal's existing hero-update path.
+    if (onCharacterUpdate) {
+      onCharacterUpdate(res.healedTarget);
+      if (!res.sameOwner) onCharacterUpdate(res.updatedOwner);
+    }
+
+    if (isMultiRound && roundState) {
+      // Reflect the heal into the live team, then advance the round: using an item is
+      // the round's action (Lead + Support get no attack this turn).
+      const newParty = roundState.party.map((h) => {
+        if (heroUidLocal(h) === heroUidLocal(res.healedTarget)) return res.healedTarget;
+        if (!res.sameOwner && heroUidLocal(h) === heroUidLocal(res.updatedOwner)) return res.updatedOwner;
+        return h;
+      });
+      const nextRound = roundState.currentRound + 1;
+      const advanced = {
+        ...roundState,
+        party: newParty,
+        character: newParty[roundState.leadIndex],
+        currentRound: nextRound,
+        supportBonus: getSupportBonus(newParty, roundState.leadIndex),
+        roundHistory: [
+          ...roundState.roundHistory,
+          {
+            round: roundState.currentRound,
+            action: `Use ${res.itemName}`,
+            leadIndex: roundState.leadIndex,
+            result: { outcomeTier: 'itemUse', narration: `Used ${res.itemName}.` }
+          }
+        ]
+      };
+      // Spending a round can run the fight past its cap -> resolve as a timeout.
+      if (nextRound > advanced.maxRounds) {
+        const bloodied = advanced.enemyCurrentHP <= advanced.enemyMaxHP * 0.25;
+        advanced.isResolved = true;
+        advanced.outcome = (advanced.playerAdvantage > 0 && bloodied) ? 'victory' : 'stalemate';
+      }
+      setRoundState(advanced);
+      setCurrentCharacter(newParty[advanced.leadIndex]);
+      setRoundResults((prev) => [...prev, { round: roundState.currentRound, result: { outcomeTier: `Used ${res.itemName}` } }]);
+      if (advanced.isResolved) {
+        generateEncounterSummary(advanced).then(setResult);
+      }
+    } else {
+      // Single-round / solo fight: no round to spend; sync the acting hero if healed.
+      if (currentCharacter && heroUidLocal(currentCharacter) === heroUidLocal(res.healedTarget)) {
+        setCurrentCharacter(res.healedTarget);
+      }
+    }
+
+    setItemUseResult({
+      heroName: target.heroName || target.characterName || target.name,
+      itemName: res.itemName,
+      healed: res.actualHeal,
+      rolled: res.rolled,
+      spentRound: !!(isMultiRound && roundState)
+    });
+    setShowItemPicker(false);
+    setPendingItemKey(null);
   };
 
   const handleFleeEncounter = () => {
@@ -831,6 +950,29 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
               <>
                 <p className="encounter-description">{encounter.description}</p>
 
+                {/* In-combat item-use result banner (persists until the next action/round). */}
+                {itemUseResult && (
+                  <div style={{
+                    padding: '10px 14px',
+                    margin: '10px 0',
+                    background: 'rgba(39, 174, 96, 0.12)',
+                    border: '1px solid #27ae60',
+                    borderRadius: '6px',
+                    textAlign: 'center'
+                  }}>
+                    <span>
+                      {itemUseResult.itemName} restored{' '}
+                      <strong style={{ color: '#27ae60' }}>{itemUseResult.healed} HP</strong>{' '}
+                      to {itemUseResult.heroName} (rolled {itemUseResult.rolled}).
+                    </span>
+                    {itemUseResult.spentRound && (
+                      <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        Tending wounds spent the party's action this round.
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {isMultiRound && renderCombatStatus()}
 
                 {roundResults.length > 0 && (
@@ -869,6 +1011,21 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                       multi-round encounters. Single-round fights previously offered no flee
                       at all (only fight actions). Both route through handleFleeEncounter, so
                       a successful flee sets outcome:'fled' and disengages via onResolve. */}
+                  {/* Use a healing consumable mid-fight. In a multi-round fight this
+                      spends the round (the heal is the party's action, no attack); a
+                      single-round fight just heals + consumes the item. Shown only when
+                      the party carries a usable consumable AND someone can be healed. */}
+                  {canUseItemInCombat && (
+                    <button
+                      className="secondary-button"
+                      onClick={() => { setPendingItemKey(null); setShowItemPicker(true); }}
+                      disabled={isResolving}
+                      style={{ marginTop: '12px', width: '100%' }}
+                    >
+                      🎒 Use Item{isMultiRound ? ' (uses your action this round)' : ''}
+                    </button>
+                  )}
+
                   {(!isMultiRound || (roundState && !roundState.isResolved)) && (
                     <button
                       className="secondary-button"
@@ -1004,6 +1161,125 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
               Continue Journey
             </button>
           </>
+        )}
+
+        {/* In-combat item picker: a FIXED, centered overlay above the encounter modal
+            (always on screen). Two steps: choose a healing consumable, then a target hero
+            (full-HP / defeated heroes disabled). Reuses the shared consumeHealingItem path. */}
+        {showItemPicker && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Use an item"
+            onClick={() => { setShowItemPicker(false); setPendingItemKey(null); }}
+            style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 4000,
+              padding: '20px'
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: '380px',
+                maxHeight: '80vh',
+                overflowY: 'auto',
+                padding: '20px',
+                background: 'var(--surface)',
+                border: '1px solid #27ae60',
+                borderRadius: '10px',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
+              }}
+            >
+              {!pendingItemKey ? (
+                <>
+                  <h3 style={{ margin: '0 0 12px 0', color: '#27ae60' }}>Use which item?</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {usableConsumables.map((it) => (
+                      <button
+                        key={it.key}
+                        className="secondary-button"
+                        onClick={() => setPendingItemKey(it.key)}
+                        style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}
+                      >
+                        <span>{it.name}</span>
+                        <span style={{ color: 'var(--text-secondary)' }}>x{it.quantity}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3 style={{ margin: '0 0 12px 0', color: '#27ae60' }}>
+                    Use {ITEM_CATALOG[pendingItemKey]?.name || 'item'} on...
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {combatParty.map((hero, idx) => {
+                      const defeated = hero.isDefeated || hero.currentHP <= 0;
+                      const atFull = hero.currentHP >= hero.maxHP;
+                      const disabled = defeated || atFull;
+                      const hpStatus = getHPStatus(hero.currentHP, hero.maxHP);
+                      return (
+                        <button
+                          key={heroUidLocal(hero) || idx}
+                          onClick={() => { if (!disabled) handleUseItemInCombat(pendingItemKey, idx); }}
+                          disabled={disabled}
+                          title={defeated ? 'Defeated' : (atFull ? 'Already at full health' : `Heal ${hero.heroName || hero.characterName}`)}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '10px 14px',
+                            background: 'rgba(0,0,0,0.2)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '6px',
+                            color: 'var(--text)',
+                            cursor: disabled ? 'not-allowed' : 'pointer',
+                            opacity: disabled ? 0.5 : 1
+                          }}
+                        >
+                          <span style={{ fontWeight: 'bold' }}>{hero.heroName || hero.characterName || 'Unknown'}</span>
+                          <span style={{ color: hpStatus.color, fontSize: '0.85rem' }}>
+                            {Math.floor(hero.currentHP)} / {hero.maxHP} HP
+                            {defeated ? ' · Defeated' : (atFull ? ' · Already at full health' : '')}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    className="secondary-button"
+                    onClick={() => setPendingItemKey(null)}
+                    style={{ marginTop: '10px', width: '100%' }}
+                  >
+                    ← Back
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => { setShowItemPicker(false); setPendingItemKey(null); }}
+                style={{
+                  marginTop: '10px',
+                  padding: '8px 14px',
+                  width: '100%',
+                  background: 'none',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         )}
     </ModalShell>
   );

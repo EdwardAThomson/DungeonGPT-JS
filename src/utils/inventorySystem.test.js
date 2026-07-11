@@ -10,7 +10,9 @@ import {
   maxRarityRankForTier,
   isItemAllowedForTier,
   filterDropsByTier,
-  RARITY_RANK
+  RARITY_RANK,
+  consumeHealingItem,
+  isHealingConsumable
 } from './inventorySystem';
 
 describe('food consumables restore HP (were no-ops)', () => {
@@ -24,6 +26,96 @@ describe('food consumables restore HP (were no-ops)', () => {
     expect(item.amount).toBeTruthy();
     const rolled = rollDice(item.amount);
     expect(rolled).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('consumeHealingItem (shared heal-a-consumable path)', () => {
+  // heroId gives each hero a stable identity (heroUid), matching real app heroes.
+  const makeHero = (over = {}) => ({
+    heroId: 'h1',
+    heroName: 'Aria',
+    currentHP: 10,
+    maxHP: 30,
+    inventory: [{ key: 'healing_potion', quantity: 2 }],
+    ...over
+  });
+
+  it('identifies healing consumables', () => {
+    expect(isHealingConsumable('healing_potion')).toBe(true);
+    expect(isHealingConsumable('rations')).toBe(true); // food heals too
+    expect(isHealingConsumable('rope')).toBe(false);
+    expect(isHealingConsumable('not_a_real_item')).toBe(false);
+  });
+
+  it('heals the target by the (injected) rolled amount and decrements the stack by 1', () => {
+    const hero = makeHero();
+    const res = consumeHealingItem('healing_potion', hero, hero, { rolled: 7 });
+    expect(res.ok).toBe(true);
+    expect(res.rolled).toBe(7);
+    expect(res.actualHeal).toBe(7);
+    expect(res.healedTarget.currentHP).toBe(17);
+    // owner === target -> the healed hero also carries the decremented stack
+    expect(res.sameOwner).toBe(true);
+    const stack = res.healedTarget.inventory.find((i) => i.key === 'healing_potion');
+    expect(stack.quantity).toBe(1);
+    // The heal returns a new hero object; the input's HP is not mutated.
+    // (removeItem decrements the stack quantity in place, its long-standing behavior.)
+    expect(hero.currentHP).toBe(10);
+  });
+
+  it('does not overheal past maxHP', () => {
+    const hero = makeHero({ currentHP: 28, maxHP: 30 });
+    const res = consumeHealingItem('healing_potion', hero, hero, { rolled: 20 });
+    expect(res.ok).toBe(true);
+    expect(res.healedTarget.currentHP).toBe(30); // clamped
+    expect(res.actualHeal).toBe(2); // only the HP actually restored
+  });
+
+  it('handles a pooled owner different from the target (shared party inventory)', () => {
+    const target = makeHero({ heroId: 'target', currentHP: 5, inventory: [] });
+    const owner = makeHero({ heroId: 'owner', currentHP: 30, inventory: [{ key: 'healing_potion', quantity: 3 }] });
+    const res = consumeHealingItem('healing_potion', target, owner, { rolled: 6 });
+    expect(res.ok).toBe(true);
+    expect(res.sameOwner).toBe(false);
+    // Heal lands on the target...
+    expect(res.healedTarget.heroId).toBe('target');
+    expect(res.healedTarget.currentHP).toBe(11);
+    // ...the stack is removed from the owner, and the target keeps its own (empty) inventory
+    expect(res.updatedOwner.heroId).toBe('owner');
+    expect(res.updatedOwner.inventory.find((i) => i.key === 'healing_potion').quantity).toBe(2);
+    expect(res.healedTarget.inventory).toEqual([]);
+  });
+
+  it('removes the item entirely when the last one is used', () => {
+    const hero = makeHero({ inventory: [{ key: 'healing_potion', quantity: 1 }] });
+    const res = consumeHealingItem('healing_potion', hero, hero, { rolled: 4 });
+    expect(res.ok).toBe(true);
+    expect(res.healedTarget.inventory.find((i) => i.key === 'healing_potion')).toBeUndefined();
+  });
+
+  it('rejects a full-HP target (no heal, no stack decrement)', () => {
+    const hero = makeHero({ currentHP: 30, maxHP: 30 });
+    const res = consumeHealingItem('healing_potion', hero, hero, { rolled: 5 });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('full_health');
+    expect(res.healedTarget).toBeUndefined();
+  });
+
+  it('rejects a defeated target and a non-consumable item', () => {
+    const defeated = makeHero({ currentHP: 0, isDefeated: true });
+    expect(consumeHealingItem('healing_potion', defeated, defeated, { rolled: 5 }).reason).toBe('defeated');
+    const hero = makeHero();
+    expect(consumeHealingItem('rope', hero, hero, { rolled: 5 }).reason).toBe('not_consumable');
+  });
+
+  it('rolls via rollDice when no amount is injected (within the item range)', () => {
+    const hero = makeHero({ currentHP: 1, maxHP: 100 });
+    // healing_potion amount is 2d4+2 -> 4..10
+    const res = consumeHealingItem('healing_potion', hero, hero);
+    expect(res.ok).toBe(true);
+    expect(res.rolled).toBeGreaterThanOrEqual(4);
+    expect(res.rolled).toBeLessThanOrEqual(10);
+    expect(res.actualHeal).toBe(res.rolled);
   });
 });
 
