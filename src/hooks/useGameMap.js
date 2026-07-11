@@ -399,21 +399,25 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         setConversation([...conversation, { role: 'system', content: `You leave ${currentSiteMap.name} and return to the wilds.` }]);
     };
 
-    // Moves the party in-site and RETURNS the tile moved to (or null if the move was
-    // rejected), so the game loop can fire that tile's content / roll wandering monsters.
-    const handleSiteTileClick = (clickedX, clickedY) => {
+    // Moves the party ONE tile in-site and RETURNS the tile moved to (or null if the
+    // move was rejected), so the game loop can fire that tile's content / roll wandering
+    // monsters. The party now walks to ANY reachable tile: Game.js computes the path and
+    // steps it one tile at a time through this, halting on a combat trigger. No distance
+    // cap (the walk is tile-by-tile, each step is adjacent). The previous pickup/objective
+    // notice is NOT cleared here: a single walk can accumulate several notices (Game.js
+    // clears the notice once at the start of a fresh walk via clearSiteNotice).
+    const moveSitePlayerTo = (clickedX, clickedY) => {
         if (!sitePlayerPosition || !currentSiteMap || isLoading) return null;
-        const distance = Math.abs(clickedX - sitePlayerPosition.x) + Math.abs(clickedY - sitePlayerPosition.y);
-        if (distance === 0) return null;
-        if (distance > 5) { setError('You can move up to 5 tiles at a time.'); return null; }
         const targetTile = currentSiteMap.mapData[clickedY] && currentSiteMap.mapData[clickedY][clickedX];
         if (!targetTile) return null;
-        if (!targetTile.walkable) { setError('You cannot move there.'); return null; }
+        if (!targetTile.walkable) return null;
         setSiteError(null);
-        setSiteNotice(null); // a fresh move clears the previous pickup/objective notice
         setSitePlayerPosition({ x: clickedX, y: clickedY });
         return targetTile;
     };
+
+    // Clear the in-modal site notice (called once at the start of a fresh site walk).
+    const clearSiteNotice = () => setSiteNotice(null);
 
     // Mark a site content slot as consumed (after its encounter fires / loot is taken) so
     // it doesn't re-trigger. Mutates the cached site tile (same ref) and re-renders.
@@ -548,31 +552,23 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         setConversation([...conversation, exitMessage]);
     };
 
-    const handleTownTileClick = (clickedX, clickedY, setConversation, conversation) => {
-        if (!townPlayerPosition || !currentTownMap || isLoading) return;
-
-        const currentX = townPlayerPosition.x;
-        const currentY = townPlayerPosition.y;
-
-        const distance = Math.abs(clickedX - currentX) + Math.abs(clickedY - currentY);
-
-        if (distance === 0) return;
-
-        if (distance > 5) {
-            setError('You can move up to 5 tiles at a time in town.');
-            return;
-        }
+    // Moves the party ONE tile in-town and RETURNS the tile moved to (or null if the move
+    // was rejected). The party walks to ANY reachable tile now: Game.js computes the path
+    // and steps it one tile at a time through this, rolling a town encounter per step and
+    // halting where one fires. No distance cap (each step is adjacent). Building tiles are
+    // intercepted for the info popup in TownMapDisplay and never reach movement, so a walk
+    // destination is always walkable ground.
+    const moveTownPlayerTo = (clickedX, clickedY) => {
+        if (!townPlayerPosition || !currentTownMap || isLoading) return null;
 
         const targetTile = currentTownMap.mapData[clickedY] && currentTownMap.mapData[clickedY][clickedX] ? currentTownMap.mapData[clickedY][clickedX] : null;
-        if (!targetTile) return;
+        if (!targetTile) return null;
 
-        if (!targetTile.walkable && targetTile.type !== 'building') {
-            setError('You cannot move to that location.');
-            return;
-        }
+        if (!targetTile.walkable && targetTile.type !== 'building') return null;
 
         setTownError(null);
         setTownPlayerPosition({ x: clickedX, y: clickedY });
+        return targetTile;
     };
 
     return {
@@ -594,11 +590,12 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         isMapModalOpen,
         setIsMapModalOpen,
         townError,
+        setTownError,
 
         handleEnterLocation,
         handleEnterCurrentTown,
         handleLeaveTown,
-        handleTownTileClick,
+        moveTownPlayerTo,
 
         // wilderness sites (caves / ruins)
         currentSiteMap,
@@ -607,10 +604,12 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         isInsideSite,
         siteMapsCache,
         siteError,
+        setSiteError,
         siteNotice,
         pushSiteNotice,
+        clearSiteNotice,
         handleLeaveSite,
-        handleSiteTileClick,
+        moveSitePlayerTo,
         markSiteContentConsumed,
 
         visitedBiomes,
