@@ -26,6 +26,7 @@ import { composeRewardSentence, composeLootSentence, narrateRewardMessages } fro
 import { getStepHint, getQuestObjectiveStep, summarizeQuestReward, describeTurnInTarget } from '../game/questHints';
 import { generateMovementNarrative } from '../game/movementController';
 import { computeWalkPath, runTileWalk, TILE_STEP_MS } from '../game/tileWalk';
+import { stepMobs } from '../game/mobMovement';
 import { buildSaveName } from '../game/saveController';
 import { conversationsApi } from '../services/conversationsApi';
 import {
@@ -408,6 +409,15 @@ const Game = ({ resumeConversation = null }) => {
   const settingsRef = useRef(settings);
   useEffect(() => { movesSinceEncounterRef.current = movesSinceEncounter; }, [movesSinceEncounter]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
+  // Moving-mob plumbing for site walks. Like the counters above, these read from refs so
+  // the async per-step callback (runSiteStep) sees the freshest mob positions / grid
+  // mid-walk instead of the stale render-time closure. The mob objects are mutated in
+  // place (they share the cached site's mobs array), so the cache stays in sync and a
+  // leave/re-enter keeps positions + defeats. activeSiteMobIdRef remembers which mob
+  // triggered the current fight so handleEncounterResolve can mark it defeated on victory.
+  const siteMobsRef = useRef([]);
+  const siteMapDataRef = useRef(null);
+  const activeSiteMobIdRef = useRef(null);
   // Monotonic move counter that clocks the quest-offer cooldown (rumour + Quest Board
   // share it via pickOfferableSideQuest). Bumped once per move (world tile, town step,
   // site step). It is NOT persisted every move (that would churn settings); instead the
@@ -452,6 +462,13 @@ const Game = ({ resumeConversation = null }) => {
   useEffect(() => () => {
     if (walkCancelRef.current) { walkCancelRef.current(); walkCancelRef.current = null; }
   }, [mapHook.currentMapLevel]);
+
+  // Keep the moving-mob refs fresh so runSiteStep (async, stale closure) reads the latest
+  // mob array + grid. Declared after mapHook so the dependency does not read it in the TDZ.
+  useEffect(() => {
+    siteMobsRef.current = mapHook.currentSiteMap?.mobs || [];
+    siteMapDataRef.current = mapHook.currentSiteMap?.mapData || null;
+  }, [mapHook.currentSiteMap]);
 
   const interactionHook = useGameInteraction(
     loadedConversation,
@@ -994,28 +1011,78 @@ const Game = ({ resumeConversation = null }) => {
     return !revealed[tile.poi === 'cave_entrance' ? 'cave' : 'ruins'];
   };
 
-  // Per-tile site effect: move onto the entered tile, then fire its fixed content and/or
-  // roll wandering monsters (unchanged single-step behaviour). Returns 'halt' if the tile
-  // triggers combat (fixed encounter / objective-combat / wandering monster) so the walk
-  // stops on that tile and the fight opens; loot / objective-item / location pickups are
-  // non-blocking notices and return 'continue'. Reads settings/movesSinceEncounter from
-  // refs so successive steps see fresh values.
+  // Advance the site's moving mobs one player-step and write the new positions back.
+  // Reads/writes the mob array through refs (runSiteStep is a stale async closure) and
+  // mutates the mob objects in place so the cached site stays in sync (mirrors
+  // markSiteContentConsumed). Returns the first mob now in contact with the party (the one
+  // that forces a fight this step), or null. TODO(fast-follow): a guarded idle setInterval
+  // (mobs also creep while any is aggro and the party stands still) is a planned v2; v1
+  // deliberately moves mobs ONLY on the player's step so everything stays deterministic.
+  const advanceMobs = (playerPos) => {
+    const mobs = siteMobsRef.current;
+    const mapData = siteMapDataRef.current;
+    if (!Array.isArray(mobs) || mobs.length === 0 || !mapData) return null;
+    const { mobs: nextMobs, combatMob } = stepMobs(mobs, playerPos, { mapData });
+    // Copy stepped state onto the SHARED mob objects (same array the cache holds), then
+    // re-render. Keeps positions/defeats persistent across a leave/re-enter and a save.
+    mobs.forEach((m, i) => {
+      const n = nextMobs[i];
+      if (!m || !n) return;
+      m.x = n.x; m.y = n.y; m.state = n.state; m.defeated = n.defeated;
+    });
+    mapHook.setCurrentSiteMap(prev => (prev ? { ...prev } : prev));
+    return combatMob;
+  };
+
+  // Per-tile site effect: move onto the entered tile, then resolve AT MOST ONE halt in a
+  // fixed order so two triggers never fire on one step: (1) a MOVING MOB in contact forces
+  // combat; else (2) the tile's fixed content (loot / objective-item / location; legacy
+  // cached encounter content still fires here for old saves); else (3) a wandering-monster
+  // roll. Non-combat content is a passing notice and returns 'continue'. Reads
+  // settings/movesSinceEncounter from refs so successive steps see fresh values.
   const runSiteStep = (pos) => {
     const movedTile = mapHook.moveSitePlayerTo(pos.x, pos.y);
     if (!movedTile) return 'halt'; // unwalkable/unexpected: stop rather than fall through
     questOfferClockRef.current += 1; // clock the quest-offer cooldown
+    // Default: this step is not a mob fight. Only the mob-contact branch below re-sets it,
+    // so a fled mob's id can never leak into a later wandering/legacy fight's victory.
+    activeSiteMobIdRef.current = null;
 
-    // Fixed room set-piece takes priority over wandering rolls.
+    // (1) Moving mobs advance first. A mob (wandering chaser or milestone boss guard) now
+    // in contact forces the fight and halts the walk before any content / wandering roll.
+    const combatMob = advanceMobs(pos);
+    if (combatMob) {
+      activeSiteMobIdRef.current = combatMob.id; // resolve marks this mob defeated on victory
+      mapHook.setIsMapModalOpen(false);
+      reopenMapAfterEncounterRef.current = true;
+      // A boss carries enemyId so its defeat completes the milestone (handleEncounterResolve).
+      openEncounterAction({
+        encounter: combatMob.isBoss
+          ? { ...combatMob.encounter, enemyId: combatMob.enemyId }
+          : combatMob.encounter,
+      });
+      return 'halt'; // stop the walk on the tile where the mob caught the party
+    }
+
+    // (2) Fixed room set-piece.
     if (movedTile.content && !movedTile.content.consumed) {
       const c = movedTile.content;
+      // Combat is a moving-mob entity now (handled in step 1) and carries no tile-content
+      // encounter. LEGACY cached sites still store combat as content WITH an `encounter`
+      // and must keep firing here for backwards compatibility; a mob-era combat objective
+      // marker (no encounter) is skipped so the boss mob is the single source of the fight.
+      const isLegacyCombatContent =
+        (c.kind === 'encounter' || (c.kind === 'objective' && c.objectiveType === 'combat')) && c.encounter;
+      const isMobObjectiveMarker =
+        c.kind === 'objective' && c.objectiveType === 'combat' && !c.encounter;
+      if (isMobObjectiveMarker) return 'continue'; // boss handled by advanceMobs
+
       mapHook.markSiteContentConsumed(pos.x, pos.y);
-      if (c.kind === 'encounter' || (c.kind === 'objective' && c.objectiveType === 'combat')) {
-        // a normal mob or a milestone boss — both run through the combat flow; a boss
-        // carries enemyId so its defeat completes the milestone in handleEncounterResolve.
+      if (isLegacyCombatContent) {
         mapHook.setIsMapModalOpen(false);
         reopenMapAfterEncounterRef.current = true;
         openEncounterAction({ encounter: c.encounter });
-        return 'halt'; // stop the walk on the tile the fight fired
+        return 'halt'; // stop the walk on the tile the (legacy) fight fired
       } else if (c.kind === 'loot') {
         grantSiteLoot(c.loot);
       } else if (c.kind === 'objective' && c.objectiveType === 'item') {
@@ -1688,6 +1755,11 @@ const Game = ({ resumeConversation = null }) => {
     if (result?.rewards?.items?.length > 0) recordItemsInCodex(result.rewards.items);
 
     if (result?.outcome === 'victory' || result?.outcome === 'success') {
+      // A site MOB that triggered this fight is now dead: mark it defeated so it stops
+      // rendering / chasing and never re-triggers (mirrors markSiteContentConsumed).
+      if (activeSiteMobIdRef.current) {
+        mapHook.setSiteMobDefeated(activeSiteMobIdRef.current);
+      }
       // Check enemy_defeated milestone
       const enemyId = activeEncounter?.enemyId || activeEncounter?.name?.toLowerCase().replace(/\s+/g, '_');
       if (enemyId) {

@@ -17,6 +17,7 @@
 
 import { CAVE_ENCOUNTERS } from '../data/encounters/caveEncounters';
 import { RUINS_ENCOUNTERS } from '../data/encounters/ruinsEncounters';
+import { makeMob, spawnMobsFromSlots } from './mobMovement';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('site-populator');
@@ -306,6 +307,11 @@ export function populateSite(site, seed, partyLevel) {
   const rng = seededRandom((Number.isFinite(seed) ? seed : 1) + 777);
   const slots = Array.isArray(site.contentSlots) ? site.contentSlots : [];
 
+  // Combat slots are MOVING MOBS (site.mobs), not static tile content: they wake and
+  // chase the party (mobMovement.js), so a foe can no longer be routed around. Loot /
+  // harvest / objectives stay as static tile content (they are genuine props).
+  site.mobs = Array.isArray(site.mobs) ? site.mobs : [];
+
   if (slots.length > 0) {
     const pool = combatPool(combatType);
     const entry = site.entryPoint || { x: 0, y: 0 };
@@ -321,16 +327,21 @@ export function populateSite(site, seed, partyLevel) {
       kinds[(deepestIdx + 1) % kinds.length] = 'encounter';
     }
 
+    // Pick each combat slot's encounter here, IN SLOT ORDER, so the rng stream (and thus
+    // the loot + harvest-node placement that follows) stays byte-identical to before mobs
+    // existed. Loot slots still write tile content; combat slots feed spawnMobsFromSlots.
+    const encounterBySlot = {};
     slots.forEach((slot, i) => {
       const tile = site.mapData[slot.y] && site.mapData[slot.y][slot.x];
       if (!tile) return;
       if (kinds[i] === 'encounter' && pool.length > 0) {
-        const enc = clone(pickCombatEncounter(pool, rng, partyLevel));
-        tile.content = { kind: 'encounter', encounter: enc, consumed: false };
+        encounterBySlot[i] = clone(pickCombatEncounter(pool, rng, partyLevel));
       } else {
         tile.content = { kind: 'loot', loot: rollLoot(lootType, rng, i === deepestIdx), consumed: false };
       }
     });
+    // Same slot decisions (kinds), same encounters (encounterBySlot): build moving mobs.
+    site.mobs = [...site.mobs, ...spawnMobsFromSlots(site, kinds, (i) => encounterBySlot[i] || null)];
   }
 
   // After the slots, convert some scattered decorations into harvestable nodes
@@ -410,12 +421,19 @@ export function injectSiteObjective(site, objectiveOrList) {
       placedIds.add(t.content.milestoneId);
     }
   }));
+  // A combat objective is now a boss MOB (not tile content), so its idempotence key lives
+  // on site.mobs. Include placed boss milestones so re-entry never spawns a duplicate boss.
+  (site.mobs || []).forEach((m) => { if (m && m.isBoss && m.milestoneId != null) placedIds.add(m.milestoneId); });
 
-  // Deepest open slots first; slots already claimed by an objective stay claimed.
+  // Deepest open slots first. A slot already claimed by an objective (content) OR held by a
+  // BOSS guard mob stays claimed. A slot holding a RANDOM chaser mob is still claimable: the
+  // objective replaces it (mirroring how an objective used to overwrite encounter content),
+  // and the random mob is stripped below so the tile never ends up double-occupied.
+  const bossSlotKeys = new Set((site.mobs || []).filter((m) => m && m.isBoss).map((m) => `${m.x},${m.y}`));
   const openSlots = site.contentSlots
     .slice()
     .sort((a, b) => dist(b) - dist(a))
-    .filter((p) => { const t = tileAt(p); return t && !(t.content && t.content.kind === 'objective'); });
+    .filter((p) => { const t = tileAt(p); return t && !(t.content && t.content.kind === 'objective') && !bossSlotKeys.has(`${p.x},${p.y}`); });
 
   // When slots run short, hard dependencies win: an item/combat objective can only ever
   // complete on its slot, while a location objective is the softest to drop.
@@ -431,20 +449,40 @@ export function injectSiteObjective(site, objectiveOrList) {
       return;
     }
     const tile = tileAt(slot);
-    // Carry unclaimed loot under the objective so the hoard isn't deleted (R1).
-    const carriedLoot = tile.content && tile.content.kind === 'loot' && !tile.content.consumed
-      ? tile.content.loot : null;
+    // A random chaser mob may sit on this claimed slot: strip it so the objective (boss mob
+    // or content) is the sole occupant, exactly as an objective used to overwrite a random
+    // encounter's content.
+    if (Array.isArray(site.mobs)) {
+      site.mobs = site.mobs.filter((m) => !(m && !m.isBoss && m.x === slot.x && m.y === slot.y));
+    }
     const objectiveType = objective.objectiveType;
-    const common = {
-      kind: 'objective', objectiveType, milestoneId: objective.milestoneId, consumed: false,
-      ...(carriedLoot ? { loot: carriedLoot } : {}),
-    };
     if (objectiveType === 'combat') {
-      tile.content = { ...common, encounter: makeBossEncounter(objective, type) };
-    } else if (objectiveType === 'item') {
-      tile.content = { ...common, item: { id: objective.id, name: objective.name } };
-    } else { // 'location': reaching this room completes the milestone
-      tile.content = { ...common, locationId: objective.id, name: objective.name };
+      // The boss becomes a stationary GUARD MOB on the objective tile (speed 0), not tile
+      // content: its defeat fires enemy_defeated (enemyId) and completes the milestone. The
+      // tile's existing content (e.g. the deep hoard) is left in place, so once the guard
+      // falls the hoard on that tile is still there to walk onto and claim (R1 preserved).
+      const boss = makeMob({
+        x: slot.x, y: slot.y,
+        encounter: makeBossEncounter(objective, type),
+        enemyId: objective.id,
+        isBoss: true,
+        milestoneId: objective.milestoneId,
+        speed: 0,
+      });
+      site.mobs = [...(site.mobs || []), boss];
+    } else {
+      // Carry unclaimed loot under the objective so the hoard isn't deleted (R1).
+      const carriedLoot = tile.content && tile.content.kind === 'loot' && !tile.content.consumed
+        ? tile.content.loot : null;
+      const common = {
+        kind: 'objective', objectiveType, milestoneId: objective.milestoneId, consumed: false,
+        ...(carriedLoot ? { loot: carriedLoot } : {}),
+      };
+      if (objectiveType === 'item') {
+        tile.content = { ...common, item: { id: objective.id, name: objective.name } };
+      } else { // 'location': reaching this room completes the milestone
+        tile.content = { ...common, locationId: objective.id, name: objective.name };
+      }
     }
     const record = { x: slot.x, y: slot.y, ...objective };
     site.objectives = [...(site.objectives || []), record];
