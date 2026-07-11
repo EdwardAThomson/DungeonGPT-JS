@@ -9,6 +9,8 @@ import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
 import { createLogger } from '../utils/logger';
 import { ITEM_CATALOG } from '../utils/inventorySystem';
+import { effectivePartyLevel } from '../game/questEngine';
+import { getRelativeThreat } from '../game/threat';
 
 const logger = createLogger('encounter-action-modal');
 
@@ -397,6 +399,26 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
     return labels[tier] || tier;
   };
 
+  // Relative-threat chip: SAME helper/colors as the site-mob ring, so a fight's danger
+  // reads consistently on both surfaces. Covers ALL encounters (world POI, town, site),
+  // derived from the encounter's difficulty vs the party's current level. Renders
+  // nothing when difficulty is unknown (legacy encounters), never crashes.
+  const encounterThreat = getRelativeThreat(encounter.difficulty, effectivePartyLevel(party));
+  const renderThreatBadge = () => encounterThreat && (
+    <span
+      className="encounter-threat-badge"
+      style={{
+        display: 'inline-block', padding: '2px 10px', borderRadius: '10px',
+        fontSize: '11px', fontWeight: 700, letterSpacing: '0.5px',
+        color: encounterThreat.color, border: `1px solid ${encounterThreat.color}`,
+        background: 'rgba(20,18,24,0.35)', textTransform: 'uppercase',
+      }}
+      title={`This fight is rated ${encounterThreat.label} for your party's current level`}
+    >
+      Threat: {encounterThreat.label}
+    </span>
+  );
+
   // Get available actions (base or contextual for multi-round)
   const availableActions = isMultiRound && roundState && !currentRoundResult
     ? getRoundActions(roundState)
@@ -446,6 +468,9 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
             <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--state-muted-strong)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '8px' }}>
               Random Encounter
             </div>
+            {encounterThreat && (
+              <div style={{ textAlign: 'center', marginBottom: '8px' }}>{renderThreatBadge()}</div>
+            )}
             {encounter.image && (
               <ClickableImage
                 src={encounter.image}
@@ -581,6 +606,9 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
               <div style={{ fontSize: '11px', color: 'var(--state-muted-strong)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>
                 Random Encounter
               </div>
+              {encounterThreat && (
+                <div style={{ marginBottom: '8px' }}>{renderThreatBadge()}</div>
+              )}
               {encounter.image && !result && (
                 <ClickableImage
                   src={encounter.image}
