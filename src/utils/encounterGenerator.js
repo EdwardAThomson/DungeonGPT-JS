@@ -179,9 +179,14 @@ export const rollRandomEncounter = (tile, settings) => {
  * 
  * @param {Object} tile - The map tile
  * @param {Object} settings - Game settings
+ * @param {Object} [options] - Roll context
+ * @param {boolean} [options.enclosedInterior] - True when rolling inside an enclosed
+ *   site interior (cave, mountain), which suppresses open-air `setting: 'outdoor'`
+ *   weather/sky hazards. Defaults to false so open-air and world-map rolls are unchanged.
  * @returns {Object|null} The environmental encounter or null
  */
-export const rollEnvironmentalEncounter = (tile, settings) => {
+export const rollEnvironmentalEncounter = (tile, settings, options = {}) => {
+  const { enclosedInterior = false } = options;
   const biome = getEncounterBiome(tile);
   const chance = environmentalEncounterChance[biome] || 0.10;
   
@@ -214,7 +219,21 @@ export const rollEnvironmentalEncounter = (tile, settings) => {
     return tag === climate;
   });
 
-  const roll = weightedRandom(climateTable);
+  // Inside an enclosed interior (cave / mountain), suppress open-air weather/sky
+  // hazards. Untagged templates and those tagged 'any' are always eligible
+  // (backwards-compatible); a template tagged 'outdoor' is dropped underground.
+  // If the filter empties the table, roll nothing rather than erroring.
+  const settingTable = enclosedInterior
+    ? climateTable.filter((entry) => {
+        if (entry.template === 'none') return true;
+        const template = encounterTemplates[entry.template];
+        return template?.setting !== 'outdoor';
+      })
+    : climateTable;
+
+  if (settingTable.length === 0) return null;
+
+  const roll = weightedRandom(settingTable);
 
   if (roll.template === 'none') return null;
   
@@ -294,9 +313,13 @@ export const checkForPoiEncounter = (tile, isFirstVisit, settings) => {
  * @param {boolean} isFirstVisit - First time visiting this tile
  * @param {Object} settings - Game settings
  * @param {number} movesSinceLastEncounter - Moves since last encounter
+ * @param {Object} [options] - Roll context passed through to the environmental roll
+ * @param {boolean} [options.enclosedInterior] - True for enclosed site interiors
+ *   (caves, mountains); suppresses open-air `setting: 'outdoor'` environmental hazards.
+ *   Defaults to false so every existing caller is unaffected.
  * @returns {Object|null} The encounter or null
  */
-export const checkForEncounter = (tile, isFirstVisit, settings, movesSinceLastEncounter = 0) => {
+export const checkForEncounter = (tile, isFirstVisit, settings, movesSinceLastEncounter = 0, options = {}) => {
   const biome = getEncounterBiome(tile);
   logger.debug('[ENCOUNTER DEBUG] checkForEncounter called:', {
     tile: { biome: tile?.biome, poi: tile?.poi },
@@ -314,7 +337,7 @@ export const checkForEncounter = (tile, isFirstVisit, settings, movesSinceLastEn
   }
   
   // Then check for environmental encounters
-  const envEncounter = rollEnvironmentalEncounter(tile, settings);
+  const envEncounter = rollEnvironmentalEncounter(tile, settings, options);
   if (envEncounter) {
     logger.debug('[ENCOUNTER] Environmental encounter triggered:', envEncounter.name);
     return envEncounter;

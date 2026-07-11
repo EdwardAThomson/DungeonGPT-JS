@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
 import { useModal } from '../contexts/ModalContext';
 import { checkForEncounter } from '../utils/encounterGenerator';
+import { isEnclosedSiteType } from '../utils/siteMapGenerator';
 import useGameSession from '../hooks/useGameSession';
 import useGameMap from '../hooks/useGameMap';
 import useGameInteraction from '../hooks/useGameInteraction';
@@ -1008,7 +1009,13 @@ const Game = ({ resumeConversation = null }) => {
     // Hybrid: a small per-move chance of wandering monsters in the corridors, using the
     // same probabilistic model as the world map (immediate-tier only — no narrative pops).
     const siteType = mapHook.currentSiteMap?.type || 'cave';
-    const wandering = checkForEncounter({ poi: siteType, biome: 'plains' }, false, settingsRef.current, movesSinceEncounterRef.current);
+    // Enclosed interiors (cave, mountain) suppress open-air weather/sky hazards
+    // (storms, aurora, fog) that make no sense underground. Reads settings/moves from
+    // refs so per-step values stay fresh during a multi-tile walk (see runSiteStep).
+    const enclosedInterior = isEnclosedSiteType(siteType);
+    const wandering = checkForEncounter(
+      { poi: siteType, biome: 'plains' }, false, settingsRef.current, movesSinceEncounterRef.current, { enclosedInterior }
+    );
     if (wandering && wandering.encounterTier === 'immediate') {
       movesSinceEncounterRef.current = 0;
       setMovesSinceEncounter(0);

@@ -22,6 +22,12 @@ const VALID_DIFFICULTIES = new Set(['trivial', 'easy', 'medium', 'hard', 'deadly
 // everywhere. Anything else silently never matches a climate and is dead content.
 const VALID_CLIMATES = new Set(['hot', 'cold', 'any']);
 
+// The setting vocabulary the environmental selector honors (encounterGenerator
+// rollEnvironmentalEncounter): 'outdoor' (open-air only, filtered out inside enclosed
+// caves/mountains), 'interior' (enclosed only), or 'any' (== untagged) for everywhere.
+// Anything else silently never matches the interior filter and is a typo.
+const VALID_SETTINGS = new Set(['outdoor', 'interior', 'any']);
+
 // -----------------------------------------------------------------------------
 // KNOWN ACCEPTED DEBT (ENC-03, advisory).
 //
@@ -195,14 +201,16 @@ const enc05 = {
 
 /**
  * ENC-06 (warn): remaining completeness invariants — any `climate` tag is from the
- * valid hot/cold/any vocabulary (a typo'd climate silently never matches), and
- * every encounter offers a non-empty `suggestedActions` list (the modal's action
- * buttons; an empty list leaves the player nothing to click).
+ * valid hot/cold/any vocabulary (a typo'd climate silently never matches), any
+ * `setting` tag is from the valid outdoor/interior/any vocabulary (a typo'd setting
+ * silently never matches the interior filter), and every encounter offers a non-empty
+ * `suggestedActions` list (the modal's action buttons; an empty list leaves the player
+ * nothing to click).
  */
 const enc06 = {
   id: 'ENC-06',
   domain: DOMAIN,
-  title: 'Climate tag is from the valid vocabulary and suggestedActions is non-empty',
+  title: 'Climate and setting tags are from the valid vocabulary and suggestedActions is non-empty',
   severity: SEVERITY.WARN,
   run(ctx) {
     const violations = [];
@@ -211,6 +219,9 @@ const enc06 = {
       const gaps = [];
       if (enc.climate != null && !VALID_CLIMATES.has(enc.climate)) {
         gaps.push(`climate '${enc.climate}' is not hot/cold/any — it never matches the selector`);
+      }
+      if (enc.setting != null && !VALID_SETTINGS.has(enc.setting)) {
+        gaps.push(`setting '${enc.setting}' is not outdoor/interior/any (it never matches the interior filter)`);
       }
       if (!Array.isArray(enc.suggestedActions) || enc.suggestedActions.length === 0) {
         gaps.push('no suggestedActions (the modal shows no action buttons)');
