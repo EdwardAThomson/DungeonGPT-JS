@@ -57,8 +57,10 @@ the no-new-art rule), `docs/FEATURE_SHOPS.md` (how new items reach the player).
   reach only by clicking a party portrait, and it is a plain dropdown with no visual slots.
 - **Inventory UI today** (`src/components/PartyInventoryModal.js`, modal id `inventory`,
   opened from the toolbar via `onOpenInventory`): shows pooled party gold + a flat grid of
-  all collected items with rarity borders and a "Use" button for healing potions. **It does
-  not show equipped gear and has no equip controls at all.**
+  all collected items with rarity borders and a "Use" button for healing potions. Clicking an
+  item opens `ItemDetailModal` (modal id `itemDetail`) showing the item's full-size art,
+  rarity/type/value, and its catalog `description`; the flavor description is **not** rendered
+  inline in the list. **It still does not show equipped gear and has no equip controls at all.**
 - **Modal system** (`src/contexts/ModalContext.js`): registry-driven. `hero` is in the `info`
   group (layer 0); `inventory` is its own group (layer 2). `useModal(id)` gives
   `open/close/isOpen/data`.

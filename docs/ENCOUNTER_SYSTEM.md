@@ -54,7 +54,7 @@ Phase 1 (core encounters), Phase 2 (random generation + movement integration), a
 ```
 
 ### Multi-Round Combat
-- State machine: `createMultiRoundEncounter()` returns round state with enemy HP, morale (starts 100), and player advantage (starts 0).
+- State machine: `createMultiRoundEncounter()` returns round state with enemy HP, morale (starts 100), and a **computed starting player advantage**. `computeStartingAdvantage()` derives a modest, varying lean (lead's best stat + equipped attack + level bonus + a share of party support vs. the encounter DC), clamped to `[-2, +2]` and centered so a matched fight starts near 0. It is surfaced from the encounter intro rather than forced to a constant.
 - Each round: player picks action, rolls d20 + modifier, outcome affects enemy HP/morale and player HP.
 - Contextual actions unlock mid-combat: "Finish Them" at advantage >= 2, "Demand Surrender" at morale < 50, "Tactical Retreat" after round 1.
 - Encounter ends on: enemy HP <= 0, enemy morale <= 0, player flees, or max rounds reached.

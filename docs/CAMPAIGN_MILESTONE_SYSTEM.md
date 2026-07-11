@@ -32,12 +32,12 @@ These milestones have clear, verifiable triggers tied to game state. The **game 
 |------|---------|---------|
 | `item` | Item enters party inventory | "Find the hidden map in the archives" |
 | `combat` | Enemy is defeated (HP reaches 0) | "Defeat the Shadow Overlord" |
-| `location` | Party visits a specific tile/area | "Breach the Shadow Fortress" |
+| `location` | Party searches a specific tile/area (via a "Search this location" action, not silent arrival) | "Breach the Shadow Fortress" |
 
 **How it works:**
 1. Adventure creation defines the milestone with a `type` and `trigger`
 2. The game engine spawns the required entities (items, enemies, locations) at map generation time
-3. During gameplay, the engine listens for state changes (item acquired, enemy defeated, tile visited)
+3. During gameplay, the engine listens for state changes (item acquired, enemy defeated, location searched)
 4. When a trigger fires, the engine marks the milestone complete and **tells the AI** to narrate the achievement
 5. The AI becomes the narrator, not the judge
 
@@ -68,7 +68,7 @@ Rather than letting the AI freely decide if a narrative goal is met, we constrai
 > **Shipped 2026-07-02 — the `talk` type (see `MILESTONE_NPC_GROUNDING_PLAN.md`).** A fourth
 > mechanical type covers the "meet/warn an NPC" case deterministically: `type: 'talk'` with
 > `trigger: { npc: '<spawn.id>', action: 'talk' }` completes on an `npc_talked` event, fired
-> by a "💬 Talk" button on the authored NPC (placed into its quest building by
+> by a "📜 Quest: Talk to &lt;npc&gt;" button on the authored NPC (placed into its quest building by
 > `populateTown` via `getMilestoneNpcsForTown`), with a building-level "Ask for …" fallback.
 > The narrative `[COMPLETE_MILESTONE]` marker path (`findMarkerMilestoneIndex`) stays guarded to
 > `narrative`/legacy-untyped milestones only. Milestone boss fights launch from the POI
@@ -88,6 +88,13 @@ Rather than letting the AI freely decide if a narrative goal is met, we constrai
 > conservative model narrating a concluded talk but never firing the marker). All anti-premature
 > guards remain (no marking mid-conversation, on mere mention, or with the NPC absent), the Talk
 > button stays the guaranteed path, and `findMarkerMilestoneIndex` (narrative) is untouched.
+
+> **`location` is search-to-complete (shipped 2026-07-10).** Reaching the milestone tile no
+> longer completes it on its own. The POI arrival modal offers a "Search this location" action,
+> resolved by `getMilestoneLocationForTile` (`milestoneEngine.js`), which fires the
+> `location_visited` event, mirroring the item ("🌿 Gather", `getMilestoneItemForTile`) and boss
+> ("⚔️ Confront", `getMilestoneBossForTile`) tile actions. This keeps location completion a
+> deliberate player act rather than a silent side effect of movement.
 
 ---
 
@@ -230,12 +237,9 @@ Both go through the existing `applyEncounterRewards()` in `encounterController.j
 
 Boss encounters can define a `minLevel` field. This prevents a level 1 party from stumbling into a fight they can't win.
 
-**Enforcement options (to decide during implementation):**
-- **Soft gate:** The encounter triggers but a warning is shown ("Your party may not be strong enough"). The player can attempt it anyway. This is more in the spirit of open-world RPGs.
-- **Hard gate:** The encounter simply doesn't trigger. The AI narrates why ("The fortress gates hold fast — you need more strength/allies"). This is safer for campaign pacing.
-- **Scaling:** The encounter difficulty adjusts to party level. Simpler but less dramatic — a boss that scales down feels less boss-like.
+**Shipped behavior (soft gate).** The fight always launches; the affordance (Talk / Confront button) is never hidden by `minLevel`. Instead, completion is *withheld*: when the party wins under level, `checkMilestoneCompletion` returns `level_blocked` (with `requiredLevel`) rather than completing the milestone, and the handler surfaces a fixed system message (e.g. `⚔️ You have bested <deed>, but your party must reach level <n> before this deed is recognized.`, and a "not yet seasoned enough" line for the location-search path in `Game.js`). The player can always attempt the fight; the milestone simply does not tick until they are the required level.
 
-The `minLevel` is a recommendation. Implementation can decide how strictly to enforce it.
+**Tier-1 finales carry no gate.** To avoid an unreachable soft-lock at the start of a campaign, tier-1 combat finales are authored with `minLevel: null` (`storyTemplates.js`); the `progressionLint`/audit tests guard against reintroducing an unreachable `minLevel`.
 
 ### Team encounters (future consideration)
 
