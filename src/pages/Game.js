@@ -51,7 +51,7 @@ import { healPartyUpward, reconcileHeroWithLedger } from '../game/heroInvariants
 import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile, getMilestoneLocationForTile } from '../game/milestoneEngine';
 import { recordItemDiscoveries, recordEnemyDiscovery, seedCodexFromParty, getBestiaryEntries, findBestiaryMatch, slugify as slugifyCodexKey } from '../game/codexEngine';
 import { buyItem, sellItem } from '../game/shopController';
-import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, getActiveGatherResources, turnInQuest, getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
+import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, getActiveGatherResources, turnInQuest, getRevealedSiteTypes, effectivePartyLevel, pickOfferableSideQuest } from '../game/questEngine';
 import { buildInSaveContinuation, applyContinuationToSettings, healPartyForNextChapter } from '../game/campaignChain';
 import ContinueLegendPicker from '../components/ContinueLegendPicker';
 import { QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
@@ -172,6 +172,8 @@ const SaveConfirmationModal = () => {
 const QuestOfferModal = () => {
   const { data, close } = useModal('questOffer');
   const quest = data?.quest;
+  // Same modal, source-flavoured heading: a town Quest Board posting vs a travelling rumour.
+  const heading = data?.source === 'board' ? '📜 A Posting Catches Your Eye' : '📜 A Rumour Reaches You';
   // Derive the informative bits from live quest data so an accept is an informed choice:
   // the objective step + its "how do I do this?" hint (reused from the journal so the
   // wording stays consistent), the giver's venue, and a full reward preview.
@@ -185,7 +187,7 @@ const QuestOfferModal = () => {
   });
   return (
     <ModalShell modalId="questOffer" ariaLabel="Quest Offer" style={{ maxWidth: '460px' }}>
-      <h3 className="rumour-heading">📜 A Rumour Reaches You</h3>
+      <h3 className="rumour-heading">{heading}</h3>
       <p className="rumour-title">{quest?.title}</p>
       {(quest?.giver?.hook || quest?.description) && (
         <p className="rumour-hook">"{quest?.giver?.hook || quest?.description}"</p>
@@ -405,6 +407,25 @@ const Game = ({ resumeConversation = null }) => {
   const settingsRef = useRef(settings);
   useEffect(() => { movesSinceEncounterRef.current = movesSinceEncounter; }, [movesSinceEncounter]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
+  // Monotonic move counter that clocks the quest-offer cooldown (rumour + Quest Board
+  // share it via pickOfferableSideQuest). Bumped once per move (world tile, town step,
+  // site step). It is NOT persisted every move (that would churn settings); instead the
+  // clock is written into settings.questOfferClock alongside settings.lastQuestOfferAt
+  // whenever an offer is actually shown, and reseeded from that on load. After a reload
+  // the clock therefore reads conservatively (never below the last offer), so at worst it
+  // re-applies one cooldown window rather than letting offers flood.
+  const questOfferClockRef = useRef(settings?.questOfferClock || 0);
+  // Resumed saves hydrate SettingsContext AFTER mount, so seed the clock from the
+  // persisted value once settings arrive (before the player can move). max() keeps any
+  // (rare) pre-hydration local increments; a fresh game has no questOfferClock -> 0.
+  const questClockSeededRef = useRef(false);
+  useEffect(() => {
+    if (questClockSeededRef.current) return;
+    if (settings && Object.keys(settings).length > 0) {
+      questOfferClockRef.current = Math.max(questOfferClockRef.current, settings.questOfferClock || 0);
+      questClockSeededRef.current = true;
+    }
+  }, [settings]);
   // Guided tour: advance the in-game coachmarks (Start Adventure -> Map) as the
   // player acts.
   const { tourActive, activeStep: tourStep, advanceStep: advanceTour } = useGuidedTour();
@@ -848,6 +869,7 @@ const Game = ({ resumeConversation = null }) => {
   const runTownStep = (pos) => {
     const moved = mapHook.moveTownPlayerTo(pos.x, pos.y);
     if (!moved) return 'halt'; // unwalkable/unexpected: stop rather than fall through
+    questOfferClockRef.current += 1; // clock the quest-offer cooldown
 
     // Synthetic tile the encounter generator recognizes as 'town'.
     const syntheticTownTile = { poi: 'town', biome: 'plains' };
@@ -976,6 +998,7 @@ const Game = ({ resumeConversation = null }) => {
   const runSiteStep = (pos) => {
     const movedTile = mapHook.moveSitePlayerTo(pos.x, pos.y);
     if (!movedTile) return 'halt'; // unwalkable/unexpected: stop rather than fall through
+    questOfferClockRef.current += 1; // clock the quest-offer cooldown
 
     // Fixed room set-piece takes priority over wandering rolls.
     if (movedTile.content && !movedTile.content.consumed) {
@@ -1078,18 +1101,37 @@ const Game = ({ resumeConversation = null }) => {
     setTimeout(() => performSave(), 500);
   };
 
+  // Whenever ANY quest offer is shown (rumour OR the town Quest Board), stamp the current
+  // move-clock into settings so the shared cooldown survives a reload. Both fields ride
+  // along in the persisted settings blob, so no dedicated save wiring is needed; old saves
+  // simply lack them and behave as "no recent offer".
+  const recordQuestOffer = () => {
+    const at = questOfferClockRef.current;
+    setSettings(prev => ({ ...prev, lastQuestOfferAt: at, questOfferClock: at }));
+  };
+
+  // Show a side-quest offer through the shared rumour modal. `source` lets the modal pick
+  // board- vs rumour-flavoured copy. Records the cooldown stamp so rumours and the board
+  // cannot both flood the player.
+  const showQuestOffer = (quest, source) => {
+    openQuestOffer({ quest, source, onAccept: () => handleAcceptSideQuest(quest.id) });
+    recordQuestOffer();
+  };
+
   // Exploration rumour: occasionally OFFER an available, map-valid side quest while
   // travelling (every quest in sideQuests is already validated by selection, so its POI
-  // exists). Offer-based — the player chooses; accepting reveals its site.
+  // exists). Offer-based: the player chooses, and accepting reveals its site. The
+  // selection + guardrails (available/in-level, active-quest cap, cooldown) live in the
+  // shared pickOfferableSideQuest; here we only keep the extra RUMOUR_CHANCE dice gate.
   const RUMOUR_CHANCE = 0.12;
   const maybeOfferRumour = () => {
-    const sq = settings?.sideQuests;
-    if (!sq || sq.length === 0) return;
-    const available = sq.filter(q => q.status === 'available' && (q.minLevel || 1) <= effectivePartyLevel(selectedHeroes));
-    if (available.length === 0) return;
     if (Math.random() >= RUMOUR_CHANCE) return;
-    const quest = available[Math.floor(Math.random() * available.length)];
-    openQuestOffer({ quest, onAccept: () => handleAcceptSideQuest(quest.id) });
+    const quest = pickOfferableSideQuest(settings?.sideQuests, selectedHeroes, {
+      now: questOfferClockRef.current,
+      lastOfferAt: settings?.lastQuestOfferAt ?? null,
+    });
+    if (!quest) return;
+    showQuestOffer(quest, 'rumour');
   };
 
   // Hand in completed side-quest turn-ins at a building (return-to-giver / courier).
@@ -1345,6 +1387,10 @@ const Game = ({ resumeConversation = null }) => {
     } else if (plannedEncounterFlow.shouldIncrementMoves) {
       setMovesSinceEncounter((prev) => prev + 1);
     }
+    // Arriving on this world tile is a move: clock the quest-offer cooldown regardless
+    // of whether an encounter fired (movesSinceEncounter resets on encounters, so it
+    // cannot double as the offer clock).
+    questOfferClockRef.current += 1;
 
     if (plannedEncounterFlow.openActionEncounter) {
       mapHook.setIsMapModalOpen(false); // close map so the encounter is visible
@@ -1670,6 +1716,31 @@ const Game = ({ resumeConversation = null }) => {
     if (reopenMapAfterEncounterRef.current) {
       reopenMapAfterEncounterRef.current = false;
       mapHook.setIsMapModalOpen(true);
+    }
+
+    // Quest Board hook: a successful board read OFFERS a real side quest, reusing the
+    // shared rumour offer flow and its guardrails (pickOfferableSideQuest: available and
+    // in-level, active-quest cap, cooldown). The board cannot invent quests; it only ever
+    // surfaces one already in the available pool, so it can never over-spawn. On a
+    // cap/cooldown/empty-pool miss it drops a brief flavour line instead of a modal, so a
+    // success never dead-ends.
+    if (
+      activeEncounter?.templateKey === 'town_quest_board' &&
+      (result?.outcomeTier === 'success' || result?.outcomeTier === 'criticalSuccess')
+    ) {
+      const offered = pickOfferableSideQuest(settings?.sideQuests, updatedParty, {
+        now: questOfferClockRef.current,
+        lastOfferAt: settings?.lastQuestOfferAt ?? null,
+      });
+      if (offered) {
+        // Sequence AFTER the encounter modal tears down: questOffer (info group) and
+        // encounterAction (encounter group) both sit on layer 1, and the info group has
+        // no conflict rule to auto-close the encounter, so a same-tick open could leave
+        // two FocusTraps fighting. The setTimeout lets closeEncounterAction settle first.
+        setTimeout(() => showQuestOffer(offered, 'board'), 0);
+      } else {
+        interactionHook.setConversation(prev => [...prev, { role: 'system', content: '📜 Nothing new on the board catches your eye.' }]);
+      }
     }
 
     // Trigger immediate save after encounter to preserve rewards
