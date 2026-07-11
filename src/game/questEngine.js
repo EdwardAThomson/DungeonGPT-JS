@@ -217,6 +217,65 @@ export const effectivePartyLevel = (party) => {
 export const acceptSideQuest = (sideQuests, questId) =>
   (sideQuests || []).map((q) => (q.id === questId && q.status === 'available' ? { ...q, status: 'active' } : q));
 
+// --- Shared offer picker (rumour + quest board) ------------------------------
+// Both the exploration rumour (maybeOfferRumour) and the town Quest Board route
+// through this ONE function so they share the same anti-flood guardrails and can
+// never both flood the player. It cannot invent quests: it only ever surfaces a
+// quest already present in `sideQuests` with status 'available' (a finite pool,
+// topped up by backfillSideQuests), which is the primary over-spawn cap.
+
+/** Max side quests the player may have ACTIVE at once before offers dry up. */
+export const ACTIVE_QUEST_CAP = 3;
+/** Moves that must pass between any two quest offers (board or rumour). */
+export const OFFER_COOLDOWN_MOVES = 4;
+
+/**
+ * Pick one offerable side quest, or null when nothing should be offered. Pure and
+ * deterministic (no Math.random) so both callers and unit tests share the guardrails.
+ * Applied in order:
+ *   1. status 'available' only, with minLevel <= effectivePartyLevel(party);
+ *   2. active-quest cap: null once ACTIVE side quests >= activeCap;
+ *   3. cooldown: null while (now - lastOfferAt) is within cooldownMoves;
+ *   4. deterministic choice from the remaining pool (index derived from `now`, so
+ *      successive offers rotate rather than always yielding the same quest).
+ * @param {Array} sideQuests - the settings.sideQuests pool.
+ * @param {Array} party - hero party (for effectivePartyLevel).
+ * @param {Object} [opts]
+ * @param {number} [opts.now=0] - a monotonic move counter (the clock).
+ * @param {number|null} [opts.lastOfferAt=null] - clock value when an offer was last shown.
+ * @param {number} [opts.cooldownMoves=OFFER_COOLDOWN_MOVES]
+ * @param {number} [opts.activeCap=ACTIVE_QUEST_CAP]
+ * @returns {Object|null} the chosen quest, or null when nothing is offerable.
+ */
+export const pickOfferableSideQuest = (sideQuests, party, opts = {}) => {
+  const {
+    now = 0,
+    lastOfferAt = null,
+    cooldownMoves = OFFER_COOLDOWN_MOVES,
+    activeCap = ACTIVE_QUEST_CAP,
+  } = opts;
+
+  // 2. Active-quest cap: don't pile more objectives on an already-busy party.
+  if (getActiveSideQuests(sideQuests).length >= activeCap) return null;
+
+  // 3. Cooldown: a valid (non-negative, in-window) gap since the last offer blocks.
+  //    A missing lastOfferAt, or a clock that ran backwards (e.g. a stale reload),
+  //    counts as "no recent offer" so old saves and reseeded clocks still offer.
+  if (lastOfferAt != null && Number.isFinite(now)) {
+    const elapsed = now - lastOfferAt;
+    if (elapsed >= 0 && elapsed < cooldownMoves) return null;
+  }
+
+  // 1. Eligible pool: available, in-level.
+  const level = effectivePartyLevel(party);
+  const eligible = getAvailableSideQuests(sideQuests).filter((q) => (q.minLevel || 1) <= level);
+  if (eligible.length === 0) return null;
+
+  // 4. Deterministic rotate: index from the stable clock, never Math.random.
+  const idx = ((Math.floor(now) % eligible.length) + eligible.length) % eligible.length;
+  return eligible[idx];
+};
+
 /**
  * Run a game event against every ACTIVE side quest, completing matching event-steps
  * (item / enemy / location, with count support). Turn-in steps are NOT event-driven (see

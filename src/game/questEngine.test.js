@@ -3,6 +3,7 @@ import {
   getActiveSideQuests, getAvailableSideQuests, getCompletedSideQuests,
   getSideQuestProgress, getActiveSiteObjectives, selectSideQuests, effectivePartyLevel,
   deriveSideQuestAvailability, backfillSideQuests, applySideQuestBackfill,
+  pickOfferableSideQuest, ACTIVE_QUEST_CAP, OFFER_COOLDOWN_MOVES,
 } from './questEngine';
 import { initialSideQuests, SIDE_QUESTS, QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
 import { ITEM_CATALOG } from '../utils/inventorySystem';
@@ -691,5 +692,70 @@ describe('questEngine — applySideQuestBackfill (#45 load-path wrapper + pool-s
     expect(out.sideQuests).toEqual([]);
     // and the stamped result short-circuits next time
     expect(applySideQuestBackfill(out, { worldMap: barren, townMapsCache: {}, party }).settings).toBe(out);
+  });
+});
+
+describe('questEngine: pickOfferableSideQuest (shared rumour + Quest Board picker)', () => {
+  // Minimal quest shapes: the picker only reads status + minLevel (and quest identity).
+  const q = (id, status = 'available', minLevel = 1) => ({ id, title: id, status, minLevel });
+  const level3Party = [{ level: 3 }]; // effectivePartyLevel([{level:3}]) === 3
+
+  test('returns an eligible available, in-level quest when nothing blocks', () => {
+    const pool = [q('a'), q('b')];
+    const picked = pickOfferableSideQuest(pool, level3Party, { now: 0, lastOfferAt: null });
+    expect(picked).not.toBeNull();
+    expect(['a', 'b']).toContain(picked.id);
+  });
+
+  test('excludes non-available and over-level quests', () => {
+    const pool = [
+      q('active_one', 'active'),
+      q('done_one', 'completed'),
+      q('too_high', 'available', 9),
+    ];
+    expect(pickOfferableSideQuest(pool, level3Party, { now: 0, lastOfferAt: null })).toBeNull();
+  });
+
+  test('returns null at the active-quest cap even when an available quest exists', () => {
+    const actives = Array.from({ length: ACTIVE_QUEST_CAP }, (_, i) => q(`act${i}`, 'active'));
+    const pool = [...actives, q('offerable')];
+    expect(pickOfferableSideQuest(pool, level3Party, { now: 0, lastOfferAt: null })).toBeNull();
+    // one below the cap: an offer is possible again
+    const underCap = [...actives.slice(1), q('offerable')];
+    expect(pickOfferableSideQuest(underCap, level3Party, { now: 0, lastOfferAt: null })?.id).toBe('offerable');
+  });
+
+  test('returns null within the cooldown window and offers once it elapses', () => {
+    const pool = [q('a')];
+    // lastOfferAt = 10; within OFFER_COOLDOWN_MOVES the picker is silent.
+    expect(pickOfferableSideQuest(pool, level3Party, { now: 10, lastOfferAt: 10 })).toBeNull();
+    expect(pickOfferableSideQuest(pool, level3Party, { now: 10 + OFFER_COOLDOWN_MOVES - 1, lastOfferAt: 10 })).toBeNull();
+    // exactly cooldownMoves later: eligible again.
+    expect(pickOfferableSideQuest(pool, level3Party, { now: 10 + OFFER_COOLDOWN_MOVES, lastOfferAt: 10 })?.id).toBe('a');
+  });
+
+  test('a missing or backwards clock counts as no recent offer (old saves keep offering)', () => {
+    const pool = [q('a')];
+    expect(pickOfferableSideQuest(pool, level3Party, { now: 5, lastOfferAt: null })?.id).toBe('a');
+    // clock ran backwards (e.g. a reload reseeded it low): do not wrongly block.
+    expect(pickOfferableSideQuest(pool, level3Party, { now: 0, lastOfferAt: 20 })?.id).toBe('a');
+  });
+
+  test('returns null when the pool is empty', () => {
+    expect(pickOfferableSideQuest([], level3Party, { now: 0, lastOfferAt: null })).toBeNull();
+    expect(pickOfferableSideQuest(undefined, level3Party, { now: 0, lastOfferAt: null })).toBeNull();
+  });
+
+  test('choice is deterministic for a given clock and rotates across offers', () => {
+    const pool = [q('a'), q('b'), q('c')];
+    const opts = (now) => ({ now, lastOfferAt: null });
+    // same clock -> same pick every time (no Math.random)
+    expect(pickOfferableSideQuest(pool, level3Party, opts(0)).id)
+      .toBe(pickOfferableSideQuest(pool, level3Party, opts(0)).id);
+    // clock indexes into the pool, so successive offers rotate through it
+    expect(pickOfferableSideQuest(pool, level3Party, opts(0)).id).toBe('a');
+    expect(pickOfferableSideQuest(pool, level3Party, opts(1)).id).toBe('b');
+    expect(pickOfferableSideQuest(pool, level3Party, opts(2)).id).toBe('c');
+    expect(pickOfferableSideQuest(pool, level3Party, opts(3)).id).toBe('a');
   });
 });
