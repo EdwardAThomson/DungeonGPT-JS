@@ -228,7 +228,7 @@ database, not the public bundle). Cards go in `public/assets/templates/`,
 | `tidewater-t2.webp` | A drowned stone bell tower bared at dead low tide off a marshy shore, seaweed-draped causeway leading out, a lone lantern-lit rowboat approaching in blue dusk. Epic fantasy illustration, sweeping landscape with dramatic sky. Wide cinematic composition 16:9. Cold teal and lantern-amber palette, painterly style. No text, no UI, no borders. | DONE 2026-07-06 |
 | `tidewater-t3.webp` | A Venice-like canal city at a river mouth under storm light, bridges and bell towers half-flooded, a great bronze bell glowing faintly beneath the harbor water. Epic fantasy illustration, sweeping cityscape with dramatic sky. Wide cinematic composition 16:9. Deep teal, verdigris and storm-grey palette, painterly style. No text, no UI, no borders. | DONE 2026-07-06 |
 
-## Generation queue (2026-07-08, milestone POI arrival images)
+## Generation queue (2026-07-08, milestone POI arrival images) - COMPLETE
 
 Sixteen milestone POIs render their "you have arrived" modal with no image
 because they have no key in `POI_IMAGES` (`src/game/worldMoveController.js`).
