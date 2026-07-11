@@ -23,6 +23,7 @@ import { composeLocalMovementNarrative, composeLocalAmbientNarrative, composeNpc
 import { composeRewardSentence, composeLootSentence, narrateRewardMessages } from '../game/rewardNarrator';
 import { getStepHint, getQuestObjectiveStep, summarizeQuestReward, describeTurnInTarget } from '../game/questHints';
 import { generateMovementNarrative } from '../game/movementController';
+import { computeWalkPath, runTileWalk, TILE_STEP_MS } from '../game/tileWalk';
 import { buildSaveName } from '../game/saveController';
 import { conversationsApi } from '../services/conversationsApi';
 import {
@@ -394,6 +395,15 @@ const Game = ({ resumeConversation = null }) => {
   const authReady = !authLoading;
   // Reopen the map after an encounter that interrupted exploration.
   const reopenMapAfterEncounterRef = useRef(false);
+  // Tile-by-tile walk plumbing (town + site movement). The active walk's cancel handle
+  // lives here so a fresh click (or leaving the sub-map / unmount) can stop it. Encounter
+  // rolls inside the async stepping callback read movesSinceEncounter/settings from refs,
+  // not the render-time closure, so per-step values never go stale mid-walk.
+  const walkCancelRef = useRef(null);
+  const movesSinceEncounterRef = useRef(movesSinceEncounter);
+  const settingsRef = useRef(settings);
+  useEffect(() => { movesSinceEncounterRef.current = movesSinceEncounter; }, [movesSinceEncounter]);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
   // Guided tour: advance the in-game coachmarks (Start Adventure -> Map) as the
   // player acts.
   const { tourActive, activeStep: tourStep, advanceStep: advanceTour } = useGuidedTour();
@@ -412,6 +422,13 @@ const Game = ({ resumeConversation = null }) => {
   // settings (loaded saves) and finally 'grassland' so older saves are unaffected.
   const mapTheme = settings?.theme || settingsObj?.theme || 'grassland';
   const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme, getActiveSiteObjectives(settings?.sideQuests), settings?.milestones, getActiveGatherResources(settings?.sideQuests));
+
+  // Cancel any in-progress town/site walk when the sub-map changes (leaving a town/site
+  // flips currentMapLevel back to 'world') or the component unmounts, so no scheduled step
+  // fires against a torn-down map. Declared after mapHook so it does not read it in the TDZ.
+  useEffect(() => () => {
+    if (walkCancelRef.current) { walkCancelRef.current(); walkCancelRef.current = null; }
+  }, [mapHook.currentMapLevel]);
 
   const interactionHook = useGameInteraction(
     loadedConversation,
@@ -824,25 +841,52 @@ const Game = ({ resumeConversation = null }) => {
     return result;
   };
 
-  // --- Town Tile Click Wrapper (adds encounter checks) ---
-  const handleTownTileClick = (clickedX, clickedY) => {
-    // Delegate movement to the hook
-    mapHook.handleTownTileClick(clickedX, clickedY, interactionHook.setConversation, interactionHook.conversation);
+  // Per-tile town effect: move onto the entered tile, then roll a town encounter for that
+  // step. Returns 'halt' (stop the walk here, on the tile the encounter fired) or 'continue'.
+  // Reads movesSinceEncounter/settings from refs so successive steps see fresh values.
+  const runTownStep = (pos) => {
+    const moved = mapHook.moveTownPlayerTo(pos.x, pos.y);
+    if (!moved) return 'halt'; // unwalkable/unexpected: stop rather than fall through
 
-    // Check for town encounter after moving
-    // Create a synthetic tile that the encounter generator recognizes as 'town'
+    // Synthetic tile the encounter generator recognizes as 'town'.
     const syntheticTownTile = { poi: 'town', biome: 'plains' };
-    const townEncounter = checkForEncounter(syntheticTownTile, false, settings, movesSinceEncounter);
+    const townEncounter = checkForEncounter(syntheticTownTile, false, settingsRef.current, movesSinceEncounterRef.current);
 
     if (townEncounter) {
-      // Close map modal — conflict rule handles this once map is migrated
+      movesSinceEncounterRef.current = 0;
+      setMovesSinceEncounter(0);
       mapHook.setIsMapModalOpen(false);
       reopenMapAfterEncounterRef.current = true; // reopen once the encounter resolves
       openEncounterAction({ encounter: townEncounter });
-      setMovesSinceEncounter(0);
-    } else {
-      setMovesSinceEncounter(prev => prev + 1);
+      return 'halt';
     }
+    movesSinceEncounterRef.current += 1;
+    setMovesSinceEncounter(prev => prev + 1);
+    return 'continue';
+  };
+
+  // --- Town Tile Click Wrapper: walk to ANY reachable tile, one step every TILE_STEP_MS,
+  // rolling an encounter per step and halting where one fires. ---
+  const handleTownTileClick = (clickedX, clickedY) => {
+    if (interactionHook.isLoading) return; // no walking while an AI request is in flight
+    const townMap = mapHook.currentTownMap;
+    const start = mapHook.townPlayerPosition;
+    if (!townMap || !start) return;
+    if (clickedX === start.x && clickedY === start.y) return;
+
+    const path = computeWalkPath(townMap.mapData, start, { x: clickedX, y: clickedY }, (t) => !!t && t.walkable);
+    if (path.length === 0) {
+      mapHook.setTownError('You cannot reach that tile.');
+      return;
+    }
+
+    // A new click cancels the in-progress walk and starts fresh from the current position.
+    if (walkCancelRef.current) walkCancelRef.current();
+    walkCancelRef.current = runTileWalk({
+      path,
+      stepIntervalMs: TILE_STEP_MS,
+      onEnterTile: (pos) => runTownStep(pos),
+    });
   };
 
   // --- Site Tile Click Wrapper (caves / ruins): fires room content + wandering monsters ---
@@ -922,20 +966,27 @@ const Game = ({ resumeConversation = null }) => {
     return !revealed[tile.poi === 'cave_entrance' ? 'cave' : 'ruins'];
   };
 
-  const handleSiteTileClick = (clickedX, clickedY) => {
-    const movedTile = mapHook.handleSiteTileClick(clickedX, clickedY);
-    if (!movedTile) return; // move rejected (blocked / too far)
+  // Per-tile site effect: move onto the entered tile, then fire its fixed content and/or
+  // roll wandering monsters (unchanged single-step behaviour). Returns 'halt' if the tile
+  // triggers combat (fixed encounter / objective-combat / wandering monster) so the walk
+  // stops on that tile and the fight opens; loot / objective-item / location pickups are
+  // non-blocking notices and return 'continue'. Reads settings/movesSinceEncounter from
+  // refs so successive steps see fresh values.
+  const runSiteStep = (pos) => {
+    const movedTile = mapHook.moveSitePlayerTo(pos.x, pos.y);
+    if (!movedTile) return 'halt'; // unwalkable/unexpected: stop rather than fall through
 
     // Fixed room set-piece takes priority over wandering rolls.
     if (movedTile.content && !movedTile.content.consumed) {
       const c = movedTile.content;
-      mapHook.markSiteContentConsumed(clickedX, clickedY);
+      mapHook.markSiteContentConsumed(pos.x, pos.y);
       if (c.kind === 'encounter' || (c.kind === 'objective' && c.objectiveType === 'combat')) {
         // a normal mob or a milestone boss — both run through the combat flow; a boss
         // carries enemyId so its defeat completes the milestone in handleEncounterResolve.
         mapHook.setIsMapModalOpen(false);
         reopenMapAfterEncounterRef.current = true;
         openEncounterAction({ encounter: c.encounter });
+        return 'halt'; // stop the walk on the tile the fight fired
       } else if (c.kind === 'loot') {
         grantSiteLoot(c.loot);
       } else if (c.kind === 'objective' && c.objectiveType === 'item') {
@@ -950,21 +1001,53 @@ const Game = ({ resumeConversation = null }) => {
         checkMilestoneEvent({ type: 'location_visited', locationId: c.locationId }, selectedHeroes);
         setTimeout(() => performSave(), 500);
       }
-      return;
+      // Non-combat content (loot / item / location) is a passing notice: keep walking.
+      return 'continue';
     }
 
     // Hybrid: a small per-move chance of wandering monsters in the corridors, using the
     // same probabilistic model as the world map (immediate-tier only — no narrative pops).
     const siteType = mapHook.currentSiteMap?.type || 'cave';
-    const wandering = checkForEncounter({ poi: siteType, biome: 'plains' }, false, settings, movesSinceEncounter);
+    const wandering = checkForEncounter({ poi: siteType, biome: 'plains' }, false, settingsRef.current, movesSinceEncounterRef.current);
     if (wandering && wandering.encounterTier === 'immediate') {
+      movesSinceEncounterRef.current = 0;
+      setMovesSinceEncounter(0);
       mapHook.setIsMapModalOpen(false);
       reopenMapAfterEncounterRef.current = true;
       openEncounterAction({ encounter: wandering });
-      setMovesSinceEncounter(0);
-    } else {
-      setMovesSinceEncounter(prev => prev + 1);
+      return 'halt'; // stop the walk on the tile the wandering monster fired
     }
+    movesSinceEncounterRef.current += 1;
+    setMovesSinceEncounter(prev => prev + 1);
+    return 'continue';
+  };
+
+  // --- Site Tile Click Wrapper: walk to ANY reachable tile, one step every TILE_STEP_MS,
+  // firing content + wandering rolls per step and halting where combat fires. ---
+  const handleSiteTileClick = (clickedX, clickedY) => {
+    if (interactionHook.isLoading) return; // no walking while an AI request is in flight
+    const siteMap = mapHook.currentSiteMap;
+    const start = mapHook.sitePlayerPosition;
+    if (!siteMap || !start) return;
+    if (clickedX === start.x && clickedY === start.y) return;
+
+    const path = computeWalkPath(siteMap.mapData, start, { x: clickedX, y: clickedY }, (t) => !!t && t.walkable);
+    if (path.length === 0) {
+      mapHook.setSiteError('You cannot reach that tile.');
+      return;
+    }
+
+    // A fresh walk clears the previous pickup/objective notice; grants during this walk
+    // then accumulate into a clean notice.
+    mapHook.clearSiteNotice();
+
+    // A new click cancels the in-progress walk and starts fresh from the current position.
+    if (walkCancelRef.current) walkCancelRef.current();
+    walkCancelRef.current = runTileWalk({
+      path,
+      stepIntervalMs: TILE_STEP_MS,
+      onEnterTile: (pos) => runSiteStep(pos),
+    });
   };
 
   // Accept an offered side quest (from a building quest-giver). Activates it so its steps
