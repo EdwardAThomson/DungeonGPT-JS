@@ -3151,6 +3151,24 @@ function pruneOrphanPaths(mapData) {
 }
 
 /**
+ * Movement walkability for a town tile, derived from tile TYPE rather than the
+ * stored `walkable` boolean.
+ *
+ * The generator invariant is that ONLY `water` and `building` tiles are ever made
+ * non-walkable (every `walkable = false` assignment in this file lands on a water
+ * or building/keep/house tile); bridges and beaches are walkable ground. Town maps
+ * are generated once and cached in the save (sub_maps.townMapsCache) and never
+ * regenerated, so a town cached by an older generator can carry a stale `walkable:
+ * false` on a bridge or shore tile from before those became walkable. Keying
+ * walkability off the type heals those old saves retroactively without touching the
+ * stored grid: any tile that is not water and not a building can be stepped onto.
+ *
+ * @param {Object} t tile object (mapData[y][x]).
+ * @returns {boolean} true when the party may step onto the tile.
+ */
+export const isTownTileWalkable = (t) => !!t && t.type !== 'water' && t.type !== 'building';
+
+/**
  * Get emoji representation for town map tiles
  * @param {Object} tile - Tile object
  * @returns {string} Emoji to display
