@@ -1778,11 +1778,14 @@ const Game = ({ resumeConversation = null }) => {
       if (from.level === 'world') mapHook.setPlayerPosition({ x: from.x, y: from.y });
       else if (from.level === 'town') mapHook.setTownPlayerPosition({ x: from.x, y: from.y });
       else if (from.level === 'site') mapHook.setSitePlayerPosition({ x: from.x, y: from.y });
-      // TODO(#115): once site mobs chase (feat/site-moving-mobs), a FLED mob is not
-      // defeated and would re-contact the party next step. The reposition above moves the
-      // party away (likely outside aggro range), which mitigates it, but a proper fix needs
-      // a temporary de-aggro/cooldown on activeSiteMobIdRef.current here. That model lives
-      // on the unmerged #115 branch, so it is deferred, not built now.
+      // A fled site mob (from the chasing model, #115) is not defeated, so on its own it
+      // would just re-close and re-contact the repositioned party next step (a speed-2
+      // hunter re-contacts immediately). Stamp a brief flee cooldown on it so it de-aggros
+      // and the party actually breaks contact; the reposition above buys the distance the
+      // cooldown then protects. Only a SUCCESSFUL flee reaches here (from is truthy).
+      if (activeSiteMobIdRef.current) {
+        mapHook.setSiteMobFleeCooldown(activeSiteMobIdRef.current);
+      }
     }
     preEncounterPosRef.current = null; // consume: never reposition on a later encounter
 
