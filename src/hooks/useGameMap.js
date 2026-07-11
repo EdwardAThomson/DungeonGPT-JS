@@ -619,6 +619,9 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         setCurrentMapLevel,
         currentTownMap,
         townPlayerPosition,
+        // Exposed so handleEncounterResolve can reposition the party to its pre-encounter
+        // tile on a successful flee (the flee-disengage fix). Same for setSitePlayerPosition.
+        setTownPlayerPosition,
         currentTownTile,
         isInsideTown,
         townMapsCache,
@@ -642,6 +645,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         // player-step (the mob objects are mutated in place so the cache stays in sync).
         setCurrentSiteMap,
         sitePlayerPosition,
+        setSitePlayerPosition,
         currentSiteTile,
         isInsideSite,
         siteMapsCache,
