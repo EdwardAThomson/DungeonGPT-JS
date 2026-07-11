@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { tileBackground, waterwayMask, OFF_MAP, POI_EMOJI } from '../utils/townTileArt';
+import { isTownTileWalkable } from '../utils/townMapGenerator';
 import BuildingModal from './BuildingModal';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
@@ -132,7 +133,10 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           // The party now walks to ANY reachable tile (the 5-tile cap is gone); a tile is
           // clickable if it is walkable ground (or a building, which opens its info popup).
           // Reachability is enforced by the walk itself (an unreachable click errors).
-          const isClickable = onTileClick && distance > 0 && (tile.walkable || isBuilding) && !isPlayer;
+          // Walkability keys off tile TYPE (isTownTileWalkable), matching the walk's BFS
+          // predicate, so clickability and reachability agree on bridges/shores even on
+          // old cached town maps whose stored `walkable` flag is stale.
+          const isClickable = onTileClick && distance > 0 && (isTownTileWalkable(tile) || isBuilding) && !isPlayer;
 
           const neighbours = { n: typeAt(col, row - 1), e: typeAt(col + 1, row), s: typeAt(col, row + 1), w: typeAt(col - 1, row) };
           // waterway-neighbour mask (canal banks, quay lips, bridge-over-canal): the

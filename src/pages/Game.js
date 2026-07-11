@@ -6,6 +6,7 @@ import { useGuidedTour } from '../contexts/GuidedTourContext';
 import { useModal } from '../contexts/ModalContext';
 import { checkForEncounter } from '../utils/encounterGenerator';
 import { isEnclosedSiteType } from '../utils/siteMapGenerator';
+import { isTownTileWalkable } from '../utils/townMapGenerator';
 import useGameSession from '../hooks/useGameSession';
 import useGameMap from '../hooks/useGameMap';
 import useGameInteraction from '../hooks/useGameInteraction';
@@ -897,7 +898,11 @@ const Game = ({ resumeConversation = null }) => {
     if (!townMap || !start) return;
     if (clickedX === start.x && clickedY === start.y) return;
 
-    const path = computeWalkPath(townMap.mapData, start, { x: clickedX, y: clickedY }, (t) => !!t && t.walkable);
+    // Walkability by tile TYPE (isTownTileWalkable), not the stored `walkable` flag:
+    // town maps are cached and never regenerated, so an old save can carry a stale
+    // non-walkable flag on a bridge/shore tile. Deriving from type heals that
+    // retroactively (only water and buildings block the party).
+    const path = computeWalkPath(townMap.mapData, start, { x: clickedX, y: clickedY }, isTownTileWalkable);
     if (path.length === 0) {
       mapHook.setTownError('You cannot reach that tile.');
       return;
