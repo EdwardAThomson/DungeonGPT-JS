@@ -1,6 +1,8 @@
 import React from 'react';
 import { tileBackground, SITE_POI, ART_POI } from '../utils/siteTileArt';
 import { resolveProfilePicture } from '../utils/assetHelper';
+import { getRelativeThreat } from '../game/threat';
+import { HUNTER_SPEED } from '../game/mobMovement';
 
 const TILE = 30; // a 20x20 site is 600px wide — fits the map modal
 const MOB_STEP_MS = 400; // matches TILE_STEP_MS: a mob glides one tile per player-step
@@ -19,6 +21,23 @@ const mobRingStyle = (state) => {
 
 const mobGlyph = (mob) => (mob.encounter && mob.encounter.icon) || (mob.isBoss ? '👹' : '⚔️');
 
+// Outer THREAT ring: a colored ring showing how dangerous the mob is RELATIVE to the
+// party's current level (green trivial -> gold fair -> orange tough -> red deadly). It
+// is concentric with (does not replace) the inner alert-state telegraph, so "how
+// dangerous" and "has it noticed you" both read at a glance. A hunter (speed ===
+// HUNTER_SPEED, an unavoidable chaser) gets a distinct pulse on this ring plus a
+// corner chevron. Returns null when threat is unknown (no ring, never crashes).
+const threatRingStyle = (threat, isHunter) => {
+  if (!threat) return null;
+  return {
+    position: 'absolute', left: 1, top: 1, width: TILE - 2, height: TILE - 2,
+    borderRadius: '50%', border: `2px solid ${threat.color}`,
+    boxShadow: `0 0 4px 1px ${threat.color}`,
+    pointerEvents: 'none', boxSizing: 'border-box',
+    ...(isHunter ? { animation: 'siteThreatHunterPulse 1.1s ease-in-out infinite' } : {}),
+  };
+};
+
 /**
  * Renders an explorable wilderness site (cave / ruin) sub-map: the SVG tileset, decoration
  * + content-slot overlays, the moving mobs, and the player marker. Mirrors TownMapDisplay
@@ -30,7 +49,7 @@ const mobGlyph = (mob) => (mob.encounter && mob.encounter.icon) || (mob.isBoss ?
  * a step animates the SAME element between tiles (a CSS transform transition) instead of
  * teleporting. Their fight/AI lives in the game loop; this component only visualizes them.
  */
-const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite, showLeaveButton = true, firstHero, siteError, siteNotice }) => {
+const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite, showLeaveButton = true, firstHero, siteError, siteNotice, partyLevel }) => {
   if (!siteMapData) return null;
   const { width, height, mapData, theme } = siteMapData;
 
@@ -49,7 +68,7 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite,
         width: width * TILE, border: '2px solid #1b1a1f', background: '#1b1a1f', margin: '0 auto',
         position: 'relative',
       }}>
-        <style>{'@keyframes siteMobPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }'}</style>
+        <style>{'@keyframes siteMobPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } } @keyframes siteThreatHunterPulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.18); opacity: 0.55; } }'}</style>
         {mapData.flat().map((tile) => {
           const neighbours = { n: typeAt(tile.x, tile.y - 1), e: typeAt(tile.x + 1, tile.y), s: typeAt(tile.x, tile.y + 1), w: typeAt(tile.x - 1, tile.y) };
           const isPlayer = playerPosition && tile.x === playerPosition.x && tile.y === playerPosition.y;
@@ -94,9 +113,16 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite,
         })}
         {/* Moving-mob overlay: one persistent element per mob id, positioned by transform so
             a step animates smoothly between tiles instead of jumping. */}
-        {liveMobs.map((mob) => (
+        {liveMobs.map((mob) => {
+          // RELATIVE threat vs the party's current level (null tolerates a mob with
+          // no encounter/difficulty: it simply gets no threat ring). isHunter marks an
+          // unavoidable chaser (speed === HUNTER_SPEED) for the distinct pulse + chevron.
+          const threat = getRelativeThreat(mob.encounter && mob.encounter.difficulty, partyLevel);
+          const isHunter = mob.speed === HUNTER_SPEED;
+          return (
           <div
             key={mob.id}
+            title={threat ? `${threat.label} threat${isHunter ? ' · Hunter (will chase)' : ''}` : undefined}
             style={{
               position: 'absolute', left: 0, top: 0, width: TILE, height: TILE,
               transform: `translate(${mob.x * TILE}px, ${mob.y * TILE}px)`,
@@ -105,6 +131,8 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite,
               pointerEvents: 'none', zIndex: 2,
             }}
           >
+            {/* Threat ring (concentric with the inner alert-state telegraph). */}
+            {threat && <span aria-hidden="true" style={threatRingStyle(threat, isHunter)} />}
             <span style={{
               width: TILE - 8, height: TILE - 8, borderRadius: '50%',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -113,8 +141,21 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite,
             }}>
               {mobGlyph(mob)}
             </span>
+            {/* Hunter chevron: an unavoidable chaser reads differently from a normal mob
+                of the same difficulty (in the threat color, so it does not fight the ring). */}
+            {isHunter && (
+              <span aria-hidden="true" style={{
+                position: 'absolute', top: -2, right: -2,
+                width: TILE * 0.36, height: TILE * 0.36, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: TILE * 0.32, lineHeight: 1, fontWeight: 700,
+                color: (threat && threat.color) || '#e74c3c',
+                background: 'rgba(20,18,24,0.85)', textShadow: '0 0 2px #000',
+              }}>»</span>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
       {siteNotice && (
         <div

@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useMemo } from 'react';
 import { computeVisibleMilestonePois, computeActiveMilestonePois } from '../game/milestoneEngine';
-import { getRevealedSiteTypes } from '../game/questEngine';
+import { getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
 
 // Lazy load modal components for better performance
 const AdventureBook = lazy(() => import('./AdventureBook'));
@@ -84,6 +84,11 @@ const GameModals = ({
     [settings?.sideQuests]
   );
 
+  // Effective party level drives the RELATIVE-threat ring on site mobs: the same
+  // basis quest gating and spawn selection use, so a fixed mob's ring shifts toward
+  // green as the party levels up. Threaded down to SiteMapDisplay via MapModal.
+  const partyLevel = useMemo(() => effectivePartyLevel(selectedHeroes), [selectedHeroes]);
+
   return (
     <>
       <Suspense fallback={<ModalLoadingFallback />}>
@@ -161,6 +166,7 @@ const GameModals = ({
         onLeaveSite={() => mapHook.handleLeaveSite(interactionHook.setConversation, interactionHook.conversation)}
         siteError={mapHook.siteError}
         siteNotice={mapHook.siteNotice}
+        partyLevel={partyLevel}
         />
       </Suspense>
       <Suspense fallback={<ModalLoadingFallback />}>
