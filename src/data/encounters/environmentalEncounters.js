@@ -6,6 +6,15 @@
 //   'cold' - cold campaigns (snow theme)
 //   'any'  - or simply untagged: fires everywhere (default, backwards-compatible)
 // Leave genuinely universal hazards untagged so older saves keep working.
+//
+// Optional `setting` field scopes an encounter to open-air vs enclosed interiors so
+// weather/sky hazards can be suppressed underground (see rollEnvironmentalEncounter).
+// Vocabulary:
+//   'outdoor'  - open-air only: filtered out inside enclosed sites (caves, mountains)
+//   'interior' - enclosed interiors only
+//   'any'      - or simply untagged: fires everywhere (default, backwards-compatible)
+// Leave hazards that read fine both above and below ground untagged (e.g. earthquake,
+// which becomes a cave-in underground).
 
 export const ENVIRONMENTAL_ENCOUNTERS = {
   'sudden_storm': {
@@ -13,6 +22,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     icon: '⛈️',
     encounterTier: 'immediate',
     environmental: true,
+    setting: 'outdoor',
     description: 'Dark clouds gather with unnatural speed and a violent storm breaks overhead!',
     image: '/assets/encounters/sudden_storm.webp',
     difficulty: 'medium',
@@ -36,6 +46,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     icon: '🌫️',
     encounterTier: 'narrative',
     environmental: true,
+    setting: 'outdoor',
     narrativeHook: 'a wall of thick fog rolling across the land',
     aiContext: 'Dense fog blankets the area, reducing visibility to nearly nothing. Strange sounds echo through the mist. The fog might be natural, magical, or hiding something.',
     description: 'Impenetrable fog rolls in, reducing visibility to mere feet. Strange sounds echo in the whiteness.',
@@ -85,6 +96,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     encounterTier: 'narrative',
     environmental: true,
     climate: 'hot',
+    setting: 'outdoor',
     narrativeHook: 'the air shimmering with intense heat',
     aiContext: 'An oppressive heat wave makes travel dangerous. Dehydration and heat exhaustion threaten the party. Finding water and shade becomes critical.',
     description: 'The sun beats down mercilessly, the air so hot it shimmers. Every step is exhausting.',
@@ -111,6 +123,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     encounterTier: 'narrative',
     environmental: true,
     climate: 'cold',
+    setting: 'outdoor',
     narrativeHook: 'the air turning brutally, bone-deep cold',
     aiContext: 'A savage cold snap descends on the party. Frostbite and hypothermia threaten anyone caught in the open. Finding shelter and warmth becomes critical.',
     description: 'The temperature plummets and a biting wind cuts through every layer. Each breath fogs and freezes.',
@@ -136,6 +149,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     icon: '✨',
     encounterTier: 'narrative',
     environmental: true,
+    setting: 'outdoor',
     narrativeHook: 'mysterious lights dancing on the horizon',
     aiContext: 'Unexplained lights appear in the sky or floating above the ground. They could be will-o-wisps, magical phenomena, or signals from other travelers.',
     description: 'Eerie lights dance in the distance, their colors shifting and their movement almost purposeful.',

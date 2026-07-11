@@ -1,4 +1,4 @@
-import { shouldTriggerEncounter, checkForPoiEncounter } from './encounterGenerator';
+import { shouldTriggerEncounter, checkForPoiEncounter, rollEnvironmentalEncounter } from './encounterGenerator';
 
 describe('encounterGenerator.shouldTriggerEncounter', () => {
   afterEach(() => {
@@ -76,5 +76,55 @@ describe('encounterGenerator.checkForPoiEncounter', () => {
   it('still returns null for a poi with no encounter table', () => {
     jest.spyOn(Math, 'random').mockReturnValue(0.01);
     expect(checkForPoiEncounter({ biome: 'plains', poi: 'town' }, true, {})).toBeNull();
+  });
+});
+
+describe('encounterGenerator.rollEnvironmentalEncounter (enclosed-interior setting filter)', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  // Math.random is called twice inside rollEnvironmentalEncounter: first the chance
+  // gate (a 0 always passes it), then weightedRandom's selection value. Sweeping the
+  // selection value across the whole table lets us assert which templates can/cannot
+  // be produced, deterministically.
+  const rollAt = (pickValue, options) => {
+    jest.spyOn(Math, 'random')
+      .mockReturnValueOnce(0)          // pass the chance gate
+      .mockReturnValueOnce(pickValue); // weightedRandom selection
+    const result = rollEnvironmentalEncounter(
+      { poi: 'cave', biome: 'plains' },
+      { grimnessLevel: 'Gritty' },
+      options
+    );
+    Math.random.mockRestore();
+    return result;
+  };
+
+  const sweepTemplateKeys = (options) => {
+    const keys = new Set();
+    for (let i = 0; i < 100; i += 1) {
+      const result = rollAt(i / 100, options);
+      if (result) keys.add(result.templateKey);
+    }
+    return keys;
+  };
+
+  it('never returns outdoor weather/sky hazards when enclosedInterior is true', () => {
+    const keys = sweepTemplateKeys({ enclosedInterior: true });
+    expect(keys.has('sudden_storm')).toBe(false);
+    expect(keys.has('strange_lights')).toBe(false);
+    expect(keys.has('thick_fog')).toBe(false);
+  });
+
+  it('still returns the untagged earthquake when enclosedInterior is true (cave-in)', () => {
+    const keys = sweepTemplateKeys({ enclosedInterior: true });
+    expect(keys.has('earthquake')).toBe(true);
+  });
+
+  it('still allows outdoor hazards when not enclosed (open-air default)', () => {
+    const keys = sweepTemplateKeys({});
+    expect(keys.has('sudden_storm')).toBe(true);
+    expect(keys.has('strange_lights')).toBe(true);
   });
 });

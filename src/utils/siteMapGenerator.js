@@ -61,6 +61,15 @@ const SITE_CONFIG = {
 
 export const siteThemeFor = (type) => (SITE_CONFIG[type === 'cave_entrance' ? 'cave' : type] || SITE_CONFIG.cave).theme;
 
+// Is this site type an enclosed interior (rock all around) rather than an open-air
+// landscape? Enclosed sites use the subtractive 'organic' layout style (cave, mountain);
+// open-air sites use 'structured' (ruins, forest, hills). Callers use this to suppress
+// open-air weather/sky hazards underground. Unknown types default to false (open-air).
+export const isEnclosedSiteType = (type) => {
+  const cfg = SITE_CONFIG[type === 'cave_entrance' ? 'cave' : type];
+  return cfg ? cfg.style === 'organic' : false;
+};
+
 // Open-air sites take their surrounding ground from the world tile's biome.
 export const groundKindFor = (biome) => (biome === 'desert' ? 'sand' : biome === 'snow' ? 'snow' : 'grass');
 
