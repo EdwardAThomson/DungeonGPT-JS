@@ -52,7 +52,7 @@ backlog; see the `docs/` design docs for each system.
 
 - [ ] Fix magic-link email template (OTP token shown but no UI input) — critical quick fix
 - [ ] Add missing assets (quest-item icons; the `workshop` building interior (Henry #26) is delivered)
-- [ ] Replace fragile keyword-based encounter-engagement detection
+- [x] Replace fragile keyword-based encounter-engagement detection: superseded by the two-tier narration redesign; the keyword matching no longer exists (OUTSTANDING_ISSUES #13)
 - [ ] Mobile UI fixes (sign-in/nav overlap, How-To-Play layout)
 - [ ] Guest conversion: prompt at a high-intent moment (e.g. first milestone), beyond the persistent banner
 

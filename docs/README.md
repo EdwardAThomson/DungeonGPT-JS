@@ -11,17 +11,17 @@ deleted. When the code and a doc disagree, the code wins.
 - Business-sensitive plans (pricing/monetization strategy) live in `docs/private/` — gitignored, local only
 
 ## Architecture & deployment
-- `DEPLOYMENT_ARCHITECTURE.md` — current prod stack (CF Pages + Worker + self-hosted Postgres via Hyperdrive)
 - `OPS_RUNBOOK.md` — incidents, rollbacks, BACKUPS (post-cutover: self-hosted PG), deploy CI, drills
-- `CF_WORKER_GUIDE.md` — production Worker reference (model lineup: code wins over the doc)
+- `CF_WORKER_GUIDE.md`: production Worker reference, incl. Octonion-hub auth / JWT verification (model lineup: code wins over the doc)
 - `REDEMPTION_CODES.md` — redemption codes: schema, redeem endpoint, effective-tier rule, code lifecycle (#6 first slice)
-- `authentication_plan.md` — Octonion-hub auth / JWT verification
 
 ## System references (shipped, live systems)
 - `CAMPAIGN_MILESTONE_SYSTEM.md` — milestone/campaign engine
+- `CAMPAIGN_MILESTONES.md`: generated at-a-glance overview of every campaign's milestones (run `npm run docs:campaigns` to regenerate; do not hand-edit)
 - `MILESTONE_NPC_GROUNDING_PLAN.md` — authored-NPC grounding + `talk` milestones (Options B+C shipped 2026-07-02)
 - `ENCOUNTER_SYSTEM.md` — encounter system
 - `EQUIPMENT_ITEMS.md` — equipment stat model, item ladder, deferred work
+- `CONTENT_AUDIT.md`: content-integrity audit harness (`npm run audit` report + a Jest CI gate) that cross-checks authored data against code capability tables
 - `TIERED_NARRATION_PLAN.md` — "smart-by-default" narration tiers (localNarrator)
 
 ## Active feature plans (not yet built / in progress)
@@ -43,6 +43,7 @@ deleted. When the code and a doc disagree, the code wins.
 - `LARGER_WORLDS_PLAN.md` — chunked generation, flat storage, growable saves for paid tiers (#60; step 2 viewport shipped dark 2026-07-05, step 3 chunk-assembly prototype shipped debug-only behind `/debug/large-world`)
 - `WATER_TOWNS_PLAN.md`: canal city + river city as water-typed hub-and-spoke variants, premium (#65; Phases 1-4 + 6 shipped 2026-07-05/06 along with the #67-69 river doctrine wave, Phase 5 packaging remains)
 - `T3_CAMPAIGNS_PLAN.md` — Tier 3 campaign program (implemented in waves 2026-07-03/04; body kept as the planning record, per-row status in `OUTSTANDING_ISSUES.md`)
+- `ARC_CARDS_AND_NARRATIVE_PLAN.md`: overarching arc cards + narrative framing (#73; Phase 1 shipped 2026-07-07, phases 2-4 future work)
 
 ## Art & assets
 - `IMAGE_GENERATION_PROMPTS.md` — art-gen prompt library + style guide
