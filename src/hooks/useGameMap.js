@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { generateMapData, getTile, findStartingTown, enrichWorldMap } from '../utils/mapGenerator';
-import { generateTownMap } from '../utils/townMapGenerator';
+import { generateTownMap, isTownTileWalkable } from '../utils/townMapGenerator';
 // getTownWaterContext = analyzeTownWater PLUS the world tile's `waterTown` stamp
 // (water towns #65, stamped once at New Game) passed through as water.archetype.
 // Cached towns are untouched: only first-visit generation reads the stamp.
@@ -564,7 +564,11 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         const targetTile = currentTownMap.mapData[clickedY] && currentTownMap.mapData[clickedY][clickedX] ? currentTownMap.mapData[clickedY][clickedX] : null;
         if (!targetTile) return null;
 
-        if (!targetTile.walkable && targetTile.type !== 'building') return null;
+        // Per-step walkability MUST match the pathfinder's predicate (isTownTileWalkable,
+        // used by computeWalkPath and TownMapDisplay). Gating on the stale `walkable` flag
+        // here silently halted walks onto bridges/shores in older cached towns even though
+        // the BFS had routed through them (only water and building tiles are non-walkable).
+        if (!isTownTileWalkable(targetTile)) return null;
 
         setTownError(null);
         setTownPlayerPosition({ x: clickedX, y: clickedY });
