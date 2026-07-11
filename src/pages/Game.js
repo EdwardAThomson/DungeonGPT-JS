@@ -404,12 +404,6 @@ const Game = ({ resumeConversation = null }) => {
   const settingsRef = useRef(settings);
   useEffect(() => { movesSinceEncounterRef.current = movesSinceEncounter; }, [movesSinceEncounter]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
-  // Cancel any in-progress town/site walk when the sub-map changes (leaving a town/site
-  // flips currentMapLevel back to 'world') or the component unmounts, so no scheduled step
-  // fires against a torn-down map.
-  useEffect(() => () => {
-    if (walkCancelRef.current) { walkCancelRef.current(); walkCancelRef.current = null; }
-  }, [mapHook.currentMapLevel]);
   // Guided tour: advance the in-game coachmarks (Start Adventure -> Map) as the
   // player acts.
   const { tourActive, activeStep: tourStep, advanceStep: advanceTour } = useGuidedTour();
@@ -428,6 +422,13 @@ const Game = ({ resumeConversation = null }) => {
   // settings (loaded saves) and finally 'grassland' so older saves are unaffected.
   const mapTheme = settings?.theme || settingsObj?.theme || 'grassland';
   const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme, getActiveSiteObjectives(settings?.sideQuests), settings?.milestones, getActiveGatherResources(settings?.sideQuests));
+
+  // Cancel any in-progress town/site walk when the sub-map changes (leaving a town/site
+  // flips currentMapLevel back to 'world') or the component unmounts, so no scheduled step
+  // fires against a torn-down map. Declared after mapHook so it does not read it in the TDZ.
+  useEffect(() => () => {
+    if (walkCancelRef.current) { walkCancelRef.current(); walkCancelRef.current = null; }
+  }, [mapHook.currentMapLevel]);
 
   const interactionHook = useGameInteraction(
     loadedConversation,
