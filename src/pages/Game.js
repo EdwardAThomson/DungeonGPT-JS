@@ -881,13 +881,22 @@ const Game = ({ resumeConversation = null }) => {
     return result;
   };
 
-  // Per-tile town effect: move onto the entered tile, then roll a town encounter for that
-  // step. Returns 'halt' (stop the walk here, on the tile the encounter fired) or 'continue'.
-  // Reads movesSinceEncounter/settings from refs so successive steps see fresh values.
-  const runTownStep = (pos) => {
+  // Per-tile town effect: move onto the entered tile, then (only on every 3rd entered
+  // tile) roll a town encounter for that step. Returns 'halt' (stop the walk here, on
+  // the tile the encounter fired) or 'continue'. Reads movesSinceEncounter/settings from
+  // refs so successive steps see fresh values.
+  //
+  // The party MOVES on every tile so the walk animates smoothly, but we only ROLL for an
+  // encounter on tiles 0, 3, 6, ... A town crossing is a quiet stroll, not a gauntlet:
+  // per-tile rolling made even a short crossing very likely to trigger a fight. Combined
+  // with the town pity exemption in shouldTriggerEncounter, this keeps town encounters rare.
+  const runTownStep = (pos, index = 0) => {
     const moved = mapHook.moveTownPlayerTo(pos.x, pos.y);
     if (!moved) return 'halt'; // unwalkable/unexpected: stop rather than fall through
     questOfferClockRef.current += 1; // clock the quest-offer cooldown
+
+    // Only roll on every 3rd entered tile; other tiles just move the party and continue.
+    if (index % 3 !== 0) return 'continue';
 
     // Synthetic tile the encounter generator recognizes as 'town'.
     const syntheticTownTile = { poi: 'town', biome: 'plains' };
@@ -930,7 +939,7 @@ const Game = ({ resumeConversation = null }) => {
     walkCancelRef.current = runTileWalk({
       path,
       stepIntervalMs: TILE_STEP_MS,
-      onEnterTile: (pos) => runTownStep(pos),
+      onEnterTile: (pos, index) => runTownStep(pos, index),
     });
   };
 

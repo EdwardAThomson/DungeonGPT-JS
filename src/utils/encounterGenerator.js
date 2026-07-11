@@ -92,11 +92,17 @@ export const shouldTriggerEncounter = (tile, isFirstVisit, settings, movesSinceL
   chance *= grimnessModifier[settings?.grimnessLevel] || 1.0;
 
   // Increase chance slightly if it's been a while since last encounter
-  // (prevents long stretches of nothing happening)
-  if (movesSinceLastEncounter >= 3) {
+  // (prevents long stretches of nothing happening).
+  // Towns are exempt: the pity/streak bonus is an absolute add that dwarfs the
+  // tiny town base and, combined with per-tile rolling during a town walk, made
+  // town crossings trigger fights far too often. Keep towns at a flat base rate
+  // regardless of the shared moves counter. World-map and site (cave/ruins)
+  // biomes keep the pity bonus unchanged.
+  const isTown = biome === 'town';
+  if (!isTown && movesSinceLastEncounter >= 3) {
     chance += 0.10;
   }
-  if (movesSinceLastEncounter >= 5) {
+  if (!isTown && movesSinceLastEncounter >= 5) {
     chance += 0.15;
   }
 
@@ -109,7 +115,7 @@ export const shouldTriggerEncounter = (tile, isFirstVisit, settings, movesSinceL
     isFirstVisit,
     revisitMultiplier: !isFirstVisit ? (revisitEncounterMultiplier[biome] || 0.3) : 1,
     grimness: settings?.grimnessLevel,
-    moveBonus: movesSinceLastEncounter >= 5 ? 0.25 : (movesSinceLastEncounter >= 3 ? 0.10 : 0),
+    moveBonus: isTown ? 0 : (movesSinceLastEncounter >= 5 ? 0.25 : (movesSinceLastEncounter >= 3 ? 0.10 : 0)),
     finalChance: chance,
     roll,
     triggered: roll < chance
