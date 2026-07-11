@@ -1,4 +1,4 @@
-import { resolveEncounter } from './encounterResolver';
+import { resolveEncounter, CONTEXTUAL_ACTIONS } from './encounterResolver';
 
 // A hostile encounter (name contains 'goblin') with a Strength/Athletics action,
 // so it counts as a combat action and deals HP damage.
@@ -194,5 +194,37 @@ describe('resolveEncounter #43 combat depth', () => {
     expect(supported.supportBonus).toBe(3);
     expect(base.supportBonus).toBe(0);
     expect(supported.rollResult.total).toBe(base.rollResult.total + 3);
+  });
+});
+
+// Regression: the mid-fight contextual actions injected by getRoundActions
+// ('Tactical Retreat', 'Finish Them', 'Demand Surrender') are NOT part of an
+// encounter's suggestedActions. resolveEncounter used to throw "Invalid action" on
+// them, which was swallowed into a generic "An error occurred" failure (the crash the
+// player reported). They must now resolve without throwing.
+describe('resolveEncounter contextual actions do not throw (crash-class fix)', () => {
+  const contextualLabels = ['Tactical Retreat', 'Finish Them', 'Demand Surrender'];
+
+  it('exposes each contextual action label in CONTEXTUAL_ACTIONS', () => {
+    contextualLabels.forEach((label) => {
+      expect(CONTEXTUAL_ACTIONS[label]).toBeTruthy();
+      expect(CONTEXTUAL_ACTIONS[label].skill).toBeTruthy();
+    });
+  });
+
+  contextualLabels.forEach((label) => {
+    it(`resolves '${label}' without throwing and returns a real outcome`, async () => {
+      const result = await resolveEncounter(makeEncounter(), label, makeCharacter(), {});
+      expect(result).toBeTruthy();
+      expect(result.outcomeTier).toBeTruthy();
+      // Not the swallowed-error shape.
+      expect(result.narration).not.toMatch(/an error occurred/i);
+    });
+  });
+
+  it('an entirely unknown action label resolves as a harmless no-op instead of throwing', async () => {
+    const result = await resolveEncounter(makeEncounter(), 'Totally Made Up', makeCharacter(), {});
+    expect(result.outcomeTier).toBe('success');
+    expect(result.rewards).toBeNull();
   });
 });

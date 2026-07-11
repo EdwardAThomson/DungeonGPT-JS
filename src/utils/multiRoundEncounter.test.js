@@ -12,7 +12,8 @@ import {
   createMultiRoundEncounter,
   computeStartingAdvantage,
   resolveRound,
-  generateEncounterSummary
+  generateEncounterSummary,
+  getRoundActions
 } from './multiRoundEncounter';
 
 // Numeric damage profile => rollProfileDamage returns the exact number, keeping
@@ -285,5 +286,41 @@ describe('generateEncounterSummary', () => {
     expect(summary.isTeamEncounter).toBe(true);
     expect(summary.leadIndex).toBe(2);
     expect(summary.supporterCount).toBe(2);
+  });
+});
+
+// Flee / contextual-action regression: getRoundActions must not inject a separate
+// 'Tactical Retreat' action (fleeing is the dedicated button now, one affordance), and
+// resolveRound must never throw on a contextual label reaching it directly.
+describe('flee + contextual actions', () => {
+  const baseState = (over = {}) => ({
+    encounter: makeBoss(),
+    currentRound: 2,
+    playerAdvantage: 3,   // unlocks 'Finish Them'
+    enemyMorale: 40,      // unlocks 'Demand Surrender'
+    ...over
+  });
+
+  test('getRoundActions no longer injects a Tactical Retreat action', () => {
+    const actions = getRoundActions(baseState());
+    const labels = actions.map((a) => a.label);
+    expect(labels).not.toContain('Tactical Retreat');
+    // The other contextual actions are still offered when their conditions are met.
+    expect(labels).toContain('Finish Them');
+    expect(labels).toContain('Demand Surrender');
+  });
+
+  test('resolveRound does not throw on any contextual label', async () => {
+    mockRoll(0.7); // stable success roll
+    for (const label of ['Tactical Retreat', 'Finish Them', 'Demand Surrender']) {
+      const state = createMultiRoundEncounter(
+        makeBoss(), makeHero(), {}, {}, [makeHero()]
+      );
+      state.currentRound = 2;
+      // eslint-disable-next-line no-await-in-loop
+      const { roundResult } = await resolveRound(state, label);
+      expect(roundResult).toBeTruthy();
+      expect(roundResult.narration).not.toMatch(/an error occurred/i);
+    }
   });
 });

@@ -29,6 +29,36 @@ export const encounterDC = (encounter) =>
   Number.isFinite(encounter?.dc) ? encounter.dc : DIFFICULTY_DC[encounter?.difficulty];
 
 /**
+ * Contextual actions that multiRoundEncounter.getRoundActions injects mid-fight
+ * (Finish Them / Demand Surrender / Tactical Retreat). They are NOT part of an
+ * encounter's authored `suggestedActions`, so resolveEncounter would otherwise
+ * throw "Invalid action" when the player picked one; that throw was swallowed into
+ * a generic "An error occurred" failure result (the Tactical Retreat / Finish Them
+ * crash). Recognizing them here maps each to a real skill check so they resolve
+ * cleanly. getRoundActions imports these so the two lists never drift.
+ * (Tactical Retreat is also intercepted in the modal and routed to the flee handler;
+ * this entry keeps resolveEncounter safe if it is ever resolved directly, e.g. tests
+ * or the balance sim.)
+ */
+export const CONTEXTUAL_ACTIONS = {
+  'Finish Them': {
+    label: 'Finish Them',
+    skill: 'Athletics',
+    description: 'Press your advantage for a decisive victory'
+  },
+  'Demand Surrender': {
+    label: 'Demand Surrender',
+    skill: 'Intimidation',
+    description: "Force them to yield while they're weakened"
+  },
+  'Tactical Retreat': {
+    label: 'Tactical Retreat',
+    skill: 'Acrobatics',
+    description: 'Disengage and escape while you can'
+  }
+};
+
+/**
  * Resolves an encounter based on player action and dice roll
  * Returns AI-narrated outcome with rewards/penalties
  *
@@ -43,11 +73,23 @@ export const encounterDC = (encounter) =>
  *   breakdown so the UI can show "d20 + modifier + support").
  */
 export const resolveEncounter = async (encounter, playerAction, character, settings, llmConfig = {}, rng = Math.random, context = {}) => {
-  // 1. Determine relevant skill and modifier
-  const action = encounter.suggestedActions.find(a => a.label === playerAction);
+  // 1. Determine relevant skill and modifier. Contextual mid-fight actions
+  // (Finish Them / Demand Surrender / Tactical Retreat) are not in suggestedActions,
+  // so fall back to the shared CONTEXTUAL_ACTIONS map. NEVER throw on an unknown
+  // label: a thrown error here was swallowed into a generic "An error occurred"
+  // failure that punished the player. An unrecognized action resolves as a harmless
+  // no-op success instead.
+  const action = encounter.suggestedActions.find(a => a.label === playerAction)
+    || CONTEXTUAL_ACTIONS[playerAction];
 
   if (!action) {
-    throw new Error(`Invalid action: ${playerAction}`);
+    return {
+      narration: `You ${String(playerAction || 'act').toLowerCase()}.`,
+      rollResult: null,
+      outcomeTier: 'success',
+      rewards: null,
+      penalties: null
+    };
   }
 
   // Handle non-skill actions (like "Move On" or "Leave")

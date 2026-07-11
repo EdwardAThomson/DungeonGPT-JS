@@ -1,4 +1,4 @@
-import { resolveEncounter, clampPenaltyGold, encounterDC } from './encounterResolver';
+import { resolveEncounter, clampPenaltyGold, encounterDC, CONTEXTUAL_ACTIONS } from './encounterResolver';
 import { calculateModifier } from './rules';
 import { applyDamage } from './healthSystem';
 import { getLevelBonus } from './progressionSystem';
@@ -178,32 +178,25 @@ export const getRoundActions = (roundState) => {
   // Later rounds: add contextual actions based on previous results
   const contextualActions = [];
 
+  // Contextual action defs are shared with encounterResolver (CONTEXTUAL_ACTIONS) so
+  // resolveEncounter recognizes every label these buttons can produce and never throws.
+
   // If player has advantage, offer finishing moves
   if (roundState.playerAdvantage >= 2) {
-    contextualActions.push({
-      label: 'Finish Them',
-      skill: 'Athletics',
-      description: 'Press your advantage for a decisive victory'
-    });
+    contextualActions.push(CONTEXTUAL_ACTIONS['Finish Them']);
   }
 
   // If enemy morale is low, offer intimidation
   if (roundState.enemyMorale < 50) {
-    contextualActions.push({
-      label: 'Demand Surrender',
-      skill: 'Intimidation',
-      description: 'Force them to yield while they\'re weakened'
-    });
+    contextualActions.push(CONTEXTUAL_ACTIONS['Demand Surrender']);
   }
 
-  // Always allow tactical retreat
-  if (round > 1) {
-    contextualActions.push({
-      label: 'Tactical Retreat',
-      skill: 'Acrobatics',
-      description: 'Disengage and escape while you can'
-    });
-  }
+  // Fleeing is offered through the dedicated "Attempt to Flee" button (single AND
+  // multi-round), which routes through the flee handler + onResolve reposition. We no
+  // longer inject a separate "Tactical Retreat" action here, so there is exactly ONE
+  // flee affordance per encounter (the button) instead of two competing ones. The
+  // CONTEXTUAL_ACTIONS['Tactical Retreat'] def is retained only so resolveEncounter
+  // stays safe if the label is ever resolved directly (tests / balance sim).
 
   return [...baseActions, ...contextualActions];
 };

@@ -4,7 +4,10 @@ import {
   applyPartyRewardsToAll,
   applyTeamEncounterOutcomeToParty,
   NARRATIVE_HOOK_PERSIST_MOVES,
-  planWorldTileEncounterFlow
+  planWorldTileEncounterFlow,
+  isFleeOutcome,
+  isEncounterVictory,
+  getFleeReposition
 } from './encounterController';
 
 describe('planWorldTileEncounterFlow', () => {
@@ -280,5 +283,42 @@ describe('grant-ledger events (SAVE_SYNC_PLAN 9.2): additive ledgerEvents return
     expect(updatedParty[0].gold).toBe(60);
     expect(rewardMessages).toEqual(['+25 XP', '+10 gold']);
     expect(penaltyMessages).toEqual([]);
+  });
+});
+
+// Flee/disengage helpers used by Game.js handleEncounterResolve. These drive the
+// reposition-on-flee behavior and gate the enemy/mob-defeat path, so they are unit-tested
+// here (a full Game.js render is too heavy for this decision logic).
+describe('flee outcome helpers', () => {
+  const world = { level: 'world', x: 2, y: 3 };
+
+  test('isFleeOutcome recognizes fled and escaped, not victory/success/failure', () => {
+    expect(isFleeOutcome({ outcome: 'fled' })).toBe(true);
+    expect(isFleeOutcome({ outcome: 'escaped' })).toBe(true);
+    expect(isFleeOutcome({ outcome: 'victory' })).toBe(false);
+    expect(isFleeOutcome({ outcome: 'success' })).toBe(false);
+    // A caught (failed) flee has outcomeTier 'failure' and NO outcome:'fled'.
+    expect(isFleeOutcome({ outcomeTier: 'failure' })).toBe(false);
+    expect(isFleeOutcome(null)).toBe(false);
+  });
+
+  test('isEncounterVictory is win-only and excludes a flee', () => {
+    expect(isEncounterVictory({ outcome: 'victory' })).toBe(true);
+    expect(isEncounterVictory({ outcome: 'success' })).toBe(true);
+    // A fled foe is NOT a victory, so enemy/mob-defeat never fires on a flee.
+    expect(isEncounterVictory({ outcome: 'fled', outcomeTier: 'success' })).toBe(false);
+    expect(isEncounterVictory({ outcome: 'escaped' })).toBe(false);
+  });
+
+  test('getFleeReposition returns the pre-encounter tile only on a real flee', () => {
+    // A successful flee with a captured pre-encounter tile repositions there.
+    expect(getFleeReposition({ outcome: 'fled' }, world)).toEqual(world);
+    expect(getFleeReposition({ outcome: 'escaped' }, world)).toEqual(world);
+    // A win never repositions.
+    expect(getFleeReposition({ outcome: 'victory' }, world)).toBeNull();
+    // A flee with no captured tile (stationary/legacy encounter) does not move.
+    expect(getFleeReposition({ outcome: 'fled' }, null)).toBeNull();
+    // A caught (failed) flee stays put.
+    expect(getFleeReposition({ outcomeTier: 'failure' }, world)).toBeNull();
   });
 });
