@@ -5,20 +5,30 @@ import { encounterTemplates } from '../data/encounters';
 
 const make = (type, seed) => populateSite(generateSiteMap(type, type, 'south', seed, { biome: 'plains' }), seed);
 const slotTiles = (site) => site.contentSlots.map((s) => site.mapData[s.y][s.x]);
+// A combat slot is now a MOVING MOB (site.mobs) at the slot coordinate, not tile content.
+const mobAt = (site, x, y) => (site.mobs || []).find((m) => m.x === x && m.y === y) || null;
 
 describe('populateSite', () => {
-  test('fills every content slot with an encounter or valid loot', () => {
+  test('fills every content slot with a moving mob or valid loot', () => {
     ['cave', 'ruins', 'forest', 'hills', 'mountain'].forEach((type) => {
       for (let seed = 1; seed <= 25; seed++) {
         const site = make(type, seed);
         expect(site.populated).toBe(true);
-        slotTiles(site).forEach((tile) => {
-          expect(tile.content).toBeTruthy();
-          expect(tile.content.consumed).toBe(false);
-          if (tile.content.kind === 'encounter') {
-            expect(tile.content.encounter.name).toBeTruthy();
-            expect(tile.content.encounter.rewards).toBeTruthy();
+        expect(Array.isArray(site.mobs)).toBe(true);
+        site.contentSlots.forEach((slot) => {
+          const tile = site.mapData[slot.y][slot.x];
+          const mob = mobAt(site, slot.x, slot.y);
+          if (mob) {
+            // a combat slot: a moving mob, not tile content
+            expect(tile.content).toBeFalsy();
+            expect(mob.defeated).toBe(false);
+            expect(mob.encounter.name).toBeTruthy();
+            expect(mob.encounter.rewards).toBeTruthy();
+            expect(mob.state).toBe('idle');
+            expect(mob.home).toEqual({ x: slot.x, y: slot.y });
           } else {
+            expect(tile.content).toBeTruthy();
+            expect(tile.content.consumed).toBe(false);
             expect(tile.content.kind).toBe('loot');
             expect(tile.content.loot.gold).toBeGreaterThan(0);
             expect(tile.content.loot.items.length).toBeGreaterThan(0);
@@ -30,13 +40,14 @@ describe('populateSite', () => {
     });
   });
 
-  test('a multi-room site has at least one encounter and one loot', () => {
+  test('a multi-room site has at least one mob and one loot', () => {
     let both = 0;
     for (let seed = 1; seed <= 30; seed++) {
       const site = make('cave', seed);
       if (site.contentSlots.length < 2) continue;
-      const kinds = new Set(slotTiles(site).map((t) => t.content.kind));
-      if (kinds.has('encounter') && kinds.has('loot')) both++;
+      const hasMob = site.contentSlots.some((s) => mobAt(site, s.x, s.y));
+      const hasLoot = slotTiles(site).some((t) => t.content && t.content.kind === 'loot');
+      if (hasMob && hasLoot) both++;
     }
     expect(both).toBeGreaterThan(0);
   });
@@ -66,14 +77,25 @@ describe('populateSite', () => {
       expect(site.objective.milestoneId).toBe('m1');
     });
 
-    test('combat objective is a milestone boss carrying enemyId (so defeat completes it)', () => {
+    test('combat objective is a stationary boss MOB carrying enemyId (so defeat completes it)', () => {
       const site = injectSiteObjective(make('ruins', 4), { objectiveType: 'combat', id: 'cave_tyrant', name: 'the Cave Tyrant', milestoneId: 'm2' });
-      const tile = deepestTile(site);
-      expect(tile.content.objectiveType).toBe('combat');
-      expect(tile.content.encounter.enemyId).toBe('cave_tyrant');
-      expect(tile.content.encounter.isMilestoneBoss).toBe(true);
-      expect(tile.content.encounter.name).toBe('the Cave Tyrant');
-      expect(tile.content.encounter.suggestedActions.length).toBeGreaterThan(0); // valid encounter shape
+      const entry = site.entryPoint;
+      const dist = (p) => Math.abs(p.x - entry.x) + Math.abs(p.y - entry.y);
+      const slot = site.contentSlots.reduce((a, b) => (dist(b) > dist(a) ? b : a));
+      // The boss is a guard mob at the deepest slot, not tile content.
+      const boss = (site.mobs || []).find((m) => m.isBoss && m.enemyId === 'cave_tyrant');
+      expect(boss).toBeTruthy();
+      expect(boss.x).toBe(slot.x);
+      expect(boss.y).toBe(slot.y);
+      expect(boss.speed).toBe(0); // stationary guard, holds its tile
+      expect(boss.milestoneId).toBe('m2');
+      expect(boss.encounter.isMilestoneBoss).toBe(true);
+      expect(boss.encounter.name).toBe('the Cave Tyrant');
+      expect(boss.encounter.enemyId).toBe('cave_tyrant');
+      expect(boss.encounter.suggestedActions.length).toBeGreaterThan(0); // valid encounter shape
+      // idempotent: a re-inject with the same milestone spawns no duplicate boss
+      injectSiteObjective(site, { objectiveType: 'combat', id: 'cave_tyrant', name: 'the Cave Tyrant', milestoneId: 'm2' });
+      expect((site.mobs || []).filter((m) => m.isBoss && m.milestoneId === 'm2')).toHaveLength(1);
     });
 
     test('location objective records the locationId for the reach-room trigger', () => {
@@ -445,7 +467,7 @@ describe('populateSite', () => {
 
   describe('per-type loot pools (issue #49 — no more cave coercion)', () => {
     const lootItems = (site) => slotTiles(site)
-      .filter((t) => t.content.kind === 'loot')
+      .filter((t) => t.content && t.content.kind === 'loot')
       .flatMap((t) => t.content.loot.items);
 
     test('forest/hills/mountain sites draw ONLY from their own LOOT/HOARD_BONUS pools', () => {
@@ -462,21 +484,19 @@ describe('populateSite', () => {
       });
     });
 
-    test('combat encounters on forest/hills/mountain sites still work (cave-mob fallback)', () => {
-      let encounters = 0;
+    test('combat mobs on forest/hills/mountain sites still spawn (cave-mob fallback)', () => {
+      let mobs = 0;
       ['forest', 'hills', 'mountain'].forEach((type) => {
         for (let seed = 1; seed <= 20; seed++) {
-          slotTiles(make(type, seed))
-            .filter((t) => t.content.kind === 'encounter')
-            .forEach((t) => {
-              encounters++;
-              expect(t.content.encounter.name).toBeTruthy();
-              expect(t.content.encounter.rewards).toBeTruthy();
-              expect(t.content.encounter.suggestedActions.length).toBeGreaterThan(0);
-            });
+          (make(type, seed).mobs || []).forEach((m) => {
+            mobs++;
+            expect(m.encounter.name).toBeTruthy();
+            expect(m.encounter.rewards).toBeTruthy();
+            expect(m.encounter.suggestedActions.length).toBeGreaterThan(0);
+          });
         }
       });
-      expect(encounters).toBeGreaterThan(0);
+      expect(mobs).toBeGreaterThan(0);
     });
 
     test('hide_armor actually drops from forest and hills hoards (issue #49 obtainability)', () => {
@@ -514,13 +534,19 @@ describe('populateSite', () => {
     });
   });
 
-  test('deterministic per seed, and idempotent', () => {
+  test('deterministic per seed, and idempotent (loot content + mobs)', () => {
     const a = make('cave', 314);
     const b = make('cave', 314);
     expect(JSON.stringify(slotTiles(a).map((t) => t.content))).toBe(JSON.stringify(slotTiles(b).map((t) => t.content)));
-    // calling populate again is a no-op (already populated)
+    // mobs are deterministic too (same ids/positions/encounters per seed)
+    const mobSig = (site) => JSON.stringify((site.mobs || []).map((m) => [m.id, m.x, m.y, m.speed, m.encounter.name]));
+    expect(mobSig(a)).toBe(mobSig(b));
+    expect((a.mobs || []).length).toBeGreaterThan(0);
+    // calling populate again is a no-op (already populated): no map churn, no extra mobs
     const before = JSON.stringify(a.mapData);
+    const mobsBefore = mobSig(a);
     populateSite(a, 314);
     expect(JSON.stringify(a.mapData)).toBe(before);
+    expect(mobSig(a)).toBe(mobsBefore);
   });
 });

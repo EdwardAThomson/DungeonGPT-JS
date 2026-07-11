@@ -7,6 +7,7 @@ import { generateTownMap, isTownTileWalkable } from '../utils/townMapGenerator';
 import { getTownWaterContext, getTownRoadEdges } from '../utils/townWater';
 import { generateSiteMap } from '../utils/siteMapGenerator';
 import { populateSite, injectSiteObjective, injectHarvestResource } from '../game/sitePopulator';
+import { healMobsToIdle } from '../game/mobMovement';
 import { populateTown } from '../utils/npcGenerator';
 import { injectQuestBuildings } from '../game/milestoneSpawner';
 import { getMilestoneNpcsForTown } from '../game/milestoneEngine';
@@ -87,7 +88,13 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
     const [townMapsCache, setTownMapsCache] = useState(subMapsData?.townMapsCache || initialTownMapsCache || {});
 
     // Wilderness site sub-maps (caves / ruins) — parallel to the town sub-map system.
-    const [currentSiteMap, setCurrentSiteMap] = useState(subMapsData?.currentSiteMap || null);
+    const [currentSiteMap, setCurrentSiteMap] = useState(() => {
+        // A save resumed mid-site must not resume an in-flight chase: downgrade any
+        // persisted alerted/aggro mob to idle before the rehydrated map re-renders.
+        const loaded = subMapsData?.currentSiteMap || null;
+        if (loaded && Array.isArray(loaded.mobs)) healMobsToIdle(loaded.mobs);
+        return loaded;
+    });
     const [sitePlayerPosition, setSitePlayerPosition] = useState(subMapsData?.sitePlayerPosition || null);
     const [currentSiteTile, setCurrentSiteTile] = useState(subMapsData?.currentSiteTile || null);
     const [isInsideSite, setIsInsideSite] = useState(subMapsData?.isInsideSite || false);
@@ -368,6 +375,9 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 logger.info('Ensured gather resources in site', { key, items: gatherResources.map(r => r.itemId) });
             }
 
+            // Entering a cached site whose mobs were persisted mid-chase: start them calm.
+            if (Array.isArray(siteMap.mobs)) healMobsToIdle(siteMap.mobs);
+
             setCurrentSiteMap(siteMap);
             setCurrentSiteTile(tile);
             setSitePlayerPosition({ x: siteMap.entryPoint.x, y: siteMap.entryPoint.y });
@@ -426,6 +436,18 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             if (!prev) return prev;
             const tile = prev.mapData[y] && prev.mapData[y][x];
             if (tile && tile.content) tile.content.consumed = true;
+            return { ...prev };
+        });
+    };
+
+    // Mark a site mob defeated after its fight resolves in victory, so it stops rendering
+    // and never re-triggers. Mutates the mob in place (the cached site shares this mobs
+    // array, mirroring markSiteContentConsumed) so a leave/re-enter keeps it dead.
+    const setSiteMobDefeated = (id) => {
+        setCurrentSiteMap(prev => {
+            if (!prev || !Array.isArray(prev.mobs)) return prev;
+            const mob = prev.mobs.find(m => m && m.id === id);
+            if (mob) { mob.defeated = true; mob.state = 'idle'; }
             return { ...prev };
         });
     };
@@ -603,6 +625,9 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
 
         // wilderness sites (caves / ruins)
         currentSiteMap,
+        // Exposed so Game.js's advanceMobs can write stepped mob positions back each
+        // player-step (the mob objects are mutated in place so the cache stays in sync).
+        setCurrentSiteMap,
         sitePlayerPosition,
         currentSiteTile,
         isInsideSite,
@@ -615,6 +640,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         handleLeaveSite,
         moveSitePlayerTo,
         markSiteContentConsumed,
+        setSiteMobDefeated,
 
         visitedBiomes,
         visitedTowns,
