@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ITEM_CATALOG, rollDice, removeItem, getRarityColor } from '../utils/inventorySystem';
-import { applyHealing, getHPStatus } from '../utils/healthSystem';
+import { ITEM_CATALOG, getRarityColor, consumeHealingItem } from '../utils/inventorySystem';
+import { getHPStatus } from '../utils/healthSystem';
 import { heroUid } from '../utils/partyUtils';
 import { useModal } from '../contexts/ModalContext';
 import {
@@ -105,33 +105,25 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
   const handleUsePotion = (heroIndex) => {
     const { itemKey } = useItemState;
     const target = party[heroIndex];
-    const catalogEntry = ITEM_CATALOG[itemKey];
-    const rolled = rollDice(catalogEntry.amount);
-    const before = target.currentHP;
-    const healed = applyHealing(target, rolled);
-    const actualHeal = healed.currentHP - before;
-
-    // Remove one instance from whichever hero owns the item.
+    // Remove one instance from whichever hero owns the item (pooled inventory), and
+    // heal the target via the SHARED consume path also used by in-combat item use.
     const owner = findItemOwner(itemKey);
-    const updatedInventory = removeItem(owner.inventory || [], itemKey, 1);
-    const updatedOwner = { ...owner, inventory: updatedInventory };
-    const sameOwner = heroUid(owner) === heroUid(target);
-    // If owner and target are the same hero, merge the heal and the removal.
-    const finalTarget = sameOwner ? { ...healed, inventory: updatedInventory } : healed;
+    const res = consumeHealingItem(itemKey, target, owner);
+    if (!res.ok) { setUseItemState(null); return; }
 
     // Persist to the party state, and reflect it locally for instant UI updates.
     if (onUseItem) {
-      onUseItem(heroUid(target), itemKey, finalTarget);
-      if (!sameOwner) onUseItem(heroUid(owner), itemKey, updatedOwner);
+      onUseItem(heroUid(target), itemKey, res.healedTarget);
+      if (!res.sameOwner) onUseItem(heroUid(owner), itemKey, res.updatedOwner);
     }
-    applyHeroes(sameOwner ? [finalTarget] : [finalTarget, updatedOwner]);
+    applyHeroes(res.sameOwner ? [res.healedTarget] : [res.healedTarget, res.updatedOwner]);
 
     const resultId = Date.now();
     setUseResults(prev => [...prev, {
       heroName: target.characterName || target.name,
-      itemName: catalogEntry.name,
-      rolled,
-      healed: actualHeal,
+      itemName: res.itemName,
+      rolled: res.rolled,
+      healed: res.actualHeal,
       id: resultId
     }]);
     const timer = setTimeout(() => {
@@ -369,67 +361,97 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
           )}
         </div>
 
-        {/* Hero picker for using a healing item */}
+        {/* Hero picker for using a healing item.
+            #: previously an in-flow block appended AFTER the (scrollable, 35vh-capped)
+            item grid inside the Adventure Book's overflow:auto body, so clicking "Use"
+            mounted it below the fold and nothing appeared to happen. It is now a
+            FIXED, centered overlay with a dimmed backdrop layered above the book, so it
+            is always on screen regardless of scroll position. */}
         {useItemState && (
-          <div style={{
-            marginTop: '16px',
-            padding: '16px',
-            background: 'rgba(39, 174, 96, 0.1)',
-            border: '1px solid #27ae60',
-            borderRadius: '8px'
-          }}>
-            <h4 style={{ margin: '0 0 12px 0', color: '#27ae60', fontFamily: 'var(--header-font)' }}>
-              Use {ITEM_CATALOG[useItemState.itemKey]?.name} on...
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {party.filter(h => !h.isDefeated).map((hero) => {
-                const hpStatus = getHPStatus(hero.currentHP, hero.maxHP);
-                const heroIndex = party.findIndex(h => heroUid(h) === heroUid(hero));
-                const atFull = hero.currentHP >= hero.maxHP;
-                return (
-                  <button
-                    key={heroUid(hero)}
-                    onClick={() => { if (!atFull) handleUsePotion(heroIndex); }}
-                    disabled={atFull}
-                    title={atFull ? 'Already at full health' : `Heal ${hero.characterName || hero.name}`}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      padding: '10px 14px',
-                      background: 'rgba(0,0,0,0.2)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '6px',
-                      color: 'var(--text)',
-                      cursor: atFull ? 'not-allowed' : 'pointer',
-                      opacity: atFull ? 0.5 : 1,
-                      fontFamily: 'var(--body-font)',
-                      fontSize: '0.95rem'
-                    }}
-                  >
-                    <span style={{ fontWeight: 'bold' }}>{hero.characterName || hero.name}</span>
-                    <span style={{ color: hpStatus.color, fontSize: '0.85rem' }}>
-                      {hero.currentHP} / {hero.maxHP} HP{atFull ? ' · Full' : ''}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => setUseItemState(null)}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Use ${ITEM_CATALOG[useItemState.itemKey]?.name || 'item'}`}
+            onClick={() => setUseItemState(null)}
+            style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(0,0,0,0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 4000,
+              padding: '20px'
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
               style={{
-                marginTop: '10px',
-                padding: '6px 14px',
-                background: 'none',
-                border: '1px solid var(--border)',
-                borderRadius: '4px',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                fontSize: '0.85rem'
+                width: '100%',
+                maxWidth: '380px',
+                maxHeight: '80vh',
+                overflowY: 'auto',
+                padding: '20px',
+                background: 'var(--surface)',
+                border: '1px solid #27ae60',
+                borderRadius: '10px',
+                boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
               }}
             >
-              Cancel
-            </button>
+              <h4 style={{ margin: '0 0 12px 0', color: '#27ae60', fontFamily: 'var(--header-font)' }}>
+                Use {ITEM_CATALOG[useItemState.itemKey]?.name} on...
+              </h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {party.filter(h => !h.isDefeated).map((hero) => {
+                  const hpStatus = getHPStatus(hero.currentHP, hero.maxHP);
+                  const heroIndex = party.findIndex(h => heroUid(h) === heroUid(hero));
+                  const atFull = hero.currentHP >= hero.maxHP;
+                  return (
+                    <button
+                      key={heroUid(hero)}
+                      onClick={() => { if (!atFull) handleUsePotion(heroIndex); }}
+                      disabled={atFull}
+                      title={atFull ? 'Already at full health' : `Heal ${hero.characterName || hero.name}`}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '10px 14px',
+                        background: 'rgba(0,0,0,0.2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '6px',
+                        color: 'var(--text)',
+                        cursor: atFull ? 'not-allowed' : 'pointer',
+                        opacity: atFull ? 0.5 : 1,
+                        fontFamily: 'var(--body-font)',
+                        fontSize: '0.95rem'
+                      }}
+                    >
+                      <span style={{ fontWeight: 'bold' }}>{hero.characterName || hero.name}</span>
+                      <span style={{ color: hpStatus.color, fontSize: '0.85rem' }}>
+                        {hero.currentHP} / {hero.maxHP} HP{atFull ? ' · Already at full health' : ''}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => setUseItemState(null)}
+                style={{
+                  marginTop: '12px',
+                  padding: '8px 14px',
+                  width: '100%',
+                  background: 'none',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontSize: '0.85rem'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 

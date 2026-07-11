@@ -1,6 +1,9 @@
 // Phase 4: Inventory System
 // Gold management and item tracking
 
+import { applyHealing } from './healthSystem';
+import { heroUid } from './partyUtils';
+
 /**
  * Roll dice notation (e.g., "3d10", "2d6+5")
  * @param {string} notation - Dice notation
@@ -419,6 +422,87 @@ export const removeItem = (inventory, itemKey, quantity = 1) => {
   }
 
   return newInventory;
+};
+
+/**
+ * Is this catalog item a USABLE healing consumable? (effect === 'heal' with an amount).
+ * Shared by both surfaces (Party inventory picker + in-combat item use) so the two
+ * agree on exactly which items show a "Use" affordance.
+ * @param {string} itemKey - ITEM_CATALOG key
+ * @returns {boolean}
+ */
+export const isHealingConsumable = (itemKey) => {
+  const entry = ITEM_CATALOG[itemKey];
+  return !!(entry && entry.effect === 'heal' && entry.amount);
+};
+
+/**
+ * Consume ONE healing consumable: roll its heal, apply it to the target hero, and
+ * decrement one from the owning hero's stack. This is the SINGLE shared path used by
+ * both the Party-inventory picker (PartyInventoryModal) and the in-combat item action
+ * (EncounterActionModal), so behavior stays identical on both surfaces.
+ *
+ * Handles the shared-pool case where the item owner differs from the heal target (the
+ * party inventory is pooled): the heal lands on `targetHero` while the stack is removed
+ * from `ownerHero`. When owner and target are the same hero the two merge into one
+ * updated hero object (heal + inventory decrement together).
+ *
+ * Pure and deterministic when `options.rolled` is supplied (tests inject it); otherwise
+ * the amount is rolled via rollDice (Math.random).
+ *
+ * @param {string} itemKey - ITEM_CATALOG key of the consumable
+ * @param {Object} targetHero - hero receiving the heal
+ * @param {Object} [ownerHero] - hero whose inventory the item is removed from (defaults to targetHero)
+ * @param {Object} [options]
+ * @param {number} [options.rolled] - pre-rolled heal amount (skips rollDice; for tests/determinism)
+ * @returns {{ ok: boolean, reason?: string, itemName?: string, healedTarget?: Object,
+ *   updatedOwner?: Object, updatedOwnerInventory?: Array, rolled?: number,
+ *   actualHeal?: number, sameOwner?: boolean }}
+ */
+export const consumeHealingItem = (itemKey, targetHero, ownerHero, options = {}) => {
+  const catalogEntry = ITEM_CATALOG[itemKey];
+  if (!catalogEntry || catalogEntry.effect !== 'heal' || !catalogEntry.amount) {
+    return { ok: false, reason: 'not_consumable' };
+  }
+  if (!targetHero) return { ok: false, reason: 'no_target' };
+  if (targetHero.isDefeated || targetHero.currentHP <= 0) {
+    return { ok: false, reason: 'defeated' };
+  }
+  if (targetHero.currentHP >= targetHero.maxHP) {
+    return { ok: false, reason: 'full_health' };
+  }
+
+  const owner = ownerHero || targetHero;
+  const sameOwner = heroUid(owner) === heroUid(targetHero);
+
+  const rolled = Number.isFinite(options.rolled)
+    ? options.rolled
+    : rollDice(catalogEntry.amount);
+  const before = targetHero.currentHP;
+  const healed = applyHealing(targetHero, rolled);
+  const actualHeal = healed.currentHP - before;
+
+  const updatedOwnerInventory = removeItem(owner.inventory || [], itemKey, 1);
+
+  // If the same hero both owns the item and receives the heal, merge the heal and the
+  // stack decrement into one hero object; otherwise keep them as two distinct heroes.
+  const healedTarget = sameOwner
+    ? { ...healed, inventory: updatedOwnerInventory }
+    : healed;
+  const updatedOwner = sameOwner
+    ? healedTarget
+    : { ...owner, inventory: updatedOwnerInventory };
+
+  return {
+    ok: true,
+    itemName: catalogEntry.name,
+    healedTarget,
+    updatedOwner,
+    updatedOwnerInventory,
+    rolled,
+    actualHeal,
+    sameOwner
+  };
 };
 
 /**
