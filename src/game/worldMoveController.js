@@ -83,6 +83,27 @@ export const buildPoiEncounter = (targetTile) => {
     corrupted_lighthouse: '/assets/encounters/corrupted_lighthouse_arrival.webp',
     mourn_peak_summit: '/assets/encounters/mourn_peak_summit_arrival.webp'
   };
+  // Generic per-size settlement arrival art. World-map settlement tiles all carry
+  // poi='town' regardless of size (mapGenerator stamps poi='town' for every settlement),
+  // and the real size lives in tile.townSize (city/town/village/hamlet). So the arrival
+  // image is keyed by townSize, not poiType, and a village gets village_arrival.webp.
+  const SETTLEMENT_SIZES = ['city', 'town', 'village', 'hamlet'];
+  const SETTLEMENT_IMAGES = {
+    city: '/assets/encounters/city_arrival.webp',
+    town: '/assets/encounters/town_arrival.webp',
+    village: '/assets/encounters/village_arrival.webp',
+    hamlet: '/assets/encounters/hamlet_arrival.webp'
+  };
+  // A settlement tile is any tile whose poi resolves to 'town' (all sizes) or, defensively,
+  // a tile whose poiType is already a size word. Pick the size image by townSize, falling
+  // back to the poiType size word, then to 'town'.
+  const isSettlement = poiType === 'town' || SETTLEMENT_SIZES.includes(poiType);
+  const settlementSize = isSettlement
+    ? (SETTLEMENT_SIZES.includes(targetTile.townSize)
+        ? targetTile.townSize
+        : (SETTLEMENT_SIZES.includes(poiType) ? poiType : 'town'))
+    : null;
+  const arrivalImage = settlementSize ? SETTLEMENT_IMAGES[settlementSize] : (POI_IMAGES[poiType] || null);
   // Milestone POIs carry their authored display name on the tile (poiName); named mountain
   // ranges show their range name ("the Grey Moors", not "the Mountains"); the raw poi id
   // is only ever a last resort and gets title-cased so it never renders underscored.
@@ -93,7 +114,7 @@ export const buildPoiEncounter = (targetTile) => {
   return {
     name: displayName,
     poiType,
-    image: POI_IMAGES[poiType] || null,
+    image: arrivalImage,
     isMilestonePoi: !!targetTile.milestonePoi,
     description: targetTile.descriptionSeed || `You have arrived at ${displayName}.`,
     canEnter: ['town', 'city', 'village', 'hamlet', 'dungeon', 'cave_entrance', 'cave', 'ruins', 'forest', 'hills', 'mountain'].includes(poiType),

@@ -23,8 +23,12 @@ const KNOWN_MISSING_CARDS = [];
 // file lands. A NEW undeclared gap still fails immediately. Paths are matched
 // exactly as they appear in source (leading slash preserved where present).
 const KNOWN_MISSING_ASSETS = [
-  '/assets/encounters/cold_snap.webp',    // Bitter Cold hazard art (cold counterpart to heat_wave.webp)
-  'assets/icons/items/frost_flower.webp', // Bitter Cold reward-drop icon
+  '/assets/encounters/cold_snap.webp',        // Bitter Cold hazard art (cold counterpart to heat_wave.webp)
+  'assets/icons/items/frost_flower.webp',     // Bitter Cold reward-drop icon
+  '/assets/encounters/city_arrival.webp',     // Generic settlement arrival art, queued (docs/IMAGE_GENERATION_PROMPTS.md)
+  '/assets/encounters/town_arrival.webp',     // Generic settlement arrival art, queued
+  '/assets/encounters/village_arrival.webp',  // Generic settlement arrival art, queued
+  '/assets/encounters/hamlet_arrival.webp',   // Generic settlement arrival art, queued
 ];
 
 // Data source files whose string literals declare art paths.
