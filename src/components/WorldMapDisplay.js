@@ -134,7 +134,7 @@ export const _resetRememberedZoom = () => { rememberedZoom = 'close'; };
 
 const ZOOM_LABELS = { fit: 'Fit', medium: 'Mid', close: 'Close' };
 
-const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visibleMilestonePois, revealedSiteTypes }) => {
+const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visibleMilestonePois, activeMilestonePois, revealedSiteTypes }) => {
   const mapHeight = mapData ? mapData.length : 0;
   const mapWidth = mapHeight > 0 ? mapData[0].length : 0;
 
@@ -310,9 +310,12 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
     // POI sprite overlay (town/forest/mountain/hills/cave_entrance/ruins/milestone)
     const poi = (isMilestoneHidden || isSiteHidden) ? null : poiSprite(tile);
 
-    // A revealed milestone POI (objective) gets a warm glowing border for findability,
-    // mirroring the town quest-building glow. Hidden (locked) POIs stay unmarked.
-    const isVisibleMilestonePoi = !!tile.milestonePoi && !isMilestoneHidden;
+    // An ACTIVE milestone POI (revealed but not yet completed) gets a warm glowing
+    // border for findability, mirroring the town quest-building glow. Completed
+    // objectives and prior-chapter landmarks stay drawn but stop glowing. When no active
+    // set is supplied (debug harnesses), nothing glows. Hidden (locked) POIs stay unmarked.
+    const isActiveMilestonePoi = !!tile.milestonePoi && !isMilestoneHidden
+      && !!activeMilestonePois && activeMilestonePois.has(tile.poi);
 
     // Collect a name label for this tile if applicable
     const labelText = tile.townName
@@ -330,7 +333,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
     return (
       <div
         key={`${tile.x}-${tile.y}`}
-        className={`map-tile ${isPlayerHere ? 'player-tile' : ''} ${!tile.isExplored ? 'unexplored' : ''} ${isVisibleMilestonePoi ? 'milestone-poi-tile' : ''}`}
+        className={`map-tile ${isPlayerHere ? 'player-tile' : ''} ${!tile.isExplored ? 'unexplored' : ''} ${isActiveMilestonePoi ? 'milestone-poi-tile' : ''}`}
         style={{
           backgroundImage: biomeBackground(tile, tile.x, tile.y),
           backgroundSize: 'cover',

@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useMemo } from 'react';
-import { computeVisibleMilestonePois } from '../game/milestoneEngine';
+import { computeVisibleMilestonePois, computeActiveMilestonePois } from '../game/milestoneEngine';
 import { getRevealedSiteTypes } from '../game/questEngine';
 
 // Lazy load modal components for better performance
@@ -69,6 +69,14 @@ const GameModals = ({
     [settings?.milestones, mapHook.worldMap]
   );
 
+  // Which milestone POIs still GLOW: only ACTIVE objectives (revealed but not yet
+  // completed). Completed POIs stay visible (above) but stop glowing, and prior-chapter
+  // landmarks never glow.
+  const activeMilestonePois = useMemo(
+    () => computeActiveMilestonePois(settings?.milestones),
+    [settings?.milestones]
+  );
+
   // Which site types (cave/ruins) a quest has revealed — for hiding un-quested sites.
   // null = no gating (old saves / campaigns with no side quests keep sites visible).
   const revealedSiteTypes = useMemo(
@@ -134,6 +142,7 @@ const GameModals = ({
         townError={mapHook.townError}
         markBuildingDiscovered={mapHook.markBuildingDiscovered}
         visibleMilestonePois={visibleMilestonePois}
+        activeMilestonePois={activeMilestonePois}
         revealedSiteTypes={revealedSiteTypes}
         onQuestItemFound={onQuestItemFound}
         onRest={onRest}

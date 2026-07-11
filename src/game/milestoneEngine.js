@@ -238,6 +238,32 @@ export const computeVisibleMilestonePois = (milestones, worldMap) => {
 };
 
 /**
+ * Which milestone POIs should still GLOW (the "go here next" findability highlight).
+ *
+ * Distinct from computeVisibleMilestonePois: a POI stays visible on the map forever
+ * once revealed (completed objectives and prior-chapter landmarks remain drawn), but
+ * it should only glow while its objective is ACTIVE, i.e. revealed (prerequisites met)
+ * and not yet completed. A finished objective (e.g. a cleared goblin hideout) keeps
+ * its sprite but drops the glow, and prior-chapter POIs never glow.
+ *
+ * Returns a Set (possibly empty) of glowing poi ids. Callers treat an absent/undefined
+ * value as "no glow".
+ *
+ * @param {Array} milestones - CURRENT campaign milestones
+ * @returns {Set<string>} poi ids that should glow
+ */
+export const computeActiveMilestonePois = (milestones) => {
+    const ms = Array.isArray(milestones) ? milestones : [];
+    const active = new Set();
+    for (const m of ms) {
+        if (m.spawn?.type === 'poi' && !m.completed && areRequirementsMet(m, ms)) {
+            active.add(m.spawn.id);
+        }
+    }
+    return active;
+};
+
+/**
  * Find the milestone item gatherable on a world tile, if any.
  *
  * Covers item milestones authored at WILDERNESS locations (building: null) — e.g.
