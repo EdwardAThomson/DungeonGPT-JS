@@ -32,11 +32,26 @@ const EncounterModal = () => {
         return icons[poiType] || '📍';
     };
 
+    // Subtitle describing the location. This modal is the ARRIVAL modal for a settlement or
+    // explorable site, never a random combat encounter, so it must never say "Random Encounter".
+    // Settlement tiles all carry poi='town' regardless of size, with the real size in
+    // tile.townSize (city/town/village/hamlet); prefer that, fall back to poiType.
+    const SETTLEMENT_TYPES = ['city', 'town', 'village', 'hamlet'];
+    const getLocationLabel = () => {
+        if (encounter.isMilestonePoi) return 'Quest Location';
+        const size = encounter.tile?.townSize;
+        const settlement = (size && SETTLEMENT_TYPES.includes(size))
+            ? size
+            : (SETTLEMENT_TYPES.includes(encounter.poiType) ? encounter.poiType : null);
+        if (settlement) return settlement.charAt(0).toUpperCase() + settlement.slice(1);
+        return 'Location';
+    };
+
     return (
         <ModalShell modalId="encounterInfo" className="encounter-modal-content" ariaLabel="Encounter" style={{ padding: '20px 24px' }}>
                     <h2 style={{ marginTop: '0', marginBottom: '2px', paddingBottom: '6px' }}>{encounter.name}</h2>
                     <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--state-muted-strong)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '10px' }}>
-                        {encounter.isMilestonePoi ? 'Quest Location' : 'Random Encounter'}
+                        {getLocationLabel()}
                     </div>
                     {encounter.image && (
                         <ClickableImage

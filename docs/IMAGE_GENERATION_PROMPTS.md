@@ -346,3 +346,28 @@ repoint an icon before its file exists on disk or `artIntegrity.test.js` goes re
 | `pine_resin.webp` | A sticky amber lump of fresh pine resin tapped from forest pine, glistening translucent gold with a few flecks of bark and a slow drip caught mid-fall. Painterly digital fantasy art with rich amber and sap textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | low (borrows rare_ingredient.webp; boatwright gather item) |
 | `studded_leather.webp` | A set of studded leather armor, a boiled-leather cuirass reinforced with rows of dark iron rivets and buckled straps, supple and battle-worn. Painterly digital fantasy art with rich leather and iron textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | low (borrows hard_leather.webp; +2 armor) |
 | `hide_armor.webp` | A crude suit of hide armor layered from thick beast pelts and rawhide lashings, fur still on the shoulders, rugged and primal. Painterly digital fantasy art with rich fur and rawhide textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | low (borrows beast_hide.webp; +2 armor) |
+
+## Generation queue (2026-07-11, generic settlement arrival images)
+
+Playtest: the POI arrival modal (`src/components/EncounterModal.js`, opened for
+settlements on the world map) shows NO image when the player arrives at a town,
+only the fallback emoji, because `POI_IMAGES` in `buildPoiEncounter`
+(`src/game/worldMoveController.js`) had no settlement entries. World-map
+settlement tiles all carry `poi='town'` regardless of size, with the real size in
+`tile.townSize` (city/town/village/hamlet), so the modal now resolves a generic
+per-size arrival image keyed by `townSize` (a village gets `village_arrival.webp`,
+a city `city_arrival.webp`, and so on). The four paths are already declared in the
+code and pinned in `src/data/artIntegrity.test.js` (`KNOWN_MISSING_ASSETS`); drop
+each file at the path below and delete its pin as the art lands. No further code
+change is needed. These are biome-neutral establishing "arrival at the edge of a
+settlement" shots in the house arrival style, sized appropriately, with no people
+in the foreground so they read as one series alongside the existing
+`*_site_arrival.webp` art.
+
+### Arrival images (`public/assets/encounters/`)
+| File | Prompt | Note |
+|---|---|---|
+| `public/assets/encounters/city_arrival.webp` | The approach to a great walled city at the edge of open country, high stone curtain walls and watchtowers rising above a fortified gatehouse, banners on the battlements and rooftops and a cathedral spire beyond the walls, a road leading up to the closed gates. Grand and imposing, biome-neutral establishing shot. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | pending/new (playtest 2026-07-11: settlement arrival modal shows no image; keyed by townSize='city') |
+| `public/assets/encounters/town_arrival.webp` | The approach to a modest walled town of timber-and-thatch houses clustered around a central market square, a low palisade or stone wall with a simple gate, tiled and thatched roofs and a few chimney smokes, a dirt road running in from the fields. Lived-in and ordinary, biome-neutral establishing shot. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | pending/new (playtest 2026-07-11: settlement arrival modal shows no image; keyed by townSize='town') |
+| `public/assets/encounters/village_arrival.webp` | The approach to a small farming village, a scattering of thatched timber cottages among tilled fields and hedgerows, a well and a few barns, low fences and a rutted lane winding between the houses under an open sky. Humble and rustic, biome-neutral establishing shot. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | pending/new (playtest 2026-07-11: settlement arrival modal shows no image; keyed by townSize='village') |
+| `public/assets/encounters/hamlet_arrival.webp` | The approach to a tiny hamlet of just a few weathered cottages huddled at the roadside, thatched roofs and a single crooked chimney smoke, a woodpile and a low dry-stone wall, an empty dirt track leading past into the wilds. Sparse, remote and quiet, biome-neutral establishing shot. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | pending/new (playtest 2026-07-11: settlement arrival modal shows no image; keyed by townSize='hamlet') |
