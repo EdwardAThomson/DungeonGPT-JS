@@ -2,6 +2,28 @@ import { addGold, addItem, ITEM_CATALOG } from '../utils/inventorySystem';
 import { awardXP, getLevelUpSummary } from '../utils/progressionSystem';
 import { heroUid } from '../utils/partyUtils';
 
+// --- Flee / disengage outcome helpers (pure; shared by Game.js handleEncounterResolve) ---
+
+// A flee/disengage outcome: the party broke away rather than winning or losing. A single-
+// round flee sets outcome:'fled' (EncounterActionModal); the multi-round Tactical Retreat
+// path sets 'escaped'. Used to reposition the party to their pre-encounter tile AND to skip
+// the enemy/mob-defeat path (a fled foe is not defeated).
+export const isFleeOutcome = (result) =>
+  result?.outcome === 'fled' || result?.outcome === 'escaped';
+
+// A win: victory (enemy dead / routed) or a single-round success. The enemy_defeated
+// milestone check and the site-mob defeat gate on this; a flee is deliberately excluded so
+// breaking away never counts the foe as slain.
+export const isEncounterVictory = (result) =>
+  result?.outcome === 'victory' || result?.outcome === 'success';
+
+// The tile to send the party back to on a flee, or null when there is nothing to restore:
+// a FAILED flee (never sets 'fled', so the caught party stays put), or a stationary/legacy
+// encounter with no captured pre-encounter position. Pure: the caller applies the
+// level-appropriate position setter.
+export const getFleeReposition = (result, preEncounterPos) =>
+  (isFleeOutcome(result) && preEncounterPos) ? preEncounterPos : null;
+
 // Grant-ledger note (SAVE_SYNC_PLAN.md 9.2): the reward/penalty helpers below
 // ALSO return the ledger `events` they imply ({ heroId, kind, amount?|key? },
 // no source/timestamp: the Game.js call site stamps the source and

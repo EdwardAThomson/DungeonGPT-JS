@@ -170,6 +170,16 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
       return;
     }
 
+    // 'Tactical Retreat' is a disengage, not a combat check. Route it to the working
+    // flee handler (70% success + reposition via outcome:'fled') so it never reaches
+    // resolveEncounter (where a non-suggestedActions label used to throw). The dedicated
+    // "Attempt to Flee" button is the primary flee affordance; this guard just keeps any
+    // stray Tactical Retreat action coherent with it.
+    if (action?.label === 'Tactical Retreat') {
+      handleFleeEncounter();
+      return;
+    }
+
     setSelectedAction(action);
     setIsResolving(true);
 
@@ -268,6 +278,12 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
         narration: `${currentCharacter.heroName || currentCharacter.characterName} successfully breaks away from combat and flees to safety.`,
         rollResult: null,
         outcomeTier: 'success',
+        // `outcome: 'fled'` is the signal handleEncounterResolve (Game.js) branches on to
+        // DISENGAGE: it repositions the party back to the pre-encounter tile and skips the
+        // enemy/mob-defeat path (a fled foe is not defeated). outcomeTier stays 'success'
+        // for the badge. A FAILED flee (below) deliberately omits this: the party was
+        // caught, so it neither disengages nor repositions.
+        outcome: 'fled',
         rewards: null,
         penalties: {
           messages: ['Fled from combat'],
@@ -301,19 +317,19 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
     }
   };
 
-  const handleContinue = () => {
-    if (onResolve) {
+  // Route a resolved outcome through onResolve, then tear the modal down. EVERY exit that
+  // ends an encounter (Continue Journey, pre-combat flee, retreat-when-defeated) goes
+  // through here so NONE of them bypass onResolve; a bypassing close() left the map closed
+  // (reopenMapAfterEncounterRef stuck) and skipped the reward/penalty + reposition flush.
+  const resolveAndClose = (finalResult) => {
+    if (onResolve && finalResult) {
       // Include which hero led. Team summaries (#43) carry leadIndex /
       // isTeamEncounter / supporterCount from generateEncounterSummary; the final
       // lead may differ from the picked one after a KO auto-swap.
-      const leadHeroIndex = result?.isTeamEncounter
-        ? result.leadIndex
+      const leadHeroIndex = finalResult?.isTeamEncounter
+        ? finalResult.leadIndex
         : (initiativeResult ? initiativeResult.actualHeroIndex : (party ? selectedHeroIndex : 0));
-      const resultWithHero = {
-        ...result,
-        heroIndex: leadHeroIndex
-      };
-      onResolve(resultWithHero);
+      onResolve({ ...finalResult, heroIndex: leadHeroIndex });
     }
     // Reset all state - the ref will be cleared when modal closes via useEffect
     setSelectedAction(null);
@@ -326,6 +342,36 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
     setHeroConfirmed(false);
     setInitiativeResult(null);
     close();
+  };
+
+  const handleContinue = () => resolveAndClose(result);
+
+  // Pre-combat flee (from the hero-selection / formation phase): the fight has not
+  // started, so this is a clean guaranteed disengage. outcome:'fled' makes Game.js
+  // reposition the party back to the pre-encounter tile and reopen the map.
+  const handleFleeBeforeCombat = () => {
+    const name = currentCharacter?.heroName || currentCharacter?.characterName || 'The party';
+    resolveAndClose({
+      narration: `${name} slips away before the fight begins, disengaging without a scratch.`,
+      rollResult: null,
+      outcomeTier: 'success',
+      outcome: 'fled',
+      rewards: null,
+      penalties: null
+    });
+  };
+
+  // Retreat when defeated mid-fight: the party lost, so this is NOT a clean flee (no
+  // 'fled' reposition), but it must still flush through onResolve so the map reopens and
+  // any live-applied damage is preserved. HP damage was already applied during the fight.
+  const handleRetreatDefeated = () => {
+    resolveAndClose({
+      narration: `Too wounded to continue, the party breaks off and retreats from the ${encounter.name.toLowerCase()}.`,
+      rollResult: null,
+      outcomeTier: 'failure',
+      rewards: null,
+      penalties: null
+    });
   };
 
   // Check if character is defeated
@@ -496,7 +542,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
               </button>
             </div>
 
-            <button className="modal-close-button" onClick={() => close()}>
+            <button className="modal-close-button" onClick={handleFleeBeforeCombat}>
               Flee Encounter
             </button>
           </>
@@ -653,7 +699,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                 <div className="defeat-warning">
                   <h3 style={{ color: 'var(--state-danger)', margin: '0 0 10px 0' }}>💀 You are defeated!</h3>
                   <p>You cannot continue fighting in your current condition.</p>
-                  <button className="primary-button" onClick={close} style={{ marginTop: '15px' }}>
+                  <button className="primary-button" onClick={handleRetreatDefeated} style={{ marginTop: '15px' }}>
                     Retreat from Combat
                   </button>
                 </div>
@@ -791,8 +837,11 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                     ))}
                   </div>
 
-                  {/* Flee button for multi-round encounters */}
-                  {isMultiRound && roundState && !roundState.isResolved && (
+                  {/* Flee button: the single flee affordance for BOTH single-round and
+                      multi-round encounters. Single-round fights previously offered no flee
+                      at all (only fight actions). Both route through handleFleeEncounter, so
+                      a successful flee sets outcome:'fled' and disengages via onResolve. */}
+                  {(!isMultiRound || (roundState && !roundState.isResolved)) && (
                     <button
                       className="secondary-button"
                       onClick={handleFleeEncounter}

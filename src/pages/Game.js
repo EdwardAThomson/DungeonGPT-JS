@@ -45,7 +45,9 @@ import {
   applyTeamEncounterOutcomeToParty,
   planWorldTileEncounterFlow,
   formatEncounterPenaltyLog,
-  formatEncounterRewardLog
+  formatEncounterRewardLog,
+  isEncounterVictory,
+  getFleeReposition
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
 import { appendLedgerEvents } from '../game/heroLedger';
@@ -418,6 +420,12 @@ const Game = ({ resumeConversation = null }) => {
   const siteMobsRef = useRef([]);
   const siteMapDataRef = useRef(null);
   const activeSiteMobIdRef = useRef(null);
+  // Pre-encounter position for FLEE/disengage. A move-triggered encounter fires AFTER the
+  // party has already stepped ONTO the threat tile, so to flee we must send them back to
+  // the tile they came from. Captured at move time as { level: 'world'|'town'|'site', x, y }
+  // and restored in handleEncounterResolve when the outcome is a flee. Stationary encounters
+  // (POI boss, look-hook chip) clear it to null so a flee there never teleports to a stale tile.
+  const preEncounterPosRef = useRef(null);
   // Monotonic move counter that clocks the quest-offer cooldown (rumour + Quest Board
   // share it via pickOfferableSideQuest). Bumped once per move (world tile, town step,
   // site step). It is NOT persisted every move (that would churn settings); instead the
@@ -891,6 +899,9 @@ const Game = ({ resumeConversation = null }) => {
   // per-tile rolling made even a short crossing very likely to trigger a fight. Combined
   // with the town pity exemption in shouldTriggerEncounter, this keeps town encounters rare.
   const runTownStep = (pos, index = 0) => {
+    // Tile the party is leaving THIS step, captured before the move so a flee from a
+    // town encounter can send them back to it (see handleEncounterResolve).
+    const fromTownPos = mapHook.townPlayerPosition;
     const moved = mapHook.moveTownPlayerTo(pos.x, pos.y);
     if (!moved) return 'halt'; // unwalkable/unexpected: stop rather than fall through
     questOfferClockRef.current += 1; // clock the quest-offer cooldown
@@ -907,6 +918,9 @@ const Game = ({ resumeConversation = null }) => {
       setMovesSinceEncounter(0);
       mapHook.setIsMapModalOpen(false);
       reopenMapAfterEncounterRef.current = true; // reopen once the encounter resolves
+      preEncounterPosRef.current = fromTownPos
+        ? { level: 'town', x: fromTownPos.x, y: fromTownPos.y }
+        : null;
       openEncounterAction({ encounter: townEncounter });
       return 'halt';
     }
@@ -1050,6 +1064,9 @@ const Game = ({ resumeConversation = null }) => {
   // roll. Non-combat content is a passing notice and returns 'continue'. Reads
   // settings/movesSinceEncounter from refs so successive steps see fresh values.
   const runSiteStep = (pos) => {
+    // Tile the party is leaving THIS step, captured before the move so a flee from a
+    // site encounter (mob / legacy combat / wandering) can send them back to it.
+    const fromSitePos = mapHook.sitePlayerPosition;
     const movedTile = mapHook.moveSitePlayerTo(pos.x, pos.y);
     if (!movedTile) return 'halt'; // unwalkable/unexpected: stop rather than fall through
     questOfferClockRef.current += 1; // clock the quest-offer cooldown
@@ -1064,6 +1081,9 @@ const Game = ({ resumeConversation = null }) => {
       activeSiteMobIdRef.current = combatMob.id; // resolve marks this mob defeated on victory
       mapHook.setIsMapModalOpen(false);
       reopenMapAfterEncounterRef.current = true;
+      preEncounterPosRef.current = fromSitePos
+        ? { level: 'site', x: fromSitePos.x, y: fromSitePos.y }
+        : null;
       // A boss carries enemyId so its defeat completes the milestone (handleEncounterResolve).
       openEncounterAction({
         encounter: combatMob.isBoss
@@ -1090,6 +1110,9 @@ const Game = ({ resumeConversation = null }) => {
       if (isLegacyCombatContent) {
         mapHook.setIsMapModalOpen(false);
         reopenMapAfterEncounterRef.current = true;
+        preEncounterPosRef.current = fromSitePos
+          ? { level: 'site', x: fromSitePos.x, y: fromSitePos.y }
+          : null;
         openEncounterAction({ encounter: c.encounter });
         return 'halt'; // stop the walk on the tile the (legacy) fight fired
       } else if (c.kind === 'loot') {
@@ -1125,6 +1148,9 @@ const Game = ({ resumeConversation = null }) => {
       setMovesSinceEncounter(0);
       mapHook.setIsMapModalOpen(false);
       reopenMapAfterEncounterRef.current = true;
+      preEncounterPosRef.current = fromSitePos
+        ? { level: 'site', x: fromSitePos.x, y: fromSitePos.y }
+        : null;
       openEncounterAction({ encounter: wandering });
       return 'halt'; // stop the walk on the tile the wandering monster fired
     }
@@ -1337,6 +1363,9 @@ const Game = ({ resumeConversation = null }) => {
       onFight: boss ? () => {
         mapHook.setIsMapModalOpen(false);
         reopenMapAfterEncounterRef.current = true;
+        // Stationary boss fight (party is standing on the POI): no move preceded it, so
+        // clear any stale pre-encounter tile so a flee here does not teleport the party.
+        preEncounterPosRef.current = null;
         // enemyId rides on the encounter so handleEncounterResolve fires
         // enemy_defeated with the right id and the milestone completes.
         openEncounterAction({ encounter: { ...boss.encounter, enemyId: boss.enemyId } });
@@ -1393,6 +1422,10 @@ const Game = ({ resumeConversation = null }) => {
       }]);
       return;
     }
+
+    // Capture the tile we are LEAVING before the move commits. If an encounter fires on
+    // the destination, fleeing sends the party back here (see handleEncounterResolve).
+    const fromWorldPos = mapHook.playerPosition;
 
     const { newMap, targetTile, wasExplored } = applyWorldMapMove(
       mapHook.worldMap,
@@ -1476,6 +1509,9 @@ const Game = ({ resumeConversation = null }) => {
     if (plannedEncounterFlow.openActionEncounter) {
       mapHook.setIsMapModalOpen(false); // close map so the encounter is visible
       reopenMapAfterEncounterRef.current = true; // reopen once the encounter resolves
+      preEncounterPosRef.current = fromWorldPos
+        ? { level: 'world', x: fromWorldPos.x, y: fromWorldPos.y }
+        : null;
       setTimeout(() => {
         // Conflict rule encounter→closes navigation handles closing encounterInfo automatically
         openEncounterAction({ encounter: randomEncounter });
@@ -1630,6 +1666,9 @@ const Game = ({ resumeConversation = null }) => {
   const handleHookChipAction = () => {
     const encounter = lookHookChips?.encounter;
     setLookHookChips(null);
+    // Look-hook engagement is stationary (the party acts where it stands): clear any stale
+    // pre-encounter tile so a flee from this fight does not teleport them to an old tile.
+    preEncounterPosRef.current = null;
     if (encounter) openEncounterAction({ encounter });
   };
 
@@ -1726,6 +1765,27 @@ const Game = ({ resumeConversation = null }) => {
   const handleEncounterResolve = (result) => {
     logger.info('Encounter resolved', result);
 
+    // Flee/disengage detection. A successful flee (EncounterActionModal sets
+    // outcome:'fled') or the multi-round 'escaped' outcome means the party broke away:
+    // they must NOT count the foe as defeated, and they should be sent back to the tile
+    // they came from (preEncounterPosRef, captured at move time per map level). A FAILED
+    // flee never sets outcome:'fled', so a caught party stays put and takes its lumps.
+    const from = getFleeReposition(result, preEncounterPosRef.current);
+    if (from) {
+      // Restore to the pre-encounter tile with the setter for that level. That tile was
+      // walkable and adjacent (the party just stood there), so no extra validation is
+      // needed; a missing ref (stationary/legacy encounter) simply skips the reposition.
+      if (from.level === 'world') mapHook.setPlayerPosition({ x: from.x, y: from.y });
+      else if (from.level === 'town') mapHook.setTownPlayerPosition({ x: from.x, y: from.y });
+      else if (from.level === 'site') mapHook.setSitePlayerPosition({ x: from.x, y: from.y });
+      // TODO(#115): once site mobs chase (feat/site-moving-mobs), a FLED mob is not
+      // defeated and would re-contact the party next step. The reposition above moves the
+      // party away (likely outside aggro range), which mitigates it, but a proper fix needs
+      // a temporary de-aggro/cooldown on activeSiteMobIdRef.current here. That model lives
+      // on the unmerged #115 branch, so it is deferred, not built now.
+    }
+    preEncounterPosRef.current = null; // consume: never reposition on a later encounter
+
     // #43: team boss fights split XP across the whole party (+10% pot per
     // supporter); gold/items/penalties still flow through the lead. Solo results
     // keep the classic single-hero path. HP damage was already applied live during
@@ -1763,7 +1823,9 @@ const Game = ({ resumeConversation = null }) => {
     // Reward items entering the inventory are item discoveries.
     if (result?.rewards?.items?.length > 0) recordItemsInCodex(result.rewards.items);
 
-    if (result?.outcome === 'victory' || result?.outcome === 'success') {
+    if (isEncounterVictory(result)) {
+      // A flee (outcome 'fled'/'escaped') is NOT a victory, so a fled foe is never marked
+      // defeated here; the enemy/mob-defeat + enemy_defeated milestone are win-only.
       // A site MOB that triggered this fight is now dead: mark it defeated so it stops
       // rendering / chasing and never re-triggers (mirrors markSiteContentConsumed).
       if (activeSiteMobIdRef.current) {
