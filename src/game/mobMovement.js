@@ -28,6 +28,14 @@ export const DEAGGRO_RADIUS = 6;
 export const DEFAULT_MOB_SPEED = 1;
 export const HUNTER_SPEED = 2;
 
+// FLEE_DEAGGRO_STEPS: after the party SUCCESSFULLY flees a mob's fight, that mob is
+// stamped with fleeCooldown = this many player-steps. While the cooldown is running the
+// mob is forced idle and cannot re-aggro or re-contact, so the party (repositioned one
+// tile back by the flee, see PR #117) actually breaks contact instead of being dropped
+// straight back into the fight. Four steps gives the repositioned party room to reach the
+// exit or leave aggro range even against a speed-2 hunter.
+export const FLEE_DEAGGRO_STEPS = 4;
+
 export const DEFAULT_MOB_CONFIG = {
   aggroRadius: AGGRO_RADIUS,
   leashRadius: LEASH_RADIUS,
@@ -67,6 +75,7 @@ export function makeMob({ id, x, y, encounter, enemyId = null, isBoss = false, m
     encounter,
     speed: resolvedSpeed,
     defeated: false,
+    fleeCooldown: 0, // >0 means the party just fled this mob; it stays disengaged until 0
   };
   if (enemyId) mob.enemyId = enemyId;
   if (isBoss) mob.isBoss = true;
@@ -141,11 +150,27 @@ export function stepMobs(mobs, playerPos, siteMap, config = DEFAULT_MOB_CONFIG) 
 
   let combatMob = null;
   const nextMobs = list.map((mob) => {
-    if (!mob || mob.defeated) return mob;
+    if (!mob || mob.defeated) return mob; // defeated wins over everything (incl. cooldown)
+
+    const speed = Number.isFinite(mob.speed) ? mob.speed : DEFAULT_MOB_SPEED;
+
+    // --- Flee cooldown. -----------------------------------------------------------------
+    // The party just fled this mob (PR #117 repositioned them a tile back). Force the mob
+    // idle, decrement the cooldown, and refuse to re-aggro or make contact this step even
+    // if the party is within AGGRO_RADIUS. It still walks one step back toward home so it
+    // decisively breaks contact rather than lingering next to the party. Normal aggro/
+    // contact resumes on the first step after the cooldown reaches 0.
+    if (Number.isFinite(mob.fleeCooldown) && mob.fleeCooldown > 0) {
+      let pos = { x: mob.x, y: mob.y };
+      if (!mob.isBoss && speed > 0 && mapData && mob.home &&
+          (mob.x !== mob.home.x || mob.y !== mob.home.y)) {
+        pos = walkAlong(mapData, mob, mob.home, speed, false); // leash return, no contact
+      }
+      return { ...mob, x: pos.x, y: pos.y, state: 'idle', fleeCooldown: mob.fleeCooldown - 1 };
+    }
 
     const dPlayer = manhattan(mob, playerPos);
     const dHome = manhattan(mob, mob.home || mob);
-    const speed = Number.isFinite(mob.speed) ? mob.speed : DEFAULT_MOB_SPEED;
 
     // --- State machine. ---
     let state = mob.state || 'idle';

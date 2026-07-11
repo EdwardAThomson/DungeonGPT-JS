@@ -7,7 +7,7 @@ import { generateTownMap, isTownTileWalkable } from '../utils/townMapGenerator';
 import { getTownWaterContext, getTownRoadEdges } from '../utils/townWater';
 import { generateSiteMap } from '../utils/siteMapGenerator';
 import { populateSite, injectSiteObjective, injectHarvestResource } from '../game/sitePopulator';
-import { healMobsToIdle } from '../game/mobMovement';
+import { healMobsToIdle, FLEE_DEAGGRO_STEPS } from '../game/mobMovement';
 import { populateTown } from '../utils/npcGenerator';
 import { injectQuestBuildings } from '../game/milestoneSpawner';
 import { getMilestoneNpcsForTown } from '../game/milestoneEngine';
@@ -452,6 +452,19 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         });
     };
 
+    // Stamp a flee cooldown on the mob the party just SUCCESSFULLY fled, so it briefly
+    // de-aggros and stops re-contacting the repositioned party (see stepMobs' cooldown
+    // branch). Mutates the mob in place (the cached site shares this mobs array, mirroring
+    // setSiteMobDefeated) so a leave/re-enter mid-cooldown keeps the disengagement.
+    const setSiteMobFleeCooldown = (id, steps = FLEE_DEAGGRO_STEPS) => {
+        setCurrentSiteMap(prev => {
+            if (!prev || !Array.isArray(prev.mobs)) return prev;
+            const mob = prev.mobs.find(m => m && m.id === id);
+            if (mob) { mob.fleeCooldown = steps; mob.state = 'idle'; }
+            return { ...prev };
+        });
+    };
+
     const handleEnterCurrentTown = (setConversation, conversation) => {
         // Prevent entering towns before adventure starts
         if (!hasAdventureStarted) {
@@ -641,6 +654,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         moveSitePlayerTo,
         markSiteContentConsumed,
         setSiteMobDefeated,
+        setSiteMobFleeCooldown,
 
         visitedBiomes,
         visitedTowns,

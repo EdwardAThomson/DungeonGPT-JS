@@ -8,6 +8,7 @@ import {
   LEASH_RADIUS,
   DEFAULT_MOB_SPEED,
   HUNTER_SPEED,
+  FLEE_DEAGGRO_STEPS,
 } from './mobMovement';
 
 // An open, all-walkable site grid (only `wall` tiles are non-walkable in real sites).
@@ -166,6 +167,58 @@ describe('stepMobs - defeated + determinism', () => {
     const r2 = stepMobs(mobs, player, site);
     expect(r1.mobs).toEqual(r2.mobs);
     expect(r1.combatMob).toEqual(r2.combatMob);
+  });
+});
+
+describe('stepMobs - flee cooldown (de-aggro after a successful flee)', () => {
+  test('a cooling-down mob adjacent to the party stays idle, is not combatMob, and decrements', () => {
+    // Mob sits ON its home so it cannot step away; adjacent to the party. Without the
+    // cooldown it would wake and immediately contact (the forced-fight loop).
+    const mob = { ...makeMob({ x: 4, y: 0, encounter: enc }), fleeCooldown: FLEE_DEAGGRO_STEPS };
+    const { mobs, combatMob } = stepMobs([mob], { x: 5, y: 0 }, site); // party adjacent
+    expect(mobs[0].state).toBe('idle');
+    expect(combatMob).toBeNull(); // no contact fight while cooling down
+    expect(mobs[0].fleeCooldown).toBe(FLEE_DEAGGRO_STEPS - 1); // ticked down one step
+  });
+
+  test('the cooldown ticks down one per step and forces idle even inside AGGRO_RADIUS', () => {
+    let mob = { ...makeMob({ x: 0, y: 0, encounter: enc, home: { x: 0, y: 0 } }), fleeCooldown: 3 };
+    const player = { x: 1, y: 0 }; // well within AGGRO_RADIUS the whole time
+    for (let expected = 3; expected > 0; expected--) {
+      const { mobs, combatMob } = stepMobs([mob], player, site);
+      expect(mobs[0].state).toBe('idle');
+      expect(combatMob).toBeNull();
+      expect(mobs[0].fleeCooldown).toBe(expected - 1);
+      mob = mobs[0];
+    }
+    expect(mob.fleeCooldown).toBe(0);
+  });
+
+  test('once the cooldown reaches 0 the same mob re-aggros and contacts normally', () => {
+    // fleeCooldown 1: this step consumes the last tick (still disengaged, no contact)...
+    const mob = { ...makeMob({ x: 4, y: 0, encounter: enc }), fleeCooldown: 1 };
+    const first = stepMobs([mob], { x: 5, y: 0 }, site);
+    expect(first.combatMob).toBeNull();
+    expect(first.mobs[0].fleeCooldown).toBe(0);
+    // ...next step, cooldown is 0, so normal aggro/contact resumes (adjacent -> combatMob).
+    const second = stepMobs([first.mobs[0]], { x: 5, y: 0 }, site);
+    expect(second.combatMob).toBeTruthy();
+    expect(second.combatMob.id).toBe(mob.id);
+  });
+
+  test('a defeated mob with a stale cooldown stays skipped (defeated wins over cooldown)', () => {
+    const dead = { ...makeMob({ x: 4, y: 0, encounter: enc }), defeated: true, fleeCooldown: FLEE_DEAGGRO_STEPS };
+    const { mobs, combatMob } = stepMobs([dead], { x: 4, y: 0 }, site); // co-located
+    expect(mobs[0]).toBe(dead); // untouched, same reference (cooldown not even decremented)
+    expect(mobs[0].fleeCooldown).toBe(FLEE_DEAGGRO_STEPS);
+    expect(combatMob).toBeNull();
+  });
+
+  test('a cooling-down mob away from home steps back toward home to break contact', () => {
+    const mob = { ...makeMob({ x: 4, y: 0, encounter: enc, home: { x: 0, y: 0 } }), fleeCooldown: 2 };
+    const { mobs, combatMob } = stepMobs([mob], { x: 5, y: 0 }, site);
+    expect(mobs[0]).toMatchObject({ x: 3, y: 0, state: 'idle' }); // one step homeward
+    expect(combatMob).toBeNull();
   });
 });
 
