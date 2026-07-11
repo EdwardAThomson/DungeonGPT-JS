@@ -20,6 +20,7 @@ import { retroInjectQuestContent } from './milestoneSpawner';
 import {
   isQuestItemSearchable,
   computeVisibleMilestonePois,
+  computeActiveMilestonePois,
   getMilestoneBossForTile,
   getMilestoneItemForTile,
 } from './milestoneEngine';
@@ -538,6 +539,24 @@ describe('derived-state conflicts after the swap (maintainer supplement)', () =>
   it('computeVisibleMilestonePois returns null (no filtering) when nothing needs gating', () => {
     expect(computeVisibleMilestonePois([], [])).toBeNull();
     expect(computeVisibleMilestonePois([{ id: 1, spawn: { type: 'item', id: 'x' } }], [])).toBeNull();
+  });
+
+  it('computeActiveMilestonePois glows only ACTIVE objectives (not completed, not prior-chapter)', () => {
+    const { next, continuation } = continued();
+    // The completed prior-chapter goblin_hideout is still VISIBLE history but must NOT glow.
+    expect(computeVisibleMilestonePois(next.milestones, continuation.mapData).has('goblin_hideout')).toBe(true);
+    expect(computeActiveMilestonePois(next.milestones).has('goblin_hideout')).toBe(false);
+    // shadow_fortress is gated (m3 requires [1,2]) so it is not yet active.
+    expect(computeActiveMilestonePois(next.milestones).has('shadow_fortress')).toBe(false);
+    // Meeting the prerequisites reveals it -> it glows.
+    const unlocked = next.milestones.map((m) => (m.id === 1 || m.id === 2 ? { ...m, completed: true } : m));
+    expect(computeActiveMilestonePois(unlocked).has('shadow_fortress')).toBe(true);
+    // Completing it stops the glow, but it stays visible on the map.
+    const done = unlocked.map((m) => (m.spawn?.id === 'shadow_fortress' ? { ...m, completed: true } : m));
+    expect(computeActiveMilestonePois(done).has('shadow_fortress')).toBe(false);
+    expect(computeVisibleMilestonePois(done, continuation.mapData).has('shadow_fortress')).toBe(true);
+    // Tolerant of junk input.
+    expect(computeActiveMilestonePois(null).size).toBe(0);
   });
 
   it('a prior campaign\'s POI/boss tiles offer no dead quest actions under the new milestones', () => {
