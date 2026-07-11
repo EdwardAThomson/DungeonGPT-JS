@@ -91,7 +91,11 @@ export const biomeEncounterChance = {
   'plains': 0.30,
   'forest': 0.35,
   'mountain': 0.30,
-  'town': 0.40,     // High chance but encounters are non-hostile
+  // Kept low on purpose: under tile-by-tile town movement every step entered
+  // rolls separately, so a high base compounds fast across a multi-tile walk.
+  // Tuned so a ~6-tile cross-town walk is roughly 50/50 rather than near-certain
+  // (per-step ~10%, ~47% over 6 tiles). Encounters here are non-hostile anyway.
+  'town': 0.12,
   'beach': 0.15,
   'water': 0.0      // No encounters on water
 };
@@ -211,7 +215,9 @@ export const environmentalEncounterChance = {
   'desert': 0.25,   // deserts have more environmental hazards
   'snow': 0.20,     // arctic/frozen tiles have frequent cold hazards (mirrors mountain)
   'swamp': 0.18,
-  'town': 0.05      // minimal environmental encounters in towns
+  // Minimal, and kept low for the same per-step reason as the town biome chance:
+  // every tile entered during a town walk rolls this separately, so it compounds.
+  'town': 0.02
 };
 
 // POI encounter chance (when player is at a POI tile)
