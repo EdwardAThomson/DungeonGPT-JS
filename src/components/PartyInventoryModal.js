@@ -120,7 +120,7 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
 
     const resultId = Date.now();
     setUseResults(prev => [...prev, {
-      heroName: target.characterName || target.name,
+      heroName: target.heroName || target.characterName || target.name,
       itemName: res.itemName,
       rolled: res.rolled,
       healed: res.actualHeal,
@@ -411,7 +411,7 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
                       key={heroUid(hero)}
                       onClick={() => { if (!atFull) handleUsePotion(heroIndex); }}
                       disabled={atFull}
-                      title={atFull ? 'Already at full health' : `Heal ${hero.characterName || hero.name}`}
+                      title={atFull ? 'Already at full health' : `Heal ${hero.heroName || hero.characterName || hero.name}`}
                       style={{
                         display: 'flex',
                         justifyContent: 'space-between',
@@ -427,7 +427,7 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
                         fontSize: '0.95rem'
                       }}
                     >
-                      <span style={{ fontWeight: 'bold' }}>{hero.characterName || hero.name}</span>
+                      <span style={{ fontWeight: 'bold' }}>{hero.heroName || hero.characterName || hero.name}</span>
                       <span style={{ color: hpStatus.color, fontSize: '0.85rem' }}>
                         {hero.currentHP} / {hero.maxHP} HP{atFull ? ' · Already at full health' : ''}
                       </span>
