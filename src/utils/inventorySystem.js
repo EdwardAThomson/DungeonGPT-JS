@@ -177,7 +177,7 @@ export const ITEM_CATALOG = {
   // (sitePopulator HARVEST_NODES.forest + LOOT.forest). Icon BORROWS rare_ingredient
   // (an amber lump) as a single-item stand-in until dedicated art lands; placeholderIcon
   // tracks it in ITEM-05 and queues pine_resin.webp (docs/IMAGE_GENERATION_PROMPTS.md).
-  'pine_resin': { name: 'Pine Resin', rarity: 'common', value: 15, stackable: true, description: 'A sticky amber lump tapped from forest pine, prized by boatwrights.', icon: 'assets/icons/items/rare_ingredient.webp', placeholderIcon: true },
+  'pine_resin': { name: 'Pine Resin', rarity: 'common', value: 15, stackable: true, description: 'A sticky amber lump tapped from forest pine, prized by boatwrights.', icon: 'assets/icons/items/pine_resin.webp' },
   'mountain_herbs': { name: 'Mountain Herbs', rarity: 'common', value: 15, description: 'Hardy alpine sprigs with a sharp, medicinal scent.', icon: 'assets/icons/items/mountain_herbs.webp' },
   'herbal_remedy': { name: 'Herbal Remedy', rarity: 'common', value: 15, effect: 'heal', amount: '1d4', description: 'A folk poultice that eases minor hurts.', icon: 'assets/icons/items/herbal_remedy.webp' },
   'elven_rations': { name: 'Elven Waybread', rarity: 'uncommon', value: 20, stackable: true, effect: 'heal', amount: '2d4', description: 'Wafers of elven waybread; a single bite restores the weary.', icon: 'assets/icons/items/elven_rations.webp' },
@@ -241,10 +241,10 @@ export const ITEM_CATALOG = {
   'leather_armor': { name: 'Leather Armor', rarity: 'common', value: 30, type: 'armor', bonus: '+1 defense', description: 'Supple boiled-leather protection for those who value speed.', icon: 'assets/icons/items/leather_armor.webp' },
   // Icon BORROWS hard_leather (a single-item stand-in) until dedicated armor art lands;
   // placeholderIcon tracks it in ITEM-05 and queues studded_leather.webp.
-  'studded_leather': { name: 'Studded Leather', rarity: 'uncommon', value: 90, type: 'armor', bonus: '+2 defense', description: 'Leather reinforced with iron studs, tougher without the weight of mail.', icon: 'assets/icons/items/hard_leather.webp', placeholderIcon: true },
+  'studded_leather': { name: 'Studded Leather', rarity: 'uncommon', value: 90, type: 'armor', bonus: '+2 defense', description: 'Leather reinforced with iron studs, tougher without the weight of mail.', icon: 'assets/icons/items/studded_leather.webp' },
   // Icon BORROWS beast_hide (a single-item stand-in) until dedicated armor art lands;
   // placeholderIcon tracks it in ITEM-05 and queues hide_armor.webp.
-  'hide_armor': { name: 'Hide Armor', rarity: 'uncommon', value: 80, type: 'armor', bonus: '+2 defense', description: 'Layered beast-hide armor, crude but surprisingly sturdy.', icon: 'assets/icons/items/beast_hide.webp', placeholderIcon: true },
+  'hide_armor': { name: 'Hide Armor', rarity: 'uncommon', value: 80, type: 'armor', bonus: '+2 defense', description: 'Layered beast-hide armor, crude but surprisingly sturdy.', icon: 'assets/icons/items/hide_armor.webp' },
   'scale_mail': { name: 'Scale Mail', rarity: 'rare', value: 350, type: 'armor', bonus: '+3 defense', description: 'Overlapping metal scales that turn aside all but the hardest blows.', icon: 'assets/icons/items/dragon_scale.webp' },
   'dragonscale_plate': { name: 'Dragonscale Plate', rarity: 'very_rare', value: 1500, type: 'armor', bonus: '+4 defense', description: 'Armor forged from dragon scales, nearly impervious and light for its strength.', icon: 'assets/icons/items/dragon_scale.webp' },
   'artifact_fragment': { name: 'Artifact Fragment', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A broken piece of some greater relic, meaningless until made whole.', icon: 'assets/icons/items/artifact_fragment.webp' },
@@ -278,18 +278,18 @@ export const ITEM_CATALOG = {
   // lists every placeholder (ITEM-05, warn) and fails (ITEM-06, error) on any NEW
   // quest item that borrows another item's icon WITHOUT the flag. Clear a placeholder
   // by generating the dedicated .webp, repointing `icon`, and removing this field.
-  'goblin_scouts_map': { name: 'Goblin Scout\'s Map', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A crude map daubed by a goblin scout, marking its warband\'s routes.', icon: 'assets/icons/items/map_fragment.webp', placeholderIcon: true },
-  'hidden_map': { name: 'Hidden Map', rarity: 'rare', value: 0, type: 'quest_item', description: 'A concealed chart revealing a place meant to stay lost.', icon: 'assets/icons/items/treasure_map.webp', placeholderIcon: true },
-  'caravan_ledger': { name: 'Caravan Ledger', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A merchant caravan\'s accounts, its entries hinting at foul play.', icon: 'assets/icons/items/map_fragment.webp', placeholderIcon: true },
-  'sun_kings_star_chart': { name: 'Sun-Kings\' Star-Chart', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A gilded chart of the heavens as the Sun-Kings once read them.', icon: 'assets/icons/items/ancient_scroll.webp', placeholderIcon: true },
-  'frostbound_ledger': { name: 'Frostbound Ledger', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A frost-rimed record book, its ink cracking with cold.', icon: 'assets/icons/items/map_fragment.webp', placeholderIcon: true },
-  'famine_winter_saga': { name: 'The Famine-Winter Saga', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'An epic recounting the long, starving winter of ages past.', icon: 'assets/icons/items/history_tome.webp', placeholderIcon: true },
-  'moorland_herbs': { name: 'Moorland Herbs', rarity: 'common', value: 0, type: 'quest_item', description: 'Bitter herbs gathered from the windswept moors.', icon: 'assets/icons/items/healing_herbs.webp', placeholderIcon: true },
-  'mutated_specimen': { name: 'Mutated Specimen', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A grotesque, twisted creature preserved for grim study.', icon: 'assets/icons/items/venom_sac.webp', placeholderIcon: true },
-  'automaton_control_rod': { name: 'Automaton Control Rod', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A humming brass rod that commands a clockwork construct.', icon: 'assets/icons/items/enchanted_trinket.webp', placeholderIcon: true },
-  'stolen_aether_blueprints': { name: 'Stolen Aether Blueprints', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'Stolen schematics detailing a forbidden aether-engine.', icon: 'assets/icons/items/ancient_scroll.webp', placeholderIcon: true },
-  'cult_journal': { name: 'Cult Journal', rarity: 'common', value: 0, type: 'quest_item', description: 'A cultist\'s diary, its later entries sliding into madness.', icon: 'assets/icons/items/journal_page.webp', placeholderIcon: true },
-  'forbidden_ritual_text': { name: 'Forbidden Ritual Text', rarity: 'rare', value: 0, type: 'quest_item', description: 'Instructions for a rite that should never be performed.', icon: 'assets/icons/items/dark_tome.webp', placeholderIcon: true }
+  'goblin_scouts_map': { name: 'Goblin Scout\'s Map', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A crude map daubed by a goblin scout, marking its warband\'s routes.', icon: 'assets/icons/items/goblin_scouts_map.webp' },
+  'hidden_map': { name: 'Hidden Map', rarity: 'rare', value: 0, type: 'quest_item', description: 'A concealed chart revealing a place meant to stay lost.', icon: 'assets/icons/items/hidden_map.webp' },
+  'caravan_ledger': { name: 'Caravan Ledger', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A merchant caravan\'s accounts, its entries hinting at foul play.', icon: 'assets/icons/items/caravan_ledger.webp' },
+  'sun_kings_star_chart': { name: 'Sun-Kings\' Star-Chart', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A gilded chart of the heavens as the Sun-Kings once read them.', icon: 'assets/icons/items/sun_kings_star_chart.webp' },
+  'frostbound_ledger': { name: 'Frostbound Ledger', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A frost-rimed record book, its ink cracking with cold.', icon: 'assets/icons/items/frostbound_ledger.webp' },
+  'famine_winter_saga': { name: 'The Famine-Winter Saga', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'An epic recounting the long, starving winter of ages past.', icon: 'assets/icons/items/famine_winter_saga.webp' },
+  'moorland_herbs': { name: 'Moorland Herbs', rarity: 'common', value: 0, type: 'quest_item', description: 'Bitter herbs gathered from the windswept moors.', icon: 'assets/icons/items/moorland_herbs.webp' },
+  'mutated_specimen': { name: 'Mutated Specimen', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A grotesque, twisted creature preserved for grim study.', icon: 'assets/icons/items/mutated_specimen.webp' },
+  'automaton_control_rod': { name: 'Automaton Control Rod', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A humming brass rod that commands a clockwork construct.', icon: 'assets/icons/items/automaton_control_rod.webp' },
+  'stolen_aether_blueprints': { name: 'Stolen Aether Blueprints', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'Stolen schematics detailing a forbidden aether-engine.', icon: 'assets/icons/items/stolen_aether_blueprints.webp' },
+  'cult_journal': { name: 'Cult Journal', rarity: 'common', value: 0, type: 'quest_item', description: 'A cultist\'s diary, its later entries sliding into madness.', icon: 'assets/icons/items/cult_journal.webp' },
+  'forbidden_ritual_text': { name: 'Forbidden Ritual Text', rarity: 'rare', value: 0, type: 'quest_item', description: 'Instructions for a rite that should never be performed.', icon: 'assets/icons/items/forbidden_ritual_text.webp' }
 };
 
 // --- Rarity-by-tier loot gating ---------------------------------------------

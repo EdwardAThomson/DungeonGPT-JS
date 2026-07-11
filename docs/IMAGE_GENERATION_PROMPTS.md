@@ -265,7 +265,7 @@ The MAP-01 audit check clears for that POI once the key exists and the file is p
 | `public/assets/encounters/corrupted_lighthouse_arrival.webp` | A gaunt coastal lighthouse on a jagged sea cliff at Whisper-Cove, its beacon corrupted to cast a sickly non-euclidean green-purple light out over a churning black ocean, barnacle-crusted stone streaked with alien growths and writhing shadow, storm surf pounding the rocks below. Cosmic-horror seascape, drowned-god dread, oppressive and hallucinatory. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (MAP-01; Eldritch Horror T2, The Great Dreamer) |
 | `public/assets/encounters/mourn_peak_summit_arrival.webp` | A bleak, wind-scoured mountain summit above the clouds where the sky tears open into a yawning cosmic void, impossible stars and a vast dreaming presence bleeding through the rift over the barren rock, thin air, colorless stone, reality warping at the edges. Cosmic-horror sublime terror, vertiginous altitude, a vision of the Void breaking through. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | medium (MAP-01; Eldritch Horror T2, The Great Dreamer) |
 
-## Generation queue (2026-07-10, dedicated quest-item icons)
+## Generation queue (2026-07-10, dedicated quest-item icons) - COMPLETE
 
 Every `type: 'item'` milestone in the built-in campaigns (`src/data/storyTemplates.js`)
 BORROWS a lookalike icon rather than having its own art. All twelve are in
@@ -298,7 +298,7 @@ borrow pattern; their quest items need an equivalent sweep there.)
 | `cult_journal.webp` | A small worn cultist's journal bound in dark frayed cloth, its curling pages scrawled with frantic handwriting and unsettling occult sigils, a leather cord wrapping the cover. Painterly digital fantasy art with rich cloth and ink textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | medium (Eldritch Horror T1, The Blackwood Cult) |
 | `forbidden_ritual_text.webp` | A forbidden grimoire bound in black leather and clasped with tarnished iron, warped eldritch runes glowing faintly sickly-green across its swollen cover. Painterly digital fantasy art with rich black leather and iron textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | medium (Eldritch Horror T2, The Great Dreamer) |
 
-## Generation queue (2026-07-10, Bitter Cold hazard)
+## Generation queue (2026-07-10, Bitter Cold hazard) - COMPLETE
 
 The climate-aware environmental encounters shipped a cold-climate hazard,
 `cold_snap` ("Bitter Cold"), as the Frozen Frontier counterpart to the
@@ -323,7 +323,7 @@ the paths are already declared in the data.
 |---|---|---|
 | `assets/icons/items/frost_flower.webp` | A delicate crystalline flower grown from pale blue ice, its petals formed of clear translucent frost with a faint inner shimmer and dusted with fine snow. Painterly digital fantasy art with rich ice and frost textures, dramatic cinematic lighting, and deep shadows. Perfectly centered on a solid dark charcoal background (#2c2c2c). Professional 2D game asset. | low (Bitter Cold reward drop; reward line shows no icon until generated) |
 
-## Generation queue (2026-07-10, non-quest borrowed item icons)
+## Generation queue (2026-07-10, non-quest borrowed item icons) - COMPLETE (studded_leather pending regeneration)
 
 The dedicated-quest-item sweep above covered the twelve `type: 'quest_item'` borrows.
 This queue covers the NON-quest catalog items (`ITEM_CATALOG`,
