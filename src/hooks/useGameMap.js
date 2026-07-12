@@ -465,6 +465,20 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         });
     };
 
+    // Push a freshly-spawned mob (a per-step wandering monster) onto the site's mobs array.
+    // Mutates prev.mobs in place (the same array siteMobsRef holds, mirroring the other mob
+    // mutators) so a mid-walk spawn is visible to the very next advanceMobs step, then
+    // re-renders so the mob paints immediately. A missing/null mob is a no-op.
+    const addSiteMob = (mob) => {
+        if (!mob) return;
+        setCurrentSiteMap(prev => {
+            if (!prev) return prev;
+            const mobs = Array.isArray(prev.mobs) ? prev.mobs : [];
+            mobs.push(mob);
+            return { ...prev, mobs };
+        });
+    };
+
     const handleEnterCurrentTown = (setConversation, conversation) => {
         // Prevent entering towns before adventure starts
         if (!hasAdventureStarted) {
@@ -659,6 +673,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         markSiteContentConsumed,
         setSiteMobDefeated,
         setSiteMobFleeCooldown,
+        addSiteMob,
 
         visitedBiomes,
         visitedTowns,

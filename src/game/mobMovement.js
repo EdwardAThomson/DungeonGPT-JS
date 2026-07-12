@@ -36,6 +36,21 @@ export const HUNTER_SPEED = 2;
 // exit or leave aggro range even against a speed-2 hunter.
 export const FLEE_DEAGGRO_STEPS = 4;
 
+// Wandering-monster spawn tuning (see spawnWanderingMob). A site's per-step wandering roll
+// no longer opens a fight out of nowhere: it spawns a VISIBLE, already-aggro'd mob near the
+// party that chases and engages on contact like any other mob, so the party can see it and
+// flee. These constants keep corridors from flooding and keep the spawn reachable.
+// WANDERING_MOB_CAP: max simultaneous non-defeated WANDERING mobs in a site (placed mobs and
+//   bosses do not count against it). At the cap the roll is consumed without a new spawn.
+// WANDERING_SPAWN_MIN_DIST / _MAX_DIST: Manhattan band (from the party) the spawn tile must
+//   fall in: far enough not to appear on top of the party, near enough to actually close in.
+export const WANDERING_MOB_CAP = 2;
+export const WANDERING_SPAWN_MIN_DIST = 2;
+export const WANDERING_SPAWN_MAX_DIST = 4;
+// A wandering mob spawns already committed so it approaches immediately (no idle telegraph
+// tell): the "surprise" is now a visible pursuer instead of an out-of-nowhere modal.
+export const WANDERING_SPAWN_STATE = 'aggro';
+
 export const DEFAULT_MOB_CONFIG = {
   aggroRadius: AGGRO_RADIUS,
   leashRadius: LEASH_RADIUS,
@@ -63,15 +78,19 @@ export const isSiteWalkable = (t) => !!t && t.walkable === true;
  * @param {string} [args.milestoneId] owning milestone (idempotence key for injection).
  * @param {number} [args.speed] tiles closed per step; defaults 0 for bosses, 1 otherwise.
  * @param {{x:number,y:number}} [args.home] leash anchor (defaults to spawn).
+ * @param {string} [args.state] initial alert state ('idle' | 'alerted' | 'aggro').
+ *   Defaults to 'idle'; a wandering-monster spawn passes 'aggro' so it approaches at once.
+ * @param {boolean} [args.wandering] marks a mob spawned by a per-step wandering roll (vs a
+ *   placed slot mob or a milestone boss), so cap/analytics logic can tell them apart.
  * @returns {Object} the mob entity.
  */
-export function makeMob({ id, x, y, encounter, enemyId = null, isBoss = false, milestoneId = null, speed, home } = {}) {
+export function makeMob({ id, x, y, encounter, enemyId = null, isBoss = false, milestoneId = null, speed, home, state, wandering = false } = {}) {
   const resolvedSpeed = Number.isFinite(speed) ? speed : (isBoss ? 0 : DEFAULT_MOB_SPEED);
   const mob = {
     id: id || (isBoss ? `bossmob_${milestoneId != null ? milestoneId : (enemyId || 'x')}_${x}_${y}` : `mob_${x}_${y}`),
     x, y,
     home: home || { x, y },
-    state: 'idle', // 'idle' | 'alerted' | 'aggro'
+    state: state || 'idle', // 'idle' | 'alerted' | 'aggro'
     encounter,
     speed: resolvedSpeed,
     defeated: false,
@@ -80,6 +99,7 @@ export function makeMob({ id, x, y, encounter, enemyId = null, isBoss = false, m
   if (enemyId) mob.enemyId = enemyId;
   if (isBoss) mob.isBoss = true;
   if (milestoneId != null) mob.milestoneId = milestoneId;
+  if (wandering) mob.wandering = true;
   return mob;
 }
 
@@ -109,6 +129,89 @@ export function spawnMobsFromSlots(site, kinds, encounterForSlot) {
     mobs.push(makeMob({ x: slot.x, y: slot.y, encounter, speed }));
   });
   return mobs;
+}
+
+/**
+ * Count the live (non-defeated) WANDERING mobs currently in a site. Placed slot mobs and
+ * milestone bosses are excluded, so the wandering cap only limits the roaming spawns.
+ *
+ * @param {Array<Object>} mobs the site's mobs.
+ * @returns {number} count of non-defeated mobs flagged `wandering`.
+ */
+export function countActiveWanderingMobs(mobs) {
+  if (!Array.isArray(mobs)) return 0;
+  return mobs.reduce((n, m) => (m && m.wandering && !m.defeated ? n + 1 : n), 0);
+}
+
+/**
+ * Decide where a per-step site wandering roll spawns its VISIBLE mob. Pure and testable: it
+ * does not mutate `site` (the caller pushes the returned mob onto site.mobs). Returns the mob
+ * to spawn, or null when it should NOT spawn one: either the wandering cap is already met, or
+ * no walkable, unoccupied, in-range, party-reachable tile exists (the caller then falls back
+ * to opening the fight so a wandering monster is never silently lost).
+ *
+ * The spawn tile is chosen from every walkable tile in the [minDist, maxDist] Manhattan band
+ * around the party that is not occupied by the party or a live mob and is reachable from the
+ * party via the site BFS (so the mob can actually path in to engage). One is picked with the
+ * supplied `rng` (defaults to Math.random; tests inject a deterministic function).
+ *
+ * @param {{mapData:Array<Array<Object>>, mobs?:Array<Object>}} site the site grid + its mobs.
+ * @param {{x:number,y:number}} playerPos the party's current tile.
+ * @param {Object} encounter the rolled encounter the mob resolves as (carries difficulty).
+ * @param {Object} [config] tuning overrides.
+ * @param {number} [config.cap] max live wandering mobs (defaults WANDERING_MOB_CAP).
+ * @param {number} [config.minDist] closest a spawn may sit (defaults WANDERING_SPAWN_MIN_DIST).
+ * @param {number} [config.maxDist] farthest a spawn may sit (defaults WANDERING_SPAWN_MAX_DIST).
+ * @param {string} [config.state] spawn alert state (defaults WANDERING_SPAWN_STATE, 'aggro').
+ * @param {()=>number} [config.rng] uniform [0,1) source for the tile pick.
+ * @returns {Object|null} the mob to spawn, or null to skip (cap met / no reachable tile).
+ */
+export function spawnWanderingMob(site, playerPos, encounter, config = {}) {
+  const {
+    cap = WANDERING_MOB_CAP,
+    minDist = WANDERING_SPAWN_MIN_DIST,
+    maxDist = WANDERING_SPAWN_MAX_DIST,
+    state = WANDERING_SPAWN_STATE,
+    rng = Math.random,
+  } = config;
+  if (!encounter || !playerPos) return null;
+  const mapData = site && site.mapData;
+  if (!Array.isArray(mapData) || mapData.length === 0) return null;
+  const mobs = Array.isArray(site.mobs) ? site.mobs : [];
+  if (countActiveWanderingMobs(mobs) >= cap) return null; // cap met: consume the roll, no spawn
+
+  // Off-limits tiles: the party's tile and every live mob's tile (defeated mobs vacate).
+  const occupied = new Set([`${playerPos.x},${playerPos.y}`]);
+  mobs.forEach((m) => { if (m && !m.defeated) occupied.add(`${m.x},${m.y}`); });
+
+  // Gather all walkable, unoccupied, in-band, party-reachable candidate tiles.
+  const candidates = [];
+  for (let y = 0; y < mapData.length; y++) {
+    const row = mapData[y];
+    if (!Array.isArray(row)) continue;
+    for (let x = 0; x < row.length; x++) {
+      if (!isSiteWalkable(row[x])) continue;
+      const d = Math.abs(x - playerPos.x) + Math.abs(y - playerPos.y);
+      if (d < minDist || d > maxDist) continue;
+      if (occupied.has(`${x},${y}`)) continue;
+      // Reachable from the party (undirected grid: reachable to the party too) so the mob
+      // can path in. computeWalkPath returns [] when there is no route.
+      const path = computeWalkPath(mapData, playerPos, { x, y }, isSiteWalkable);
+      if (!path || path.length === 0) continue;
+      candidates.push({ x, y });
+    }
+  }
+  if (candidates.length === 0) return null; // no reachable spot: caller falls back to modal
+
+  const idx = Math.min(candidates.length - 1, Math.max(0, Math.floor(rng() * candidates.length)));
+  const pick = candidates[idx];
+  // Tougher foes chase as fast "hunters" (mirrors spawnMobsFromSlots). Unique id keyed on the
+  // live mob count so successive wandering spawns never collide with each other or a slot mob.
+  const speed = encounter.difficulty === 'hard' ? HUNTER_SPEED : DEFAULT_MOB_SPEED;
+  return makeMob({
+    id: `wmob_${pick.x}_${pick.y}_${mobs.length}`,
+    x: pick.x, y: pick.y, encounter, speed, state, wandering: true,
+  });
 }
 
 // Take up to `speed` steps along a BFS path, stopping before the goal tile when the goal

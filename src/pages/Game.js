@@ -26,7 +26,7 @@ import { composeRewardSentence, composeLootSentence, narrateRewardMessages } fro
 import { getStepHint, getQuestObjectiveStep, summarizeQuestReward, describeTurnInTarget } from '../game/questHints';
 import { generateMovementNarrative } from '../game/movementController';
 import { computeWalkPath, runTileWalk, TILE_STEP_MS } from '../game/tileWalk';
-import { stepMobs } from '../game/mobMovement';
+import { stepMobs, spawnWanderingMob, countActiveWanderingMobs, WANDERING_MOB_CAP } from '../game/mobMovement';
 import { buildSaveName } from '../game/saveController';
 import { conversationsApi } from '../services/conversationsApi';
 import {
@@ -1061,7 +1061,10 @@ const Game = ({ resumeConversation = null }) => {
   // fixed order so two triggers never fire on one step: (1) a MOVING MOB in contact forces
   // combat; else (2) the tile's fixed content (loot / objective-item / location; legacy
   // cached encounter content still fires here for old saves); else (3) a wandering-monster
-  // roll. Non-combat content is a passing notice and returns 'continue'. Reads
+  // roll. The wandering roll no longer halts: on an immediate hit it SPAWNS a visible mob
+  // that engages later on contact (only a no-reachable-tile fallback opens the fight and
+  // halts), so the only halts are the mob-contact (1) and fixed-combat (2) branches.
+  // Non-combat content is a passing notice and returns 'continue'. Reads
   // settings/movesSinceEncounter from refs so successive steps see fresh values.
   const runSiteStep = (pos) => {
     // Tile the party is leaving THIS step, captured before the move so a flee from a
@@ -1144,15 +1147,42 @@ const Game = ({ resumeConversation = null }) => {
       { poi: siteType, biome: 'plains' }, false, settingsRef.current, movesSinceEncounterRef.current, { enclosedInterior }
     );
     if (wandering && wandering.encounterTier === 'immediate') {
+      // The roll fired, so it consumes the pity timer whether or not it produces a spawn.
+      // (Not resetting would re-roll immediate every subsequent step and flood the corridor;
+      // the actual fight, on contact, is handled by the advanceMobs branch above.)
       movesSinceEncounterRef.current = 0;
       setMovesSinceEncounter(0);
+
+      // A wandering monster is no longer an out-of-nowhere modal: it spawns as a VISIBLE,
+      // already-aggro'd mob a few tiles off (SITES ONLY: the entity layer exists only here;
+      // world/town wandering rolls are untouched and still open the modal). The party sees it
+      // coming, reads its threat ring, and can flee. It engages later on CONTACT through the
+      // same advanceMobs path as any placed mob (so no halt here, and threat ring + flee
+      // de-aggro come for free). advanceMobs already ran this step, so this fresh mob first
+      // moves on the NEXT step: no double-fire.
+      const spawnedMob = spawnWanderingMob(
+        { mapData: siteMapDataRef.current, mobs: siteMobsRef.current },
+        pos,
+        wandering
+      );
+      if (spawnedMob) {
+        mapHook.addSiteMob(spawnedMob);
+        return 'continue'; // a spawn does not halt the walk; the mob engages on contact later
+      }
+      // No spawn produced. If we are AT the wandering cap, the party already has visible
+      // pursuers, so do not pop a modal on top of them; just keep walking. Otherwise no
+      // reachable spawn tile was found, so FALL BACK to the old behavior (open the fight)
+      // rather than silently dropping the wandering monster.
+      if (countActiveWanderingMobs(siteMobsRef.current) >= WANDERING_MOB_CAP) {
+        return 'continue';
+      }
       mapHook.setIsMapModalOpen(false);
       reopenMapAfterEncounterRef.current = true;
       preEncounterPosRef.current = fromSitePos
         ? { level: 'site', x: fromSitePos.x, y: fromSitePos.y }
         : null;
       openEncounterAction({ encounter: wandering });
-      return 'halt'; // stop the walk on the tile the wandering monster fired
+      return 'halt'; // fallback: stop the walk on the tile the wandering monster fired
     }
     movesSinceEncounterRef.current += 1;
     setMovesSinceEncounter(prev => prev + 1);
