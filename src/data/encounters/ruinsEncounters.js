@@ -78,7 +78,7 @@ export const RUINS_ENCOUNTERS = {
     consequences: {
       criticalSuccess: 'The sentinel crumbles, revealing a reliquary sealed in its chest.',
       success: 'You topple the sentinel and continue deeper.',
-      failure: 'Its stone fists land hard before it finally falls still.',
+      failure: 'Its stone fists land hard, battering you back as it presses forward.',
       criticalFailure: 'The sentinel hammers you back and you barely escape the chamber.'
     }
   },
@@ -172,7 +172,7 @@ export const RUINS_ENCOUNTERS = {
     consequences: {
       criticalSuccess: 'You stop the ritual and capture the cult leader for questioning.',
       success: 'You defeat the cultists and prevent the ritual.',
-      failure: 'You defeat them but the ritual partially completes - something stirs.',
+      failure: 'The cultists hold you off and the ritual partially completes; something stirs.',
       criticalFailure: 'The ritual completes - you must face what they summoned!'
     }
   },

@@ -443,6 +443,11 @@ export const generateEncounterSummary = async (roundState) => {
   return {
     narration: fullNarration,
     outcome,
+    // Surface the enemy's final HP so a non-victory outcome can explain itself on the
+    // final card (e.g. "The enemy still held the field (14/45)"). Threaded per round via
+    // resolveRound; defaults keep older callers safe.
+    enemyCurrentHP: roundState.enemyCurrentHP,
+    enemyMaxHP: roundState.enemyMaxHP,
     rewards: totalRewards,
     // Clamp the SUMMED gold loss to the hero's available gold so a multi-round fight can't
     // display "Lost 44 gold" when the hero had less (the per-round sums are unbounded; the
