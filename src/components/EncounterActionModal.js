@@ -1101,6 +1101,18 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                 </div>
               )}
 
+              {/* Make a loss legible: on a defeat or stalemate, say WHY the fight did not
+                  end in victory (the enemy was still standing) rather than leaving a bare
+                  "DEFEAT" badge. Only shown for combats that tracked enemy HP. */}
+              {(result.outcome === 'defeat' || result.outcome === 'stalemate') &&
+                result.enemyMaxHP > 0 && (
+                <div className="outcome-reason" style={{ marginTop: '6px', opacity: 0.85, fontSize: '0.92em' }}>
+                  {result.outcome === 'defeat'
+                    ? `Your momentum broke before you could finish it. ${encounter.name} still held the field (${result.enemyCurrentHP}/${result.enemyMaxHP} HP).`
+                    : `Neither side could force the end. ${encounter.name} was still standing (${result.enemyCurrentHP}/${result.enemyMaxHP} HP).`}
+                </div>
+              )}
+
               {result.hpDamage > 0 && (
                 <div className="hp-damage-section">
                   <h4>💔 Health Impact</h4>

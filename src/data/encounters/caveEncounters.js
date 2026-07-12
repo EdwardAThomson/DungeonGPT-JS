@@ -103,7 +103,7 @@ export const CAVE_ENCOUNTERS = {
     consequences: {
       criticalSuccess: 'You defeat the spiders and find valuable silk and a wrapped corpse with treasure.',
       success: 'You fight through the spiders and continue deeper.',
-      failure: 'You defeat the spiders but suffer venomous bites.',
+      failure: 'Venomous bites sink deep as the spiders swarm over you.',
       criticalFailure: 'The spiders overwhelm you - you barely escape, poisoned and weakened.'
     }
   },
