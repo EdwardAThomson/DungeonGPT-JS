@@ -518,6 +518,20 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
     return labels[tier] || tier;
   };
 
+  // Friendly label for the FINAL encounter outcome (victory/defeat/escaped/stalemate/
+  // fled), so a draw reads as a titlecased "Stalemate" instead of a raw shouted
+  // "STALEMATE". Unknown values fall back to a titlecased form so nothing crashes.
+  const getFinalOutcomeLabel = (outcome) => {
+    const labels = {
+      'victory': 'Victory',
+      'defeat': 'Defeat',
+      'escaped': 'Escaped',
+      'fled': 'Fled',
+      'stalemate': 'Stalemate'
+    };
+    return labels[outcome] || (outcome ? outcome.charAt(0).toUpperCase() + outcome.slice(1) : outcome);
+  };
+
   // Relative-threat chip: SAME helper/colors as the site-mob ring, so a fight's danger
   // reads consistently on both surfaces. Covers ALL encounters (world POI, town, site),
   // derived from the encounter's difficulty vs the party's current level. Renders
@@ -1097,7 +1111,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
 
               {result.outcome && (
                 <div className="outcome-summary">
-                  <strong>Final Outcome:</strong> {result.outcome.toUpperCase()}
+                  <strong>Final Outcome:</strong> {getFinalOutcomeLabel(result.outcome)}
                 </div>
               )}
 
@@ -1109,7 +1123,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                 <div className="outcome-reason" style={{ marginTop: '6px', opacity: 0.85, fontSize: '0.92em' }}>
                   {result.outcome === 'defeat'
                     ? `Your momentum broke before you could finish it. ${encounter.name} still held the field (${result.enemyCurrentHP}/${result.enemyMaxHP} HP).`
-                    : `Neither side could force the end. ${encounter.name} was still standing (${result.enemyCurrentHP}/${result.enemyMaxHP} HP).`}
+                    : `Neither side could force the end. ${encounter.name} was still standing (${result.enemyCurrentHP}/${result.enemyMaxHP} HP). No spoils, but you keep your gear.`}
                 </div>
               )}
 

@@ -346,7 +346,15 @@ export const resolveRound = async (roundState, playerAction, rng = Math.random) 
     updatedState.supportBonus = getSupportBonus(updatedState.party, updatedState.leadIndex);
   }
 
-  // Check for resolution conditions (a party wipe above wins the tie)
+  // Check for resolution conditions (a party wipe above wins the tie).
+  //
+  // ORDER MATTERS. Enemy-HP-depleted and morale-broken VICTORY are checked FIRST, so
+  // finishing the foe on the final round is always a win. The round-cap TIMEOUT is then
+  // checked BEFORE the advantage-floor DEFEAT: a fight that simply runs out of rounds
+  // should end in the softer stalemate, not a flat defeat, even if its advantage tally
+  // bottomed out on the very same round the cap was reached. The advantage floor still
+  // forces a real defeat on any round BEFORE the cap (the timeout condition is only true
+  // once currentRound > maxRounds), so a genuine mid-fight rout is still a defeat.
   if (!updatedState.isResolved) {
     if (updatedState.enemyCurrentHP <= 0) {
       updatedState.isResolved = true;
@@ -354,16 +362,18 @@ export const resolveRound = async (roundState, playerAction, rng = Math.random) 
     } else if (updatedState.enemyMorale <= 0) {
       updatedState.isResolved = true;
       updatedState.outcome = 'victory';
-    } else if (updatedState.playerAdvantage <= (updatedState.advantageDefeatThreshold ?? -3)) {
-      updatedState.isResolved = true;
-      updatedState.outcome = 'defeat';
     } else if (updatedState.currentRound > updatedState.maxRounds) {
-      // Timeout: a win requires momentum AND a nearly-depleted enemy — with flat
-      // damage the HP pool must matter, so a 300 HP boss at half health is a
-      // stalemate no matter the advantage score.
+      // Timeout: a win requires momentum AND a nearly-depleted enemy; with flat damage
+      // the HP pool must matter, so a 300 HP boss at half health is a stalemate no
+      // matter the advantage score. Reaching the cap with a collapsed advantage is a
+      // stalemate (you broke off), NOT a defeat.
       const bloodied = updatedState.enemyCurrentHP <= updatedState.enemyMaxHP * 0.25;
       updatedState.isResolved = true;
       updatedState.outcome = (updatedState.playerAdvantage > 0 && bloodied) ? 'victory' : 'stalemate';
+    } else if (updatedState.playerAdvantage <= (updatedState.advantageDefeatThreshold ?? -3)) {
+      // Mid-fight rout: momentum genuinely collapsed on a round BEFORE the cap -> defeat.
+      updatedState.isResolved = true;
+      updatedState.outcome = 'defeat';
     } else if (playerAction === 'Tactical Retreat' && result.outcomeTier !== 'criticalFailure') {
       updatedState.isResolved = true;
       updatedState.outcome = 'escaped';
@@ -438,6 +448,14 @@ export const generateEncounterSummary = async (roundState) => {
   } else if (outcome === 'escaped') {
     totalRewards.xp = Math.floor(totalRewards.xp * 0.7); // Reduced XP for fleeing
     totalRewards.items = []; // No loot when fleeing
+  } else if (outcome === 'stalemate') {
+    // A stalemate is the other disengage outcome (you could not finish them and broke
+    // off when the round cap ran out). Treated like `escaped`: NO loot, REDUCED xp,
+    // keep all gear, and NO defeat penalty. The multiplier is slightly below fleeing's
+    // 0.7 because you traded blows to the bitter end rather than choosing to run, so a
+    // clean flee stays marginally more rewarding than grinding to a draw.
+    totalRewards.xp = Math.floor(totalRewards.xp * 0.6); // Reduced XP for a draw
+    totalRewards.items = []; // No loot when the fight ends unresolved
   }
 
   return {
