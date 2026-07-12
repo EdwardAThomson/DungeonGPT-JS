@@ -1,5 +1,5 @@
 import React from 'react';
-import { getRarityColor, describeHealAmount } from '../utils/inventorySystem';
+import { getRarityColor, describeHealAmount, describeSpellDamage } from '../utils/inventorySystem';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
 
@@ -54,8 +54,10 @@ const ItemDetailModal = () => {
   const imgSrc = item.icon ? `/${item.icon}` : null;
 
   // Heal consumables show how much HP they restore, derived from the dice `amount`
-  // (formula + min-to-max range). Only heal items; cure_poison/spell are handled elsewhere.
+  // (formula + min-to-max range). Offensive spell scrolls show a parallel "Deals:" row
+  // from their `damage`. Both are display-only; the scroll has no functional Use here.
   const healLine = item.effect === 'heal' ? describeHealAmount(item.amount) : null;
+  const damageLine = item.effect === 'spell' ? describeSpellDamage(item.damage) : null;
 
   return (
     <ModalShell
@@ -174,6 +176,21 @@ const ItemDetailModal = () => {
           }}>
             <span style={{ color: 'var(--text-secondary)' }}>Restores:</span>
             <strong style={{ color: '#27ae60' }}>{healLine}</strong>
+          </div>
+        )}
+
+        {/* Damage (offensive spell scrolls only): derived formula + min-to-max range. */}
+        {damageLine && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '16px',
+            color: 'var(--text)',
+            fontSize: '0.95rem'
+          }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Deals:</span>
+            <strong style={{ color: '#e67e22' }}>{damageLine}</strong>
           </div>
         )}
 

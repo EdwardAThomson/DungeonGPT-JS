@@ -387,6 +387,64 @@ export const resolveRound = async (roundState, playerAction, rng = Math.random) 
 };
 
 /**
+ * Apply a consumable's flat damage to the enemy for one round (e.g. a Fire Scroll),
+ * mirroring resolveRound's enemy-side bookkeeping so combat-resolution logic lives here
+ * rather than being duplicated in the modal. Using an item IS the party's action for the
+ * round: it spends the turn (no attack, no d20), subtracts `rolledDamage` from the enemy
+ * HP pool (clamped at 0), nudges enemy morale down by the HP fraction removed (matching
+ * resolveRound), advances the round counter, and then resolves the fight:
+ *   enemy HP <= 0 -> victory; enemy morale <= 0 -> victory; round-cap timeout -> the same
+ *   bloodied/advantage stalemate-vs-victory check resolveRound uses; else the fight continues.
+ * Pure: returns a NEW state, never mutates `roundState`.
+ * @param {Object} roundState - current multi-round state
+ * @param {number} rolledDamage - damage the item rolled (already rolled by the caller)
+ * @returns {Object} updated round state
+ */
+export const applyItemDamageRound = (roundState, rolledDamage) => {
+  const updatedState = { ...roundState };
+  const damage = Math.max(0, Math.floor(rolledDamage || 0));
+
+  // Record the item-use round in history, then advance like any other action.
+  updatedState.roundHistory = [
+    ...(roundState.roundHistory || []),
+    {
+      round: roundState.currentRound,
+      action: 'itemDamage',
+      leadIndex: roundState.leadIndex,
+      result: { outcomeTier: 'itemUse', enemyDamage: damage }
+    }
+  ];
+  updatedState.currentRound = roundState.currentRound + 1;
+
+  // Apply the blast to the enemy HP pool (clamp at 0), mirroring resolveRound.
+  updatedState.enemyCurrentHP = Math.max(0, updatedState.enemyCurrentHP - damage);
+
+  // Morale falls by the HP fraction actually removed (matches resolveRound ~L293-296).
+  if (damage > 0 && updatedState.enemyMaxHP > 0) {
+    updatedState.enemyMorale -= Math.round((damage / updatedState.enemyMaxHP) * 100);
+  }
+  updatedState.enemyMorale = Math.min(100, updatedState.enemyMorale);
+
+  // Resolve with the same ordering resolveRound uses (enemy dead / morale broken win
+  // first; then the round-cap timeout stalemate-vs-victory check).
+  if (!updatedState.isResolved) {
+    if (updatedState.enemyCurrentHP <= 0) {
+      updatedState.isResolved = true;
+      updatedState.outcome = 'victory';
+    } else if (updatedState.enemyMorale <= 0) {
+      updatedState.isResolved = true;
+      updatedState.outcome = 'victory';
+    } else if (updatedState.currentRound > updatedState.maxRounds) {
+      const bloodied = updatedState.enemyCurrentHP <= updatedState.enemyMaxHP * 0.25;
+      updatedState.isResolved = true;
+      updatedState.outcome = (updatedState.playerAdvantage > 0 && bloodied) ? 'victory' : 'stalemate';
+    }
+  }
+
+  return updatedState;
+};
+
+/**
  * Generate final encounter summary from all rounds
  */
 export const generateEncounterSummary = async (roundState) => {

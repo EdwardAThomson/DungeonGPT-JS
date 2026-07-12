@@ -54,19 +54,39 @@ export const diceRange = (notation) => {
 };
 
 /**
- * Human-readable heal description derived from a dice `amount` string, e.g.
- * "2d4+2 HP (4 to 10)". Reused by the item-detail modal (and later, tooltips)
- * so the derived formula + range never drift from the catalog data.
+ * Human-readable "formula + range" for any dice-driven effect, e.g.
+ * "2d4+2 HP (4 to 10)" or "3d6 (3 to 18)". The `unit` (e.g. "HP") is inlined after
+ * the formula; pass '' to omit it (the caller supplies context, e.g. a "Deals:" label).
+ * Reused by the item-detail modal (and later, tooltips) so the derived formula + range
+ * never drift from the catalog data.
+ * @param {string|number} notation - dice notation (or a bare number)
+ * @param {string} [unit] - unit label to inline after the formula (default '')
+ * @returns {string|null} e.g. "2d4+2 HP (4 to 10)", or null for bad/empty input
+ */
+export const describeDiceEffect = (notation, unit = '') => {
+  const range = diceRange(notation);
+  if (!range) return null;
+  const formula = typeof notation === 'number' ? String(notation) : String(notation).trim();
+  const label = unit ? `${formula} ${unit}` : formula;
+  if (range.min === range.max) return `${label} (${range.min})`;
+  return `${label} (${range.min} to ${range.max})`;
+};
+
+/**
+ * Human-readable heal description derived from a consumable's `amount` dice string,
+ * e.g. "2d4+2 HP (4 to 10)". Thin wrapper over describeDiceEffect with the "HP" unit.
  * @param {string|number} amount - the consumable's `amount` dice notation
  * @returns {string|null} e.g. "2d4+2 HP (4 to 10)", or null for bad/empty input
  */
-export const describeHealAmount = (amount) => {
-  const range = diceRange(amount);
-  if (!range) return null;
-  const formula = typeof amount === 'number' ? String(amount) : String(amount).trim();
-  if (range.min === range.max) return `${formula} HP (${range.min})`;
-  return `${formula} HP (${range.min} to ${range.max})`;
-};
+export const describeHealAmount = (amount) => describeDiceEffect(amount, 'HP');
+
+/**
+ * Human-readable damage description for a spell consumable's `damage` dice string,
+ * e.g. "3d6 (3 to 18)". No inline unit (a "Deals:" label supplies the context).
+ * @param {string|number} damage - the spell item's `damage` dice notation
+ * @returns {string|null} e.g. "3d6 (3 to 18)", or null for bad/empty input
+ */
+export const describeSpellDamage = (damage) => describeDiceEffect(damage, '');
 
 /**
  * Parse item drop with chance (e.g., "healing_potion:50%")
@@ -135,14 +155,14 @@ export const processRewards = (rewards, outcome) => {
 export const ITEM_CATALOG = {
   // Common items
   'healing_potion': { name: 'Healing Potion', rarity: 'common', value: 50, effect: 'heal', amount: '2d4+2', description: 'A ruby draught that knits flesh and closes wounds in moments.', icon: 'assets/icons/items/healing_potion.webp' },
-  'antidote': { name: 'Antidote', rarity: 'common', value: 25, effect: 'cure_poison', description: 'A bitter green tincture that purges venom from the blood.', icon: 'assets/icons/items/antidote.webp' },
+  'antidote': { name: 'Antidote', rarity: 'common', value: 25, effect: 'heal', amount: '1d4+1', description: 'A bitter green tincture that purges venom and steadies the blood.', icon: 'assets/icons/items/antidote.webp' },
   'rations': { name: 'Trail Rations', rarity: 'common', value: 5, stackable: true, effect: 'heal', amount: '1d4', description: 'Dried meat, hardtack, and nuts. Plain fare, but it keeps a traveler walking.', icon: 'assets/icons/items/rations.webp' },
   'torch': { name: 'Torch', rarity: 'common', value: 1, stackable: true, description: 'A pitch-soaked brand that throws back the dark for an hour or so.', icon: 'assets/icons/items/torch.webp' },
   'rope': { name: 'Rope (50ft)', rarity: 'common', value: 10, description: 'Fifty feet of sturdy hemp, good for climbs, bindings, and hasty escapes.', icon: 'assets/icons/items/rope.webp' },
 
   // Uncommon items
   'greater_healing_potion': { name: 'Greater Healing Potion', rarity: 'uncommon', value: 150, effect: 'heal', amount: '4d4+4', description: 'A deep-crimson elixir potent enough to mend grievous injury.', icon: 'assets/icons/items/greater_healing_potion.webp' },
-  'scroll_fireball': { name: 'Fire Scroll', rarity: 'uncommon', value: 200, effect: 'spell', spell: 'fireball', description: 'A rune-scribed vellum that looses a roaring blast of flame when read aloud.', icon: 'assets/icons/items/scroll_fireball.webp' },
+  'scroll_fireball': { name: 'Fire Scroll', rarity: 'uncommon', value: 200, effect: 'spell', spell: 'fireball', damage: '3d6', target: 'enemy', combatOnly: true, description: 'A rune-scribed vellum that looses a roaring blast of flame at a foe when read aloud.', icon: 'assets/icons/items/scroll_fireball.webp' },
   'silver_dagger': { name: 'Silver Dagger', rarity: 'uncommon', value: 100, type: 'weapon', bonus: '+1', description: 'A keen blade of blessed silver, bane of beasts that shun the moon.', icon: 'assets/icons/items/silver_dagger.webp' },
 
   // Rare items
@@ -545,6 +565,85 @@ export const consumeHealingItem = (itemKey, targetHero, ownerHero, options = {})
     actualHeal,
     sameOwner
   };
+};
+
+/**
+ * Is this catalog item a USABLE consumable of ANY kind? Generalizes isHealingConsumable
+ * over both consumable families: a heal (effect 'heal' with an `amount`) OR an offensive
+ * spell scroll (effect 'spell' with a `damage`). The in-combat item picker filters on
+ * this (plus a combat-only guard so a damage scroll only appears with a live enemy).
+ * @param {string} itemKey - ITEM_CATALOG key
+ * @returns {boolean}
+ */
+export const isConsumable = (itemKey) => {
+  const entry = ITEM_CATALOG[itemKey];
+  if (!entry) return false;
+  return !!(
+    (entry.effect === 'heal' && entry.amount) ||
+    (entry.effect === 'spell' && entry.damage)
+  );
+};
+
+/**
+ * Consume ONE offensive spell scroll: roll its damage and decrement one from the owning
+ * hero's stack. Unlike consumeHealingItem this does NOT touch a hero's HP: the target is
+ * the ENEMY, so the caller applies `rolled` to the enemy HP pool (see applyItemDamageRound
+ * in multiRoundEncounter.js). The result shape parallels the heal result (itemName, rolled,
+ * updatedOwner, updatedOwnerInventory) for symmetric handling on the combat surface.
+ *
+ * Pure and deterministic when `options.rolled` is supplied (tests inject it); otherwise the
+ * damage is rolled via rollDice (Math.random).
+ *
+ * @param {string} itemKey - ITEM_CATALOG key of the spell scroll
+ * @param {Object} ownerHero - hero whose inventory the scroll is removed from
+ * @param {Object} [options]
+ * @param {number} [options.rolled] - pre-rolled damage (skips rollDice; for tests/determinism)
+ * @returns {{ ok: boolean, reason?: string, itemName?: string, rolled?: number,
+ *   damage?: number, updatedOwner?: Object, updatedOwnerInventory?: Array }}
+ */
+export const consumeSpellItem = (itemKey, ownerHero, options = {}) => {
+  const catalogEntry = ITEM_CATALOG[itemKey];
+  if (!catalogEntry || catalogEntry.effect !== 'spell' || !catalogEntry.damage) {
+    return { ok: false, reason: 'not_consumable' };
+  }
+  if (!ownerHero) return { ok: false, reason: 'no_owner' };
+
+  const rolled = Number.isFinite(options.rolled)
+    ? options.rolled
+    : rollDice(catalogEntry.damage);
+
+  const updatedOwnerInventory = removeItem(ownerHero.inventory || [], itemKey, 1);
+  const updatedOwner = { ...ownerHero, inventory: updatedOwnerInventory };
+
+  return {
+    ok: true,
+    itemName: catalogEntry.name,
+    rolled,
+    damage: rolled,
+    updatedOwner,
+    updatedOwnerInventory
+  };
+};
+
+/**
+ * Single dispatch for consuming any usable item. Routes by the catalog `effect`:
+ *   - 'heal'  -> consumeHealingItem(itemKey, target, owner, context) (unchanged)
+ *   - 'spell' -> consumeSpellItem(itemKey, owner || target, context)
+ *   - anything else -> { ok:false, reason:'not_consumable' }
+ * Heal consumes onto `target` (removing the stack from `owner`); spell consumes off the
+ * OWNER only (its target is the enemy, applied by the combat caller).
+ * @param {string} itemKey - ITEM_CATALOG key
+ * @param {Object} target - heal recipient (heal) / acting hero fallback (spell)
+ * @param {Object} [owner] - hero whose inventory the item leaves
+ * @param {Object} [context] - forwarded options (e.g. { rolled } for determinism)
+ * @returns {Object} the effect-specific consume result, or a not_consumable failure
+ */
+export const consumeConsumable = (itemKey, target, owner, context = {}) => {
+  const entry = ITEM_CATALOG[itemKey];
+  if (!entry) return { ok: false, reason: 'not_consumable' };
+  if (entry.effect === 'heal') return consumeHealingItem(itemKey, target, owner, context);
+  if (entry.effect === 'spell') return consumeSpellItem(itemKey, owner || target, context);
+  return { ok: false, reason: 'not_consumable' };
 };
 
 /**

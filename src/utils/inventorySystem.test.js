@@ -6,6 +6,7 @@ import {
   rollDice,
   diceRange,
   describeHealAmount,
+  describeSpellDamage,
   rollItemDrop,
   ITEM_CATALOG,
   resolveTier,
@@ -14,7 +15,10 @@ import {
   filterDropsByTier,
   RARITY_RANK,
   consumeHealingItem,
-  isHealingConsumable
+  isHealingConsumable,
+  isConsumable,
+  consumeSpellItem,
+  consumeConsumable
 } from './inventorySystem';
 
 describe('food consumables restore HP (were no-ops)', () => {
@@ -118,6 +122,103 @@ describe('consumeHealingItem (shared heal-a-consumable path)', () => {
     expect(res.rolled).toBeGreaterThanOrEqual(4);
     expect(res.rolled).toBeLessThanOrEqual(10);
     expect(res.actualHeal).toBe(res.rolled);
+  });
+});
+
+describe('antidote is now a small heal (was cure_poison, an inert effect)', () => {
+  it('is a heal consumable with a 1d4+1 amount', () => {
+    expect(ITEM_CATALOG.antidote.effect).toBe('heal');
+    expect(ITEM_CATALOG.antidote.amount).toBe('1d4+1');
+    expect(isHealingConsumable('antidote')).toBe(true);
+    expect(isConsumable('antidote')).toBe(true);
+  });
+
+  it('heals a wounded hero through the shared consume path', () => {
+    const hero = { heroId: 'h1', currentHP: 5, maxHP: 20, inventory: [{ key: 'antidote', quantity: 1 }] };
+    const res = consumeHealingItem('antidote', hero, hero, { rolled: 4 });
+    expect(res.ok).toBe(true);
+    expect(res.healedTarget.currentHP).toBe(9);
+    expect(res.healedTarget.inventory.find((i) => i.key === 'antidote')).toBeUndefined();
+  });
+});
+
+describe('isConsumable (generalized over heal + spell families)', () => {
+  it('is true for heals with an amount and spells with a damage', () => {
+    expect(isConsumable('healing_potion')).toBe(true); // heal
+    expect(isConsumable('rations')).toBe(true); // food heal
+    expect(isConsumable('scroll_fireball')).toBe(true); // spell with damage
+  });
+  it('is false for non-consumables and unknown ids', () => {
+    expect(isConsumable('rope')).toBe(false);
+    expect(isConsumable('silver_dagger')).toBe(false); // weapon
+    expect(isConsumable('not_a_real_item')).toBe(false);
+  });
+});
+
+describe('consumeSpellItem (offensive scroll: rolls damage, decrements the scroll)', () => {
+  const makeOwner = (over = {}) => ({
+    heroId: 'caster',
+    currentHP: 20,
+    maxHP: 20,
+    inventory: [{ key: 'scroll_fireball', quantity: 2 }],
+    ...over
+  });
+
+  it('rolls the scroll damage (injected) and decrements the stack by 1, without touching HP', () => {
+    const owner = makeOwner();
+    const res = consumeSpellItem('scroll_fireball', owner, { rolled: 12 });
+    expect(res.ok).toBe(true);
+    expect(res.itemName).toBe('Fire Scroll');
+    expect(res.rolled).toBe(12);
+    expect(res.damage).toBe(12);
+    // stack decremented, HP untouched (target is the enemy, not the caster)
+    expect(res.updatedOwner.inventory.find((i) => i.key === 'scroll_fireball').quantity).toBe(1);
+    expect(res.updatedOwner.currentHP).toBe(20);
+    // input not mutated at the HP level
+    expect(owner.currentHP).toBe(20);
+  });
+
+  it('removes the scroll entirely when the last one is used', () => {
+    const owner = makeOwner({ inventory: [{ key: 'scroll_fireball', quantity: 1 }] });
+    const res = consumeSpellItem('scroll_fireball', owner, { rolled: 9 });
+    expect(res.ok).toBe(true);
+    expect(res.updatedOwner.inventory.find((i) => i.key === 'scroll_fireball')).toBeUndefined();
+  });
+
+  it('rolls via rollDice within the 3d6 range when no damage is injected', () => {
+    const owner = makeOwner();
+    const res = consumeSpellItem('scroll_fireball', owner);
+    expect(res.ok).toBe(true);
+    expect(res.rolled).toBeGreaterThanOrEqual(3);
+    expect(res.rolled).toBeLessThanOrEqual(18);
+  });
+
+  it('rejects a non-spell item and a missing owner', () => {
+    expect(consumeSpellItem('healing_potion', makeOwner(), { rolled: 5 }).reason).toBe('not_consumable');
+    expect(consumeSpellItem('scroll_fireball', null, { rolled: 5 }).reason).toBe('no_owner');
+  });
+});
+
+describe('consumeConsumable (single dispatch by effect)', () => {
+  it('dispatches heal -> heal result', () => {
+    const hero = { heroId: 'h1', currentHP: 5, maxHP: 20, inventory: [{ key: 'healing_potion', quantity: 1 }] };
+    const res = consumeConsumable('healing_potion', hero, hero, { rolled: 6 });
+    expect(res.ok).toBe(true);
+    expect(res.healedTarget.currentHP).toBe(11); // heal-shaped result
+  });
+
+  it('dispatches spell -> spell result (owner supplies the scroll)', () => {
+    const owner = { heroId: 'caster', currentHP: 20, maxHP: 20, inventory: [{ key: 'scroll_fireball', quantity: 1 }] };
+    const res = consumeConsumable('scroll_fireball', null, owner, { rolled: 10 });
+    expect(res.ok).toBe(true);
+    expect(res.damage).toBe(10); // spell-shaped result
+    expect(res.updatedOwner.inventory.find((i) => i.key === 'scroll_fireball')).toBeUndefined();
+  });
+
+  it('returns not_consumable for a non-consumable and an unknown id', () => {
+    const hero = { heroId: 'h1', currentHP: 5, maxHP: 20, inventory: [] };
+    expect(consumeConsumable('rope', hero, hero).reason).toBe('not_consumable');
+    expect(consumeConsumable('not_a_real_item', hero, hero).reason).toBe('not_consumable');
   });
 });
 
@@ -296,5 +397,17 @@ describe('diceRange / describeHealAmount (heal-amount display)', () => {
     expect(describeHealAmount('')).toBeNull();
     expect(describeHealAmount(null)).toBeNull();
     expect(describeHealAmount('garbage')).toBeNull();
+  });
+
+  it('describeSpellDamage formats formula + range with no inline unit', () => {
+    expect(describeSpellDamage('3d6')).toBe('3d6 (3 to 18)');
+    expect(describeSpellDamage(ITEM_CATALOG.scroll_fireball.damage)).toBe('3d6 (3 to 18)');
+  });
+
+  it('describeSpellDamage collapses a fixed amount and rejects bad input', () => {
+    expect(describeSpellDamage(5)).toBe('5 (5)');
+    expect(describeSpellDamage('')).toBeNull();
+    expect(describeSpellDamage(null)).toBeNull();
+    expect(describeSpellDamage('garbage')).toBeNull();
   });
 });

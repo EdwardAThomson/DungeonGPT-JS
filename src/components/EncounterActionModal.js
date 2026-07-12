@@ -1,8 +1,8 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { resolveEncounter } from '../utils/encounterResolver';
-import { createMultiRoundEncounter, resolveRound, getRoundActions, generateEncounterSummary, heroSupportContribution, getSupportBonus } from '../utils/multiRoundEncounter';
+import { createMultiRoundEncounter, resolveRound, getRoundActions, generateEncounterSummary, heroSupportContribution, getSupportBonus, applyItemDamageRound } from '../utils/multiRoundEncounter';
 import { applyDamage, getHPStatus } from '../utils/healthSystem';
-import { consumeHealingItem, isHealingConsumable } from '../utils/inventorySystem';
+import { consumeHealingItem, isConsumable, consumeSpellItem, describeSpellDamage } from '../utils/inventorySystem';
 import { effectiveActionModifier } from '../game/balanceSim';
 import SettingsContext from '../contexts/SettingsContext';
 import ClickableImage from './ClickableImage';
@@ -286,24 +286,37 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
 
   const heroUidLocal = (h) => (h && (h.heroId || h.characterId)) || null;
 
-  // Healing consumables available across the (pooled) combat party, aggregated by key.
+  // A live, unresolved multi-round fight with an enemy HP pool: the ONLY context in which
+  // an offensive spell scroll may be used (single-round encounters have no enemy HP pool,
+  // so they never offer scrolls).
+  const isMultiRoundLive = isMultiRound && !!roundState && !roundState.isResolved;
+  const hasHealableHero = combatParty.some(
+    (h) => h && !h.isDefeated && h.currentHP > 0 && h.currentHP < h.maxHP
+  );
+  const hasLiveEnemy = isMultiRoundLive && roundState.enemyCurrentHP > 0;
+
+  // Consumables available across the (pooled) combat party, aggregated by key. Heals show
+  // whenever a hero can be healed; offensive spell scrolls show ONLY in a live multi-round
+  // fight with an enemy HP pool (the combat-only guard). isConsumable covers both families.
   const usableConsumables = (() => {
     const map = {};
     combatParty.forEach((h) => (h.inventory || []).forEach((item) => {
       const key = typeof item === 'string' ? item : (item && item.key);
-      if (!key || !isHealingConsumable(key)) return;
+      if (!key || !isConsumable(key)) return;
+      const effect = ITEM_CATALOG[key]?.effect;
+      // Combat-only gate: a damage scroll only appears when there is a live enemy to hit.
+      if (effect === 'spell' && !hasLiveEnemy) return;
+      // A heal only appears when someone can actually be healed.
+      if (effect === 'heal' && !hasHealableHero) return;
       const qty = (typeof item === 'object' && item.quantity) ? item.quantity : 1;
       map[key] = (map[key] || 0) + qty;
     }));
     return Object.entries(map).map(([key, quantity]) => ({
-      key, quantity, name: ITEM_CATALOG[key]?.name || key
+      key, quantity, name: ITEM_CATALOG[key]?.name || key, effect: ITEM_CATALOG[key]?.effect
     }));
   })();
 
-  const hasHealableHero = combatParty.some(
-    (h) => h && !h.isDefeated && h.currentHP > 0 && h.currentHP < h.maxHP
-  );
-  const canUseItemInCombat = usableConsumables.length > 0 && hasHealableHero;
+  const canUseItemInCombat = usableConsumables.length > 0;
 
   // Use one healing consumable on a chosen hero DURING the fight. Reuses the SHARED
   // consumeHealingItem path (identical roll/heal/decrement/pooled-owner handling as the
@@ -379,6 +392,60 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
       healed: res.actualHeal,
       rolled: res.rolled,
       spentRound: !!(isMultiRound && roundState)
+    });
+    setShowItemPicker(false);
+    setPendingItemKey(null);
+  };
+
+  // Fire an offensive spell scroll (e.g. Fire Scroll) at the ENEMY during a multi-round
+  // fight. Unlike the heal branch there is no target hero: the scroll's damage lands on
+  // the enemy HP pool via applyItemDamageRound, which also SPENDS THE ROUND (the scroll is
+  // the party's action this turn) and resolves victory / timeout. Scrolls are gated to a
+  // live multi-round fight, so this path never runs in a single-round encounter.
+  const handleUseSpellItemInCombat = (itemKey) => {
+    if (!isMultiRound || !roundState || roundState.isResolved) {
+      setShowItemPicker(false); setPendingItemKey(null); return;
+    }
+    // Owner: any hero in the (pooled) combat party carrying the scroll.
+    const owner = combatParty.find((h) =>
+      (h.inventory || []).some((i) => (typeof i === 'string' ? i : i && i.key) === itemKey)
+    );
+    if (!owner) { setShowItemPicker(false); setPendingItemKey(null); return; }
+
+    const res = consumeSpellItem(itemKey, owner);
+    if (!res.ok) { setShowItemPicker(false); setPendingItemKey(null); return; }
+
+    // Persist the owner's shrunk stack up to game state.
+    if (onCharacterUpdate) onCharacterUpdate(res.updatedOwner);
+
+    // Reflect the consumed scroll into the live team, then apply the blast to the enemy
+    // and advance the round (the scroll is this turn's action; no attack, no d20).
+    const newParty = roundState.party.map((h) =>
+      heroUidLocal(h) === heroUidLocal(res.updatedOwner) ? res.updatedOwner : h
+    );
+    const withParty = {
+      ...roundState,
+      party: newParty,
+      character: newParty[roundState.leadIndex],
+      supportBonus: getSupportBonus(newParty, roundState.leadIndex)
+    };
+    const advanced = applyItemDamageRound(withParty, res.rolled);
+
+    setRoundState(advanced);
+    setCurrentCharacter(advanced.party[advanced.leadIndex]);
+    setRoundResults((prev) => [...prev, {
+      round: roundState.currentRound,
+      result: { outcomeTier: `${res.itemName} sears the enemy for ${res.rolled}` }
+    }]);
+    if (advanced.isResolved) {
+      generateEncounterSummary(advanced).then(setResult);
+    }
+
+    setItemUseResult({
+      itemName: res.itemName,
+      damage: res.rolled,
+      isSpell: true,
+      spentRound: true
     });
     setShowItemPicker(false);
     setPendingItemKey(null);
@@ -974,14 +1041,23 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                     borderRadius: '6px',
                     textAlign: 'center'
                   }}>
-                    <span>
-                      {itemUseResult.itemName} restored{' '}
-                      <strong style={{ color: '#27ae60' }}>{itemUseResult.healed} HP</strong>{' '}
-                      to {itemUseResult.heroName} (rolled {itemUseResult.rolled}).
-                    </span>
+                    {itemUseResult.isSpell ? (
+                      <span>
+                        {itemUseResult.itemName} sears the enemy for{' '}
+                        <strong style={{ color: '#e67e22' }}>{itemUseResult.damage} damage</strong>.
+                      </span>
+                    ) : (
+                      <span>
+                        {itemUseResult.itemName} restored{' '}
+                        <strong style={{ color: '#27ae60' }}>{itemUseResult.healed} HP</strong>{' '}
+                        to {itemUseResult.heroName} (rolled {itemUseResult.rolled}).
+                      </span>
+                    )}
                     {itemUseResult.spentRound && (
                       <span style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                        Tending wounds spent the party's action this round.
+                        {itemUseResult.isSpell
+                          ? "Loosing the scroll spent the party's action this round."
+                          : "Tending wounds spent the party's action this round."}
                       </span>
                     )}
                   </div>
@@ -1227,18 +1303,67 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                 <>
                   <h3 style={{ margin: '0 0 12px 0', color: '#27ae60' }}>Use which item?</h3>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    {usableConsumables.map((it) => (
-                      <button
-                        key={it.key}
-                        className="secondary-button"
-                        onClick={() => setPendingItemKey(it.key)}
-                        style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}
-                      >
-                        <span>{it.name}</span>
-                        <span style={{ color: 'var(--text-secondary)' }}>x{it.quantity}</span>
-                      </button>
-                    ))}
+                    {usableConsumables.map((it) => {
+                      // Show what the item does before the player commits: heals show a
+                      // "Restores:" line, offensive scrolls a "Deals:" damage line.
+                      const effectLine = it.effect === 'spell'
+                        ? (describeSpellDamage(ITEM_CATALOG[it.key]?.damage) && `Deals ${describeSpellDamage(ITEM_CATALOG[it.key]?.damage)}`)
+                        : null;
+                      return (
+                        <button
+                          key={it.key}
+                          className="secondary-button"
+                          onClick={() => setPendingItemKey(it.key)}
+                          style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '2px', width: '100%' }}
+                        >
+                          <span style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                            <span>{it.name}</span>
+                            <span style={{ color: 'var(--text-secondary)' }}>x{it.quantity}</span>
+                          </span>
+                          {effectLine && (
+                            <span style={{ fontSize: '0.78rem', color: '#e67e22', textAlign: 'left' }}>{effectLine}</span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
+                </>
+              ) : ITEM_CATALOG[pendingItemKey]?.effect === 'spell' ? (
+                // Offensive spell scroll: no hero to pick (the target is the enemy). Confirm
+                // and fire; applyItemDamageRound spends the round and resolves the fight.
+                <>
+                  <h3 style={{ margin: '0 0 12px 0', color: '#e67e22' }}>
+                    Loose {ITEM_CATALOG[pendingItemKey]?.name || 'the scroll'} at the enemy?
+                  </h3>
+                  <p style={{ margin: '0 0 12px 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    Deals {describeSpellDamage(ITEM_CATALOG[pendingItemKey]?.damage) || 'damage'} to the enemy.
+                    Using it spends the party's action this round.
+                  </p>
+                  <button
+                    onClick={() => handleUseSpellItemInCombat(pendingItemKey)}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      padding: '12px 14px',
+                      width: '100%',
+                      background: '#e67e22',
+                      border: '1px solid #e67e22',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontWeight: 'bold',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    🔥 Fire at the enemy
+                  </button>
+                  <button
+                    className="secondary-button"
+                    onClick={() => setPendingItemKey(null)}
+                    style={{ marginTop: '10px', width: '100%' }}
+                  >
+                    ← Back
+                  </button>
                 </>
               ) : (
                 <>
