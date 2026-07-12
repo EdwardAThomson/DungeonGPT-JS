@@ -3,12 +3,18 @@ import {
   spawnMobsFromSlots,
   stepMobs,
   healMobsToIdle,
+  countActiveWanderingMobs,
+  spawnWanderingMob,
   AGGRO_RADIUS,
   DEAGGRO_RADIUS,
   LEASH_RADIUS,
   DEFAULT_MOB_SPEED,
   HUNTER_SPEED,
   FLEE_DEAGGRO_STEPS,
+  WANDERING_MOB_CAP,
+  WANDERING_SPAWN_MIN_DIST,
+  WANDERING_SPAWN_MAX_DIST,
+  WANDERING_SPAWN_STATE,
 } from './mobMovement';
 
 // An open, all-walkable site grid (only `wall` tiles are non-walkable in real sites).
@@ -232,5 +238,132 @@ describe('healMobsToIdle', () => {
     healMobsToIdle(mobs);
     expect(mobs.map((m) => m.state)).toEqual(['idle', 'idle', 'idle']);
     expect(mobs[2].defeated).toBe(true); // defeat is untouched
+  });
+});
+
+describe('makeMob - wandering flag + state override', () => {
+  test('state override and wandering flag are honored', () => {
+    const m = makeMob({ x: 2, y: 2, encounter: enc, state: 'aggro', wandering: true });
+    expect(m.state).toBe('aggro');
+    expect(m.wandering).toBe(true);
+  });
+
+  test('default mob is idle with no wandering flag', () => {
+    const m = makeMob({ x: 2, y: 2, encounter: enc });
+    expect(m.state).toBe('idle');
+    expect(m.wandering).toBeUndefined();
+  });
+});
+
+describe('countActiveWanderingMobs', () => {
+  test('counts only non-defeated wandering mobs (placed mobs and bosses excluded)', () => {
+    const mobs = [
+      makeMob({ x: 1, y: 1, encounter: enc, wandering: true }),
+      { ...makeMob({ x: 2, y: 2, encounter: enc, wandering: true }), defeated: true },
+      makeMob({ x: 3, y: 3, encounter: enc }), // placed slot mob
+      makeMob({ x: 4, y: 4, encounter: enc, isBoss: true }), // boss
+      makeMob({ x: 5, y: 5, encounter: enc, wandering: true }),
+    ];
+    expect(countActiveWanderingMobs(mobs)).toBe(2);
+    expect(countActiveWanderingMobs(null)).toBe(0);
+    expect(countActiveWanderingMobs([])).toBe(0);
+  });
+});
+
+describe('spawnWanderingMob', () => {
+  const rng0 = () => 0; // deterministic: always picks the first candidate
+
+  test('spawns a walkable, in-range, aggro, wandering mob near the party', () => {
+    const s = { ...makeSite(30, 12), mobs: [] };
+    const player = { x: 10, y: 5 };
+    const mob = spawnWanderingMob(s, player, enc, { rng: rng0 });
+    expect(mob).not.toBeNull();
+    expect(mob.wandering).toBe(true);
+    expect(mob.state).toBe(WANDERING_SPAWN_STATE); // 'aggro'
+    expect(mob.encounter).toBe(enc);
+    const d = Math.abs(mob.x - player.x) + Math.abs(mob.y - player.y);
+    expect(d).toBeGreaterThanOrEqual(WANDERING_SPAWN_MIN_DIST);
+    expect(d).toBeLessThanOrEqual(WANDERING_SPAWN_MAX_DIST);
+    // The tile it lands on is walkable and unoccupied.
+    expect(s.mapData[mob.y][mob.x].walkable).toBe(true);
+    expect(mob.x === player.x && mob.y === player.y).toBe(false);
+  });
+
+  test('hard encounters spawn as fast hunters; normal ones at default speed', () => {
+    const s = { ...makeSite(30, 12), mobs: [] };
+    const player = { x: 10, y: 5 };
+    const hard = spawnWanderingMob(s, player, { ...enc, difficulty: 'hard' }, { rng: rng0 });
+    const easy = spawnWanderingMob(s, player, { ...enc, difficulty: 'easy' }, { rng: rng0 });
+    expect(hard.speed).toBe(HUNTER_SPEED);
+    expect(easy.speed).toBe(DEFAULT_MOB_SPEED);
+  });
+
+  test('returns null at the wandering cap (roll consumed, no new spawn)', () => {
+    const mobs = [];
+    for (let i = 0; i < WANDERING_MOB_CAP; i++) {
+      mobs.push(makeMob({ x: i, y: 0, encounter: enc, wandering: true }));
+    }
+    const s = { ...makeSite(30, 12), mobs };
+    expect(spawnWanderingMob(s, { x: 10, y: 5 }, enc, { rng: rng0 })).toBeNull();
+  });
+
+  test('defeated wandering mobs do not count toward the cap', () => {
+    const mobs = [];
+    for (let i = 0; i < WANDERING_MOB_CAP; i++) {
+      mobs.push({ ...makeMob({ x: i, y: 0, encounter: enc, wandering: true }), defeated: true });
+    }
+    const s = { ...makeSite(30, 12), mobs };
+    expect(spawnWanderingMob(s, { x: 10, y: 5 }, enc, { rng: rng0 })).not.toBeNull();
+  });
+
+  test('returns null when no walkable tile exists in range (party boxed in by walls)', () => {
+    // A 1x1 walkable island: every other tile is a wall, so nothing sits in the band.
+    const mapData = [];
+    for (let y = 0; y < 12; y++) {
+      const row = [];
+      for (let x = 0; x < 30; x++) row.push({ x, y, walkable: false, type: 'wall' });
+      mapData.push(row);
+    }
+    mapData[5][10] = { x: 10, y: 5, walkable: true, type: 'floor' };
+    const s = { mapData, mobs: [] };
+    expect(spawnWanderingMob(s, { x: 10, y: 5 }, enc, { rng: rng0 })).toBeNull();
+  });
+
+  test('returns null when the only in-range tiles are unreachable across a wall', () => {
+    // Two rooms split by a full wall column; the party is on the left, the only in-band
+    // walkable tiles are on the right and cannot be pathed to.
+    const mapData = [];
+    for (let y = 0; y < 3; y++) {
+      const row = [];
+      for (let x = 0; x < 6; x++) {
+        const isWall = x === 3; // full dividing wall
+        row.push({ x, y, walkable: !isWall, type: isWall ? 'wall' : 'floor' });
+      }
+      mapData.push(row);
+    }
+    const s = { mapData, mobs: [] };
+    // Party in the far-left column. With minDist 4 the whole left room is too close, so the
+    // only in-band tile is (4,1) in the right room, which is unreachable across the wall.
+    const mob = spawnWanderingMob(s, { x: 0, y: 1 }, enc, { rng: rng0, minDist: 4, maxDist: 4 });
+    expect(mob).toBeNull();
+  });
+
+  test('does not spawn onto a tile occupied by a live mob', () => {
+    const s = { ...makeSite(6, 3), mobs: [makeMob({ x: 3, y: 1, encounter: enc })] };
+    const player = { x: 1, y: 1 };
+    // Force the pick to the last candidate to exercise the occupied filter across the set.
+    const mob = spawnWanderingMob(s, player, enc, { rng: () => 0.999 });
+    expect(mob).not.toBeNull();
+    expect(`${mob.x},${mob.y}`).not.toBe('3,1'); // never the occupied tile
+    expect(`${mob.x},${mob.y}`).not.toBe('1,1'); // never the party tile
+  });
+
+  test('successive spawns get unique ids', () => {
+    const s = { ...makeSite(30, 12), mobs: [] };
+    const player = { x: 10, y: 5 };
+    const a = spawnWanderingMob(s, player, enc, { rng: rng0 });
+    s.mobs.push(a);
+    const b = spawnWanderingMob(s, player, enc, { rng: rng0 });
+    expect(a.id).not.toBe(b.id);
   });
 });
