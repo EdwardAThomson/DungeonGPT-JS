@@ -307,7 +307,7 @@ const AdventureBook = ({
       // Fixed frame height (not content-driven): the tabs hold very different
       // content volumes, and a shrink-to-fit modal jarringly resizes on every
       // tab switch. All tabs share this silhouette; content scrolls within.
-      style={{ maxWidth: '900px', width: '95%', height: 'min(90vh, 1000px)', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
+      style={{ maxWidth: '900px', width: '95%', height: 'min(95vh, 1200px)', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
     >
       <div style={{ padding: '20px 20px 0 20px', borderBottom: '1px solid var(--border)' }}>
         <h2 style={{ margin: '0 0 10px 0', color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>📖 Adventure Book</h2>

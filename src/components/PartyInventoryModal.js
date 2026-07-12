@@ -487,8 +487,9 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
             background: 'var(--inventory-shelf-bg)',
             borderRadius: '8px',
             padding: '16px',
-            maxHeight: '45vh',
-            overflowY: 'auto',
+            // No inner scroll: the loadout grows with its content and the Adventure Book
+            // body (overflowY:auto) provides the single scrollbar. A maxHeight+overflow
+            // here nested inside that body produced a double scrollbar (matches the item shelf).
             border: '1px solid var(--border)',
             boxShadow: 'inset 0 4px 15px rgba(0,0,0,0.8)',
             display: 'flex',
