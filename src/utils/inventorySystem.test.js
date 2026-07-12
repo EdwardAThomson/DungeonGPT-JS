@@ -4,6 +4,8 @@ import {
   processRewards,
   removeGold,
   rollDice,
+  diceRange,
+  describeHealAmount,
   rollItemDrop,
   ITEM_CATALOG,
   resolveTier,
@@ -246,5 +248,53 @@ describe('rarity-by-tier loot gating', () => {
     // Same list at Tier 3 keeps everything.
     expect(filterDropsByTier(rolled, { tier: 3 })).toEqual(rolled);
     expect(filterDropsByTier(undefined, { tier: 1 })).toEqual([]);
+  });
+});
+
+describe('diceRange / describeHealAmount (heal-amount display)', () => {
+  it('computes min/max from XdY+Z notation', () => {
+    // min = X*1 + Z, max = X*Y + Z
+    expect(diceRange('2d4+2')).toEqual({ min: 4, max: 10 });
+    expect(diceRange('4d4+4')).toEqual({ min: 8, max: 20 });
+    expect(diceRange('1d4')).toEqual({ min: 1, max: 4 });
+    expect(diceRange('3d6')).toEqual({ min: 3, max: 18 });
+  });
+
+  it('treats bare numbers and numeric strings as a fixed value', () => {
+    expect(diceRange(5)).toEqual({ min: 5, max: 5 });
+    expect(diceRange('7')).toEqual({ min: 7, max: 7 });
+  });
+
+  it('returns null for bad/empty input rather than throwing', () => {
+    expect(diceRange('')).toBeNull();
+    expect(diceRange(null)).toBeNull();
+    expect(diceRange(undefined)).toBeNull();
+    expect(diceRange('not-dice')).toBeNull();
+    expect(diceRange({})).toBeNull();
+  });
+
+  it('matches the catalog: derived range always contains a real roll', () => {
+    const { min, max } = diceRange(ITEM_CATALOG.healing_potion.amount);
+    for (let i = 0; i < 50; i++) {
+      const rolled = rollDice(ITEM_CATALOG.healing_potion.amount);
+      expect(rolled).toBeGreaterThanOrEqual(min);
+      expect(rolled).toBeLessThanOrEqual(max);
+    }
+  });
+
+  it('describeHealAmount formats formula + range', () => {
+    expect(describeHealAmount('2d4+2')).toBe('2d4+2 HP (4 to 10)');
+    expect(describeHealAmount('4d4+4')).toBe('4d4+4 HP (8 to 20)');
+    expect(describeHealAmount('1d4')).toBe('1d4 HP (1 to 4)');
+  });
+
+  it('describeHealAmount collapses a fixed amount to a single number', () => {
+    expect(describeHealAmount(5)).toBe('5 HP (5)');
+  });
+
+  it('describeHealAmount returns null for bad/empty input', () => {
+    expect(describeHealAmount('')).toBeNull();
+    expect(describeHealAmount(null)).toBeNull();
+    expect(describeHealAmount('garbage')).toBeNull();
   });
 });

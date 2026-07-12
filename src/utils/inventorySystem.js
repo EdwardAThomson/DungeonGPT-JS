@@ -27,6 +27,48 @@ export const rollDice = (notation) => {
 };
 
 /**
+ * Compute the min and max total for a dice notation string (e.g. "2d4+2").
+ * For XdY(+Z): min = X*1 + Z (every die shows 1), max = X*Y + Z (every die shows Y).
+ * A bare number (or numeric string) has min === max === that number.
+ * @param {string|number} notation - Dice notation
+ * @returns {{ min: number, max: number }|null} range, or null for unparseable input
+ */
+export const diceRange = (notation) => {
+  if (typeof notation === 'number' && Number.isFinite(notation)) {
+    return { min: notation, max: notation };
+  }
+  if (!notation || typeof notation !== 'string') return null;
+
+  const match = notation.trim().match(/^(\d+)d(\d+)(?:\+(\d+))?$/);
+  if (!match) {
+    const flat = parseInt(notation, 10);
+    if (Number.isNaN(flat)) return null;
+    return { min: flat, max: flat };
+  }
+
+  const count = parseInt(match[1], 10);
+  const sides = parseInt(match[2], 10);
+  const bonus = parseInt(match[3], 10) || 0;
+
+  return { min: count * 1 + bonus, max: count * sides + bonus };
+};
+
+/**
+ * Human-readable heal description derived from a dice `amount` string, e.g.
+ * "2d4+2 HP (4 to 10)". Reused by the item-detail modal (and later, tooltips)
+ * so the derived formula + range never drift from the catalog data.
+ * @param {string|number} amount - the consumable's `amount` dice notation
+ * @returns {string|null} e.g. "2d4+2 HP (4 to 10)", or null for bad/empty input
+ */
+export const describeHealAmount = (amount) => {
+  const range = diceRange(amount);
+  if (!range) return null;
+  const formula = typeof amount === 'number' ? String(amount) : String(amount).trim();
+  if (range.min === range.max) return `${formula} HP (${range.min})`;
+  return `${formula} HP (${range.min} to ${range.max})`;
+};
+
+/**
  * Parse item drop with chance (e.g., "healing_potion:50%")
  * @param {string} itemString - Item with chance notation
  * @returns {Object|null} { name, dropped } or null if not dropped

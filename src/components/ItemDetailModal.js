@@ -1,5 +1,5 @@
 import React from 'react';
-import { getRarityColor } from '../utils/inventorySystem';
+import { getRarityColor, describeHealAmount } from '../utils/inventorySystem';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
 
@@ -52,6 +52,10 @@ const ItemDetailModal = () => {
   const rarityColor = getRarityColor(item.rarity);
   const rarityLabel = RARITY_LABELS[item.rarity] || titleCase(item.rarity) || 'Common';
   const imgSrc = item.icon ? `/${item.icon}` : null;
+
+  // Heal consumables show how much HP they restore, derived from the dice `amount`
+  // (formula + min-to-max range). Only heal items; cure_poison/spell are handled elsewhere.
+  const healLine = item.effect === 'heal' ? describeHealAmount(item.amount) : null;
 
   return (
     <ModalShell
@@ -157,6 +161,21 @@ const ItemDetailModal = () => {
           <span style={{ color: 'var(--text-secondary)' }}>Value:</span>
           <strong style={{ color: 'var(--primary)' }}>{valueLabel(item.value)}</strong>
         </div>
+
+        {/* Heal amount (heal consumables only): derived formula + min-to-max range. */}
+        {healLine && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '16px',
+            color: 'var(--text)',
+            fontSize: '0.95rem'
+          }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Restores:</span>
+            <strong style={{ color: '#27ae60' }}>{healLine}</strong>
+          </div>
+        )}
 
         {/* Description (fallback keeps the section from ever reading empty). */}
         <p style={{
