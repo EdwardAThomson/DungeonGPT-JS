@@ -252,6 +252,61 @@ describe('resolveRound: flat enemy damage and incoming party damage', () => {
   });
 });
 
+// Outcome-ordering: a fight that simply runs out of rounds ends in the softer
+// STALEMATE, not a flat DEFEAT, even when its advantage tally bottoms out on the very
+// same round the cap is reached. The advantage floor must STILL cause a defeat on any
+// round BEFORE the cap (a genuine rout), and HP/morale VICTORY and a party wipe must
+// keep their existing priority.
+describe('resolveRound: outcome ordering (round cap vs advantage floor)', () => {
+  test('reaching the round cap with a collapsed advantage is a stalemate, not a defeat', async () => {
+    mockRoll(0.5); // d20 = 11 -> failure: advantage -1, enemy takes only 2
+    // enemyHP 50 -> maxRounds 4, advantageDefeatThreshold -3.
+    const state = createMultiRoundEncounter(makeBoss({ enemyHP: 50 }), makeHero(), {});
+    expect(state.maxRounds).toBe(4);
+    expect(state.advantageDefeatThreshold).toBe(-3);
+    state.currentRound = state.maxRounds; // final round -> increments past the cap
+    state.playerAdvantage = -3; // at the floor; the failure below drops it to -4
+    const { updatedState } = await resolveRound(state, 'Fight');
+    // Advantage is now -4 (<= the -3 floor) AND the cap is exceeded. Old ordering scored
+    // this a DEFEAT; the cap check now runs first, so it is a stalemate.
+    expect(updatedState.playerAdvantage).toBe(-4);
+    expect(updatedState.currentRound).toBeGreaterThan(updatedState.maxRounds);
+    expect(updatedState.outcome).toBe('stalemate');
+  });
+
+  test('an advantage collapse BEFORE the cap is still a defeat (rout preserved)', async () => {
+    mockRoll(0.5); // failure: advantage -1
+    const state = createMultiRoundEncounter(makeBoss({ enemyHP: 50 }), makeHero(), {});
+    state.currentRound = 1; // nowhere near the cap (maxRounds 4)
+    state.playerAdvantage = -3; // the failure below drops it to -4 (<= floor)
+    const { updatedState } = await resolveRound(state, 'Fight');
+    expect(updatedState.currentRound).toBeLessThanOrEqual(updatedState.maxRounds);
+    expect(updatedState.playerAdvantage).toBe(-4);
+    expect(updatedState.outcome).toBe('defeat');
+  });
+
+  test('killing the enemy on the final round is still a victory, not a stalemate', async () => {
+    mockRoll(0.99); // d20 = 20 -> critical success: 50 flat damage depletes the pool
+    const state = createMultiRoundEncounter(makeBoss({ enemyHP: 50 }), makeHero(), {});
+    state.currentRound = state.maxRounds; // final round; the cap is exceeded after this
+    state.playerAdvantage = 0;
+    const { updatedState } = await resolveRound(state, 'Fight');
+    expect(updatedState.enemyCurrentHP).toBe(0);
+    expect(updatedState.currentRound).toBeGreaterThan(updatedState.maxRounds);
+    expect(updatedState.outcome).toBe('victory');
+  });
+
+  test('a party wipe is still a defeat, even at the round cap', async () => {
+    mockRoll(0.5); // failure -> 5 damage KOs a 4 HP solo hero
+    const state = createMultiRoundEncounter(makeBoss({ enemyHP: 50 }), makeHero({ maxHP: 4 }), {});
+    state.currentRound = state.maxRounds; // at the cap, where the timeout branch could fire
+    state.playerAdvantage = 0;
+    const { roundResult, updatedState } = await resolveRound(state, 'Fight');
+    expect(roundResult.partyWiped).toBe(true);
+    expect(updatedState.outcome).toBe('defeat'); // wipe terminal wins over the timeout
+  });
+});
+
 describe('generateEncounterSummary', () => {
   const rewardRound = (round) => ({
     round,
@@ -271,6 +326,29 @@ describe('generateEncounterSummary', () => {
     // 3 paying rounds x 100 XP x 1.2 victory bonus; gold capped the same way
     expect(summary.rewards.xp).toBe(360);
     expect(summary.rewards.gold).toBe(30);
+  });
+
+  test('stalemate grants reduced xp, no loot, and no defeat penalty', async () => {
+    const itemRound = {
+      round: 1,
+      action: 'Fight',
+      result: { narration: 'hit', rewards: { xp: 100, gold: 10, items: ['gold_ring'] }, penalties: null }
+    };
+    const state = {
+      roundHistory: [itemRound, rewardRound(2), rewardRound(3)],
+      outcome: 'stalemate',
+      character: { gold: 100 },
+      isTeamEncounter: false,
+      leadIndex: 0
+    };
+    const summary = await generateEncounterSummary(state);
+    // Reduced xp (0.6x of the 3 paying rounds' 300) but NOT zeroed like a victory bonus.
+    expect(summary.rewards.xp).toBe(180);
+    expect(summary.rewards.xp).toBeGreaterThan(0);
+    // No loot: the fight ended unresolved, so nothing is claimed.
+    expect(summary.rewards.items).toEqual([]);
+    // No defeat penalty message is appended for a draw.
+    expect(summary.penalties.messages).not.toContain('Defeated - serious injuries sustained');
   });
 
   test('carries the Phase 5 team fields for the reward distributor', async () => {

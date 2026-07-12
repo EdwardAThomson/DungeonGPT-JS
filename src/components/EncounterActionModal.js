@@ -518,6 +518,20 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
     return labels[tier] || tier;
   };
 
+  // Friendly label for the FINAL encounter outcome (victory/defeat/escaped/stalemate/
+  // fled), so a draw reads as a titlecased "Stalemate" instead of a raw shouted
+  // "STALEMATE". Unknown values fall back to a titlecased form so nothing crashes.
+  const getFinalOutcomeLabel = (outcome) => {
+    const labels = {
+      'victory': 'Victory',
+      'defeat': 'Defeat',
+      'escaped': 'Escaped',
+      'fled': 'Fled',
+      'stalemate': 'Stalemate'
+    };
+    return labels[outcome] || (outcome ? outcome.charAt(0).toUpperCase() + outcome.slice(1) : outcome);
+  };
+
   // Relative-threat chip: SAME helper/colors as the site-mob ring, so a fight's danger
   // reads consistently on both surfaces. Covers ALL encounters (world POI, town, site),
   // derived from the encounter's difficulty vs the party's current level. Renders
@@ -1097,7 +1111,12 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
 
               {result.outcome && (
                 <div className="outcome-summary">
-                  <strong>Final Outcome:</strong> {result.outcome.toUpperCase()}
+                  <strong>Final Outcome:</strong> {getFinalOutcomeLabel(result.outcome)}
+                  {result.outcome === 'stalemate' && (
+                    <p className="outcome-flavor" style={{ margin: '6px 0 0 0', color: 'var(--text-secondary)' }}>
+                      You could not finish them off and broke off the fight. No spoils, but you keep your gear.
+                    </p>
+                  )}
                 </div>
               )}
 
