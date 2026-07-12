@@ -13,7 +13,8 @@ import {
   computeStartingAdvantage,
   resolveRound,
   generateEncounterSummary,
-  getRoundActions
+  getRoundActions,
+  applyItemDamageRound
 } from './multiRoundEncounter';
 
 // Numeric damage profile => rollProfileDamage returns the exact number, keeping
@@ -400,5 +401,50 @@ describe('flee + contextual actions', () => {
       expect(roundResult).toBeTruthy();
       expect(roundResult.narration).not.toMatch(/an error occurred/i);
     }
+  });
+});
+
+describe('applyItemDamageRound (offensive scroll spends a round, damages the enemy)', () => {
+  const makeState = () =>
+    createMultiRoundEncounter(makeBoss({ enemyHP: 50 }), makeHero(), {}, {}, [makeHero()]);
+
+  test('subtracts the damage from enemy HP and advances the round', () => {
+    const state = makeState();
+    const before = state.currentRound;
+    const next = applyItemDamageRound(state, 12);
+    expect(next.enemyCurrentHP).toBe(38); // 50 - 12
+    expect(next.currentRound).toBe(before + 1); // the scroll spent the turn
+    expect(next.isResolved).toBe(false);
+    // a round-history entry was recorded for the item use
+    expect(next.roundHistory.length).toBe(state.roundHistory.length + 1);
+    expect(next.roundHistory.at(-1).action).toBe('itemDamage');
+    // pure: original state untouched
+    expect(state.enemyCurrentHP).toBe(50);
+    expect(state.currentRound).toBe(before);
+  });
+
+  test('sets victory when the blast drops enemy HP to 0', () => {
+    const state = makeState();
+    const next = applyItemDamageRound(state, 999);
+    expect(next.enemyCurrentHP).toBe(0); // clamped
+    expect(next.isResolved).toBe(true);
+    expect(next.outcome).toBe('victory');
+  });
+
+  test('nudges enemy morale down by the HP fraction removed', () => {
+    const state = makeState(); // 50 max HP, morale starts at 100
+    const next = applyItemDamageRound(state, 25); // 50% of the pool
+    expect(next.enemyMorale).toBe(50); // 100 - round(25/50 * 100)
+  });
+
+  test('resolves as a timeout when the scroll spends the final round without a kill', () => {
+    const state = makeState();
+    state.currentRound = state.maxRounds; // this action pushes currentRound past the cap
+    state.enemyCurrentHP = 40; // not bloodied, not dead
+    state.playerAdvantage = 0;
+    const next = applyItemDamageRound(state, 2);
+    expect(next.currentRound).toBe(state.maxRounds + 1);
+    expect(next.isResolved).toBe(true);
+    expect(next.outcome).toBe('stalemate'); // survived the cap, not bloodied enough to win
   });
 });
