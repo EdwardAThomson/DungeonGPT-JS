@@ -57,10 +57,21 @@ the no-new-art rule), `docs/FEATURE_SHOPS.md` (how new items reach the player).
   reach only by clicking a party portrait, and it is a plain dropdown with no visual slots.
 - **Inventory UI today** (`src/components/PartyInventoryModal.js`, modal id `inventory`,
   opened from the toolbar via `onOpenInventory`): shows pooled party gold + a flat grid of
-  all collected items with rarity borders and a "Use" button for healing potions. Clicking an
-  item opens `ItemDetailModal` (modal id `itemDetail`) showing the item's full-size art,
-  rarity/type/value, and its catalog `description`; the flavor description is **not** rendered
-  inline in the list. **It still does not show equipped gear and has no equip controls at all.**
+  all collected items with rarity borders and a "Use" button for healing potions. The "Use"
+  button opens a **fixed, centered hero-picker overlay** with a dimmed backdrop (full-HP heroes
+  disabled with an "Already at full health" reason); it previously rendered as an in-flow block
+  below the scrollable item grid and mounted below the fold, so it looked like it did nothing.
+  Clicking an item opens `ItemDetailModal` (modal id `itemDetail`) showing the item's full-size
+  art, rarity/type/value, and its catalog `description`; the flavor description is **not**
+  rendered inline in the list. **It still does not show equipped gear and has no equip controls
+  at all.**
+- **Healing consumables can also be used in combat.** `EncounterActionModal` has a "Use Item"
+  action (single- and multi-round) that opens a fixed picker of the party's healing consumables
+  and a target hero; in a multi-round fight it spends that round's action. Both the inventory
+  and combat surfaces route through one shared, deterministic `consumeHealingItem(itemKey,
+  targetHero, ownerHero, { rolled })` helper in `inventorySystem.js` (roll heal, decrement the
+  owner's stack, respect shared-pool ownership, no overheal past maxHP, reject full-HP/defeated
+  targets and non-consumables), so behavior stays identical across both.
 - **Modal system** (`src/contexts/ModalContext.js`): registry-driven. `hero` is in the `info`
   group (layer 0); `inventory` is its own group (layer 2). `useModal(id)` gives
   `open/close/isOpen/data`.
