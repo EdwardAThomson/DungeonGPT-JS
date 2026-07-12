@@ -1112,11 +1112,6 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
               {result.outcome && (
                 <div className="outcome-summary">
                   <strong>Final Outcome:</strong> {getFinalOutcomeLabel(result.outcome)}
-                  {result.outcome === 'stalemate' && (
-                    <p className="outcome-flavor" style={{ margin: '6px 0 0 0', color: 'var(--text-secondary)' }}>
-                      You could not finish them off and broke off the fight. No spoils, but you keep your gear.
-                    </p>
-                  )}
                 </div>
               )}
 
@@ -1128,7 +1123,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                 <div className="outcome-reason" style={{ marginTop: '6px', opacity: 0.85, fontSize: '0.92em' }}>
                   {result.outcome === 'defeat'
                     ? `Your momentum broke before you could finish it. ${encounter.name} still held the field (${result.enemyCurrentHP}/${result.enemyMaxHP} HP).`
-                    : `Neither side could force the end. ${encounter.name} was still standing (${result.enemyCurrentHP}/${result.enemyMaxHP} HP).`}
+                    : `Neither side could force the end. ${encounter.name} was still standing (${result.enemyCurrentHP}/${result.enemyMaxHP} HP). No spoils, but you keep your gear.`}
                 </div>
               )}
 
