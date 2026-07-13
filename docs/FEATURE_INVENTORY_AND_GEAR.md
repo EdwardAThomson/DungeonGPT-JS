@@ -62,16 +62,30 @@ the no-new-art rule), `docs/FEATURE_SHOPS.md` (how new items reach the player).
   disabled with an "Already at full health" reason); it previously rendered as an in-flow block
   below the scrollable item grid and mounted below the fold, so it looked like it did nothing.
   Clicking an item opens `ItemDetailModal` (modal id `itemDetail`) showing the item's full-size
-  art, rarity/type/value, and its catalog `description`; the flavor description is **not**
-  rendered inline in the list. **It still does not show equipped gear and has no equip controls
+  art, rarity/type/value, and its catalog `description`, plus an effect row for consumables:
+  a **"Restores: 1d4+1 (2 to 5)"** row for heals (`describeHealAmount`) and a **"Deals: 3d6
+  (3 to 18)"** row for spell scrolls (`describeSpellDamage`), both built on the shared
+  `describeDiceEffect(notation, unit)` helper. The flavor description is **not** rendered inline
+  in the list. **It still does not show equipped gear and has no equip controls
   at all.**
-- **Healing consumables can also be used in combat.** `EncounterActionModal` has a "Use Item"
-  action (single- and multi-round) that opens a fixed picker of the party's healing consumables
-  and a target hero; in a multi-round fight it spends that round's action. Both the inventory
-  and combat surfaces route through one shared, deterministic `consumeHealingItem(itemKey,
-  targetHero, ownerHero, { rolled })` helper in `inventorySystem.js` (roll heal, decrement the
-  owner's stack, respect shared-pool ownership, no overheal past maxHP, reject full-HP/defeated
-  targets and non-consumables), so behavior stays identical across both.
+- **Consumables can also be used in combat.** `EncounterActionModal` has a "Use Item" action
+  (single- and multi-round) that opens a fixed picker of the party's usable consumables; in a
+  multi-round fight it spends that round's action. Consumables are dispatched through
+  `inventorySystem.js`: `isConsumable(itemKey)` (a heal **or** a spell) gates what shows, and
+  `consumeConsumable(itemKey, target, owner, ctx)` branches by `effect`:
+  - **Heal** (`effect: 'heal'`, e.g. `healing_potion`, and now `antidote` — repurposed from an
+    inert `cure_poison` into a small `1d4+1` heal) routes through the shared, deterministic
+    `consumeHealingItem(itemKey, targetHero, ownerHero, { rolled })` helper (roll heal, decrement
+    the owner's stack, respect shared-pool ownership, no overheal past maxHP, reject
+    full-HP/defeated targets and non-consumables). The combat picker keeps the pick-a-hero step.
+  - **Spell** (`effect: 'spell'`, e.g. `scroll_fireball` with `damage: '3d6'`, `target: 'enemy'`,
+    `combatOnly: true`) routes through `consumeSpellItem(itemKey, ownerHero, { rolled })` (rolls
+    the scroll's damage and decrements it off the owner, **never** touching a hero's HP) and is
+    resolved against the enemy via `applyItemDamageRound` in `multiRoundEncounter.js`. Spell
+    scrolls only appear in a **live multi-round fight** (gated by a `hasLiveEnemy` guard); the
+    single-round and out-of-combat party pickers never offer them, so combat resolution stays
+    out of the modal.
+  Both the inventory and combat heal surfaces still share one path, so behavior stays identical.
 - **Modal system** (`src/contexts/ModalContext.js`): registry-driven. `hero` is in the `info`
   group (layer 0); `inventory` is its own group (layer 2). `useModal(id)` gives
   `open/close/isOpen/data`.

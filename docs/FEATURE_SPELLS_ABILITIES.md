@@ -2,9 +2,10 @@
 
 Give each class a **mechanical identity** in combat. Today a hero's class is mostly stat
 flavour (`heroTemplates` in `src/data/heroData.js` sets a stat spread and a one-line
-background, nothing more); level-up only recalculates HP (`progressionSystem.js`); and the
-one "spell" in the game, `scroll_fireball`, is a catalog entry with `effect: 'spell',
-spell: 'fireball'` that **nothing casts**. This feature adds real, **code-resolved**
+background, nothing more); level-up only recalculates HP (`progressionSystem.js`); and the only combat "spell" in the
+game, `scroll_fireball`, is a one-shot consumable item (`effect: 'spell'`, `damage: '3d6'`,
+`target: 'enemy'`) fired from the in-combat item picker in a multi-round fight, not a
+class-owned, MP-costed ability anyone can **cast**. This feature adds real, **code-resolved**
 abilities: the player picks "Cast Fireball", the engine rolls the dice and applies the
 numbers, and the AI only narrates the result. No AI-decided outcomes, ever.
 
@@ -281,8 +282,10 @@ flow exactly as today (no ability buttons, no MP bar, identical numbers).
   migrate. `knownAbilities` is optional and unset by default.
 - `effect.status` rides inside the static registry, not in saves; `target.statuses` is an
   additive optional array that old saves simply lack (renderers fall back to none).
-- The existing `scroll_fireball` catalog item is left as-is in the MVP; routing it through
-  the casting system (consume scroll -> cast Fireball at 0 MP) is a Phase 3 tidy-up.
+- The existing `scroll_fireball` catalog item now works as a standalone offensive combat
+  consumable (in-combat item picker, `3d6` to the enemy) and is left as-is in the MVP;
+  reconciling it with the casting system (consume scroll -> cast Fireball at 0 MP) is a
+  Phase 3 tidy-up.
 
 ## Non-goals
 
