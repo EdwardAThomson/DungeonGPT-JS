@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { redeemCode } from '../services/redemptionApi';
 import AiPoolPills from '../components/AiPoolPills';
+import '../styles/profile.css';
 
 // Friendly copy for the redeem endpoint's error contract (redemptionApi.js).
 // 'code_invalid' is deliberately one line for every dead-code flavour (unknown,
@@ -142,7 +143,7 @@ const Profile = () => {
                   time-boxed local grant (say Premium-until-August on top of
                   lifetime Member) still shows its honest end date. */}
               {tier && tier !== 'free' && hubLifetimeTier === tier ? (
-                <span className="tier-note"> · lifetime</span>
+                <span className="tier-pill-lifetime">Lifetime</span>
               ) : (
                 /* Time-boxed grants (redeemed codes, #6) carry an end date; stored
                    tiers do not, so the row stays as before for them. */

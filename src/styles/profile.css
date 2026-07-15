@@ -1,0 +1,30 @@
+/* Profile page — membership row.
+   The tier-badge / tier-note classes rendered unstyled until now (no stylesheet
+   ever defined them); this file gives the membership row its intended look.
+   The lifetime pill mirrors the gold LIFETIME badge on the Octonion hub's
+   account page, in this app's palette (gold is --primary in dark-fantasy). */
+
+.tier-badge {
+  font-size: 1.05rem;
+}
+
+.tier-note {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.tier-pill-lifetime {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 10px;
+  border: 1px solid color-mix(in srgb, var(--primary) 55%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+  font-family: var(--font-header);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
