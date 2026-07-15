@@ -208,6 +208,27 @@ export function getHubEntitlementsSnapshot() {
     return sessionHubEntitlements;
 }
 
+// Display-only mirror of the Worker's authoritative hub->game rename
+// (cf-worker/src/services/hubEntitlements.ts hubTierToGameTier). Kept here so
+// display surfaces can relate the raw hub snapshot to the game ladder without
+// a second source of gating truth: gates still never read hub values.
+const HUB_TIER_TO_GAME_TIER = { free: 'free', members: 'member', premium: 'premium', elite: 'elite' };
+
+/**
+ * The game-ladder tier the hub holds FOR LIFE for this account, or null when
+ * there is no lifetime hub grant (guests, fetch failures, ordinary
+ * subscriptions). Display metadata for the Profile page: a lifetime hub grant
+ * has no end date, so surfaces should prefer "lifetime" over a local grant's
+ * expiry when the lifetime rung is the one being displayed — players get
+ * spooked by an "active until" date shorter than what they actually own.
+ * @returns {('free'|'member'|'premium'|'elite')|null}
+ */
+export function getHubLifetimeGameTier() {
+    const hub = sessionHubEntitlements;
+    if (!hub || hub.lifetime !== true) return null;
+    return HUB_TIER_TO_GAME_TIER[hub.tier] || null;
+}
+
 /** Test hook: reset all module state (cache, fetch memo). Not for app code. */
 export function _resetEntitlementsForTests() {
     sessionTier = null;

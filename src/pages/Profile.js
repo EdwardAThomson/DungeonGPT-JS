@@ -23,7 +23,7 @@ const formatDate = (iso) => {
 const tierLabel = (tier) => (tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : '');
 
 const Profile = () => {
-  const { user, signOut, tier, tierExpiresAt, refreshTier } = useAuth();
+  const { user, signOut, tier, tierExpiresAt, hubLifetimeTier, refreshTier } = useAuth();
   const navigate = useNavigate();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [codeInput, setCodeInput] = useState('');
@@ -135,10 +135,20 @@ const Profile = () => {
               {(!tier || tier === 'free') && (
                 <span className="tier-badge tier-free">⚡ Free <span className="tier-note">· Membership coming soon</span></span>
               )}
-              {/* Time-boxed grants (redeemed codes, #6) carry an end date; stored
-                  tiers do not, so the row stays as before for them. */}
-              {tier && tier !== 'free' && tierExpiresAt && formatDate(tierExpiresAt) && (
-                <span className="tier-note"> · active until {formatDate(tierExpiresAt)}</span>
+              {/* A lifetime hub grant (Founder unlock / grandfathered tester) has no
+                  end date, so it beats a local grant's expiry — showing "active
+                  until" a date SHORTER than what the player owns spooks them. Only
+                  when the lifetime rung IS the displayed rung, though: a higher
+                  time-boxed local grant (say Premium-until-August on top of
+                  lifetime Member) still shows its honest end date. */}
+              {tier && tier !== 'free' && hubLifetimeTier === tier ? (
+                <span className="tier-note"> · lifetime</span>
+              ) : (
+                /* Time-boxed grants (redeemed codes, #6) carry an end date; stored
+                   tiers do not, so the row stays as before for them. */
+                tier && tier !== 'free' && tierExpiresAt && formatDate(tierExpiresAt) && (
+                  <span className="tier-note"> · active until {formatDate(tierExpiresAt)}</span>
+                )
               )}
             </p>
           </div>
