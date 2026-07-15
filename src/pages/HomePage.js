@@ -27,7 +27,7 @@ const HomePage = () => {
     <div className="Home-page main-card">
       <div className="hero-section">
         <h1>DungeonGPT</h1>
-        <p className="subtitle">Enter the realm of infinite stories</p>
+        <p className="subtitle">Handcrafted campaigns, brought to life by AI</p>
       </div>
 
       <div className="home-navigation">
