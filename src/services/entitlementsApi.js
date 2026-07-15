@@ -1,9 +1,13 @@
 // entitlementsApi.js
-// Fetches the caller's account tier from the CF Worker (GET /api/db/entitlements),
-// following the same authed cfFetch pattern as conversationsApi. The endpoint is
-// backed by the account_tiers table (cf-worker/migrations/002_account_tiers.sql)
-// and only exists on the Worker: the local Express dev server has no equivalent,
-// so local dev relies on the entitlements dev override instead.
+// Fetches the caller's entitlements snapshot from the CF Worker
+// (GET /api/entitlements), following the same authed fetch pattern as
+// conversationsApi. Since hub payments Phase 1 the Worker merges two sources
+// behind that route: the Octonion hub's billing tier (GET /api/me/entitlements
+// at octonion.io, 60 s worker-side cache, fail-closed) and the game's own
+// account_tiers/tier_grants rows (manual grants + redemption codes), reporting
+// the higher rung. The endpoint only exists on the Worker: the local Express
+// dev server has no equivalent, so local dev relies on the entitlements dev
+// override instead.
 //
 // This module only does the network hop. Caching, the tier ladder, and every gate
 // live in src/game/entitlements.js (the single source of truth for premium status).
@@ -20,7 +24,10 @@ const CF_WORKER_URL = process.env.REACT_APP_CF_WORKER_URL || '';
  * a network call: the endpoint requires auth, so there is nothing to ask. Network
  * or server failures throw; the caller (entitlements.js) fails closed to 'free'.
  *
- * @returns {Promise<{ tier: string, updatedAt: string|null }>}
+ * @returns {Promise<{ tier: string, updatedAt: string|null, expiresAt?: string|null, hub?: object }>}
+ *   `tier` is the effective game-ladder tier; `hub` is the raw hub billing
+ *   snapshot ({ tier, status, lifetime, currentPeriodEnd, perks, credits }),
+ *   display metadata only.
  */
 export async function fetchEntitlements() {
   if (!supabase) return { tier: 'free', updatedAt: null };
@@ -28,7 +35,7 @@ export async function fetchEntitlements() {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) return { tier: 'free', updatedAt: null };
 
-  const response = await fetch(`${CF_WORKER_URL}/api/db/entitlements`, {
+  const response = await fetch(`${CF_WORKER_URL}/api/entitlements`, {
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${session.access_token}`,

@@ -1,13 +1,19 @@
 // Entitlements: the single source of truth for premium status.
 //
-// Backed by a real account tier since backlog #39: the CF Worker exposes
-// GET /api/db/entitlements (account_tiers table, self-hosted data Postgres), and this
-// module caches the resolved tier so every gate stays a plain synchronous call.
+// Backed by a real account tier since backlog #39, and since hub payments Phase 1
+// (octonion-io-website docs/payments-spec.md) that tier comes from the CF Worker's
+// GET /api/entitlements: the Worker merges the Octonion hub's billing tier (the
+// billing authority going forward, 60 s cached, fail-closed) with the game's own
+// account_tiers/tier_grants rows and reports the higher rung. This module caches
+// the resolved snapshot so every gate stays a plain synchronous call.
 //
 // TIER LADDER (business plan; launch scope is free + member, all four modelled now):
 //   free < member < premium < elite
-// The table stores ONLY the tier; the tier-to-benefit mapping lives HERE, next to each
-// gate, so the storage can hoist to the Octonion hub later without touching benefits.
+// The hub spells its paid rung 'members'; the Worker normalizes it to this ladder in
+// one place (cf-worker/src/services/hubEntitlements.ts hubTierToGameTier), so this
+// module only ever sees game-ladder values. The storage layer knows ONLY the tier;
+// the tier-to-benefit mapping (the game's feature map) lives HERE, next to each
+// gate, so billing can evolve on the hub without touching benefits.
 //
 // Current gate map:
 //   desert/snow world themes ......... member  (canUseTheme)
@@ -65,6 +71,12 @@ let fetchPromise = null;  // in-flight/settled once-per-session fetch memo
 // tier already covers it. Session-only (no mirror): it is display metadata for
 // the Profile page, never a gate input.
 let sessionTierExpiresAt = null;
+// Raw hub billing snapshot ({ tier, status, lifetime, currentPeriodEnd, perks,
+// credits }) reported by the Worker since hub payments Phase 1; null for guests,
+// fetch failures, and older Workers that omit it. Session-only display metadata
+// (account/upgrade surfaces), never a gate input: gates key on the game-ladder
+// tier above, which the Worker already derived from this.
+let sessionHubEntitlements = null;
 
 function readMirror() {
     try {
@@ -121,6 +133,7 @@ export function setUserTier(tier) {
 export function clearUserTier() {
     sessionTier = 'free';
     sessionTierExpiresAt = null;
+    sessionHubEntitlements = null;
     fetchPromise = null;
     try {
         localStorage.removeItem(TIER_MIRROR_KEY);
@@ -141,14 +154,19 @@ export async function getUserTier() {
     if (!fetchPromise) {
         fetchPromise = (async () => {
             try {
-                const { tier, expiresAt } = await fetchEntitlements();
+                const { tier, expiresAt, hub } = await fetchEntitlements();
                 setUserTier(tier);
                 // expiresAt is additive on the endpoint (#6); older Workers simply
                 // omit it and the display falls back to "no end date".
                 sessionTierExpiresAt = typeof expiresAt === 'string' ? expiresAt : null;
+                // hub is additive too (hub payments Phase 1): the raw billing
+                // snapshot, kept only for display surfaces.
+                sessionHubEntitlements =
+                    hub && typeof hub === 'object' ? hub : null;
             } catch {
                 sessionTier = 'free';
                 sessionTierExpiresAt = null;
+                sessionHubEntitlements = null;
             }
         })();
     }
@@ -177,10 +195,24 @@ export function getTierExpiresAt() {
     return sessionTierExpiresAt;
 }
 
+/**
+ * Raw hub billing snapshot from the last successful entitlements fetch:
+ * { tier, status, lifetime, currentPeriodEnd, perks, credits } (hub-ladder tier,
+ * e.g. 'members'; credits is null until the hub credit ledger ships). Null for
+ * guests, unresolved sessions, fetch failures, and older Workers. Display
+ * metadata only (account/upgrade surfaces): never use this in a gate; gates go
+ * through hasTier()/isPremium() on the game-ladder tier.
+ * @returns {object|null}
+ */
+export function getHubEntitlementsSnapshot() {
+    return sessionHubEntitlements;
+}
+
 /** Test hook: reset all module state (cache, fetch memo). Not for app code. */
 export function _resetEntitlementsForTests() {
     sessionTier = null;
     sessionTierExpiresAt = null;
+    sessionHubEntitlements = null;
     fetchPromise = null;
 }
 

@@ -4,6 +4,7 @@ import { aiRoutes } from "./routes/ai";
 import { embedRoutes } from "./routes/embed";
 import { imageRoutes } from "./routes/image";
 import dbRoutes from "./routes/db";
+import { entitlementsRoutes } from "./routes/entitlements";
 import { requireAuth } from "./middleware/auth";
 import { rateLimit } from "./middleware/rateLimit";
 import type { Env } from "./types";
@@ -76,6 +77,10 @@ app.use(
   rateLimit("db-write", { methods: ["POST", "PUT", "PATCH", "DELETE"] })
 );
 app.route("/api/db", dbRoutes);
+// Hub payments Phase 1: the client's own entitlements snapshot (hub tier merged
+// with local grants). Auth is applied inside the route file (as /api/ai does);
+// unthrottled GET on purpose, same sign-in-read rationale as /api/db reads above.
+app.route("/api/entitlements", entitlementsRoutes);
 
 app.notFound((c) =>
   c.json(

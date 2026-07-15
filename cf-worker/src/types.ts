@@ -10,6 +10,11 @@ export interface Env {
   SUPABASE_SERVICE_ROLE_KEY?: string;
   // Auth hub — untouched by this migration.
   OCTONION_SUPABASE_URL?: string;
+  // Octonion hub base URL (payments Phase 1): GET ${HUB_URL}/api/me/entitlements
+  // is the billing read path (services/hubEntitlements.ts). A [vars] entry in
+  // wrangler.toml; local dev can point it at a local hub via .dev.vars.
+  // Defaults to https://octonion.io when unset.
+  HUB_URL?: string;
   // Premium AI pool (backlog #7): OpenRouter API key, set via
   // `npx wrangler secret put OPENROUTER_API_KEY` (local dev: cf-worker/.dev.vars).
   // Optional: when absent the premium pool degrades to the free pool.
