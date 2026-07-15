@@ -23,4 +23,8 @@ id = "fbe8cace6ef34b9f9894887ade11254e"
 [vars]
 ENVIRONMENT = "development"
 CF_ACCOUNT_ID = "0696395687ae6f35b87de803102ae3ca"
+# Octonion hub base URL (payments Phase 1): the Worker resolves user entitlements
+# from ${HUB_URL}/api/me/entitlements (src/services/hubEntitlements.ts). Not a
+# secret. Local dev against a local hub: override in .dev.vars.
+HUB_URL = "https://octonion.io"
 # CF_API_TOKEN should be set via `wrangler secret put CF_API_TOKEN` or .dev.vars

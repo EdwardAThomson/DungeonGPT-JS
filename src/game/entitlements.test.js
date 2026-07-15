@@ -8,6 +8,7 @@ import {
     getUserTier,
     refreshUserTier,
     getTierExpiresAt,
+    getHubEntitlementsSnapshot,
     setUserTier,
     clearUserTier,
     hasTier,
@@ -185,6 +186,48 @@ describe('entitlements', () => {
             await getUserTier();
             clearUserTier();
             expect(getTierExpiresAt()).toBe(null);
+        });
+    });
+
+    describe('hub billing snapshot (hub payments Phase 1)', () => {
+        const HUB = {
+            tier: 'members',
+            status: 'active',
+            lifetime: false,
+            currentPeriodEnd: '2026-08-01T00:00:00.000Z',
+            perks: {},
+            credits: null,
+        };
+
+        it('is null before any fetch resolves', () => {
+            expect(getHubEntitlementsSnapshot()).toBe(null);
+        });
+
+        it('captures the raw hub snapshot from the entitlements fetch', async () => {
+            fetchEntitlements.mockResolvedValue({ tier: 'member', updatedAt: null, hub: HUB });
+            await getUserTier();
+            expect(getHubEntitlementsSnapshot()).toEqual(HUB);
+            // Display metadata only: gates keep keying on the game-ladder tier.
+            expect(getCurrentTier()).toBe('member');
+        });
+
+        it('stays null for older Workers that omit the hub field', async () => {
+            fetchEntitlements.mockResolvedValue({ tier: 'member', updatedAt: null });
+            await getUserTier();
+            expect(getHubEntitlementsSnapshot()).toBe(null);
+        });
+
+        it('resets to null on fetch failure and on sign-out', async () => {
+            fetchEntitlements.mockResolvedValue({ tier: 'member', updatedAt: null, hub: HUB });
+            await getUserTier();
+            expect(getHubEntitlementsSnapshot()).toEqual(HUB);
+
+            clearUserTier();
+            expect(getHubEntitlementsSnapshot()).toBe(null);
+
+            fetchEntitlements.mockRejectedValue(new Error('network down'));
+            await getUserTier();
+            expect(getHubEntitlementsSnapshot()).toBe(null);
         });
     });
 
