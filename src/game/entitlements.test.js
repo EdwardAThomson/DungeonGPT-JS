@@ -9,6 +9,7 @@ import {
     refreshUserTier,
     getTierExpiresAt,
     getHubEntitlementsSnapshot,
+    getHubLifetimeGameTier,
     setUserTier,
     clearUserTier,
     hasTier,
@@ -228,6 +229,58 @@ describe('entitlements', () => {
             fetchEntitlements.mockRejectedValue(new Error('network down'));
             await getUserTier();
             expect(getHubEntitlementsSnapshot()).toBe(null);
+        });
+    });
+
+    describe('getHubLifetimeGameTier (Profile lifetime display)', () => {
+        const lifetimeHub = (tier) => ({
+            tier,
+            status: 'active',
+            lifetime: true,
+            currentPeriodEnd: null,
+            perks: {},
+            credits: null,
+        });
+
+        it('is null before any fetch resolves', () => {
+            expect(getHubLifetimeGameTier()).toBe(null);
+        });
+
+        it('maps a lifetime hub grant onto the game ladder (members -> member)', async () => {
+            fetchEntitlements.mockResolvedValue({
+                tier: 'member', updatedAt: null, hub: lifetimeHub('members'),
+            });
+            await getUserTier();
+            expect(getHubLifetimeGameTier()).toBe('member');
+        });
+
+        it('is null when the hub grant is not lifetime', async () => {
+            fetchEntitlements.mockResolvedValue({
+                tier: 'member',
+                updatedAt: null,
+                hub: { ...lifetimeHub('members'), lifetime: false },
+            });
+            await getUserTier();
+            expect(getHubLifetimeGameTier()).toBe(null);
+        });
+
+        it('fails closed to null on an unknown hub tier name', async () => {
+            fetchEntitlements.mockResolvedValue({
+                tier: 'member', updatedAt: null, hub: lifetimeHub('gold'),
+            });
+            await getUserTier();
+            expect(getHubLifetimeGameTier()).toBe(null);
+        });
+
+        it('resets to null on sign-out', async () => {
+            fetchEntitlements.mockResolvedValue({
+                tier: 'member', updatedAt: null, hub: lifetimeHub('members'),
+            });
+            await getUserTier();
+            expect(getHubLifetimeGameTier()).toBe('member');
+
+            clearUserTier();
+            expect(getHubLifetimeGameTier()).toBe(null);
         });
     });
 

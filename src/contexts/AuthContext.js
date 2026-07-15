@@ -7,6 +7,7 @@ import {
   clearUserTier,
   getCurrentTier,
   getTierExpiresAt,
+  getHubLifetimeGameTier,
 } from '../game/entitlements';
 import { loadPremiumTemplates, clearPremiumTemplates } from '../services/premiumContentApi';
 import { autoSelectPoolForTier } from '../services/aiPool';
@@ -27,6 +28,10 @@ export const AuthProvider = ({ children }) => {
   // End date of the grant backing the tier when it comes from a redeemed code (#6);
   // null for stored tiers and free accounts. Display metadata for the Profile page.
   const [tierExpiresAt, setTierExpiresAt] = useState(null);
+  // Game-ladder tier the hub holds for life (Founder-style unlock or grandfathered
+  // tester), or null. Display metadata: Profile prefers "lifetime" over a local
+  // grant's shorter expiry when this matches the displayed tier.
+  const [hubLifetimeTier, setHubLifetimeTier] = useState(null);
   // Premium content delivery (#40). True once this session's server-delivered
   // templates are registered into storyTemplates. The state flip matters even when
   // the tier value itself is unchanged (localStorage warm start): setTier alone would
@@ -54,6 +59,7 @@ export const AuthProvider = ({ children }) => {
           .then((resolvedTier) => {
             setTier(resolvedTier);
             setTierExpiresAt(getTierExpiresAt());
+            setHubLifetimeTier(getHubLifetimeGameTier());
             autoSelectPoolForTier(); // membership visibly delivers premium AI (2026-07-07)
             setPremiumContentReady(true);
           })
@@ -64,6 +70,7 @@ export const AuthProvider = ({ children }) => {
         setPremiumContentReady(false);
         setTier('free');
         setTierExpiresAt(null);
+        setHubLifetimeTier(null);
       }
     };
 
@@ -104,6 +111,7 @@ export const AuthProvider = ({ children }) => {
     await loadPremiumTemplates();
     setTier(resolvedTier);
     setTierExpiresAt(getTierExpiresAt());
+    setHubLifetimeTier(getHubLifetimeGameTier());
     autoSelectPoolForTier(); // a redeemed code upgrades the pool on the spot
     setPremiumContentReady(true);
     return resolvedTier;
@@ -124,6 +132,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     tier,
     tierExpiresAt,
+    hubLifetimeTier,
     premiumContentReady,
     refreshTier,
     redirectToLogin,
