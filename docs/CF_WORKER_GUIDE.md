@@ -26,6 +26,7 @@
 | `POST /api/image/generate`| `routes/image.ts`    | Yes* | Image generation (8 models; FLUX.2 uses REST API, others use AI binding) |
 | `/api/db/*`            | `routes/db.ts`          | Yes  | Postgres CRUD proxy via Hyperdrive (heroes, saves, etc.). All responses carry `Cache-Control: no-store`; every read/write is owner-scoped (`WHERE user_id = ${userId}`, including the revision-guarded conversation upsert and its guard-miss branch). The conversations **list** GET selects only lightweight columns (no `conversation_data`/`world_map`/`sub_maps`/`summary`). Hero create/update names are validated server-side (`services/validation.ts`) |
 | `GET  /api/db/entitlements` | `routes/db.ts`     | Yes  | Caller's **effective** account tier: `{ tier, updatedAt, expiresAt }`, no row = `free`. Effective tier = base `account_tiers` row MAX any unexpired `tier_grants` (see `services/tiers.ts`); `expiresAt` is the grant end date when a grant supplies the tier (additive, `null` when the base row covers it). Read-only (base grants via psql `002_account_tiers.sql`; time-boxed grants also arrive via `POST /api/db/redeem-code`); smoke test: `scripts/test-cf-entitlements.mjs` |
+| `GET  /api/entitlements` | `routes/entitlements.ts` | Yes | Caller's **merged** entitlements snapshot (hub payments Phase 1): `{ tier, updatedAt, expiresAt, hub }`. Reports `MAX(local game-ladder tier, hub billing tier)` so manual grants and redemption codes never regress while billing moves to the Octonion hub. `tier` is the effective game-ladder tier; `updatedAt`/`expiresAt` keep the `GET /api/db/entitlements` contract; `hub` is the raw hub snapshot (display metadata only, every gate keys on `tier`). Both sources fail closed independently → both failing yields `free` with a `200`, never a `500`. `Cache-Control: no-store`. Client: `src/services/entitlementsApi.js` (the app now fetches this route, not `/api/db/entitlements`) |
 | `POST /api/db/redeem-code` | `routes/db.ts`      | Yes  | Redeem a membership code (billing MVP #6, migration `006_redemption_codes.sql`): body `{ code }`, success `200 { tier, expiresAt }` grants a time-boxed `tier_grants` row atomically. Generic `400 code_invalid` for any dead code, `409 already_redeemed`, per-user `429 rate_limited` (10/day, fails CLOSED). See `docs/REDEMPTION_CODES.md` |
 | `GET  /api/db/premium-templates` | `routes/db.ts` | Yes  | Server-delivered premium story templates (#40): `{ templates: [...] }` with all enabled `premium_templates` rows: the full template when the caller's tier covers `min_tier`, otherwise a marketing-safe **teaser** (card-face metadata only: id, name, subtitle, tier, levelRange, shortDescription, theme, minTier, `teaser: true`; authored content (settings, milestones, customNames, NPCs, rewards) never leaves the server below tier). Free/no-row accounts get teasers, never an error. Read-only (content loaded/disabled via psql, see the `cf-worker/migrations/004_premium_templates.sql` runbook); smoke test: `scripts/test-cf-premium.mjs` (manual, not auto-run) |
 
@@ -37,6 +38,7 @@
 - **`services/ai.ts`** — `generateText()` orchestrates: resolve model (unknown IDs fall back to default), call Workers AI, handle response format variants, try fallback on failure, sanitize output (strips leaked prompt markers; `sanitizeResponse` is exported so the premium pool reuses the exact same pass).
 - **`services/openrouter.ts`** — premium pool (#7): `PREMIUM_MODEL_REGISTRY`, `DEFAULT_PREMIUM_MODEL_ID`, `generatePremiumText()` (OpenRouter chat completions, same resolve/clamp/fallback/sanitize shape as `ai.ts`).
 - **`services/pg.ts` / `services/tiers.ts`** — shared per-request postgres.js client (Hyperdrive) and the tier ladder + `getAccountTier()` lookup, used by `routes/db.ts`, the rate limiter, and the premium gate. `getAccountTier()` returns the **effective** tier = base `account_tiers` row MAX any unexpired `tier_grants` (redemption-code grants, #6); expiry is passive and a grant never lowers the base, so premium-templates / premium-AI / allowances all honour grants with no further changes.
+- **`services/hubEntitlements.ts`** — hub payments Phase 1: `getHubEntitlements()` reads the Octonion hub's billing tier (`GET ${HUB_URL}/api/me/entitlements` with the user's forwarded JWT), 60 s per-user cache mirroring the JWKS-cache pattern, 3 s timeout, **fails closed to free** (failures uncached). `hubTierToGameTier()` normalizes the hub's `members` rung onto the game ladder's `member` in exactly one place. Consumed by `routes/entitlements.ts`.
 - **`services/validation.ts`**: server-side hero-name allowlist (`validateHeroName`, `sanitizeHeroName`; length `HERO_NAME_MIN` to `HERO_NAME_MAX`, i.e. 2 to 40, Latin letters plus diacritics/digits/space/apostrophe/hyphen). Mirrors the client `src/utils/validation.js` and is enforced in `routes/db.ts` on hero create/update so a crafted client cannot persist a name outside the allowlist.
 
 ### Rate limiting (`middleware/rateLimit.ts`, backlog #12)
@@ -104,13 +106,14 @@ interface Env {
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   OCTONION_SUPABASE_URL?: string;
+  HUB_URL?: string;                // Octonion hub base URL (billing reads); [vars], defaults to https://octonion.io
   OPENROUTER_API_KEY?: string;     // premium AI pool (#7); secret via wrangler
   CUSTOM_DOMAIN?: string;
   ALLOW_UNAUTHENTICATED_DEV?: string;
 }
 ```
 
-`CF_ACCOUNT_ID` and `CF_API_TOKEN` are only used by the image route for FLUX.2 models (REST API path). `OPENROUTER_API_KEY` powers the premium pool; when absent, premium requests degrade to the free pool (marked in the response).
+`CF_ACCOUNT_ID` and `CF_API_TOKEN` are only used by the image route for FLUX.2 models (REST API path). `OPENROUTER_API_KEY` powers the premium pool; when absent, premium requests degrade to the free pool (marked in the response). `HUB_URL` is a plain `[vars]` entry (not a secret) pointing at the Octonion billing hub; it defaults to `https://octonion.io` and can target a local hub via `.dev.vars`.
 
 ---
 
@@ -278,6 +281,9 @@ const res = await fetch(`${CF_WORKER_URL}/api/embed`, {
 | Embedding route | `cf-worker/src/routes/embed.ts` |
 | Image route | `cf-worker/src/routes/image.ts` |
 | DB proxy route | `cf-worker/src/routes/db.ts` |
+| Merged entitlements route | `cf-worker/src/routes/entitlements.ts` |
+| Hub billing-tier reader | `cf-worker/src/services/hubEntitlements.ts` |
+| Frontend entitlements fetch | `src/services/entitlementsApi.js` |
 | Hero-name validation (server) | `cf-worker/src/services/validation.ts` |
 | Model registry | `cf-worker/src/services/models.ts` |
 | AI service logic | `cf-worker/src/services/ai.ts` |
