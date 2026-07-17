@@ -1,6 +1,6 @@
 import React from 'react';
 import { heroSupportContribution } from '../utils/multiRoundEncounter';
-import { getHPStatus } from '../utils/healthSystem';
+import { getHPStatus, encounterDealsDamage } from '../utils/healthSystem';
 import { describeSpellDamage, ITEM_CATALOG } from '../utils/inventorySystem';
 import ClickableImage from './ClickableImage';
 import { useModal } from '../contexts/ModalContext';
@@ -151,7 +151,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
   };
 
   return (
-    <ModalShell modalId="encounterAction" className="encounter-action-modal" ariaLabel="Encounter" usePortal style={{ maxWidth: '800px', width: '95%', padding: '20px 24px' }}>
+    <ModalShell modalId="encounterAction" className="encounter-action-modal" ariaLabel="Encounter" usePortal style={{ maxWidth: '800px', width: '95%', padding: '14px 20px' }}>
         {showHeroSelection && !heroConfirmed && party && party.length > 1 ? (
           // Hero selection phase
           <>
@@ -166,9 +166,9 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
               <ClickableImage
                 src={encounter.image}
                 alt={encounter.name}
-                height={fullSizeImage ? '360px' : '240px'}
-                maxHeight={fullSizeImage ? '360px' : '240px'}
-                objectPosition={fullSizeImage ? 'center 60%' : 'center 30%'}
+                height={'clamp(200px, calc(100vh - 720px), 560px)'}
+                maxWidth={'560px'}
+                objectPosition={fullSizeImage ? 'center 60%' : 'center 35%'}
               />
             )}
             <div className="encounter-description" style={{ marginBottom: '10px', fontSize: '14px' }}>
@@ -297,24 +297,40 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
               <div style={{ fontSize: '11px', color: 'var(--state-muted-strong)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>
                 Random Encounter
               </div>
-              {encounterThreat && (
-                <div style={{ marginBottom: '8px' }}>{renderThreatBadge()}</div>
+              {(encounterThreat || (isMultiRound && roundState)) && (
+                <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  {renderThreatBadge()}
+                  {isMultiRound && roundState && (
+                    <div className="round-indicator">
+                      Round {roundState.currentRound} of {roundState.maxRounds}
+                    </div>
+                  )}
+                </div>
               )}
+              {/* Encounter art is SQUARE (640x640), so a short full-width box only shows a
+                  thin horizontal slice. Height is content-aware so the image fills whatever
+                  the phase leaves free (keeping the overall modal height steady):
+                  - mid-fight round result: compact banner (round data dominates)
+                  - active multi-round fight: medium (enemy HP + morale + party strip below)
+                  - single-round / non-combat: tall (little content below -> show the most art)
+                  The centered maxWidth lets a tall box stay near-square instead of
+                  side-cropping the square source. */}
               {encounter.image && !result && (
                 <ClickableImage
                   src={encounter.image}
                   alt={encounter.name}
-                  height={fullSizeImage ? '300px' : '200px'}
-                  maxHeight={fullSizeImage ? '300px' : '200px'}
-                  objectPosition={fullSizeImage ? 'center 60%' : 'center 30%'}
+                  height={(currentRoundResult || roundResults.length > 0)
+                    ? 'clamp(130px, calc(100vh - 745px), 460px)'
+                    : isMultiRound
+                      ? 'clamp(220px, calc(100vh - 685px), 640px)'
+                      : encounterDealsDamage(encounter)
+                        ? 'clamp(260px, calc(100vh - 470px), 700px)'
+                        : 'clamp(280px, calc(100vh - 435px), 600px)'}
+                  maxWidth={(currentRoundResult || roundResults.length > 0) ? undefined : '620px'}
+                  objectPosition={fullSizeImage ? 'center 60%' : 'center 35%'}
                 />
               )}
               {!encounter.image && <span className="encounter-icon">{encounter.icon}</span>}
-              {isMultiRound && roundState && (
-                <div className="round-indicator">
-                  Round {roundState.currentRound} of {roundState.maxRounds}
-                </div>
-              )}
 
               {/* Initiative result notification */}
               {initiativeResult && initiativeResult.message && (
@@ -331,8 +347,12 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                 </div>
               )}
 
-              {/* Player HP Bar */}
-              {currentCharacter && currentCharacter.maxHP && (
+              {/* Player HP Bar — only for encounters that can actually deal damage.
+                  A non-combat encounter (no dealsDamage / non-hostile) can never hurt the
+                  hero, so an HP bar is noise there; the freed height goes to the art
+                  instead (the image-height branch below grows to keep the modal height
+                  steady). */}
+              {currentCharacter && currentCharacter.maxHP && encounterDealsDamage(encounter) && (
                 <div className="encounter-hp-bar">
                   <div className="hp-label">
                     <span>
@@ -363,7 +383,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
               {isMultiRound && roundState && roundState.isTeamEncounter && (
                 <div className="encounter-party-strip" style={{
                   display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center',
-                  margin: '6px 0', fontSize: '12px'
+                  margin: '3px 0', fontSize: '12px'
                 }}>
                   {roundState.party.map((hero, idx) => {
                     if (idx === roundState.leadIndex) return null;
@@ -586,41 +606,39 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                   {/* Use a healing consumable mid-fight. In a multi-round fight this
                       spends the round (the heal is the party's action, no attack); a
                       single-round fight just heals + consumes the item. Shown only when
-                      the party carries a usable consumable AND someone can be healed. */}
-                  {canUseItemInCombat && (
-                    <button
-                      className="secondary-button"
-                      onClick={() => { setPendingItemKey(null); setShowItemPicker(true); }}
-                      disabled={isResolving}
-                      style={{ marginTop: '12px', width: '100%' }}
-                    >
-                      🎒 Use Item{isMultiRound ? ' (uses your action this round)' : ''}
-                    </button>
-                  )}
-
-                  {(!isMultiRound || (roundState && !roundState.isResolved)) && (
-                    <button
-                      className="secondary-button"
-                      onClick={handleFleeEncounter}
-                      disabled={isResolving}
-                      style={{
-                        marginTop: '15px',
-                        width: '100%'
-                      }}
-                    >
-                      🏃 Attempt to Flee (70% success, risks damage/gold loss)
-                    </button>
+                      the party carries a usable consumable AND someone can be healed.
+                      Item + Flee share one row (with tooltips carrying the fine print)
+                      so the fight fits the viewport without scrolling. */}
+                  {(canUseItemInCombat || !isMultiRound || (roundState && !roundState.isResolved)) && (
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                      {canUseItemInCombat && (
+                        <button
+                          className="secondary-button"
+                          onClick={() => { setPendingItemKey(null); setShowItemPicker(true); }}
+                          disabled={isResolving}
+                          title={isMultiRound ? 'Using an item spends your action this round' : undefined}
+                          style={{ flex: 1 }}
+                        >
+                          🎒 Use Item
+                        </button>
+                      )}
+                      {(!isMultiRound || (roundState && !roundState.isResolved)) && (
+                        <button
+                          className="secondary-button"
+                          onClick={handleFleeEncounter}
+                          disabled={isResolving}
+                          title="70% success; failure risks damage and gold loss"
+                          style={{ flex: 1 }}
+                        >
+                          🏃 Attempt to Flee (70%)
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </>
             )}
 
-            {isResolving && (
-              <div className="resolving-indicator">
-                <div className="spinner"></div>
-                <p>Resolving encounter...</p>
-              </div>
-            )}
           </>
         ) : (
           <>
