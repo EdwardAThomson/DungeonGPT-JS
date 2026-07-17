@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import EncounterActionModal from '../components/EncounterActionModal';
+import { useModal } from '../contexts/ModalContext';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('encounter-debug');
 
 const EncounterModalDebug = () => {
+  // The modal reads isOpen/encounter from ModalContext (useModal('encounterAction')),
+  // not from props; this page predated that migration and silently stopped opening the
+  // modal. Open through the context, same payload shape as Game.js.
+  const { open: openEncounterAction } = useModal('encounterAction');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [testEncounter, setTestEncounter] = useState(null);
   const [testHero, setTestHero] = useState(null);
@@ -118,6 +123,29 @@ const EncounterModalDebug = () => {
         items: ['rusty_dagger:40', 'bandit_cloak:20']
       },
       multiRound: false
+    },
+    // Non-combat: no dealsDamage and a non-hostile name, so encounterDealsDamage() is
+    // false and the modal hides the player HP bar (the art grows to fill that space).
+    social: {
+      name: 'Wandering Minstrel',
+      description: 'A minstrel strums a lute by the roadside and offers to share news of the region for a coin.',
+      icon: '🎶',
+      image: '/assets/encounters/wandering_minstrel.webp',
+      difficulty: 'trivial',
+      dealsDamage: false,
+      suggestedActions: [
+        { label: 'Listen', skill: 'Persuasion', description: 'Hear the minstrel out' },
+        { label: 'Trade News', skill: 'Persuasion', description: 'Swap rumours of the road' },
+        { label: 'Move On', skill: null, description: 'Continue on your way' }
+      ],
+      consequences: {
+        criticalSuccess: 'The minstrel shares a rare secret of the region.',
+        success: 'You trade friendly news and part on good terms.',
+        failure: 'The minstrel shrugs and returns to their song.',
+        criticalFailure: 'You offend the minstrel, who packs up and leaves.'
+      },
+      rewards: { xp: 20, gold: '1d4', items: [] },
+      multiRound: false
     }
   };
 
@@ -180,6 +208,7 @@ const EncounterModalDebug = () => {
     setTestParty(party);
     setEncounterResult(null);
     setIsModalOpen(true);
+    openEncounterAction({ encounter });
 
     addLog('Modal opened', 'info');
   };
@@ -309,6 +338,23 @@ const EncounterModalDebug = () => {
             </button>
             <button
               onClick={() => startTest('bandit', 2)}
+              className="primary-button"
+            >
+              2 Heroes (Selection)
+            </button>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <h3>Non-Combat (no HP bar)</h3>
+            <button
+              onClick={() => startTest('social', 1)}
+              style={{ marginRight: '10px' }}
+              className="primary-button"
+            >
+              1 Hero
+            </button>
+            <button
+              onClick={() => startTest('social', 2)}
               className="primary-button"
             >
               2 Heroes (Selection)

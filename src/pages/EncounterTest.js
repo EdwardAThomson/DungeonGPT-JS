@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
 import EncounterActionModal from '../components/EncounterActionModal';
+import { useModal } from '../contexts/ModalContext';
 import { encounterTemplates } from '../data/encounters';
 import { initializeHP, applyDamage, getHPStatus } from '../utils/healthSystem';
 
 const EncounterTest = () => {
+  // The modal reads isOpen/encounter from ModalContext (useModal('encounterAction')),
+  // not from props; this page predated that migration and silently stopped opening the
+  // modal. Open through the context, same payload shape as Game.js.
+  const { open: openEncounterAction } = useModal('encounterAction');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEncounter, setSelectedEncounter] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -63,6 +68,7 @@ const EncounterTest = () => {
     
     setSelectedEncounter(encounterTemplates[encounterKey]);
     setIsModalOpen(true);
+    openEncounterAction({ encounter: encounterTemplates[encounterKey] });
   };
 
   const handleResolve = (result) => {
