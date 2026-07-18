@@ -34,7 +34,12 @@ function seededRandom(seed) {
 // Combat (immediate-tier) encounters available for each site type.
 const combatPool = (type) => {
   const table = type === 'ruins' ? RUINS_ENCOUNTERS : CAVE_ENCOUNTERS;
-  return Object.values(table).filter((e) => e.encounterTier === 'immediate');
+  // Only genuine MULTI-ROUND creatures become placeable chasing MOBS. A single-round
+  // hazard (a bat swarm, ruin scavengers) has no enemy HP to deplete, so it can never
+  // report a combat 'victory' — placing it as a chasing slot mob made it an undefeatable
+  // icon that wouldn't despawn (playtest 2026-07-18). Such hazards still appear as one-off
+  // wandering events (runSiteStep), the right model for a swarm that erupts and passes.
+  return Object.values(table).filter((e) => e.encounterTier === 'immediate' && e.multiRound === true);
 };
 
 // Difficulty tiers a NON-QUEST random wilderness combat may use, by party level

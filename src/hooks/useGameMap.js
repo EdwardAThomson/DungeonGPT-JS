@@ -409,6 +409,22 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         setConversation([...conversation, { role: 'system', content: `You leave ${currentSiteMap.name} and return to the wilds.` }]);
     };
 
+    // Force the party back onto the WORLD map at `pos`, abandoning any site interior. Unlike
+    // handleLeaveSite this does NOT require standing at the entrance: it is the party-wipe
+    // recovery escape hatch (Game.js), which teleports a downed party out of wherever they
+    // fell to the nearest town. Clears site state and re-centres the world view on `pos`.
+    const evacuateToWorldTile = (pos) => {
+        if (!pos) return;
+        setSiteError(null);
+        setSiteNotice(null);
+        setCurrentSiteMap(null);
+        setSitePlayerPosition(null);
+        setCurrentSiteTile(null);
+        setIsInsideSite(false);
+        setCurrentMapLevel('world');
+        setPlayerPosition({ x: pos.x, y: pos.y });
+    };
+
     // Moves the party ONE tile in-site and RETURNS the tile moved to (or null if the
     // move was rejected), so the game loop can fire that tile's content / roll wandering
     // monsters. The party now walks to ANY reachable tile: Game.js computes the path and
@@ -669,6 +685,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         pushSiteNotice,
         clearSiteNotice,
         handleLeaveSite,
+        evacuateToWorldTile,
         moveSitePlayerTo,
         markSiteContentConsumed,
         setSiteMobDefeated,
