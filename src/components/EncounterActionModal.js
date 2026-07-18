@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { heroSupportContribution } from '../utils/multiRoundEncounter';
 import { getHPStatus, encounterDealsDamage } from '../utils/healthSystem';
 import { describeSpellDamage, ITEM_CATALOG } from '../utils/inventorySystem';
@@ -38,7 +38,6 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
     handleAction,
     handleNextRound,
     handleFightAgain,
-    handleClaimVictory,
     handleUseItemInCombat,
     handleUseSpellItemInCombat,
     handleFleeEncounter,
@@ -55,6 +54,14 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
     onClose: close
   });
 
+  // Bring the inline item tray into view when it opens (it renders at the modal bottom).
+  const itemTrayRef = useRef(null);
+  useEffect(() => {
+    if (showItemPicker && itemTrayRef.current) {
+      itemTrayRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [showItemPicker, pendingItemKey]);
+
   if (!isOpen || !encounter) return null;
 
   // Early return if no character - prevents crashes during initialization
@@ -64,6 +71,10 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
   }
 
   const heroUidLocal = (h) => (h && (h.heroId || h.characterId)) || null;
+
+  // Flee only makes sense for encounters that can hurt you; a non-combat encounter
+  // leaves via its own "Move On" action. Also hidden once a multi-round fight resolves.
+  const canFlee = encounterDealsDamage(encounter) && (!isMultiRound || (roundState && !roundState.isResolved));
 
   const getOutcomeBadgeClass = (tier) => {
     const classes = {
@@ -443,17 +454,6 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                   </button>
                 </div>
               </>
-            ) : roundState && roundState.enemyCurrentHP <= 0 && !result ? (
-              // Enemy is defeated
-              <>
-                <div className="victory-banner">
-                  <h3 style={{ color: 'var(--state-success-strong)', margin: '0 0 10px 0' }}>⚔️ Victory!</h3>
-                  <p>The {encounter.name.toLowerCase()} has been defeated!</p>
-                  <button className="primary-button" onClick={handleClaimVictory} style={{ marginTop: '15px' }}>
-                    Claim Victory
-                  </button>
-                </div>
-              </>
             ) : currentRoundResult ? (
               // Show current round result before continuing
               <>
@@ -599,17 +599,18 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                     ))}
                   </div>
 
-                  {/* Flee button: the single flee affordance for BOTH single-round and
-                      multi-round encounters. Single-round fights previously offered no flee
-                      at all (only fight actions). Both route through handleFleeEncounter, so
-                      a successful flee sets outcome:'fled' and disengages via onResolve. */}
+                  {/* Flee button: the single flee affordance, shown only for encounters
+                      that can actually deal damage (you don't "flee" a minstrel — a
+                      non-combat encounter's own "Move On" action handles leaving). Routes
+                      through handleFleeEncounter, so a successful flee sets outcome:'fled'
+                      and disengages via onResolve. */}
                   {/* Use a healing consumable mid-fight. In a multi-round fight this
                       spends the round (the heal is the party's action, no attack); a
                       single-round fight just heals + consumes the item. Shown only when
                       the party carries a usable consumable AND someone can be healed.
                       Item + Flee share one row (with tooltips carrying the fine print)
                       so the fight fits the viewport without scrolling. */}
-                  {(canUseItemInCombat || !isMultiRound || (roundState && !roundState.isResolved)) && (
+                  {(canUseItemInCombat || canFlee) && (
                     <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
                       {canUseItemInCombat && (
                         <button
@@ -622,7 +623,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                           🎒 Use Item
                         </button>
                       )}
-                      {(!isMultiRound || (roundState && !roundState.isResolved)) && (
+                      {canFlee && (
                         <button
                           className="secondary-button"
                           onClick={handleFleeEncounter}
@@ -765,40 +766,21 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
           </>
         )}
 
-        {/* In-combat item picker: a FIXED, centered overlay above the encounter modal
-            (always on screen). Two steps: choose a healing consumable, then a target hero
-            (full-HP / defeated heroes disabled). Reuses the shared consumeHealingItem path. */}
+        {/* In-combat item tray: an INLINE panel below the action buttons (was a
+            fixed zIndex-4000 modal-in-a-modal). Two steps: choose a consumable, then a
+            target hero (full-HP / defeated heroes disabled). Reuses consumeHealingItem. */}
         {showItemPicker && (
           <div
-            role="dialog"
-            aria-modal="true"
+            ref={itemTrayRef}
             aria-label="Use an item"
-            onClick={() => { setShowItemPicker(false); setPendingItemKey(null); }}
             style={{
-              position: 'fixed',
-              top: 0, left: 0, right: 0, bottom: 0,
-              background: 'rgba(0,0,0,0.6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 4000,
-              padding: '20px'
+              marginTop: '10px',
+              padding: '14px',
+              background: 'var(--surface)',
+              border: '1px solid #27ae60',
+              borderRadius: '10px'
             }}
           >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                maxWidth: '380px',
-                maxHeight: '80vh',
-                overflowY: 'auto',
-                padding: '20px',
-                background: 'var(--surface)',
-                border: '1px solid #27ae60',
-                borderRadius: '10px',
-                boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
-              }}
-            >
               {!pendingItemKey ? (
                 <>
                   <h3 style={{ margin: '0 0 12px 0', color: '#27ae60' }}>Use which item?</h3>
@@ -929,7 +911,6 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
               >
                 Cancel
               </button>
-            </div>
           </div>
         )}
     </ModalShell>
