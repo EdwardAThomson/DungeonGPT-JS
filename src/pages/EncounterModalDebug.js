@@ -170,7 +170,7 @@ const EncounterModalDebug = () => {
         charisma: 8
       },
       gold: 50,
-      inventory: [],
+      inventory: [{ key: 'healing_potion', quantity: 2 }, { key: 'fireball_scroll', quantity: 1 }],
       profilePicture: '/assets/characters/fighter.webp'
     },
     {
