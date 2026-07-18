@@ -10,7 +10,6 @@ import SegmentedControl from "../components/SegmentedControl";
 import RaritySelect from "../components/RaritySelect";
 import { storyTemplates } from "../data/storyTemplates";
 import { launchCampaign, mergeLocationNames } from "../game/campaignLauncher";
-import { llmService } from "../services/llmService";
 import { createLogger } from "../utils/logger";
 import { QUEST_ENEMIES, getEnemiesByTierAndTheme } from "../data/questEnemies";
 import { QUEST_BUILDINGS, NPC_ROLES, POI_TYPES, THEME_DEFAULTS, THEME_NAMES, getCustomQuestItems } from "../data/questPickerData";
@@ -28,7 +27,7 @@ const NewGame = () => {
   // characters should be saved in Context
   const { heroes } = useContext(HeroContext);
   // Get settings, provider, and model state from context
-  const { settings, setSettings, selectedProvider, selectedModel } = useContext(SettingsContext);
+  const { settings, setSettings } = useContext(SettingsContext);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -85,12 +84,6 @@ const NewGame = () => {
   // World biome theme for the generated map (Phase 2b). 'grassland' (default) reproduces
   // the historical plains map; a themed template (e.g. desert) overrides it.
   const [worldTheme, setWorldTheme] = useState('grassland');
-
-  // AI Generation state
-  const [isAiGenerating, setIsAiGenerating] = useState(false);
-  const [aiError, setAiError] = useState('');
-  const [rawAiResponse, setRawAiResponse] = useState('');
-  const [showStoryDebug, setShowStoryDebug] = useState(false);
 
 
 
@@ -154,95 +147,6 @@ const NewGame = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleAiGenerateStory = async () => {
-    setIsAiGenerating(true);
-    setAiError('');
-    setSelectedTemplate('ai');
-    setTemplateLabel('AI Generated World');
-
-    const prompt = `You are a world-class RPG campaign designer. Create a unique, compelling story preset for a tabletop-style RPG.
-    Provide the output in STRICT JSON format with the following keys:
-    - shortDescription: A 2-sentence overview of the world and the conflict.
-    - campaignGoal: The ultimate objective of the campaign (1 sentence).
-    - milestones: An array of 3 objects, each with "text" (the objective) and "location" (one of the town or mountain names where it takes place, or null if it's an unknown location).
-    - grimnessLevel: Choose one [Noble, Neutral, Bleak, Grim].
-    - darknessLevel: Choose one [Bright, Neutral, Grey, Dark].
-    - magicLevel: Choose one [No Magic, Low Magic, High Magic, Arcane Tech].
-    - technologyLevel: Choose one [Ancient, Medieval, Renaissance, Industrial].
-    - responseVerbosity: Choose one [Concise, Moderate, Descriptive].
-    - customNames: An object with two arrays: "towns" (4 thematic town names, first should be the capital) and "mountains" (1 thematic mountain range name).
-
-    Make it creative and atmospheric. Do not include any text other than the JSON object.`;
-
-    try {
-      const response = await llmService.generateUnified({
-        provider: selectedProvider,
-        model: selectedModel,
-        prompt: prompt,
-        maxTokens: 1000,
-        temperature: 0.9
-      });
-
-      setRawAiResponse(response);
-
-      // Improved JSON extraction and sanitization
-      const extractAndParseJson = (str) => {
-        // 1. Find the actual JSON object bounds
-        const start = str.indexOf('{');
-        const end = str.lastIndexOf('}');
-        if (start === -1 || end === -1) throw new Error("AI failed to provide a valid JSON object.");
-
-        let json = str.substring(start, end + 1);
-
-        // 2. Sanitize literal control characters (like newlines) inside strings
-        // JSON.parse fails on literal newlines in strings, but LLMs often include them.
-        let sanitized = '';
-        let inString = false;
-        let escaped = false;
-        for (let i = 0; i < json.length; i++) {
-          const char = json[i];
-          if (char === '"' && !escaped) inString = !inString;
-
-          if (inString && (char === '\n' || char === '\r')) {
-            sanitized += '\\n';
-          } else {
-            sanitized += char;
-          }
-          escaped = (char === '\\' && !escaped);
-        }
-
-        return JSON.parse(sanitized);
-      };
-
-      const data = extractAndParseJson(response);
-
-      // Apply the generated data
-      setShortDescription(data.shortDescription || '');
-      setCampaignGoal(data.campaignGoal || '');
-      setMilestones((data.milestones || []).map(m => {
-        if (typeof m === 'object' && m.text) return { text: m.text, location: m.location || null };
-        return { text: String(m), location: null };
-      }));
-      setGrimnessLevel(data.grimnessLevel || 'Neutral');
-      setDarknessLevel(data.darknessLevel || 'Neutral');
-      setMagicLevel(data.magicLevel || 'Low Magic');
-      setTechnologyLevel(data.technologyLevel || 'Medieval');
-      setResponseVerbosity(data.responseVerbosity || 'Moderate');
-      // Normalize customNames: support both structured object and legacy flat array
-      const rawNames = data.customNames || [];
-      if (Array.isArray(rawNames)) {
-        setCustomNames({ towns: rawNames, mountains: [] });
-      } else {
-        setCustomNames({ towns: rawNames.towns || [], mountains: rawNames.mountains || [] });
-      }
-
-    } catch (error) {
-      logger.error("AI Story Generation failed:", error);
-      setAiError(error.message);
-    } finally {
-      setIsAiGenerating(false);
-    }
-  };
 
   const handleSubmit = () => {
     // Custom tab: validate slots and auto-generate description if needed
@@ -296,7 +200,7 @@ const NewGame = () => {
     // minTier), and a free user must never generate a sand/snow (premium) world
     // map. This closes loopholes like a premium biome theme carried over from a
     // previewed template into Custom/Freeform.
-    const selTpl = selectedTemplate && selectedTemplate !== 'custom' && selectedTemplate !== 'ai'
+    const selTpl = selectedTemplate && selectedTemplate !== 'custom'
       ? storyTemplates.find(t => t.id === selectedTemplate)
       : null;
     if (selTpl && !canUseTemplate(selTpl)) {
@@ -315,16 +219,15 @@ const NewGame = () => {
     }
 
     const templateName = templateLabel
-      || (selectedTemplate === 'ai' ? 'AI Generated World'
-        : selectedTemplate === 'custom' || !selectedTemplate ? 'Custom Tale'
-          : storyTemplates.find(t => t.id === selectedTemplate)?.name || 'Unknown Template');
+      || (selectedTemplate === 'custom' || !selectedTemplate ? 'Custom Tale'
+        : storyTemplates.find(t => t.id === selectedTemplate)?.name || 'Unknown Template');
 
     // For custom tab, use the auto-generated description if it was just set
     const finalDescription = shortDescription.trim() ||
       `A custom ${(THEME_DEFAULTS[customTheme]?.name || 'fantasy').toLowerCase()} adventure.`;
 
     // Resolve tier and level range from template or custom settings
-    const templateData = selectedTemplate && selectedTemplate !== 'custom' && selectedTemplate !== 'ai'
+    const templateData = selectedTemplate && selectedTemplate !== 'custom'
       ? storyTemplates.find(t => t.id === selectedTemplate)
       : null;
 
@@ -607,7 +510,7 @@ const NewGame = () => {
   // can't reach its band yet: same class of soft warning the continue-legend
   // picker uses. Never a block: the real party-level warning (and still no
   // block) happens at hero selection, where the chosen party is known.
-  const selectedTemplateData = selectedTemplate && !['custom', 'ai', 'freeform'].includes(selectedTemplate)
+  const selectedTemplateData = selectedTemplate && selectedTemplate !== 'custom'
     ? storyTemplates.find((t) => t.id === selectedTemplate)
     : null;
   const higherTierNote = (() => {
@@ -992,7 +895,7 @@ const NewGame = () => {
     // Same rule as the tab-switch handler, re-checked whenever the tier or theme state
     // settles: a free account must never carry a premium (desert/snow) biome from a
     // previewed template into a Custom/Freeform world.
-    if ((activeTab === 'custom' || activeTab === 'freeform') && !premiumUnlocked && isThemePremium(worldTheme)) {
+    if (activeTab === 'custom' && !premiumUnlocked && isThemePremium(worldTheme)) {
       setWorldTheme('grassland');
     }
   }, [activeTab, premiumUnlocked, worldTheme]);
@@ -1270,116 +1173,6 @@ const NewGame = () => {
     </div>
   );
 
-  const renderFreeformTab = () => (
-    <div className="form-section story-settings-section">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          Open-ended storytelling. The AI drives the narrative — no structured quest tracking.
-        </p>
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={handleAiGenerateStory}
-            disabled={isAiGenerating || !user}
-            className={`ai-generate-button ${isAiGenerating ? 'loading' : ''}`}
-            title={!user ? 'Sign in to use AI generation' : ''}
-            style={{
-              background: !user ? 'var(--text-secondary)' : 'linear-gradient(135deg, #6c5ce7, #a29bfe)',
-              color: 'white',
-              border: 'none',
-              padding: '8px 16px',
-              borderRadius: '20px',
-              fontSize: '0.85rem',
-              fontWeight: 'bold',
-              cursor: !user ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              boxShadow: !user ? 'none' : '0 4px 15px rgba(108, 92, 231, 0.3)',
-              transition: 'all 0.3s ease',
-              opacity: !user ? 0.6 : 1
-            }}
-          >
-            {isAiGenerating ? '✨ Spawning World...' : '✨ Generate with AI'}
-          </button>
-          {!user && (
-            <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-secondary)', textAlign: 'center', marginTop: '4px' }}>
-              Sign in required
-            </span>
-          )}
-        </div>
-      </div>
-      {aiError && <p className="error-message" style={{ marginBottom: '15px' }}>{aiError}</p>}
-
-      <div style={{ marginBottom: '15px' }}>
-        <button
-          type="button"
-          onClick={() => setShowStoryDebug(!showStoryDebug)}
-          style={{ background: 'none', border: 'none', color: 'var(--state-muted-strong)', fontSize: '0.75rem', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
-        >
-          {showStoryDebug ? 'Hide AI Debug' : 'Show AI Debug Info'}
-        </button>
-
-        {showStoryDebug && (
-          <div style={{ marginTop: '10px', padding: '10px', background: 'var(--bg)', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '0.8rem' }}>
-            <h5 style={{ margin: '0 0 5px 0', color: 'var(--text)' }}>Raw AI Response:</h5>
-            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: 'var(--text-secondary)', maxHeight: '200px', overflowY: 'auto' }}>
-              {rawAiResponse || 'No data yet. Generate a story to see output.'}
-            </pre>
-          </div>
-        )}
-      </div>
-
-      <div className="settings-row">
-        <div className="settings-group full-width">
-          <label htmlFor="shortDescription">Adventure Description</label>
-          <textarea
-            id="shortDescription"
-            value={shortDescription}
-            onChange={(e) => setShortDescription(e.target.value)}
-            placeholder="e.g., A group of mercenaries investigating a haunted mine..."
-            className="settings-textarea"
-          />
-        </div>
-      </div>
-
-      <div className="settings-row">
-        <div className="settings-group full-width">
-          <label htmlFor="campaignGoal">Campaign Goal</label>
-          <textarea
-            id="campaignGoal"
-            value={campaignGoal}
-            onChange={(e) => setCampaignGoal(e.target.value)}
-            placeholder="e.g., Defeat the dragon terrorizing the kingdom..."
-            className="settings-textarea"
-            style={{ minHeight: '60px' }}
-          />
-        </div>
-      </div>
-
-      <div className="settings-row">
-        <div className="settings-group full-width">
-          <label htmlFor="milestones">Story Milestones (one per line)</label>
-          <textarea
-            id="milestones"
-            value={milestones.map(m => typeof m === 'object' ? m.text : m).join('\n')}
-            onChange={(e) => {
-              const lines = e.target.value.split('\n');
-              setMilestones(lines.map((line, i) => {
-                const existing = milestones[i];
-                if (existing && typeof existing === 'object' && existing.text === line) return existing;
-                return { text: line, location: (existing && typeof existing === 'object') ? existing.location : null };
-              }));
-            }}
-            placeholder="e.g., Find the ancient key&#10;Bribe the castle guard..."
-            className="settings-textarea"
-            style={{ minHeight: '80px' }}
-          />
-        </div>
-      </div>
-
-      {renderToneSettings()}
-    </div>
-  );
 
   return (
     <div className="page-container new-game-page">
@@ -1396,7 +1189,6 @@ const NewGame = () => {
         {[
           { id: 'templates', label: 'Ready-Made', icon: '📜' },
           { id: 'custom', label: 'Custom', icon: '🛠️' },
-          { id: 'freeform', label: 'Freeform', icon: '✍️' },
         ].map(tab => (
           <button
             key={tab.id}
@@ -1404,13 +1196,11 @@ const NewGame = () => {
               setActiveTab(tab.id);
               if (tab.id === 'custom' && selectedTemplate && selectedTemplate !== 'custom') {
                 setSelectedTemplate('custom');
-              } else if (tab.id === 'freeform' && selectedTemplate && selectedTemplate !== 'ai' && selectedTemplate !== 'freeform') {
-                setSelectedTemplate('freeform');
               }
-              // Custom/Freeform have no biome picker, so a premium world theme here can only
-              // be a leftover from a previewed template. Drop it back to grassland for free
-              // users so they can't ride a premium (desert/snow) map into a custom tale.
-              if ((tab.id === 'custom' || tab.id === 'freeform') && !premiumUnlocked && isThemePremium(worldTheme)) {
+              // Custom has no biome picker, so a premium world theme here can only be a
+              // leftover from a previewed template. Drop it back to grassland for free users
+              // so they can't ride a premium (desert/snow) map into a custom tale.
+              if (tab.id === 'custom' && !premiumUnlocked && isThemePremium(worldTheme)) {
                 setWorldTheme('grassland');
               }
             }}
@@ -1436,7 +1226,6 @@ const NewGame = () => {
       {/* Tab Content */}
       {activeTab === 'templates' && renderTemplateTab()}
       {activeTab === 'custom' && renderCustomTab()}
-      {activeTab === 'freeform' && renderFreeformTab()}
 
       {/* Arc Detail Modal (chapter ladder + picker, #73 phase 1) */}
       {previewArc && (
