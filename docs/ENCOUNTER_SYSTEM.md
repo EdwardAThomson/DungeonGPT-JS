@@ -24,7 +24,8 @@ Phase 1 (core encounters), Phase 2 (random generation + movement integration), a
 | `src/data/encounterTables.js` | Biome-specific weighted encounter tables |
 | `src/utils/progressionSystem.js` | XP thresholds and leveling (D&D 5e-inspired, cap 20) |
 | `src/utils/inventorySystem.js` | Gold management, item drops, dice notation rolling; consumable dispatch (`isConsumable`, `consumeConsumable`) over the shared heal path (`consumeHealingItem`) and offensive spell scrolls (`consumeSpellItem`) |
-| `src/components/EncounterActionModal.js` | Choice-driven encounter UI with HP bars, damage, threat badge, in-combat Use Item |
+| `src/hooks/useEncounterFight.js` | Headless fight-flow controller (#79 keystone): owns the phase machine (formation → initiative → action → resolving → roundResult → final) previously trapped in the modal. Presentation-free; engine semantics stay in `encounterResolver`/`multiRoundEncounter` |
+| `src/components/EncounterActionModal.js` | Choice-driven encounter UI (HP bars, damage, threat badge, in-combat Use Item); renders the state `useEncounterFight` exposes and calls its handlers |
 | `src/pages/EncounterTest.js` | Isolated encounter testing page (`/encounter-test`) |
 
 ---
