@@ -47,9 +47,14 @@ const combatPool = (type) => {
 export const difficultyBandForLevel = (level) => {
   if (!Number.isFinite(level)) return null;
   const L = Math.max(1, Math.floor(level));
+  // Bands always span MORE THAN ONE difficulty so random combat is varied, never a wall
+  // of the single hardest foe (playtest 2026-07-18: a hard-only band + only ONE 'hard'
+  // cave encounter meant every cave combat slot became the spider nest — three in a row).
+  // Difficulty still scales with level; the top band drops 'easy' but never becomes
+  // hard-only. `deadly` stays reserved for authored quest/milestone bosses.
   if (L <= 2) return ['easy', 'medium'];
-  if (L <= 4) return ['medium', 'hard'];
-  return ['hard'];
+  if (L <= 5) return ['easy', 'medium', 'hard'];
+  return ['medium', 'hard'];
 };
 
 // Pick one random combat encounter matched to the party level. Consumes exactly one
