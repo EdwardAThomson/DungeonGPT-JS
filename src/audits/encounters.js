@@ -248,12 +248,19 @@ const enc06 = {
   }
 };
 
+// Encounters spawned by a DEDICATED code path rather than a weighted table or the site
+// combat pool. tavern_brawl fires from Game.js handleVisitTavern (visiting a tavern/inn),
+// deliberately removed from the random town table. Keep this in sync when a new
+// special-spawn hook is added.
+const SPECIAL_SPAWN_KEYS = new Set(['tavern_brawl']);
+
 /**
  * ENC-07 (error): every defined encounter template is REACHABLE — referenced by at least
- * one weighted table OR present in the site combat pool (immediate-tier cave/ruins). A
- * template referenced by nothing is fully authored (art, rewards) but can never spawn
- * (dead content), e.g. mountain_hermit_cave before it was added to the mountain table.
- * This is the mirror of ENC-02 (which catches table refs with no template).
+ * one weighted table, OR present in the site combat pool (immediate-tier cave/ruins), OR
+ * spawned by a dedicated code path (SPECIAL_SPAWN_KEYS). A template reachable by none is
+ * fully authored (art, rewards) but can never spawn (dead content), e.g. mountain_hermit_cave
+ * before it was added to the mountain table. This is the mirror of ENC-02 (table refs with
+ * no template).
  */
 const enc07 = {
   id: 'ENC-07',
@@ -265,7 +272,7 @@ const enc07 = {
     const violations = [];
     for (const encId of Object.keys(ctx.encounterTemplates || {})) {
       if (encId === 'none') continue;
-      if (inTables.has(encId) || SITE_COMBAT_POOL_KEYS.has(encId)) continue;
+      if (inTables.has(encId) || SITE_COMBAT_POOL_KEYS.has(encId) || SPECIAL_SPAWN_KEYS.has(encId)) continue;
       violations.push({
         message: `encounter template '${encId}' is referenced by no weighted table and is not an immediate-tier cave/ruins site-combat encounter — it can never spawn (dead content)`,
         location: `encounterTemplates['${encId}']`
