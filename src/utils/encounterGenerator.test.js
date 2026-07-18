@@ -127,4 +127,17 @@ describe('encounterGenerator.rollEnvironmentalEncounter (enclosed-interior setti
     expect(keys.has('sudden_storm')).toBe(true);
     expect(keys.has('strange_lights')).toBe(true);
   });
+
+  it("honors each template's authored encounterTier (P3), not a hardcoded 'immediate'", () => {
+    // Sweep the table; collect the tier each produced template resolves to.
+    const tierByTemplate = {};
+    for (let i = 0; i < 100; i += 1) {
+      const r = rollAt(i / 100, {});
+      if (r) tierByTemplate[r.templateKey] = r.encounterTier;
+    }
+    // sudden_storm/earthquake are authored 'immediate'; thick_fog/strange_lights 'narrative'.
+    expect(tierByTemplate.sudden_storm).toBe('immediate');
+    expect(tierByTemplate.thick_fog).toBe('narrative');
+    expect(tierByTemplate.strange_lights).toBe('narrative');
+  });
 });
