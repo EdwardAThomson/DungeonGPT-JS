@@ -59,7 +59,8 @@ const GameModals = ({
   sideQuests,
   onAcceptSideQuest,
   onTurnInQuest,
-  onTalkToNpc
+  onTalkToNpc,
+  onVisitTavern
 }) => {
   // Which milestone POIs are visible: current campaign POIs gate on prerequisites;
   // POIs stamped by a COMPLETED previous campaign (in-save continuation) are
@@ -156,6 +157,7 @@ const GameModals = ({
         onTurnInQuest={onTurnInQuest}
         milestones={settings?.milestones}
         onTalkToNpc={onTalkToNpc}
+        onVisitTavern={onVisitTavern}
         onResurrect={onResurrect}
         onBuy={onBuy}
         onSell={onSell}
