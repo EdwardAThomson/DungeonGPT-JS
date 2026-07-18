@@ -48,6 +48,7 @@ import {
   formatEncounterPenaltyLog,
   formatEncounterRewardLog,
   isEncounterVictory,
+  isFleeOutcome,
   getFleeReposition
 } from '../game/encounterController';
 import { resolveProviderAndModel } from '../llm/modelResolver';
@@ -1201,14 +1202,15 @@ const Game = ({ resumeConversation = null }) => {
       movesSinceEncounterRef.current = 0;
       setMovesSinceEncounter(0);
 
-      // Weather (storm/fog/etc.) is NOT a creature: it doesn't hunt, has no HP, and can
-      // never be "defeated", so spawning it as a chasing mob trapped the party in an
-      // unwinnable loop (the mob is only cleared on a combat victory, which a weather
-      // skill-check never produces) and sat the storm on the party's own tile (playtest
-      // 2026-07-18). Environmental encounters resolve as a ONE-OFF event modal instead:
-      // the storm appears once, the party weathers it, it passes. activeSiteMobIdRef was
-      // already reset to null at the top of this step, so the resolve touches no mob.
-      if (wandering.environmental) {
+      // A one-shot HAZARD (weather like a storm/fog, OR a single-round swarm like the
+      // bats) is not a creature: it has no enemy HP and can never report a combat
+      // 'victory', so spawning it as a chasing mob trapped the party in an unwinnable loop
+      // (mobs clear only on victory) and sat it on the party's own tile (playtest
+      // 2026-07-18: the storm, then cave_bats). These resolve as a ONE-OFF event modal
+      // instead — it appears once, the party deals with it, it passes. Only genuine
+      // multi-round fights (enemy HP to deplete) become chasing mobs. activeSiteMobIdRef
+      // was already reset to null at the top of this step, so the resolve touches no mob.
+      if (wandering.environmental || !wandering.multiRound) {
         mapHook.setIsMapModalOpen(false);
         reopenMapAfterEncounterRef.current = true;
         preEncounterPosRef.current = fromSitePos
@@ -1935,6 +1937,14 @@ const Game = ({ resumeConversation = null }) => {
     recordEnemyInCodex(activeEncounter);
     // Reward items entering the inventory are item discoveries.
     if (result?.rewards?.items?.length > 0) recordItemsInCodex(result.rewards.items);
+
+    // A SINGLE-ROUND site mob is a one-shot hazard (e.g. a bat swarm — no enemy HP, so it
+    // resolves in one action and can NEVER report 'victory'): clear it on ANY non-flee
+    // outcome, else it re-triggers forever (playtest 2026-07-18, cave_bats). multiRound
+    // fights still clear only on a real victory (below).
+    if (activeSiteMobIdRef.current && activeEncounter && !activeEncounter.multiRound && !isFleeOutcome(result)) {
+      mapHook.setSiteMobDefeated(activeSiteMobIdRef.current);
+    }
 
     if (isEncounterVictory(result)) {
       // A flee (outcome 'fled'/'escaped') is NOT a victory, so a fled foe is never marked
