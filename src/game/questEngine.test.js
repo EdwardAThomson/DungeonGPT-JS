@@ -4,6 +4,7 @@ import {
   getSideQuestProgress, getActiveSiteObjectives, selectSideQuests, effectivePartyLevel,
   deriveSideQuestAvailability, backfillSideQuests, applySideQuestBackfill,
   pickOfferableSideQuest, ACTIVE_QUEST_CAP, OFFER_COOLDOWN_MOVES,
+  resolveQuestOrigin, stampQuestOrigin,
 } from './questEngine';
 import { initialSideQuests, SIDE_QUESTS, QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
 import { ITEM_CATALOG } from '../utils/inventorySystem';
@@ -757,5 +758,80 @@ describe('questEngine: pickOfferableSideQuest (shared rumour + Quest Board picke
     expect(pickOfferableSideQuest(pool, level3Party, opts(1)).id).toBe('b');
     expect(pickOfferableSideQuest(pool, level3Party, opts(2)).id).toBe('c');
     expect(pickOfferableSideQuest(pool, level3Party, opts(3)).id).toBe('a');
+  });
+});
+
+describe('questEngine: quest origin town (playtest 2026-07-18)', () => {
+  const world = [
+    [{ x: 0, y: 0, poi: 'town', townName: 'Farhaven' }, { x: 1, y: 0, biome: 'plains' }],
+    [{ x: 0, y: 1, biome: 'plains' }, { x: 1, y: 1, poi: 'town', townName: 'Millhaven' }],
+  ];
+  // A cached town sub-map for Millhaven with a named guild building.
+  const townMapsCache = {
+    Millhaven: { mapData: [[{ buildingType: 'guild', buildingName: 'The Ironbond Chapterhouse' }, { type: 'grass' }]] },
+  };
+  const guildQuest = {
+    id: 'gq', giver: { building: 'guild', hook: '...' },
+    milestones: [
+      { id: 'o1', trigger: { item: 'x' } },
+      { id: 'in', trigger: { turnIn: { building: 'guild' } } },
+    ],
+  };
+
+  test('current town wins and carries its real building name', () => {
+    const o = resolveQuestOrigin(guildQuest, { worldMap: world, townMapsCache, currentTownName: 'Millhaven' });
+    expect(o).toEqual({ town: 'Millhaven', buildingName: 'The Ironbond Chapterhouse' });
+  });
+
+  test('wilderness rumour picks the nearest named town, preferring a mapped guild name', () => {
+    // Player at (1,1) = Millhaven tile; Millhaven has the cached guild name.
+    const o = resolveQuestOrigin(guildQuest, { worldMap: world, townMapsCache, playerPos: { x: 1, y: 1 } });
+    expect(o.town).toBe('Millhaven');
+    expect(o.buildingName).toBe('The Ironbond Chapterhouse');
+  });
+
+  test('falls back to town + null name when no town is mapped yet', () => {
+    const o = resolveQuestOrigin(guildQuest, { worldMap: world, townMapsCache: {}, playerPos: { x: 0, y: 0 } });
+    expect(o.town).toBe('Farhaven'); // nearest to (0,0)
+    expect(o.buildingName).toBeNull();
+  });
+
+  test('null when the world map has no towns', () => {
+    expect(resolveQuestOrigin(guildQuest, { worldMap: [[{ biome: 'plains' }]] })).toBeNull();
+  });
+
+  test('stampQuestOrigin sets giver town/name and restricts turn-in to that town', () => {
+    const stamped = stampQuestOrigin(guildQuest, { town: 'Millhaven', buildingName: 'The Ironbond Chapterhouse' });
+    expect(stamped.giver.town).toBe('Millhaven');
+    expect(stamped.giver.buildingName).toBe('The Ironbond Chapterhouse');
+    const turnIn = stamped.milestones.find((m) => m.trigger?.turnIn);
+    expect(turnIn.trigger.turnIn.location).toBe('Millhaven');
+    // objective step untouched
+    expect(stamped.milestones[0]).toEqual(guildQuest.milestones[0]);
+  });
+});
+
+describe('questEngine: origin-stamped turn-in is restricted to that town (playtest 2026-07-18)', () => {
+  const baseQuest = () => ({
+    id: 'gq', title: 'Guild Errand', status: 'active',
+    giver: { building: 'guild' },
+    milestones: [
+      { id: 'o1', type: 'combat', trigger: { enemy: 'any' }, requires: [], completed: true },
+      { id: 'in', type: 'turnin', trigger: { turnIn: { building: 'guild' } }, requires: ['o1'], completed: false, rewards: { xp: 0, gold: 50, items: [] } },
+    ],
+  });
+
+  test('a quest stamped to Millhaven turns in ONLY at Millhaven', () => {
+    const stamped = stampQuestOrigin(baseQuest(), { town: 'Millhaven', buildingName: 'The Ironbond Chapterhouse' });
+    // Wrong town: no completion.
+    expect(turnInQuest([stamped], { buildingType: 'guild', townName: 'Farhaven' }).completions).toHaveLength(0);
+    // Right town: completes.
+    const ok = turnInQuest([stamped], { buildingType: 'guild', townName: 'Millhaven' });
+    expect(ok.completions).toHaveLength(1);
+    expect(ok.completions[0].questId).toBe('gq');
+  });
+
+  test('an unstamped quest still turns in at any matching building (unchanged behavior)', () => {
+    expect(turnInQuest([baseQuest()], { buildingType: 'guild', townName: 'Anywhere' }).completions).toHaveLength(1);
   });
 });

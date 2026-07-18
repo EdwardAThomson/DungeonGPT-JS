@@ -55,7 +55,7 @@ import { healPartyUpward, reconcileHeroWithLedger } from '../game/heroInvariants
 import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile, getMilestoneLocationForTile } from '../game/milestoneEngine';
 import { recordItemDiscoveries, recordEnemyDiscovery, seedCodexFromParty, getBestiaryEntries, findBestiaryMatch, slugify as slugifyCodexKey } from '../game/codexEngine';
 import { buyItem, sellItem } from '../game/shopController';
-import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, getActiveGatherResources, turnInQuest, getRevealedSiteTypes, effectivePartyLevel, pickOfferableSideQuest } from '../game/questEngine';
+import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, getActiveGatherResources, turnInQuest, getRevealedSiteTypes, effectivePartyLevel, pickOfferableSideQuest, resolveQuestOrigin, stampQuestOrigin } from '../game/questEngine';
 import { buildInSaveContinuation, applyContinuationToSettings, healPartyForNextChapter } from '../game/campaignChain';
 import ContinueLegendPicker from '../components/ContinueLegendPicker';
 import { QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
@@ -183,7 +183,13 @@ const QuestOfferModal = () => {
   // wording stays consistent), the giver's venue, and a full reward preview.
   const objective = getQuestObjectiveStep(quest);
   const objectiveHint = objective ? getStepHint(objective, quest) : '';
-  const giverLabel = describeTurnInTarget(quest?.giver?.building);
+  // "From" the giver: prefer the town's ACTUAL generated building name (a proper noun,
+  // e.g. a specific guildhall) when known, else the generic building label; the origin
+  // town supplies the specificity ("the guild in Millhaven"), addressing playtest #1a.
+  const giverBase = quest?.giver?.buildingName || describeTurnInTarget(quest?.giver?.building);
+  const giverLabel = giverBase
+    ? (quest?.giver?.town ? `${giverBase} in ${quest.giver.town}` : giverBase)
+    : '';
   const rewardTotals = summarizeQuestReward(quest);
   const rewardItemNames = (rewardTotals.items || []).map((id) => (ITEM_CATALOG[id]?.name) || id);
   const rewardSentence = composeRewardSentence({
@@ -408,6 +414,11 @@ const Game = ({ resumeConversation = null }) => {
   // not the render-time closure, so per-step values never go stale mid-walk.
   const walkCancelRef = useRef(null);
   const movesSinceEncounterRef = useRef(movesSinceEncounter);
+  // Persistent town step counter so the "roll only every 3rd tile" throttle survives across
+  // clicks. The local `index` passed to runTownStep resets to 0 on every runTileWalk call
+  // (tileWalk.js), so short multi-click town hops rolled on the FIRST tile every time,
+  // defeating the throttle (playtest 2026-07-18). This ref counts steps across the visit.
+  const townStepCounterRef = useRef(0);
   const settingsRef = useRef(settings);
   useEffect(() => { movesSinceEncounterRef.current = movesSinceEncounter; }, [movesSinceEncounter]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
@@ -906,8 +917,10 @@ const Game = ({ resumeConversation = null }) => {
     if (!moved) return 'halt'; // unwalkable/unexpected: stop rather than fall through
     questOfferClockRef.current += 1; // clock the quest-offer cooldown
 
-    // Only roll on every 3rd entered tile; other tiles just move the party and continue.
-    if (index % 3 !== 0) return 'continue';
+    // Only roll on every 3rd entered tile ACROSS the town visit (persistent counter, not
+    // the per-walk `index` which resets each click — playtest 2026-07-18).
+    townStepCounterRef.current += 1;
+    if (townStepCounterRef.current % 3 !== 0) return 'continue';
 
     // Synthetic tile the encounter generator recognizes as 'town'.
     const syntheticTownTile = { poi: 'town', biome: 'plains' };
@@ -916,6 +929,15 @@ const Game = ({ resumeConversation = null }) => {
     if (townEncounter) {
       movesSinceEncounterRef.current = 0;
       setMovesSinceEncounter(0);
+      // Tier-aware, mirroring the world map (planWorldTileEncounterFlow): only IMMEDIATE
+      // encounters (e.g. a tavern brawl) open the blocking action modal. Narrative town
+      // encounters (market, healer, stranger) are pure FLAVOR — a full fight-style modal
+      // that had to be fled to escape blocked town movement every few steps (playtest
+      // 2026-07-18). Surface them as a one-line, non-blocking note and keep walking.
+      if (townEncounter.encounterTier !== 'immediate') {
+        interactionHook.setConversation(prev => [...prev, { role: 'system', content: `🏘️ ${townEncounter.description}` }]);
+        return 'continue';
+      }
       mapHook.setIsMapModalOpen(false);
       reopenMapAfterEncounterRef.current = true; // reopen once the encounter resolves
       preEncounterPosRef.current = fromTownPos
@@ -1153,6 +1175,23 @@ const Game = ({ resumeConversation = null }) => {
       movesSinceEncounterRef.current = 0;
       setMovesSinceEncounter(0);
 
+      // Weather (storm/fog/etc.) is NOT a creature: it doesn't hunt, has no HP, and can
+      // never be "defeated", so spawning it as a chasing mob trapped the party in an
+      // unwinnable loop (the mob is only cleared on a combat victory, which a weather
+      // skill-check never produces) and sat the storm on the party's own tile (playtest
+      // 2026-07-18). Environmental encounters resolve as a ONE-OFF event modal instead:
+      // the storm appears once, the party weathers it, it passes. activeSiteMobIdRef was
+      // already reset to null at the top of this step, so the resolve touches no mob.
+      if (wandering.environmental) {
+        mapHook.setIsMapModalOpen(false);
+        reopenMapAfterEncounterRef.current = true;
+        preEncounterPosRef.current = fromSitePos
+          ? { level: 'site', x: fromSitePos.x, y: fromSitePos.y }
+          : null;
+        openEncounterAction({ encounter: wandering });
+        return 'halt';
+      }
+
       // A wandering monster is no longer an out-of-nowhere modal: it spawns as a VISIBLE,
       // already-aggro'd mob a few tiles off (SITES ONLY: the entity layer exists only here;
       // world/town wandering rolls are untouched and still open the modal). The party sees it
@@ -1219,10 +1258,15 @@ const Game = ({ resumeConversation = null }) => {
 
   // Accept an offered side quest (from a building quest-giver). Activates it so its steps
   // start tracking and any site it targets gets revealed/injected on entry.
-  const handleAcceptSideQuest = (questId) => {
+  const handleAcceptSideQuest = (questId, origin = null) => {
     const q = (settings?.sideQuests || []).find(x => x.id === questId);
     if (!q || q.status !== 'available') return;
-    setSettings(prev => ({ ...prev, sideQuests: acceptSideQuest(prev.sideQuests || [], questId) }));
+    setSettings(prev => {
+      let sq = acceptSideQuest(prev.sideQuests || [], questId);
+      // Persist the origin town stamped at offer time so the turn-in stays anchored there.
+      if (origin) sq = sq.map(x => (x.id === questId ? stampQuestOrigin(x, origin) : x));
+      return { ...prev, sideQuests: sq };
+    });
     // Accepting a site-bound quest reveals its site type on the world map (sticky) — but
     // the player was never TOLD, which made "recover X from the cave" read as a mystery.
     // Gather steps carry a `sites` source hint; only cave/ruins are actually hidden, so
@@ -1251,7 +1295,17 @@ const Game = ({ resumeConversation = null }) => {
   // board- vs rumour-flavoured copy. Records the cooldown stamp so rumours and the board
   // cannot both flood the player.
   const showQuestOffer = (quest, source) => {
-    openQuestOffer({ quest, source, onAccept: () => handleAcceptSideQuest(quest.id) });
+    // Anchor the quest to a real origin town (playtest 2026-07-18): the offer names it and
+    // the turn-in is restricted back to it. Stamp at OFFER time so the modal can show it
+    // and acceptance persists the same town/building the player will actually return to.
+    const origin = resolveQuestOrigin(quest, {
+      worldMap: mapHook.worldMap,
+      townMapsCache: mapHook.townMapsCache,
+      currentTownName: mapHook.currentTownTile?.townName || null,
+      playerPos: mapHook.playerPosition,
+    });
+    const offered = origin ? stampQuestOrigin(quest, origin) : quest;
+    openQuestOffer({ quest: offered, source, onAccept: () => handleAcceptSideQuest(quest.id, origin) });
     recordQuestOffer();
   };
 

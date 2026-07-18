@@ -106,14 +106,20 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite,
               {/* Suppress the reserved-slot ◆ under a live mob (the mob occupies the tile). */}
               {!tile.content && tile.contentSlot && !hasMob && <span style={{ color: '#ffd34d', fontSize: TILE * 0.5, textShadow: '0 0 3px #000' }}>◆</span>}
               {isPlayer && (firstHero
-                ? <img src={resolveProfilePicture(firstHero.profilePicture)} alt={firstHero.characterName} width={TILE - 6} height={TILE - 6} style={{ borderRadius: '50%', border: '2px solid #ffd34d', position: 'absolute' }} loading="lazy" />
-                : <span style={{ position: 'absolute', fontSize: TILE * 0.7 }}>⭐</span>)}
+                ? <img src={resolveProfilePicture(firstHero.profilePicture)} alt={firstHero.characterName} width={TILE - 6} height={TILE - 6} style={{ borderRadius: '50%', border: '2px solid #ffd34d', position: 'absolute', zIndex: 3 }} loading="lazy" />
+                : <span style={{ position: 'absolute', fontSize: TILE * 0.7, zIndex: 3 }}>⭐</span>)}
             </div>
           );
         })}
         {/* Moving-mob overlay: one persistent element per mob id, positioned by transform so
-            a step animates smoothly between tiles instead of jumping. */}
-        {liveMobs.map((mob) => {
+            a step animates smoothly between tiles instead of jumping. A mob is never meant to
+            REST on the party's tile (spawn excludes it, chasers stop one tile short), but the
+            contact check fires at distance <= 1 including co-location; if a mob transiently
+            shares the hero's tile we skip its glyph so the hero marker never vanishes
+            (playtest 2026-07-18: "hero icon disappeared" after a fight). */}
+        {liveMobs
+          .filter((mob) => !(playerPosition && mob.x === playerPosition.x && mob.y === playerPosition.y))
+          .map((mob) => {
           // RELATIVE threat vs the party's current level (null tolerates a mob with
           // no encounter/difficulty: it simply gets no threat ring). isHunter marks an
           // unavoidable chaser (speed === HUNTER_SPEED) for the distinct pulse + chevron.
