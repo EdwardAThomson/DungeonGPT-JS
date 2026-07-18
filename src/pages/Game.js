@@ -414,6 +414,11 @@ const Game = ({ resumeConversation = null }) => {
   // not the render-time closure, so per-step values never go stale mid-walk.
   const walkCancelRef = useRef(null);
   const movesSinceEncounterRef = useRef(movesSinceEncounter);
+  // Persistent town step counter so the "roll only every 3rd tile" throttle survives across
+  // clicks. The local `index` passed to runTownStep resets to 0 on every runTileWalk call
+  // (tileWalk.js), so short multi-click town hops rolled on the FIRST tile every time,
+  // defeating the throttle (playtest 2026-07-18). This ref counts steps across the visit.
+  const townStepCounterRef = useRef(0);
   const settingsRef = useRef(settings);
   useEffect(() => { movesSinceEncounterRef.current = movesSinceEncounter; }, [movesSinceEncounter]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
@@ -912,8 +917,10 @@ const Game = ({ resumeConversation = null }) => {
     if (!moved) return 'halt'; // unwalkable/unexpected: stop rather than fall through
     questOfferClockRef.current += 1; // clock the quest-offer cooldown
 
-    // Only roll on every 3rd entered tile; other tiles just move the party and continue.
-    if (index % 3 !== 0) return 'continue';
+    // Only roll on every 3rd entered tile ACROSS the town visit (persistent counter, not
+    // the per-walk `index` which resets each click — playtest 2026-07-18).
+    townStepCounterRef.current += 1;
+    if (townStepCounterRef.current % 3 !== 0) return 'continue';
 
     // Synthetic tile the encounter generator recognizes as 'town'.
     const syntheticTownTile = { poi: 'town', biome: 'plains' };
@@ -922,6 +929,15 @@ const Game = ({ resumeConversation = null }) => {
     if (townEncounter) {
       movesSinceEncounterRef.current = 0;
       setMovesSinceEncounter(0);
+      // Tier-aware, mirroring the world map (planWorldTileEncounterFlow): only IMMEDIATE
+      // encounters (e.g. a tavern brawl) open the blocking action modal. Narrative town
+      // encounters (market, healer, stranger) are pure FLAVOR — a full fight-style modal
+      // that had to be fled to escape blocked town movement every few steps (playtest
+      // 2026-07-18). Surface them as a one-line, non-blocking note and keep walking.
+      if (townEncounter.encounterTier !== 'immediate') {
+        interactionHook.setConversation(prev => [...prev, { role: 'system', content: `🏘️ ${townEncounter.description}` }]);
+        return 'continue';
+      }
       mapHook.setIsMapModalOpen(false);
       reopenMapAfterEncounterRef.current = true; // reopen once the encounter resolves
       preEncounterPosRef.current = fromTownPos

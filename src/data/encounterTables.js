@@ -56,8 +56,10 @@ export const encounterTables = {
   ],
 
   'town': [
-    // Immediate encounters (rare in towns)
-    { template: 'tavern_brawl', weight: 8, hostile: false },
+    // Immediate encounters (rare in towns). tavern_brawl is a real fight (dealsDamage,
+    // encounterTier 'immediate') so it must be hostile — otherwise the tier logic derives
+    // 'narrative' from this row and the only combat town encounter reads as flavor.
+    { template: 'tavern_brawl', weight: 8, hostile: true },
 
     // Narrative encounters (common in towns)
     { template: 'town_market', weight: 20, hostile: false },
