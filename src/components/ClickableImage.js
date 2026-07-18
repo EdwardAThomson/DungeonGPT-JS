@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 
-const ClickableImage = ({ src, alt, height = '240px', maxHeight = '240px', objectPosition = 'center 30%' }) => {
+const ClickableImage = ({ src, alt, height = '240px', maxHeight, maxWidth, objectPosition = 'center 30%' }) => {
     const [isHovered, setIsHovered] = useState(false);
     const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
@@ -14,9 +14,15 @@ const ClickableImage = ({ src, alt, height = '240px', maxHeight = '240px', objec
         <>
             <div
                 style={{
+                    // maxWidth (optional) keeps a tall box near-square and centered, so a
+                    // square source is shown more fully instead of side-cropped.
                     width: '100%',
+                    maxWidth: maxWidth || 'none',
+                    marginLeft: 'auto',
+                    marginRight: 'auto',
                     height,
-                    maxHeight,
+                    // Default the cap to the height so callers can grow past the old 240px.
+                    maxHeight: maxHeight || height,
                     marginBottom: '12px',
                     borderRadius: '8px',
                     overflow: 'hidden',

@@ -2,10 +2,14 @@ import React, { useState } from 'react';
 import { encounterTemplates } from '../data/encounters';
 import EncounterModal from '../components/EncounterModal';
 import EncounterActionModal from '../components/EncounterActionModal';
+import { useModal } from '../contexts/ModalContext';
 
 const EncounterVisualDebug = () => {
     const [selectedEncounterKey, setSelectedEncounterKey] = useState(Object.keys(encounterTemplates)[0]);
     const [modalType, setModalType] = useState('discovery'); // 'discovery' or 'action'
+    // The action modal reads isOpen/encounter from ModalContext, not props (the page
+    // predated that migration); open through the context, same payload as Game.js.
+    const { open: openEncounterAction } = useModal('encounterAction');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [customDescription, setCustomDescription] = useState('');
     const [forceImage, setForceImage] = useState(true);
@@ -134,7 +138,10 @@ const EncounterVisualDebug = () => {
                     </div>
 
                     <button
-                        onClick={() => setIsModalOpen(true)}
+                        onClick={() => {
+                            setIsModalOpen(true);
+                            if (modalType === 'action') openEncounterAction({ encounter: testEncounter });
+                        }}
                         className="primary-button"
                         style={{ width: '100%', padding: '15px', fontSize: '18px' }}
                     >
