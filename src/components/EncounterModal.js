@@ -136,7 +136,7 @@ const EncounterModal = () => {
                         </button>
                     </div>
                     <p style={{ fontSize: '11px', color: 'var(--state-muted-strong)', marginTop: '10px', marginBottom: '0', fontStyle: 'italic' }}>
-                        💡 Use the Map button in the top-right to navigate
+                        💡 Use the Map button in the top bar to navigate
                     </p>
         </ModalShell>
     );

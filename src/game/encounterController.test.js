@@ -187,6 +187,18 @@ describe('applyPartyRewardsToAll (#55): milestone/quest rewards are party-wide',
     expect(rewardMessages.some((m) => m.startsWith('Bem'))).toBe(true);
   });
 
+  it('uses heroName for the level-up line when characterName is absent (playtest #3)', () => {
+    // Heroes created through the hero builder carry heroName, not characterName; the
+    // level-up line used to check only characterName and fell back to "Hero N".
+    const party = [
+      { heroName: 'Kaelin', heroClass: 'Fighter', level: 1, xp: 250, gold: 0, inventory: [], stats: { strength: 10, constitution: 10 } },
+    ];
+    const { rewardMessages } = applyPartyRewardsToAll({ party, rewards: { xp: 100 } });
+    const levelUp = rewardMessages.find((m) => m.includes('LEVEL UP'));
+    expect(levelUp).toMatch(/^Kaelin /);
+    expect(levelUp).not.toMatch(/Hero 1/);
+  });
+
   it('tolerates an empty party', () => {
     expect(applyPartyRewardsToAll({ party: [], rewards: { xp: 10 } }).updatedParty).toEqual([]);
   });

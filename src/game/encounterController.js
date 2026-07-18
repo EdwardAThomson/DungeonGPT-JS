@@ -193,7 +193,7 @@ export const applyPartyRewardsToAll = ({ party, rewards, leadIndex = 0 }) => {
     messages.forEach((m) => {
       if (/^\+\d+ XP$/.test(m)) return; // announced once, party-wide, below
       if (m.includes('LEVEL UP')) {
-        rewardMessages.push(`${hero.characterName || `Hero ${i + 1}`} ${m}`);
+        rewardMessages.push(`${hero.heroName || hero.characterName || `Hero ${i + 1}`} ${m}`);
       } else if (i === lead) {
         rewardMessages.push(m);
       }
