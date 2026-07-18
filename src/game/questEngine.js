@@ -39,6 +39,72 @@ const turnInMatches = (turnIn, ctx = {}) => {
   return true;
 };
 
+// --- Quest origin town (playtest 2026-07-18) --------------------------------
+// A side quest's giver lives in a real town. Even a wilderness RUMOUR is "word from the
+// guild of somewhere": we anchor the quest to a real town so the offer can name it and
+// the turn-in points back to it (restricted via turnIn.location). We never invent a guild
+// name — we use the town's ACTUAL generated building name when the town is already mapped,
+// otherwise just the town + building type (both real).
+
+// First building name of `type` (or any of an array) in a cached town sub-map, or null.
+const buildingNameInTown = (townMap, type) => {
+  const grid = townMap?.mapData;
+  if (!Array.isArray(grid) || !type) return null;
+  const types = Array.isArray(type) ? type : [type];
+  for (const row of grid) {
+    if (!Array.isArray(row)) continue;
+    for (const tile of row) {
+      if (tile && types.includes(tile.buildingType) && tile.buildingName) return tile.buildingName;
+    }
+  }
+  return null;
+};
+
+/**
+ * Choose a real origin town for a side quest's giver building. Prefers the town the party
+ * is currently in; otherwise the nearest named town on the world map, preferring one
+ * already visited so its ACTUAL building name is available. Returns
+ * `{ town, buildingName }` (buildingName null when the town isn't mapped yet) or null when
+ * the world map has no towns.
+ * @param {Object} quest
+ * @param {Object} ctx { worldMap, townMapsCache, currentTownName, playerPos:{x,y} }
+ */
+export const resolveQuestOrigin = (quest, { worldMap, townMapsCache = {}, currentTownName = null, playerPos = null } = {}) => {
+  const giver = quest?.giver?.building;
+  if (!giver) return null;
+  if (currentTownName) {
+    return { town: currentTownName, buildingName: buildingNameInTown(townMapsCache[currentTownName], giver) };
+  }
+  const towns = [];
+  (worldMap || []).forEach((row) => (row || []).forEach((t) => {
+    if (t && t.poi === 'town' && t.townName) towns.push(t);
+  }));
+  if (towns.length === 0) return null;
+  const dist = (t) => (playerPos ? Math.abs(t.x - playerPos.x) + Math.abs(t.y - playerPos.y) : 0);
+  towns.sort((a, b) => dist(a) - dist(b));
+  // Nearest town that already carries a real giver-building name wins; else the nearest.
+  const named = towns.find((t) => buildingNameInTown(townMapsCache[t.townName], giver));
+  const chosen = named || towns[0];
+  return { town: chosen.townName, buildingName: buildingNameInTown(townMapsCache[chosen.townName], giver) };
+};
+
+/**
+ * Immutably stamp a resolved origin onto a quest: giver.town + giver.buildingName, and
+ * turnIn.location on every turn-in step so the hand-in is restricted to that town.
+ */
+export const stampQuestOrigin = (quest, origin) => {
+  if (!quest || !origin?.town) return quest;
+  return {
+    ...quest,
+    giver: { ...quest.giver, town: origin.town, buildingName: origin.buildingName || null },
+    milestones: (quest.milestones || []).map((m) =>
+      m?.trigger?.turnIn
+        ? { ...m, trigger: { ...m.trigger, turnIn: { ...m.trigger.turnIn, location: origin.town } } }
+        : m
+    ),
+  };
+};
+
 /**
  * Can this quest be both STARTED and COMPLETED on the generated map? It must have a giver
  * building that exists, every site objective's site type must exist, and every turn-in

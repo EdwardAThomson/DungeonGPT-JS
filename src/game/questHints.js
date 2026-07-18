@@ -22,6 +22,13 @@ const BUILDING_LABEL = {
 
 const labelForBuilding = (b) => BUILDING_LABEL[b] || `the ${String(b).replace(/_/g, ' ')}`;
 
+// Do a turn-in target and the giver building overlap (either may be a type or type list)?
+const sameBuilding = (a, b) => {
+  const as = Array.isArray(a) ? a : [a];
+  const bs = Array.isArray(b) ? b : [b];
+  return as.some((x) => bs.includes(x));
+};
+
 /**
  * Where can this item be obtained? Derived live from encounter reward tables, site loot
  * pools, and shop stock, e.g. "found in the wilds; in forest or hills sites; sold at the
@@ -92,11 +99,18 @@ export const formatStepProgress = (step) => {
 export const getStepHint = (step, quest) => {
   if (!step || step.completed) return '';
 
-  // Turn-in: where to go, and whether it's ready.
+  // Turn-in: where to go, and whether it's ready. When the quest is anchored to an origin
+  // town (playtest 2026-07-18), name it — and prefer the giver's ACTUAL building name when
+  // the turn-in is a return-to-giver at that same building.
   if (step.trigger?.turnIn) {
-    const target = describeTurnInTarget(step.trigger.turnIn.building);
-    const ready = quest ? isStepReady(step, quest.milestones) : false;
+    const turnIn = step.trigger.turnIn;
+    const returnsToGiver = quest?.giver?.building && sameBuilding(turnIn.building, quest.giver.building);
+    let target = (returnsToGiver && quest?.giver?.buildingName)
+      ? quest.giver.buildingName
+      : describeTurnInTarget(turnIn.building);
     if (!target) return '';
+    if (turnIn.location) target = `${target} in ${turnIn.location}`;
+    const ready = quest ? isStepReady(step, quest.milestones) : false;
     return ready ? `✅ Ready — return to ${target}` : `Return to ${target}`;
   }
 
