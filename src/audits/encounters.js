@@ -6,8 +6,20 @@
 // ./context.js: encounterTemplates, itemCatalog, encounterTableRefs, stripDropChance.
 
 import { SEVERITY } from './types';
+import { CAVE_ENCOUNTERS } from '../data/encounters/caveEncounters';
+import { RUINS_ENCOUNTERS } from '../data/encounters/ruinsEncounters';
 
 const DOMAIN = 'encounters';
+
+// Templates reachable via the SITE combat pool (sitePopulator combatPool), which draws
+// immediate-tier cave/ruins encounters DIRECTLY from the encounter objects, not through
+// the weighted tables. ENC-07's reachability check must count this path too, else it
+// false-flags real site-combat encounters (cave_giant_rats, ruin_scavengers, ...).
+const SITE_COMBAT_POOL_KEYS = new Set(
+  [...Object.entries(CAVE_ENCOUNTERS), ...Object.entries(RUINS_ENCOUNTERS)]
+    .filter(([, e]) => e && e.encounterTier === 'immediate')
+    .map(([k]) => k)
+);
 
 // The consequence tiers the roll resolves to (encounterResolver applyConsequences
 // keys outcome text by these). A consequences block must fill every tier or the
@@ -236,6 +248,33 @@ const enc06 = {
   }
 };
 
-export const checks = [enc01, enc02, enc03, enc04, enc05, enc06];
+/**
+ * ENC-07 (error): every defined encounter template is REACHABLE — referenced by at least
+ * one weighted table OR present in the site combat pool (immediate-tier cave/ruins). A
+ * template referenced by nothing is fully authored (art, rewards) but can never spawn
+ * (dead content), e.g. mountain_hermit_cave before it was added to the mountain table.
+ * This is the mirror of ENC-02 (which catches table refs with no template).
+ */
+const enc07 = {
+  id: 'ENC-07',
+  domain: DOMAIN,
+  title: 'Every encounter template is reachable by some spawn path',
+  severity: SEVERITY.ERROR,
+  run(ctx) {
+    const inTables = new Set((ctx.encounterTableRefs || []).map((r) => r.template));
+    const violations = [];
+    for (const encId of Object.keys(ctx.encounterTemplates || {})) {
+      if (encId === 'none') continue;
+      if (inTables.has(encId) || SITE_COMBAT_POOL_KEYS.has(encId)) continue;
+      violations.push({
+        message: `encounter template '${encId}' is referenced by no weighted table and is not an immediate-tier cave/ruins site-combat encounter — it can never spawn (dead content)`,
+        location: `encounterTemplates['${encId}']`
+      });
+    }
+    return violations;
+  }
+};
+
+export const checks = [enc01, enc02, enc03, enc04, enc05, enc06, enc07];
 
 export default checks;

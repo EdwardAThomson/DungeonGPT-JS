@@ -178,9 +178,12 @@ export const mountainEncounterTable = [
   // Narrative encounters
   { template: 'mountain_pass', weight: 20, hostile: false },
   { template: 'mountain_hermit', weight: 18, hostile: false },
+  // mountain_hermit_cave was fully authored but referenced by no table (P6 orphan) — a
+  // distinct 'cave hermit' scene from the wilderness mountain_hermit. Now reachable.
+  { template: 'mountain_hermit_cave', weight: 12, hostile: false },
   { template: 'mountain_eagle_nest', weight: 15, hostile: false },
 
-  { template: 'none', weight: 42 }
+  { template: 'none', weight: 30 }
 ];
 
 // Environmental encounters (can occur in any biome)

@@ -173,7 +173,10 @@ export const rollRandomEncounter = (tile, settings) => {
     ...template,
     templateKey: roll.template,
     isHostile: roll.hostile !== false,
-    encounterTier: roll.hostile !== false ? 'immediate' : 'narrative',
+    // The template's authored encounterTier is the source of truth (P3): each encounter
+    // declares 'immediate' | 'narrative' and that decides blocking-modal vs Look-around
+    // hook. The hostile-derived value is only a fallback for old data missing the field.
+    encounterTier: template.encounterTier || (roll.hostile !== false ? 'immediate' : 'narrative'),
     sourceBiome: biome,
     sourcePoiType: poiType
   };
@@ -254,7 +257,10 @@ export const rollEnvironmentalEncounter = (tile, settings, options = {}) => {
     templateKey: roll.template,
     isHostile: false,
     isEnvironmental: true,
-    encounterTier: 'immediate',  // Environmental encounters show modal immediately
+    // Honor the authored tier (P3): storms/earthquakes are 'immediate' (blocking) but
+    // fog/strange-lights are authored 'narrative' and should be Look-around hooks on the
+    // world map, not forced modals. Fallback keeps old behavior for data missing the field.
+    encounterTier: template.encounterTier || 'immediate',
     sourceBiome: biome
   };
 };
@@ -305,7 +311,8 @@ export const checkForPoiEncounter = (tile, isFirstVisit, settings) => {
     ...template,
     templateKey: roll.template,
     isHostile: roll.hostile !== false,
-    encounterTier: roll.hostile !== false ? 'immediate' : 'narrative',
+    // Authored tier is source of truth (P3); hostile-derived value is the fallback.
+    encounterTier: template.encounterTier || (roll.hostile !== false ? 'immediate' : 'narrative'),
     sourcePoiType: poiType
   };
 };
