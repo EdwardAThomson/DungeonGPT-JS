@@ -23,7 +23,7 @@ const TILE = 34; // bigger than the original 30 but small enough that a 20x20 to
  * @param {string} townError - Error message to display in town map
  * @param {Function} markBuildingDiscovered - Callback to mark a building as seen
  */
-const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError, markBuildingDiscovered, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, sideQuests, onAcceptSideQuest, onTurnInQuest, milestones, onTalkToNpc }) => {
+const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError, markBuildingDiscovered, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, sideQuests, onAcceptSideQuest, onTurnInQuest, milestones, onTalkToNpc, onVisitTavern }) => {
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [distanceWarning, setDistanceWarning] = useState(false);
 
@@ -79,6 +79,11 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
 
     // Allow seeing info if close enough (within 2 tiles) OR if already discovered
     if (distance <= 2 || isDiscovered) {
+      // Visiting a tavern/inn may erupt into a brawl (its own cooldown, handled in
+      // Game.js). When it fires, show the fight instead of the normal building view.
+      if ((tile.buildingType === 'tavern' || tile.buildingType === 'inn') && onVisitTavern && onVisitTavern(tile.buildingType)) {
+        return;
+      }
       // Find NPCs in this building (workers here OR residents whose home is here)
       const buildingNpcs = (townMapData.npcs || []).filter(npc => {
         if (!npc.location) return false;

@@ -56,10 +56,9 @@ export const encounterTables = {
   ],
 
   'town': [
-    // Immediate encounters (rare in towns). tavern_brawl is a real fight (dealsDamage,
-    // encounterTier 'immediate') so it must be hostile — otherwise the tier logic derives
-    // 'narrative' from this row and the only combat town encounter reads as flavor.
-    { template: 'tavern_brawl', weight: 8, hostile: true },
+    // tavern_brawl is deliberately NOT in this random-walk pool: a brawl in the middle of
+    // the street is incongruous. It fires only when the party VISITS a tavern/inn, on its
+    // own cooldown (Game.js handleVisitTavern). All entries here are narrative (flavor).
 
     // Narrative encounters (common in towns)
     { template: 'town_market', weight: 20, hostile: false },
@@ -70,7 +69,7 @@ export const encounterTables = {
     { template: 'wandering_minstrel', weight: 8, hostile: false },
     { template: 'mysterious_stranger', weight: 10, hostile: false },
 
-    { template: 'none', weight: 9 }
+    { template: 'none', weight: 17 }
   ],
 
   'beach': [

@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
 import { useModal } from '../contexts/ModalContext';
 import { checkForEncounter } from '../utils/encounterGenerator';
+import { encounterTemplates } from '../data/encounters';
 import { isEnclosedSiteType } from '../utils/siteMapGenerator';
 import { isTownTileWalkable } from '../utils/townMapGenerator';
 import useGameSession from '../hooks/useGameSession';
@@ -419,6 +420,10 @@ const Game = ({ resumeConversation = null }) => {
   // (tileWalk.js), so short multi-click town hops rolled on the FIRST tile every time,
   // defeating the throttle (playtest 2026-07-18). This ref counts steps across the visit.
   const townStepCounterRef = useRef(0);
+  // Tavern brawls fire only on VISITING a tavern/inn (not random town walking), on their
+  // own cooldown: the town-step-clock at the last brawl. Requires TAVERN_BRAWL_COOLDOWN
+  // steps between brawls so back-to-back tavern visits don't brawl every time.
+  const tavernBrawlAtRef = useRef(-999);
   const settingsRef = useRef(settings);
   useEffect(() => { movesSinceEncounterRef.current = movesSinceEncounter; }, [movesSinceEncounter]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
@@ -949,6 +954,27 @@ const Game = ({ resumeConversation = null }) => {
     movesSinceEncounterRef.current += 1;
     setMovesSinceEncounter(prev => prev + 1);
     return 'continue';
+  };
+
+  // A brawl fires only when the party VISITS a tavern/inn (called from the town
+  // building-click flow), never while walking the streets, and on its own cooldown
+  // (measured in town-walk steps, so a couple of tavern visits in a row can't both brawl).
+  // Returns true when a brawl opened, so the caller skips the normal building view.
+  const TAVERN_BRAWL_COOLDOWN = 12;
+  const TAVERN_BRAWL_CHANCE = 0.30;
+  const handleVisitTavern = (buildingType) => {
+    if (buildingType !== 'tavern' && buildingType !== 'inn') return false;
+    const now = townStepCounterRef.current;
+    if (now - tavernBrawlAtRef.current < TAVERN_BRAWL_COOLDOWN) return false;
+    if (Math.random() >= TAVERN_BRAWL_CHANCE) return false;
+    tavernBrawlAtRef.current = now;
+    // The party walked in, so they stay put; a flee returns them to this tile.
+    mapHook.setIsMapModalOpen(false);
+    reopenMapAfterEncounterRef.current = true;
+    const p = mapHook.townPlayerPosition;
+    preEncounterPosRef.current = p ? { level: 'town', x: p.x, y: p.y } : null;
+    openEncounterAction({ encounter: { ...encounterTemplates.tavern_brawl, encounterTier: 'immediate' } });
+    return true;
   };
 
   // --- Town Tile Click Wrapper: walk to ANY reachable tile, one step every TILE_STEP_MS,
@@ -2248,6 +2274,7 @@ const Game = ({ resumeConversation = null }) => {
         onAcceptSideQuest={handleAcceptSideQuest}
         onTurnInQuest={handleTurnInQuest}
         onTalkToNpc={handleTalkToNpc}
+        onVisitTavern={handleVisitTavern}
         onBuy={(itemKey) => {
           const result = buyItem(selectedHeroes, itemKey);
           if (result.ok) {
