@@ -1201,8 +1201,11 @@ const Game = ({ resumeConversation = null }) => {
     // and rolls no open-air weather (enclosed interiors have no sky). Reads settings/moves
     // from refs so per-step values stay fresh during a multi-tile walk.
     const siteType = mapHook.currentSiteMap?.type || 'cave';
+    // Level-gate the wandering pool with the SAME party-level metric the placed slot mobs
+    // use (effectivePartyLevel), so a low party is never randomly blindsided by the hard
+    // nest / deadly guardian on the wandering path (they stay reachable at higher levels).
     const wandering = rollSiteWanderingEncounter(
-      siteType, settingsRef.current, movesSinceEncounterRef.current
+      siteType, settingsRef.current, movesSinceEncounterRef.current, effectivePartyLevel(selectedHeroes)
     );
     if (wandering && wandering.encounterTier === 'immediate') {
       // The roll fired, so it consumes the pity timer whether or not it produces a spawn.

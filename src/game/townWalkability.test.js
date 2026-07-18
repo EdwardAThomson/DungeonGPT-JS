@@ -73,16 +73,20 @@ function waterConfigs(seed) {
 }
 
 describe('isTownTileWalkable (movement walkability by tile type)', () => {
-  test('blocks exactly water and building tiles; everything else is walkable', () => {
+  test('blocks water and every solid structure (building/wall/keep_wall); other ground is walkable', () => {
     expect(isTownTileWalkable({ type: 'water' })).toBe(false);
     expect(isTownTileWalkable({ type: 'building' })).toBe(false);
+    // Structural walls are impassable barriers, not walkable ground (playtest 2026-07-18:
+    // the party could walk THROUGH a city wall / keep ring).
+    expect(isTownTileWalkable({ type: 'wall' })).toBe(false);
+    expect(isTownTileWalkable({ type: 'keep_wall' })).toBe(false);
     expect(isTownTileWalkable({ type: 'bridge' })).toBe(true);
     expect(isTownTileWalkable({ type: 'beach' })).toBe(true);
     expect(isTownTileWalkable({ type: 'grass' })).toBe(true);
     expect(isTownTileWalkable({ type: 'dirt_path' })).toBe(true);
     expect(isTownTileWalkable({ type: 'stone_path' })).toBe(true);
     expect(isTownTileWalkable({ type: 'town_square' })).toBe(true);
-    expect(isTownTileWalkable({ type: 'wall' })).toBe(true);
+    expect(isTownTileWalkable({ type: 'farm_field' })).toBe(true); // a crop field is passable
     expect(isTownTileWalkable(null)).toBe(false);
     expect(isTownTileWalkable(undefined)).toBe(false);
   });

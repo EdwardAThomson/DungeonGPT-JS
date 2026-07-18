@@ -161,4 +161,88 @@ export const CAVE_ENCOUNTERS = {
     }
   },
 
+  // Variety spawns (playtest 2026-07-18): the cave pool was bats + one hard nest + a
+  // deadly guardian. These fill the EASY/MEDIUM band so caves are lively but fair — fun
+  // with some bite, not a survival grind. Stats sit at or below cave_giant_rats (the
+  // sim-validated mid-tier reference); DCs and HP are checked with balanceSim.
+  'cave_kobolds': {
+    name: 'Kobold Skulkers',
+    icon: '🦎',
+    encounterTier: 'immediate',
+    poiType: 'cave',
+    description: 'Yipping kobolds boil out of a side tunnel, jabbing with crude spears and hurling stones from the dark!',
+    image: '/assets/encounters/goblin_ambush.webp',
+    difficulty: 'easy',
+    dc: 12,
+    dealsDamage: true,
+    multiRound: true,
+    enemyHP: 24,
+    suggestedActions: [
+      { label: 'Attack', skill: 'Athletics', description: 'Cut down the skulkers' },
+      { label: 'Hold a Chokepoint', skill: 'Athletics', description: 'Funnel them so they can\'t swarm' },
+      { label: 'Scare Them Off', skill: 'Intimidation', description: 'Break their nerve with a show of force' },
+      { label: 'Dodge Their Traps', skill: 'Acrobatics', description: 'Pick a safe path through the tripwires' }
+    ],
+    rewards: { xp: 35, gold: '1d12', items: ['raw_gems:35%', 'cave_mushrooms:50%', 'healing_potion:15%'] },
+    consequences: {
+      criticalSuccess: 'You rout the kobolds and loot their crude stash of shinies.',
+      success: 'You drive the kobolds back into the dark and press on.',
+      failure: 'A few spears and slung stones find their mark before the kobolds scatter.',
+      criticalFailure: 'The kobolds spring their traps - you retreat scraped and rattled.'
+    }
+  },
+
+  'cave_lurker': {
+    name: 'Cave Lurker',
+    icon: '👁️',
+    encounterTier: 'immediate',
+    poiType: 'cave',
+    description: 'A pale, blind predator unfolds from a ceiling crevice, tasting the air as it drops toward you!',
+    image: '/assets/encounters/forest_beast.webp',
+    difficulty: 'medium',
+    dc: 15,
+    dealsDamage: true,
+    multiRound: true,
+    enemyHP: 34,
+    suggestedActions: [
+      { label: 'Attack', skill: 'Athletics', description: 'Strike before it pins you' },
+      { label: 'Hold Still', skill: 'Stealth', description: 'It hunts by sound - go silent and let it pass' },
+      { label: 'Blind It With Light', skill: 'Arcana', description: 'A burst of light overwhelms its senses' },
+      { label: 'Back Away', skill: 'Acrobatics', description: 'Give ground toward the exit without a sound' }
+    ],
+    rewards: { xp: 55, gold: '1d10', items: ['spider_silk:40%', 'raw_gems:45%', 'poison_vial:25%'] },
+    consequences: {
+      criticalSuccess: 'You fell the lurker clean and find its nest lined with swallowed valuables.',
+      success: 'You beat the lurker off and move on, wary of the ceiling.',
+      failure: 'It rakes you once before slinking back into the dark.',
+      criticalFailure: 'The lurker drags you off your feet - you break free bloodied and shaken.'
+    }
+  },
+
+  // A one-shot HAZARD (single-round, no enemyHP), like cave_bats: it fires as a passing
+  // wandering event, never a chasing mob. A quick check to avoid the falling rock.
+  'cave_in': {
+    name: 'Cave-In',
+    icon: '🪨',
+    encounterTier: 'immediate',
+    poiType: 'cave',
+    description: 'A deep groan runs through the rock and the ceiling begins to give way in a rain of dust and stone!',
+    image: '/assets/encounters/cave_site_arrival.webp',
+    difficulty: 'easy',
+    dealsDamage: true,
+    suggestedActions: [
+      { label: 'Dive Clear', skill: 'Acrobatics', description: 'Throw yourself out of the fall zone' },
+      { label: 'Shelter', skill: 'Survival', description: 'Duck under a sturdy overhang' },
+      { label: 'Sprint Through', skill: 'Athletics', description: 'Outrun the collapse' },
+      { label: 'Brace a Beam', skill: 'Athletics', description: 'Hold the timbers long enough to pass' }
+    ],
+    rewards: { xp: 20, gold: '0', items: ['raw_gems:40%', 'exposed_minerals:55%'] },
+    consequences: {
+      criticalSuccess: 'You ride out the collapse and spot fresh ore laid bare in the rubble.',
+      success: 'You scramble clear as the passage fills behind you.',
+      failure: 'Falling stone catches you a glancing blow before you break clear.',
+      criticalFailure: 'The collapse batters you and buries the way ahead - you dig out slowly.'
+    }
+  },
+
 };

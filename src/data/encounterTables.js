@@ -131,8 +131,16 @@ export const encounterFrequency = {
 // Cave POI encounters
 export const caveEncounterTable = [
   // Immediate encounters
-  { template: 'cave_bats', weight: 15, hostile: false },
-  { template: 'cave_spider_nest', weight: 12, hostile: true },
+  // cave_bats trimmed 15 -> 10 (playtest 2026-07-18: bats dominated the cave pool). A
+  // medium multi-round foe (cave_giant_rats) was authored but referenced by no table, so
+  // caves offered only the easy bat hazard, the hard spider nest and the deadly guardian —
+  // nothing in between. Adding it fills the mid-tier gap and dilutes the bat share.
+  { template: 'cave_bats', weight: 10, hostile: false },
+  { template: 'cave_kobolds', weight: 12, hostile: true },
+  { template: 'cave_giant_rats', weight: 12, hostile: true },
+  { template: 'cave_lurker', weight: 10, hostile: true },
+  { template: 'cave_spider_nest', weight: 10, hostile: true },
+  { template: 'cave_in', weight: 8, hostile: false },
   { template: 'cave_treasure_guardian', weight: 5, hostile: true },
 
   // Narrative encounters

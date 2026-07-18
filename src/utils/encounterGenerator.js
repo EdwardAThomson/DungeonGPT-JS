@@ -336,23 +336,58 @@ export const checkForPoiEncounter = (tile, isFirstVisit, settings) => {
  * @param {number} movesSinceLastEncounter - steps since the last site encounter fired
  * @returns {Object|null} an encounter template (with encounterTier) or null
  */
-export const SITE_WANDER_BASE_CHANCE = 0.12;
-export const rollSiteWanderingEncounter = (siteType, settings, movesSinceLastEncounter = 0) => {
+// Per-step base chance. Tuned between the old flood (the 50% arrival roll re-fired every
+// step) and empty (playtest 2026-07-18: a full cave traverse with zero spawns at 0.12).
+// Note only ~1/3 of fired rolls are immediate-tier combat (the rest are narrative/none,
+// which are dropped), so the effective per-step FIGHT rate is well under this number.
+export const SITE_WANDER_BASE_CHANCE = 0.18;
+
+const DIFFICULTY_ORDER = ['trivial', 'easy', 'medium', 'hard', 'deadly'];
+
+/**
+ * Hardest difficulty a party of `level` should meet from a RANDOM site wandering roll.
+ * This is a TOP CAP only, deliberately different from sitePopulator's difficultyBandForLevel
+ * (which ALSO drops easy foes for high parties, right for a placed slot boss): a wandering
+ * roll should still throw the occasional easy hazard (a bat swarm, a cave-in) at any level,
+ * it just must never blindside a low party with a hard nest or a deadly guardian they never
+ * chose to fight (playtest 2026-07-18). Placed mobs are already level-matched; this closes
+ * the same gap on the wandering path. Unknown level (legacy callers / tests) → no cap.
+ */
+export const maxWanderDifficultyForLevel = (level) => {
+  if (!Number.isFinite(level)) return 'deadly';
+  const L = Math.max(1, Math.floor(level));
+  if (L <= 2) return 'medium'; // low parties: no hard/deadly
+  if (L <= 5) return 'hard';   // mid parties: no deadly
+  return 'deadly';             // veterans: the guardian is fair game
+};
+
+export const rollSiteWanderingEncounter = (siteType, settings, movesSinceLastEncounter = 0, partyLevel = null) => {
   const table = poiEncounterTables[siteType];
   if (!table) return null;
 
   let chance = SITE_WANDER_BASE_CHANCE;
   const grimnessModifier = { Noble: 0.8, Gritty: 1.0, Dark: 1.2, Grimdark: 1.4 };
   chance *= grimnessModifier[settings?.grimnessLevel] || 1.0;
-  // Gentle pity bonus (smaller than the world-map one — sites are denser to begin with) so
-  // a long quiet stretch still eventually yields something without ever flooding.
-  if (movesSinceLastEncounter >= 3) chance += 0.05;
-  if (movesSinceLastEncounter >= 5) chance += 0.08;
-  chance = Math.min(chance, 0.35);
+  // Pity bonus so a quiet stretch reliably yields something (the pity timer only resets on
+  // an immediate hit, so it keeps climbing through narrative/none rolls).
+  if (movesSinceLastEncounter >= 3) chance += 0.07;
+  if (movesSinceLastEncounter >= 5) chance += 0.11;
+  chance = Math.min(chance, 0.42);
 
   if (Math.random() > chance) return null;
 
-  const roll = weightedRandom(table);
+  // Level-gate the pool (top cap): drop any encounter harder than the party's cap so a
+  // random roll never blindsides a low party. Runs AFTER the fire roll, so the gate only
+  // changes WHAT can appear, never HOW OFTEN. 'none' and any untagged/unknown-difficulty
+  // entry always stay (never over-block), so a fully-capped pool still yields a quiet step.
+  const capIdx = DIFFICULTY_ORDER.indexOf(maxWanderDifficultyForLevel(partyLevel));
+  const eligible = table.filter((entry) => {
+    if (entry.template === 'none') return true;
+    const di = DIFFICULTY_ORDER.indexOf(encounterTemplates[entry.template]?.difficulty);
+    return di < 0 || di <= capIdx;
+  });
+
+  const roll = weightedRandom(eligible.length ? eligible : table);
   if (roll.template === 'none') return null;
   const template = encounterTemplates[roll.template];
   if (!template) {

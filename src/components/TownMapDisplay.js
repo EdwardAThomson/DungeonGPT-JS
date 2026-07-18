@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { tileBackground, waterwayMask, OFF_MAP, POI_EMOJI } from '../utils/townTileArt';
 import { isTownTileWalkable } from '../utils/townMapGenerator';
+import { getReadyTurnIns } from '../game/questEngine';
 import BuildingModal from './BuildingModal';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
@@ -55,6 +56,16 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
     (haveMilestoneData
       ? activeQuestBuildingNames.has(String(tile.buildingName || '').toLowerCase())
       : true); // no completion info at all: glow every quest building (safe default)
+
+  // Side-quest TURN-IN venues glow too (playtest 2026-07-18: "no pulsing border on the
+  // building where we return the quest"). Milestone buildings glow via isActiveQuestTile
+  // above; this is the parallel path for side quests, matched by building TYPE + town.
+  // getReadyTurnIns already filters to steps whose prereqs are met and whose turnIn.location
+  // matches this town (turnInMatches), so a tile glows only once the quest is actually
+  // returnable HERE — the same condition BuildingModal uses to show the Turn In button.
+  const isTurnInTile = (tile) =>
+    !!tile.buildingType &&
+    getReadyTurnIns(sideQuests || [], { buildingType: tile.buildingType, townName: townMapData.townName }).length > 0;
 
   const { width, height, mapData } = townMapData;
   // Biome theme drives the ground palette (sand for desert). Older cached town maps
@@ -165,7 +176,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
                 outline: (isPlayer || tile.isEntry) ? '2px solid yellow' : 'none',
                 outlineOffset: '-2px',
                 cursor: isClickable ? 'pointer' : 'default',
-                ...(isBuilding && isActiveQuestTile(tile)
+                ...(isBuilding && (isActiveQuestTile(tile) || isTurnInTile(tile))
                   ? { animation: 'questPulse 1.6s ease-in-out infinite', zIndex: 3, borderRadius: 3 }
                   : {}),
               }}
@@ -176,7 +187,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
                   onTileClick(col, row);
                 }
               }}
-              title={`(${tile.x}, ${tile.y}) - ${displayName}${isBuilding && tile.buildingType ? ` (${prettyType(tile.buildingType)})` : ''}${isBuilding && isActiveQuestTile(tile) ? ' (QUEST)' : ''}${distance > 0 ? ` [${distance} tiles away]` : ''}${isDiscovered ? ' (Discovered)' : ''}`}
+              title={`(${tile.x}, ${tile.y}) - ${displayName}${isBuilding && tile.buildingType ? ` (${prettyType(tile.buildingType)})` : ''}${isBuilding && isActiveQuestTile(tile) ? ' (QUEST)' : (isBuilding && isTurnInTile(tile) ? ' (TURN IN)' : '')}${distance > 0 ? ` [${distance} tiles away]` : ''}${isDiscovered ? ' (Discovered)' : ''}`}
             >
               {isBuilding && isActiveQuestTile(tile) && (
                 <span style={{

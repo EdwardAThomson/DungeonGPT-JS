@@ -3151,22 +3151,32 @@ function pruneOrphanPaths(mapData) {
 }
 
 /**
+ * Impassable town tile types: open water and every solid STRUCTURE. `wall` (the
+ * cities-only perimeter ring, placeCityWalls) and `keep_wall` (the ring hugging a
+ * keep) are structural barriers just like a `building` footprint — they render as
+ * solid walls and the internal road pathfinder already treats them as solids (see
+ * the `Infinity` cost branch: "building / wall / keep_wall / farm_field"). They were
+ * missing here, so the party could walk straight THROUGH a city wall or keep ring
+ * (playtest 2026-07-18: "the hero icon can walk walls"). `farm_field` is intentionally
+ * NOT blocked — a crop field is passable ground, not a wall.
+ */
+const TOWN_UNWALKABLE_TYPES = new Set(['water', 'building', 'wall', 'keep_wall']);
+
+/**
  * Movement walkability for a town tile, derived from tile TYPE rather than the
  * stored `walkable` boolean.
  *
- * The generator invariant is that ONLY `water` and `building` tiles are ever made
- * non-walkable (every `walkable = false` assignment in this file lands on a water
- * or building/keep/house tile); bridges and beaches are walkable ground. Town maps
- * are generated once and cached in the save (sub_maps.townMapsCache) and never
- * regenerated, so a town cached by an older generator can carry a stale `walkable:
- * false` on a bridge or shore tile from before those became walkable. Keying
- * walkability off the type heals those old saves retroactively without touching the
- * stored grid: any tile that is not water and not a building can be stepped onto.
+ * Walkability is a pure VIEW-layer predicate re-derived at move time, never baked into
+ * the save, so extending the blocked set heals every cached town retroactively (the
+ * stored grid keeps its tile types; only the derived pass/block decision changes) —
+ * the same mechanism that let old saves gain walkable bridges/beaches. Perimeter gates
+ * stay open because city walls only overwrite perimeter GRASS, never the road tiles the
+ * party enters and leaves through, so blocking walls cannot seal the party in.
  *
  * @param {Object} t tile object (mapData[y][x]).
  * @returns {boolean} true when the party may step onto the tile.
  */
-export const isTownTileWalkable = (t) => !!t && t.type !== 'water' && t.type !== 'building';
+export const isTownTileWalkable = (t) => !!t && !TOWN_UNWALKABLE_TYPES.has(t.type);
 
 /**
  * Get emoji representation for town map tiles

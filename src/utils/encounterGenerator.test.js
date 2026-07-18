@@ -141,3 +141,38 @@ describe('encounterGenerator.rollEnvironmentalEncounter (enclosed-interior setti
     expect(tierByTemplate.strange_lights).toBe('narrative');
   });
 });
+
+describe('rollSiteWanderingEncounter level gate (top cap)', () => {
+  it('caps difficulty by party level, no cap when level is unknown', () => {
+    const { maxWanderDifficultyForLevel } = require('./encounterGenerator');
+    expect(maxWanderDifficultyForLevel(1)).toBe('medium');
+    expect(maxWanderDifficultyForLevel(2)).toBe('medium');
+    expect(maxWanderDifficultyForLevel(5)).toBe('hard');
+    expect(maxWanderDifficultyForLevel(8)).toBe('deadly');
+    expect(maxWanderDifficultyForLevel(null)).toBe('deadly');
+  });
+
+  it('never blindsides a level-1 party with the hard nest / deadly guardian', () => {
+    const { rollSiteWanderingEncounter } = require('./encounterGenerator');
+    const seen = new Set();
+    for (let i = 0; i < 4000; i++) {
+      const e = rollSiteWanderingEncounter('cave', {}, 4, 1);
+      if (e) seen.add(e.templateKey);
+    }
+    expect(seen.has('cave_spider_nest')).toBe(false);
+    expect(seen.has('cave_treasure_guardian')).toBe(false);
+    // ...but the level-appropriate cave foes still appear.
+    expect(seen.has('cave_kobolds') || seen.has('cave_giant_rats') || seen.has('cave_bats')).toBe(true);
+  });
+
+  it('lets a veteran party (level 8) meet the hard nest and deadly guardian', () => {
+    const { rollSiteWanderingEncounter } = require('./encounterGenerator');
+    const seen = new Set();
+    for (let i = 0; i < 6000; i++) {
+      const e = rollSiteWanderingEncounter('cave', {}, 5, 8);
+      if (e) seen.add(e.templateKey);
+    }
+    expect(seen.has('cave_spider_nest')).toBe(true);
+    expect(seen.has('cave_treasure_guardian')).toBe(true);
+  });
+});
