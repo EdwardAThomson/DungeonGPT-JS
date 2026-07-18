@@ -4,9 +4,8 @@ import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from '../contexts/AuthContext';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
 import { useModal } from '../contexts/ModalContext';
-import { checkForEncounter } from '../utils/encounterGenerator';
+import { checkForEncounter, rollSiteWanderingEncounter } from '../utils/encounterGenerator';
 import { encounterTemplates } from '../data/encounters';
-import { isEnclosedSiteType } from '../utils/siteMapGenerator';
 import { isTownTileWalkable } from '../utils/townMapGenerator';
 import useGameSession from '../hooks/useGameSession';
 import useGameMap from '../hooks/useGameMap';
@@ -779,14 +778,23 @@ const Game = ({ resumeConversation = null }) => {
     const sideQuests = settings?.sideQuests;
     if (sideQuests && sideQuests.length > 0) {
       const { updatedSideQuests, completions } = checkSideQuestEvent(sideQuests, event, heroLevel);
-      if (completions.length > 0) {
-        // Recompute against prev INSIDE the updater: `updatedSideQuests` above came from a
-        // snapshot, and writing it wholesale would revert any side-quest change that landed
-        // since (a second event in the same handler, an accept during an AI generation).
+      // Persist whenever ANY step advanced, not only on completion. A multi-item gather
+      // step ("collect 3 glowing fungi") bumps PROGRESS without completing; gating the
+      // write on `completions` discarded that partial progress on every pickup, so a
+      // count>1 gather (or defeat-N) quest could never finish (playtest 2026-07-18). The
+      // per-quest reference is preserved for unchanged quests (checkSideQuestEvent returns
+      // the same object when nothing matched), so an element-wise compare detects the bump.
+      // Recompute against prev INSIDE the updater: `updatedSideQuests` came from a snapshot,
+      // and successive events in one handler (e.g. a two-item loot bundle) must each apply
+      // to the latest state — writing the snapshot wholesale would revert a sibling change.
+      const sideQuestsChanged = updatedSideQuests.some((q, i) => q !== sideQuests[i]);
+      if (sideQuestsChanged) {
         setSettings(prev => ({
           ...prev,
           sideQuests: checkSideQuestEvent(prev.sideQuests || [], event, heroLevel).updatedSideQuests
         }));
+      }
+      if (completions.length > 0) {
         let party = currentParty;
         completions.forEach(c => {
           const stepRewards = c.rewards || { xp: 0, gold: 0, items: [] };
@@ -1185,15 +1193,16 @@ const Game = ({ resumeConversation = null }) => {
       return 'continue';
     }
 
-    // Hybrid: a small per-move chance of wandering monsters in the corridors, using the
-    // same probabilistic model as the world map (immediate-tier only — no narrative pops).
+    // A small per-STEP chance of wandering monsters in the corridors. This uses the
+    // dedicated per-step site roll (rollSiteWanderingEncounter), NOT checkForEncounter: the
+    // latter's POI path is a ONE-TIME 50% arrival roll and re-firing it every tile flooded a
+    // cave crawl with combats (playtest 2026-07-18: cave_bats popped almost every step). The
+    // site roll draws from the same POI table but at a low base chance with the pity timer,
+    // and rolls no open-air weather (enclosed interiors have no sky). Reads settings/moves
+    // from refs so per-step values stay fresh during a multi-tile walk.
     const siteType = mapHook.currentSiteMap?.type || 'cave';
-    // Enclosed interiors (cave, mountain) suppress open-air weather/sky hazards
-    // (storms, aurora, fog) that make no sense underground. Reads settings/moves from
-    // refs so per-step values stay fresh during a multi-tile walk (see runSiteStep).
-    const enclosedInterior = isEnclosedSiteType(siteType);
-    const wandering = checkForEncounter(
-      { poi: siteType, biome: 'plains' }, false, settingsRef.current, movesSinceEncounterRef.current, { enclosedInterior }
+    const wandering = rollSiteWanderingEncounter(
+      siteType, settingsRef.current, movesSinceEncounterRef.current
     );
     if (wandering && wandering.encounterTier === 'immediate') {
       // The roll fired, so it consumes the pity timer whether or not it produces a spawn.
@@ -1899,6 +1908,20 @@ const Game = ({ resumeConversation = null }) => {
         mapHook.setSiteMobFleeCooldown(activeSiteMobIdRef.current);
       }
     }
+    // A multi-round SITE MOB fight that ended WITHOUT a win and WITHOUT a successful flee —
+    // a stalemate ("you broke off"), a defeat, or a failed flee — used to leave the party
+    // standing on the mob's tile with the mob still aggro, re-triggering the SAME fight on
+    // the very next step (an unwilling loop the narration already claims the party escaped).
+    // Treat any such disengage like a flee for the mob: send the party back to their
+    // pre-encounter tile and stamp a brief de-aggro cooldown so "you broke off" is true
+    // (audit 2026-07-18). Victory (mob cleared below) and a successful flee (handled above,
+    // hence `else`) are excluded; single-round hazards clear on any non-flee outcome below.
+    else if (activeSiteMobIdRef.current && encounterActionData?.encounter?.multiRound
+             && !isEncounterVictory(result) && preEncounterPosRef.current?.level === 'site') {
+      const back = preEncounterPosRef.current;
+      mapHook.setSitePlayerPosition({ x: back.x, y: back.y });
+      mapHook.setSiteMobFleeCooldown(activeSiteMobIdRef.current);
+    }
     preEncounterPosRef.current = null; // consume: never reposition on a later encounter
 
     // #43: team boss fights split XP across the whole party (+10% pot per
@@ -1979,6 +2002,46 @@ const Game = ({ resumeConversation = null }) => {
         }
         return updated;
       });
+    }
+
+    // Consume the active-mob ref so a later encounter that is NOT a mob fight (or a mob at a
+    // colliding coordinate) can never read a stale id — mirrors the preEncounterPosRef
+    // consume above (audit 2026-07-18). Every reader (flee/disengage/victory paths) has run.
+    activeSiteMobIdRef.current = null;
+
+    // A FULL party wipe outside a town used to strand the player: no game-over and no forced
+    // return, only an undocumented walk-the-dead-party-to-a-Temple recovery that could be
+    // impossible if a still-aggro site mob kept re-triggering combat they couldn't act on
+    // (audit 2026-07-18). Detect an all-defeated party the instant a fight resolves and
+    // auto-return: revive everyone to half HP and teleport to the nearest town (a free
+    // rescue, not a reward). HP was applied live during the fight, so updatedParty holds the
+    // real post-fight HP. No towns on the map (degenerate) → revive in place so the party can
+    // at least act/flee rather than loop on a "you are defeated" card.
+    const partyWiped = Array.isArray(updatedParty) && updatedParty.length > 0
+      && updatedParty.every(h => h && (h.isDefeated || (h.currentHP || 0) <= 0));
+    if (partyWiped) {
+      let town = null, bestD = Infinity;
+      (mapHook.worldMap || []).forEach((row, y) => (row || []).forEach((tile, x) => {
+        if (!tile || tile.poi !== 'town') return;
+        const d = Math.abs(x - mapHook.playerPosition.x) + Math.abs(y - mapHook.playerPosition.y);
+        if (d < bestD) { bestD = d; town = { x, y, name: tile.townName || 'town' }; }
+      }));
+      const revived = updatedParty.map(h => ({
+        ...h,
+        isDefeated: false,
+        currentHP: Math.max(1, Math.floor((h.maxHP || 20) * 0.5)),
+      }));
+      setSelectedHeroes(revived);
+      interactionHook.setConversation(prev => [...prev, { role: 'system', content:
+        `💀 Your party falls in battle. Kindly strangers carry you to safety; you awaken, battered but alive,${town ? ` in ${town.name}` : ' back in the wilds'}.` }]);
+      reopenMapAfterEncounterRef.current = false; // never reopen a site map onto a wiped party
+      closeEncounterAction();
+      if (town) {
+        mapHook.evacuateToWorldTile({ x: town.x, y: town.y });
+        mapHook.setIsMapModalOpen(true);
+      }
+      setTimeout(() => performSave(), 500);
+      return;
     }
 
     closeEncounterAction();

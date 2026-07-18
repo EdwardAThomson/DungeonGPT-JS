@@ -380,6 +380,36 @@ const ms07 = {
   }
 };
 
-export const checks = [ms01, ms02, ms03, ms04, ms05, ms06, ms07];
+/**
+ * MS-08 (error): a `combat` milestone's `encounter` must carry `multiRound: true`. A
+ * single-round encounter reports only `outcomeTier` (never `result.outcome === 'victory'`),
+ * so `isEncounterVictory` stays false, the `enemy_defeated` event never fires, and the
+ * milestone — plus every step gated behind it — silently dead-ends with no error anywhere
+ * (audit 2026-07-18). The engine now force-stamps multiRound when it serves a milestone
+ * boss, so this catches the authoring slip at build time as defense in depth.
+ */
+const ms08 = {
+  id: 'MS-08',
+  domain: DOMAIN,
+  title: 'Combat milestone encounter is multi-round (single-round boss never completes)',
+  severity: SEVERITY.ERROR,
+  run(ctx) {
+    const violations = [];
+    for (const c of ctx.campaigns) {
+      for (const m of c.milestones) {
+        if (!m || m.type !== 'combat') continue;
+        if (!m.encounter) continue; // missing encounter is MS-05's concern
+        if (m.encounter.multiRound === true) continue;
+        violations.push({
+          message: `combat milestone ${m.id} encounter is not multiRound — a single-round boss can never report 'victory', so enemy_defeated never fires and the milestone silently never completes; add multiRound: true (and enemyHP) to its encounter`,
+          location: `${c.template} / milestone ${m.id} (combat)`
+        });
+      }
+    }
+    return violations;
+  }
+};
+
+export const checks = [ms01, ms02, ms03, ms04, ms05, ms06, ms07, ms08];
 
 export default checks;

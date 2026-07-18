@@ -367,7 +367,12 @@ export const getMilestoneBossForTile = (milestones, tile) => {
                 return {
                     enemyId: combat.trigger.enemy,
                     name: combat.spawn?.name || combat.encounter.name,
-                    encounter: { ...combat.encounter, milestoneId: combat.id, isMilestoneBoss: true }
+                    // Force multiRound so the boss resolves as a real multi-round fight whose
+                    // 'victory' outcome fires enemy_defeated. A single-round authored encounter
+                    // reports only outcomeTier (never result.outcome === 'victory'), so
+                    // isEncounterVictory stays false and the milestone silently never completes
+                    // (audit 2026-07-18). MS-08 guards against authoring one, this heals it.
+                    encounter: { ...combat.encounter, milestoneId: combat.id, isMilestoneBoss: true, multiRound: true }
                 };
             }
         }
@@ -506,7 +511,10 @@ export const getMilestoneEncounter = (milestones, enemyId) => {
     return {
         ...milestone.encounter,
         milestoneId: milestone.id,
-        isMilestoneBoss: true
+        isMilestoneBoss: true,
+        // See getMilestoneBossForTile: a single-round boss can never report victory, so
+        // the milestone would never complete. Force the multi-round fight path.
+        multiRound: true
     };
 };
 

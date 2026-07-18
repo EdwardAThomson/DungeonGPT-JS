@@ -318,6 +318,57 @@ export const checkForPoiEncounter = (tile, isFirstVisit, settings) => {
 };
 
 /**
+ * Per-STEP wandering roll for the INSIDE of a site (cave/ruins corridors), drawn from the
+ * site type's POI encounter table.
+ *
+ * This is deliberately NOT checkForPoiEncounter: that function models a ONE-TIME ARRIVAL at
+ * a world-map POI (~50% "caves almost always have something"), which is correct when you
+ * step onto a cave tile ONCE, but catastrophic when re-rolled on EVERY tile of a multi-tile
+ * cave walk — a 50% flat per-step chance with no pity throttle floods the corridor with
+ * combats (playtest 2026-07-18: cave_bats popped almost every step). Here the base chance is
+ * low and the shared pity timer applies, so a cave crawl produces the occasional wandering
+ * foe, not a wall of them. Encounters stay theme-correct (same POI table) and honor their
+ * authored encounterTier. Environmental/weather hazards are intentionally NOT rolled inside
+ * sites (enclosed interiors have no sky); the caller handles those it wants.
+ *
+ * @param {string} siteType - 'cave' | 'ruins' | ... (a poiEncounterTables key)
+ * @param {Object} settings - game settings (grimness modifier)
+ * @param {number} movesSinceLastEncounter - steps since the last site encounter fired
+ * @returns {Object|null} an encounter template (with encounterTier) or null
+ */
+export const SITE_WANDER_BASE_CHANCE = 0.12;
+export const rollSiteWanderingEncounter = (siteType, settings, movesSinceLastEncounter = 0) => {
+  const table = poiEncounterTables[siteType];
+  if (!table) return null;
+
+  let chance = SITE_WANDER_BASE_CHANCE;
+  const grimnessModifier = { Noble: 0.8, Gritty: 1.0, Dark: 1.2, Grimdark: 1.4 };
+  chance *= grimnessModifier[settings?.grimnessLevel] || 1.0;
+  // Gentle pity bonus (smaller than the world-map one — sites are denser to begin with) so
+  // a long quiet stretch still eventually yields something without ever flooding.
+  if (movesSinceLastEncounter >= 3) chance += 0.05;
+  if (movesSinceLastEncounter >= 5) chance += 0.08;
+  chance = Math.min(chance, 0.35);
+
+  if (Math.random() > chance) return null;
+
+  const roll = weightedRandom(table);
+  if (roll.template === 'none') return null;
+  const template = encounterTemplates[roll.template];
+  if (!template) {
+    logger.warn(`[ENCOUNTER] Site wandering template not found: ${roll.template}`);
+    return null;
+  }
+  return {
+    ...template,
+    templateKey: roll.template,
+    isHostile: roll.hostile !== false,
+    encounterTier: template.encounterTier || (roll.hostile !== false ? 'immediate' : 'narrative'),
+    sourcePoiType: siteType
+  };
+};
+
+/**
  * Convenience function: check + roll in one call.
  * Now includes POI and environmental encounter checks.
  * Priority: POI encounters > Environmental > Regular biome encounters
