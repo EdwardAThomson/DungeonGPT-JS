@@ -24,6 +24,14 @@ export interface PremiumModelDefinition {
   id: string;
   displayName: string;
   maxTokens: number;
+  /**
+   * OpenRouter provider slugs this model may be served by (sent as
+   * provider.only with allow_fallbacks:false). Used to pin Chinese-origin
+   * open-weight models to US-based inference hosts so player prompts never
+   * route to Chinese-hosted endpoints. Omit for frontier-lab models that only
+   * have first-party hosting.
+   */
+  providerOnly?: readonly string[];
 }
 
 /**
@@ -57,6 +65,22 @@ export const PREMIUM_MODEL_REGISTRY: readonly PremiumModelDefinition[] = [
     id: 'google/gemini-3.5-flash',
     displayName: 'Gemini 3.5 Flash',
     maxTokens: 1500,
+  },
+  // ── PROPOSAL (2026-07-15 model trial, NOT yet a default change) ────────────
+  // Cheap Members-tier candidate: ~10x cheaper than Haiku ($0.27/$0.40 per 1M
+  // vs $1/$5, live OR catalog 2026-07-15). Provider-pinned to US hosts (slugs
+  // verified against /api/v1/models/deepseek/deepseek-v3.2/endpoints). Placed
+  // LAST so the existing fallback chain (default + next two) is unchanged; it
+  // is only reachable by explicit modelId until the maintainer flips the
+  // default. Evaluate first with scripts/eval-premium-models.mjs; if a Kimi or
+  // GLM candidate wins instead, swap this entry (moonshotai/kimi-k2.6 pin:
+  // deepinfra/fireworks/parasail/baseten/wandb; z-ai/glm-5.2 pin adds
+  // together). Trial context: octonion docs/ai-cost-analysis.md.
+  {
+    id: 'deepseek/deepseek-v3.2',
+    displayName: 'DeepSeek V3.2',
+    maxTokens: 1500,
+    providerOnly: ['deepinfra', 'digitalocean', 'venice'],
   },
 ];
 
@@ -129,6 +153,13 @@ async function callOpenRouter(
   }
   messages.push({ role: 'user', content: prompt });
 
+  // US-host pin for models that declare one (see PremiumModelDefinition):
+  // provider.only restricts routing to the listed hosts and allow_fallbacks
+  // false stops OpenRouter widening the pool when they are busy. A model with
+  // no pin (frontier labs) keeps OpenRouter's default routing. Ids outside the
+  // registry resolve to undefined and are likewise unpinned.
+  const providerOnly = getPremiumModelById(modelId)?.providerOnly;
+
   let response: Response;
   try {
     response = await fetch(OPENROUTER_URL, {
@@ -145,6 +176,9 @@ async function callOpenRouter(
         messages,
         max_tokens: maxTokens,
         temperature,
+        ...(providerOnly
+          ? { provider: { only: [...providerOnly], allow_fallbacks: false } }
+          : {}),
       }),
     });
   } catch (error: unknown) {
