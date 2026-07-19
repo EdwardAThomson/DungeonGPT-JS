@@ -75,8 +75,9 @@ Fixed-window per-user counters in the `request_counters` Postgres table (migrati
 | `anthropic/claude-haiku-4.5` | Claude Haiku 4.5 | **DEFAULT_PREMIUM_MODEL_ID**: better name-grounding and richer prose |
 | `openai/gpt-5-mini` | GPT-5 Mini | First fallback: very cheap, reliable workhorse |
 | `google/gemini-3.5-flash` | Gemini 3.5 Flash | Lab-diversity fallback, long context |
+| `deepseek/deepseek-v3.2` | DeepSeek V3.2 | Inert proposal candidate (reachable only by explicit modelId; last in registry order so the default + fallback chain are unchanged). Carries `providerOnly: ['deepinfra', 'digitalocean', 'venice']`, sent to OpenRouter as `provider.only` + `allow_fallbacks: false` to pin inference to US hosts |
 
-Every rung caps output at **1500 tokens** (raised from 800 for parity with the free pool); the registry enforces the cap even against a client-requested `maxTokens`.
+A registry entry may carry an optional `providerOnly` list to pin which OpenRouter providers may serve it (no pin means any provider). Every rung caps output at **1500 tokens** (raised from 800 for parity with the free pool); the registry enforces the cap even against a client-requested `maxTokens`.
 
 The pool is the choice in production: clients send their free-pool model id and the premium default carries the pool (only ids present in `PREMIUM_MODEL_REGISTRY` are honored; everything else resolves to the premium default). The client side lives in `src/services/aiPool.js` (persisted preference, tier-gated request pool, pool-outcome notices), `src/services/llmService.js` (sends `pool`, retries once on `premium_cap`/`premium_required`), and the pool chips in `src/components/Modals.js`.
 

@@ -73,12 +73,14 @@ what the app sees. Jest runs the same modules directly through its Babel pipelin
 | MS-05 | milestones | error | implemented | No null/undefined in required milestone fields (`id`/`text`/`type` always; type-appropriate `trigger` field + `spawn` for mechanical types). |
 | MS-06 | milestones | warn | implemented | Flags a non-first milestone with empty `requires` (co-active from turn 1) — usually intentional parallel design, so advisory. |
 | MS-07 | milestones | error | implemented | A `minLevel` gate must be reachable on the main-quest path: the XP a party is guaranteed at the gate (cumulative completion XP of every `requires` ancestor, plus the milestone's own boss `encounter.rewards.xp` granted before the gate fires) must meet `XP_THRESHOLDS[minLevel-1]`. Scoped to fresh-start campaigns (`levelRange[0] <= 1`, where the 0-XP baseline is provable); continuation chapters carry unbounded prior XP and are skipped. Side-quest XP is optional and not counted. Catches a finale gated above its own reachable level, which returns `level_blocked` and silently soft-locks the campaign. |
+| MS-08 | milestones | error | implemented | Every `combat` milestone's `encounter` carries `multiRound: true` (a single-round boss never reports `outcome: 'victory'`, so the milestone would silently dead-end; the engine also forces `multiRound` in `milestoneEngine.js`). |
 | ENC-01 | encounters | error | implemented | Every encounter reward item id (in any encounter template's `rewards.items`) exists in `ITEM_CATALOG`. (Encounters-domain restatement of the encounter half of ITEM-01.) |
 | ENC-02 | encounters | error | implemented | Every `template` key in every weighted encounter table (`encounterTables.js`) resolves to a defined `encounterTemplates` entry (`none` exempt); no dangling table keys. |
 | ENC-03 | encounters | warn | implemented | Every encounter has `name`, a visual (`image` OR `icon`), and a valid `difficulty`; environmental encounters carry a `climate` tag (climate-neutral ones allowlisted). |
 | ENC-04 | encounters | error | implemented | Rewards are always STATED: a fully-absent `rewards` field renders a blank reward area (`result.rewards` gate + `generateLoot` returns null), so absence is a violation; an explicit object (even `{}`) is a stated "none" and passes. |
 | ENC-05 | encounters | error | implemented | When an encounter defines a `consequences` block, every roll tier (criticalSuccess/success/failure/criticalFailure) has non-blank outcome text. |
 | ENC-06 | encounters | warn | implemented | Any `climate` tag is from the valid `hot`/`cold`/`any` vocabulary (a typo never matches the selector), and `suggestedActions` is a non-empty list. |
+| ENC-07 | encounters | error | implemented | Every encounter template is REACHABLE by some spawn path: referenced by a weighted table, in the site combat pool (`SITE_COMBAT_POOL_KEYS`), or spawned by a dedicated code path (`SPECIAL_SPAWN_KEYS`, currently `tavern_brawl` via `handleVisitTavern`). Catches dead content (the pre-fix orphaned `mountain_hermit_cave`). |
 | MAP-01 | map | error | implemented | Every milestone POI id (every `type:'poi'` spawn) has an ARRIVAL image in `POI_IMAGES` (`worldMoveController.js`). Passes via real coverage (all 16 milestone POIs now ship arrival art); the debt allowlist is empty and it fails on any NEW POI shipped without arrival art. |
 | MAP-02 | map | warn | implemented | Every milestone POI id has a DISTINCTIVE world sprite in `poiSprite` (`worldTileArt.js`) rather than the generic milestone flag. Passes via real coverage (all 17 milestone POIs now ship a dedicated sprite); it warns on any NEW POI added without a `poiSprite` case, and the generic flag stays as the fallback for unknown ids. |
 | MAP-03 | map | error | implemented | Every biome the production generator can stamp (`plains`/`desert`/`snow`/`water`/`beach`) has a `getEncounterBiome` case (else it collapses to the plains table) AND `biomeBackground` tile art. Theme parity across plains/desert/snow. |
@@ -131,10 +133,13 @@ what the app sees. Jest runs the same modules directly through its Babel pipelin
   objectives (e.g. find-the-map AND meet-the-captain). `frozen-frontier-t2` was
   brought to house style (two co-active openers, ids 1 and 2, then id 3 gates on
   `[1, 2]`), so it no longer opens with three co-active milestones. All are advisory.
-- **encounters**: every `error`-severity check passes (0 failures). All 48 encounter
-  templates have `name`/`image`/`icon`/`difficulty`/`rewards`/`consequences`/
-  `suggestedActions`; all 108 reward item ids resolve in `ITEM_CATALOG`; no encounter
-  table has a dangling `template` key; every `consequences` block fills all four
+- **encounters**: every `error`-severity check passes (0 failures). All 54 encounter
+  templates (the 2026-07-18 cave wave added `cave_kobolds`, `cave_lurker`, `cave_in`)
+  have `name`/`image`/`icon`/`difficulty`/`rewards`/`consequences`/
+  `suggestedActions`; every reward item id resolves in `ITEM_CATALOG`; no encounter
+  table has a dangling `template` key; every template is reachable by a spawn path
+  (ENC-07; `cave_giant_rats` and `mountain_hermit_cave` were revived into tables);
+  every `consequences` block fills all four
   tiers; the only `climate` tags (`heat_wave`→`hot`, `cold_snap`→`cold`) are valid.
   ENC-03 surfaces **0 warnings** after the climate-neutral allowlist (the four
   intentionally-untagged environmental hazards).

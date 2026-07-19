@@ -50,7 +50,7 @@ backlog; see the `docs/` design docs for each system.
 
 ## Next
 
-- [ ] Fix magic-link email template (OTP token shown but no UI input) — critical quick fix
+- [x] Fix magic-link email template (OTP token shown but no UI input): resolved 2026-07-16 as a stale row; the hub's current magic-link email carries no OTP code, so no fix was needed (OUTSTANDING_ISSUES #1)
 - [x] Add missing assets: dedicated quest-item icons + hide/studded-leather armour and pine-resin art delivered (placeholders cleared); the `workshop` building interior (Henry #26) is delivered
 - [x] Replace fragile keyword-based encounter-engagement detection: superseded by the two-tier narration redesign; the keyword matching no longer exists (OUTSTANDING_ISSUES #13)
 - [ ] Mobile UI fixes (sign-in/nav overlap, How-To-Play layout)
