@@ -3,7 +3,7 @@ import { getTile } from '../utils/mapGenerator';
 import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
 import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver';
-import { areRequirementsMet, findMarkerMilestoneIndex, resolveTalkMarkerMilestone } from '../game/milestoneEngine';
+import { areRequirementsMet } from '../game/milestoneEngine';
 import { getStepHint } from '../game/questHints';
 import { formatPartyInfo } from '../game/promptComposer';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
@@ -29,8 +29,6 @@ const formatRagContext = (results) => {
 };
 
 const TRIGGER_REGEX = /\[(CHECK|ROLL):\s*([a-zA-Z0-9\s]+)\]/i;
-const MILESTONE_COMPLETE_REGEX = /\[COMPLETE_MILESTONE:\s*([\s\S]+?)\]/i;
-const CAMPAIGN_COMPLETE_REGEX = /\[COMPLETE_CAMPAIGN\]/i;
 
 // Helper function to normalize milestones (backward compatibility)
 const normalizeMilestones = (milestones) => {
@@ -81,11 +79,12 @@ const formatMilestonePromptText = (milestoneStatus) => {
                 line += ` — speak with ${who}${where ? ` at ${where}` : ''}`;
                 if (m.spawn.personality) line += `; ${m.spawn.personality}`;
             }
-            // Dual-completion cue: ONLY the current (first) active talk objective invites
-            // an AI [COMPLETE_MILESTONE] mark. Never annotate later/locked talk objectives.
+            // Talk objectives complete via the engine's Talk action (npc_talked), never by
+            // the model. Cue the model to steer the party toward that conversation without
+            // adjudicating it (the "outcomes are the engine's" protocol rule covers the rest).
             if (i === 0 && m.type === 'talk') {
                 const who = m.spawn?.name || 'this person';
-                line += ` (once your conversation with ${who} reaches its natural conclusion and its purpose is met, mark this objective complete with the [COMPLETE_MILESTONE] marker; do not mark it while the conversation is still ongoing)`;
+                line += ` (guide the party toward speaking with ${who}; the game completes this when they do — do not declare it done yourself)`;
             }
             return line;
         }).join('; ');
@@ -143,6 +142,13 @@ const cleanAIResponse = (response, contextToRemove) => {
     if (contextToRemove && cleaned.includes(contextToRemove)) {
         cleaned = cleaned.replace(contextToRemove, '');
     }
+
+    // #76: the LLM no longer adjudicates outcomes. Strip any completion marker it still
+    // emits (old few-shot habits / training data) so a leaked control token never reaches
+    // the player — the engine completes milestones/campaigns. The [CHECK/ROLL] trigger is
+    // deliberately NOT stripped here: it's a bounded skill-check proposal handled downstream.
+    cleaned = cleaned.replace(/\[COMPLETE_MILESTONE:[\s\S]*?\]/gi, '');
+    cleaned = cleaned.replace(/\[COMPLETE_CAMPAIGN\]/gi, '');
 
     // Remove common prompt artifacts
     cleaned = cleaned.replace(/\[CONTEXT\][\s\S]*?\[TASK\]/gi, '');
@@ -581,88 +587,18 @@ const useGameInteraction = (
         try {
             let aiResponse = await generateResponse(model, prompt);
 
-            // Clean the response
+            // Clean the response (also strips any leaked [COMPLETE_MILESTONE]/[COMPLETE_CAMPAIGN]
+            // control token so it never reaches the player).
             aiResponse = cleanAIResponse(aiResponse, gameContext);
 
-            // Check for milestone completion
-            const milestoneMatch = aiResponse.match(MILESTONE_COMPLETE_REGEX);
-            if (milestoneMatch) {
-                const milestoneText = milestoneMatch[1].replace(/\s+/g, ' ').trim();
-                logger.info(`Milestone complete signaled: ${milestoneText}`);
-
-                // Find and mark milestone as complete. Guarded: the AI marker may only
-                // complete 'narrative' (or legacy untyped) milestones — mechanical types
-                // (item/combat/location/talk) are engine-detected and a stray marker must
-                // not complete them. Old saves' narrative milestones still work here.
-                //
-                // IMPORTANT: this runs seconds after the generation started, so `settings`
-                // here is a stale capture. Recompute against prev INSIDE the functional
-                // update — a `{ ...settings }` spread would silently revert every settings
-                // change made during the generation (accepted side quests, engine-completed
-                // milestones, renames). That stale-spread bug ate a player's side quest.
-                const normalized = normalizeMilestones(settings.milestones);
-                const matched = normalized[findMarkerMilestoneIndex(normalized, milestoneText)];
-
-                if (matched) {
-                    // Narrative (or legacy untyped) path — unchanged. Completed locally via a
-                    // functional setSettings; narrative milestones carry no engine rewards.
-                    setSettings(prev => {
-                        const prevNormalized = normalizeMilestones(prev.milestones);
-                        const idx = findMarkerMilestoneIndex(prevNormalized, milestoneText);
-                        if (idx === -1) return prev; // already completed meanwhile — no-op
-                        return {
-                            ...prev,
-                            milestones: prevNormalized.map((m, i) => (i === idx ? { ...m, completed: true } : m))
-                        };
-                    });
-
-                    // Add celebration message to conversation
-                    const celebrationMsg = {
-                        role: 'system',
-                        content: `🎉 Milestone Achieved! 🎉\n${matched.text}`
-                    };
-                    setConversation(prev => [...prev, celebrationMsg]);
-                } else {
-                    // Dual-completion for 'talk' milestones: ONLY if the narrative path found
-                    // nothing. Strict, fail-closed resolver — the marker completes a talk
-                    // objective only when its authored NPC is actually present in the current
-                    // scene, prerequisites are met, and exactly one talk milestone qualifies.
-                    // Completion is routed through the SAME engine event as the Talk button
-                    // (onNpcTalked -> checkMilestoneEvent) so rewards/codex/ledger/save/message
-                    // are identical and idempotent; we do NOT flip `completed` locally here
-                    // (that path skips rewards).
-                    const npcs = locationContext?.currentTownMap?.npcs;
-                    const presentNpcIds = Array.isArray(npcs)
-                        ? npcs.map(n => n?.milestoneNpcId).filter(Boolean)
-                        : [];
-                    const talkMilestone = resolveTalkMarkerMilestone(normalized, milestoneText, presentNpcIds);
-                    if (talkMilestone && typeof onNpcTalked === 'function') {
-                        onNpcTalked(talkMilestone.trigger?.npc);
-                    }
-                }
-
-                // Remove the tool call from display (always, whether or not anything completed)
-                aiResponse = aiResponse.replace(milestoneMatch[0], '').trim();
-            }
-
-            // Check for campaign completion
-            const campaignMatch = aiResponse.match(CAMPAIGN_COMPLETE_REGEX);
-            if (campaignMatch) {
-                logger.info('Campaign complete signaled');
-
-                // Mark campaign as complete (functional — `settings` is a stale capture here)
-                setSettings(prev => ({ ...prev, campaignComplete: true }));
-
-                // Add epic completion message
-                const completionMsg = {
-                    role: 'system',
-                    content: `🏆 CAMPAIGN COMPLETE! 🏆\n${settings.campaignGoal || 'Victory Achieved!'}\n\nThe tale of your heroic deeds will be sung for generations to come!`
-                };
-                setConversation(prev => [...prev, completionMsg]);
-
-                // Remove the tool call from display
-                aiResponse = aiResponse.replace(campaignMatch[0], '').trim();
-            }
+            // #76: milestone and campaign completion are DECIDED BY THE ENGINE, never by the
+            // LLM. Mechanical milestones (item/combat/location/talk) complete on their game
+            // events via checkMilestoneEvent (Game.js), and the campaign completes when the
+            // engine marks the final milestone done (checkMilestoneCompletion.campaignComplete).
+            // The former [COMPLETE_MILESTONE]/[COMPLETE_CAMPAIGN] marker-parsing path is gone:
+            // free-text judgment misfired (2026-07-15 model trial), and no prompt guard fixed
+            // the class. Legacy narrative milestones are migrated to engine types on load
+            // (migrateNarrativeMilestones), so no old save is stranded.
 
             // Parse for other Triggers
             const match = aiResponse.match(TRIGGER_REGEX);

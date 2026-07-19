@@ -446,3 +446,35 @@ describe('getMilestoneLocationForTile (searchable location milestones)', () => {
     expect(getMilestoneLocationForTile([steading()], {})).toBeNull();
   });
 });
+
+describe('migrateNarrativeMilestones (#76 legacy heal)', () => {
+  const { migrateNarrativeMilestones } = require('./milestoneEngine');
+
+  it('converts a narrative milestone with an npc spawn to a talk milestone', () => {
+    const ms = [{ id: 2, type: 'narrative', trigger: null, spawn: { type: 'npc', id: 'quest_npc_smith', name: 'Smith' } }];
+    const out = migrateNarrativeMilestones(ms);
+    expect(out[0].type).toBe('talk');
+    expect(out[0].trigger).toEqual({ npc: 'quest_npc_smith' });
+  });
+
+  it('converts poi -> location and item -> item off the spawn', () => {
+    const out = migrateNarrativeMilestones([
+      { id: 1, type: 'narrative', trigger: null, spawn: { type: 'poi', id: 'quest_poi_shrine' } },
+      { id: 2, type: 'narrative', trigger: null, spawn: { type: 'item', id: 'quest_relic' } },
+    ]);
+    expect(out[0]).toMatchObject({ type: 'location', trigger: { location: 'quest_poi_shrine' } });
+    expect(out[1]).toMatchObject({ type: 'item', trigger: { item: 'quest_relic' } });
+  });
+
+  it('leaves a narrative milestone with no convertible spawn as-is', () => {
+    const ms = [{ id: 1, type: 'narrative', trigger: null, spawn: null }];
+    expect(migrateNarrativeMilestones(ms)[0].type).toBe('narrative');
+  });
+
+  it('is idempotent: returns the SAME array ref when nothing needs migrating', () => {
+    const ms = [{ id: 1, type: 'talk', trigger: { npc: 'x' } }, { id: 2, type: 'item', trigger: { item: 'y' } }];
+    expect(migrateNarrativeMilestones(ms)).toBe(ms);
+    const migrated = migrateNarrativeMilestones([{ id: 1, type: 'narrative', spawn: { type: 'npc', id: 'z' } }]);
+    expect(migrateNarrativeMilestones(migrated)).toBe(migrated); // second pass no-ops
+  });
+});
