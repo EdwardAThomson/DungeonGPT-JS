@@ -6,7 +6,7 @@ import { generateTownMap, isTownTileWalkable } from '../utils/townMapGenerator';
 // Cached towns are untouched: only first-visit generation reads the stamp.
 import { getTownWaterContext, getTownRoadEdges } from '../utils/townWater';
 import { generateSiteMap } from '../utils/siteMapGenerator';
-import { populateSite, injectSiteObjective, injectHarvestResource } from '../game/sitePopulator';
+import { populateSite, injectSiteObjective, injectHarvestResource, repopulateSiteRoamers } from '../game/sitePopulator';
 import { healMobsToIdle, FLEE_DEAGGRO_STEPS } from '../game/mobMovement';
 import { populateTown } from '../utils/npcGenerator';
 import { injectQuestBuildings } from '../game/milestoneSpawner';
@@ -374,6 +374,13 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
                 setSiteMapsCache(prev => ({ ...prev, [key]: siteMap }));
                 logger.info('Ensured gather resources in site', { key, items: gatherResources.map(r => r.itemId) });
             }
+
+            // Re-colonise the site with ambient roaming wildlife up to the target, so a
+            // re-entered (or fully cleared) site never reads as empty. Additive + cache-safe
+            // (no layout regen), runs on every entry; a fresh site is already at target from
+            // populateSite, so this no-ops there. Mirrors the harvest/objective inject hooks.
+            repopulateSiteRoamers(siteMap, partyLevel);
+            setSiteMapsCache(prev => ({ ...prev, [key]: siteMap }));
 
             // Entering a cached site whose mobs were persisted mid-chase: start them calm.
             if (Array.isArray(siteMap.mobs)) healMobsToIdle(siteMap.mobs);

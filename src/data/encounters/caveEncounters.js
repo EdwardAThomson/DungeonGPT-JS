@@ -172,11 +172,13 @@ export const CAVE_ENCOUNTERS = {
     poiType: 'cave',
     description: 'Yipping kobolds boil out of a side tunnel, jabbing with crude spears and hurling stones from the dark!',
     image: '/assets/encounters/goblin_ambush.webp',
+    // 'easy' keeps the damage multiplier gentle; dc/HP tuned so the fight sims inside the
+    // 30-90% wilderness band (progressionLint) instead of a ~95% walkover (was dc12/hp24).
     difficulty: 'easy',
-    dc: 12,
+    dc: 15,
     dealsDamage: true,
     multiRound: true,
-    enemyHP: 24,
+    enemyHP: 32,
     suggestedActions: [
       { label: 'Attack', skill: 'Athletics', description: 'Cut down the skulkers' },
       { label: 'Hold a Chokepoint', skill: 'Athletics', description: 'Funnel them so they can\'t swarm' },
