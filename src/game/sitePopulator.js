@@ -17,7 +17,7 @@
 
 import { CAVE_ENCOUNTERS } from '../data/encounters/caveEncounters';
 import { RUINS_ENCOUNTERS } from '../data/encounters/ruinsEncounters';
-import { makeMob, spawnMobsFromSlots } from './mobMovement';
+import { makeMob, spawnMobsFromSlots, seedAmbientRoamers, AMBIENT_ROAMER_TARGET } from './mobMovement';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('site-populator');
@@ -71,6 +71,20 @@ const pickCombatEncounter = (pool, rng, partyLevel) => {
   const eligible = band ? pool.filter((e) => band.includes(e.difficulty)) : pool;
   const from = eligible.length > 0 ? eligible : pool;
   return from[Math.floor(rng() * from.length)];
+};
+
+// Ambient roamers are GENTLE wildlife, not slot guardians: the combat pool capped at MEDIUM
+// (never the hard nest or deadly guardian), then level-gated so a low party meets only easy
+// foes. This keeps re-entry re-colonisation fun, not an ambush. Returns an encounterFor(rng)
+// closure for seedAmbientRoamers; yields null (skip a roamer) only if nothing is eligible.
+const ROAMER_MAX_DIFFICULTY = new Set(['easy', 'medium']);
+const roamerEncounterFor = (combatType, partyLevel) => (rng) => {
+  const pool = combatPool(combatType).filter((e) => ROAMER_MAX_DIFFICULTY.has(e.difficulty));
+  if (pool.length === 0) return null;
+  const band = difficultyBandForLevel(partyLevel);
+  const eligible = band ? pool.filter((e) => band.includes(e.difficulty)) : pool;
+  const from = eligible.length > 0 ? eligible : pool;
+  return clone(from[Math.floor(rng() * from.length)]);
 };
 
 // Themed loot item keys (catalog keys from inventorySystem). Kept modest; the hoard slot
@@ -359,9 +373,56 @@ export function populateSite(site, seed, partyLevel) {
   // content for a given seed is unchanged from before this feature existed.
   const nodeCount = placeHarvestNodes(site, rng);
 
+  // Seed the site's initial ambient roamers so it reads as INHABITED from the first step,
+  // not just at the fixed slots. Runs LAST (after slot picks + harvest nodes), consuming the
+  // seeded rng only at the tail, so slot/hoard/node placement stays byte-identical per seed.
+  // Re-entries top these up via repopulateSiteRoamers.
+  const roamers = seedAmbientRoamers(site, {
+    count: AMBIENT_ROAMER_TARGET,
+    encounterFor: roamerEncounterFor(combatType, partyLevel),
+    rng,
+  });
+  if (roamers.length) site.mobs = [...site.mobs, ...roamers];
+
   site.populated = true;
   logger.info(`[SITE] Populated ${site.type} "${site.name}" (loot: ${lootType}, mobs: ${combatType}) with ${slots.length} content slots` +
-    (nodeCount ? ` + ${nodeCount} harvest nodes` : ''));
+    (nodeCount ? ` + ${nodeCount} harvest nodes` : '') + (roamers.length ? ` + ${roamers.length} roamers` : ''));
+  return site;
+}
+
+/**
+ * Top a site's ambient roamer population back up to AMBIENT_ROAMER_TARGET on entry. This is
+ * the RE-COLONISATION hook: a cleared site regains roaming wildlife on a later visit WITHOUT
+ * ever regenerating its layout (additive, cache-safe — the same contract as
+ * injectHarvestResource / injectSiteObjective). Prunes spent roamers first so re-entries
+ * never accumulate defeated husks and roamer ids stay unique; only WANDERING mobs are pruned,
+ * so slot mobs + milestone bosses (whose defeated state gates content/objective idempotence)
+ * are untouched. Authored bosses/objectives never respawn — only ambient vermin do. Uses
+ * Math.random (a runtime top-up, not part of the deterministic generation stream).
+ *
+ * @param {Object} site a generated (ideally populated) site; its cached mob list is mutated.
+ * @param {number} [partyLevel] the party's effective level, to level-gate the roamers.
+ * @returns {Object} the same site.
+ */
+export function repopulateSiteRoamers(site, partyLevel) {
+  if (!site || !Array.isArray(site.mapData)) return site;
+  site.mobs = Array.isArray(site.mobs) ? site.mobs : [];
+  // Drop spent roamers/wanderers (keeps the list bounded + ids collision-free); slot mobs
+  // and bosses persist regardless of their defeated flag.
+  site.mobs = site.mobs.filter((m) => !(m && m.wandering && m.defeated));
+  const live = site.mobs.reduce((n, m) => (m && m.wandering && !m.defeated ? n + 1 : n), 0);
+  const need = AMBIENT_ROAMER_TARGET - live;
+  if (need <= 0) return site;
+  const combatType = site.type === 'ruins' ? 'ruins' : 'cave';
+  const roamers = seedAmbientRoamers(site, {
+    count: need,
+    encounterFor: roamerEncounterFor(combatType, partyLevel),
+    rng: Math.random,
+  });
+  if (roamers.length) {
+    site.mobs = [...site.mobs, ...roamers];
+    logger.info(`[SITE] Re-colonised "${site.name}" with ${roamers.length} ambient roamer(s)`);
+  }
   return site;
 }
 

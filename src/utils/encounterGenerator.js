@@ -339,8 +339,10 @@ export const checkForPoiEncounter = (tile, isFirstVisit, settings) => {
 // Per-step base chance. Tuned between the old flood (the 50% arrival roll re-fired every
 // step) and empty (playtest 2026-07-18: a full cave traverse with zero spawns at 0.12).
 // Note only ~1/3 of fired rolls are immediate-tier combat (the rest are narrative/none,
-// which are dropped), so the effective per-step FIGHT rate is well under this number.
-export const SITE_WANDER_BASE_CHANCE = 0.18;
+// which are dropped), so the effective per-step FIGHT rate is well under this number. This
+// is the TOP-UP layer over the ambient roamers seeded at population/re-entry (which supply
+// the site's baseline visible life), so it can stay modest.
+export const SITE_WANDER_BASE_CHANCE = 0.24;
 
 const DIFFICULTY_ORDER = ['trivial', 'easy', 'medium', 'hard', 'deadly'];
 

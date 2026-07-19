@@ -44,12 +44,22 @@ export const FLEE_DEAGGRO_STEPS = 4;
 //   bosses do not count against it). At the cap the roll is consumed without a new spawn.
 // WANDERING_SPAWN_MIN_DIST / _MAX_DIST: Manhattan band (from the party) the spawn tile must
 //   fall in: far enough not to appear on top of the party, near enough to actually close in.
-export const WANDERING_MOB_CAP = 2;
+export const WANDERING_MOB_CAP = 3;
 export const WANDERING_SPAWN_MIN_DIST = 2;
 export const WANDERING_SPAWN_MAX_DIST = 4;
+
+// AMBIENT_ROAMER_TARGET: how many roaming, non-boss mobs a site should hold so it reads as
+// INHABITED rather than a couple of fixed slot mobs. Seeded at population time and topped up
+// on every re-entry (repopulateSiteRoamers in sitePopulator), so a cleared site re-colonises
+// with wildlife WITHOUT the layout ever regenerating (additive, cache-safe). Roamers are
+// ordinary `wandering` mobs — they count against WANDERING_MOB_CAP and behave identically —
+// just placed proactively instead of rolled per-step. Kept below the cap so the per-step roll
+// can still add the occasional extra pursuer on top.
 // A wandering mob spawns already committed so it approaches immediately (no idle telegraph
 // tell): the "surprise" is now a visible pursuer instead of an out-of-nowhere modal.
 export const WANDERING_SPAWN_STATE = 'aggro';
+
+export const AMBIENT_ROAMER_TARGET = 2;
 
 export const DEFAULT_MOB_CONFIG = {
   aggroRadius: AGGRO_RADIUS,
@@ -129,6 +139,63 @@ export function spawnMobsFromSlots(site, kinds, encounterForSlot) {
     mobs.push(makeMob({ x: slot.x, y: slot.y, encounter, speed }));
   });
   return mobs;
+}
+
+/**
+ * Decide where up to `count` AMBIENT ROAMER mobs spawn across a site. Pure: returns the mobs
+ * to add (the caller appends to site.mobs); does NOT mutate `site`. Roamers sit on random
+ * walkable floor tiles that are not the entrance, carry no content/slot, are not already held
+ * by a live mob, and lie at least `minFromEntry` from the entry point (so a fresh entry never
+ * drops the party straight into a fight). They spawn IDLE, so they hold position until the
+ * party wanders within AGGRO_RADIUS, then wake and engage like any mob. Tagged `wandering` so
+ * they share the cap + lifecycle of a per-step spawn.
+ *
+ * @param {Object} site the site (reads mapData, entryPoint, mobs).
+ * @param {Object} opts
+ * @param {number} opts.count how many to place.
+ * @param {(rng:()=>number)=>Object|null} opts.encounterFor supplies each roamer's encounter.
+ * @param {()=>number} [opts.rng] uniform [0,1) source (defaults Math.random).
+ * @param {number} [opts.minFromEntry] min Manhattan distance from the entry (defaults AGGRO_RADIUS+1).
+ * @returns {Array<Object>} the roamer mobs to append.
+ */
+export function seedAmbientRoamers(site, { count, encounterFor, rng = Math.random, minFromEntry = AGGRO_RADIUS + 1 } = {}) {
+  const mapData = site && site.mapData;
+  if (!Array.isArray(mapData) || !(count > 0) || typeof encounterFor !== 'function') return [];
+  const entry = site.entryPoint || { x: 0, y: 0 };
+  const existing = Array.isArray(site.mobs) ? site.mobs : [];
+  const occupied = new Set();
+  existing.forEach((m) => { if (m && !m.defeated) occupied.add(`${m.x},${m.y}`); });
+
+  const candidates = [];
+  for (let y = 0; y < mapData.length; y++) {
+    const row = mapData[y];
+    if (!Array.isArray(row)) continue;
+    for (let x = 0; x < row.length; x++) {
+      const tile = row[x];
+      if (!isSiteWalkable(tile) || tile.type === 'entrance') continue;
+      if (tile.content || tile.contentSlot) continue;
+      if (occupied.has(`${x},${y}`)) continue;
+      if (Math.abs(x - entry.x) + Math.abs(y - entry.y) < minFromEntry) continue;
+      candidates.push({ x, y });
+    }
+  }
+
+  const roamers = [];
+  const baseCount = existing.length;
+  for (let i = 0; i < count && candidates.length > 0; i++) {
+    const pick = candidates.splice(Math.floor(rng() * candidates.length), 1)[0];
+    const encounter = encounterFor(rng);
+    if (!encounter) break;
+    // Roamers are gentle wildlife (never a hard hunter) so speed stays 1; the id carries a
+    // growing suffix so a roamer placed where a defeated one fell never reuses its id.
+    const speed = encounter.difficulty === 'hard' ? HUNTER_SPEED : DEFAULT_MOB_SPEED;
+    roamers.push(makeMob({
+      id: `roamer_${pick.x}_${pick.y}_${baseCount + i}`,
+      x: pick.x, y: pick.y, encounter, speed, state: 'idle', wandering: true,
+    }));
+    occupied.add(`${pick.x},${pick.y}`);
+  }
+  return roamers;
 }
 
 /**
