@@ -53,7 +53,7 @@ import {
 import { resolveProviderAndModel } from '../llm/modelResolver';
 import { appendLedgerEvents } from '../game/heroLedger';
 import { healPartyUpward, reconcileHeroWithLedger } from '../game/heroInvariants';
-import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile, getMilestoneLocationForTile } from '../game/milestoneEngine';
+import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile, getMilestoneLocationForTile, migrateNarrativeMilestones } from '../game/milestoneEngine';
 import { recordItemDiscoveries, recordEnemyDiscovery, seedCodexFromParty, getBestiaryEntries, findBestiaryMatch, slugify as slugifyCodexKey } from '../game/codexEngine';
 import { buyItem, sellItem } from '../game/shopController';
 import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, getActiveGatherResources, turnInQuest, getRevealedSiteTypes, effectivePartyLevel, pickOfferableSideQuest, resolveQuestOrigin, stampQuestOrigin } from '../game/questEngine';
@@ -427,6 +427,20 @@ const Game = ({ resumeConversation = null }) => {
   const settingsRef = useRef(settings);
   useEffect(() => { movesSinceEncounterRef.current = movesSinceEncounter; }, [movesSinceEncounter]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
+
+  // #76 load-time heal: retire the AI-judged `narrative` milestone by migrating legacy saves'
+  // narrative milestones to their engine-completable type (talk/location/item) off their
+  // spawn, so removing the completion-marker path never strands an old objective (or its
+  // campaign — completion needs EVERY milestone done). Idempotent: migrateNarrativeMilestones
+  // returns the same ref when there's nothing to migrate, so this writes once then no-ops;
+  // the next autosave persists it. New games already author engine types, so this is inert
+  // for them.
+  useEffect(() => {
+    const ms = settings?.milestones;
+    if (!ms || migrateNarrativeMilestones(ms) === ms) return;
+    setSettings(prev => ({ ...prev, milestones: migrateNarrativeMilestones(prev.milestones) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.milestones]);
   // Moving-mob plumbing for site walks. Like the counters above, these read from refs so
   // the async per-step callback (runSiteStep) sees the freshest mob positions / grid
   // mid-walk instead of the stale render-time closure. The mob objects are mutated in

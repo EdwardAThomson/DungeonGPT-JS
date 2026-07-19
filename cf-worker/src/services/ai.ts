@@ -35,7 +35,10 @@ export function sanitizeResponse(text: string): string {
     ""
   );
 
-  // Remove common prompt markers
+  // Remove common prompt markers. Includes the retired completion markers (#76): the engine
+  // now referees milestone/campaign completion, so a model that still emits one (old training
+  // / few-shot habit) must never have it reach the player or the journal. The premium pool
+  // reuses this same pass.
   const markers = [
     /\[ADVENTURE START\]/gi,
     /\[GAME INFORMATION\]/gi,
@@ -44,6 +47,8 @@ export function sanitizeResponse(text: string): string {
     /\[SUMMARY\]/gi,
     /\[PLAYER ACTION\]/gi,
     /\[NARRATE\]/gi,
+    /\[COMPLETE_MILESTONE:[\s\S]*?\]/gi,
+    /\[COMPLETE_CAMPAIGN\]/gi,
   ];
 
   markers.forEach((marker) => {

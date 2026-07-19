@@ -690,14 +690,19 @@ const NewGame = () => {
     }
 
     if (roleData && building2Data) {
+      // A `talk` milestone (engine-completed via the Talk button + npc_talked event), NOT
+      // `type: 'narrative'`: narrative milestones were AI-judged via a completion marker,
+      // which is being retired (the engine referees, the LLM only narrates — #76). The NPC
+      // spawn already existed; the trigger.npc just wires it to the deterministic path.
+      const slot2NpcId = `quest_npc_${slot2Role.toLowerCase()}`;
       builtMilestones.push({
         id: 2,
         text: `Speak with the ${roleData.name.toLowerCase()} at ${town2}`,
         location: town2,
-        type: 'narrative',
+        type: 'talk',
         requires: [],
-        trigger: null,
-        spawn: { type: 'npc', id: `quest_npc_${slot2Role.toLowerCase()}`, name: roleData.name, location: town2, role: slot2Role },
+        trigger: { npc: slot2NpcId },
+        spawn: { type: 'npc', id: slot2NpcId, name: roleData.name, location: town2, role: slot2Role },
         building: { type: slot2Building, name: building2Data.name, location: town2 },
         rewards: { xp: customTier === 1 ? 25 : 150, gold: customTier === 1 ? '1d6' : '1d20', items: [] },
         minLevel: null,

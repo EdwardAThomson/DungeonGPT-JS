@@ -129,6 +129,44 @@ export const checkMilestoneCompletion = (milestones, event, currentLevel = null)
 };
 
 /**
+ * Migrate legacy `type: 'narrative'` milestones to an engine-completable type, keyed off
+ * their authored `spawn`. Narrative milestones were completed by an AI judgment marker, which
+ * is being retired (#76: the engine referees, the LLM only narrates). Without a marker path a
+ * narrative milestone can never complete — and since campaign completion needs EVERY milestone
+ * done, it would strand the whole campaign. Every narrative milestone in the wild carries a
+ * spawn (npc/poi/item — built-in campaigns were converted to `talk` during NPC grounding; the
+ * custom-game builder's "Speak with X" slot spawns an npc), so the spawn tells us the real
+ * mechanical type:
+ *   - spawn npc  -> talk     (trigger.npc  = spawn.id; completes via the Talk button)
+ *   - spawn poi  -> location (trigger.location = spawn.id)
+ *   - spawn item -> item     (trigger.item = spawn.id)
+ * A narrative milestone with no convertible spawn (not observed in practice) is left as-is and
+ * logged, so it fails visibly rather than silently corrupting a save. Idempotent: only touches
+ * `type === 'narrative'`; returns the SAME array reference when nothing changed (cheap load skip).
+ *
+ * @param {Array} milestones
+ * @returns {Array} migrated milestones (same ref if unchanged)
+ */
+const SPAWN_TYPE_TO_MILESTONE = { npc: 'talk', poi: 'location', item: 'item' };
+const TRIGGER_FIELD_FOR_TYPE = { talk: 'npc', location: 'location', item: 'item' };
+export const migrateNarrativeMilestones = (milestones) => {
+    if (!Array.isArray(milestones) || milestones.length === 0) return milestones;
+    let changed = false;
+    const migrated = milestones.map((m) => {
+        if (!m || m.type !== 'narrative') return m;
+        const spawnType = m.spawn && m.spawn.type;
+        const newType = SPAWN_TYPE_TO_MILESTONE[spawnType];
+        // No convertible spawn (not observed in practice): leave it as-is rather than
+        // guessing a trigger. It keeps its `narrative` type and simply won't auto-complete.
+        if (!newType || !m.spawn.id) return m;
+        changed = true;
+        const field = TRIGGER_FIELD_FOR_TYPE[newType];
+        return { ...m, type: newType, trigger: { ...(m.trigger || {}), [field]: m.spawn.id } };
+    });
+    return changed ? migrated : milestones;
+};
+
+/**
  * Complete a narrative milestone manually (called when NPC interaction resolves)
  * @param {Array} milestones - All milestones
  * @param {number} milestoneId - ID of the narrative milestone to complete
