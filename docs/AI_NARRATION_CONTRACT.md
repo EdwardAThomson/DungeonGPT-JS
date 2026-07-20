@@ -1,6 +1,10 @@
 # AI Narration Contract: engine referees, LLM narrates
 
-Status: **DECIDED direction (maintainer, 2026-07-15); implementation not yet scheduled.**
+Status: **Phase 1 SHIPPED 2026-07-19 (PR #152):** markers retired, client parsing removed,
+both sanitize passes strip leaked markers, NewGame's narrative slot became `talk`, campaign
+completion is engine-derived, and legacy saves' narrative milestones migrate on load
+(`migrateNarrativeMilestones`). **Phase 2 (exemplar bank, length targets, scripted beats,
+renderer-mode model re-eval, dead-helper cleanup) not yet scheduled.**
 Backlog row #76 in [OUTSTANDING_ISSUES.md](OUTSTANDING_ISSUES.md). This is a design record;
 no source is changed by this doc. When the code and this doc disagree, the code wins.
 

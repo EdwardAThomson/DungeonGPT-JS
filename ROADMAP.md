@@ -26,7 +26,7 @@ backlog; see the `docs/` design docs for each system.
 - [x] Responsive React UI (modals, dice roller, party sidebar, world/town maps, QR share)
 - [x] Playwright E2E tests (new game, save/reload, hero save) + Worker health endpoint + error boundary
 - [x] CF Pages auto-deploy; Apache 2.0 license; copyright/content review complete; asset provenance manifest
-- [x] Narrative milestones (AI-judged quest outcomes via `[COMPLETE_MILESTONE]`) — completes the milestone engine
+- [x] Narrative milestones (AI-judged quest outcomes via `[COMPLETE_MILESTONE]`) — completes the milestone engine; superseded 2026-07-19 by #76 Phase 1 (markers retired, all completions engine-refereed, legacy saves migrate on load)
 - [x] RAG memory: in-game retrieval + auto-sync/backfill of conversation embeddings (Workers-AI BGE, IndexedDB)
 - [x] Local-first guest play: on-device hero roster + IndexedDB game saves, AI-free mechanical loop (explore / combat / progression), one-click sync to the cloud on sign-in, guest conversion banner (`docs/GUEST_MODE_PLAN.md`)
 - [x] New-player onboarding: replayable guided tour (coachmarks), reworked hero creator (27-point-buy validation, gender↔name, portrait picker), simplified New Game, Journal redesign, map discoverability

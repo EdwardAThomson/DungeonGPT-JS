@@ -35,7 +35,7 @@
 ### Service layer
 
 - **`services/models.ts`** — `MODEL_REGISTRY`, `DEFAULT_MODEL_ID`, `getFallbackCandidates()`, lookup helpers (free pool).
-- **`services/ai.ts`** — `generateText()` orchestrates: resolve model (unknown IDs fall back to default), call Workers AI, handle response format variants, try fallback on failure, sanitize output (strips leaked prompt markers; `sanitizeResponse` is exported so the premium pool reuses the exact same pass).
+- **`services/ai.ts`** — `generateText()` orchestrates: resolve model (unknown IDs fall back to default), call Workers AI, handle response format variants, try fallback on failure, sanitize output (strips leaked prompt markers and, since #76 Phase 1, any `[COMPLETE_MILESTONE...]`/`[COMPLETE_CAMPAIGN]` completion marker — the engine referees completions, the LLM only narrates; `sanitizeResponse` is exported so the premium pool reuses the exact same pass).
 - **`services/openrouter.ts`** — premium pool (#7): `PREMIUM_MODEL_REGISTRY`, `DEFAULT_PREMIUM_MODEL_ID`, `generatePremiumText()` (OpenRouter chat completions, same resolve/clamp/fallback/sanitize shape as `ai.ts`).
 - **`services/pg.ts` / `services/tiers.ts`** — shared per-request postgres.js client (Hyperdrive) and the tier ladder + `getAccountTier()` lookup, used by `routes/db.ts`, the rate limiter, and the premium gate. `getAccountTier()` returns the **effective** tier = base `account_tiers` row MAX any unexpired `tier_grants` (redemption-code grants, #6); expiry is passive and a grant never lowers the base, so premium-templates / premium-AI / allowances all honour grants with no further changes.
 - **`services/hubEntitlements.ts`** — hub payments Phase 1: `getHubEntitlements()` reads the Octonion hub's billing tier (`GET ${HUB_URL}/api/me/entitlements` with the user's forwarded JWT), 60 s per-user cache mirroring the JWKS-cache pattern, 3 s timeout, **fails closed to free** (failures uncached). `hubTierToGameTier()` normalizes the hub's `members` rung onto the game ladder's `member` in exactly one place. Consumed by `routes/entitlements.ts`.
@@ -207,7 +207,7 @@ Models: GPT-OSS 20B, Gemma 3 12B, Llama 3.1 8B Fast. Four scenarios (Mysterious 
 
 - **4A** Long context (20 turns) — note degradation point and recall of turn-1 events at turn 20.
 - **4B** Invalid input — nonsensical, impossible, meta-breaking, contradictory. Expect in-character redirection.
-- **4C** Rapid milestones — three back-to-back completions, verify each emits the `[COMPLETE_MILESTONE]` tag.
+- **4C** Rapid milestones — three back-to-back completions, verify each emits the `[COMPLETE_MILESTONE]` tag. *(Historical: markers were retired by #76 Phase 1, 2026-07-19 — completions are now engine-refereed and the worker strips any leaked marker, so a rerun would instead verify clean narration with no control tokens.)*
 - **4D** Character death — death saves + revive attempt. Expect rules-aware, emotionally weighted handling.
 
 Target: >=4/5 average, minimum 3/5.
