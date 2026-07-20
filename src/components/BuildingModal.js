@@ -3,8 +3,19 @@ import { getHPStatus } from '../utils/healthSystem';
 import { getReadyTurnIns, getAvailableQuestsAt, effectivePartyLevel } from '../game/questEngine';
 import { getShopStock } from '../data/shopStock';
 import { buyPrice, sellPrice, canAfford, isSellable } from '../game/shopController';
-import { ITEM_CATALOG, getRarityColor } from '../utils/inventorySystem';
+import { ITEM_CATALOG, getRarityColor, describeHealAmount, describeSpellDamage } from '../utils/inventorySystem';
 import { areRequirementsMet, isQuestItemSearchable } from '../game/milestoneEngine';
+
+// A short "what this item does" line for the shop list, so a buyer sees the effect (e.g.
+// "+2 attack", "Heals 2d4+2 HP (4 to 10)") next to the price instead of a bare name.
+const shopEffectLabel = (item) => {
+  if (!item) return null;
+  if (item.type === 'weapon' || item.type === 'armor') return item.bonus || null; // "+2 attack" / "+2 defense"
+  if (item.type === 'accessory') return item.bonus || '+1 to checks';
+  if (item.effect === 'heal' && item.amount) return `Heals ${describeHealAmount(item.amount)}`;
+  if (item.effect === 'spell' && item.damage) return `Deals ${describeSpellDamage(item.damage)}`;
+  return null;
+};
 
 const getAbilityModifier = (score) => Math.floor(((score || 10) - 10) / 2);
 
@@ -982,7 +993,12 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                                         fontFamily: 'var(--body-font)',
                                                         fontSize: '0.9rem'
                                                     }}>
-                                                        <span style={{ fontWeight: 'bold', color: getRarityColor(item.rarity) }}>{item.name}</span>
+                                                        <span style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                                                            <span style={{ fontWeight: 'bold', color: getRarityColor(item.rarity) }}>{item.name}</span>
+                                                            {shopEffectLabel(item) && (
+                                                                <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{shopEffectLabel(item)}</span>
+                                                            )}
+                                                        </span>
                                                         <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                             <span style={{ color: '#d4af37', fontWeight: 'bold', minWidth: '60px', textAlign: 'right' }}>
                                                                 {price} GP

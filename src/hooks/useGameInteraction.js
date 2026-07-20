@@ -4,7 +4,8 @@ import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
 import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver';
 import { areRequirementsMet } from '../game/milestoneEngine';
-import { parseCheckMarker, resolveSkillCheck, formatCheckRollLine, formatCheckResultForPrompt } from '../game/skillCheck';
+import { parseCheckMarker, resolveSkillCheck, formatCheckRollLine, formatCheckResultForPrompt,
+    locationKey, isCheckLocked, addCheckLock, formatActiveLocksForPrompt, formatBlockedCheckForPrompt } from '../game/skillCheck';
 import { getSupportBonus } from '../utils/multiRoundEncounter';
 import { getStepHint } from '../game/questHints';
 import { formatPartyInfo } from '../game/promptComposer';
@@ -570,7 +571,18 @@ const useGameInteraction = (
         const milestonesInfoRegular = formatMilestonePromptText(milestoneStatusRegular);
         const sideQuestsInfoRegular = formatSideQuestPromptText(settings.sideQuests);
 
-        const gameContext = `Setting: ${settings.shortDescription || 'Fantasy Realm'}. Mood: ${settings.grimnessLevel || 'Normal'}.${goalInfo}${milestonesInfoRegular}${sideQuestsInfoRegular}\n${locationInfo}. Party: ${partyInfo}.`;
+        // #83 Phase 2: the current scene's location key, and the approaches already spent
+        // (failed) here — injected so the model steers away instead of letting more talking
+        // reverse a failed check (the primary anti-retry defense).
+        const currentLocation = locationKey({
+            isInsideTown: locationContext?.isInsideTown,
+            townName: locationContext?.currentTownTile?.townName,
+            isInsideSite: locationContext?.isInsideSite,
+            siteName: locationContext?.currentSiteName,
+        });
+        const spentApproaches = formatActiveLocksForPrompt(settings.checkLocks, currentLocation);
+
+        const gameContext = `Setting: ${settings.shortDescription || 'Fantasy Realm'}. Mood: ${settings.grimnessLevel || 'Normal'}.${goalInfo}${milestonesInfoRegular}${sideQuestsInfoRegular}\n${locationInfo}. Party: ${partyInfo}.${spentApproaches ? `\n${spentApproaches}` : ''}`;
 
         // Query RAG for relevant past events (appended at end for cache-friendliness)
         let ragContext = '';
@@ -613,16 +625,28 @@ const useGameInteraction = (
             // (party Lead + support), and strip the marker from the narration. The visible roll
             // line + next-turn context injection happen just below, after the message is added.
             let resolvedCheck = null;
+            let blockedCheck = null;
             const checkProposal = parseCheckMarker(aiResponse);
             if (checkProposal) {
-                resolvedCheck = resolveSkillCheck({
-                    skill: checkProposal.skill,
-                    tier: checkProposal.tier,
-                    hero: selectedHeroes?.[0],
-                    supportBonus: getSupportBonus(selectedHeroes || [], 0),
-                });
+                const lockEntry = { location: currentLocation, target: checkProposal.target, skill: checkProposal.skill };
+                if (isCheckLocked(settings.checkLocks, lockEntry)) {
+                    // #83 Phase 2 hard backstop: this (location, target, skill) already failed
+                    // this scene, so DO NOT roll a fresh die. Tell the model the approach is dead
+                    // (next-turn injection) and surface a brief note; the player must find another
+                    // route or leave/rest. This is mechanical, not vibes.
+                    blockedCheck = checkProposal;
+                    pendingCheckContextRef.current = formatBlockedCheckForPrompt(checkProposal.skill, checkProposal.target);
+                    logger.info(`[CHECK] blocked (already spent): ${checkProposal.skill}${checkProposal.target ? ` vs ${checkProposal.target}` : ''} @ ${currentLocation}`);
+                } else {
+                    resolvedCheck = resolveSkillCheck({
+                        skill: checkProposal.skill,
+                        tier: checkProposal.tier,
+                        hero: selectedHeroes?.[0],
+                        supportBonus: getSupportBonus(selectedHeroes || [], 0),
+                    });
+                    logger.info(`[CHECK] ${resolvedCheck.skill} (${resolvedCheck.tier}, DC ${resolvedCheck.dc}) -> rolled ${resolvedCheck.rollResult.total}: ${resolvedCheck.outcomeTier}`);
+                }
                 aiResponse = aiResponse.replace(checkProposal.raw, '').replace(/[ \t]{2,}/g, ' ').trim();
-                logger.info(`[CHECK] ${resolvedCheck.skill} (${resolvedCheck.tier}, DC ${resolvedCheck.dc}) -> rolled ${resolvedCheck.rollResult.total}: ${resolvedCheck.outcomeTier}`);
             }
             // Scrub any remaining check/roll marker (a second one, or a malformed proposal whose
             // skill didn't resolve) so a raw control token never renders to the player.
@@ -646,6 +670,16 @@ const useGameInteraction = (
                 const heroName = lead?.characterName || lead?.heroName || 'The party';
                 setConversation(prev => [...prev, { role: 'system', content: formatCheckRollLine(resolvedCheck, heroName) }]);
                 pendingCheckContextRef.current = formatCheckResultForPrompt(resolvedCheck);
+                // #83 Phase 2: a FAILED check locks this (location, target, skill) for the scene,
+                // PERSISTED in the save so a reload is not a free reroll. Cleared on a long rest
+                // or on entering a different location (Game.js). Success never locks.
+                if (!resolvedCheck.success) {
+                    const lockEntry = { location: currentLocation, target: checkProposal.target, skill: resolvedCheck.skill };
+                    setSettings(prev => ({ ...prev, checkLocks: addCheckLock(prev.checkLocks, lockEntry) }));
+                }
+            } else if (blockedCheck) {
+                setConversation(prev => [...prev, { role: 'system', content:
+                    `🚫 That approach is spent — ${blockedCheck.skill}${blockedCheck.target ? ` on ${blockedCheck.target}` : ''} won't move them further here. Try another way, or come back later.` }]);
             }
 
             // Fire-and-forget: embed the AI response for RAG

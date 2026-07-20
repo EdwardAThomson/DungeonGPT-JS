@@ -47,6 +47,7 @@ const GameModals = ({
   hasAdventureStarted,
   handleTownTileClick,
   handleSiteTileClick,
+  handleAttackSiteMob,
   handleEncounterResolve,
   handleHeroUpdate,
   onUseItem,
@@ -165,6 +166,7 @@ const GameModals = ({
         siteMapData={mapHook.currentSiteMap}
         sitePlayerPosition={mapHook.sitePlayerPosition}
         onSiteTileClick={handleSiteTileClick}
+        onAttackSiteMob={handleAttackSiteMob}
         onLeaveSite={() => mapHook.handleLeaveSite(interactionHook.setConversation, interactionHook.conversation)}
         siteError={mapHook.siteError}
         siteNotice={mapHook.siteNotice}

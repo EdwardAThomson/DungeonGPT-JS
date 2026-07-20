@@ -49,7 +49,7 @@ const threatRingStyle = (threat, isHunter) => {
  * a step animates the SAME element between tiles (a CSS transform transition) instead of
  * teleporting. Their fight/AI lives in the game loop; this component only visualizes them.
  */
-const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite, showLeaveButton = true, firstHero, siteError, siteNotice, partyLevel }) => {
+const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onAttackMob, onLeaveSite, showLeaveButton = true, firstHero, siteError, siteNotice, partyLevel }) => {
   if (!siteMapData) return null;
   const { width, height, mapData, theme } = siteMapData;
 
@@ -128,13 +128,20 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onLeaveSite,
           return (
           <div
             key={mob.id}
-            title={threat ? `${threat.label} threat${isHunter ? ' · Hunter (will chase)' : ''}` : undefined}
+            title={onAttackMob
+              ? `Click to attack${threat ? ` — ${threat.label} threat` : ''}${isHunter ? ' · Hunter (will chase)' : ''}`
+              : (threat ? `${threat.label} threat${isHunter ? ' · Hunter (will chase)' : ''}` : undefined)}
+            onClick={onAttackMob ? (e) => { e.stopPropagation(); onAttackMob(mob); } : undefined}
             style={{
               position: 'absolute', left: 0, top: 0, width: TILE, height: TILE,
               transform: `translate(${mob.x * TILE}px, ${mob.y * TILE}px)`,
               transition: `transform ${MOB_STEP_MS}ms linear`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              pointerEvents: 'none', zIndex: 2,
+              // Clickable so the player can ENGAGE a mob of their own volition (finish off a
+              // fled/idle mob that won't re-approach) rather than only fighting on contact.
+              pointerEvents: onAttackMob ? 'auto' : 'none',
+              cursor: onAttackMob ? 'pointer' : 'default',
+              zIndex: 2,
             }}
           >
             {/* Threat ring (concentric with the inner alert-state telegraph). */}

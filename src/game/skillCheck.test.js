@@ -107,3 +107,61 @@ describe('presentation', () => {
     expect(fact.toLowerCase()).toMatch(/stands/);
   });
 });
+
+describe('#83 Phase 2 — lock ledger', () => {
+  const { normalizeTarget, locationKey, isCheckLocked, addCheckLock, retainLocationLocks, formatActiveLocksForPrompt } = require('./skillCheck');
+
+  it('parses an optional target and normalizes it', () => {
+    expect(parseCheckMarker('[CHECK: Persuasion, hard, the Gate Captain]')).toMatchObject({ skill: 'Persuasion', tier: 'hard', target: 'gate captain' });
+    expect(parseCheckMarker('[CHECK: Stealth]').target).toBe('');
+    expect(normalizeTarget('The  Old   Warden')).toBe('old warden');
+  });
+
+  it('builds a location key for town / site / world', () => {
+    expect(locationKey({ isInsideTown: true, townName: 'Briar' })).toBe('town:Briar');
+    expect(locationKey({ isInsideSite: true, siteName: 'Echo Hollow' })).toBe('site:Echo Hollow');
+    expect(locationKey({})).toBe('world');
+  });
+
+  it('locks a (location, target, skill) and is idempotent', () => {
+    const e = { location: 'town:Briar', target: 'captain', skill: 'Persuasion' };
+    let locks = addCheckLock([], e);
+    expect(isCheckLocked(locks, e)).toBe(true);
+    expect(addCheckLock(locks, e)).toBe(locks); // idempotent -> same ref
+    // a different target or skill is NOT locked
+    expect(isCheckLocked(locks, { ...e, target: 'merchant' })).toBe(false);
+    expect(isCheckLocked(locks, { ...e, skill: 'Intimidation' })).toBe(false);
+  });
+
+  it('caps the ledger, dropping oldest', () => {
+    let locks = [];
+    for (let i = 0; i < 45; i++) locks = addCheckLock(locks, { location: `town:T${i}`, target: '', skill: 'Persuasion' }, 40);
+    expect(locks.length).toBe(40);
+    expect(locks[0].location).toBe('town:T5'); // first 5 dropped
+  });
+
+  it('retains only the entered location\'s locks (a different place clears the rest)', () => {
+    const locks = [
+      { location: 'town:A', target: '', skill: 'Persuasion' },
+      { location: 'town:B', target: '', skill: 'Stealth' },
+    ];
+    const afterEnterB = retainLocationLocks(locks, 'town:B');
+    expect(afterEnterB).toEqual([{ location: 'town:B', target: '', skill: 'Stealth' }]);
+    // re-entering the SAME place keeps its own locks (no reset)
+    expect(retainLocationLocks(locks, 'town:A')).toEqual([{ location: 'town:A', target: '', skill: 'Persuasion' }]);
+    // nothing to drop -> same ref
+    const onlyB = [{ location: 'town:B', target: '', skill: 'Stealth' }];
+    expect(retainLocationLocks(onlyB, 'town:B')).toBe(onlyB);
+  });
+
+  it('formats only the current location\'s spent approaches for the prompt', () => {
+    const locks = [
+      { location: 'town:A', target: 'captain', skill: 'Persuasion' },
+      { location: 'town:B', target: '', skill: 'Stealth' },
+    ];
+    const line = formatActiveLocksForPrompt(locks, 'town:A');
+    expect(line).toContain('Persuasion vs captain');
+    expect(line).not.toContain('Stealth');
+    expect(formatActiveLocksForPrompt(locks, 'town:C')).toBe('');
+  });
+});

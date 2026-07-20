@@ -91,8 +91,8 @@ describe('getEquippedBonuses', () => {
     const hero = makeHero({
       equipment: { weapon: 'magic_weapon', armor: 'magic_plate', accessory: 'ring_protection' }
     });
-    // weapon '+1' -> attack 1, armour '+2 defense' -> defense 2, ring '+1 defense' -> misc 1
-    expect(getEquippedBonuses(hero)).toEqual({ attack: 1, defense: 2, misc: 1 });
+    // magic_weapon (rare) '+2 attack' -> attack 2, armour '+2 defense' -> defense 2, ring '+1 defense' -> misc 1
+    expect(getEquippedBonuses(hero)).toEqual({ attack: 2, defense: 2, misc: 1 });
   });
 
   it('gives an accessory with no numeric bonus a default +1 misc', () => {
@@ -218,7 +218,7 @@ describe('equipItemFromParty (pooled equip + no duplication)', () => {
     expect(updatedWearer.inventory.filter((i) => i.key === 'magic_weapon')).toHaveLength(1);
     expect(updatedWearer.equipment.weapon).toBe('magic_weapon');
     // the bonus resolves on the wearer (item is in the wearer's own inventory)
-    expect(getEquippedBonuses(updatedWearer).attack).toBe(1);
+    expect(getEquippedBonuses(updatedWearer).attack).toBe(2);
   });
 
   it('conserves the total number of copies (no duplication) on transfer', () => {

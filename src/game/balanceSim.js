@@ -55,7 +55,7 @@ export const mulberry32 = (seed) => {
 // (Part II §16c: never a hypothetical loadout).
 export const LOADOUT_PRESETS = {
   none: { weapon: null, armor: null, accessory: null },
-  mid: { weapon: 'magic_weapon', armor: 'studded_leather', accessory: 'enchanted_trinket' }
+  mid: { weapon: 'silver_dagger', armor: 'studded_leather', accessory: 'enchanted_trinket' }
 };
 
 /** All ITEM_CATALOG entries that occupy an equip slot, as [key, def, slot]. */

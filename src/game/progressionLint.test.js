@@ -97,7 +97,7 @@ const KNOWN_GAPS = {
   // weapon-+2 gap is HEALED (runic_greatsword, very_rare, ruin-vault/dragon-lair
   // drops at t2). The pinned rungs now belong to the t3 legendary shelf: weapon +3
   // (blade_of_the_shattered_throne) and armor +5 (aegis_of_dawn) go live with t3.
-  unobtainableSlotRungs: { weapon: [3], armor: [5], accessory: [] },
+  unobtainableSlotRungs: { weapon: [4], armor: [5], accessory: [] },
 
   // (c) boss win-rate pins. HEALED 2026-07-03 by #43 (Lead + Support party
   // fights, flat enemy damage, explicit boss damage profiles, deadly-DC retune to

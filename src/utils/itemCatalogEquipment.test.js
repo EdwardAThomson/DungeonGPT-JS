@@ -35,12 +35,12 @@ describe('catalog equipment data', () => {
 
   test('buffed weapons add to-hit; junk weapons stay neutral', () => {
     const equip = (key) => getEquippedBonuses(equipItem({ equipment: {}, inventory: [{ key }] }, key));
-    expect(equip('shortsword').attack).toBe(1);
-    expect(equip('silver_dagger').attack).toBe(1);
-    expect(equip('hunters_longbow').attack).toBe(1);
-    expect(equip('runic_greatsword').attack).toBe(2); // #44: the obtainable +2 rung
-    expect(equip('legendary_weapon').attack).toBe(3);
-    expect(equip('blade_of_the_shattered_throne').attack).toBe(3); // t3 shelf
+    expect(equip('shortsword').attack).toBe(1);       // common
+    expect(equip('silver_dagger').attack).toBe(1);    // uncommon (green stays +1)
+    expect(equip('hunters_longbow').attack).toBe(2);  // rare (blue) now +2 — rarity scaling
+    expect(equip('runic_greatsword').attack).toBe(3); // very_rare, the obtainable +3 rung
+    expect(equip('legendary_weapon').attack).toBe(4);
+    expect(equip('blade_of_the_shattered_throne').attack).toBe(4); // t3 shelf
     expect(equip('rusty_dagger').attack).toBe(0); // junk: no bonus
   });
 

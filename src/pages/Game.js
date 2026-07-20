@@ -54,6 +54,7 @@ import { resolveProviderAndModel } from '../llm/modelResolver';
 import { appendLedgerEvents } from '../game/heroLedger';
 import { healPartyUpward, reconcileHeroWithLedger } from '../game/heroInvariants';
 import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile, getMilestoneLocationForTile, migrateNarrativeMilestones } from '../game/milestoneEngine';
+import { locationKey, retainLocationLocks } from '../game/skillCheck';
 import { recordItemDiscoveries, recordEnemyDiscovery, seedCodexFromParty, getBestiaryEntries, findBestiaryMatch, slugify as slugifyCodexKey } from '../game/codexEngine';
 import { buyItem, sellItem } from '../game/shopController';
 import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, getActiveGatherResources, turnInQuest, getRevealedSiteTypes, effectivePartyLevel, pickOfferableSideQuest, resolveQuestOrigin, stampQuestOrigin } from '../game/questEngine';
@@ -441,6 +442,7 @@ const Game = ({ resumeConversation = null }) => {
     setSettings(prev => ({ ...prev, milestones: migrateNarrativeMilestones(prev.milestones) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.milestones]);
+
   // Moving-mob plumbing for site walks. Like the counters above, these read from refs so
   // the async per-step callback (runSiteStep) sees the freshest mob positions / grid
   // mid-walk instead of the stale render-time closure. The mob objects are mutated in
@@ -494,6 +496,26 @@ const Game = ({ resumeConversation = null }) => {
   const mapTheme = settings?.theme || settingsObj?.theme || 'grassland';
   const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme, getActiveSiteObjectives(settings?.sideQuests), settings?.milestones, getActiveGatherResources(settings?.sideQuests));
 
+  // #83 Phase 2: entering a town/site clears every OTHER location's spent check locks —
+  // arriving somewhere else is what resets a prior place's approaches. Does NOTHING on the
+  // world map, so stepping out of a town and straight back in resets nothing (no cheese).
+  // retainLocationLocks returns the same array when nothing drops, so this write no-ops then.
+  // MUST come after mapHook is declared (its fields are read in the dependency array).
+  useEffect(() => {
+    const key = locationKey({
+      isInsideTown: mapHook.isInsideTown,
+      townName: mapHook.currentTownTile?.townName,
+      isInsideSite: mapHook.isInsideSite,
+      siteName: mapHook.currentSiteMap?.name,
+    });
+    if (key === 'world') return;
+    setSettings(prev => {
+      const kept = retainLocationLocks(prev?.checkLocks, key);
+      return kept === prev?.checkLocks ? prev : { ...prev, checkLocks: kept };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapHook.isInsideTown, mapHook.currentTownTile?.townName, mapHook.isInsideSite, mapHook.currentSiteMap?.name]);
+
   // Cancel any in-progress town/site walk when the sub-map changes (leaving a town/site
   // flips currentMapLevel back to 'world') or the component unmounts, so no scheduled step
   // fires against a torn-down map. Declared after mapHook so it does not read it in the TDZ.
@@ -523,7 +545,11 @@ const Game = ({ resumeConversation = null }) => {
       isInsideTown: mapHook.isInsideTown,
       currentTownTile: mapHook.currentTownTile,
       currentTownMap: mapHook.currentTownMap,
-      townPlayerPosition: mapHook.townPlayerPosition
+      townPlayerPosition: mapHook.townPlayerPosition,
+      // #83 Phase 2: site identity so a free-text check inside a cave/ruin keys its lock to
+      // that site (not a generic 'world'), matching the location-change lock clear below.
+      isInsideSite: mapHook.isInsideSite,
+      currentSiteName: mapHook.currentSiteMap?.name
     },
     sessionId,
     aiAvailable,
@@ -1308,6 +1334,40 @@ const Game = ({ resumeConversation = null }) => {
       stepIntervalMs: TILE_STEP_MS,
       onEnterTile: (pos) => runSiteStep(pos),
     });
+  };
+
+  // Click-to-attack a visible site mob. Site combat is otherwise contact-only (the mob has to
+  // reach the party), so a fled/idle mob that won't re-approach was impossible to finish off
+  // (playtest 2026-07-20). The player choosing to attack drops the mob's flee de-aggro so it
+  // engages, then: if already adjacent, opens the fight immediately (mirroring runSiteStep's
+  // mob-contact branch); otherwise walks the party to a tile beside the mob, where the normal
+  // per-step contact check engages it.
+  const handleAttackSiteMob = (mob) => {
+    if (interactionHook.isLoading || !mob || mob.defeated) return;
+    const siteMap = mapHook.currentSiteMap;
+    const start = mapHook.sitePlayerPosition;
+    if (!siteMap || !start) return;
+    // Player-initiated: clear any flee cooldown so the mob can be engaged right now.
+    mapHook.setSiteMobFleeCooldown(mob.id, 0);
+
+    if (Math.abs(start.x - mob.x) + Math.abs(start.y - mob.y) <= 1) {
+      if (walkCancelRef.current) walkCancelRef.current();
+      activeSiteMobIdRef.current = mob.id;
+      preEncounterPosRef.current = { level: 'site', x: start.x, y: start.y };
+      mapHook.setIsMapModalOpen(false);
+      reopenMapAfterEncounterRef.current = true;
+      openEncounterAction({ encounter: mob.isBoss ? { ...mob.encounter, enemyId: mob.enemyId } : mob.encounter });
+      return;
+    }
+
+    // Not adjacent: walk to the reachable walkable tile beside the mob nearest the party; the
+    // uncooled mob engages on contact during the walk (runSiteStep's advanceMobs branch).
+    const beside = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }]
+      .map(d => ({ x: mob.x + d.dx, y: mob.y + d.dy }))
+      .filter(t => { const tile = siteMap.mapData[t.y] && siteMap.mapData[t.y][t.x]; return tile && tile.walkable; })
+      .sort((a, b) => (Math.abs(a.x - start.x) + Math.abs(a.y - start.y)) - (Math.abs(b.x - start.x) + Math.abs(b.y - start.y)));
+    if (beside[0]) handleSiteTileClick(beside[0].x, beside[0].y);
+    else mapHook.setSiteError('You cannot reach that creature.');
   };
 
   // Accept an offered side quest (from a building quest-giver). Activates it so its steps
@@ -2303,6 +2363,7 @@ const Game = ({ resumeConversation = null }) => {
         hasAdventureStarted={hasAdventureStarted}
         handleTownTileClick={handleTownTileClick}
         handleSiteTileClick={handleSiteTileClick}
+        handleAttackSiteMob={handleAttackSiteMob}
         handleEncounterResolve={handleEncounterResolve}
         handleHeroUpdate={handleHeroUpdate}
         onUseItem={(heroId, itemKey, healedHero) => {
@@ -2358,6 +2419,11 @@ const Game = ({ resumeConversation = null }) => {
             return healed;
           });
           setSelectedHeroes(updatedHeroes);
+          // #83 Phase 2: a LONG rest is the deliberate "time passed" reset — clear every spent
+          // check lock so the party can attempt those approaches afresh. A short rest does not.
+          if (restType === 'long' && settings?.checkLocks?.length) {
+            setSettings(prev => ({ ...prev, checkLocks: [] }));
+          }
           return { restType, healingResults };
         }}
         sideQuests={settings?.sideQuests}

@@ -163,18 +163,18 @@ export const ITEM_CATALOG = {
   // Uncommon items
   'greater_healing_potion': { name: 'Greater Healing Potion', rarity: 'uncommon', value: 150, effect: 'heal', amount: '4d4+4', description: 'A deep-crimson elixir potent enough to mend grievous injury.', icon: 'assets/icons/items/greater_healing_potion.webp' },
   'scroll_fireball': { name: 'Fire Scroll', rarity: 'uncommon', value: 200, effect: 'spell', spell: 'fireball', damage: '3d6', target: 'enemy', combatOnly: true, description: 'A rune-scribed vellum that looses a roaring blast of flame at a foe when read aloud.', icon: 'assets/icons/items/scroll_fireball.webp' },
-  'silver_dagger': { name: 'Silver Dagger', rarity: 'uncommon', value: 100, type: 'weapon', bonus: '+1', description: 'A keen blade of blessed silver, bane of beasts that shun the moon.', icon: 'assets/icons/items/silver_dagger.webp' },
+  'silver_dagger': { name: 'Silver Dagger', rarity: 'uncommon', value: 100, type: 'weapon', bonus: '+1 attack', description: 'A keen blade of blessed silver, bane of beasts that shun the moon.', icon: 'assets/icons/items/silver_dagger.webp' },
 
   // Rare items
-  'magic_weapon': { name: 'Enchanted Blade', rarity: 'rare', value: 500, type: 'weapon', bonus: '+1', description: 'A finely balanced sword humming with a faint arcane charge.', icon: 'assets/icons/items/magic_weapon.webp' },
-  'hunters_longbow': { name: 'Hunter\'s Longbow', rarity: 'rare', value: 450, type: 'weapon', bonus: '+1', description: 'A masterwork yew longbow strung with sinew. Favored by rangers who strike from the treeline.', icon: 'assets/icons/items/hunters_longbow.webp' },
+  'magic_weapon': { name: 'Enchanted Blade', rarity: 'rare', value: 500, type: 'weapon', bonus: '+2 attack', description: 'A finely balanced sword humming with a faint arcane charge.', icon: 'assets/icons/items/magic_weapon.webp' },
+  'hunters_longbow': { name: 'Hunter\'s Longbow', rarity: 'rare', value: 450, type: 'weapon', bonus: '+2 attack', description: 'A masterwork yew longbow strung with sinew. Favored by rangers who strike from the treeline.', icon: 'assets/icons/items/hunters_longbow.webp' },
   'ring_protection': { name: 'Protective Ring', rarity: 'rare', value: 750, type: 'ring', bonus: '+1 defense', description: 'A silver band warded with protective glyphs that turn aside harm.', icon: 'assets/icons/items/ring_protection.webp' },
   'wardstone_pendant': { name: 'Wardstone Pendant', rarity: 'rare', value: 600, type: 'charm', bonus: '+1', description: 'A sliver of rune-cut mountain stone on a leather cord. It hums faintly when danger is near.', icon: 'assets/icons/items/gemstone.webp' },
 
   // Very Rare
   // #44: the obtainable +2 weapon rung (very_rare, so tier-2 drops can carry it;
   // legendary weapons are t3-gated).
-  'runic_greatsword': { name: 'Runic Greatsword', rarity: 'very_rare', value: 1500, type: 'weapon', bonus: '+2', description: 'A two-handed blade etched with dwarven war-runes that flare blue mid-swing.', icon: 'assets/icons/items/runic_greatsword.webp' },
+  'runic_greatsword': { name: 'Runic Greatsword', rarity: 'very_rare', value: 1500, type: 'weapon', bonus: '+3 attack', description: 'A two-handed blade etched with dwarven war-runes that flare blue mid-swing.', icon: 'assets/icons/items/runic_greatsword.webp' },
   // #44: a FINDABLE very_rare accessory (the other +2/+3 artifacts are bespoke quest
   // rewards).
   'stormbound_ring': { name: 'Stormbound Ring', rarity: 'very_rare', value: 3500, type: 'ring', bonus: '+2', description: 'A band of sky-iron that crackles with a captive storm. Lightning answers its wearer\'s call.', icon: 'assets/icons/items/stormbound_ring.webp' },
@@ -191,8 +191,8 @@ export const ITEM_CATALOG = {
   // (unobtainableGear) exactly like legendary_weapon. t3 authoring assigns them to
   // milestones; do NOT put them in shops, hoards, or tiered drop tables before then.
   // (#44 icon art: complete — every shelf item has its own webp as of 2026-07-03.)
-  'legendary_weapon': { name: 'Legendary Weapon', rarity: 'legendary', value: 7500, type: 'weapon', bonus: '+3', description: 'A weapon out of legend, its edge singing with ancient might.', icon: 'assets/icons/items/legendary_weapon.webp' },
-  'blade_of_the_shattered_throne': { name: 'Blade of the Shattered Throne', rarity: 'legendary', value: 10000, type: 'weapon', bonus: '+3', description: 'Reforged from the throne the Shadow Overlord broke, this blade remembers every oath sworn upon it.', icon: 'assets/icons/items/blade_of_the_shattered_throne.webp' },
+  'legendary_weapon': { name: 'Legendary Weapon', rarity: 'legendary', value: 7500, type: 'weapon', bonus: '+4 attack', description: 'A weapon out of legend, its edge singing with ancient might.', icon: 'assets/icons/items/legendary_weapon.webp' },
+  'blade_of_the_shattered_throne': { name: 'Blade of the Shattered Throne', rarity: 'legendary', value: 10000, type: 'weapon', bonus: '+4 attack', description: 'Reforged from the throne the Shadow Overlord broke, this blade remembers every oath sworn upon it.', icon: 'assets/icons/items/blade_of_the_shattered_throne.webp' },
   'aegis_of_dawn': { name: 'Aegis of Dawn', rarity: 'legendary', value: 8000, type: 'armor', bonus: '+5 defense', description: 'Plate armor quenched in first light. Blows that should kill are swallowed by a sunrise glow.', icon: 'assets/icons/items/aegis_of_dawn.webp' },
   'heart_of_the_last_winter': { name: 'Heart of the Last Winter', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'A shard of unmelting ice cut from the Blood Wendigo\'s frozen heart. Winter itself bends around its bearer.', icon: 'assets/icons/items/heart_of_the_last_winter.webp' },
   'clockwork_god_core': { name: 'Clockwork God-Core', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'The still-ticking heart of the Herald of the Old Gods. Its gears turn one second ahead of the world.', icon: 'assets/icons/items/clockwork_god_core.webp' },
@@ -209,10 +209,10 @@ export const ITEM_CATALOG = {
   'ancient_scroll': { name: 'Ancient Scroll', rarity: 'uncommon', value: 100, description: 'Brittle parchment covered in the script of a long-dead tongue.', icon: 'assets/icons/items/ancient_scroll.webp' },
   'pearl': { name: 'Pearl', rarity: 'uncommon', value: 100, description: 'A lustrous pearl from the deep, cool and perfect to the touch.', icon: 'assets/icons/items/pearl.webp' },
   'ectoplasm': { name: 'Ectoplasm', rarity: 'uncommon', value: 75, description: 'A cold, gelatinous residue left where a spirit has passed.', icon: 'assets/icons/items/ectoplasm.webp' },
-  'ritual_dagger': { name: 'Ritual Dagger', rarity: 'uncommon', value: 125, type: 'weapon', bonus: '+1', description: 'A ceremonial blade etched with symbols meant for darker rites.', icon: 'assets/icons/items/ritual_dagger.webp' },
+  'ritual_dagger': { name: 'Ritual Dagger', rarity: 'uncommon', value: 125, type: 'weapon', bonus: '+1 attack', description: 'A ceremonial blade etched with symbols meant for darker rites.', icon: 'assets/icons/items/ritual_dagger.webp' },
   'dark_tome': { name: 'Dark Tome', rarity: 'rare', value: 300, description: 'A grimoire bound in cracked hide, its pages whispering forbidden things.', icon: 'assets/icons/items/dark_tome.webp' },
   'spell_scroll': { name: 'Spell Scroll', rarity: 'uncommon', value: 50, description: 'A single spell captured in ink, spent the moment it is read.', icon: 'assets/icons/items/spell_scroll.webp' },
-  'healing_herbs': { name: 'Healing Herbs', rarity: 'common', value: 20, stackable: true, description: 'A bundle of green sprigs that soothe wounds when crushed and applied.', icon: 'assets/icons/items/healing_herbs.webp' },
+  'healing_herbs': { name: 'Healing Herbs', rarity: 'common', value: 20, stackable: true, effect: 'heal', amount: '1d4+2', description: 'A bundle of green sprigs that soothe wounds when crushed and applied.', icon: 'assets/icons/items/healing_herbs.webp' },
   'rare_flower': { name: 'Rare Flower', rarity: 'uncommon', value: 45, description: 'An uncommon bloom sought by herbalists and perfumers alike.', icon: 'assets/icons/items/rare_flower.webp' },
   'dryad_blessing': { name: 'Dryad\'s Blessing', rarity: 'rare', value: 0, type: 'blessing', description: 'A fading benediction of the forest, warm as dappled sunlight.', icon: 'assets/icons/items/dryad_blessing.webp' },
   'fairy_dust': { name: 'Fairy Dust', rarity: 'uncommon', value: 100, description: 'A pinch of glittering motes that tingle with mischievous magic.', icon: 'assets/icons/items/fairy_dust.webp' },
@@ -267,7 +267,7 @@ export const ITEM_CATALOG = {
   'ancient_artifact': { name: 'Ancient Artifact', rarity: 'rare', value: 400, description: 'A relic of vanished craftsmanship, its makers long turned to dust.', icon: 'assets/icons/items/ancient_artifact.webp' },
   'enchanted_seed': { name: 'Enchanted Seed', rarity: 'uncommon', value: 35, description: 'A seed that quivers with the promise of unnatural growth.', icon: 'assets/icons/items/enchanted_seed.webp' },
   'enchanted_mushroom': { name: 'Enchanted Mushroom', rarity: 'uncommon', value: 30, description: 'A fungus that shimmers with mild, edible magic.', icon: 'assets/icons/items/enchanted_mushroom.webp' },
-  'enchanted_staff': { name: 'Enchanted Staff', rarity: 'uncommon', value: 250, type: 'weapon', bonus: '+1', description: 'A rune-carved staff that answers a spellcaster\'s will.', icon: 'assets/icons/items/enchanted_staff.webp' },
+  'enchanted_staff': { name: 'Enchanted Staff', rarity: 'uncommon', value: 250, type: 'weapon', bonus: '+1 attack', description: 'A rune-carved staff that answers a spellcaster\'s will.', icon: 'assets/icons/items/enchanted_staff.webp' },
   'mountain_view': { name: 'Memory of a View', rarity: 'common', value: 0, description: 'Not a thing at all, but the memory of a breathtaking vista.', icon: 'assets/icons/items/mountain_view.webp' },
 
   // Environmental / natural loot (used by environmental & POI encounters)
@@ -302,7 +302,7 @@ export const ITEM_CATALOG = {
 
   // Encounter loot
   'rusty_dagger': { name: 'Rusty Dagger', rarity: 'common', value: 5, type: 'weapon', description: 'A pitted, neglected blade, barely better than none at all.', icon: 'assets/icons/items/rusty_dagger.webp' },
-  'shortsword': { name: 'Shortsword', rarity: 'common', value: 25, type: 'weapon', bonus: '+1', description: 'A serviceable soldier\'s blade, well balanced and reliable.', icon: 'assets/icons/items/shortsword.webp' },
+  'shortsword': { name: 'Shortsword', rarity: 'common', value: 25, type: 'weapon', bonus: '+1 attack', description: 'A serviceable soldier\'s blade, well balanced and reliable.', icon: 'assets/icons/items/shortsword.webp' },
   'leather_armor': { name: 'Leather Armor', rarity: 'common', value: 30, type: 'armor', bonus: '+1 defense', description: 'Supple boiled-leather protection for those who value speed.', icon: 'assets/icons/items/leather_armor.webp' },
   // Icon BORROWS hard_leather (a single-item stand-in) until dedicated armor art lands;
   // placeholderIcon tracks it in ITEM-05 and queues studded_leather.webp.
@@ -313,7 +313,7 @@ export const ITEM_CATALOG = {
   'scale_mail': { name: 'Scale Mail', rarity: 'rare', value: 350, type: 'armor', bonus: '+3 defense', description: 'Overlapping metal scales that turn aside all but the hardest blows.', icon: 'assets/icons/items/dragon_scale.webp' },
   'dragonscale_plate': { name: 'Dragonscale Plate', rarity: 'very_rare', value: 1500, type: 'armor', bonus: '+4 defense', description: 'Armor forged from dragon scales, nearly impervious and light for its strength.', icon: 'assets/icons/items/dragon_scale.webp' },
   'artifact_fragment': { name: 'Artifact Fragment', rarity: 'uncommon', value: 0, type: 'quest_item', description: 'A broken piece of some greater relic, meaningless until made whole.', icon: 'assets/icons/items/artifact_fragment.webp' },
-  'inspiration': { name: 'Minstrel\'s Blessing', rarity: 'uncommon', value: 0, type: 'buff', description: 'A minstrel\'s rousing gift, lifting the heart before the fight.', icon: 'assets/icons/items/inspiration.webp' },
+  'inspiration': { name: 'Minstrel\'s Blessing', rarity: 'uncommon', value: 45, effect: 'heal', amount: '2d4+1', description: 'A minstrel\'s rousing gift; the refrain lifts the heart and knits small hurts before the fight.', icon: 'assets/icons/items/inspiration.webp' },
   'divine_blessing': { name: 'Divine Blessing', rarity: 'rare', value: 0, type: 'blessing', description: 'A god\'s favor settling over you like a warm shield.', icon: 'assets/icons/items/divine_blessing.webp' },
   'ancient_knowledge': { name: 'Ancient Knowledge', rarity: 'rare', value: 0, type: 'lore', description: 'Wisdom recovered from the ages, worth more than gold to a scholar.', icon: 'assets/icons/items/ancient_knowledge.webp' },
   'cursed_item': { name: 'Cursed Trinket', rarity: 'rare', value: 0, type: 'cursed', description: 'A trinket that feels wrong in the hand and colder by the hour.', icon: 'assets/icons/items/cursed_item.webp' },
@@ -322,7 +322,7 @@ export const ITEM_CATALOG = {
   'ale_mug': { name: 'Ale Mug', rarity: 'common', value: 2, effect: 'heal', amount: '1d4', description: 'A frothy mug of ale; a swig steadies the nerves and dulls the aches.', icon: 'assets/icons/items/ale_mug.webp' },
   'bar_stool_leg': { name: 'Bar Stool Leg', rarity: 'common', value: 1, type: 'weapon', description: 'A stout length of table-wood, improvised weapon of many a brawl.', icon: 'assets/icons/items/bar_stool_leg.webp' },
   'stolen_goods': { name: 'Stolen Goods', rarity: 'uncommon', value: 35, description: 'Pilfered valuables best sold where no one asks questions.', icon: 'assets/icons/items/stolen_goods.webp' },
-  'poisoned_dagger': { name: 'Poisoned Dagger', rarity: 'uncommon', value: 75, type: 'weapon', bonus: '+1', description: 'A wickedly coated blade that bites long after it cuts.', icon: 'assets/icons/items/poisoned_dagger.webp' },
+  'poisoned_dagger': { name: 'Poisoned Dagger', rarity: 'uncommon', value: 75, type: 'weapon', bonus: '+1 attack', description: 'A wickedly coated blade that bites long after it cuts.', icon: 'assets/icons/items/poisoned_dagger.webp' },
   'rare_ingredient': { name: 'Rare Ingredient', rarity: 'uncommon', value: 40, description: 'A scarce component demanded by finicky alchemists.', icon: 'assets/icons/items/rare_ingredient.webp' },
 
   // Encounter reward items
