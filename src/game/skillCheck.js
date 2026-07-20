@@ -79,7 +79,15 @@ export const canonicalTier = (raw) => {
 // TRIGGER_REGEX so the two-argument form parses cleanly.
 export const CHECK_MARKER_REGEX = /\[CHECK:\s*([^\]]+)\]/i;
 
-/** Parse a [CHECK: skill, tier] marker into { skill, tier, raw } (canonicalized) or null. */
+// Normalize a proposed target (the NPC/thing the check is against) into a stable lock key
+// component: lowercased, de-articled, whitespace-collapsed. '' when absent (a location-wide
+// check). This is a fuzzy key, not an NPC-registry lookup — good enough for per-target locks.
+export const normalizeTarget = (raw) => {
+  if (!raw) return '';
+  return String(raw).trim().toLowerCase().replace(/^(the|a|an)\s+/, '').replace(/\s+/g, ' ');
+};
+
+/** Parse a [CHECK: skill, tier, target] marker into { skill, tier, target, raw } or null. */
 export const parseCheckMarker = (text) => {
   if (!text) return null;
   const m = text.match(CHECK_MARKER_REGEX);
@@ -87,7 +95,8 @@ export const parseCheckMarker = (text) => {
   const parts = m[1].split(',').map((p) => p.trim());
   const skill = canonicalSkill(parts[0]);
   if (!skill) return null;
-  return { skill, tier: canonicalTier(parts[1]), raw: m[0] };
+  // parts[2..] is the (optional) target; re-join so a target containing a comma survives.
+  return { skill, tier: canonicalTier(parts[1]), target: normalizeTarget(parts.slice(2).join(', ')), raw: m[0] };
 };
 
 /**
@@ -161,3 +170,66 @@ export const formatCheckResultForPrompt = (r) => {
     : 'Narrate the attempt failing. The failure stands for this scene — do not let further talking simply reverse it; steer toward another approach.';
   return `[CHECK RESULT: ${r.skill} check (rolled ${r.rollResult.total} vs DC ${r.dc}): ${verdict}. ${guidance}]`;
 };
+
+// --- Phase 2: the check lock ledger (anti-retry-spam) --------------------------------------
+// A FAILED check is recorded so the same approach can't be re-rolled by rephrasing. The lock is
+// keyed on (location, target, skill) and PERSISTS in the save (reload is not a free reroll). It
+// clears on a long rest (all) or on entering a DIFFERENT location (retainLocationLocks) — never
+// on merely leaving and re-entering the same place, so it can't be cheesed. Only free-text
+// checks lock; milestone progression (Talk button, required venues) never routes through here,
+// so the golden path can't be dead-ended.
+
+export const MAX_CHECK_LOCKS = 40;
+
+/** Location key for a lock: town:Name | site:Name | world. Shared by the recorder + the clears. */
+export const locationKey = ({ isInsideTown, townName, isInsideSite, siteName } = {}) => {
+  if (isInsideTown && townName) return `town:${townName}`;
+  if (isInsideSite && siteName) return `site:${siteName}`;
+  return 'world';
+};
+
+export const checkLockKey = ({ location, target, skill }) =>
+  `${location || 'world'}|${(target || '').toLowerCase()}|${skill}`;
+
+/** Is this (location, target, skill) already spent this scene? */
+export const isCheckLocked = (locks, entry) => {
+  if (!Array.isArray(locks) || locks.length === 0) return false;
+  const key = checkLockKey(entry);
+  return locks.some((l) => checkLockKey(l) === key);
+};
+
+/** Append a lock (idempotent; capped, dropping oldest). Returns a new array (or the same when unchanged). */
+export const addCheckLock = (locks, entry, cap = MAX_CHECK_LOCKS) => {
+  const base = Array.isArray(locks) ? locks : [];
+  if (isCheckLocked(base, entry)) return base;
+  const next = [...base, { location: entry.location || 'world', target: (entry.target || '').toLowerCase(), skill: entry.skill }];
+  return next.length > cap ? next.slice(next.length - cap) : next;
+};
+
+/**
+ * Keep only the locks tied to `location`, dropping every other location's. Run when the party
+ * ENTERS a town/site: arriving somewhere else is what clears a prior place's locks. Deliberately
+ * NOT run on entering the world map, so stepping out and back into the SAME place resets nothing.
+ * Returns the same array reference when nothing is dropped (cheap no-op).
+ */
+export const retainLocationLocks = (locks, location) => {
+  if (!Array.isArray(locks) || locks.length === 0) return locks;
+  const kept = locks.filter((l) => l.location === location);
+  return kept.length === locks.length ? locks : kept;
+};
+
+/**
+ * The prompt line naming the approaches already spent at the current location, so the model
+ * steers away instead of letting more talking succeed (the primary anti-retry defense; the
+ * roll-refusal on an exact re-proposal is the hard backstop).
+ */
+export const formatActiveLocksForPrompt = (locks, location, limit = 6) => {
+  const here = (Array.isArray(locks) ? locks : []).filter((l) => l.location === location);
+  if (here.length === 0) return '';
+  const items = here.slice(-limit).map((l) => `${l.skill}${l.target ? ` vs ${l.target}` : ''}`);
+  return `[SPENT APPROACHES this scene — already attempted and FAILED; do NOT let more talking reverse them, steer to another approach or route: ${items.join('; ')}]`;
+};
+
+/** The one-shot fact injected when the model re-proposes an already-spent check (no fresh roll). */
+export const formatBlockedCheckForPrompt = (skill, target) =>
+  `[CHECK BLOCKED: ${skill}${target ? ` vs ${target}` : ''} was already attempted and failed here. Do not roll it again or let more talking succeed; steer the party to a different approach or route.]`;

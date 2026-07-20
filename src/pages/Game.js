@@ -54,6 +54,7 @@ import { resolveProviderAndModel } from '../llm/modelResolver';
 import { appendLedgerEvents } from '../game/heroLedger';
 import { healPartyUpward, reconcileHeroWithLedger } from '../game/heroInvariants';
 import { checkMilestoneCompletion, getMilestoneRewards, getMilestoneBossForTile, getMilestoneItemForTile, getMilestoneLocationForTile, migrateNarrativeMilestones } from '../game/milestoneEngine';
+import { locationKey, retainLocationLocks } from '../game/skillCheck';
 import { recordItemDiscoveries, recordEnemyDiscovery, seedCodexFromParty, getBestiaryEntries, findBestiaryMatch, slugify as slugifyCodexKey } from '../game/codexEngine';
 import { buyItem, sellItem } from '../game/shopController';
 import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, getActiveGatherResources, turnInQuest, getRevealedSiteTypes, effectivePartyLevel, pickOfferableSideQuest, resolveQuestOrigin, stampQuestOrigin } from '../game/questEngine';
@@ -441,6 +442,25 @@ const Game = ({ resumeConversation = null }) => {
     setSettings(prev => ({ ...prev, milestones: migrateNarrativeMilestones(prev.milestones) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.milestones]);
+
+  // #83 Phase 2: entering a town/site clears every OTHER location's spent check locks —
+  // arriving somewhere else is what resets a prior place's approaches. Does NOTHING on the
+  // world map, so stepping out of a town and straight back in resets nothing (no cheese).
+  // retainLocationLocks returns the same array when nothing drops, so this write no-ops then.
+  useEffect(() => {
+    const key = locationKey({
+      isInsideTown: mapHook.isInsideTown,
+      townName: mapHook.currentTownTile?.townName,
+      isInsideSite: mapHook.isInsideSite,
+      siteName: mapHook.currentSiteMap?.name,
+    });
+    if (key === 'world') return;
+    setSettings(prev => {
+      const kept = retainLocationLocks(prev?.checkLocks, key);
+      return kept === prev?.checkLocks ? prev : { ...prev, checkLocks: kept };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapHook.isInsideTown, mapHook.currentTownTile?.townName, mapHook.isInsideSite, mapHook.currentSiteMap?.name]);
   // Moving-mob plumbing for site walks. Like the counters above, these read from refs so
   // the async per-step callback (runSiteStep) sees the freshest mob positions / grid
   // mid-walk instead of the stale render-time closure. The mob objects are mutated in
@@ -523,7 +543,11 @@ const Game = ({ resumeConversation = null }) => {
       isInsideTown: mapHook.isInsideTown,
       currentTownTile: mapHook.currentTownTile,
       currentTownMap: mapHook.currentTownMap,
-      townPlayerPosition: mapHook.townPlayerPosition
+      townPlayerPosition: mapHook.townPlayerPosition,
+      // #83 Phase 2: site identity so a free-text check inside a cave/ruin keys its lock to
+      // that site (not a generic 'world'), matching the location-change lock clear below.
+      isInsideSite: mapHook.isInsideSite,
+      currentSiteName: mapHook.currentSiteMap?.name
     },
     sessionId,
     aiAvailable,
@@ -2358,6 +2382,11 @@ const Game = ({ resumeConversation = null }) => {
             return healed;
           });
           setSelectedHeroes(updatedHeroes);
+          // #83 Phase 2: a LONG rest is the deliberate "time passed" reset — clear every spent
+          // check lock so the party can attempt those approaches afresh. A short rest does not.
+          if (restType === 'long' && settings?.checkLocks?.length) {
+            setSettings(prev => ({ ...prev, checkLocks: [] }));
+          }
           return { restType, healingResults };
         }}
         sideQuests={settings?.sideQuests}
