@@ -443,24 +443,6 @@ const Game = ({ resumeConversation = null }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.milestones]);
 
-  // #83 Phase 2: entering a town/site clears every OTHER location's spent check locks —
-  // arriving somewhere else is what resets a prior place's approaches. Does NOTHING on the
-  // world map, so stepping out of a town and straight back in resets nothing (no cheese).
-  // retainLocationLocks returns the same array when nothing drops, so this write no-ops then.
-  useEffect(() => {
-    const key = locationKey({
-      isInsideTown: mapHook.isInsideTown,
-      townName: mapHook.currentTownTile?.townName,
-      isInsideSite: mapHook.isInsideSite,
-      siteName: mapHook.currentSiteMap?.name,
-    });
-    if (key === 'world') return;
-    setSettings(prev => {
-      const kept = retainLocationLocks(prev?.checkLocks, key);
-      return kept === prev?.checkLocks ? prev : { ...prev, checkLocks: kept };
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapHook.isInsideTown, mapHook.currentTownTile?.townName, mapHook.isInsideSite, mapHook.currentSiteMap?.name]);
   // Moving-mob plumbing for site walks. Like the counters above, these read from refs so
   // the async per-step callback (runSiteStep) sees the freshest mob positions / grid
   // mid-walk instead of the stale render-time closure. The mob objects are mutated in
@@ -513,6 +495,26 @@ const Game = ({ resumeConversation = null }) => {
   // settings (loaded saves) and finally 'grassland' so older saves are unaffected.
   const mapTheme = settings?.theme || settingsObj?.theme || 'grassland';
   const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme, getActiveSiteObjectives(settings?.sideQuests), settings?.milestones, getActiveGatherResources(settings?.sideQuests));
+
+  // #83 Phase 2: entering a town/site clears every OTHER location's spent check locks —
+  // arriving somewhere else is what resets a prior place's approaches. Does NOTHING on the
+  // world map, so stepping out of a town and straight back in resets nothing (no cheese).
+  // retainLocationLocks returns the same array when nothing drops, so this write no-ops then.
+  // MUST come after mapHook is declared (its fields are read in the dependency array).
+  useEffect(() => {
+    const key = locationKey({
+      isInsideTown: mapHook.isInsideTown,
+      townName: mapHook.currentTownTile?.townName,
+      isInsideSite: mapHook.isInsideSite,
+      siteName: mapHook.currentSiteMap?.name,
+    });
+    if (key === 'world') return;
+    setSettings(prev => {
+      const kept = retainLocationLocks(prev?.checkLocks, key);
+      return kept === prev?.checkLocks ? prev : { ...prev, checkLocks: kept };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapHook.isInsideTown, mapHook.currentTownTile?.townName, mapHook.isInsideSite, mapHook.currentSiteMap?.name]);
 
   // Cancel any in-progress town/site walk when the sub-map changes (leaving a town/site
   // flips currentMapLevel back to 'world') or the component unmounts, so no scheduled step
