@@ -89,6 +89,15 @@ Rather than letting the AI freely decide if a narrative goal is met, we constrai
 > guards remain (no marking mid-conversation, on mere mention, or with the NPC absent), the Talk
 > button stays the guaranteed path, and `findMarkerMilestoneIndex` (narrative) is untouched.
 
+> **Marker path retired (shipped 2026-07-19, #76 Phase 1 — see `AI_NARRATION_CONTRACT.md`).**
+> The `[COMPLETE_MILESTONE]`/`[COMPLETE_CAMPAIGN]` markers, their client parsing
+> (`MILESTONE_COMPLETE_REGEX`, `resolveTalkMarkerMilestone`, the talk dual-completion path) and
+> the prompt instructions described in the two notes above are all removed: the engine referees
+> every completion, the LLM only narrates, and both `sanitizeResponse` passes plus the client
+> strip any leaked completion marker. Legacy saves' `narrative` milestones are migrated to
+> engine types on load (`migrateNarrativeMilestones` off their spawn: npc→talk, poi→location,
+> item→item), so no old save is stranded.
+
 > **`location` is search-to-complete (shipped 2026-07-10).** Reaching the milestone tile no
 > longer completes it on its own. The POI arrival modal offers a "Search this location" action,
 > resolved by `getMilestoneLocationForTile` (`milestoneEngine.js`), which fires the

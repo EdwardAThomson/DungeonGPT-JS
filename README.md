@@ -28,7 +28,7 @@ YouTube Videos 🎥:
 *   **Equipment:** Equip weapons, armour, and accessories that affect combat (attack, damage soak, all-round bonuses).
 *   **Shops & Economy:** Buy and sell at blacksmiths, markets, alchemists, and general stores so gold has a purpose.
 *   **Explorable Sites:** Enter caves, ruins, forests, hills, and mountains as procedurally generated sub-maps with encounters and loot.
-*   **Quests & Campaigns:** A deterministic campaign-milestone engine (mechanical and AI-judged narrative milestones) plus a pool of discoverable side-quests.
+*   **Quests & Campaigns:** A deterministic campaign-milestone engine (every objective engine-refereed; the AI narrates outcomes, never judges them) plus a pool of discoverable side-quests.
 *   **Campaign Chaining:** Finish a campaign and continue the next chapter inside the same save: same world, same party (healed), with the new campaign's content spawned additively into the existing map.
 *   **Adventure Book:** A tabbed in-game hub (Campaign / Side Quests / Codex / Party / AI) including a discovered-only bestiary and item codex.
 *   **Towns:** Procedurally generated town maps with road-aware gates, lakefront/coastline water, a civic layout (town square, keep, varied buildings), a hub-and-spoke street network (windy lanes from every gate to the square), themed building palettes per biome (desert adobe, snow timber), and water settlements: riverside quays for river-adjacent towns, plus river-fork and canal-city archetypes for member/premium tiers.
@@ -206,7 +206,7 @@ For deployment instructions, see the deployment guides in `/docs`.
 *   ✅ **Shops & Economy** — Buy/sell at town merchants
 *   ✅ **Explorable Sites** — Caves, ruins, forests, hills, mountains as sub-maps with loot
 *   ✅ **Side-Quests** — Discoverable quests with givers, turn-ins, and rewards
-*   ✅ **Narrative Milestones** — AI-judged campaign quest outcomes
+*   ✅ **Campaign Milestones** — engine-refereed quest outcomes with AI narration (AI judgment retired 2026-07)
 *   ✅ **Conversation Memory (RAG)** — AI recalls earlier story via embedded history
 *   ✅ **Guest Mode** — Local-first play without an account, cloud sync on sign-in
 *   ✅ **Guided Onboarding** — Interactive tour + reworked hero creator
