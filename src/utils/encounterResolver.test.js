@@ -46,7 +46,7 @@ describe('resolveEncounter with equipment', () => {
       {}
     );
 
-    expect(armed.rollResult.total).toBe(base.rollResult.total + 1);
+    expect(armed.rollResult.total).toBe(base.rollResult.total + 2); // magic_weapon (rare) is +2 attack
     expect(armed.rollResult.total).toBeGreaterThan(base.rollResult.total);
   });
 

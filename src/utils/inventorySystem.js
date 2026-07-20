@@ -166,15 +166,15 @@ export const ITEM_CATALOG = {
   'silver_dagger': { name: 'Silver Dagger', rarity: 'uncommon', value: 100, type: 'weapon', bonus: '+1 attack', description: 'A keen blade of blessed silver, bane of beasts that shun the moon.', icon: 'assets/icons/items/silver_dagger.webp' },
 
   // Rare items
-  'magic_weapon': { name: 'Enchanted Blade', rarity: 'rare', value: 500, type: 'weapon', bonus: '+1 attack', description: 'A finely balanced sword humming with a faint arcane charge.', icon: 'assets/icons/items/magic_weapon.webp' },
-  'hunters_longbow': { name: 'Hunter\'s Longbow', rarity: 'rare', value: 450, type: 'weapon', bonus: '+1 attack', description: 'A masterwork yew longbow strung with sinew. Favored by rangers who strike from the treeline.', icon: 'assets/icons/items/hunters_longbow.webp' },
+  'magic_weapon': { name: 'Enchanted Blade', rarity: 'rare', value: 500, type: 'weapon', bonus: '+2 attack', description: 'A finely balanced sword humming with a faint arcane charge.', icon: 'assets/icons/items/magic_weapon.webp' },
+  'hunters_longbow': { name: 'Hunter\'s Longbow', rarity: 'rare', value: 450, type: 'weapon', bonus: '+2 attack', description: 'A masterwork yew longbow strung with sinew. Favored by rangers who strike from the treeline.', icon: 'assets/icons/items/hunters_longbow.webp' },
   'ring_protection': { name: 'Protective Ring', rarity: 'rare', value: 750, type: 'ring', bonus: '+1 defense', description: 'A silver band warded with protective glyphs that turn aside harm.', icon: 'assets/icons/items/ring_protection.webp' },
   'wardstone_pendant': { name: 'Wardstone Pendant', rarity: 'rare', value: 600, type: 'charm', bonus: '+1', description: 'A sliver of rune-cut mountain stone on a leather cord. It hums faintly when danger is near.', icon: 'assets/icons/items/gemstone.webp' },
 
   // Very Rare
   // #44: the obtainable +2 weapon rung (very_rare, so tier-2 drops can carry it;
   // legendary weapons are t3-gated).
-  'runic_greatsword': { name: 'Runic Greatsword', rarity: 'very_rare', value: 1500, type: 'weapon', bonus: '+2 attack', description: 'A two-handed blade etched with dwarven war-runes that flare blue mid-swing.', icon: 'assets/icons/items/runic_greatsword.webp' },
+  'runic_greatsword': { name: 'Runic Greatsword', rarity: 'very_rare', value: 1500, type: 'weapon', bonus: '+3 attack', description: 'A two-handed blade etched with dwarven war-runes that flare blue mid-swing.', icon: 'assets/icons/items/runic_greatsword.webp' },
   // #44: a FINDABLE very_rare accessory (the other +2/+3 artifacts are bespoke quest
   // rewards).
   'stormbound_ring': { name: 'Stormbound Ring', rarity: 'very_rare', value: 3500, type: 'ring', bonus: '+2', description: 'A band of sky-iron that crackles with a captive storm. Lightning answers its wearer\'s call.', icon: 'assets/icons/items/stormbound_ring.webp' },
@@ -191,8 +191,8 @@ export const ITEM_CATALOG = {
   // (unobtainableGear) exactly like legendary_weapon. t3 authoring assigns them to
   // milestones; do NOT put them in shops, hoards, or tiered drop tables before then.
   // (#44 icon art: complete — every shelf item has its own webp as of 2026-07-03.)
-  'legendary_weapon': { name: 'Legendary Weapon', rarity: 'legendary', value: 7500, type: 'weapon', bonus: '+3 attack', description: 'A weapon out of legend, its edge singing with ancient might.', icon: 'assets/icons/items/legendary_weapon.webp' },
-  'blade_of_the_shattered_throne': { name: 'Blade of the Shattered Throne', rarity: 'legendary', value: 10000, type: 'weapon', bonus: '+3 attack', description: 'Reforged from the throne the Shadow Overlord broke, this blade remembers every oath sworn upon it.', icon: 'assets/icons/items/blade_of_the_shattered_throne.webp' },
+  'legendary_weapon': { name: 'Legendary Weapon', rarity: 'legendary', value: 7500, type: 'weapon', bonus: '+4 attack', description: 'A weapon out of legend, its edge singing with ancient might.', icon: 'assets/icons/items/legendary_weapon.webp' },
+  'blade_of_the_shattered_throne': { name: 'Blade of the Shattered Throne', rarity: 'legendary', value: 10000, type: 'weapon', bonus: '+4 attack', description: 'Reforged from the throne the Shadow Overlord broke, this blade remembers every oath sworn upon it.', icon: 'assets/icons/items/blade_of_the_shattered_throne.webp' },
   'aegis_of_dawn': { name: 'Aegis of Dawn', rarity: 'legendary', value: 8000, type: 'armor', bonus: '+5 defense', description: 'Plate armor quenched in first light. Blows that should kill are swallowed by a sunrise glow.', icon: 'assets/icons/items/aegis_of_dawn.webp' },
   'heart_of_the_last_winter': { name: 'Heart of the Last Winter', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'A shard of unmelting ice cut from the Blood Wendigo\'s frozen heart. Winter itself bends around its bearer.', icon: 'assets/icons/items/heart_of_the_last_winter.webp' },
   'clockwork_god_core': { name: 'Clockwork God-Core', rarity: 'legendary', value: 9000, type: 'artifact', bonus: '+3', description: 'The still-ticking heart of the Herald of the Old Gods. Its gears turn one second ahead of the world.', icon: 'assets/icons/items/clockwork_god_core.webp' },
