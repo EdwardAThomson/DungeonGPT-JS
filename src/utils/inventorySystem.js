@@ -212,7 +212,7 @@ export const ITEM_CATALOG = {
   'ritual_dagger': { name: 'Ritual Dagger', rarity: 'uncommon', value: 125, type: 'weapon', bonus: '+1', description: 'A ceremonial blade etched with symbols meant for darker rites.', icon: 'assets/icons/items/ritual_dagger.webp' },
   'dark_tome': { name: 'Dark Tome', rarity: 'rare', value: 300, description: 'A grimoire bound in cracked hide, its pages whispering forbidden things.', icon: 'assets/icons/items/dark_tome.webp' },
   'spell_scroll': { name: 'Spell Scroll', rarity: 'uncommon', value: 50, description: 'A single spell captured in ink, spent the moment it is read.', icon: 'assets/icons/items/spell_scroll.webp' },
-  'healing_herbs': { name: 'Healing Herbs', rarity: 'common', value: 20, stackable: true, description: 'A bundle of green sprigs that soothe wounds when crushed and applied.', icon: 'assets/icons/items/healing_herbs.webp' },
+  'healing_herbs': { name: 'Healing Herbs', rarity: 'common', value: 20, stackable: true, effect: 'heal', amount: '1d4+2', description: 'A bundle of green sprigs that soothe wounds when crushed and applied.', icon: 'assets/icons/items/healing_herbs.webp' },
   'rare_flower': { name: 'Rare Flower', rarity: 'uncommon', value: 45, description: 'An uncommon bloom sought by herbalists and perfumers alike.', icon: 'assets/icons/items/rare_flower.webp' },
   'dryad_blessing': { name: 'Dryad\'s Blessing', rarity: 'rare', value: 0, type: 'blessing', description: 'A fading benediction of the forest, warm as dappled sunlight.', icon: 'assets/icons/items/dryad_blessing.webp' },
   'fairy_dust': { name: 'Fairy Dust', rarity: 'uncommon', value: 100, description: 'A pinch of glittering motes that tingle with mischievous magic.', icon: 'assets/icons/items/fairy_dust.webp' },

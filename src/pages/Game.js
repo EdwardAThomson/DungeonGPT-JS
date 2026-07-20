@@ -1336,6 +1336,40 @@ const Game = ({ resumeConversation = null }) => {
     });
   };
 
+  // Click-to-attack a visible site mob. Site combat is otherwise contact-only (the mob has to
+  // reach the party), so a fled/idle mob that won't re-approach was impossible to finish off
+  // (playtest 2026-07-20). The player choosing to attack drops the mob's flee de-aggro so it
+  // engages, then: if already adjacent, opens the fight immediately (mirroring runSiteStep's
+  // mob-contact branch); otherwise walks the party to a tile beside the mob, where the normal
+  // per-step contact check engages it.
+  const handleAttackSiteMob = (mob) => {
+    if (interactionHook.isLoading || !mob || mob.defeated) return;
+    const siteMap = mapHook.currentSiteMap;
+    const start = mapHook.sitePlayerPosition;
+    if (!siteMap || !start) return;
+    // Player-initiated: clear any flee cooldown so the mob can be engaged right now.
+    mapHook.setSiteMobFleeCooldown(mob.id, 0);
+
+    if (Math.abs(start.x - mob.x) + Math.abs(start.y - mob.y) <= 1) {
+      if (walkCancelRef.current) walkCancelRef.current();
+      activeSiteMobIdRef.current = mob.id;
+      preEncounterPosRef.current = { level: 'site', x: start.x, y: start.y };
+      mapHook.setIsMapModalOpen(false);
+      reopenMapAfterEncounterRef.current = true;
+      openEncounterAction({ encounter: mob.isBoss ? { ...mob.encounter, enemyId: mob.enemyId } : mob.encounter });
+      return;
+    }
+
+    // Not adjacent: walk to the reachable walkable tile beside the mob nearest the party; the
+    // uncooled mob engages on contact during the walk (runSiteStep's advanceMobs branch).
+    const beside = [{ dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }]
+      .map(d => ({ x: mob.x + d.dx, y: mob.y + d.dy }))
+      .filter(t => { const tile = siteMap.mapData[t.y] && siteMap.mapData[t.y][t.x]; return tile && tile.walkable; })
+      .sort((a, b) => (Math.abs(a.x - start.x) + Math.abs(a.y - start.y)) - (Math.abs(b.x - start.x) + Math.abs(b.y - start.y)));
+    if (beside[0]) handleSiteTileClick(beside[0].x, beside[0].y);
+    else mapHook.setSiteError('You cannot reach that creature.');
+  };
+
   // Accept an offered side quest (from a building quest-giver). Activates it so its steps
   // start tracking and any site it targets gets revealed/injected on entry.
   const handleAcceptSideQuest = (questId, origin = null) => {
@@ -2329,6 +2363,7 @@ const Game = ({ resumeConversation = null }) => {
         hasAdventureStarted={hasAdventureStarted}
         handleTownTileClick={handleTownTileClick}
         handleSiteTileClick={handleSiteTileClick}
+        handleAttackSiteMob={handleAttackSiteMob}
         handleEncounterResolve={handleEncounterResolve}
         handleHeroUpdate={handleHeroUpdate}
         onUseItem={(heroId, itemKey, healedHero) => {
