@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { getTile } from '../utils/mapGenerator';
 import { llmService } from '../services/llmService';
 import { DM_PROTOCOL } from '../data/prompts';
 import { buildModelOptions, resolveProviderAndModel } from '../llm/modelResolver';
 import { areRequirementsMet } from '../game/milestoneEngine';
+import { parseCheckMarker, resolveSkillCheck, formatCheckRollLine, formatCheckResultForPrompt } from '../game/skillCheck';
+import { getSupportBonus } from '../utils/multiRoundEncounter';
 import { getStepHint } from '../game/questHints';
 import { formatPartyInfo } from '../game/promptComposer';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
@@ -28,7 +30,10 @@ const formatRagContext = (results) => {
     return `\n\n[RECALLED MEMORIES FROM PAST EVENTS]\n${items}`;
 };
 
-const TRIGGER_REGEX = /\[(CHECK|ROLL):\s*([a-zA-Z0-9\s]+)\]/i;
+// Any stray check/roll marker outside the resolved check flow (e.g. in the authored opening,
+// where a check must never fire) is scrubbed from display. The live check path uses
+// parseCheckMarker (skillCheck.js), which handles the two-argument [CHECK: skill, tier] form.
+const STRAY_CHECK_MARKER = /\[(?:CHECK|ROLL):[^\]]*\]/gi;
 
 // Helper function to normalize milestones (backward compatibility)
 const normalizeMilestones = (milestones) => {
@@ -149,6 +154,9 @@ const cleanAIResponse = (response, contextToRemove) => {
     // deliberately NOT stripped here: it's a bounded skill-check proposal handled downstream.
     cleaned = cleaned.replace(/\[COMPLETE_MILESTONE:[\s\S]*?\]/gi, '');
     cleaned = cleaned.replace(/\[COMPLETE_CAMPAIGN\]/gi, '');
+    // #83: a model may echo the injected [CHECK RESULT: ...] fact — never show it. The
+    // [CHECK: skill, tier] PROPOSAL is deliberately NOT stripped here; it's parsed first.
+    cleaned = cleaned.replace(/\[CHECK RESULT:[\s\S]*?\]/gi, '');
 
     // Remove common prompt artifacts
     cleaned = cleaned.replace(/\[CONTEXT\][\s\S]*?\[TASK\]/gi, '');
@@ -357,6 +365,9 @@ const useGameInteraction = (
     const [progressStatus, setProgressStatus] = useState(null); // { status, elapsed } for LLM progress
     const [error, setError] = useState(null);
     const [checkRequest, setCheckRequest] = useState(null); // { type: 'skill', skill: 'Perception' } or null
+    // #83: holds a resolved check's [CHECK RESULT: ...] line to inject into the NEXT prompt, so
+    // the model narrates the consequence as fact without a second AI call. Consumed once.
+    const pendingCheckContextRef = useRef(null);
     const [lastPrompt, setLastPrompt] = useState('');
 
     const modelOptions = useMemo(() => buildModelOptions(), []);
@@ -489,19 +500,9 @@ const useGameInteraction = (
                 logger.warn('Opening polish pass failed; using authored opening verbatim', polishErr);
             }
 
-            // Parse for Triggers
-            const match = aiResponse.match(TRIGGER_REGEX);
-            if (match) {
-                const type = match[1].toUpperCase();
-                const value = match[2].trim();
-                logger.debug(`AI trigger detected: ${type}`, value);
-
-                if (type === 'CHECK') {
-                    setCheckRequest({ type: 'skill', skill: value });
-                }
-                // Optional: Remove tag from display? 
-                // aiResponse = aiResponse.replace(match[0], '').trim();
-            }
+            // The authored opening never rolls a check; scrub any stray marker so it can't
+            // leak into the first scene the player reads.
+            aiResponse = aiResponse.replace(STRAY_CHECK_MARKER, '').trim();
 
             if (!aiResponse || !aiResponse.trim()) {
                 // An empty opening is a failed start: keep the adventure un-started so
@@ -582,7 +583,14 @@ const useGameInteraction = (
             }
         }
 
-        const prompt = `[CONTEXT]\n${gameContext}\n\n[SUMMARY]\n${currentSummary || 'The tale unfolds.'}\n\n[PLAYER ACTION]\n${userMessage.content}\n\n[NARRATE]${ragContext}`;
+        // #83: a check resolved on the PREVIOUS turn is handed to the model here as fact, so
+        // it narrates the consequence (never re-adjudicates it). Consumed once, then cleared.
+        const resolvedCheckContext = pendingCheckContextRef.current
+            ? `\n\n[RESOLVED CHECK — narrate this as already-decided fact]\n${pendingCheckContextRef.current}`
+            : '';
+        pendingCheckContextRef.current = null;
+
+        const prompt = `[CONTEXT]\n${gameContext}${resolvedCheckContext}\n\n[SUMMARY]\n${currentSummary || 'The tale unfolds.'}\n\n[PLAYER ACTION]\n${userMessage.content}\n\n[NARRATE]${ragContext}`;
 
         try {
             let aiResponse = await generateResponse(model, prompt);
@@ -600,19 +608,25 @@ const useGameInteraction = (
             // the class. Legacy narrative milestones are migrated to engine types on load
             // (migrateNarrativeMilestones), so no old save is stranded.
 
-            // Parse for other Triggers
-            const match = aiResponse.match(TRIGGER_REGEX);
-            if (match) {
-                const type = match[1].toUpperCase();
-                const value = match[2].trim();
-                logger.debug(`AI trigger detected: ${type}`, value);
-
-                if (type === 'CHECK') {
-                    setCheckRequest({ type: 'skill', skill: value });
-                }
-                // Optional: Remove tag from display? 
-                // aiResponse = aiResponse.replace(match[0], '').trim();
+            // #83: a proposed skill check. The ENGINE rolls, never the model. Parse the
+            // [CHECK: skill, tier] marker, resolve it with the SAME modifier stack combat uses
+            // (party Lead + support), and strip the marker from the narration. The visible roll
+            // line + next-turn context injection happen just below, after the message is added.
+            let resolvedCheck = null;
+            const checkProposal = parseCheckMarker(aiResponse);
+            if (checkProposal) {
+                resolvedCheck = resolveSkillCheck({
+                    skill: checkProposal.skill,
+                    tier: checkProposal.tier,
+                    hero: selectedHeroes?.[0],
+                    supportBonus: getSupportBonus(selectedHeroes || [], 0),
+                });
+                aiResponse = aiResponse.replace(checkProposal.raw, '').replace(/[ \t]{2,}/g, ' ').trim();
+                logger.info(`[CHECK] ${resolvedCheck.skill} (${resolvedCheck.tier}, DC ${resolvedCheck.dc}) -> rolled ${resolvedCheck.rollResult.total}: ${resolvedCheck.outcomeTier}`);
             }
+            // Scrub any remaining check/roll marker (a second one, or a malformed proposal whose
+            // skill didn't resolve) so a raw control token never renders to the player.
+            aiResponse = aiResponse.replace(STRAY_CHECK_MARKER, '').trim();
 
             if (!aiResponse || !aiResponse.trim()) {
                 logger.warn('Empty AI response received, skipping');
@@ -623,6 +637,16 @@ const useGameInteraction = (
 
             const updatedConv = [...tempConversation, aiMessage];
             setConversation(updatedConv);
+
+            // #83: surface the check's d20 breakdown as a system line (the player's immediate,
+            // honest feedback, mirroring combat), and stash the result so the NEXT prompt carries
+            // it as fact — the AI narrates the consequence on its own turn, no extra AI call.
+            if (resolvedCheck) {
+                const lead = selectedHeroes?.[0];
+                const heroName = lead?.characterName || lead?.heroName || 'The party';
+                setConversation(prev => [...prev, { role: 'system', content: formatCheckRollLine(resolvedCheck, heroName) }]);
+                pendingCheckContextRef.current = formatCheckResultForPrompt(resolvedCheck);
+            }
 
             // Fire-and-forget: embed the AI response for RAG
             if (sessionId) {
