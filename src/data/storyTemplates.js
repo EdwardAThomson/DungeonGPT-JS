@@ -1300,8 +1300,17 @@ export const storyTemplates = [
     // ============================================================
     // TIER 3 — COMING SOON
     // ============================================================
-    // heroic-fantasy-t3 (The Shattered Throne) removed 2026-07-20 (maintainer): the arc
-    // caps at t2 (Crown of Sunfire). Its shop-window stub was dropped too (below).
+    {
+        id: 'heroic-fantasy-t3',
+        theme: 'heroic-fantasy',
+        tier: 3,
+        levelRange: [5, 7],
+        name: 'Heroic Fantasy',
+        subtitle: 'The Shattered Throne',
+        icon: '⚔️',
+        description: 'A civil war tears the kingdom apart. Only a true hero can reunite the fractured realm.',
+        comingSoon: true,
+    },
     {
         id: 'grimdark-survival-t3',
         theme: 'grimdark-survival',
@@ -1411,8 +1420,22 @@ const SHOP_WINDOW_STUBS = [
         minTier: 'premium',
         teaser: true,
     },
-    // heroic-fantasy-t3 (The Shattered Throne) shop-window stub removed 2026-07-20
-    // (maintainer decision against a Heroic Fantasy tier 3): the arc ends at t2.
+    {
+        id: 'heroic-fantasy-t3',
+        theme: 'heroic-fantasy',
+        tier: 3,
+        levelRange: [5, 7],
+        name: 'Heroic Fantasy',
+        subtitle: 'The Shattered Throne',
+        icon: '👑',
+        shortDescription: 'The realm is won, but the throne it rests on is broken, and every claimant to its shards raises an army. End the succession war before the kingdom your heroes saved tears itself apart.',
+        // Free-tier chapter (maintainer ruling 2026-07-07: free arcs are complete
+        // for signed-in accounts; the premium_templates row delivers this to every
+        // authenticated tier). Guests cap at t2 naturally: delivery requires auth,
+        // so a signed-out click resolves to "sign in to play", never a tier upsell.
+        minTier: 'free',
+        teaser: true,
+    },
 ];
 SHOP_WINDOW_STUBS.forEach((stub) => {
     // A stub REPLACES a comingSoon entry with the same id (maintainer ruling

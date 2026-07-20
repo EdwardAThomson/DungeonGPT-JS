@@ -269,6 +269,7 @@ milestone structure to document here.
 
 | id | Name / subtitle | Kind | Access (minTier) | Level |
 |---|---|---|---|---|
+| heroic-fantasy-t3 | Heroic Fantasy - The Shattered Throne | teaser | free | 5-7 |
 | grimdark-survival-t3 | Grimdark Survival - The Last Winter | comingSoon | free | 5-7 |
 | arcane-renaissance-t3 | Arcane Renaissance - The Clockwork God | comingSoon | free | 5-7 |
 | eldritch-horror-t3 | Eldritch Horror - The Drowned City | comingSoon | member | 5-7 |

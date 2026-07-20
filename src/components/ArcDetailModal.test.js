@@ -25,19 +25,6 @@ afterEach(() => {
 const arcFor = (themeId) =>
   getStoryArcs(storyTemplates).find((a) => a.id === themeId);
 
-// heroic-fantasy-t3 was the only FREE-gated delivered-content teaser and was retired
-// (2026-07-20 maintainer decision against a Heroic Fantasy t3). Synthesize an equivalent
-// free-gated teaser from a real arc so the "sign in to play, never an upsell" path stays
-// covered: clone tidewater's t3 chapter and flip its gate to free (not locked, still a teaser).
-const FREE_TEASER_ID = 'free-teaser-t3';
-const freeTeaserArc = () => {
-  const arc = arcFor('tidewater');
-  const chapters = arc.chapters.map((c) =>
-    c.tier === 3 ? { ...c, id: FREE_TEASER_ID, gateTier: 'free', locked: false, teaser: true, comingSoon: false } : c
-  );
-  return { ...arc, chapters };
-};
-
 describe('regression: settings-less teaser stubs never crash the modal (guest)', () => {
   it('renders the tidewater arc (all shop-window stubs) for a signed-out free user', () => {
     const arc = arcFor('tidewater');
@@ -155,12 +142,12 @@ describe('chapter picker behaviour', () => {
 
 describe('teaser rows: guest vs signed-in copy (ruling B)', () => {
   it('signed OUT: a free-gated stub chapter says sign in to play, never a tier upsell', () => {
-    const arc = freeTeaserArc(); // a free-gated delivered-content teaser chapter
+    const arc = arcFor('heroic-fantasy'); // t3 is the free-gated Shattered Throne stub
     const onTeaser = jest.fn();
     render(
       <ArcDetailModal
         arc={arc}
-        selectedChapterId={FREE_TEASER_ID}
+        selectedChapterId="heroic-fantasy-t3"
         isSignedIn={false}
         onTeaserChapterClick={onTeaser}
         onClose={() => {}}
@@ -174,32 +161,32 @@ describe('teaser rows: guest vs signed-in copy (ruling B)', () => {
   });
 
   it('signed IN: the teaser row invites loading and clicking it triggers the self-heal', () => {
-    const arc = freeTeaserArc();
+    const arc = arcFor('heroic-fantasy');
     const onTeaser = jest.fn();
     render(
       <ArcDetailModal
         arc={arc}
-        selectedChapterId={FREE_TEASER_ID}
+        selectedChapterId="heroic-fantasy-t3"
         isSignedIn
         onTeaserChapterClick={onTeaser}
         onClose={() => {}}
       />
     );
     expect(screen.getByText('Tap to load')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId(`arc-chapter-row-${FREE_TEASER_ID}`));
-    expect(onTeaser).toHaveBeenCalledWith(expect.objectContaining({ id: FREE_TEASER_ID }));
+    fireEvent.click(screen.getByTestId('arc-chapter-row-heroic-fantasy-t3'));
+    expect(onTeaser).toHaveBeenCalledWith(expect.objectContaining({ id: 'heroic-fantasy-t3' }));
     fireEvent.click(screen.getByRole('button', { name: /Load My Content/i }));
     expect(onTeaser).toHaveBeenCalledTimes(2);
   });
 
   it('shows the loading state on the retried row', () => {
-    const arc = freeTeaserArc();
+    const arc = arcFor('heroic-fantasy');
     render(
       <ArcDetailModal
         arc={arc}
-        selectedChapterId={FREE_TEASER_ID}
+        selectedChapterId="heroic-fantasy-t3"
         isSignedIn
-        retryingChapterId={FREE_TEASER_ID}
+        retryingChapterId="heroic-fantasy-t3"
         onClose={() => {}}
       />
     );
