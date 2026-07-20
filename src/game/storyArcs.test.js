@@ -49,20 +49,20 @@ describe('getStoryArcs against the shipped catalog', () => {
     });
   });
 
-  it('heroic fantasy is a 3-chapter ladder ending in the Shattered Throne stub', () => {
+  it('heroic fantasy is a 2-chapter ladder ending in Crown of Sunfire (no t3 by design)', () => {
     const arc = arcById(getStoryArcs(storyTemplates), 'heroic-fantasy');
     expect(arc.chapters.map((c) => c.id)).toEqual([
-      'heroic-fantasy-t1', 'heroic-fantasy-t2', 'heroic-fantasy-t3',
+      'heroic-fantasy-t1', 'heroic-fantasy-t2',
     ]);
     expect(arc.chapters.map((c) => c.subtitle)).toEqual([
-      'The Goblin Threat', 'Crown of Sunfire', 'The Shattered Throne',
+      'The Goblin Threat', 'Crown of Sunfire',
     ]);
-    expect(arc.chapterCount).toBe(3);
+    expect(arc.chapterCount).toBe(2);
   });
 
   it('derives the full level span (chapter-1 floor to finale ceiling)', () => {
     const arcs = getStoryArcs(storyTemplates);
-    expect(arcById(arcs, 'heroic-fantasy').levelSpan).toEqual([1, 7]);
+    expect(arcById(arcs, 'heroic-fantasy').levelSpan).toEqual([1, 5]); // caps at t2 (no t3)
     expect(arcById(arcs, 'desert-expedition').levelSpan).toEqual([1, 5]); // no t3: gap tolerated
     expect(arcById(arcs, 'tidewater').levelSpan).toEqual([1, 6]); // t3 stub tops out at 6
   });
@@ -91,14 +91,12 @@ describe('getStoryArcs against the shipped catalog', () => {
 });
 
 describe('ladder-row states per chapter (free/guest user)', () => {
-  it('free-arc chapters are startable; the delivered-content stub is a teaser, not locked', () => {
+  it('free-arc chapters are startable; the arc has no t3 (removed by design)', () => {
     const arc = arcById(getStoryArcs(storyTemplates), 'heroic-fantasy');
-    const [t1, t2, t3] = arc.chapters;
+    const [t1, t2] = arc.chapters;
+    expect(arc.chapters).toHaveLength(2);
     expect(t1).toMatchObject({ startable: true, locked: false, teaser: false, comingSoon: false });
     expect(t2).toMatchObject({ startable: true, locked: false, teaser: false });
-    // Ruling B (2026-07-07): heroic-fantasy-t3 is a FREE chapter delivered at
-    // sign-in. For a guest it is a teaser (sign in to play), never a tier upsell.
-    expect(t3).toMatchObject({ startable: false, locked: false, teaser: true, comingSoon: false, gateTier: 'free' });
   });
 
   it('comingSoon chapters render as comingSoon rows (decision 4: visible, greyed)', () => {

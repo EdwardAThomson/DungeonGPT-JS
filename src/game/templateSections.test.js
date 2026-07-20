@@ -42,11 +42,10 @@ describe('getTemplateSections against the shipped catalog', () => {
   });
 
   it('excludes comingSoon stubs from the tier-3 section (only shop-window faces surface)', () => {
-    // Three built-in t3s remain comingSoon stubs and stay excluded. The
-    // heroic-fantasy-t3 SHOP_WINDOW_STUB now REPLACES its comingSoon built-in
-    // (maintainer ruling 2026-07-07) and, being a free-tier teaser (ruling B),
-    // it lands in the free legendary bucket.
-    expect(sections.legendary.map((t) => t.id)).toEqual(['heroic-fantasy-t3']);
+    // Three built-in t3s remain comingSoon stubs and stay excluded. heroic-fantasy-t3
+    // (the only free t3) was removed 2026-07-20 (maintainer decision against a Heroic
+    // Fantasy tier 3), so the free legendary bucket is now empty.
+    expect(sections.legendary.map((t) => t.id)).toEqual([]);
     ['grimdark-survival-t3', 'arcane-renaissance-t3', 'eldritch-horror-t3'].forEach((id) => {
       expect(sections.legendary.map((t) => t.id)).not.toContain(id);
       expect(sections.premiumLegendary.map((t) => t.id)).not.toContain(id);
@@ -86,9 +85,10 @@ describe('server-delivered higher-tier templates (registerPremiumTemplates then 
 
   it('a delivered t3 appears in the Legendary section after registration (no reload needed)', () => {
     const catalog = makeCatalog();
-    // Pre-delivery the shipped catalog's only tier-3 non-comingSoon entries are
-    // the shop-window stubs (free heroic + premium tidewater).
-    expect(getTemplateSections(catalog).legendary.map((t) => t.id)).toEqual(['heroic-fantasy-t3']);
+    // Pre-delivery the shipped catalog's only tier-3 non-comingSoon entry is the premium
+    // tidewater-t3 shop-window stub; the free legendary bucket is empty (heroic-fantasy-t3
+    // removed 2026-07-20).
+    expect(getTemplateSections(catalog).legendary.map((t) => t.id)).toEqual([]);
     registerPremiumTemplates([drownedBells], catalog);
     const { premiumLegendary } = getTemplateSections(catalog);
     expect(premiumLegendary.map((t) => t.id)).toEqual(['tidewater-t3']);

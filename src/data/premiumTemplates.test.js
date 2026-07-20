@@ -58,7 +58,7 @@ describe('premium local-template merge mechanism', () => {
     // require.context is a webpack-only API; its absence here is exactly what keeps
     // the progression lint and structural tests pinned to PUBLIC content.
     expect(typeof require.context).not.toBe('function');
-    const t3 = storyTemplates.find((t) => t.id === 'heroic-fantasy-t3');
+    const t3 = storyTemplates.find((t) => t.id === 'tidewater-t3');
     expect(t3).toBeDefined();
     expect(t3.settings).toBeUndefined(); // playable content never ships in the bundle
     expect(t3.teaser).toBe(true);
@@ -69,17 +69,9 @@ describe('premium local-template merge mechanism', () => {
   // information, and letting it win hid The Shattered Throne from guests).
   // The other comingSoon built-ins, with no stub claiming their id, survive.
   describe('shop-window stubs vs comingSoon built-ins (bundle-time precedence)', () => {
-    it('the heroic-fantasy-t3 stub replaced its comingSoon built-in in the live array', () => {
-      const t3 = storyTemplates.find((t) => t.id === 'heroic-fantasy-t3');
-      expect(t3.teaser).toBe(true);
-      expect(t3.comingSoon).toBeUndefined();
-      // Ruling B (free arcs complete for signed-in accounts): the chapter is
-      // free-gated; guests see "sign in to play", never a tier upsell.
-      expect(t3.minTier).toBe('free');
-      expect(t3.premium).toBeUndefined();
-      // The real card face survived the replacement.
-      expect(t3.subtitle).toBe('The Shattered Throne');
-      expect(t3.shortDescription).toMatch(/succession war/i);
+    it('heroic-fantasy-t3 was removed entirely (arc caps at t2, no comingSoon/stub)', () => {
+      // 2026-07-20 maintainer decision against a Heroic Fantasy tier 3.
+      expect(storyTemplates.find((t) => t.id === 'heroic-fantasy-t3')).toBeUndefined();
     });
 
     it('no id is duplicated by the stub merge', () => {
