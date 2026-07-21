@@ -177,7 +177,11 @@ should inherit this constraint.
    this pass: undecided. *Update 2026-07-16: [SKILL_CHECK_PLAN.md](SKILL_CHECK_PLAN.md)
    (#83) proposes the answer: the trigger stays as a bounded proposal marker and is
    upgraded into a full engine-rolled check loop; its Phase 1 rides this contract's
-   DM_PROTOCOL rewrite.*
+   DM_PROTOCOL rewrite.* *Update 2026-07-20: shipped (#83 Phases 1-2, PRs #155/#156).
+   The model emits `[CHECK: skill, tier, target?]` and stops; the engine rolls with
+   combat modifier parity (`src/game/skillCheck.js`) and hands back a `[CHECK RESULT]`
+   fact to narrate, with failed checks persisted in a lock ledger. The old
+   `TRIGGER_REGEX` → DiceRoller path is dormant, reserved for the Phase 4 animated d20.*
 6. **Campaign-completion derivation.** Confirm all-milestones-complete matches every
    template's `campaignGoal` semantics, including chained campaigns
    (`campaignChain.js`) and server-delivered flagships, before deleting the marker.
