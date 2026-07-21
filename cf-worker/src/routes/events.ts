@@ -84,7 +84,7 @@ eventsRoutes.post("/", async (c) => {
 
     await sql`
       INSERT INTO app_events (anon_id, event, props)
-      VALUES (${anonId}, ${event}, ${sql.json(props)})`;
+      VALUES (${anonId}, ${event}, ${sql.json(props as any)})`;
   } catch (error) {
     // Drop silently towards the client; log for ops.
     console.error(
