@@ -1,6 +1,7 @@
 // App.js
 
 import React, { useContext, useEffect, Suspense, lazy, useState } from "react";
+import { sendEvent } from "./services/telemetry";
 import { BrowserRouter as Router, Route, Link, Routes, Navigate, useLocation } from "react-router-dom";
 import HeroCreation from "./pages/HeroCreation";
 import HeroSummary from "./components/HeroSummary";
@@ -68,6 +69,12 @@ const AppContent = () => {
   useEffect(() => {
     document.body.setAttribute('data-theme', theme);
   }, [theme]);
+
+  // Funnel: one app_open per page load (anonymous; D1/D7 return comes from
+  // grouping these by anon id server-side).
+  useEffect(() => {
+    sendEvent('app_open', {}, { once: true });
+  }, []);
 
   // Show loading screen while checking authentication
   if (loading) {

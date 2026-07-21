@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { sendEvent } from '../services/telemetry';
 import SafeMarkdownMessage from './SafeMarkdownMessage';
 import NarrativeHookChips from './NarrativeHookChips';
 import SaveSyncIndicator from './SaveSyncIndicator';
@@ -175,7 +176,10 @@ const GameMainPanel = ({
               <button
                 type="button"
                 className="guest-ai-overlay"
-                onClick={() => setShowAuthPrompt(true)}
+                onClick={() => {
+                  sendEvent('ai_gate_shown', {}, { once: true });
+                  setShowAuthPrompt(true);
+                }}
                 aria-label="Sign in to unlock the AI Dungeon Master"
               />
             )}
@@ -209,8 +213,15 @@ const GameMainPanel = ({
                 <p>Sign in to type free-form actions and get live AI narration — and your adventures save to your account so you can keep playing across devices.</p>
               )}
               <div className="guest-ai-prompt-actions">
-                <Link to="/login" className="primary-button">Sign in</Link>
-                <button type="button" className="secondary-button" onClick={() => setShowAuthPrompt(false)}>Maybe later</button>
+                <Link to="/login" className="primary-button" onClick={() => sendEvent('ai_gate_signin_click')}>Sign in</Link>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => {
+                    sendEvent('ai_gate_dismissed');
+                    setShowAuthPrompt(false);
+                  }}
+                >Maybe later</button>
               </div>
             </div>
           </div>

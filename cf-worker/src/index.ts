@@ -5,6 +5,7 @@ import { embedRoutes } from "./routes/embed";
 import { imageRoutes } from "./routes/image";
 import dbRoutes from "./routes/db";
 import { entitlementsRoutes } from "./routes/entitlements";
+import eventsRoutes from "./routes/events";
 import { requireAuth } from "./middleware/auth";
 import { rateLimit } from "./middleware/rateLimit";
 import type { Env } from "./types";
@@ -66,6 +67,11 @@ app.get("/health", (c) =>
 
 app.route("/api/embed", embedRoutes);
 app.route("/api/ai", aiRoutes);
+// Anonymous analytics ingestion (backlog #86): the ONLY unauthenticated route.
+// Deliberate: guests are most of the funnel. Protected by the CORS origin
+// allowlist above plus the route's own event allowlist, payload caps, and an
+// IP-keyed rate limit; it stores no user id and no IP (see routes/events.ts).
+app.route("/api/events", eventsRoutes);
 app.route("/api/image", imageRoutes);
 app.use("/api/db/*", requireAuth);
 // Rate limiting (backlog #12): mutating db calls share the 'db-write' bucket.

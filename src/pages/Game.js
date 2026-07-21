@@ -64,6 +64,7 @@ import { QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
 import { embedAndStore, query as ragQuery } from '../game/ragEngine';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
+import { recordTurn } from '../services/telemetry';
 
 const logger = createLogger('game');
 
@@ -1632,6 +1633,7 @@ const Game = ({ resumeConversation = null }) => {
     );
     mapHook.setWorldMap(newMap);
     mapHook.setPlayerPosition({ x: clickedX, y: clickedY });
+    recordTurn(sessionId);
     if (!targetTile) return;
 
     const { biomeType, townName } = getAreaIdentifiers(targetTile);
@@ -2288,7 +2290,10 @@ const Game = ({ resumeConversation = null }) => {
           conversation={interactionHook.conversation}
           progressStatus={interactionHook.progressStatus}
           error={interactionHook.error}
-          onSubmit={interactionHook.handleSubmit}
+          onSubmit={(e) => {
+            recordTurn(sessionId);
+            return interactionHook.handleSubmit(e);
+          }}
           userInput={interactionHook.userInput}
           onInputChange={interactionHook.handleInputChange}
           selectedModel={selectedModel}

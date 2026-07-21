@@ -1,12 +1,20 @@
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import SettingsContext from '../contexts/SettingsContext';
 import { Navigate, Link } from 'react-router-dom';
+import { sendEvent } from '../services/telemetry';
 import '../styles/login.css';
 
 const Login = () => {
   const { user, redirectToLogin } = useAuth();
   const { theme } = useContext(SettingsContext);
+
+  // Funnel: reaching the login page at all counts as starting sign-in (the
+  // actual auth happens on the Octonion hub, out of our instrumentation reach).
+  useEffect(() => {
+    if (!user) sendEvent('signin_started', {}, { once: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // If already logged in, redirect to home
   if (user) {

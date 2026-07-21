@@ -6,6 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { generateMapData, findStartingTown } from "../utils/mapGenerator";
 import WorldMapDisplay from "../components/WorldMapDisplay";
 import OnboardingSteps from "../components/OnboardingSteps";
+import { sendEvent } from "../services/telemetry";
 import SegmentedControl from "../components/SegmentedControl";
 import RaritySelect from "../components/RaritySelect";
 import { storyTemplates } from "../data/storyTemplates";
@@ -285,6 +286,11 @@ const NewGame = () => {
 
     // Fresh game session ID for this new game
     localStorage.setItem('activeGameSessionId', launch.gameSessionId);
+
+    sendEvent('game_launched', {
+      templateId: selectedTemplate === 'custom' ? 'custom' : selectedTemplate,
+      guest: !user,
+    });
 
     // Remember the launched template so the next New Game preselects it ("Last
     // played"). Custom games aren't remembered: their slot state isn't restorable

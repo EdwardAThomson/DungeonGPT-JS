@@ -11,6 +11,8 @@ import {
 } from '../game/entitlements';
 import { loadPremiumTemplates, clearPremiumTemplates } from '../services/premiumContentApi';
 import { autoSelectPoolForTier } from '../services/aiPool';
+import { localHeroStore } from '../services/localHeroStore';
+import { sendEvent } from '../services/telemetry';
 
 const HUB_URL = process.env.REACT_APP_HUB_URL || 'https://octonion.io';
 const CALLBACK_URL = `${window.location.origin}/auth/callback`;
@@ -91,6 +93,15 @@ export const AuthProvider = ({ children }) => {
       (_event, session) => {
         setUser(session?.user ?? null);
         if (session?.user) markHadAccount();
+        if (_event === 'SIGNED_IN') {
+          // Funnel: sign-in completed. Supabase v2 emits INITIAL_SESSION (not
+          // SIGNED_IN) for restored sessions, and telemetry dedupes per page
+          // load, so this approximates real conversions. guestHeroes marks
+          // whether the browser had a guest roster to bring along.
+          let guestHeroes = false;
+          try { guestHeroes = localHeroStore.hasHeroes(); } catch (e) { /* ignore */ }
+          sendEvent('signin_completed', { guestHeroes }, { once: true });
+        }
         syncTier(session);
       }
     );

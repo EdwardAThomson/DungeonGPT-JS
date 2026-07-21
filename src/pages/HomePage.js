@@ -3,6 +3,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { sendEvent } from "../services/telemetry";
 
 const HomePage = () => {
   const { user } = useAuth();
@@ -18,7 +19,12 @@ const HomePage = () => {
         {/* Adventure-first: hero-less players are no longer detoured to the blank
             creation form — the party page offers ready-made heroes (and creation)
             as step 2, after an adventure is chosen. */}
-        <Link to="/new-game" className="home-nav-card primary-card" data-tour="start-adventure">
+        <Link
+          to="/new-game"
+          className="home-nav-card primary-card"
+          data-tour="start-adventure"
+          onClick={() => sendEvent('play_click')}
+        >
           <div className="card-icon">⚔️</div>
           <div className="card-content">
             <h3>Start Adventure</h3>
