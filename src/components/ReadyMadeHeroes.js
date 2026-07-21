@@ -35,22 +35,27 @@ const PregenCard = ({ pregen, index, compact, disabled, onPick }) => (
 );
 
 export const PregenBand = ({ pregens, disabled = false, onPick, title, note }) => (
-  <div className="pregen-band">
+  <div className="pregen-band-wrap">
+    {/* Heading sits ABOVE the bordered container, like other section headers */}
     <h3 className="pregen-band-title">{title || '⚔ Choose a ready-made hero to begin'}</h3>
-    <div className="pregen-grid">
-      {pregens.map((p, i) => (
-        <PregenCard key={p.heroName} pregen={p} index={i} compact={false} disabled={disabled} onPick={onPick} />
-      ))}
+    <div className="pregen-band">
+      <div className="pregen-grid">
+        {pregens.map((p, i) => (
+          <PregenCard key={p.heroName} pregen={p} index={i} compact={false} disabled={disabled} onPick={onPick} />
+        ))}
+      </div>
+      {note && <p className="pregen-band-note">{note}</p>}
     </div>
-    {note && <p className="pregen-band-note">{note}</p>}
   </div>
 );
 
-export const PregenStrip = ({ pregens, disabled = false, onPick, label = 'Ready-made heroes:' }) => (
+export const PregenStrip = ({ pregens, disabled = false, onPick, label = 'Ready-made heroes' }) => (
   <div className="pregen-strip">
     <span className="pregen-strip-label">{label}</span>
-    {pregens.map((p, i) => (
-      <PregenCard key={p.heroName} pregen={p} index={i} compact disabled={disabled} onPick={onPick} />
-    ))}
+    <div className="pregen-strip-cards">
+      {pregens.map((p, i) => (
+        <PregenCard key={p.heroName} pregen={p} index={i} compact disabled={disabled} onPick={onPick} />
+      ))}
+    </div>
   </div>
 );
