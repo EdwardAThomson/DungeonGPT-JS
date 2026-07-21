@@ -61,7 +61,7 @@ export const CAVE_ENCOUNTERS = {
     encounterTier: 'immediate',
     poiType: 'cave',
     description: 'A scrabbling tide of dog-sized rats pours out of a side tunnel, teeth bared!',
-    image: '/assets/encounters/cave_bats.webp',
+    image: '/assets/encounters/cave_giant_rats.webp',
     difficulty: 'medium',
     dc: 17,
     dealsDamage: true,
@@ -171,7 +171,7 @@ export const CAVE_ENCOUNTERS = {
     encounterTier: 'immediate',
     poiType: 'cave',
     description: 'Yipping kobolds boil out of a side tunnel, jabbing with crude spears and hurling stones from the dark!',
-    image: '/assets/encounters/goblin_ambush.webp',
+    image: '/assets/encounters/cave_kobolds.webp',
     // 'easy' keeps the damage multiplier gentle; dc/HP tuned so the fight sims inside the
     // 30-90% wilderness band (progressionLint) instead of a ~95% walkover (was dc12/hp24).
     difficulty: 'easy',
@@ -200,7 +200,7 @@ export const CAVE_ENCOUNTERS = {
     encounterTier: 'immediate',
     poiType: 'cave',
     description: 'A pale, blind predator unfolds from a ceiling crevice, tasting the air as it drops toward you!',
-    image: '/assets/encounters/forest_beast.webp',
+    image: '/assets/encounters/cave_lurker.webp',
     difficulty: 'medium',
     dc: 15,
     dealsDamage: true,
@@ -229,7 +229,7 @@ export const CAVE_ENCOUNTERS = {
     encounterTier: 'immediate',
     poiType: 'cave',
     description: 'A deep groan runs through the rock and the ceiling begins to give way in a rain of dust and stone!',
-    image: '/assets/encounters/cave_site_arrival.webp',
+    image: '/assets/encounters/cave_in.webp',
     difficulty: 'easy',
     dealsDamage: true,
     suggestedActions: [

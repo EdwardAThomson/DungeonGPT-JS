@@ -364,10 +364,37 @@ settlement" shots in the house arrival style, sized appropriately, with no peopl
 in the foreground so they read as one series alongside the existing
 `*_site_arrival.webp` art.
 
-### Arrival images (`public/assets/encounters/`)
+### Arrival images (`public/assets/encounters/`) - COMPLETE
 | File | Prompt | Note |
 |---|---|---|
 | `public/assets/encounters/city_arrival.webp` | The approach to a great walled city at the edge of open country, high stone curtain walls and watchtowers rising above a fortified gatehouse, banners on the battlements and rooftops and a cathedral spire beyond the walls, a road leading up to the closed gates. Grand and imposing, biome-neutral establishing shot. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | DONE 2026-07-11 |
 | `public/assets/encounters/town_arrival.webp` | The approach to a modest walled town of timber-and-thatch houses clustered around a central market square, a low palisade or stone wall with a simple gate, tiled and thatched roofs and a few chimney smokes, a dirt road running in from the fields. Lived-in and ordinary, biome-neutral establishing shot. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | DONE 2026-07-11 |
 | `public/assets/encounters/village_arrival.webp` | The approach to a small farming village, a scattering of thatched timber cottages among tilled fields and hedgerows, a well and a few barns, low fences and a rutted lane winding between the houses under an open sky. Humble and rustic, biome-neutral establishing shot. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | DONE 2026-07-11 |
 | `public/assets/encounters/hamlet_arrival.webp` | The approach to a tiny hamlet of just a few weathered cottages huddled at the roadside, thatched roofs and a single crooked chimney smoke, a woodpile and a low dry-stone wall, an empty dirt track leading past into the wilds. Sparse, remote and quiet, biome-neutral establishing shot. No people or creatures in the foreground. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | DONE 2026-07-11 |
+
+## Generation queue (2026-07-21, wrong-subject encounter art) - COMPLETE
+
+A maintainer image audit (playtest, following the 2026-07-20 "Giant Rat Pack shows a bat
+picture" report) found that several cave/ruins encounters had never gotten dedicated art:
+they were pointed at a plausible-looking but wrong-subject SIBLING encounter's image
+(rats -> bats, kobolds -> goblins, a ceiling predator -> a forest boar, a cave collapse ->
+a cave exterior arrival shot, grave-robbers -> hooded cultists, an animated statue -> a
+vault door). Each has now been repointed to its own dedicated path below and pinned in
+`src/data/artIntegrity.test.js` (`KNOWN_MISSING_ASSETS`); drop each file at the path below
+and delete its pin as the art lands. No further code change is needed — the paths are
+already declared in the data.
+
+(Separately, the same audit found 11 boss-portrait mismatches — 8 quest bosses pointing at
+the `ritual_dagger.webp` item icon, 3 template bosses pointing at a different named
+monster's portrait — but in every one of those cases the CORRECT portrait already existed
+on disk; those were fixed by repointing to the existing file, no new generation needed.)
+
+### Encounter images (`public/assets/encounters/`) - COMPLETE
+| File | Prompt | Note |
+|---|---|---|
+| `public/assets/encounters/cave_giant_rats.webp` | A scrabbling swarm of dog-sized giant rats pouring out of a narrow cave side-tunnel toward the viewer, matted brown-grey fur, bared yellow teeth, beady red eyes catching torchlight, claws scraping on damp stone. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | DONE 2026-07-21 |
+| `public/assets/encounters/cave_kobolds.webp` | A pack of yipping kobolds boiling out of a dark cave side-tunnel, small reptilian humanoids in ragged scavenged armor, jabbing crude spears and hurling stones, torchlight glinting off scaly hides and wide yellow eyes. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | DONE 2026-07-21 |
+| `public/assets/encounters/cave_lurker.webp` | A pale, eyeless subterranean predator unfolding from a ceiling crevice above a cave passage, translucent bloodless white skin stretched over an elongated many-jointed body, tasting the air with quivering sensory palps as it drops toward the viewer. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | DONE 2026-07-21 |
+| `public/assets/encounters/cave_in.webp` | The ceiling of a cave passage giving way in a sudden collapse, cracks racing across stone overhead, a rain of dust and rubble and jagged falling rock illuminated by shafts of torchlight, choking dust cloud billowing through the passage. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | DONE 2026-07-21 |
+| `public/assets/encounters/ruin_scavengers.webp` | A ragged band of grave-robbers rounding on the viewer inside a crumbling ruin, patchwork leather and stolen armor, drawn blades and stolen loot bundled at their belts, guarding a pried-open cache amid broken columns and rubble. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | DONE 2026-07-21 |
+| `public/assets/encounters/ruin_animated_statue.webp` | A weathered stone sentinel statue grinding to life inside a ruin, cracked ancient armor carved from grey rock, joints grinding with dust sifting free, leveling a chipped stone blade at the viewer, faint arcane runes glowing in the fractures. Dark fantasy digital painting, dramatic cinematic lighting, moody atmosphere. Landscape composition 16:9. No text or UI elements. | DONE 2026-07-21 |
