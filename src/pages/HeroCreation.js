@@ -110,6 +110,27 @@ const HeroCreation = () => {
     setStats(template.stats);
     setAlignment(template.alignment);
     setHeroBackground(template.backgroundSnippet);
+
+    // Quick-fill (#88): on a fresh hero, also fill the EMPTY identity fields so
+    // one click yields a complete, fully editable character (scan-and-adjust
+    // instead of compose-from-scratch). Player-set values are never overwritten,
+    // and editing an existing hero never triggers this.
+    if (!state?.editing) {
+      let gender = selectedGender;
+      if (!gender) {
+        gender = heroGenders[Math.floor(Math.random() * heroGenders.length)];
+        setSelectedGender(gender);
+      }
+      if (!heroName.trim()) setHeroName(generateName(gender));
+      if (!selectedProfilePicture) {
+        const pool = profilePictures.filter((pic) => pic.gender === gender);
+        // Prefer the portrait drawn for this class when one exists (portraits are
+        // named by class); otherwise any portrait matching the gender.
+        const classPic = pool.find((pic) => pic.src.includes(selectedTemplate.toLowerCase()));
+        const pick = classPic || pool[Math.floor(Math.random() * pool.length)];
+        if (pick) setSelectedProfilePicture(pick.src);
+      }
+    }
   };
 
   // When this page was entered from HeroSelection, the return-flow flag and the

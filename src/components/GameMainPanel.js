@@ -48,6 +48,10 @@ const GameMainPanel = ({
   onToggleAiNarrative,
   aiNarrativeEnabled,
   aiAvailable = true,
+  // Names for the guest sign-in prompt: naming the player's own hero/campaign
+  // beats generic copy. Both optional; the prompt falls back to generic wording.
+  partyLeadName = null,
+  templateName = null,
   isMapLoaded,
   lastPrompt,
   // Transient narrative-hook affordance (#35/#37): chips + preview image rendered
@@ -194,7 +198,16 @@ const GameMainPanel = ({
           <div className="modal-overlay" onClick={() => setShowAuthPrompt(false)}>
             <div className="modal-content guest-ai-prompt" onClick={(e) => e.stopPropagation()}>
               <h2>✨ Unlock the AI Dungeon Master</h2>
-              <p>Sign in to type free-form actions and get live AI narration — and your adventures save to your account so you can keep playing across devices.</p>
+              {partyLeadName ? (
+                <p>
+                  Sign in free to keep {partyLeadName}&apos;s
+                  {templateName ? ` ${templateName}` : ''} adventure in your account,
+                  and the AI Dungeon Master will narrate your every move. Right now this
+                  story lives only in this browser.
+                </p>
+              ) : (
+                <p>Sign in to type free-form actions and get live AI narration — and your adventures save to your account so you can keep playing across devices.</p>
+              )}
               <div className="guest-ai-prompt-actions">
                 <Link to="/login" className="primary-button">Sign in</Link>
                 <button type="button" className="secondary-button" onClick={() => setShowAuthPrompt(false)}>Maybe later</button>

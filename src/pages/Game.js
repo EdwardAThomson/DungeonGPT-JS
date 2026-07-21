@@ -2237,6 +2237,8 @@ const Game = ({ resumeConversation = null }) => {
       <div className="game-container">
         <GameMainPanel
           campaignGoal={settings.campaignGoal}
+          partyLeadName={selectedHeroes?.[0]?.heroName || selectedHeroes?.[0]?.characterName || null}
+          templateName={settings?.templateName || null}
           townName={townName}
           subLocationName={subLocationName}
           townPosition={mapHook.townPlayerPosition}

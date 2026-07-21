@@ -10,6 +10,8 @@ import { heroesApi } from "../services/heroesApi";
 import { createLogger } from "../utils/logger";
 import { resolveProfilePicture } from "../utils/assetHelper";
 import { useAuth } from "../contexts/AuthContext";
+import { PREGEN_HEROES, buildPregenHero } from "../data/pregenHeroes";
+import { PregenBand } from "../components/ReadyMadeHeroes";
 
 const logger = createLogger('all-heroes');
 
@@ -71,6 +73,27 @@ const AllHeroes = () => {
     setDeleteConfirm(null);
   };
 
+  // Ready-made heroes as the empty state (same picker as party selection, but
+  // roster-only: no party to select here). Optimistic add, server after.
+  const [addingPregen, setAddingPregen] = useState(false);
+  const availablePregens = PREGEN_HEROES.filter(
+    (p) => !heroes.some((h) => h.heroName === p.heroName)
+  );
+  const handleAddPregen = async (pregen) => {
+    if (addingPregen) return;
+    const hero = buildPregenHero(pregen);
+    setAddingPregen(true);
+    setHeroes((prev) => [...prev, hero]);
+    try {
+      await heroesApi.create(hero);
+    } catch (error) {
+      logger.error('Error saving ready-made hero:', error);
+      setAlertMessage(`${hero.heroName} could not be saved: ${error.message}`);
+    } finally {
+      setAddingPregen(false);
+    }
+  };
+
   return (
     <div className="page-container all-heroes-page">
       {/* No onboarding bar here: the Hall of Heroes is roster management, not the
@@ -92,7 +115,7 @@ const AllHeroes = () => {
 
       {!user && heroes.length > 0 && (
         <div className="guest-roster-note">
-          🔒 These heroes are saved on this device. <button className="link-button" onClick={() => navigate('/login')}>Sign in</button> to keep them across devices.
+          🔒 These heroes live only in this browser. <button className="link-button" onClick={() => navigate('/login')}>Sign in</button> free to keep them across devices.
         </div>
       )}
 
@@ -123,14 +146,21 @@ const AllHeroes = () => {
             </button>
           </div>
         ) : (
-          <div className="onboarding-empty">
-            <div className="onboarding-empty-icon">🧙‍♂️</div>
-            <h3>No heroes yet</h3>
-            <p>Create your first hero to begin your adventure. You'll pick a class, race, stats, and backstory.</p>
-            <button onClick={() => navigate("/hero-creation")} className="primary-button">
-              Create Your First Hero →
-            </button>
-          </div>
+          <PregenBand
+            pregens={availablePregens}
+            disabled={addingPregen}
+            onPick={handleAddPregen}
+            title="⚔ Add a ready-made hero to your roster"
+            note={
+              <>
+                One click adds them to your roster, fully yours to edit. Or{' '}
+                <button type="button" className="pregen-link-button" onClick={() => navigate("/hero-creation")}>
+                  craft your own from scratch
+                </button>
+                .
+              </>
+            }
+          />
         )
       ) : (
         <ul className="all-heroes-list">

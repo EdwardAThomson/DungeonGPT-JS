@@ -64,7 +64,7 @@ const HeroSummary = () => {
 
       logger.debug(`Hero ${isUpdate ? 'updated' : 'added'} in database. Response:`, result);
       const localNote = !user
-        ? ' Saved on this device — sign in to keep your heroes across devices.'
+        ? ' Saved only in this browser. Sign in free to keep your heroes across devices.'
         : '';
       setFeedbackModal({
         title: isUpdate ? "Hero Updated" : "Hero Added",
@@ -91,8 +91,14 @@ const HeroSummary = () => {
     if (state?.returnToHeroSelection) {
       // Spread the launch context back to top level: HeroSelection reads
       // generatedMap/worldSeed/gameSessionId/townMapsCache off its router state,
-      // and its step guard bounces to /new-game when they're missing.
-      navigate('/hero-selection', { state: { heroes: finalHeroes, settingsData: state.settingsData, ...(state.launchState || {}) } });
+      // and its step guard bounces to /new-game when they're missing. The
+      // just-created hero joins the restored party selection.
+      const launchState = state.launchState || {};
+      const selectedHeroIds = [
+        ...(launchState.selectedHeroIds || []),
+        ...(newHero?.heroId ? [newHero.heroId] : []),
+      ];
+      navigate('/hero-selection', { state: { heroes: finalHeroes, settingsData: state.settingsData, ...launchState, selectedHeroIds } });
     } else {
       // Flag a freshly-added hero so the roster can spotlight the next step.
       navigate("/all-heroes", { state: { justAdded: !isEditing } });

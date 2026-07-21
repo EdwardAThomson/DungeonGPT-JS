@@ -147,6 +147,25 @@ const NewGame = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // "Last played" default (#88): with no navigation preselect, quietly preselect
+  // the template from the previous launch. Same guards as above, but silent —
+  // a locked/teaser/missing remembered template just means no preselect (e.g. a
+  // server-delivered premium template not registered this session).
+  const [lastPlayedTemplateId] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('dungeongpt:lastLaunch') || 'null')?.templateId || null;
+    } catch (e) {
+      return null;
+    }
+  });
+  useEffect(() => {
+    if (navState?.preselectTemplateId || !lastPlayedTemplateId) return;
+    const template = storyTemplates.find((t) => t.id === lastPlayedTemplateId && !t.comingSoon);
+    if (!template || template.teaser === true || !canUseTemplate(template)) return;
+    applyTemplate(template);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const handleSubmit = () => {
     // Custom tab: validate slots and auto-generate description if needed
@@ -266,6 +285,15 @@ const NewGame = () => {
 
     // Fresh game session ID for this new game
     localStorage.setItem('activeGameSessionId', launch.gameSessionId);
+
+    // Remember the launched template so the next New Game preselects it ("Last
+    // played"). Custom games aren't remembered: their slot state isn't restorable
+    // from an id. Guarded: storage can throw in private mode.
+    if (selectedTemplate && selectedTemplate !== 'custom') {
+      try {
+        localStorage.setItem('dungeongpt:lastLaunch', JSON.stringify({ templateId: selectedTemplate }));
+      } catch (e) { /* ignore */ }
+    }
 
     // Persist the launch snapshot so a hard reload before the first save cannot lose
     // the campaign settings (milestones/story/goal/tone). The generated map already
@@ -446,6 +474,15 @@ const NewGame = () => {
               background: 'var(--primary)', color: '#fff',
               padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
             }}>SELECTED</div>
+          )}
+          {/* Same badge slot as SELECTED/lock; only shown when neither occupies it */}
+          {!isSelected && !isLockedArc && arc.chapters.some((c) => c.id === lastPlayedTemplateId) && (
+            <div style={{
+              position: 'absolute', top: 8, left: 8,
+              background: 'rgba(0,0,0,0.6)', color: 'var(--primary)',
+              padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
+              border: '1px solid var(--primary)',
+            }}>★ LAST PLAYED</div>
           )}
           {isLockedArc && (
             <div style={{

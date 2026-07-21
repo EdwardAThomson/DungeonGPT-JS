@@ -1,6 +1,6 @@
 // HeroSelection.js
 
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import HeroContext from '../contexts/HeroContext';
 import SettingsContext from '../contexts/SettingsContext';
@@ -12,6 +12,7 @@ import OnboardingSteps from '../components/OnboardingSteps';
 import { validateHero } from '../game/heroValidation';
 import { getLevelFitNotice } from '../game/campaignChain';
 import { PREGEN_HEROES, buildPregenHero } from '../data/pregenHeroes';
+import { PregenBand, PregenStrip } from '../components/ReadyMadeHeroes';
 
 const logger = createLogger('hero-selection');
 
@@ -86,11 +87,31 @@ const HeroSelection = () => {
         returnToHeroSelection: true,
         settingsData: settings,
         // Round-tripped through HeroCreation -> HeroSummary and spread back into
-        // this page's state on return, so the launched campaign survives the detour.
-        launchState: { generatedMap, worldSeed, gameSessionId, townMapsCache },
+        // this page's state on return, so the launched campaign survives the
+        // detour. selectedHeroIds restores the party picked before leaving
+        // (HeroSummary appends the just-created hero).
+        launchState: {
+          generatedMap,
+          worldSeed,
+          gameSessionId,
+          townMapsCache,
+          selectedHeroIds: selectedHeroes.map((h) => h.heroId),
+        },
       },
     });
   };
+
+  // Restore the party picked before a create-hero detour (ids ride launchState
+  // and are spread back onto this page's state). One-shot once the roster has
+  // loaded; capped at the 4-hero limit like manual selection.
+  const partyRestoredRef = useRef(false);
+  useEffect(() => {
+    if (partyRestoredRef.current) return;
+    const ids = state?.selectedHeroIds;
+    if (!ids?.length || heroes.length === 0) return;
+    partyRestoredRef.current = true;
+    setSelectedHeroes(heroes.filter((h) => ids.includes(h.heroId)).slice(0, 4));
+  }, [heroes, state]);
 
   // Pregens already in the roster (matched by name) are hidden rather than
   // disabled, so the strip never offers a duplicate.
@@ -121,33 +142,6 @@ const HeroSelection = () => {
     }
   };
 
-  const renderPregenCard = (pregen, index, compact) => (
-    <button
-      key={pregen.heroName}
-      type="button"
-      className={`pregen-card${compact ? ' compact' : ''}`}
-      onClick={() => handleAddPregen(pregen)}
-      disabled={addingPregen}
-      title={`${pregen.heroClass}: ${pregen.tagline}`}
-      style={compact ? undefined : { '--pregen-delay': `${index * 0.7}s` }}
-    >
-      <span className="pregen-portrait">
-        <img
-          src={resolveProfilePicture(pregen.profilePicture)}
-          alt=""
-          loading="lazy"
-          width={compact ? 64 : 128}
-          height={compact ? 64 : 128}
-        />
-      </span>
-      <span className="pregen-text">
-        <span className="pregen-name">{pregen.heroName}</span>
-        <span className="pregen-sub">
-          {compact ? pregen.heroClass : `${pregen.heroClass} · ${pregen.tagline}`}
-        </span>
-      </span>
-    </button>
-  );
 
   // Level warning: the campaign's authored band vs the CHOSEN party (soft warning
   // only, Start stays enabled; engine minLevel gates already protect deep
@@ -249,19 +243,20 @@ const HeroSelection = () => {
       )}
 
       {heroes.length === 0 ? (
-        <div className="pregen-band">
-          <h3 className="pregen-band-title">⚔ Choose a ready-made hero to begin</h3>
-          <div className="pregen-grid">
-            {availablePregens.map((p, i) => renderPregenCard(p, i, false))}
-          </div>
-          <p className="pregen-band-note">
-            Ready to play, and fully yours to edit later. Or{' '}
-            <button type="button" className="pregen-link-button" onClick={handleCreateHero}>
-              craft your own from scratch
-            </button>
-            .
-          </p>
-        </div>
+        <PregenBand
+          pregens={availablePregens}
+          disabled={addingPregen}
+          onPick={handleAddPregen}
+          note={
+            <>
+              Ready to play, and fully yours to edit later. Or{' '}
+              <button type="button" className="pregen-link-button" onClick={handleCreateHero}>
+                craft your own from scratch
+              </button>
+              .
+            </>
+          }
+        />
       ) : (
         <ul className="all-heroes-list hero-selection-list">
           {heroes.map((hero) => {
@@ -331,10 +326,7 @@ const HeroSelection = () => {
       )}
 
       {heroes.length > 0 && availablePregens.length > 0 && (
-        <div className="pregen-strip">
-          <span className="pregen-strip-label">Ready-made heroes:</span>
-          {availablePregens.map((p, i) => renderPregenCard(p, i, true))}
-        </div>
+        <PregenStrip pregens={availablePregens} disabled={addingPregen} onPick={handleAddPregen} />
       )}
 
       <div className="form-actions hero-selection-actions">
