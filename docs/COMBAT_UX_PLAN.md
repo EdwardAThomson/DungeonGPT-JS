@@ -1,8 +1,17 @@
 # Combat UX Plan: Animations, Modal Refine, and Open-Play Rework
 
-Status: **Brainstorm / proposed** (2026-07-16). No code yet. Tracks
+Status: **Direction decided (2026-07-21 playtest); build in progress.** Tracks
 `OUTSTANDING_ISSUES.md` #79. Combat *animations* are the combat-specific slice of the
 game-feel work ([GAME_FEEL_PLAN.md](GAME_FEEL_PLAN.md), #78).
+
+**Progress since the 2026-07-16 brainstorm:**
+- §4 keystone **done**: the headless fight flow is extracted into
+  `src/hooks/useEncounterFight.js` (+ test); `EncounterActionModal` renders over it.
+- `EncounterActionModalSimple.js` dead code **deleted**.
+- Thread B (modal refine) **done & merged**: dropped the victory interstitial, inline item
+  tray (killed the zIndex-4000 modal-in-a-modal), unified flee gating (branch
+  `refactor/combat-modal-thread-b`, merged to master — stale, safe to delete).
+- The end-state direction is now decided — see [§0 Decisions locked](#0-decisions-locked-2026-07-21) below.
 
 **Scope: presentation and flow only.** The combat *mechanics* (deterministic d20,
 Lead+Support, multi-round boss fights, damage, rewards) are owned by
@@ -16,6 +25,48 @@ Three related threads the maintainer raised, smallest to largest:
 3. **Rework combat away from modals → "open play", more like a TTRPG.**
 
 The important finding: all three share one enabling refactor (§4).
+
+---
+
+## 0. Decisions locked (2026-07-21)
+
+From a playtest-driven design pass. These resolve the modal-vs-open-play question in §7 and
+pin the end-state. With §4 (keystone) and Thread B (modal refine) already merged, the
+remaining work is re-homing the refined panel onto the map (see §0 direction below).
+
+**Direction: Thread C (open play), in a MAP-CONTEXT HUD flavor.** Combat is neither a
+fullscreen takeover nor a centered dialog. The existing map (site / POI / world tile) stays
+on screen as the combat backdrop; a docked combat HUD renders over it (party + enemy status,
+HP bars, round log, roll feed, action bar). This answers §5C's "where is the map during a
+fight" (the map IS the surface) and reuses `SiteMapDisplay` — no separate combat sub-map is
+generated or persisted (respects "maps generated once, never regenerated").
+
+**Terminology:** "modal" and "overlay" are the same mechanism (a focus-trapping layer via
+`ModalContext`); the only real choice was layout, and it is the map-context HUD above.
+
+**Control: player drives the Lead, party auto-supports.** Mechanics unchanged (Lead+Support,
+single d20 per round). Each round the player picks *which hero leads* (plus item / flee);
+every other living hero auto-contributes its support bonus. Still "visualize-only" for
+balance (no new damage model, DCs unchanged; the sim assumes a sensible lead). The one
+engine-adjacent change is stepping `useEncounterFight` round-by-round so the player can choose
+between rounds — the phase machine already models the states.
+
+**One enemy, always.** Combat is party-vs-ONE-enemy (even `wolf_pack` is a single entity with
+one HP pool). No multi-target combat, no target selection — the HUD layout is fixed.
+
+**Ceremony is threat-scaled (tentative).** Trivial fights **auto-resolve** (one tap / compact
+result), keyed off `threat.js` relative-threat tiers; only real/boss fights open the full
+stepped HUD. Rationale: a site throws many trash mobs and a full lead-picker on every rat is a
+chore. Start with auto-resolve for trash; tune by feel.
+
+**Flee: keep** the existing disengage + `fleeCooldown`, surfaced as a HUD button.
+
+**Migration: boss-fights-first.** The map-context HUD takes over the multi-round Lead+Support
+boss fights first (where the "I'm fighting alone" pain lives). Trash encounters keep the
+lightweight / auto-resolve path until later.
+
+**Out of scope:** `encounterController`'s `narrative_*` (non-combat) flows keep their normal
+modal; only combat flows enter the HUD.
 
 ---
 
@@ -174,8 +225,11 @@ Do **not** start with Thread C: prove the refactor and capture the easy wins fir
 
 ## 7. Open questions
 
-- Modal-refine vs full open-play: decide after the Thread B panel + the Thread C spike.
+- ~~Modal-refine vs full open-play~~ **RESOLVED (§0, 2026-07-21):** open play, map-context
+  HUD. Thread B's docked single-panel is now a stepping stone to it, not an alternative.
 - How much combat animation before it slows the fight (turn-based players want speed).
+- Threat threshold for auto-resolve vs full HUD (§0): which `threat.js` tier is the cutoff,
+  and does auto-resolve still show a one-line result in the log?
 - Free vs premium: animations/SFX split follows #78 (base polish likely free).
 - Does open-play combat change how the AI narration line participates (it currently just
   posts the authored consequence to the log)?
