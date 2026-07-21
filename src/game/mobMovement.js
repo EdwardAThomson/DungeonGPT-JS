@@ -313,10 +313,27 @@ const walkAlong = (mapData, from, goal, speed, stopBeforeGoal) => {
  * @param {Object} [config] radii overrides (defaults to DEFAULT_MOB_CONFIG).
  * @returns {{mobs:Array<Object>, combatMob:(Object|null)}} next mobs + first contact.
  */
+// Inter-mob collision: a mob may not step onto a tile another LIVE mob already holds, so two
+// mobs never stack on one tile (which rendered as overlapping icons and let a defeated mob look
+// like it "respawned" underneath a second one). `occupied` tracks live-mob positions and updates
+// as each mob resolves in array order; a blocked mob just holds and re-paths next step.
+const resolveMobCollision = (mob, pos, occupied) => {
+  const self = `${mob.x},${mob.y}`;
+  const target = `${pos.x},${pos.y}`;
+  const finalPos = (target !== self && occupied.has(target)) ? { x: mob.x, y: mob.y } : pos;
+  occupied.delete(self);
+  occupied.add(`${finalPos.x},${finalPos.y}`);
+  return finalPos;
+};
+
 export function stepMobs(mobs, playerPos, siteMap, config = DEFAULT_MOB_CONFIG) {
   const list = Array.isArray(mobs) ? mobs : [];
   const mapData = siteMap && siteMap.mapData;
   const { aggroRadius, leashRadius, deaggroRadius } = { ...DEFAULT_MOB_CONFIG, ...(config || {}) };
+
+  // Live-mob positions, for inter-mob collision (updated per mob as they resolve, in order).
+  const occupied = new Set();
+  list.forEach((m) => { if (m && !m.defeated) occupied.add(`${m.x},${m.y}`); });
 
   let combatMob = null;
   const nextMobs = list.map((mob) => {
@@ -336,6 +353,7 @@ export function stepMobs(mobs, playerPos, siteMap, config = DEFAULT_MOB_CONFIG) 
           (mob.x !== mob.home.x || mob.y !== mob.home.y)) {
         pos = walkAlong(mapData, mob, mob.home, speed, false); // leash return, no contact
       }
+      pos = resolveMobCollision(mob, pos, occupied);
       return { ...mob, x: pos.x, y: pos.y, state: 'idle', fleeCooldown: mob.fleeCooldown - 1 };
     }
 
@@ -365,6 +383,8 @@ export function stepMobs(mobs, playerPos, siteMap, config = DEFAULT_MOB_CONFIG) 
       }
       // 'alerted' deliberately does not move: the one-step warning.
     }
+
+    pos = resolveMobCollision(mob, pos, occupied); // never step onto another live mob's tile
 
     const nextMob = (pos.x === mob.x && pos.y === mob.y && state === mob.state)
       ? mob
