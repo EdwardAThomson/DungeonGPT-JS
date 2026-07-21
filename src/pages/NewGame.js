@@ -1181,8 +1181,24 @@ const NewGame = () => {
 
   return (
     <div className="page-container new-game-page">
-      <OnboardingSteps currentStep={2} completedSteps={heroes.length > 0 ? [1] : []} />
-      <h1>New Game Setup</h1>
+      <OnboardingSteps currentStep={1} />
+      {/* Top action mirrors the bottom submit so picking a card doesn't require
+          scrolling past the whole tab to continue. Disabled until something is
+          selected; full validation (custom slots, gating) still runs in
+          handleSubmit, which surfaces formError. */}
+      <div className="page-header">
+        <h1>New Game Setup</h1>
+        <div className="page-header-actions">
+          <button
+            onClick={handleSubmit}
+            className="primary-button"
+            disabled={!selectedTemplate}
+            title={selectedTemplate ? 'Continue to hero selection' : 'Pick an adventure first'}
+          >
+            Next: Select Heroes →
+          </button>
+        </div>
+      </div>
 
       {/* Tab Navigation */}
       <div style={{

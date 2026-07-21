@@ -112,6 +112,17 @@ const HeroCreation = () => {
     setHeroBackground(template.backgroundSnippet);
   };
 
+  // When this page was entered from HeroSelection, the return-flow flag and the
+  // campaign's launch context must survive the summary hop; dropping them strands
+  // the player on /all-heroes with the launched map/session lost.
+  const heroSelectionReturnState = state?.returnToHeroSelection
+    ? {
+        returnToHeroSelection: true,
+        settingsData: state.settingsData,
+        launchState: state.launchState,
+      }
+    : {};
+
   const handleSubmit = async () => {
     const newHero = {
       heroId: heroToEdit?.heroId || uuidv4(),
@@ -142,7 +153,7 @@ const HeroCreation = () => {
       return;
     }
 
-    navigate("/hero-summary", { state: { newCharacter: newHero } });
+    navigate("/hero-summary", { state: { newCharacter: newHero, ...heroSelectionReturnState } });
   };
 
   // Name generation is tied to gender. If no gender is chosen yet, the dice picks
@@ -163,7 +174,12 @@ const HeroCreation = () => {
 
   return (
     <div className="Home-page hero-creation-form">
-      {!state?.editing && <OnboardingSteps currentStep={1} />}
+      {/* The journey bar only renders when creation is part of the game-start flow
+          (entered from party selection). Standalone creation (Create Hero card,
+          Hall of Heroes) is roster management, not the journey — no bar. */}
+      {!state?.editing && state?.returnToHeroSelection && (
+        <OnboardingSteps currentStep={2} completedSteps={[1]} />
+      )}
       <h1 className="hero-creation-title">{state?.editing ? "Edit Hero" : "Create Your Hero"}</h1>
 
       {/* Top Container: Name + Gender (left), Profile Picture (right) */}
@@ -420,7 +436,7 @@ const HeroCreation = () => {
                 onClick={() => {
                   const hero = confirmUnspent.hero;
                   setConfirmUnspent(null);
-                  navigate('/hero-summary', { state: { newCharacter: hero } });
+                  navigate('/hero-summary', { state: { newCharacter: hero, ...heroSelectionReturnState } });
                 }}
               >
                 Create anyway

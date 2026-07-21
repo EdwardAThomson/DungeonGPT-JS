@@ -363,6 +363,15 @@
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Post-save jump into play (standalone hero creation) */
+.summary-start-adventure-btn {
+  background-color: var(--primary);
+  color: var(--bg);
+  border-color: var(--primary);
 }
 
 @media (max-width: 900px) {
@@ -646,4 +655,181 @@
   border-color: var(--border);
   color: var(--text-secondary);
   cursor: not-allowed;
+}
+
+/* --- Ready-made hero picker (HeroSelection) ------------------------------- */
+/* Empty-roster band: the pregens ARE the page content, portraits pulse a gold
+   invitation ring. Non-empty roster: the same cards render compact and quiet in
+   .pregen-strip (no glow), so returning players aren't shouted at. The glow gold
+   matches the global --primary-tint tokens (212,175,55). */
+
+.pregen-band {
+  text-align: center;
+  padding: 36px 20px 30px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--primary-tint-05);
+}
+
+.pregen-band-title {
+  margin: 0 0 22px;
+  font-size: 1.2rem;
+  color: var(--text);
+}
+
+.pregen-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  justify-content: center;
+}
+
+.pregen-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: none;
+  border: none;
+  border-radius: 10px;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.pregen-card:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.pregen-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.pregen-portrait {
+  display: block;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--primary);
+  transition: transform 0.15s ease;
+  /* Staggered via --pregen-delay so the ring pulses ripple across the row
+     instead of blinking in unison. */
+  animation: pregen-glow 3s ease-in-out infinite;
+  animation-delay: var(--pregen-delay, 0s);
+}
+
+.pregen-card:hover:not(:disabled) .pregen-portrait,
+.pregen-card:focus-visible .pregen-portrait {
+  transform: scale(1.06);
+}
+
+.pregen-portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pregen-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pregen-name {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.pregen-sub {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  max-width: 190px;
+}
+
+.pregen-band-note {
+  margin: 20px 0 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.pregen-link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@keyframes pregen-glow {
+  0%, 100% { box-shadow: 0 0 4px 1px var(--primary-tint-10); }
+  50% { box-shadow: 0 0 16px 5px rgba(212, 175, 55, 0.55); }
+}
+
+/* Compact strip under a non-empty roster */
+.pregen-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+.pregen-strip-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.pregen-card.compact {
+  flex-direction: row;
+  gap: 8px;
+  padding: 4px 8px;
+}
+
+.pregen-card.compact .pregen-portrait {
+  width: 64px;
+  height: 64px;
+  border-width: 2px;
+  animation: none;
+}
+
+.pregen-card.compact .pregen-text {
+  align-items: flex-start;
+}
+
+.pregen-card.compact .pregen-sub {
+  max-width: none;
+}
+
+/* One-shot landing pulse on the roster card a pregen just turned into, so the
+   glowing invitation visibly "becomes" the selected hero. */
+.hero-item.just-added {
+  animation: pregen-land 0.9s ease-out 1;
+}
+
+@keyframes pregen-land {
+  0% { box-shadow: 0 0 18px 7px rgba(212, 175, 55, 0.6); }
+  100% { box-shadow: 0 4px 12px var(--primary-tint-10); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pregen-portrait,
+  .hero-item.just-added {
+    animation: none;
+  }
+}
+
+.party-size-tip {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
 }

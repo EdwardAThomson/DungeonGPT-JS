@@ -1,14 +1,17 @@
 // OnboardingSteps.js
 // Lightweight 3-step progress indicator for the new-player journey:
-// Create Hero -> Choose Adventure -> Begin Quest. Rendered on the setup pages so a
-// first-time player always knows where they are and what comes next.
+// Choose Adventure -> Choose Heroes -> Begin Quest. Matches the actual flow
+// (adventure is picked first; the party page offers ready-made heroes or
+// creation), so entering New Game from the front page reads as step 1, not a
+// jarring mid-sequence step 2. Rendered only on pages that are part of this
+// journey — standalone hero creation/editing (Hall of Heroes) hides it.
 
 import React from 'react';
 import '../styles/onboarding.css';
 
 const STEPS = [
-  { n: 1, label: 'Create Hero' },
-  { n: 2, label: 'Choose Adventure' },
+  { n: 1, label: 'Choose Adventure' },
+  { n: 2, label: 'Choose Heroes' },
   { n: 3, label: 'Begin Quest' },
 ];
 

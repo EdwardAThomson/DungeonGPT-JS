@@ -28,7 +28,7 @@ export const TOUR_STEPS = [
     route: '/',
     target: '[data-tour="start-adventure"]',
     title: 'Welcome — start here',
-    body: 'New here? Click Start Adventure to create your first hero and begin your quest.',
+    body: 'New here? Click Start Adventure to pick your first adventure. You choose your hero right after.',
   },
   {
     id: 'create-hero-basics',
@@ -77,7 +77,7 @@ export const TOUR_STEPS = [
     route: '/hero-selection',
     target: '[data-tour="start-game"]',
     title: 'Choose your party',
-    body: 'Select 1–4 heroes by clicking them, then click Start Game — your quest begins!',
+    body: 'Take a ready-made hero with one click, or create your own. Then click Start Game and your quest begins!',
   },
   {
     id: 'start-adventure',

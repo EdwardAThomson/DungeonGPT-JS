@@ -69,14 +69,18 @@ const HeroSummary = () => {
       setFeedbackModal({
         title: isUpdate ? "Hero Updated" : "Hero Added",
         message: `Hero ${isUpdate ? 'updated' : 'added'} successfully.${localNote}`,
-        onConfirm: () => handleProgress(updatedHeroes)
+        onConfirm: () => handleProgress(updatedHeroes),
+        // Captured pre-save: the live isEditing check flips true once the new
+        // hero lands in the roster, so it can't be used at modal render time.
+        showStartAdventure: !isUpdate && !state?.returnToHeroSelection,
       });
     } catch (error) {
       logger.error(`Error ${isUpdate ? 'updating' : 'adding'} hero in DB:`, error);
       setFeedbackModal({
         title: "Save Warning",
         message: `Failed to ${isUpdate ? 'update' : 'add'} hero in database: ${error.message}. Changes were applied locally.`,
-        onConfirm: () => handleProgress(updatedHeroes)
+        onConfirm: () => handleProgress(updatedHeroes),
+        showStartAdventure: !isUpdate && !state?.returnToHeroSelection,
       });
     }
   };
@@ -85,7 +89,10 @@ const HeroSummary = () => {
     // This function only handles navigation now
     const finalHeroes = currentHeroes || heroes; // Use passed array or context
     if (state?.returnToHeroSelection) {
-      navigate('/hero-selection', { state: { heroes: finalHeroes, settingsData: state.settingsData } });
+      // Spread the launch context back to top level: HeroSelection reads
+      // generatedMap/worldSeed/gameSessionId/townMapsCache off its router state,
+      // and its step guard bounces to /new-game when they're missing.
+      navigate('/hero-selection', { state: { heroes: finalHeroes, settingsData: state.settingsData, ...(state.launchState || {}) } });
     } else {
       // Flag a freshly-added hero so the roster can spotlight the next step.
       navigate("/all-heroes", { state: { justAdded: !isEditing } });
@@ -105,7 +112,12 @@ const HeroSummary = () => {
   return (
     // Use a specific container class
     <div className="summary-container">
-      {!isEditing && <OnboardingSteps currentStep={1} />}
+      {/* Journey bar only when this summary is part of the game-start flow (came
+          from party selection); standalone crafting shows no bar, matching
+          HeroCreation. */}
+      {!isEditing && state?.returnToHeroSelection && (
+        <OnboardingSteps currentStep={2} completedSteps={[1]} />
+      )}
       {/* Removed main h2, using name as header */}
       <div className="summary-content">
         {/* Image Column */}
@@ -164,7 +176,18 @@ const HeroSummary = () => {
       <div className="summary-actions">
         {/* Back Button - always takes you back to edit */}
         <button
-          onClick={() => { navigate("/hero-creation", { state: { newCharacter: newHero, editing: true } }); }}
+          onClick={() => {
+            navigate("/hero-creation", {
+              state: {
+                newCharacter: newHero,
+                editing: true,
+                // Keep the hero-selection return flow alive through an edit loop.
+                returnToHeroSelection: state?.returnToHeroSelection,
+                settingsData: state?.settingsData,
+                launchState: state?.launchState,
+              },
+            });
+          }}
           className="summary-action-btn summary-back-btn"
         >
           Back (Edit)
@@ -191,6 +214,17 @@ const HeroSummary = () => {
             <h3>{feedbackModal.title}</h3>
             <p>{feedbackModal.message}</p>
             <div className="summary-feedback-actions">
+              {/* Standalone creation ends at the Hall of Heroes; offer the jump
+                  into play so hero-first crafting isn't a dead end. The in-flow
+                  path (returnToHeroSelection) already continues to the party. */}
+              {feedbackModal.showStartAdventure && (
+                <button
+                  className="modal-close-button summary-start-adventure-btn"
+                  onClick={() => navigate('/new-game')}
+                >
+                  ⚔️ Start an Adventure
+                </button>
+              )}
               <button className="modal-close-button" onClick={closeFeedbackModal}>
                 Continue
               </button>

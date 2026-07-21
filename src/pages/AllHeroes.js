@@ -9,7 +9,6 @@ import { calculateMaxHP } from "../utils/healthSystem";
 import { heroesApi } from "../services/heroesApi";
 import { createLogger } from "../utils/logger";
 import { resolveProfilePicture } from "../utils/assetHelper";
-import OnboardingSteps from "../components/OnboardingSteps";
 import { useAuth } from "../contexts/AuthContext";
 
 const logger = createLogger('all-heroes');
@@ -74,11 +73,9 @@ const AllHeroes = () => {
 
   return (
     <div className="page-container all-heroes-page">
-      <OnboardingSteps
-        currentStep={heroes.length > 0 ? 2 : 1}
-        completedSteps={heroes.length > 0 ? [1] : []}
-      />
-
+      {/* No onboarding bar here: the Hall of Heroes is roster management, not the
+          adventure-first journey (Choose Adventure -> Choose Heroes -> Begin Quest).
+          The next-step banner below carries the "Ready to play?" guidance. */}
       {/* Add a header container for Title + Button */}
       <div className="page-header">
         <h2>All Heroes</h2>
