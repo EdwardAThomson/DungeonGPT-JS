@@ -1,7 +1,11 @@
 # Skill-Check Plan: BG3-style rolls for narrative actions
 
-Status: **Proposed, HIGH PRIORITY (2026-07-16). No code yet.** Tracks
-`OUTSTANDING_ISSUES.md` #83. This plan extends the #76 narration contract
+Status: **Phases 1-2 SHIPPED 2026-07-20 (PRs #155/#156):** `src/game/skillCheck.js`
+(marker parsing + engine roll with combat modifier parity) plus the persisted failed-check
+lock ledger (`settings.checkLocks`, spent-approach injection, hard no-reroll backstop,
+long-rest / different-place reset). **Phases 3 (fail-forward consequences) and 4 (animated
+d20) not yet scheduled.** §2's "what exists today" dead-end map below is the pre-Phase-1
+historical state. Tracks `OUTSTANDING_ISSUES.md` #83. This plan extends the #76 narration contract
 ([AI_NARRATION_CONTRACT.md](AI_NARRATION_CONTRACT.md)) to social/narrative actions and
 **answers its open question 5** (the `[CHECK/ROLL]` trigger: in scope, kept, upgraded into
 a real loop). It also builds out the contract's "Future: NPC direct-talk uses bounded

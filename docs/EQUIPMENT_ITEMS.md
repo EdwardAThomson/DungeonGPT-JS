@@ -25,11 +25,19 @@ occupies decides what that number does (`src/game/equipment.js` -> `getEquippedB
 | common | 0-1 | +1 | +1 |
 | uncommon | +1 | +2 | +1 |
 | rare | +2 | +3 | +2 |
-| very rare | +2-3 | +4 | +2-3 |
-| legendary (t3-gated) | +3 | +5 | +3 |
+| very rare | +3 | +4 | +2-3 |
+| legendary (t3-gated) | +4 | +5 | +3 |
 
 Armour values run higher because soak is flat HP per hit; to-hit and all-checks are d20
 modifiers where each point is strong, so they stay low.
+
+**Weapon curve rescaled 2026-07-20 ("Minimal" curve):** common +1, uncommon +1, rare +2,
+very rare +3, legendary +4, so rarity now matters mechanically (uncommon != rare). Uncommon
+deliberately stays at +1 so the balance-sim "mid" loadout (now `silver_dagger`) and every
+`progressionLint` band are unchanged; only rare+ gear got stronger. A "Gentle" curve
+(uncommon +2) was tried and reverted because it trivialised the tier-1 bosses. Differentiating
+common from uncommon (both +1) is deferred to a baseline-buff + boss-retune session.
+Catalog weapon `bonus` strings are now labelled (`'+1 attack'`); `parseBonus` is unchanged.
 
 ## Changes made
 
@@ -49,8 +57,9 @@ acquisition, so neither is redundant. (Avoid putting both in one shop, or the ch
 
 **Weapons** (bonuses assigned to existing; art is blade/dagger/staff only)
 - `+1`: `shortsword`, `silver_dagger`, `ritual_dagger`, `poisoned_dagger`, `enchanted_staff`
-- already `+1`/`+2`: `magic_weapon`, `legendary_weapon` (since moved to the legendary
-  shelf at +3, see the #44 section below)
+- already `+1`/`+2`: `magic_weapon` (since raised to `+2` by the 2026-07-20 rarity
+  curve), `legendary_weapon` (since moved to the legendary shelf, now `+4`, see the
+  #44 section below)
 - left at 0 (starters/junk): `rusty_dagger`, `bar_stool_leg`
 
 **Accessories** (buffed existing; gave the inert very-rare artifacts teeth)
@@ -74,15 +83,16 @@ acquisition, so neither is redundant. (Avoid putting both in one shop, or the ch
 The #44 pass filled the gaps this doc left open (design rationale in
 `T3_CAMPAIGNS_PLAN.md` §5 and `OUTSTANDING_ISSUES.md` #44):
 
-- **Findable +2 rung**: `runic_greatsword` (very_rare weapon, +2) and `stormbound_ring`
-  (very_rare ring, +2) drop from encounter tables, so tier-2 play reaches +2 without a
-  bespoke quest artifact. `hunters_longbow` (rare weapon, +1) joined the catalogue. New
+- **Findable +2 rung**: `runic_greatsword` (very_rare weapon, +2 then; +3 since the
+  2026-07-20 rarity curve) and `stormbound_ring` (very_rare ring, +2) drop from encounter
+  tables, so tier-2 play reaches the upper weapon rungs without a bespoke quest artifact.
+  `hunters_longbow` (rare weapon, +1 then; now +2) joined the catalogue. New
   icon art landed for these (the "no new images" constraint no longer holds).
 - **`dragonscale_plate` is now obtainable**: it drops from the mountain dragon-lair
   encounter hoard (20%) and is authored as a story-template milestone reward, resolving
   the "no source yet" deferral below.
-- **t3 legendary shelf**: a `legendary` rarity above very_rare (`legendary_weapon` +3,
-  `blade_of_the_shattered_throne` +3, `aegis_of_dawn` +5 defense, and the +3 artifacts
+- **t3 legendary shelf**: a `legendary` rarity above very_rare (`legendary_weapon` +4,
+  `blade_of_the_shattered_throne` +4, `aegis_of_dawn` +5 defense, and the +3 artifacts
   `heart_of_the_last_winter`, `clockwork_god_core`, `crown_of_the_drowned_city`).
   Legendary is tier-gated to t3+ (`maxRarityRankForTier`); until a playable t3 campaign
   exists these are unobtainable by design, pinned in the `progressionLint` KNOWN_GAPS
