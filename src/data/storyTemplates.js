@@ -420,7 +420,7 @@ export const storyTemplates = [
                         icon: '🐍',
                         // Boss-art note: closest thematic fit in the current library; shared
                         // with questEnemies' Red Wyrm. Bespoke sand-wyrm art is an art-queue item.
-                        image: '/assets/encounters/bosses/dragon_wyrm.webp',
+                        image: '/assets/encounters/bosses/dune_wyrm.webp',
                         encounterTier: 'boss',
                         difficulty: 'deadly',
                         // #43 schema: deadly's default DC 25 is a ~1% lottery; DC pinned into
@@ -658,7 +658,7 @@ export const storyTemplates = [
                         // library; shared with questEnemies' Blood Wendigo (grimdark t2) and a
                         // T3_CAMPAIGNS_PLAN candidate for The Last Winter. Bespoke gaunt
                         // frost-revenant art is an art-queue item.
-                        image: '/assets/encounters/bosses/blood_wendigo.webp',
+                        image: '/assets/encounters/bosses/pale_hunger.webp',
                         encounterTier: 'boss',
                         difficulty: 'deadly',
                         // #43 schema: deadly's default DC 25 is a ~1% lottery; DC pinned into
@@ -1159,7 +1159,7 @@ export const storyTemplates = [
                     encounter: {
                         name: 'The Hooded Priest',
                         icon: '🕯️',
-                        image: '/assets/encounters/bosses/worm_that_walks.webp',
+                        image: '/assets/encounters/bosses/cult_leader.webp',
                         encounterTier: 'boss',
                         difficulty: 'medium',
                         multiRound: true,

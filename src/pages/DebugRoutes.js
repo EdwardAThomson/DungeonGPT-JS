@@ -35,6 +35,7 @@ import SummarizationTest from './SummarizationTest';
 import RagTest from './RagTest';
 import PremiumPage from './PremiumPage';
 import BossFightTest from './BossFightTest';
+import CombatHudTest from './CombatHudTest';
 
 const sectionIcons = {
   'Terrain & Maps': '🗺️',
@@ -65,6 +66,7 @@ const debugSections = [
   {
     title: 'Encounters',
     links: [
+      { to: 'combat-hud', label: 'Combat HUD (map-context, WIP)' },
       { to: 'boss-fight', label: 'Boss Fight Test (party vs t1/t2 bosses)' },
       { to: 'encounter-test', label: 'Encounter Test' },
       { to: 'encounter-debug', label: 'Encounter Debug' },
@@ -211,6 +213,7 @@ const DebugRoutes = () => {
           <Route index element={<DebugIndex />} />
           <Route path="terrain-studio-v2" element={<TerrainStudioV2 />} />
           <Route path="terrain-studio" element={<TerrainStudio />} />
+          <Route path="combat-hud" element={<CombatHudTest />} />
           <Route path="boss-fight" element={<BossFightTest />} />
           <Route path="encounter-test" element={<EncounterTest />} />
           <Route path="encounter-debug" element={<EncounterDebug />} />

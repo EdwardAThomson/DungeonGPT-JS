@@ -3,6 +3,7 @@ import { heroSupportContribution } from '../utils/multiRoundEncounter';
 import { getHPStatus, encounterDealsDamage } from '../utils/healthSystem';
 import { describeSpellDamage, ITEM_CATALOG } from '../utils/inventorySystem';
 import ClickableImage from './ClickableImage';
+import CombatStage from './CombatStage';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
 import useEncounterFight from '../hooks/useEncounterFight';
@@ -167,9 +168,6 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
           // Hero selection phase
           <>
             <h2 style={{ marginBottom: '2px', paddingBottom: '6px' }}>⚔️ {encounter.name}</h2>
-            <div style={{ textAlign: 'center', fontSize: '11px', color: 'var(--state-muted-strong)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '8px' }}>
-              Random Encounter
-            </div>
             {encounterThreat && (
               <div style={{ textAlign: 'center', marginBottom: '8px' }}>{renderThreatBadge()}</div>
             )}
@@ -190,8 +188,8 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
               <h3 style={{ marginBottom: '8px' }}>Choose Your Lead</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '12px', marginBottom: '10px' }}>
                 {encounter.multiRound
-                  ? 'The lead acts and rolls each round; everyone else supports, adding their bonus to the roll. If the lead falls, the healthiest hero steps in. (15% chance initiative fails)'
-                  : 'Select hero to lead. (15% chance initiative fails)'}
+                  ? 'Lead rolls each round; allies add their bonus. Lead falls → healthiest takes over. (15% init-fail)'
+                  : 'Select hero to lead. (15% init-fail)'}
               </p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -305,9 +303,6 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
           <>
             <div className="encounter-header">
               <h2 style={{ marginBottom: '2px' }}>{encounter.name}</h2>
-              <div style={{ fontSize: '11px', color: 'var(--state-muted-strong)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px' }}>
-                Random Encounter
-              </div>
               {(encounterThreat || (isMultiRound && roundState)) && (
                 <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                   {renderThreatBadge()}
@@ -326,10 +321,11 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                   - single-round / non-combat: tall (little content below -> show the most art)
                   The centered maxWidth lets a tall box stay near-square instead of
                   side-cropping the square source. */}
-              {encounter.image && !result && (
-                <ClickableImage
-                  src={encounter.image}
+              {!result && (
+                <CombatStage
+                  image={encounter.image}
                   alt={encounter.name}
+                  icon={encounter.icon}
                   height={(currentRoundResult || roundResults.length > 0)
                     ? 'clamp(130px, calc(100vh - 745px), 460px)'
                     : isMultiRound
@@ -339,9 +335,12 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                         : 'clamp(280px, calc(100vh - 435px), 600px)'}
                   maxWidth={(currentRoundResult || roundResults.length > 0) ? undefined : '620px'}
                   objectPosition={fullSizeImage ? 'center 60%' : 'center 35%'}
+                  enemyName={encounter.name}
+                  enemyCurrentHP={isMultiRound && roundState ? roundState.enemyCurrentHP : undefined}
+                  enemyMaxHP={isMultiRound && roundState ? roundState.enemyMaxHP : undefined}
+                  roundResult={currentRoundResult}
                 />
               )}
-              {!encounter.image && <span className="encounter-icon">{encounter.icon}</span>}
 
               {/* Initiative result notification */}
               {initiativeResult && initiativeResult.message && (
@@ -390,57 +389,31 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                 </div>
               )}
 
-              {/* Party support strip (#43 Lead + Support) */}
-              {isMultiRound && roundState && roundState.isTeamEncounter && (
+              {/* Party support strip (#43 Lead + Support) — compact (2026-07-21): just the
+                  actionable total, plus a callout only for DOWNED allies (whose support is
+                  lost). The old per-hero "Name (HP) supports +1" list restated the total for
+                  every hero and was pure overload. */}
+              {isMultiRound && roundState && roundState.isTeamEncounter && roundState.supportBonus > 0 && (
                 <div className="encounter-party-strip" style={{
-                  display: 'flex', flexWrap: 'wrap', gap: '6px', alignItems: 'center',
+                  display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center',
                   margin: '3px 0', fontSize: '12px'
                 }}>
+                  <span style={{ color: 'var(--state-success-strong)', fontWeight: 'bold' }}>
+                    Party support: +{roundState.supportBonus} to every roll
+                  </span>
                   {roundState.party.map((hero, idx) => {
                     if (idx === roundState.leadIndex) return null;
                     const down = hero.currentHP <= 0 || hero.isDefeated;
-                    return (
-                      <span key={idx} style={{
-                        padding: '2px 8px', borderRadius: '10px',
-                        border: '1px solid var(--border)',
-                        background: 'var(--surface)',
-                        opacity: down ? 0.5 : 1
-                      }}>
-                        {hero.heroName || hero.characterName}{' '}
-                        {down
-                          ? '💀 down'
-                          : <>({Math.floor(hero.currentHP)}/{hero.maxHP} HP) supports +{heroSupportContribution(hero)}</>}
+                    return down ? (
+                      <span key={idx} style={{ opacity: 0.6 }}>
+                        💀 {hero.heroName || hero.characterName} down
                       </span>
-                    );
+                    ) : null;
                   })}
-                  {roundState.supportBonus > 0 && (
-                    <span style={{ color: 'var(--state-success-strong)', fontWeight: 'bold' }}>
-                      Party support: +{roundState.supportBonus} to every roll
-                    </span>
-                  )}
                 </div>
               )}
 
-              {/* Enemy HP Bar */}
-              {isMultiRound && roundState && roundState.enemyMaxHP && (
-                <div className="encounter-hp-bar enemy-hp-bar">
-                  <div className="hp-label">
-                    <span>{encounter.name}</span>
-                    <span style={{ color: roundState.enemyCurrentHP <= roundState.enemyMaxHP * 0.3 ? 'var(--state-danger)' : 'var(--state-warning)' }}>
-                      {roundState.enemyCurrentHP} / {roundState.enemyMaxHP} HP
-                    </span>
-                  </div>
-                  <div className="hp-bar-container">
-                    <div
-                      className="hp-bar-fill"
-                      style={{
-                        width: `${(roundState.enemyCurrentHP / roundState.enemyMaxHP) * 100}%`,
-                        background: roundState.enemyCurrentHP <= roundState.enemyMaxHP * 0.3 ? 'var(--state-danger)' : 'var(--state-warning)'
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
+              {/* Enemy HP is now overlaid on the art (CombatStage), not a separate row. */}
             </div>
 
             {isDefeated && !result ? (
@@ -491,32 +464,9 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
                   {currentRoundResult.narration}
                 </div>
 
-                <div className="combat-damage-summary">
-                  {currentRoundResult.enemyDamage > 0 && (
-                    <div className="enemy-damage-section">
-                      <h4>⚔️ Damage Dealt</h4>
-                      <div className="damage-amount" style={{ color: 'var(--state-warning)' }}>{currentRoundResult.enemyDamage} HP</div>
-                      <p className="damage-description">You strike the {encounter.name.toLowerCase()}!</p>
-                    </div>
-                  )}
-
-                  {currentRoundResult.hpDamage > 0 && (
-                    <div className="player-damage-section">
-                      <h4>🩸 Damage Taken</h4>
-                      <div className="damage-amount" style={{ color: 'var(--state-danger)' }}>{currentRoundResult.hpDamage} HP</div>
-                      <p className="damage-description">The {encounter.name.toLowerCase()} strikes back!</p>
-                      {(currentRoundResult.partyDamage || []).some((d) => d.role === 'support') && (
-                        <p className="damage-description">
-                          The blow splashes into the party:{' '}
-                          {currentRoundResult.partyDamage
-                            .filter((d) => d.role === 'support')
-                            .map((d) => `${roundState.party[d.heroIndex]?.heroName || roundState.party[d.heroIndex]?.characterName || 'ally'} -${d.amount} HP`)
-                            .join(', ')}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                {/* Per-round "Damage Dealt / Damage Taken" boxes removed (2026-07-21): the
+                    rise-and-fade damage numbers over the art (CombatStage) now convey dealt +
+                    taken damage, and the enemy/hero HP bars show the running totals. */}
 
                 {renderCombatStatus()}
 
@@ -567,16 +517,8 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
 
                 {isMultiRound && renderCombatStatus()}
 
-                {roundResults.length > 0 && (
-                  <div className="round-history">
-                    <h4>Previous Rounds:</h4>
-                    {roundResults.map((r, idx) => (
-                      <div key={idx} className="round-summary">
-                        <strong>Round {r.round}:</strong> {r.result.outcomeTier}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {/* "Previous Rounds" scrollback removed (overload cut, 2026-07-21): the
+                    current round + running HP/damage carry the state the player needs. */}
 
                 <div className="encounter-actions">
                   <h3>What do you do?</h3>

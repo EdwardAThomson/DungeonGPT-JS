@@ -419,6 +419,83 @@
   text-shadow: 0 2px 4px var(--glow-danger-30);
 }
 
+/* ── Combat stage (CombatStage.js): art as the fight surface ───────────────────
+   Enemy HP overlaid on the top of the art, rise-and-fade damage numbers over it. */
+.combat-stage {
+  position: relative;
+  line-height: 0; /* kill inline-image descender gap so the HP overlay hugs the top */
+}
+
+.combat-stage-hp {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  padding: 6px 10px 8px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0));
+  pointer-events: none;
+  line-height: 1.2;
+}
+.combat-stage-hp-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 3px #000;
+  margin-bottom: 4px;
+}
+.combat-stage-hp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combat-stage-hp-num { color: var(--state-warning); flex-shrink: 0; }
+.combat-stage-hp-num.low { color: var(--state-danger); }
+.combat-stage-hp-track {
+  height: 8px;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.combat-stage-hp-fill {
+  height: 100%;
+  background: var(--state-warning);
+  border-radius: 3px;
+  transition: width 0.45s ease;
+}
+.combat-stage-hp-fill.low { background: var(--state-danger); }
+
+.combat-stage-floaters {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  line-height: 1;
+}
+.damage-floater {
+  font-size: 36px;
+  font-weight: 800;
+  text-shadow: 0 2px 6px #000, 0 0 3px #000;
+  animation: damageRiseFade 1.8s ease-out forwards;
+}
+.damage-floater.dealt { color: #ffd34d; } /* damage dealt to the enemy */
+.damage-floater.taken { color: #ff5a4d; } /* damage the party took */
+
+/* Pop in fast, then HOLD readable for most of the duration before drifting up and
+   fading (the hold from ~12% to ~70% is what keeps the number on screen long enough). */
+@keyframes damageRiseFade {
+  0%   { opacity: 0; transform: translateY(12px) scale(0.8); }
+  10%  { opacity: 1; transform: translateY(0) scale(1.14); }
+  20%  { transform: translateY(-3px) scale(1); }
+  70%  { opacity: 1; transform: translateY(-16px) scale(1); }
+  100% { opacity: 0; transform: translateY(-40px) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .damage-floater { animation: none; opacity: 0; } /* snap: no motion */
+  .combat-stage-hp-fill { transition: none; }
+}
+
 .damage-description {
   font-size: 14px;
   color: var(--text);

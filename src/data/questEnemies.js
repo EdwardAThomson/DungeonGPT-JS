@@ -98,7 +98,7 @@ export const QUEST_ENEMIES = {
     cult_leader: {
         name: 'The Hooded Priest',
         icon: '🕯️',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/cult_leader.webp',
         tier: 1,
         theme: 'eldritch-horror',
         encounterTier: 'boss',
@@ -228,7 +228,7 @@ export const QUEST_ENEMIES = {
     deep_one_scout: {
         name: 'Deep One Scout',
         icon: '🐟',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/deep_one_scout.webp',
         tier: 1,
         theme: 'eldritch-horror',
         encounterTier: 'boss',
@@ -388,7 +388,7 @@ export const QUEST_ENEMIES = {
     shadow_stalker: {
         name: 'Shadow Stalker',
         icon: '👤',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/shadow_stalker.webp',
         tier: 1,
         theme: 'eldritch-horror',
         encounterTier: 'boss',
@@ -414,7 +414,7 @@ export const QUEST_ENEMIES = {
     worm_that_walks: {
         name: 'The Worm That Walks',
         icon: '🪱',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/worm_that_walks.webp',
         tier: 1,
         theme: 'eldritch-horror',
         encounterTier: 'boss',
@@ -528,7 +528,7 @@ export const QUEST_ENEMIES = {
     great_dreamer: {
         name: 'The Great Dreamer',
         icon: '🐙',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/great_dreamer.webp',
         tier: 2,
         theme: 'eldritch-horror',
         encounterTier: 'boss',
@@ -748,7 +748,7 @@ export const QUEST_ENEMIES = {
     void_leviathan: {
         name: 'The Void Leviathan',
         icon: '🌀',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/void_leviathan.webp',
         tier: 2,
         theme: 'eldritch-horror',
         encounterTier: 'boss',
@@ -780,7 +780,7 @@ export const QUEST_ENEMIES = {
     leyline_dragon: {
         name: 'The Leyline Dragon',
         icon: '🐲',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/leyline_dragon.webp',
         tier: 2,
         theme: 'arcane-renaissance',
         encounterTier: 'boss',
@@ -807,7 +807,7 @@ export const QUEST_ENEMIES = {
     psionic_devourer: {
         name: 'The Psionic Devourer',
         icon: '🧠',
-        image: '/assets/icons/items/ritual_dagger.webp',
+        image: '/assets/encounters/bosses/psionic_devourer.webp',
         tier: 2,
         theme: 'eldritch-horror',
         encounterTier: 'boss',
