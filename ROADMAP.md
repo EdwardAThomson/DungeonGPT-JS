@@ -1,6 +1,6 @@
 # Roadmap — DungeonGPT (JS)
 
-_Status: active · updated 2026-07-08_
+_Status: active · updated 2026-07-22_
 
 The production rewrite of DungeonGPT — a React web app for creating fantasy
 characters and playing AI-narrated RPG campaigns. Deployed at dungeongpt.xyz on
@@ -47,14 +47,28 @@ backlog; see the `docs/` design docs for each system.
 - [x] Themed town building palettes (#64): desert adobe + snow timber with tier-2 details (flat roofs, chimney smoke, icicles, jetty docks); world-map viewport with stepped zoom + tile culling, shipped dark for worlds above 10x10 (#60 step 2)
 - [x] Rate limiting on `/api/ai`, `/api/embed`, and `/api/db/*` writes (#12) + premium AI pool via OpenRouter for member+ tiers with daily/monthly allowances (#7)
 - [x] Ops hardening (#11/#19-21): automated Worker deploy CI with prod smoke test, Postgres backup/restore scripts, ops runbook (`docs/OPS_RUNBOOK.md`)
+- [x] AI narration contract Phase 1 (#76): all four milestone types engine-refereed ("engine referees, LLM narrates"), completion markers retired, legacy saves migrate on load; Talk-button NPC objectives, authored milestone NPCs placed in quest buildings (`docs/AI_NARRATION_CONTRACT.md`)
+- [x] Engine-rolled skill checks for narrative actions, BG3-style (#83 Phases 1-2): the model proposes `[CHECK: skill, tier, target]` and stops, the engine rolls with the combat modifier stack and injects the result; failed checks lock per (location, target, skill) until a rest or a move
+- [x] Tiered New Game discovery (#72) + arc cards Phase 1 (#73): campaign picker organized as story arcs with chapter cards
+- [x] Redemption codes (first billing slice): time-boxed tier grants via `POST /api/db/redeem-code` + Profile redeem flow (`docs/REDEMPTION_CODES.md`)
+- [x] Combat UX Thread A step 1 (#79): map-context combat stage (HP overlays + damage floaters over the live map), modal overload cuts, `/debug/combat-hud` harness; inter-mob collision fix
+- [x] Product analytics (#86): anonymous first-session funnel + retention events through an unauthenticated `/api/events` route (CORS origin allowlist, event-name allowlist, props cap, IP rate limit); built, awaiting migration 007 + deploy (see Next)
+- [x] Sign-up flow polish (#87): guest sign-in prompt names the player's own hero/campaign; guest-save-is-browser-only copy stated plainly across banner, roster, and save toast
+- [x] Onboarding + setup streamlining (#88): ready-made starter heroes with adventure-first flow, last-played template + last-used party preselects, hero-creation prefill, state-driven progress bar (Choose Adventure → Choose Heroes → Begin Quest)
+- [x] Playtest fixes: quest-building injection for milestone towns (#74), Start Adventure retry (#75); 17 encounter/boss image mismatches corrected
 
 ## Next
 
 - [x] Fix magic-link email template (OTP token shown but no UI input): resolved 2026-07-16 as a stale row; the hub's current magic-link email carries no OTP code, so no fix was needed (OUTSTANDING_ISSUES #1)
 - [x] Add missing assets: dedicated quest-item icons + hide/studded-leather armour and pine-resin art delivered (placeholders cleared); the `workshop` building interior (Henry #26) is delivered
 - [x] Replace fragile keyword-based encounter-engagement detection: superseded by the two-tier narration redesign; the keyword matching no longer exists (OUTSTANDING_ISSUES #13)
-- [ ] Mobile UI fixes (sign-in/nav overlap, How-To-Play layout)
-- [ ] Guest conversion: prompt at a high-intent moment (e.g. first milestone), beyond the persistent banner
+- [ ] Deploy product analytics (#86): apply migration 007, then deploy the Worker (built and merged, not yet live)
+- [ ] Landing page + UI redesign (#82, HIGH PRIORITY): visibly behind competitors; art slots + mockup in the private plan
+- [ ] Map & Adventure Log layout: promote the map to the main stage (#84, HIGH PRIORITY)
+- [ ] Combat UX continuation (#79): dockable map-context HUD (§0 step 2), then the remaining animation/refine threads (`docs/COMBAT_UX_PLAN.md`)
+- [ ] In-flight phase work: AI narration contract Phase 2 (#76), skill checks Phases 3-4 (#83), arc cards Phases 2-4 (#73)
+- [ ] Mobile UI fixes (sign-in/nav overlap, How-To-Play layout) (tracked only here, no backlog row)
+- [ ] Guest conversion: prompt at a high-intent moment (e.g. first milestone), beyond the persistent banner; #86's funnel now measures this (tracked only here, no backlog row)
 
 ## Backlog
 
@@ -68,3 +82,8 @@ backlog; see the `docs/` design docs for each system.
 - [ ] SSO expansion (Google, GitHub, Discord) + magic-link sign-in
 - [ ] Monitoring (Sentry), structured logging (automated Worker deploy + ops runbook shipped, see above)
 - [ ] Graph-enhanced RAG for long-context quests (basic RAG shipped; see `docs/RAG_GRAPH_ENHANCEMENT_PLAN.md`)
+- [ ] Heroic Fantasy hourglass starters: two sibling t1 campaigns (#85, decided, not scheduled)
+- [ ] AI-authored quests/campaigns with deterministic milestones (#77, design done, not scheduled)
+- [ ] Larger world maps for paid tiers (#60, design done; chunk-assembly prototype behind `/debug/large-world`)
+- [ ] Game feel: audio + visual juice (#78); grimdark/eldritch mood theming (#80); TTS voice narration (#81) (ideas captured, not scheduled)
+- [ ] Combat-sim depth (backlog rows 27-33): attack-roll/AC loop, conditions, initiative, death saves, tactical positioning (known deficiencies, unscheduled)
