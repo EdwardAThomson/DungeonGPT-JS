@@ -77,6 +77,12 @@ let sessionTierExpiresAt = null;
 // (account/upgrade surfaces), never a gate input: gates key on the game-ladder
 // tier above, which the Worker already derived from this.
 let sessionHubEntitlements = null;
+// Premium-pool allowance meter ({ premiumDaily: { used, limit }, premiumMonthly:
+// { used, limit } }) reported by the Worker for member+ accounts (#6 visibility
+// slice); null for free tier, guests, fetch failures, counter outages, and older
+// Workers. Session-only display metadata (Profile), never a gate input: the
+// enforcement lives in the Worker's routes/ai.ts.
+let sessionUsage = null;
 
 function readMirror() {
     try {
@@ -134,6 +140,7 @@ export function clearUserTier() {
     sessionTier = 'free';
     sessionTierExpiresAt = null;
     sessionHubEntitlements = null;
+    sessionUsage = null;
     fetchPromise = null;
     try {
         localStorage.removeItem(TIER_MIRROR_KEY);
@@ -154,7 +161,7 @@ export async function getUserTier() {
     if (!fetchPromise) {
         fetchPromise = (async () => {
             try {
-                const { tier, expiresAt, hub } = await fetchEntitlements();
+                const { tier, expiresAt, hub, usage } = await fetchEntitlements();
                 setUserTier(tier);
                 // expiresAt is additive on the endpoint (#6); older Workers simply
                 // omit it and the display falls back to "no end date".
@@ -163,10 +170,14 @@ export async function getUserTier() {
                 // snapshot, kept only for display surfaces.
                 sessionHubEntitlements =
                     hub && typeof hub === 'object' ? hub : null;
+                // usage is additive as well (#6 visibility slice): the premium
+                // allowance meter, display only; older Workers omit it.
+                sessionUsage = usage && typeof usage === 'object' ? usage : null;
             } catch {
                 sessionTier = 'free';
                 sessionTierExpiresAt = null;
                 sessionHubEntitlements = null;
+                sessionUsage = null;
             }
         })();
     }
@@ -206,6 +217,18 @@ export function getTierExpiresAt() {
  */
 export function getHubEntitlementsSnapshot() {
     return sessionHubEntitlements;
+}
+
+/**
+ * Premium-pool allowance meter from the last successful entitlements fetch:
+ * { premiumDaily: { used, limit }, premiumMonthly: { used, limit } }, or null
+ * (free tier, guests, unresolved sessions, fetch/counter failures, older
+ * Workers). Display metadata only (Profile usage row): enforcement stays in
+ * the Worker, which 429s with code 'premium_cap' at the same limits.
+ * @returns {object|null}
+ */
+export function getUsageSnapshot() {
+    return sessionUsage;
 }
 
 // Display-only mirror of the Worker's authoritative hub->game rename

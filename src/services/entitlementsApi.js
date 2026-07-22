@@ -24,10 +24,13 @@ const CF_WORKER_URL = process.env.REACT_APP_CF_WORKER_URL || '';
  * a network call: the endpoint requires auth, so there is nothing to ask. Network
  * or server failures throw; the caller (entitlements.js) fails closed to 'free'.
  *
- * @returns {Promise<{ tier: string, updatedAt: string|null, expiresAt?: string|null, hub?: object }>}
+ * @returns {Promise<{ tier: string, updatedAt: string|null, expiresAt?: string|null, hub?: object, usage?: object|null }>}
  *   `tier` is the effective game-ladder tier; `hub` is the raw hub billing
  *   snapshot ({ tier, status, lifetime, currentPeriodEnd, perks, credits }),
- *   display metadata only.
+ *   display metadata only. `usage` (additive, #6 visibility slice) is the
+ *   premium allowance meter for member+ accounts ({ premiumDaily: { used,
+ *   limit }, premiumMonthly: { used, limit } }); null for free tier or when
+ *   the Worker could not read the counters.
  */
 export async function fetchEntitlements() {
   if (!supabase) return { tier: 'free', updatedAt: null };

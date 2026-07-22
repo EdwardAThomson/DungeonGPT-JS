@@ -94,6 +94,7 @@ describe("GET /api/entitlements: snapshot", () => {
       updatedAt: null,
       expiresAt: null,
       hub: hubPayload("free"),
+      usage: null, // free tier has no premium allowance to meter
     });
   });
 
@@ -134,6 +135,58 @@ describe("GET /api/entitlements: snapshot", () => {
     const json = (await res.json()) as any;
     expect(json.tier).toBe("member");
     expect(json.expiresAt).toBe("2026-08-05T00:00:00.000Z");
+  });
+});
+
+describe("GET /api/entitlements: usage meter (backlog #6 visibility slice)", () => {
+  it("member+ callers get read-only premium allowance meters from request_counters", async () => {
+    fetchStub.on(HUB_ENDPOINT, () => hubPayload("members"));
+    sql.onQuery(/FROM request_counters/, (q) =>
+      q.values.includes("ai-premium-daily") ? [{ count: 7 }] : [{ count: 42 }]
+    );
+    const res = await getAs(nextUser());
+    const json = (await res.json()) as any;
+    expect(json.tier).toBe("member");
+    expect(json.usage).toEqual({
+      premiumDaily: { used: 7, limit: 100 },
+      premiumMonthly: { used: 42, limit: 800 },
+    });
+  });
+
+  it("meters scale with the tier's limits (elite)", async () => {
+    fetchStub.on(HUB_ENDPOINT, () => hubPayload("elite"));
+    // No counter rows this window: a fresh day/month reads 0, not an error.
+    const res = await getAs(nextUser());
+    const json = (await res.json()) as any;
+    expect(json.usage).toEqual({
+      premiumDaily: { used: 0, limit: 300 },
+      premiumMonthly: { used: 0, limit: 4000 },
+    });
+  });
+
+  it("a counter outage nulls the meter but never the snapshot (fail-soft)", async () => {
+    fetchStub.on(HUB_ENDPOINT, () => hubPayload("members"));
+    sql.onQuery(/FROM request_counters/, () => {
+      throw new Error("counters down");
+    });
+    const res = await getAs(nextUser());
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as any;
+    expect(json.tier).toBe("member");
+    expect(json.usage).toBe(null);
+  });
+
+  it("free tier never reads counters and reports usage null", async () => {
+    fetchStub.on(HUB_ENDPOINT, () => hubPayload("free"));
+    const counterReads: string[] = [];
+    sql.onQuery(/FROM request_counters/, (q) => {
+      counterReads.push(q.text);
+      return [{ count: 5 }];
+    });
+    const res = await getAs(nextUser());
+    const json = (await res.json()) as any;
+    expect(json.usage).toBe(null);
+    expect(counterReads).toEqual([]);
   });
 });
 

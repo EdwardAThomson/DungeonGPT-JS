@@ -4,6 +4,16 @@ import { requireAuth, type AuthVariables } from '../middleware/auth';
 import { getSql } from '../services/pg';
 import { freeHubEntitlements } from '../services/hubEntitlements';
 import { getMergedTier, bearerToken } from '../services/mergedTier';
+import { tierRank } from '../services/tiers';
+import {
+  readCounter,
+  PREMIUM_DAILY_BUCKET,
+  PREMIUM_DAILY_WINDOW_SECONDS,
+  PREMIUM_DAILY_LIMITS,
+  PREMIUM_MONTHLY_BUCKET,
+  PREMIUM_MONTHLY_WINDOW_SECONDS,
+  PREMIUM_MONTHLY_LIMITS,
+} from '../middleware/rateLimit';
 
 // GET /api/entitlements — the logged-in client's own entitlements snapshot
 // (hub payments Phase 1; docs/payments-spec.md "Game consumption contract").
@@ -27,10 +37,16 @@ import { getMergedTier, bearerToken } from '../services/mergedTier';
 // this route must always report the raw hub snapshot for display.
 //
 // Response shape (client: src/services/entitlementsApi.js):
-//   { tier, updatedAt, expiresAt, hub }
+//   { tier, updatedAt, expiresAt, hub, usage }
 // `tier` is the effective GAME-ladder tier (free|member|premium|elite);
 // updatedAt/expiresAt keep the GET /api/db/entitlements contract (local base-row
 // timestamp / local grant expiry); `hub` is the raw hub snapshot for display.
+// `usage` (additive, backlog #6 visibility slice) is the premium-pool allowance
+// meter for member+ callers: { premiumDaily: { used, limit }, premiumMonthly:
+// { used, limit } }, read-only peeks at the same request_counters rows the
+// routes/ai.ts gate bumps. null for free tier and whenever the counter read
+// fails (display metadata must never break the snapshot). Display only: the
+// enforcement stays in routes/ai.ts, which bumps rather than peeks.
 const entitlementsRoutes = new Hono<{ Bindings: Env; Variables: AuthVariables }>();
 
 // Per-user, mutable data: never let any cache store it (same rationale as the
@@ -62,11 +78,43 @@ entitlementsRoutes.get('/', requireAuth, async (c) => {
   const sql = getSql(c.env);
   try {
     const merged = await getMergedTier(c.env, sql, { userId, jwt });
+
+    // Premium-pool allowance meter (display only; see the shape note above).
+    // Fail-soft: a counter outage nulls the meter but never the snapshot.
+    let usage: {
+      premiumDaily: { used: number; limit: number };
+      premiumMonthly: { used: number; limit: number };
+    } | null = null;
+    if (tierRank(merged.tier) >= tierRank('member')) {
+      try {
+        const [dailyUsed, monthlyUsed] = await Promise.all([
+          readCounter(sql, userId, PREMIUM_DAILY_BUCKET, PREMIUM_DAILY_WINDOW_SECONDS),
+          readCounter(sql, userId, PREMIUM_MONTHLY_BUCKET, PREMIUM_MONTHLY_WINDOW_SECONDS),
+        ]);
+        usage = {
+          premiumDaily: {
+            used: dailyUsed,
+            limit: PREMIUM_DAILY_LIMITS[merged.tier] ?? PREMIUM_DAILY_LIMITS.member,
+          },
+          premiumMonthly: {
+            used: monthlyUsed,
+            limit: PREMIUM_MONTHLY_LIMITS[merged.tier] ?? PREMIUM_MONTHLY_LIMITS.member,
+          },
+        };
+      } catch (error) {
+        console.error(
+          '[entitlements] usage counter read failed; omitting meter:',
+          error instanceof Error ? error.message : error
+        );
+      }
+    }
+
     return c.json({
       tier: merged.tier,
       updatedAt: merged.local.baseUpdatedAt,
       expiresAt: merged.local.grantExpiresAt,
       hub: merged.hub,
+      usage,
     });
   } finally {
     c.executionCtx.waitUntil(sql.end());

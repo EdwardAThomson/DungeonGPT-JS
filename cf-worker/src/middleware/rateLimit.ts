@@ -134,6 +134,28 @@ export async function bumpCounter(
   };
 }
 
+/**
+ * Read-only peek at the current aligned window's count, WITHOUT incrementing.
+ * For display surfaces (the /api/entitlements usage snapshot), never for
+ * enforcement: gates keep using bumpCounter so a peek can never race a spend.
+ * 0 when the user has no row this window. Same window alignment as bumpCounter.
+ */
+export async function readCounter(
+  sql: Sql,
+  userId: string,
+  bucket: string,
+  windowSeconds: number
+): Promise<number> {
+  const windowMs = windowSeconds * 1000;
+  const windowStart = new Date(Math.floor(Date.now() / windowMs) * windowMs).toISOString();
+
+  const [row] = await sql`
+    SELECT count FROM request_counters
+    WHERE user_id = ${userId} AND bucket = ${bucket} AND window_start = ${windowStart}`;
+
+  return Number(row?.count ?? 0);
+}
+
 interface RateLimitOptions {
   /** Only count these HTTP methods; others pass straight through (e.g. mutating-only db-write). */
   methods?: readonly string[];

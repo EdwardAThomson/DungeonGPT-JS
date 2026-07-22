@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { redeemCode } from '../services/redemptionApi';
+import { getHubEntitlementsSnapshot, getUsageSnapshot } from '../game/entitlements';
 import AiPoolPills from '../components/AiPoolPills';
 import '../styles/profile.css';
 
@@ -154,6 +155,39 @@ const Profile = () => {
             </p>
           </div>
 
+          {(() => {
+            // Display-only reads (#6 visibility slice): the usage meter comes
+            // from the same entitlements fetch that resolved the tier, the
+            // credit balance from the raw hub snapshot. Both are session
+            // metadata getters, safe to read at render; either being null
+            // simply hides its line. Free tier shows neither, so the field
+            // disappears entirely rather than rendering an empty shell.
+            const usage = getUsageSnapshot();
+            const credits = getHubEntitlementsSnapshot()?.credits;
+            const showCredits = credits && typeof credits.balance === 'number';
+            if (!usage && !showCredits) return null;
+            return (
+              <div className="profile-field">
+                <label>AI usage</label>
+                {usage && (
+                  <p className="usage-line">
+                    Premium generations: {usage.premiumDaily.used} of {usage.premiumDaily.limit} today
+                    {' '}· {usage.premiumMonthly.used} of {usage.premiumMonthly.limit} this month
+                  </p>
+                )}
+                {showCredits && (
+                  <p className="usage-line">
+                    {/* The hub ledger is grant-only for now (consumption debits are
+                        the remaining #6 wiring), so this states what the number IS
+                        rather than implying it draws down with play. */}
+                    AI credits granted this month: {credits.balance.toLocaleString()}
+                    <span className="tier-note"> · managed at octonion.io</span>
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+
           <div className="profile-field">
             <label>AI narration</label>
             {/* Members pick their pool here too, not only from the in-game AI tab
@@ -262,6 +296,11 @@ const Profile = () => {
           font-size: 0.85rem;
           margin: 8px 0 0;
         }
+        .usage-line {
+          font-size: 0.9rem;
+          margin: 0 0 4px;
+        }
+
         .redeem-success { color: #2e8b57; }
         .redeem-error { color: var(--state-danger); }
 

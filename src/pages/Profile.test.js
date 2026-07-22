@@ -27,6 +27,16 @@ jest.mock('../services/redemptionApi', () => {
   return { redeemCode: jest.fn(), RedemptionError };
 });
 
+// Display-only session getters behind the AI usage row (#6 visibility slice).
+// Defaults (undefined) hide the row, matching a guest/free session, so the
+// redemption tests above render unchanged.
+jest.mock('../game/entitlements', () => ({
+  ...jest.requireActual('../game/entitlements'),
+  getHubEntitlementsSnapshot: jest.fn(),
+  getUsageSnapshot: jest.fn(),
+}));
+const { getHubEntitlementsSnapshot, getUsageSnapshot } = require('../game/entitlements');
+
 const USER = {
   id: 'user-1',
   email: 'player@example.com',
@@ -140,5 +150,45 @@ describe('Profile redemption', () => {
     mockAuth();
     render(<Profile />);
     expect(screen.getByRole('button', { name: /^redeem$/i })).toBeDisabled();
+  });
+});
+
+describe('Profile AI usage row (#6 visibility slice)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows the premium allowance meter for a member with usage data', () => {
+    mockAuth({ tier: 'member' });
+    getUsageSnapshot.mockReturnValue({
+      premiumDaily: { used: 7, limit: 100 },
+      premiumMonthly: { used: 42, limit: 800 },
+    });
+    render(<Profile />);
+
+    expect(screen.getByText('AI usage')).toBeInTheDocument();
+    expect(
+      screen.getByText(/Premium generations: 7 of 100 today\s*· 42 of 800 this month/)
+    ).toBeInTheDocument();
+  });
+
+  it('shows the hub credit balance, worded as granted (ledger has no debits yet)', () => {
+    mockAuth({ tier: 'member' });
+    getHubEntitlementsSnapshot.mockReturnValue({
+      tier: 'members',
+      credits: { month: '2026-07', balance: 800 },
+    });
+    render(<Profile />);
+
+    expect(screen.getByText(/AI credits granted this month: 800/)).toBeInTheDocument();
+    expect(screen.getByText(/managed at octonion\.io/)).toBeInTheDocument();
+  });
+
+  it('hides the row entirely when there is no usage and no credit data (free/guest)', () => {
+    mockAuth({ tier: 'free' });
+    render(<Profile />);
+
+    expect(screen.queryByText('AI usage')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Premium generations/)).not.toBeInTheDocument();
   });
 });
