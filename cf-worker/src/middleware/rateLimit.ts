@@ -80,6 +80,12 @@ export const PREMIUM_DAILY_LIMITS: Record<string, number> = {
 // Daily caps above remain as burst protection within the month.
 export const PREMIUM_MONTHLY_BUCKET = 'ai-premium-monthly';
 export const PREMIUM_MONTHLY_WINDOW_SECONDS = 30 * 86400;
+// KEEP IN LOCK STEP with the hub's TIER_ALLOWANCES in
+// octonion-io-website/src/pages/api/billing/webhook.ts (the monthly credit
+// grant shown on the octonion.io account page and mirrored on the game's
+// Profile usage row). These caps ARE that allowance until the Phase 4
+// consume:<game> ledger wiring lands; if one side changes without the other,
+// players see a granted number that does not match what the game enforces.
 export const PREMIUM_MONTHLY_LIMITS: Record<string, number> = {
   member: 800,
   premium: 2000,
