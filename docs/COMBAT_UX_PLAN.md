@@ -12,6 +12,16 @@ game-feel work ([GAME_FEEL_PLAN.md](GAME_FEEL_PLAN.md), #78).
   tray (killed the zIndex-4000 modal-in-a-modal), unified flee gating (branch
   `refactor/combat-modal-thread-b`, merged to master — stale, safe to delete).
 - The end-state direction is now decided — see [§0 Decisions locked](#0-decisions-locked-2026-07-21) below.
+- Thread A (juice) step 1 **shipped 2026-07-21**: `CombatStage.js` overlays the enemy HP
+  bar on the encounter art and floats rise-and-fade damage numbers each round; the fight
+  still opens as the existing centered modal (Step 1 of the map-context migration — see
+  §0). Paired with a modal overload cut: the "Random Encounter" label, the separate enemy
+  HP row, Previous Rounds scrollback, per-round Damage Dealt/Taken boxes, and the verbose
+  support list are gone.
+- Iteration surface added: `/debug/combat-hud` (`CombatHudTest.js`) drives the real fight
+  over a live, walkable populated site map (click-to-walk, roaming mobs chase/engage on
+  contact, selectable boss guardian) — the harness for building the dockable HUD (§0 Step
+  2: extracting the panel out of `ModalShell` and anchoring it on the map).
 
 **Scope: presentation and flow only.** The combat *mechanics* (deterministic d20,
 Lead+Support, multi-round boss fights, damage, rewards) are owned by
