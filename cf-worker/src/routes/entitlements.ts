@@ -2,17 +2,15 @@ import { Hono } from 'hono';
 import type { Env } from '../types';
 import { requireAuth, type AuthVariables } from '../middleware/auth';
 import { getSql } from '../services/pg';
-import { getEffectiveTier, tierRank, TIER_LADDER, type EffectiveTier } from '../services/tiers';
-import {
-  getHubEntitlements,
-  hubTierToGameTier,
-  freeHubEntitlements,
-} from '../services/hubEntitlements';
+import { freeHubEntitlements } from '../services/hubEntitlements';
+import { getMergedTier, bearerToken } from '../services/mergedTier';
 
 // GET /api/entitlements — the logged-in client's own entitlements snapshot
 // (hub payments Phase 1; docs/payments-spec.md "Game consumption contract").
 //
-// Combines TWO sources, and reports the higher rung:
+// Combines TWO sources, and reports the higher rung (services/mergedTier.ts,
+// the SAME resolver the Phase 3 server enforcement points use, so the client
+// snapshot and the server gates can never drift):
 //   1. The Octonion hub (services/hubEntitlements.ts): the billing authority
 //      going forward. 60 s per-user cache, fail-closed to free.
 //   2. The game's own account_tiers + tier_grants (services/tiers.ts): today's
@@ -22,9 +20,11 @@ import {
 //      once Phase 2 grandfathers testers on the hub the local rows become
 //      redundant and this merge can collapse to hub-only.
 //
-// Both sources fail closed independently: a hub outage leaves local grants
-// working, a game-DB outage leaves hub tiers working, and both failing yields
-// plain 'free' with a 200 (never a 500: errors must not break free-tier play).
+// Both sources fail closed independently (inside getMergedTier): a hub outage
+// leaves local grants working, a game-DB outage leaves hub tiers working, and
+// both failing yields plain 'free' with a 200 (never a 500: errors must not
+// break free-tier play). No skipHubAtOrAbove short-circuit here on purpose:
+// this route must always report the raw hub snapshot for display.
 //
 // Response shape (client: src/services/entitlementsApi.js):
 //   { tier, updatedAt, expiresAt, hub }
@@ -45,8 +45,7 @@ entitlementsRoutes.options('*', (c) => c.body(null, 204));
 
 entitlementsRoutes.get('/', requireAuth, async (c) => {
   const userId = c.get('userId');
-  const authHeader = c.req.header('Authorization');
-  const jwt = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  const jwt = bearerToken(c.req.header('Authorization'));
 
   // ALLOW_UNAUTHENTICATED_DEV bypass: no verified user, nothing to look up.
   if (!userId || !jwt) {
@@ -58,35 +57,20 @@ entitlementsRoutes.get('/', requireAuth, async (c) => {
     });
   }
 
-  // Hub read path: already fail-closed (free shape) inside the helper.
-  const hub = await getHubEntitlements(c.env, userId, jwt);
-
-  // Local read path: fail closed to free on DB errors instead of propagating a
-  // 500 (the old /api/db/entitlements 500s here; this route must stay usable
-  // through a game-DB blip because the hub side may still hold the answer).
-  let local: Pick<EffectiveTier, 'tier' | 'baseUpdatedAt' | 'grantExpiresAt'> = {
-    tier: 'free',
-    baseUpdatedAt: null,
-    grantExpiresAt: null,
-  };
+  // Both sources resolved (and independently failed closed) inside the shared
+  // resolver; this route only owns the response shape and the sql lifecycle.
   const sql = getSql(c.env);
   try {
-    local = await getEffectiveTier(sql, userId);
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(`[entitlements] local tier lookup failed, failing closed to free: ${message}`);
+    const merged = await getMergedTier(c.env, sql, { userId, jwt });
+    return c.json({
+      tier: merged.tier,
+      updatedAt: merged.local.baseUpdatedAt,
+      expiresAt: merged.local.grantExpiresAt,
+      hub: merged.hub,
+    });
   } finally {
     c.executionCtx.waitUntil(sql.end());
   }
-
-  const effectiveRank = Math.max(tierRank(local.tier), tierRank(hubTierToGameTier(hub.tier)));
-
-  return c.json({
-    tier: TIER_LADDER[effectiveRank],
-    updatedAt: local.baseUpdatedAt,
-    expiresAt: local.grantExpiresAt,
-    hub,
-  });
 });
 
 export { entitlementsRoutes };

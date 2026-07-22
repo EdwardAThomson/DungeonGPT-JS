@@ -4,7 +4,8 @@ import { generateText, AiServiceError } from "../services/ai";
 import { getAllModels, DEFAULT_MODEL_ID } from "../services/models";
 import { generatePremiumText } from "../services/openrouter";
 import { getSql, type Sql } from "../services/pg";
-import { getAccountTier, tierRank } from "../services/tiers";
+import { tierRank } from "../services/tiers";
+import { getMergedTier, bearerToken } from "../services/mergedTier";
 import { requireAuth, type AuthVariables } from "../middleware/auth";
 import {
   rateLimit,
@@ -77,16 +78,25 @@ aiRoutes.post("/generate", requireAuth, rateLimit("ai-generate"), async (c) => {
   // sends nothing keeps working, a garbage value gets the safe pool).
   const requestedPool = parsed.data.pool === "premium" ? "premium" : "free";
 
-  // ── Premium pool gate (backlog #7) ──────────────────────────────────────────
-  // pool: 'premium' requires tier member+ (account_tiers, same lookup the
-  // entitlements/premium-templates routes use) and passes through the DAILY
-  // premium allowance (bucket 'ai-premium-daily' in request_counters):
+  // ── Premium pool gate (backlog #7; hub payments Phase 3) ────────────────────
+  // pool: 'premium' requires tier member+ where the effective tier is
+  // MAX(local tier, hub tier) via services/mergedTier.ts: local account_tiers +
+  // tier_grants first (cheap, no network; a local member skips the hub call
+  // entirely), otherwise the Octonion hub is consulted (60 s per-user cache,
+  // fail-closed to free) so a subscriber who paid at octonion.io is admitted with
+  // no local row at all. The request then passes through the DAILY premium
+  // allowance (bucket 'ai-premium-daily' in request_counters):
   //   not entitled  -> 403 { code: 'premium_required' }
   //   over allowance-> 429 { code: 'premium_cap', retryAfterSeconds }
   // Both carry a code so the client can quietly fall back to the free pool.
-  // A DB error here (tier lookup / counter) does NOT open the paid pool: the
-  // request degrades to the free pool instead (availability without leaking paid
-  // model usage).
+  // Failure posture: each tier source fails closed to 'free' inside the resolver
+  // (a game-DB blip cannot block a hub member; a hub outage cannot block a local
+  // member; access never widens on error). When the merge still says free, a
+  // GENUINE free verdict gets the 403; a local-DB OUTAGE instead degrades to the
+  // free pool with the fallback fields (pre-hub posture: never 403 a possibly-
+  // paying member over a blip). A DB error in the COUNTER path likewise does NOT
+  // open the paid pool: the request degrades to the free pool instead
+  // (availability without leaking paid model usage).
   let usePremium = false;
   let premiumDegraded = false; // premium requested but DB trouble forced free
   if (requestedPool === "premium") {
@@ -99,70 +109,89 @@ aiRoutes.post("/generate", requireAuth, rateLimit("ai-generate"), async (c) => {
         403
       );
     }
+    // requireAuth verified this JWT already; forwarded to the hub as-is.
+    const jwt = bearerToken(c.req.header("Authorization"));
 
     let sql: Sql | undefined;
     try {
       sql = getSql(c.env);
-      const tier = await getAccountTier(sql, userId);
+      // Never throws: each source degrades to 'free' independently inside.
+      const merged = await getMergedTier(
+        c.env,
+        sql,
+        { userId, jwt },
+        { skipHubAtOrAbove: "member" }
+      );
+      const tier = merged.tier;
       if (tierRank(tier) < tierRank("member")) {
-        return c.json(
-          { error: "Premium AI requires a Membership", code: "premium_required" },
-          403
+        if (!merged.localErrored) {
+          return c.json(
+            { error: "Premium AI requires a Membership", code: "premium_required" },
+            403
+          );
+        }
+        // Neither source could admit, but the local verdict was an OUTAGE, not
+        // a genuine 'free' (and the hub could not vouch either). Keep the
+        // pre-hub posture: degrade to the free pool with the fallback fields
+        // rather than 403-ing a possibly-paying member over a DB blip.
+        premiumDegraded = true;
+      } else {
+        const dailyLimit =
+          PREMIUM_DAILY_LIMITS[tier] ?? PREMIUM_DAILY_LIMITS.member;
+        const { count, retryAfterSeconds } = await bumpCounter(
+          sql,
+          userId,
+          PREMIUM_DAILY_BUCKET,
+          PREMIUM_DAILY_WINDOW_SECONDS
         );
-      }
+        if (count > dailyLimit) {
+          console.warn(
+            `[premium] daily allowance hit: user=${userId} tier=${tier} count=${count} limit=${dailyLimit}`
+          );
+          c.header("Retry-After", String(retryAfterSeconds));
+          return c.json(
+            {
+              error: "Premium AI allowance used for today",
+              code: "premium_cap",
+              retryAfterSeconds,
+            },
+            429
+          );
+        }
 
-      const dailyLimit =
-        PREMIUM_DAILY_LIMITS[tier] ?? PREMIUM_DAILY_LIMITS.member;
-      const { count, retryAfterSeconds } = await bumpCounter(
-        sql,
-        userId,
-        PREMIUM_DAILY_BUCKET,
-        PREMIUM_DAILY_WINDOW_SECONDS
-      );
-      if (count > dailyLimit) {
-        console.warn(
-          `[premium] daily allowance hit: user=${userId} tier=${tier} count=${count} limit=${dailyLimit}`
+        // Monthly allowance: the subscription-aligned ceiling (the daily cap is
+        // burst protection; this is the one that bounds spend against revenue).
+        const monthlyLimit =
+          PREMIUM_MONTHLY_LIMITS[tier] ?? PREMIUM_MONTHLY_LIMITS.member;
+        const monthly = await bumpCounter(
+          sql,
+          userId,
+          PREMIUM_MONTHLY_BUCKET,
+          PREMIUM_MONTHLY_WINDOW_SECONDS
         );
-        c.header("Retry-After", String(retryAfterSeconds));
-        return c.json(
-          {
-            error: "Premium AI allowance used for today",
-            code: "premium_cap",
-            retryAfterSeconds,
-          },
-          429
-        );
-      }
+        if (monthly.count > monthlyLimit) {
+          console.warn(
+            `[premium] monthly allowance hit: user=${userId} tier=${tier} count=${monthly.count} limit=${monthlyLimit}`
+          );
+          c.header("Retry-After", String(monthly.retryAfterSeconds));
+          return c.json(
+            {
+              error: "Premium AI allowance used for this month",
+              code: "premium_cap",
+              retryAfterSeconds: monthly.retryAfterSeconds,
+            },
+            429
+          );
+        }
 
-      // Monthly allowance: the subscription-aligned ceiling (the daily cap is
-      // burst protection; this is the one that bounds spend against revenue).
-      const monthlyLimit =
-        PREMIUM_MONTHLY_LIMITS[tier] ?? PREMIUM_MONTHLY_LIMITS.member;
-      const monthly = await bumpCounter(
-        sql,
-        userId,
-        PREMIUM_MONTHLY_BUCKET,
-        PREMIUM_MONTHLY_WINDOW_SECONDS
-      );
-      if (monthly.count > monthlyLimit) {
-        console.warn(
-          `[premium] monthly allowance hit: user=${userId} tier=${tier} count=${monthly.count} limit=${monthlyLimit}`
-        );
-        c.header("Retry-After", String(monthly.retryAfterSeconds));
-        return c.json(
-          {
-            error: "Premium AI allowance used for this month",
-            code: "premium_cap",
-            retryAfterSeconds: monthly.retryAfterSeconds,
-          },
-          429
-        );
+        usePremium = true;
       }
-
-      usePremium = true;
     } catch (error) {
+      // Only the allowance counters can throw now (the tier resolver fails
+      // closed internally): a counter outage degrades to the free pool rather
+      // than serving unmetered paid generations.
       console.error(
-        "[premium] tier/allowance check failed; degrading to free pool:",
+        "[premium] allowance check failed; degrading to free pool:",
         error instanceof Error ? error.message : error
       );
       premiumDegraded = true;

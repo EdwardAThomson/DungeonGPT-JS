@@ -5,7 +5,8 @@ import type { AuthVariables } from '../middleware/auth';
 // to services/pg.ts and services/tiers.ts so the rate limiter (#12) and the premium
 // AI pool gate (#7) share them; behaviour here is unchanged.
 import { getSql, type Sql } from '../services/pg';
-import { getAccountTier, getEffectiveTier, tierRank } from '../services/tiers';
+import { getEffectiveTier, tierRank } from '../services/tiers';
+import { getMergedTier, bearerToken } from '../services/mergedTier';
 import { normalizeCode } from '../services/redemption';
 import { validateHeroName } from '../services/validation';
 import {
@@ -649,15 +650,32 @@ dbRoutes.post('/redeem-code', async (c) => {
 // client-side gates stay UX. Read-only on purpose: rows are loaded/disabled manually
 // via psql (see migrations/004_premium_templates.sql for the runbook and recipes).
 //
-// Entitlement: caller tier from account_tiers (no row = 'free'), a row is delivered
-// when tierRank(caller) >= tierRank(min_tier). Free/no-row accounts get
+// Entitlement (hub payments Phase 3): caller tier = MAX(local effective tier, hub
+// tier) via services/mergedTier.ts, so a subscriber who paid at octonion.io gets
+// their content with no local row at all. A row is delivered when
+// tierRank(caller) >= tierRank(min_tier). Free/no-row accounts get
 // { templates: [] } with 200, never an error: an empty delivery is the normal state.
+// The hub is only skipped when the LOCAL tier already tops the ladder: unlike a
+// fixed member+ gate, the required rung here varies per row (min_tier can be
+// premium/elite), so any lower local tier could still be raised by the hub.
+// Each tier source fails closed to 'free' independently inside the resolver
+// (a local-DB blip while the hub says member must still deliver member rows);
+// only the premium_templates query itself can 500 here, and without the DB there
+// is no content to deliver anyway.
 dbRoutes.get('/premium-templates', async (c) => {
   const sql = getSql(c.env);
   try {
     const userId = c.get('userId');
+    // requireAuth (mounted on /api/db/*) verified this JWT; forward it to the hub.
+    const jwt = bearerToken(c.req.header('Authorization'));
 
-    const callerRank = tierRank(await getAccountTier(sql, userId));
+    const merged = await getMergedTier(
+      c.env,
+      sql,
+      { userId, jwt },
+      { skipHubAtOrAbove: 'elite' }
+    );
+    const callerRank = tierRank(merged.tier);
 
     // Ladder comparison in code (few rows, simplest correct): fetch enabled rows,
     // keep those the caller's rank covers.
