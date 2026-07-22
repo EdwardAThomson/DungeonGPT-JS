@@ -62,7 +62,7 @@ backlog; see the `docs/` design docs for each system.
 - [x] Fix magic-link email template (OTP token shown but no UI input): resolved 2026-07-16 as a stale row; the hub's current magic-link email carries no OTP code, so no fix was needed (OUTSTANDING_ISSUES #1)
 - [x] Add missing assets: dedicated quest-item icons + hide/studded-leather armour and pine-resin art delivered (placeholders cleared); the `workshop` building interior (Henry #26) is delivered
 - [x] Replace fragile keyword-based encounter-engagement detection: superseded by the two-tier narration redesign; the keyword matching no longer exists (OUTSTANDING_ISSUES #13)
-- [ ] Deploy product analytics (#86): apply migration 007, then deploy the Worker (built and merged, not yet live)
+- [x] Deploy product analytics (#86): migration 007 applied + Worker deployed; pipeline verified live 2026-07-22 (funnel events recording)
 - [ ] Landing page + UI redesign (#82, HIGH PRIORITY): visibly behind competitors; art slots + mockup in the private plan
 - [ ] Map & Adventure Log layout: promote the map to the main stage (#84, HIGH PRIORITY)
 - [ ] Combat UX continuation (#79): dockable map-context HUD (§0 step 2), then the remaining animation/refine threads (`docs/COMBAT_UX_PLAN.md`)
