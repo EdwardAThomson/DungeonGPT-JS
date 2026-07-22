@@ -136,6 +136,8 @@ const AppContent = () => {
             ]}
             onNavClose={() => setIsMobileNavOpen(false)}
           />
+          {/* Membership: linked since 2026-07-22 — billing is live at the hub. */}
+          <li><Link to="/membership" onClick={() => setIsMobileNavOpen(false)}>Membership</Link></li>
           <li className="nav-settings-item">
             <button
               onClick={() => setTheme(theme === 'light-fantasy' ? 'dark-fantasy' : 'light-fantasy')}
@@ -201,6 +203,7 @@ const AppContent = () => {
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/getting-started" element={<GettingStarted />} />
               <Route path="/premium" element={<PremiumPage />} />
+              <Route path="/membership" element={<PremiumPage />} />
               <Route path="/features" element={<HowToPlay />} />
               <Route path="/how-to-play" element={<Navigate to="/getting-started" replace />} />
               <Route path="/hero-creation" element={<HeroCreation />} />

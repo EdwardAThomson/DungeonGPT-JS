@@ -6,15 +6,15 @@ import '../styles/premium.css';
 /**
  * PremiumPage: player-facing tier comparison for DungeonGPT accounts.
  *
- * Mounted at /premium (App.js) since 2026-07-06, deliberately UNLINKED from
- * any nav until billing (#6) ships: reachable by URL for review, not
- * discoverable. Also still on /debug/premium for the debug menu.
+ * Mounted at /premium with a /membership alias (App.js); linked from the main
+ * nav since 2026-07-22 - billing is LIVE at the Octonion hub (Stripe Managed
+ * Payments), so the Members CTA sends players to octonion.io/membership to
+ * subscribe. Games never touch the payment provider (hub payments spec).
  *
  * Content source of truth: docs/private/PREMIUM_ACCOUNTS_PLAN.md (local, gitignored) ("Tier ladder").
  * Launch scope is Free + Members: Members is the purchasable highlight;
  * Premium and Elite render as roadmap-only (dimmed, not purchasable) because
  * they are backed by unbuilt content (ships, bigger maps).
- * No billing is wired: the Members CTA is a disabled "Coming soon" placeholder.
  */
 
 const TIERS = [
@@ -53,13 +53,13 @@ const TIERS = [
     highlight: true,
     summary: 'Everything in Free Account, plus premium adventures.',
     benefits: [
-      'Premium AI storytelling, with a generous monthly allowance',
+      "AI storytelling on the members' model pool, with a generous monthly allowance",
       'Eldritch, desert and snow realms, each with their own campaigns and foes',
       'River cities: settlements grown around island districts',
       'Higher-tier campaigns for seasoned parties',
       'Unlocks in other octonion.io games as they ship',
     ],
-    cta: { kind: 'placeholder', label: 'Coming Soon' },
+    cta: { kind: 'external', label: 'Become a Member', href: 'https://octonion.io/membership' },
   },
   {
     id: 'premium',
@@ -107,8 +107,8 @@ const FAQ = [
     a: 'Your saves and characters are never taken away. Premium gates the creation of new premium content, never your existing games: a desert campaign you started as a member stays fully playable.',
   },
   {
-    q: 'When can I subscribe?',
-    a: 'Members is the first paid tier and opens soon. Premium and Elite are on the roadmap and will open only once the features they promise actually exist in the game.',
+    q: 'How do I subscribe?',
+    a: 'Membership lives on your octonion.io account - one $5/month subscription covers DungeonGPT and every other Octonion game. Premium and Elite are on the roadmap and will open only once the features they promise actually exist in the game.',
   },
   {
     q: 'Do I need an account to play?',
@@ -124,16 +124,13 @@ const TierCta = ({ cta }) => {
           {cta.label}
         </Link>
       );
-    case 'placeholder':
+    case 'external':
+      // Membership is bought at the Octonion hub (one subscription, every
+      // game); same account, so players land signed-in-ready.
       return (
-        <button
-          type="button"
-          className="premium-cta primary-cta"
-          disabled
-          title="Billing is not live yet"
-        >
+        <a className="premium-cta primary-cta" href={cta.href}>
           {cta.label}
-        </button>
+        </a>
       );
     case 'disabled':
       return (
