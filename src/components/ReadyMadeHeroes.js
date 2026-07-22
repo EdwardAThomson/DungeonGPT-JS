@@ -13,7 +13,7 @@ const PregenCard = ({ pregen, index, compact, disabled, onPick }) => (
     className={`pregen-card${compact ? ' compact' : ''}`}
     onClick={() => onPick(pregen)}
     disabled={disabled}
-    title={`${pregen.heroClass}: ${pregen.tagline}`}
+    title={pregen.heroClass}
     style={compact ? undefined : { '--pregen-delay': `${index * 0.7}s` }}
   >
     <span className="pregen-portrait">
@@ -27,9 +27,7 @@ const PregenCard = ({ pregen, index, compact, disabled, onPick }) => (
     </span>
     <span className="pregen-text">
       <span className="pregen-name">{pregen.heroName}</span>
-      <span className="pregen-sub">
-        {compact ? pregen.heroClass : `${pregen.heroClass} · ${pregen.tagline}`}
-      </span>
+      <span className="pregen-sub">{pregen.heroClass}</span>
     </span>
   </button>
 );

@@ -113,6 +113,29 @@ const HeroSelection = () => {
     setSelectedHeroes(heroes.filter((h) => ids.includes(h.heroId)).slice(0, 4));
   }, [heroes, state]);
 
+  // Preselect the last-launched party (#88a): on a fresh entry (no create-hero
+  // detour restore to honour), quietly re-pick the heroes used last time,
+  // filtered to those still in the roster and capped at 4. Same scan-and-adjust
+  // intent as the New Game "last played" template preselect — silent, and
+  // everything stays editable. A stale/deleted id just drops out; an empty
+  // result leaves the party blank. One-shot once the roster has loaded.
+  const lastPartyPreselectedRef = useRef(false);
+  useEffect(() => {
+    if (lastPartyPreselectedRef.current) return;
+    if (state?.selectedHeroIds?.length) return; // detour restore owns the party
+    if (heroes.length === 0) return;
+    lastPartyPreselectedRef.current = true;
+    let ids = null;
+    try {
+      ids = JSON.parse(localStorage.getItem('dungeongpt:lastParty') || 'null');
+    } catch (e) {
+      ids = null;
+    }
+    if (!Array.isArray(ids) || ids.length === 0) return;
+    const restored = heroes.filter((h) => ids.includes(h.heroId)).slice(0, 4);
+    if (restored.length > 0) setSelectedHeroes(restored);
+  }, [heroes, state]);
+
   // Pregens already in the roster (matched by name) are hidden rather than
   // disabled, so the strip never offers a duplicate.
   const availablePregens = PREGEN_HEROES.filter(
@@ -189,6 +212,15 @@ const HeroSelection = () => {
     }
     setSelectionError('');
 
+    // Remember this party so the next new game preselects it (#88a). Ids only;
+    // resolved against the live roster on the next visit, so a since-deleted hero
+    // just drops out. Best-effort — a storage failure never blocks the launch.
+    try {
+      localStorage.setItem('dungeongpt:lastParty', JSON.stringify(selectedHeroes.map((h) => h.heroId)));
+    } catch (e) {
+      // ignore (private mode / quota); preselect simply won't populate next time
+    }
+
     // Initialize HP for all selected heroes
     const heroesWithHP = selectedHeroes.map(hero => initializeHP(hero));
 
@@ -207,8 +239,10 @@ const HeroSelection = () => {
     <div className="page-container hero-selection-page">
       {/* Step 2 of the adventure-first journey. Step 1 (Choose Adventure) is
           always truthfully done here: the launch-context guard above bounces any
-          entry that didn't come through New Game. */}
-      <OnboardingSteps currentStep={2} completedSteps={[1]} />
+          entry that didn't come through New Game. Step 2 (Choose Heroes) ticks to
+          done from real state — the moment a hero is in the party — so the bar
+          counts what's actually complete rather than freezing on step 2 (#88b). */}
+      <OnboardingSteps currentStep={2} completedSteps={selectedHeroes.length > 0 ? [1, 2] : [1]} />
       <div className="hero-selection-top-nav">
         <button onClick={handleBack} className="back-button">
           ← Back to Story Setup
