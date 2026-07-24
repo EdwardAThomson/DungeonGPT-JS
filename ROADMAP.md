@@ -1,6 +1,6 @@
 # Roadmap — DungeonGPT (JS)
 
-_Status: active · updated 2026-07-22_
+_Status: active · updated 2026-07-24_
 
 The production rewrite of DungeonGPT — a React web app for creating fantasy
 characters and playing AI-narrated RPG campaigns. Deployed at dungeongpt.xyz on
@@ -52,10 +52,11 @@ backlog; see the `docs/` design docs for each system.
 - [x] Tiered New Game discovery (#72) + arc cards Phase 1 (#73): campaign picker organized as story arcs with chapter cards
 - [x] Redemption codes (first billing slice): time-boxed tier grants via `POST /api/db/redeem-code` + Profile redeem flow (`docs/REDEMPTION_CODES.md`)
 - [x] Combat UX Thread A step 1 (#79): map-context combat stage (HP overlays + damage floaters over the live map), modal overload cuts, `/debug/combat-hud` harness; inter-mob collision fix
-- [x] Product analytics (#86): anonymous first-session funnel + retention events through an unauthenticated `/api/events` route (CORS origin allowlist, event-name allowlist, props cap, IP rate limit); built, awaiting migration 007 + deploy (see Next)
+- [x] Product analytics (#86): anonymous first-session funnel + retention events through an unauthenticated `/api/events` route (CORS origin allowlist, event-name allowlist, props cap, IP rate limit); live since 2026-07-22 (migration 007 applied, pipeline verified)
 - [x] Sign-up flow polish (#87): guest sign-in prompt names the player's own hero/campaign; guest-save-is-browser-only copy stated plainly across banner, roster, and save toast
 - [x] Onboarding + setup streamlining (#88): ready-made starter heroes with adventure-first flow, last-played template + last-used party preselects, hero-creation prefill, state-driven progress bar (Choose Adventure → Choose Heroes → Begin Quest)
 - [x] Playtest fixes: quest-building injection for milestone towns (#74), Start Adventure retry (#75); 17 encounter/boss image mismatches corrected
+- [x] Hub payments enforcement + visibility (#6, 2026-07-22): billing live at the Octonion hub; the Worker's premium gates (AI pool, premium templates) and the client snapshot all admit on the merged tier MAX(local, hub) via `cf-worker/src/services/mergedTier.ts`; Profile shows a read-only premium-allowance meter (daily/monthly used vs limit) plus the hub credit balance; Membership page links the hub tier page with a live upgrade CTA
 
 ## Next
 
@@ -72,7 +73,7 @@ backlog; see the `docs/` design docs for each system.
 
 ## Backlog
 
-- [ ] Billing + credit system (Lemon Squeezy) + AI usage tracking (the OpenRouter premium pool itself shipped with #7; redemption codes shipped the first slice — time-boxed tier grants via `POST /api/db/redeem-code` + a Profile redeem flow, `docs/REDEMPTION_CODES.md`; payment rails and usage/credit accounting remain)
+- [ ] Billing + credit system + AI usage tracking (the OpenRouter premium pool itself shipped with #7; redemption codes shipped the first slice — time-boxed tier grants via `POST /api/db/redeem-code` + a Profile redeem flow, `docs/REDEMPTION_CODES.md`; payment rails are now LIVE via the Octonion hub with server-side enforcement of hub tiers (`mergedTier.ts`, 2026-07-22) and a read-only usage meter on Profile; the consumption wiring (a `consume:<game>` debit against hub credits) remains)
 - [ ] Tiered narration — local templated prose for routine moves, AI for notable moments, as a cost/latency lever; subsumes guest movement narration / Guest Mode B3 (`docs/TIERED_NARRATION_PLAN.md`)
 - [ ] Streaming AI responses
 - [ ] Dungeon sub-maps (procedural caves / dungeons)
