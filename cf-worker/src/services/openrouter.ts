@@ -41,16 +41,29 @@ export interface PremiumModelDefinition {
  * NOT the flagship rung: the visible jump from open-weights is already large, and
  * the daily allowance math only works at this price class.
  *
- *   anthropic/claude-haiku-4.5   default: best prose quality per dollar of the
- *                               class, strong instruction-following for the strict
- *                               DM protocol.
- *   openai/gpt-5-mini           very cheap, reliable, excellent availability; the
- *   anthropic/claude-haiku-4.5  default: best name-grounding of the three in play.
+ *   deepseek/deepseek-v3.2      default: matched or beat Haiku on name-grounding
+ *                               and format discipline in the 2026-07-15 trial at
+ *                               ~10x lower cost. US-host-pinned. Members workhorse.
+ *   anthropic/claude-haiku-4.5  quality fallback: richest prose of the set, and
+ *                               the first fallback if a DeepSeek US host is down.
  *   openai/gpt-5-mini           cheap workhorse fallback.
  *   google/gemini-3.5-flash     fast, long context; diversity fallback so a single-
  *                               lab outage never empties the pool.
  */
 export const PREMIUM_MODEL_REGISTRY: readonly PremiumModelDefinition[] = [
+  {
+    // Members-pool default since 2026-07-25 (swapped from Haiku 4.5 after the
+    // 2026-07-15 trial: matched quality at ~10x lower cost). Pinned to US
+    // inference hosts (slugs verified against
+    // /api/v1/models/deepseek/deepseek-v3.2/endpoints) so player prompts never
+    // route to Chinese-hosted endpoints. Re-evaluate with
+    // scripts/eval-premium-models.mjs; trial context in octonion
+    // docs/ai-cost-analysis.md.
+    id: 'deepseek/deepseek-v3.2',
+    displayName: 'DeepSeek V3.2',
+    maxTokens: 1500,
+    providerOnly: ['deepinfra', 'digitalocean', 'venice'],
+  },
   {
     id: 'anthropic/claude-haiku-4.5',
     displayName: 'Claude Haiku 4.5',
@@ -66,31 +79,16 @@ export const PREMIUM_MODEL_REGISTRY: readonly PremiumModelDefinition[] = [
     displayName: 'Gemini 3.5 Flash',
     maxTokens: 1500,
   },
-  // ── PROPOSAL (2026-07-15 model trial, NOT yet a default change) ────────────
-  // Cheap Members-tier candidate: ~10x cheaper than Haiku ($0.27/$0.40 per 1M
-  // vs $1/$5, live OR catalog 2026-07-15). Provider-pinned to US hosts (slugs
-  // verified against /api/v1/models/deepseek/deepseek-v3.2/endpoints). Placed
-  // LAST so the existing fallback chain (default + next two) is unchanged; it
-  // is only reachable by explicit modelId until the maintainer flips the
-  // default. Evaluate first with scripts/eval-premium-models.mjs; if a Kimi or
-  // GLM candidate wins instead, swap this entry (moonshotai/kimi-k2.6 pin:
-  // deepinfra/fireworks/parasail/baseten/wandb; z-ai/glm-5.2 pin adds
-  // together). Trial context: octonion docs/ai-cost-analysis.md.
-  {
-    id: 'deepseek/deepseek-v3.2',
-    displayName: 'DeepSeek V3.2',
-    maxTokens: 1500,
-    providerOnly: ['deepinfra', 'digitalocean', 'venice'],
-  },
 ];
 
-// Default flipped to Haiku 4.5 (2026-07-07): in playtest gpt-5-mini conflated the
-// town name with character names and ran terse; Haiku follows the name-grounding
-// prompt better and reads richer. gpt-5-mini stays next in the chain as the cheap
-// fallback. Output cap raised 800 -> 1500 for parity with the free pool (premium
-// reading SHORTER than free was backwards); worst-case output cost roughly doubles
-// per call but stays fractions of a cent, bounded overall by the monthly allowance.
-export const DEFAULT_PREMIUM_MODEL_ID = 'anthropic/claude-haiku-4.5';
+// Members-pool default: DeepSeek V3.2 (swapped from Haiku 4.5 on 2026-07-25).
+// The 2026-07-15 trial (octonion docs/ai-cost-analysis.md) found V3.2 matched or
+// beat Haiku on name-grounding, milestone/format discipline, and speed at ~10x
+// lower cost ($0.27/$0.40 vs $1/$5 per 1M); the maintainer judged its prose good
+// enough. Haiku is first in the fallback chain (getPremiumFallbackCandidates) as
+// the richer-prose safety net if a DeepSeek US host is unavailable. Output cap
+// stays 1500 for parity with the free pool. Reverting is a one-line change here.
+export const DEFAULT_PREMIUM_MODEL_ID = 'deepseek/deepseek-v3.2';
 // Registry verified against the LIVE OpenRouter catalog on 2026-07-06 (the first
 // draft named claude-3.5-haiku, which no longer exists there at all): re-verify
 // ids against https://openrouter.ai/api/v1/models when touching this list.
