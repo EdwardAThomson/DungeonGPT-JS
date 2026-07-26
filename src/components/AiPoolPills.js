@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { hasTier } from '../game/entitlements';
 import { getPreferredPool, setPreferredPool, subscribeAiPool } from '../services/aiPool';
 
@@ -34,7 +35,8 @@ const AiPoolPills = ({ style }) => {
   const premiumActive = premiumUnlocked && pool === 'premium';
 
   return (
-    <div style={{ display: 'flex', gap: '8px', ...style }} role="radiogroup" aria-label="AI pool">
+    <div style={style}>
+    <div style={{ display: 'flex', gap: '8px' }} role="radiogroup" aria-label="AI pool">
       <button
         type="button"
         role="radio"
@@ -44,7 +46,7 @@ const AiPoolPills = ({ style }) => {
       >
         ⚡ Free AI
         <div style={{ fontSize: '0.72rem', fontWeight: 400, color: 'var(--text-secondary)', marginTop: '2px' }}>
-          Cloudflare open-weights pool — included for everyone
+          Cloudflare open-weights pool, included for everyone
         </div>
       </button>
       {premiumUnlocked ? (
@@ -75,6 +77,24 @@ const AiPoolPills = ({ style }) => {
             Stronger models · Members
           </div>
         </button>
+      )}
+    </div>
+      {/* Contextual, non-intrusive nudge: shown only to non-members, right under
+          the locked pool they just reached for. Links to the in-app Membership
+          page (which explains the tiers and links out to checkout). */}
+      {!premiumUnlocked && (
+        <Link
+          to="/membership"
+          style={{
+            display: 'inline-block',
+            marginTop: '8px',
+            fontSize: '0.78rem',
+            color: 'var(--primary)',
+            textDecoration: 'none',
+          }}
+        >
+          ✨ Unlock Premium AI with Membership →
+        </Link>
       )}
     </div>
   );

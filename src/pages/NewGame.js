@@ -134,7 +134,7 @@ const NewGame = () => {
     // generates a sand map via the custom tab" hole). Locked templates now
     // nudge instead of applying.
     if (template && !canUseTemplate(template)) {
-      setFormError('That adventure is part of Membership. Pick a free adventure below, or check the Premium page.');
+      setFormError('That adventure is part of Membership. Open the Membership page to unlock it, or pick a free adventure below.');
       return;
     }
     // Teaser stubs have no settings to apply (shop-window card faces only);
@@ -224,7 +224,7 @@ const NewGame = () => {
       ? storyTemplates.find(t => t.id === selectedTemplate)
       : null;
     if (selTpl && !canUseTemplate(selTpl)) {
-      setFormError('This is a Premium adventure. Premium unlock is coming soon; pick a free adventure to begin.');
+      setFormError('This is a Members adventure. Open the Membership page to unlock it, or pick a free adventure to begin.');
       return;
     }
     if (selTpl && selTpl.teaser === true) {
@@ -234,7 +234,7 @@ const NewGame = () => {
       return;
     }
     if (!premiumUnlocked && isThemePremium(worldTheme)) {
-      setFormError('Desert and snow adventures are a Premium feature (coming soon). Choose a temperate setting to continue.');
+      setFormError('Desert and snow adventures are a Members feature. Open the Membership page to unlock them, or choose a temperate setting to continue.');
       return;
     }
 
@@ -389,7 +389,7 @@ const NewGame = () => {
   const lockedChapterCopy = (chapter) =>
     chapter.gateTier === 'premium' || chapter.gateTier === 'elite'
       ? 'This chapter is a Premium unlock (coming soon). Preview the arc freely; a Premium account is needed to play it.'
-      : 'This chapter comes with Membership (coming soon). Pick a free chapter to begin.';
+      : 'This chapter comes with Membership. Open the Membership page to unlock it, or pick a free chapter to begin.';
 
   // Teaser self-heal (maintainer ruling A, 2026-07-07): a teaser-stub chapter
   // click never dead-ends. Signed out, the fix IS signing in (delivery
@@ -599,7 +599,7 @@ const NewGame = () => {
           </div>
           {!premiumUnlocked && (
             <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-              Eldritch, desert and snow arcs are a Members unlock (coming soon). Preview them below.
+              Eldritch, desert and snow arcs are a Members unlock. Preview them below, or visit the Membership page.
             </p>
           )}
           <div style={gridStyle}>
@@ -966,7 +966,7 @@ const NewGame = () => {
               // These genre ids aren't premium today, but this keeps the seam airtight if a
               // premium world-biome theme is ever surfaced in this picker.
               if (!premiumUnlocked && isThemePremium(theme)) {
-                setFormError('That theme is a Premium feature (coming soon).');
+                setFormError('That theme is a Members feature. Open the Membership page to unlock it.');
                 return;
               }
               setCustomTheme(theme);
@@ -1358,7 +1358,7 @@ const NewGame = () => {
                 onClick={() => {
                   // Premium backstop: never build a sand/snow map for a free user.
                   if (!premiumUnlocked && isThemePremium(worldTheme)) {
-                    setFormError('Desert and snow maps are a Premium feature (coming soon). Choose a temperate setting to continue.');
+                    setFormError('Desert and snow maps are a Members feature. Open the Membership page to unlock them, or choose a temperate setting to continue.');
                     return;
                   }
                   // Slot validation BEFORE map generation (maintainer 2026-07-06):
