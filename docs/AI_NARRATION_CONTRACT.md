@@ -54,8 +54,9 @@ measured milestone discipline directly:
 Consequence for model selection: under this contract a model's milestone-marker
 discipline stops mattering entirely, so V3.2's one blemish becomes irrelevant. A
 renderer-mode re-evaluation (`scripts/eval-premium-models.mjs --mode=renderer`, being
-built in parallel) will produce the decision data; the model verdict is still pending the
-maintainer's narrative-quality read of the transcripts.
+built in parallel) will produce the decision data. The model verdict landed 2026-07-25:
+the maintainer judged V3.2's prose good enough and it became `DEFAULT_PREMIUM_MODEL_ID`
+(`cf-worker/src/services/openrouter.ts`), with Haiku first in the fallback chain.
 
 ## The determinism ladder
 
