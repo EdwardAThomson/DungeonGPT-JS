@@ -45,6 +45,8 @@ const AppContent = () => {
   const { loading } = useAuth();
   const isDebugEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEBUG_ROUTES === 'true';
   const isGamePage = location.pathname === '/game';
+  // Redesign marketing routes (#82 §12.3) go full-bleed; other pages keep the container.
+  const isBleedPage = ['/', '/overview', '/engine'].includes(location.pathname);
 
   const {
     selectedProvider,
@@ -111,7 +113,7 @@ const AppContent = () => {
       />
 
       {/* === Add this wrapper div === */}
-      <div id="main-content" className={`main-content ${isGamePage ? 'game-page-content' : ''}`}>
+      <div id="main-content" className={`main-content ${isGamePage ? 'game-page-content' : ''} ${isBleedPage ? 'redesign-bleed' : ''}`}>
         <GuestBanner />
         <ErrorBoundary>
           <Suspense fallback={<div className="page-container">Loading...</div>}>
