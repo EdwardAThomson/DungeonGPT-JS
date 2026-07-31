@@ -121,3 +121,101 @@ tabs below a width breakpoint, so option A subsumes the mobile answer.
   that turned the chat into a feed (the trigger for this rethink).
 - [LARGER_WORLDS_PLAN.md](LARGER_WORLDS_PLAN.md): viewport/zoom machinery a docked
   pane reuses.
+
+---
+
+## 8. Mock-review answers (maintainer + #82 mock session, 2026-07-18)
+
+The #82 Quick Start mock's step-3 "map as the stage" screen is effectively a first draft
+of Option A; reviewing it settled several open questions:
+
+- **Multiple heroes (new):** the sidebar hero card generalizes to a **party strip** (lead
+  portrait large, companion chips beneath; click-through to the Adventure Book Party tab).
+  The **map keeps ONE marker** wearing the lead's portrait: the party is a single token in
+  the world, and lead/support only matters at encounter time (existing formation phase).
+  Quick Start's solo pregen is mechanically honest (t1 is solo-tuned); parties come from
+  the classic HeroSelection flow, and later from companions (FEATURE_COMPANIONS).
+- **Map size (open Q1, partially):** map gets the width majority and derives tile size
+  from its container (reusing the #61 viewport/zoom machinery); a **fullscreen toggle,
+  not a modal** (settles open Q3).
+- **Log placement (open Q1/Q6):** desktop = **persistent right pane with the input
+  attached** (a tab would recreate the map-hides-log exclusion this plan exists to fix);
+  mobile = Map | Log **tabs** (the pane collapse). Suggested actions render as **chips
+  above the log input** (narrative verbs live with the narrative pane), which is also
+  where the mock's "On the map" buttons land.
+- **Chrome (new):** other in-game buttons move to a slim **left icon rail** (Adventure
+  Book, Party/Inventory, Settings, account), completing a rail + stage + log triptych;
+  the header Map button dissolves (open Q5, partially: tour steps still need rework).
+  Rail icons are a natural home for #78's reactive-glow badges (e.g. new codex entry).
+
+Layout sketch:
+
+    +----+---------------------------+----------------+
+    |rail|        THE MAP            | ADVENTURE LOG  |
+    |icon|      (the stage)          |  ...narration  |
+    |icon|  party strip (lead large, |  [action chips]|
+    |    |  companion chips)         |  [input______] |
+    +----+---------------------------+----------------+
+    mobile: rail -> bottom bar; panes -> Map | Log tabs
+
+## 9. Log placement: the MMO-convention discussion (2026-07-18)
+
+Maintainer concern: a right-docked input is off the eye path ("typing into a squashed box
+not quite in the line of sight"); bottom-docked is in the eye path but halves the map;
+MMOs put chat bottom-left as a movable overlay over a fullscreen world.
+
+Analysis that resolved it:
+
+- **MMO input is peripheral BY DESIGN**: the world is the primary verb, typing is
+  summoned by intent (Enter focuses chat). Peripheral placement states the verb
+  hierarchy, which matches this game exactly (map primary, free-text occasional).
+  The eye-path concern applies to *reading*, not typing.
+- **Our log is prose, not a chat ticker.** MMO chat overlays survive transparency
+  because lines are short. DungeonGPT narration is literary paragraphs: it needs a
+  stable, solid ~45-65ch reading column. Overlay-on-map and full-width bottom panes
+  are both typographically wrong for it.
+- **Our map has a natural size; MMO worlds do not.** A tile world at sane zoom leaves
+  spare desktop width, which is exactly where the chronicle column fits. The fullscreen
+  toggle covers the big-world case.
+- Bottom-right input = Discord/Slack/messenger muscle memory; not actually unusual.
+
+**Direction (settles open Q1/Q2, pending final sign-off):**
+1. Default: right-docked chronicle pane, input at its bottom, suggested-action chips
+   above the input.
+2. **Collapsible log** (chevron): map takes ~full screen (MMO-immersion mode); while
+   collapsed, key events surface as transient toasts (the pattern already proven in the
+   #82 Quick Start mock; the honest descendant of siteNotice).
+3. **Enter summons the input** from anywhere (focuses it; slides the log open if
+   collapsed) — the MMO pattern that makes peripheral placement costless.
+4. Later, cheap nod to MMO movability: a dock-position **setting** (right | bottom),
+   two CSS layouts + one preference. No free drag/resize (that is a window manager).
+5. Mobile: Map | Log tabs (unchanged).
+
+## 10. Auto-travel & interruptions (maintainer questions, 2026-07-18)
+
+The workspace mock's scripted journey (real `findPath()` route, walked tile by tile)
+surfaced the travel design questions. Direction:
+
+- **Pass-through vs. enter.** Auto-travel treats intermediate tiles as *passed through*:
+  narrated (localNarrator biome pools underfoot), encounter-rollable, but **no arrival
+  modals**. Only the chosen **destination** gets the full arrival treatment (town arrival
+  view / building entry). Popping the mountain/POI modal for every tile crossed would
+  destroy the flow the docked map exists to create.
+- **Events interrupt; terrain narrates.** "Real terrain to cross" is honored by (a)
+  biome-appropriate narration as the ground changes, and (b) **encounters spawning from
+  the biome underfoot** (forest/hills/mountain tables), which PAUSE travel, resolve, and
+  resume. Mock proves the shape with an auto-resolved d20 beat (success and fail-forward
+  variants); the full interactive version is #79's inline-combat stage.
+- **Discoveries** (a cave mouth, a milestone POI on the route) should interrupt with a
+  lightweight choice ("Investigate / Press on"), not a modal takeover. Not in the mock yet.
+- **Travel pace:** ~750ms/tile felt right in the mock (420ms read as teleporting across
+  the world). Real value tunable; long journeys may want a 2x speed control.
+- **Destination affordances open views:** "Find Captain Ulric" should open the **town
+  map** (Briarwood) — the town/site views render inside the same stage (the pane IS the
+  viewport for world/town/site alike, as §3's migration implies). Mock currently stubs
+  this with a notice; porting `townMapGenerator`+`townTileArt` into the mock is the next
+  fidelity step if wanted.
+- **Auto-path vs one-tile-per-click (flagged for the real game):** the mock's
+  click-a-destination-and-walk pattern is a change from the live game's one-tile-per-move
+  loop; adopting it is a gameplay decision (movement costs/encounter rates per tile still
+  apply — auto-path just batches the clicks, it must not batch away the risk).
