@@ -333,3 +333,29 @@ geography, or milestones; it only ensures the phase 3 copy leaves the door open.
 
 Phase 1 is the smallest shippable and delivers the whole "7 cards instead of 19"
 win by itself; phases 2-3 are copywriting-heavy and safe to trail.
+
+---
+
+## 10. Addendum (2026-07-18): Heroic Fantasy starter structure — the hourglass
+
+Decision (maintainer, from the home-page Quick Start design work): within an arc, multiple
+tier-1 **entry tracks** are structured as an **hourglass**, not silos and not co-active
+mains:
+
+- **2–3 distinct t1 openings authored on the SAME shared geography** (the same-world trick
+  heroic-fantasy-t2 already uses: Willowdale / Briarwood / Thornfield / Millhaven +
+  Greenridge Hills), each starting in a different town and unearthing a different local
+  trace of the Sundering (§7 framing B).
+- **All tracks converge on the one existing t2 chain** ("three roads into the same war"),
+  so the deep-tier authoring burden stays single and the XP economy keeps its per-curve
+  tuning (the player runs ONE main track at a time).
+- **Cross-track texture, not co-activation:** the tracks you did not pick surface as side
+  quests / rumours in the same world. Full BG3-style co-active interleaving was considered
+  and deliberately deferred — it is an engine + balance program (multi-campaign milestone
+  state, prompt grounding, XP rework), not content authoring. The hourglass keeps a clean
+  upgrade path to it because all tracks already share one world.
+
+First application: Heroic Fantasy gets two sibling t1s alongside The Goblin Threat
+(working premises: a vanished caravan out of Thornfield; a wrong-turning mill at
+Millhaven). Surfaced in the Quick Start flow as "choose your adventure" cards over one
+shared world mini-map, each card highlighting its starting town.
