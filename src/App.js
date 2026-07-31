@@ -1,8 +1,8 @@
 // App.js
 
-import React, { useContext, useEffect, Suspense, lazy, useState } from "react";
+import React, { useContext, useEffect, Suspense, lazy } from "react";
 import { sendEvent } from "./services/telemetry";
-import { BrowserRouter as Router, Route, Link, Routes, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import HeroCreation from "./pages/HeroCreation";
 import HeroSummary from "./components/HeroSummary";
 import AllHeroes from "./pages/AllHeroes";
@@ -20,17 +20,15 @@ import HowToPlay from './pages/HowToPlay';
 import GettingStarted from './pages/GettingStarted';
 import { useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import UserProfileIndicator from './components/UserProfileIndicator';
 
 import "./styles/index.css";
 
-import DebugMenu from './components/DebugMenu';
 import SettingsContext from "./contexts/SettingsContext";
 import { AISettingsModalContent } from "./components/Modals";
 import ErrorBoundary from "./components/ErrorBoundary";
-import NavDropdown from "./components/NavDropdown";
+import RedesignNav from "./components/RedesignNav";
 import DatabaseIndicator from "./components/DatabaseIndicator";
-import { GuidedTourProvider, useGuidedTour } from "./contexts/GuidedTourContext";
+import { GuidedTourProvider } from "./contexts/GuidedTourContext";
 import TourOverlay from "./components/TourOverlay";
 import LocalHeroSync from "./components/LocalHeroSync";
 import LocalGameSync from "./components/LocalGameSync";
@@ -44,11 +42,9 @@ const PremiumPage = lazy(() => import('./pages/PremiumPage'));
 
 const AppContent = () => {
   const location = useLocation();
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
   const isDebugEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEBUG_ROUTES === 'true';
   const isGamePage = location.pathname === '/game';
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  const { startTour } = useGuidedTour();
 
   const {
     selectedProvider,
@@ -61,13 +57,15 @@ const AppContent = () => {
     setAssistantModel,
     isSettingsModalOpen,
     setIsSettingsModalOpen,
-    theme,
-    setTheme
+    theme
   } = useContext(SettingsContext);
 
-  // Sync theme to document.body so Portal content inherits CSS variables
+  // Sync theme to document.body so Portal content inherits CSS variables.
+  // Redesign branch (#82 §12): the whole app runs on the dark redesign theme; the
+  // light-fantasy/dark-fantasy `theme` state machinery is preserved but overridden here
+  // (the §12.6 "keep the light/dark toggle?" decision can restore it).
   useEffect(() => {
-    document.body.setAttribute('data-theme', theme);
+    document.body.setAttribute('data-theme', 'redesign');
   }, [theme]);
 
   // Funnel: one app_open per page load (anonymous; D1/D7 return comes from
@@ -79,7 +77,7 @@ const AppContent = () => {
   // Show loading screen while checking authentication
   if (loading) {
     return (
-      <div className="App" data-theme={theme}>
+      <div className="App" data-theme="redesign">
         <div style={{
           display: 'flex',
           justifyContent: 'center',
@@ -94,89 +92,10 @@ const AppContent = () => {
   }
 
   return (
-    <div className="App" data-theme={theme}>
+    <div className="App" data-theme="redesign">
       <a href="#main-content" className="skip-link">Skip to main content</a>
 
-      {/* Hamburger button - visible on mobile for all pages */}
-      <button
-        className="hamburger-btn"
-        onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
-        aria-label="Toggle navigation menu"
-        aria-expanded={isMobileNavOpen}
-      >
-        {isMobileNavOpen ? '✕' : '☰'}
-      </button>
-
-      {/* Add className="main-nav" here for the nav styles */}
-      <nav className={`main-nav ${isGamePage ? 'game-page-nav' : ''} ${isMobileNavOpen ? 'mobile-nav-open' : ''}`}>
-        <ul>
-          <li><Link to="/" onClick={() => setIsMobileNavOpen(false)}>Home</Link></li>
-          <NavDropdown
-            label="How to Play"
-            items={[
-              { label: "Getting Started", path: "/getting-started" },
-              { label: "Features & FAQ", path: "/features" },
-              { label: "Replay Tutorial", onClick: startTour }
-            ]}
-            onNavClose={() => setIsMobileNavOpen(false)}
-          />
-          <NavDropdown
-            label="Heroes"
-            items={[
-              { label: "Create New Hero", path: "/hero-creation" },
-              { label: "All Heroes", path: "/all-heroes" }
-            ]}
-            onNavClose={() => setIsMobileNavOpen(false)}
-          />
-          <NavDropdown
-            label="Games"
-            items={[
-              { label: "New Game", path: "/new-game" },
-              { label: "Saved Games", path: "/saved-conversations" }
-            ]}
-            onNavClose={() => setIsMobileNavOpen(false)}
-          />
-          {/* Membership: linked since 2026-07-22 — billing is live at the hub. */}
-          <li><Link to="/membership" onClick={() => setIsMobileNavOpen(false)}>Membership</Link></li>
-          <li className="nav-settings-item">
-            <button
-              onClick={() => setTheme(theme === 'light-fantasy' ? 'dark-fantasy' : 'light-fantasy')}
-              className="nav-settings-btn"
-              title={theme === 'light-fantasy' ? 'Switch to dark mode' : 'Switch to light mode'}
-              aria-label="Toggle light/dark theme"
-            >
-              {theme === 'light-fantasy' ? '🌙' : '☀️'} <span className="settings-text">{theme === 'light-fantasy' ? 'Dark' : 'Light'}</span>
-            </button>
-          </li>
-          {isGamePage && user && (
-            <li className="nav-settings-item">
-              <button
-                onClick={() => window.dispatchEvent(new CustomEvent('open-ai-assistant'))}
-                className="nav-settings-btn nav-ai-btn"
-                title="Open AI Assistant"
-              >
-                🤖 AI Assistant
-              </button>
-            </li>
-          )}
-          {isDebugEnabled && (
-            <li className="nav-settings-item nav-debug-item">
-              <DebugMenu inNav />
-            </li>
-          )}
-          <li className="nav-profile-item">
-            <UserProfileIndicator isMobileNavOpen={isMobileNavOpen} onNavClose={() => setIsMobileNavOpen(false)} />
-          </li>
-        </ul>
-      </nav>
-
-      {/* Mobile nav overlay - moved outside nav to prevent filter nesting issues */}
-      {isMobileNavOpen && (
-        <div
-          className="mobile-nav-overlay"
-          onClick={() => setIsMobileNavOpen(false)}
-        />
-      )}
+      <RedesignNav isDebugEnabled={isDebugEnabled} />
 
       <AISettingsModalContent
         isOpen={isSettingsModalOpen}

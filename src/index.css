@@ -130,6 +130,55 @@
   --body-font: var(--font-body);
 }
 
+/*
+ * Redesign theme (#82, UI_REDESIGN_PLAN.md §12). The canonical dark token set the
+ * site redesign is built on, ported from the marketing mockup (landing-mockup/styles.css).
+ * Additive and opt-in: a redesign surface sets data-theme="redesign" on its root wrapper;
+ * the existing light-fantasy / dark-fantasy themes and all game-UI tokens are untouched.
+ * This block does two jobs at once:
+ *   1. defines the richer mockup token vocabulary (--ground/--gold/--wrap/--step/...),
+ *   2. maps the app's existing semantic contract (--bg/--primary/--border/...) onto dark
+ *      redesign values, so ported mockup CSS AND any reused legacy component both render right.
+ */
+[data-theme='redesign'] {
+  /* Mockup vocabulary (dark ground + gold + purple; purple-tinted neutrals, warm gold) */
+  --ground: #0e0d13;
+  --ground-2: #131019;
+  --surface-2: #221c2e;
+  --line: #2e2740;
+  --line-soft: #221d30;
+  --gold: #d8a64e;
+  --gold-bright: #e2be7f;
+  --purple: #8e44ad;
+  --purple-bright: #b46fd4;
+  --muted: #a29caf;
+  --muted-2: #7d778c;
+  --parchment: #f4e4bc;
+  --parchment-ink: #3a2c1e;
+  --parchment-ink-soft: #6a5238;
+
+  --font-display: 'Cinzel', 'Trajan Pro', Georgia, 'Times New Roman', serif;
+  --font-ui: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Layout rhythm */
+  --wrap: 1120px;
+  --step: clamp(4.5rem, 9vw, 8rem);
+
+  /* Map the app's existing semantic contract onto redesign dark values */
+  --bg: var(--ground);
+  --surface: #1a1622;
+  --primary: var(--gold);
+  --accent: var(--purple, #8e44ad);
+  --text: #ece7e0;
+  --text-secondary: var(--muted);
+  --border: var(--line);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --success: #57c07f;
+  --inventory-shelf-bg: #0a0a0a;
+  --header-font: var(--font-display);
+  --body-font: var(--font-body);
+}
+
 body {
   margin: 0;
   padding: 0;

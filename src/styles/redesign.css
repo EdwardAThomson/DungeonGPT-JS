@@ -1,0 +1,106 @@
+/*
+ * Redesign primitives (#82, UI_REDESIGN_PLAN.md §12). Ported from the marketing mockup
+ * (docs/private/landing-mockup/styles.css). Every selector is scoped under
+ * [data-theme='redesign'] so these class names (.btn, .rd-nav, ...) cannot collide with
+ * the app's existing global styles. Tokens come from the [data-theme='redesign'] block in
+ * src/index.css.
+ */
+
+/* ---- buttons ---- */
+[data-theme='redesign'] .btn {
+  display: inline-flex; align-items: center; gap: 0.55rem;
+  font-family: var(--font-ui); font-weight: 600; font-size: 0.95rem;
+  padding: 0.85rem 1.5rem; border-radius: 2px; cursor: pointer; text-decoration: none;
+  border: 1px solid transparent;
+  transition: transform .15s ease, background .2s ease, border-color .2s ease;
+}
+[data-theme='redesign'] .btn-primary {
+  background: linear-gradient(160deg, var(--gold-bright), var(--gold));
+  color: #211a0a; box-shadow: 0 8px 30px -12px rgba(212, 175, 55, .6);
+}
+[data-theme='redesign'] .btn-primary:hover { transform: translateY(-2px); }
+[data-theme='redesign'] .btn-ghost {
+  border-color: var(--line); color: var(--text); background: rgba(255, 255, 255, .02);
+}
+[data-theme='redesign'] .btn-ghost:hover { border-color: var(--gold); }
+
+/* ---- top nav ---- */
+[data-theme='redesign'] .rd-nav {
+  position: sticky; top: 0; z-index: 40;
+  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--ground) 82%, transparent);
+  border-bottom: 1px solid var(--line-soft);
+}
+[data-theme='redesign'] .rd-nav-inner {
+  display: flex; align-items: center; justify-content: space-between; height: 68px;
+  max-width: var(--wrap); margin: 0 auto; padding-inline: clamp(1.15rem, 4vw, 2.5rem);
+}
+[data-theme='redesign'] .rd-wordmark {
+  font-family: var(--font-display); font-weight: 700; font-size: 1.2rem;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--text);
+  display: inline-flex; align-items: center; gap: .6rem; text-decoration: none;
+}
+[data-theme='redesign'] .rd-wordmark .rune { color: var(--gold); }
+
+[data-theme='redesign'] .rd-nav-cluster { display: flex; align-items: center; gap: 2rem; }
+[data-theme='redesign'] .rd-nav-links {
+  display: flex; align-items: center; gap: 2rem; list-style: none; margin: 0; padding: 0;
+  font-family: var(--font-ui); font-size: .9rem; color: var(--muted);
+}
+[data-theme='redesign'] .rd-nav-cta { display: flex; align-items: center; gap: 1.2rem; }
+[data-theme='redesign'] .rd-nav-cta .btn { padding: 0.6rem 1.15rem; }
+
+[data-theme='redesign'] .rd-link {
+  font-family: var(--font-ui); font-size: .9rem; font-weight: 600; color: var(--muted);
+  text-decoration: none;
+}
+[data-theme='redesign'] .rd-link:hover { color: var(--text); }
+
+/* profile chip (the NavDropdown reused for the signed-in account menu) */
+[data-theme='redesign'] .rd-profile .nav-dropdown-toggle { color: var(--text); }
+
+/* ---- theme the reused NavDropdown to redesign tokens ---- */
+[data-theme='redesign'] .rd-nav .nav-dropdown-toggle {
+  background: transparent; border: none; cursor: pointer;
+  font-family: var(--font-ui); font-size: .9rem; font-weight: 500; color: var(--muted);
+  display: inline-flex; align-items: center; gap: .35rem; padding: 0;
+}
+[data-theme='redesign'] .rd-nav .nav-dropdown-toggle:hover { color: var(--text); }
+[data-theme='redesign'] .rd-nav .dropdown-arrow { font-size: .6rem; }
+[data-theme='redesign'] .rd-nav .nav-dropdown-menu {
+  list-style: none; margin: .6rem 0 0; padding: .4rem;
+  position: absolute; min-width: 190px; z-index: 45;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 7px;
+  box-shadow: 0 20px 50px -20px rgba(0, 0, 0, .85);
+}
+[data-theme='redesign'] .rd-nav .nav-dropdown-menu a,
+[data-theme='redesign'] .rd-nav .nav-dropdown-action {
+  display: block; width: 100%; text-align: left;
+  padding: .55rem .7rem; border-radius: 5px;
+  font-family: var(--font-ui); font-size: .88rem; color: var(--muted);
+  text-decoration: none; background: transparent; border: none; cursor: pointer;
+}
+[data-theme='redesign'] .rd-nav .nav-dropdown-menu a:hover,
+[data-theme='redesign'] .rd-nav .nav-dropdown-action:hover {
+  background: var(--surface-2); color: var(--text);
+}
+
+/* ---- mobile ---- */
+[data-theme='redesign'] .rd-burger { display: none; }
+@media (max-width: 760px) {
+  [data-theme='redesign'] .rd-burger {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border: 1px solid var(--line-soft); border-radius: 4px;
+    background: transparent; color: var(--text); cursor: pointer; font-size: 1.1rem;
+  }
+  [data-theme='redesign'] .rd-nav-cluster {
+    position: absolute; top: 68px; left: 0; right: 0; z-index: 39;
+    flex-direction: column; align-items: flex-start; gap: 1rem;
+    padding: 1rem clamp(1.15rem, 4vw, 2.5rem) 1.4rem;
+    background: var(--ground-2); border-bottom: 1px solid var(--line-soft);
+    display: none;
+  }
+  [data-theme='redesign'] .rd-nav-cluster.open { display: flex; }
+  [data-theme='redesign'] .rd-nav-links,
+  [data-theme='redesign'] .rd-nav-cta { flex-direction: column; align-items: flex-start; gap: 1rem; width: 100%; }
+}
