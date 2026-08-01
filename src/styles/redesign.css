@@ -134,7 +134,7 @@
 [data-theme='redesign'] .rd-home .learn::after { content: '\2192'; }
 
 /* hero */
-[data-theme='redesign'] .rd-home .hero { position: relative; display: flex; align-items: center; min-height: clamp(560px, 72vh, 660px); padding-block: clamp(2.5rem, 5vw, 4rem); overflow: hidden; }
+[data-theme='redesign'] .rd-home .hero { position: relative; display: flex; align-items: center; min-height: max(640px, 82vh); padding-block: clamp(2.5rem, 5vw, 4rem); overflow: hidden; }
 [data-theme='redesign'] .rd-home .hero-photo { position: absolute; inset: 0; z-index: 0; background-position: 76% center; background-size: cover; background-repeat: no-repeat; }
 [data-theme='redesign'] .rd-home .hero-scrim { position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background: linear-gradient(100deg, var(--ground) 6%, color-mix(in srgb, var(--ground) 84%, transparent) 32%, color-mix(in srgb, var(--ground) 32%, transparent) 55%, transparent 74%), linear-gradient(0deg, var(--ground) 3%, transparent 32%); }
