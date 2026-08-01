@@ -1,6 +1,6 @@
 # Roadmap — DungeonGPT (JS)
 
-_Status: active · updated 2026-07-24_
+_Status: active · updated 2026-07-31_
 
 The production rewrite of DungeonGPT — a React web app for creating fantasy
 characters and playing AI-narrated RPG campaigns. Deployed at dungeongpt.xyz on
@@ -64,7 +64,7 @@ backlog; see the `docs/` design docs for each system.
 - [x] Add missing assets: dedicated quest-item icons + hide/studded-leather armour and pine-resin art delivered (placeholders cleared); the `workshop` building interior (Henry #26) is delivered
 - [x] Replace fragile keyword-based encounter-engagement detection: superseded by the two-tier narration redesign; the keyword matching no longer exists (OUTSTANDING_ISSUES #13)
 - [x] Deploy product analytics (#86): migration 007 applied + Worker deployed; pipeline verified live 2026-07-22 (funnel events recording)
-- [ ] Landing page + UI redesign (#82, HIGH PRIORITY): visibly behind competitors; art slots + mockup in the private plan
+- [ ] Landing page + UI redesign (#82, HIGH PRIORITY): in progress on a dedicated `redesign` branch (build-then-cutover, live site untouched until done) — dark token layer + auth-aware nav (§12.1-2) and the auth-aware home, guest landing + signed-in dashboard (§12.3a), shipped there; not yet merged to master/live
 - [ ] Map & Adventure Log layout: promote the map to the main stage (#84, HIGH PRIORITY)
 - [ ] Combat UX continuation (#79): dockable map-context HUD (§0 step 2), then the remaining animation/refine threads (`docs/COMBAT_UX_PLAN.md`)
 - [ ] In-flight phase work: AI narration contract Phase 2 (#76), skill checks Phases 3-4 (#83), arc cards Phases 2-4 (#73)
