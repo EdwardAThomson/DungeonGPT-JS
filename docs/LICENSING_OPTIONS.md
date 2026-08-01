@@ -30,7 +30,7 @@ Details below.
 | Contributors | `git shortlog -sne HEAD`: **one person** (Edward Thomson, 275 commits across two name spellings of the same GitHub identity). **No external contributors.** |
 | `package.json` | No `license` field (`"private": true`); cosmetic gap only, `LICENSE` file governs |
 | Premium content **in the public repo** | `src/data/storyTemplates.js`: `desert-expedition-t1` and the Frozen Frontier snow campaign, both `premium: true` |
-| Entitlement gate | `src/game/entitlements.js`: client-side placeholder; `isPremium()` reads a `localStorage` dev override. No server-side enforcement yet. |
+| Entitlement gate | `src/game/entitlements.js`: client-side placeholder; `isPremium()` reads a `localStorage` dev override. No server-side enforcement yet. **UPDATE: server-side enforcement shipped 2026-07-05/06 (#39/#40) — `account_tiers` in Postgres, checked in `routes/ai.ts` and `routes/db.ts`; the client gate remains as the UX seam described here, no longer the security boundary.** |
 | Positioning depends on the license | `COMPETITORS.md`: "Apache 2.0 open source (this is rare in the field)"; primary wedge is **"verifiable, open-source determinism"**, i.e. "the only AI GM where you can read the dice code"; "No rival can copy the open-source angle without changing their business model." Competitors (AI Dungeon, NovelAI, Friends & Fables) are closed-source. |
 
 Two consequences of sole authorship:
@@ -118,7 +118,7 @@ open-source verifiability):
 
 ### Action items (in order)
 
-1. **Enforce entitlements server-side.** Move the `isPremium()` decision to the CF Worker
+1. ~~**Enforce entitlements server-side.**~~ **DONE (#39/#40, shipped 2026-07-05/06).** Move the `isPremium()` decision to the CF Worker
    (tier claim on the Octonion JWT / user row, checked in `/api/ai` and `/api/db/*`).
    Keep `src/game/entitlements.js` as the client seam it was designed to be.
 2. **Open-core the content, going forward.** Ship future premium campaigns, `very_rare`

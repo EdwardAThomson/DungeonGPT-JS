@@ -548,7 +548,7 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [ ] ~~Custom tab: milestone editor with registry-backed entity pickers~~ (deferred to Phase 3+)
 
 ### Phase 3: Custom Campaign Builder & Registries
-- [x] Extract quest enemies into shared data file (`questEnemies.js`) — 31 bosses, 4 themes × 2 tiers, `getEnemiesByTierAndTheme()` helper
+- [x] Extract quest enemies into shared data file (`questEnemies.js`) — 35 bosses, 4 themes × 2 tiers, `getEnemiesByTierAndTheme()` helper
 - [x] Extract quest items into shared registry — `QUEST_ITEMS` + `SEARCHABLE_ITEMS` in `questPickerData.js`
 - [x] Extract quest POIs into shared registry — `POI_TYPES` in `questPickerData.js` (10 types with terrain tags)
 - [x] Build menu-driven Custom tab with registry-backed pickers (not free text) — theme, tier, enemy, item, building, NPC, POI, town/mountain name pickers
@@ -557,8 +557,8 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [x] Per-slot town/mountain name selection feeding into `customNames` for map generation
 - [x] Template modal contextual progression buttons (Generate Map → Hero Selection)
 - [x] Entity validation at campaign creation time — pickers prevent invalid picks; `validateCustomSlots()` catches partial slots and requires ≥2 complete milestone slots (raised from 1 on 2026-07-06); `shortDescription` auto-generated from selections
-- [x] Design team/party encounter system — Lead + Support model, see [`TEAM_ENCOUNTER_DESIGN.md`](TEAM_ENCOUNTER_DESIGN.md)
-- [ ] Implement team encounter system (support roles, formation UI, team damage/rewards)
+- [x] Design team/party encounter system — Lead + Support model, see [`ENCOUNTER_SYSTEM.md` Phase 5](ENCOUNTER_SYSTEM.md#phase-5-team-encounters----lead--support-model-shipped-2026-07-03-43)
+- [x] Implement team encounter system (support roles, formation UI, team damage/rewards) — shipped 2026-07-03 as part of the #43 combat-depth program, see `ENCOUNTER_SYSTEM.md` Phase 5
 - [ ] Add encounter images for quest bosses
 
 ### Phase 4: Narrative Milestones
@@ -579,7 +579,7 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [ ] Flesh out Tier 3 templates with full milestone data
 - [ ] AI-assisted campaign creation that outputs structured milestone data
 - [ ] Player customization options (difficulty, milestone count, theme)
-- [ ] Combo attacks: class-pair synergy actions in combat — see [`TEAM_ENCOUNTER_DESIGN.md` Appendix A](TEAM_ENCOUNTER_DESIGN.md#appendix-a-combo-attacks-future--phase-5)
+- [ ] Combo attacks: class-pair synergy actions in combat — see [`ENCOUNTER_SYSTEM.md`](ENCOUNTER_SYSTEM.md) (deferred past the team MVP)
 - [ ] Party synergy hints on Hero Selection page
 
 ---

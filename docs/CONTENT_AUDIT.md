@@ -97,20 +97,20 @@ what the app sees. Jest runs the same modules directly through its Babel pipelin
   the maintainer treats typeless items as acceptable, narrow `REQUIRED_DISPLAY_FIELDS`
   in `src/audits/items.js` to `name`/`icon`/`rarity`/`value` (all of which pass) —
   no other change needed.
-- **ITEM-05** surfaces **12 warnings**, one per campaign quest item that borrows a
-  lookalike sibling's icon until dedicated art ships (`goblin_scouts_map`,
-  `hidden_map`, `caravan_ledger`, `sun_kings_star_chart`, `frostbound_ledger`,
-  `famine_winter_saga`, `moorland_herbs`, `mutated_specimen`, `automaton_control_rod`,
-  `stolen_aether_blueprints`, `cult_journal`, `forbidden_ritual_text`). This is the
-  point of the check: the borrowed files exist on disk, so ITEM-01/04 and
-  `artIntegrity` stay green and the debt was previously invisible. The list clears as
-  each dedicated `.webp` from docs/IMAGE_GENERATION_PROMPTS.md lands (generate art,
-  repoint `icon`, drop the `placeholderIcon` flag). Non-blocking.
-- **ITEM-06** surfaces **0 violations** every one of those 12 borrows is tagged
-  `placeholderIcon: true`, so the error-severity untagged-borrow gate is green. It
-  fails the moment a NEW quest item is added pointing at a sibling's icon without the
-  flag, forcing the author to either ship dedicated art or explicitly tag the debt
-  (which moves it to the ITEM-05 list).
+- **ITEM-05** surfaces **0 warnings today** — the 12 campaign quest items that used to
+  borrow a lookalike sibling's icon (`goblin_scouts_map`, `hidden_map`, `caravan_ledger`,
+  `sun_kings_star_chart`, `frostbound_ledger`, `famine_winter_saga`, `moorland_herbs`,
+  `mutated_specimen`, `automaton_control_rod`, `stolen_aether_blueprints`, `cult_journal`,
+  `forbidden_ritual_text`) each now have their own dedicated `.webp` (`icon` repointed,
+  `placeholderIcon` flag dropped); `src/utils/inventorySystem.js` no longer sets
+  `placeholderIcon: true` on any catalog item. The check itself is still live (this is the
+  intended end state of the debt-tracking flow it describes) and will surface again the next
+  time a new item is deliberately tagged. Non-blocking.
+- **ITEM-06** surfaces **0 violations** — with no items left borrowing an icon at all, the
+  error-severity untagged-borrow gate is trivially green. It fails the moment a NEW quest
+  item is added pointing at a sibling's icon without the flag, forcing the author to either
+  ship dedicated art or explicitly tag the debt (which would move it back onto the ITEM-05
+  list).
 - **buildings / npcs / milestones**: every `error`-severity check passes today
   (0 failures) with no remaining building debt: every placeable building type now
   has a name-generator branch, so BLD-03 passes via real coverage (empty allowlist)

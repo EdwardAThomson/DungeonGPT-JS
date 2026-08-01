@@ -216,9 +216,8 @@ For deployment instructions, see the deployment guides in `/docs`.
 
 ## Potential Future Improvements
 
-*   💳 **Billing Integration** — Credit-based system with Lemon Squeezy
-*   📊 **Usage Tracking** — AI usage analytics and cost monitoring
-*   🚀 **Rate Limiting** — Request throttling and abuse prevention
+*   💳 **Billing completion** — payment rails are live via the Octonion hub (redemption codes + hub-enforced tiers); the remaining piece is wiring in-game AI usage to debit hub credits
+*   📊 **Usage Tracking** — a read-only premium-AI usage meter is live on Profile; per-generation cost accounting is not yet built
 *   📈 **Monitoring** — Error tracking and performance metrics
 *   🎬 **Streaming AI Responses** — Real-time text generation for better UX
 *   🧪 **Expanded Testing** — Unit and integration tests for core game loops

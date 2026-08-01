@@ -25,14 +25,25 @@ the no-new-art rule), `docs/FEATURE_SHOPS.md` (how new items reach the player).
 
 ## Current state (what exists today)
 
+> **UPDATE:** a bow item (`hunters_longbow`, `src/utils/inventorySystem.js`, +2 attack, rare,
+> with its own `public/assets/icons/items/hunters_longbow.webp` art) has since shipped, sold at
+> the blacksmith (`src/data/shopStock.js`) and dropped as forest loot (`sitePopulator.js`). It
+> resolves THE ART PROBLEM below (dedicated art, no stopgap needed) but is **not** the ranged
+> mechanic this doc proposes: it carries no `ranged` flag, `getEquippedBonuses` still returns
+> only `{ attack, defense, misc }`, and there is no standoff/retaliation-avoidance branch in
+> `encounterResolver.js`. Mechanically it is a flavor-reskinned melee-equivalent weapon today —
+> Thread 1's actual mechanic (below) remains unbuilt.
+
 - **Item model** (`src/utils/inventorySystem.js` -> `ITEM_CATALOG`): every item is a flat
   record. Weapons carry `type: 'weapon'` and a `bonus` string (`'+1'`). The only weapon art
   is blades, daggers, and one staff: `shortsword` (+1, common, value 25),
   `silver_dagger`/`ritual_dagger`/`poisoned_dagger` (+1), `enchanted_staff` (+1, uncommon,
   value 250), `magic_weapon`/`legendary_weapon`, plus 0-bonus junk (`rusty_dagger`,
-  `bar_stool_leg`). **There is no bow item.**
-- **Icons** (`public/assets/icons/items/`, 122 files): **no bow / arrow / quiver / sling /
-  crossbow art exists** (verified). The repo rule (see `EQUIPMENT_ITEMS.md`) is *reuse
+  `bar_stool_leg`). ~~There is no bow item.~~ (see UPDATE above — a bow item now exists, but
+  without the ranged mechanic this doc proposes)
+- **Icons** (`public/assets/icons/items/`, 122 files): ~~no bow / arrow / quiver / sling /
+  crossbow art exists~~ — `hunters_longbow.webp` now exists (see UPDATE above). No
+  arrow/quiver/sling/crossbow art. The repo rule (see `EQUIPMENT_ITEMS.md`) is *reuse
   existing art, add no new images*.
 - **Equip engine** (`src/game/equipment.js`): one item per slot, three slots
   (`EQUIP_SLOTS = ['weapon','armor','accessory']`). `SLOT_FOR_TYPE` maps item `type` to slot
