@@ -31,7 +31,7 @@ const GuestHome = () => (
           <p className="eyebrow">Solo AI game master</p>
           <h1>The AI tells the story.<br /><span className="accent">The rules decide what happens.</span></h1>
           <p className="lede">
-            Every skill check and fight is resolved by a structured rules engine, not the model.
+            Every skill check and fight is resolved by a structured rules engine,<br />not the model.
             The AI writes the story around the result; it doesn't get to change it. The engine is
             open source, so you can read how the game is designed to work.
           </p>

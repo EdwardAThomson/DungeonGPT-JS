@@ -137,12 +137,12 @@
 [data-theme='redesign'] .rd-home .hero-photo { position: absolute; inset: 0; z-index: 0; background-position: 76% center; background-size: cover; background-repeat: no-repeat; }
 [data-theme='redesign'] .rd-home .hero-scrim { position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background: linear-gradient(100deg, var(--ground) 6%, color-mix(in srgb, var(--ground) 84%, transparent) 32%, color-mix(in srgb, var(--ground) 32%, transparent) 55%, transparent 74%), linear-gradient(0deg, var(--ground) 3%, transparent 32%); }
-[data-theme='redesign'] .rd-home .hero-inner { position: relative; z-index: 2; width: 100%; max-width: var(--wrap); margin-inline: auto; padding-inline: clamp(1.25rem, 5vw, 4.5rem); }
+[data-theme='redesign'] .rd-home .hero-inner { position: relative; z-index: 2; width: 100%; padding-inline: clamp(1.25rem, 5vw, 4.5rem); }
 [data-theme='redesign'] .rd-home .hero-copy { max-width: 40rem; }
-[data-theme='redesign'] .rd-home .hero h1 { font-size: clamp(1.9rem, 3.4vw, 2.6rem); line-height: 1.12; letter-spacing: -0.01em; }
+[data-theme='redesign'] .rd-home .hero h1 { font-size: clamp(1.9rem, 3.4vw, 2.6rem); line-height: 1.12; letter-spacing: -0.01em; text-wrap: normal; }
 [data-theme='redesign'] .rd-home .hero h1 .accent { color: var(--gold); font-style: normal; }
 [data-theme='redesign'] .rd-home .lede { color: #cdc7d3; font-size: clamp(1.05rem, 1.5vw, 1.22rem); line-height: 1.6; margin: 1.4rem 0 2rem; max-width: 36rem; }
-[data-theme='redesign'] .rd-home .hero-actions { display: flex; flex-wrap: wrap; gap: 0.9rem; max-width: 36rem; }
+[data-theme='redesign'] .rd-home .hero-actions { display: flex; flex-direction: column; gap: 0.9rem; max-width: 36rem; }
 [data-theme='redesign'] .rd-home .hero-actions .btn { justify-content: center; padding: 0.95rem 1.5rem; font-size: 1rem; }
 [data-theme='redesign'] .rd-home .hero-note { margin-top: 1.6rem; font-family: var(--font-ui); font-size: .82rem; color: var(--muted-2); display: flex; align-items: center; gap: .5rem; }
 [data-theme='redesign'] .rd-home .hero-note .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 10px var(--success); }
