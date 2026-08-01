@@ -28,14 +28,12 @@ const GuestHome = () => (
       <div className="hero-scrim" aria-hidden="true" />
       <div className="hero-inner">
         <div className="hero-copy">
-          <p className="eyebrow">Solo AI game master</p>
           <h1>The AI tells the story.<br /><span className="accent">The rules decide what happens.</span></h1>
-          <p className="lede">A solo RPG on an open, deterministic engine. The AI narrates; it never decides the outcome.</p>
           <div className="hero-actions">
             <Link to="/new-game" className="btn btn-primary" onClick={() => sendEvent('play_click')}>Play now</Link>
             <Link to="/engine" className="btn btn-ghost">See how the engine works</Link>
           </div>
-          <p className="hero-note"><span className="dot" /> No sign-up to start · play instantly as a guest · a free account adds the AI Dungeon Master</p>
+          <p className="hero-note"><span className="dot" /> No sign-up to start · play instantly as a guest</p>
         </div>
 
         <div className="roll-card" aria-label="Example skill check resolved in code">
