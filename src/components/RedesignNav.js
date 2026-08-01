@@ -62,7 +62,7 @@ const RedesignNav = ({ isDebugEnabled }) => {
           </ul>
 
           <div className="rd-nav-cta">
-            <Link to="/membership" className="rd-link" onClick={close}>Subscribe</Link>
+            <Link to="/membership" className="btn btn-ghost" onClick={close}>Subscribe</Link>
             {user ? (
               <>
                 <Link to="/game" className="btn btn-primary" onClick={close}>Play</Link>

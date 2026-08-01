@@ -10,6 +10,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { sendEvent } from "../services/telemetry";
+import HomeWorldMap from "../components/HomeWorldMap";
 import "../styles/redesign.css";
 
 const HERO_IMG = "/assets/redesign/hero.jpg";
@@ -127,7 +128,7 @@ const GuestHome = () => (
             <div className="stamp"><span>◆</span> Persuasion check passed: <b>19 vs 17</b></div>
           </div>
           <div className="map-card">
-            <div className="map-placeholder">Live world-map preview<br />(rendered from the real generator)</div>
+            <HomeWorldMap />
             <div className="map-caption">The real <code style={{ color: "var(--gold)" }}>generateMapData()</code> output, rendered with the game's own tile art. Roads, rivers and the lake are placed by the actual generator, not staged.</div>
           </div>
         </div>
