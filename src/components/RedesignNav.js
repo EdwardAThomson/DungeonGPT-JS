@@ -43,8 +43,8 @@ const RedesignNav = ({ isDebugEnabled }) => {
   return (
     <header className="rd-nav" data-theme="redesign">
       <div className="rd-nav-inner">
-        <Link to="/" className="rd-wordmark" onClick={close}>
-          <span className="rune" aria-hidden="true">✦</span> DungeonGPT
+        <Link to="/" className="rd-wordmark" onClick={close} aria-label="DungeonGPT home">
+          <img className="rd-logo" src="/assets/redesign/logo.webp" alt="DungeonGPT" />
         </Link>
 
         <button
