@@ -30,11 +30,7 @@ const GuestHome = () => (
         <div className="hero-copy">
           <p className="eyebrow">Solo AI game master</p>
           <h1>The AI tells the story.<br /><span className="accent">The rules decide what happens.</span></h1>
-          <p className="lede">
-            Every skill check and fight is resolved by a structured rules engine,<br />not the model.
-            The AI writes the story around the result; it doesn't get to change it. The engine is
-            open source, so you can read how the game is designed to work.
-          </p>
+          <p className="lede">A solo RPG on an open, deterministic engine. The AI narrates; it never decides the outcome.</p>
           <div className="hero-actions">
             <Link to="/new-game" className="btn btn-primary" onClick={() => sendEvent('play_click')}>Play now</Link>
             <Link to="/engine" className="btn btn-ghost">See how the engine works</Link>
