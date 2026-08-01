@@ -36,30 +36,34 @@ const GuestHome = () => (
           <p className="hero-note"><span className="dot" /> No sign-up to start · play instantly as a guest</p>
         </div>
 
-        <div className="roll-card" aria-label="Example skill check resolved in code">
+        {/* Option B: the die IS the roll (14); the math reads left-to-right as one equation,
+            no duplicated "d20 14" label. Tag is "Skill check" until the roll animation lands
+            (§12.3c), then it can become "Live". */}
+        <div className="roll-card" aria-label="Example skill check: rolled 14, +5 modifiers, 19 versus difficulty 17, success — resolved in code">
           <div className="roll-head">
-            <span className="roll-tag">Live skill check</span>
+            <span className="roll-tag">Skill check</span>
             <span className="roll-quest">Persuade the harbor master</span>
           </div>
           <div className="roll-body">
             <div className="d20">
               <svg viewBox="0 0 100 100" aria-hidden="true">
-                <polygon points="50,5 90,28 90,72 50,95 10,72 10,28" fill="#171320" stroke="#3a3350" strokeWidth="1.5" />
-                <polygon points="50,5 90,28 50,50 10,28" fill="#1f1a2c" stroke="#3a3350" strokeWidth="1" />
-                <polygon points="90,28 90,72 50,50" fill="#181322" stroke="#3a3350" strokeWidth="1" />
-                <polygon points="10,28 10,72 50,50" fill="#1c1728" stroke="#3a3350" strokeWidth="1" />
-                <polygon points="50,50 90,72 50,95 10,72" fill="#141019" stroke="#3a3350" strokeWidth="1" />
-                <polygon points="50,5 90,28 90,72 50,95 10,72 10,28" fill="none" stroke="#d4af37" strokeWidth="1.4" opacity="0.55" />
+                <polygon points="7,26 50,3 50,25 28,63" fill="#1c1728" stroke="#3a3350" strokeWidth="1" />
+                <polygon points="50,3 93,26 72,63 50,25" fill="#181322" stroke="#3a3350" strokeWidth="1" />
+                <polygon points="7,26 28,63 7,74" fill="#1f1a2c" stroke="#3a3350" strokeWidth="1" />
+                <polygon points="93,26 93,74 72,63" fill="#1f1a2c" stroke="#3a3350" strokeWidth="1" />
+                <polygon points="28,63 72,63 93,74 50,97 7,74" fill="#141019" stroke="#3a3350" strokeWidth="1" />
+                <polygon points="50,25 72,63 28,63" fill="#241d33" stroke="#3a3350" strokeWidth="1" />
+                <polygon points="50,3 93,26 93,74 50,97 7,74 7,26" fill="none" stroke="#d4af37" strokeWidth="1.4" opacity="0.55" />
               </svg>
-              <span className="val">20</span>
+              <span className="val">14</span>
             </div>
             <div className="roll-math">
               <div className="math-row">
-                <span>d20 <b>14</b></span>
                 <span className="op">+</span>
                 <span>modifiers <b>+5</b></span>
               </div>
               <div className="math-total">
+                <span className="op">=</span>
                 <span className="total-num">19</span>
                 <span className="vs">vs DC 17</span>
                 <span className="pill-success">Success</span>
