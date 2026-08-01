@@ -36,6 +36,9 @@ import GuestBanner from "./components/GuestBanner";
 import ScrollToTop from "./components/ScrollToTop";
 
 const DebugRoutes = lazy(() => import('./pages/DebugRoutes'));
+// Redesign marketing depth pages (#82 §12.4), reached from the "The Game" nav dropdown.
+const EnginePage = lazy(() => import('./pages/EnginePage'));
+const OverviewPage = lazy(() => import('./pages/OverviewPage'));
 // Premium tier page: mounted at /premium but deliberately NOT linked from any
 // nav yet (billing is not live); it becomes discoverable when #6 ships.
 const PremiumPage = lazy(() => import('./pages/PremiumPage'));
@@ -123,6 +126,8 @@ const AppContent = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/getting-started" element={<GettingStarted />} />
+              <Route path="/overview" element={<OverviewPage />} />
+              <Route path="/engine" element={<EnginePage />} />
               <Route path="/premium" element={<PremiumPage />} />
               <Route path="/membership" element={<PremiumPage />} />
               <Route path="/features" element={<HowToPlay />} />

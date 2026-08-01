@@ -14,6 +14,7 @@ import HomeWorldMap from "../components/HomeWorldMap";
 import "../styles/redesign.css";
 
 const HERO_IMG = "/assets/redesign/hero.jpg";
+const GITHUB_URL = "https://github.com/EdwardAThomson/DungeonGPT-JS";
 
 const Tick = () => (
   <svg className="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -95,7 +96,7 @@ const GuestHome = () => (
             <div className="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l7 4v6c0 4-3 7-7 10-4-3-7-6-7-10V6z" /><path d="M9 12l2 2 4-4" /></svg></div>
             <h3>Open source</h3>
             <p>The engine is Apache-2.0. The rules code is public. DungeonGPT is the only shipped AI GM where you can read exactly how checks and combat are resolved.</p>
-            <div className="foot">Apache-2.0 · auditable repo</div>
+            <div className="foot"><a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">Apache-2.0 · view the repo on GitHub</a></div>
           </article>
           <article className="feat">
             <div className="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H7l-3 3z" /><path d="M8 10h8M8 13h5" /></svg></div>
@@ -152,10 +153,10 @@ const GuestHome = () => (
           <p>Roll a hero, equip them, and watch the stats matter: every modifier on the sheet feeds the same engine that resolves your rolls.</p>
         </div>
         <div className="heroes-row">
-          <article className="hero-card"><div className="portrait" style={{ backgroundImage: "url('/assets/characters/fighter.webp')" }} /><div className="label"><div className="cls">Fighter</div><div className="sub">Strength · blade &amp; shield</div></div></article>
-          <article className="hero-card"><div className="portrait" style={{ backgroundImage: "url('/assets/characters/female_ranger.webp')" }} /><div className="label"><div className="cls">Ranger</div><div className="sub">Dexterity · bow &amp; survival</div></div></article>
-          <article className="hero-card"><div className="portrait" style={{ backgroundImage: "url('/assets/characters/wizard.webp')" }} /><div className="label"><div className="cls">Wizard</div><div className="sub">Intelligence · the arcane</div></div></article>
-          <article className="hero-card"><div className="portrait" style={{ backgroundImage: "url('/assets/characters/female_paladin.webp')" }} /><div className="label"><div className="cls">Paladin</div><div className="sub">Charisma · oath &amp; shield</div></div></article>
+          <article className="hero-card"><div className="portrait" style={{ backgroundImage: "url('/assets/characters/fighter.webp')" }} /><div className="label"><div className="cls">Fighter</div></div></article>
+          <article className="hero-card"><div className="portrait" style={{ backgroundImage: "url('/assets/characters/female_ranger.webp')" }} /><div className="label"><div className="cls">Ranger</div></div></article>
+          <article className="hero-card"><div className="portrait" style={{ backgroundImage: "url('/assets/characters/wizard.webp')" }} /><div className="label"><div className="cls">Wizard</div></div></article>
+          <article className="hero-card"><div className="portrait" style={{ backgroundImage: "url('/assets/characters/female_paladin.webp')" }} /><div className="label"><div className="cls">Paladin</div></div></article>
         </div>
         <p className="price-note">Class portraits from the in-game roster. Every hero is human; choose from twelve classes.</p>
       </div>
@@ -217,7 +218,7 @@ const Dashboard = ({ user }) => {
 const HomePage = () => {
   const { user } = useAuth();
   return (
-    <div className="rd-home">
+    <div className="rd-page">
       {user ? <Dashboard user={user} /> : <GuestHome />}
     </div>
   );
