@@ -249,4 +249,4 @@ This project uses d20-based game mechanics (rolling a 20-sided die for skill che
 
 This project uses various open-source libraries (React, Express, SQLite3, etc.) under their respective licenses. See [CREDITS.md](./CREDITS.md) for a complete list.
 
-For contribution guidelines, see [CONTRIBUTING.md](./CONTRIBUTING.md) if available.
+For contribution guidelines, see [CONTRIBUTING.md](./CONTRIBUTING.md).
