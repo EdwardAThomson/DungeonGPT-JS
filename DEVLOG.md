@@ -1,5 +1,9 @@
 # Dev Log
 
+## 2026-08-07
+
+A small doc-cleanup pass: README dropped its "if available" hedge on the CONTRIBUTING.md link now that the file genuinely exists, and `docs/OUTSTANDING_ISSUES.md` row #6 stopped naming Lemon Squeezy as a candidate payment processor since billing ended up shipping through the Octonion hub instead, not that integration.
+
 ## 2026-08-01
 
 A full day of polish on the #82 redesign's hero and landing content, followed by two new pages that finally gave the nav's "The Game" dropdown somewhere real to go. The hero went through several corrective passes: a verification sweep against `docs/private/landing-mockup` caught places the initial port had guessed CSS values instead of copying them (`.feat` border-radius/padding/hover lift, `.portrait` positioning, `.price-note` sizing), plus two layout regressions (content had drifted centered instead of left-hugging, and the action buttons had gone side-by-side instead of the designed stacked column). Copy then got progressively lighter — the hero was restating the same wedge three times across eyebrow/headline/lede, so it collapsed down to a single punchy headline plus a trimmed reassurance line, leaving the specifics to the trust band and roll card already below it. Each copy cut had a knock-on layout fix: a global link-color reset briefly made primary buttons unreadable (white-on-gold), the shrinking hero text lost the height that used to hold the banner open (fixed by anchoring min-height to viewport instead of content), and the roll card's die was redrawn to look like an actual d20 and to show the roll it was claiming to show, instead of contradicting the math beside it.
