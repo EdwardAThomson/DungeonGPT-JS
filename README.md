@@ -2,13 +2,14 @@
 
 **🎮 Live App:** https://dungeongpt.xyz/
 
-This is a web application built with React that allows users to create detailed characters for role-playing games, manage them, and use them in an interactive game session powered by an AI dungeon master. The live app runs on Cloudflare Workers AI with a curated set of open-weights models (including GPT-OSS, Llama, and Gemma); members additionally get a premium model pool served via OpenRouter.
+This is a web application built with React that allows users to create detailed characters for role-playing games, manage them, and use them in an interactive game session powered by an AI dungeon master.
 
 This project is based upon the [Python version of the same name](https://github.com/EdwardAThomson/DungeonGPT).
 
 YouTube Videos 🎥:
 
 * [How To Play / Overview](https://youtu.be/CGskdUTQnMo)
+* [DungeonGPT goes live!](https://youtu.be/0Dvaz9yULuA)
 * [AI-powered quests: How can we solve non-determinism with LLM outputs?](https://youtu.be/Rzv3Rh3aOkM)
 
 
