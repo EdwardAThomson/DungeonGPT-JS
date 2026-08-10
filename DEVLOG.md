@@ -1,5 +1,9 @@
 # Dev Log
 
+## 2026-08-10
+
+A small README touch-up: the intro paragraph dropped its sentence detailing the AI model pools (Workers AI open-weights lineup plus the OpenRouter premium pool), leaving a simpler one-line description of the app, and the YouTube list gained a new "DungeonGPT goes live!" launch video alongside the existing overview and non-determinism videos.
+
 ## 2026-08-07
 
 A small doc-cleanup pass: README dropped its "if available" hedge on the CONTRIBUTING.md link now that the file genuinely exists, and `docs/OUTSTANDING_ISSUES.md` row #6 stopped naming Lemon Squeezy as a candidate payment processor since billing ended up shipping through the Octonion hub instead, not that integration.
