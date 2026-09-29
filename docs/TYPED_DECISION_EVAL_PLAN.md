@@ -367,8 +367,14 @@ measures its latency cost. Moving the roll server-side is out of scope.
 - [ ] Optional `turnMeta` on `generateAiRequestSchema` + client send
 - [ ] `turn_log` migration + flagged worker write + 90-day retention job + privacy note line
 - [ ] `scripts/export-turns.mjs`
-- [ ] `scripts/label-turns.mjs`, piloted on `harness-transcripts/`; then
-      `harness-transcripts/turns/labelled.jsonl` (≥200 real turns, 10% double-labelled,
+- [x] Pilot tooling (2026-09-29), under `scripts/adjudication/`: `turns-from-harness.mjs`
+      (88 unique harness turns, old talk cue rewritten to current wording),
+      `label-turns.mjs` (resumable labeller, `--pass2` double-label sample, `--stats`
+      agreement), and 60 hand-written awkward turns in
+      `harness-transcripts/turns/pilot-adversarial.jsonl` reusing harness scenes via
+      `context_ref`
+- [ ] Label the pilot set (~148 turns + ~19 second-pass)
+- [ ] `harness-transcripts/turns/labelled.jsonl` from real turns (≥200, 10% double-labelled,
       never committed)
 - [ ] `scripts/adjudication-eval.mjs` with gen-json, logit and reference backends
 - [ ] `results/adjudication/summary.json` + a short `RESULTS.md` with the metrics in §4.3
