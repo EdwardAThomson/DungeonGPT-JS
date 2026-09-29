@@ -14,7 +14,7 @@
  *
  * Flags:
  *   --worker-url=http://localhost:8787    (default from .env.local)
- *   --models=gpt-oss-20b,gemma-3-12b     (filter models by name/id substring)
+ *   --models=gpt-oss-20b,llama-4-scout     (filter models by name/id substring)
  *   --all-models                           (include optional premium models)
  *   --resume=tests-ai/multiturn-run-...   (resume a previous run)
  *   --no-halt                              (don't stop on model failure)
@@ -52,7 +52,6 @@ const DEFAULT_WORKER_URL = getCfWorkerUrl();
 
 const DEFAULT_MODELS = [
   { id: '@cf/openai/gpt-oss-20b', name: 'GPT-OSS 20B', tier: 'quality' },
-  { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B', tier: 'quality' },
   { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast', tier: 'balanced' },
 ];
 

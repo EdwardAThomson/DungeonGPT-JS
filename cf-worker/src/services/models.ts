@@ -29,12 +29,6 @@ export const MODEL_REGISTRY: readonly ModelDefinition[] = [
     tier: "quality",
     maxTokens: 4096,
   },
-  {
-    id: "@cf/google/gemma-3-12b-it",
-    displayName: "Gemma 3 12B",
-    tier: "quality",
-    maxTokens: 4096,
-  },
 
   // Balanced Tier - 8B
   {

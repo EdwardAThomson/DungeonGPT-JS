@@ -18,7 +18,6 @@ const CFWorkerDebug = () => {
 
   const availableModels = [
     { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast' },
-    { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B' },
     { id: '@cf/meta/llama-3.3-70b-instruct-fp8-fast', name: 'Llama 3.3 70B' }
   ];
 

@@ -33,7 +33,6 @@ export const AVAILABLE_MODELS = {
         // Quality Tier (12B-20B) - Best for production
         { id: '@cf/openai/gpt-oss-20b', name: 'GPT-OSS 20B (Quality) ⭐' },
         { id: '@cf/meta/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B (Quality)' },
-        { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B (Quality)' },
         // Balanced Tier (8B)
         { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast (Balanced)' }
     ]
