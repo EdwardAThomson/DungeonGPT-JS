@@ -495,6 +495,7 @@ async function loadAppData() {
         `export { storyTemplates } from './storyTemplates.js';\n` +
         `export { DM_PROTOCOL } from './prompts.js';\n` +
         `export { composeIntro, formatStartObjective } from '../game/introComposer.js';\n` +
+        `export { getMilestoneStatus, formatMilestonePromptText } from '../game/turnContext.js';\n` +
         `export {\n` +
         `  areRequirementsMet,\n` +
         `  getMilestoneState,\n` +
@@ -749,59 +750,14 @@ function composeRequests(template, DM_PROTOCOL, steps) {
 // ===========================================================================
 // RECORDED PLAYTHROUGH composition — REPLICATED from useGameInteraction.js
 // (handleSubmit: gameContext + [CONTEXT]/[SUMMARY]/[PLAYER ACTION]/[NARRATE] body,
-// getMilestoneStatus + formatMilestonePromptText grounding, generateResponse's
-// DM_PROTOCOL + style wrap). This is a COPY of the hook and CAN DRIFT; a future
-// refactor should extract one shared pure builder the hook and this harness share.
+// generateResponse's DM_PROTOCOL + style wrap). The body/wrap assembly is still a COPY
+// of the hook and CAN DRIFT; the milestone grounding (getMilestoneStatus +
+// formatMilestonePromptText) now comes from the shared src/game/turnContext.js.
 // ===========================================================================
 
-// Replica of getMilestoneStatus (useGameInteraction.js): current/completed/active/
-// locked derived from the milestones' own `completed` flags + requires graph.
-function getMilestoneStatusReplica(milestones) {
-  const list = Array.isArray(milestones) ? milestones : [];
-  const reqMet = (m) => {
-    const reqs = Array.isArray(m.requires) ? m.requires : [];
-    return reqs.every((id) => list.find((x) => x.id === id)?.completed);
-  };
-  const completed = list.filter((m) => m.completed);
-  const remaining = list.filter((m) => !m.completed);
-  const active = remaining.filter((m) => reqMet(m));
-  const locked = remaining.filter((m) => !reqMet(m));
-  return { current: active[0] || null, completed, remaining, active, locked, all: list };
-}
-
-// Replica of formatMilestonePromptText (useGameInteraction.js). Kept character-for-
-// character (including the em dash the app uses) so the harness prompt matches the
-// real in-game prompt; do not "clean up" the punctuation or it drifts.
-function formatMilestonePromptTextReplica(milestoneStatus) {
-  const { completed, active, locked } = milestoneStatus;
-  if (completed.length === 0 && active.length === 0 && locked.length === 0) return '';
-  let text = '';
-  if (active.length > 0) {
-    text += '\nActive Milestones: ' + active.map((m, i) => {
-      const typeTag = m.type ? ` [${m.type}]` : '';
-      const levelTag = m.minLevel ? ` (Lv.${m.minLevel}+)` : '';
-      let line = `${m.text}${typeTag}${levelTag}`;
-      if (m.spawn?.type === 'npc' && m.spawn.name) {
-        const who = m.spawn.role ? `${m.spawn.name} (${m.spawn.role})` : m.spawn.name;
-        const where = m.building?.name || m.spawn.location;
-        line += ` — speak with ${who}${where ? ` at ${where}` : ''}`;
-        if (m.spawn.personality) line += `; ${m.spawn.personality}`;
-      }
-      if (i === 0 && m.type === 'talk') {
-        const who = m.spawn?.name || 'this person';
-        line += ` (you may mark this complete once the party finishes speaking with ${who})`;
-      }
-      return line;
-    }).join('; ');
-  }
-  if (completed.length > 0) {
-    text += '\nCompleted: ' + completed.map((m) => m.text).join('; ');
-  }
-  if (locked.length > 0) {
-    text += '\nLocked (prerequisites not met): ' + locked.map((m) => m.text).join('; ');
-  }
-  return text;
-}
+// getMilestoneStatus + formatMilestonePromptText are the REAL shared builders from
+// src/game/turnContext.js (passed in via appExports), not replicas, so the playthrough
+// milestone grounding cannot drift from the in-game prompt.
 
 // Topological completion order: repeatedly take the first milestone (in authored
 // order) whose `requires` are all already completed. Mirrors the order the engine
@@ -899,7 +855,7 @@ function buildMinimalLocationContext(m) {
 // Build the full recorded playthrough: opening (reuse composeRequests steps=1) then
 // one in-game turn per milestone in completion order. Each returned request carries
 // { label, prompt, playerInput?, milestone? } — playerInput/milestone only for turns.
-function composePlaythroughRequests(template, DM_PROTOCOL, { composeIntro, formatStartObjective }) {
+function composePlaythroughRequests(template, DM_PROTOCOL, { composeIntro, formatStartObjective, getMilestoneStatus, formatMilestonePromptText }) {
   const settings = template.settings || {};
   const requests = [];
 
@@ -957,8 +913,8 @@ function composePlaythroughRequests(template, DM_PROTOCOL, { composeIntro, forma
   const goalInfo = settings.campaignGoal ? `\nGoal: ${settings.campaignGoal}` : '';
 
   for (const m of order) {
-    const status = getMilestoneStatusReplica(working);
-    const milestonesInfo = formatMilestonePromptTextReplica(status);
+    const status = getMilestoneStatus(working);
+    const milestonesInfo = formatMilestonePromptText(status);
     const locationInfo = buildMinimalLocationContext(m);
     const gameContext = `Setting: ${settings.shortDescription || 'Fantasy Realm'}. Mood: ${settings.grimnessLevel || 'Normal'}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
     const isTalk = m.type === 'talk';
@@ -2352,14 +2308,15 @@ async function main() {
 
   // Load app data + compose the prompts. composeIntro/formatStartObjective are the REAL
   // shared authored-opening builders (used by the playthrough opening).
-  let storyTemplates, DM_PROTOCOL, composeIntro, formatStartObjectiveReal;
+  let storyTemplates, DM_PROTOCOL, composeIntro, formatStartObjectiveReal, getMilestoneStatus, formatMilestonePromptText;
   try {
-    ({ storyTemplates, DM_PROTOCOL, composeIntro, formatStartObjective: formatStartObjectiveReal } = await loadAppData());
+    ({ storyTemplates, DM_PROTOCOL, composeIntro, formatStartObjective: formatStartObjectiveReal,
+      getMilestoneStatus, formatMilestonePromptText } = await loadAppData());
   } catch (err) {
     console.error(redact(`Failed to load app data (storyTemplates / DM_PROTOCOL): ${err.message}`));
     process.exit(5);
   }
-  const appExports = { composeIntro, formatStartObjective: formatStartObjectiveReal };
+  const appExports = { composeIntro, formatStartObjective: formatStartObjectiveReal, getMilestoneStatus, formatMilestonePromptText };
 
   // Recorded playthrough SWEEP: every playable built-in campaign (+ premium templates
   // when --premium-dir is given). One transcript per campaign + one aggregate summary.
