@@ -11,7 +11,7 @@
  *
  * Flags:
  *   --worker-url=http://localhost:8787    (default from .env.local)
- *   --models=llama-3.1-8b,gemma-3-12b     (filter models by name/id substring)
+ *   --models=llama-3.1-8b,gpt-oss-20b     (filter models by name/id substring)
  *   --scenarios=opening,interaction         (filter scenarios)
  *   --resume=tests-ai/run-2026-03-01-...   (resume a previous run, skip completed)
  *   --no-halt                               (don't stop on model failure)
@@ -59,7 +59,6 @@ const TEST_MODELS = [
   // Quality Tier
   { id: '@cf/openai/gpt-oss-20b', name: 'GPT-OSS 20B', tier: 'quality' },
   { id: '@cf/meta/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B', tier: 'quality' },
-  { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B', tier: 'quality' },
   // Balanced Tier
   { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast', tier: 'balanced' },
 ];

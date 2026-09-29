@@ -10,7 +10,7 @@
  *   CF_ACCOUNT_ID=xxx CF_API_TOKEN=xxx node scripts/test-cf-models.mjs
  *
  * Optional flags:
- *   --models=llama-3.1-8b-instruct-fast,gemma-3-12b-it   (test subset)
+ *   --models=llama-3.1-8b-instruct-fast,gpt-oss-20b   (test subset)
  *   --scenarios=opening,interaction                        (test subset)
  *   --output=test-results/my-report.md                     (custom output)
  *   --delay=2000                                           (ms between calls)
@@ -45,7 +45,6 @@ const ALL_MODELS = [
 
   // Tier 2 — Medium
   { id: '@cf/meta/llama-4-scout-17b-16e-instruct', name: 'Llama 4 Scout', tier: 'medium', params: '17B MoE' },
-  { id: '@cf/google/gemma-3-12b-it', name: 'Gemma 3 12B', tier: 'medium', params: '12B' },
 
   // Tier 3 — Small / Fast
   { id: '@cf/meta/llama-3.1-8b-instruct-fast', name: 'Llama 3.1 8B Fast', tier: 'small', params: '8B' },
