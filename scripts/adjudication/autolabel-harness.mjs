@@ -40,9 +40,10 @@ function labelFor(turn) {
   if (kind === 'talk') {
     const who = text.match(/speak with (.+?)\.$/)?.[1] || text.match(/^We hear (.+?) out /)?.[1];
     const target = who && turn.targets.find((t) => t === who);
+    // Scripted "speak with X" / "hear X out and accept" is plain conversation: no roll.
     return target
-      ? { ...blank, q1: 'talk_to_npc', q3: target, q7: false }
-      : { ...blank, q1: 'talk_to_npc', q3: 'other (not listed)', ...(who ? { q3_other: who } : {}), q7: false };
+      ? { ...blank, q1: 'talk_to_npc', q3: target, q4: false, q7: false }
+      : { ...blank, q1: 'talk_to_npc', q3: 'other (not listed)', ...(who ? { q3_other: who } : {}), q4: false, q7: false };
   }
   return null;
 }

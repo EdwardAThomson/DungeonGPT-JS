@@ -32,6 +32,8 @@
 //   Q1 talk_to_npc = speech aimed at a specific named NPC, present or not (Q7 then says
 //      whether they are actually here); "I ask around" is action/persuade.
 //   Q4 = would a human DM call for a roll? trivial/obvious = no; contested/uncertain = yes.
+//      Asked for talk_to_npc too: plain conversation = no, but persuading, deceiving,
+//      intimidating or reading a named NPC can be a roll.
 //      Unsure -> yes with tier trivial.
 //   Precedence: addressed to a named NPC -> talk_to_npc, even if it is also an acceptance or
 //      includes a move ("go to X and speak with Y"); continue = bare acknowledgement only.
@@ -144,7 +146,7 @@ function applies(q, a) {
   if (q.key === 'q3') return a.q1 === 'action' || a.q1 === 'talk_to_npc';
   if (q.onlyIf === 'action') return a.q1 === 'action';
   if (q.onlyIf === 'action_or_talk') return a.q1 === 'action' || a.q1 === 'talk_to_npc';
-  if (q.onlyIf === 'check') return a.q1 === 'action' && a.q4 === true;
+  if (q.onlyIf === 'check') return (a.q1 === 'action' || a.q1 === 'talk_to_npc') && a.q4 === true;
   return false;
 }
 
@@ -212,7 +214,8 @@ async function labelTurn(turn, sug) {
   }
   const note = await ask(DIM('note (enter to skip): '));
   const overrides = sug
-    ? [...QUESTIONS.map((q) => q.key), 'q3_other'].filter((k) => (sug[k] ?? null) !== (a[k] ?? null))
+    // Only questions that carried a suggestion can be overridden.
+    ? [...QUESTIONS.map((q) => q.key), 'q3_other'].filter((k) => k in sug && (sug[k] ?? null) !== (a[k] ?? null))
     : undefined;
   return { labels: a, note: note || undefined, overrides };
 }

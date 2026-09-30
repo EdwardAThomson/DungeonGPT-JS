@@ -46,7 +46,12 @@ const fileName = opt('--file', 'pilot-adversarial.jsonl');
 // account's Workers AI allowance; OR has no cloudflare endpoint for gpt-oss-120b.
 const backend = opt('--backend', 'workers-ai');
 const keyFile = opt('--key-file', null);
-const MODEL = backend === 'openrouter'
+// --narrator deepseek = the member (premium) pool default: same prompt, same pinned hosts as
+// cf-worker/src/services/openrouter.ts (PREMIUM_MODEL_REGISTRY, allow_fallbacks false).
+const narrator = opt('--narrator', 'gpt-oss-120b');
+const MODEL = narrator === 'deepseek'
+  ? { key: 'or-deepseek-v3.2', backend: 'openrouter', id: 'deepseek/deepseek-v3.2', provider: ['deepinfra', 'digitalocean', 'venice'], in: 0.28, out: 0.42 }
+  : backend === 'openrouter'
   // Several US hosts: a single pinned host 429s under load (CoreWeave did on 2026-09-30).
   // servedBy on each row records which one answered.
   ? { key: 'or-gpt-oss-120b', backend, id: 'openai/gpt-oss-120b', provider: ['coreweave', 'deepinfra', 'together', 'parasail', 'cerebras'], in: 0.037, out: 0.17 }
@@ -171,13 +176,14 @@ async function main() {
 
 function report(rows, compare, labels, turns) {
   const ids = new Set(turns.map((t) => t.id));
+  // Scored turns: the label answered Q4 (actions, and talk_to_npc since the v3 scheme).
   const actionRows = rows.filter((r) => r.label && r.label.q4 != null);
-  // Checks proposed where the label says it is not even an action (ooc, questions, dialogue).
-  const nonAction = rows.filter((r) => r.label && r.label.q1 !== 'action');
-  const falseChecks = nonAction.filter((r) => r.answer?.q4).length;
-  console.log(`\nSkill-check decisions on ${new Set(actionRows.map((r) => r.id)).size} action turns (label has a Q4):`);
+  // Checks proposed where no roll can apply (ooc, questions, clarification, continue, unclear).
+  const noCheckTurns = rows.filter((r) => r.label && r.label.q4 == null);
+  const falseChecks = noCheckTurns.filter((r) => r.answer?.q4).length;
+  console.log(`\nSkill-check decisions on ${new Set(actionRows.map((r) => r.id)).size} turns whose label answers Q4:`);
   console.log(`  narrator (${MODEL.key}, production prompt): ${JSON.stringify(tally(actionRows))}`);
-  console.log(`  narrator proposed a check on ${falseChecks}/${nonAction.length} non-action turns`);
+  console.log(`  narrator proposed a check on ${falseChecks}/${noCheckTurns.length} turns where no roll applies`);
   if (compare) {
     const dir = path.join(repoRoot, 'harness-transcripts', 'eval', compare, 'orig');
     if (!fs.existsSync(dir)) { console.log(`  (no eval run at ${path.relative(repoRoot, dir)})`); return; }
@@ -186,8 +192,8 @@ function report(rows, compare, labels, turns) {
       for (const r of readJsonl(path.join(dir, f))) if (!r.error && ids.has(r.id)) latest.set(r.id, r);
       const rs = [...latest.values()].map((r) => ({ ...r, correct: scoreCheck(r.answer || {}, labels.get(r.id).labels) }))
         .filter((r) => r.label && r.label.q4 != null);
-      const fc = [...latest.values()].filter((r) => labels.get(r.id).labels.q1 !== 'action' && r.answer?.q4).length;
-      console.log(`  adjudicator ${f.replace('.jsonl', '').padEnd(18)} ${JSON.stringify(tally(rs))}  | checks on non-action: ${fc}`);
+      const fc = [...latest.values()].filter((r) => labels.get(r.id).labels.q4 == null && r.answer?.q4).length;
+      console.log(`  adjudicator ${f.replace('.jsonl', '').padEnd(18)} ${JSON.stringify(tally(rs))}  | checks where no roll applies: ${fc}`);
     }
   }
 }

@@ -189,6 +189,9 @@ should inherit this constraint.
 
 ## Related docs
 
+- [AI_DM_DESIGN_DIRECTION.md](AI_DM_DESIGN_DIRECTION.md): extends this contract from
+  milestones to the whole turn (code holds state, decides and picks context; the model reads
+  free text and narrates), with buttons and free text resolving through one rulebook.
 - [CAMPAIGN_MILESTONE_SYSTEM.md](CAMPAIGN_MILESTONE_SYSTEM.md): the milestone engine.
   Its "Narrative Milestones (Guided Flexibility)" section (marker system retained as the
   lower-priority path) is superseded by this decision.

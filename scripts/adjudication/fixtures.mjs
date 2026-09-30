@@ -55,7 +55,9 @@ export const QUESTIONS = [
       other: 'flavour with no effect on the world: emote, rest, wait, make camp',
     } },
   { key: 'q3', text: 'Target', type: 'target' },
-  { key: 'q4', text: 'Does this need a skill check?', type: 'yesno', onlyIf: 'action' },
+  // Asked for talk_to_npc too (2026-09-30): persuading, deceiving or reading a named NPC in
+  // dialogue can need a roll. Q5/Q6 follow whenever Q4 = yes.
+  { key: 'q4', text: 'Does this need a skill check?', type: 'yesno', onlyIf: 'action_or_talk' },
   { key: 'q5', text: 'Which skill', type: 'skill', onlyIf: 'check' },
   { key: 'q6', text: 'Difficulty', type: 'choice', onlyIf: 'check', options: CHECK_TIERS },
   // Asked for actions AND talk_to_npc: Q1 is what the player is trying to do, Q7 whether

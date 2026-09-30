@@ -43,12 +43,21 @@ inference. GPT-6 Luna ran as a plain chat model, not through OpenAI's Decisions 
 
 ## Skill checks vs today's narrator (same 24 action turns, 11 with a labelled roll)
 
-| | Q4 roll needed | Q5 skill | Q6 within one tier | Rolls proposed on non-action turns |
-|---|---|---|---|---|
-| Today's narrator (gpt-oss-120b) | **83%** | 73% | 91% | 6 of 36 |
-| gpt-6-luna | 79% | 73% | 88% | **0** |
-| gpt-oss-20b | 79% | 45% | 88% | 0 |
-| gemma-4-26b | 67% | 73% | 100% | 2 |
+| | Q4 roll needed | Q5 skill | Q6 exact | Q6 within one tier | Rolls proposed on non-action turns | Typical latency |
+|---|---|---|---|---|---|---|
+| Free-pool narrator (gpt-oss-120b) | **83%** | 73% | 64% | 91% | 6 of 36 (5 in `talk_to_npc`) | ~10 s |
+| Member-pool narrator (DeepSeek V3.2) | 71% | 36% | 18% | 100% (n=7) | 9 of 36 (7 in `talk_to_npc`, 1 ooc) | ~12 s |
+| gpt-6-luna | 79% | 73% | 27% | 88% | 0 | 3.1 s |
+| gpt-oss-20b | 79% | 45% | 36% | 88% | 0 | 1.4 s |
+| gemma-4-26b | 67% | 73% | **82%** | 100% | 2 | 1.8 s |
+
+The "non-action" column needs care: in the v2 question scheme Q4 was only asked for
+`action`, so the adjudicators could not propose a roll during a conversation at all. Most of
+the narrators' "non-action" rolls are Persuasion or Insight checks on `talk_to_npc` turns
+(e.g. convincing Warden Sigrun to trust the party), several of them reasonable. Only one was
+on an out-of-character message (DeepSeek, a Perception check on "this is really fun lol").
+The scheme now asks Q4-Q6 for `talk_to_npc` too (prompt v3); the 12 hand-written
+`talk_to_npc` turns need their roll labels before this table can be rescored.
 
 ## Pilot-1 (Workers AI, prompt v1), for reference
 
@@ -63,10 +72,12 @@ for every model. Prompt v2 raised gemma's `unclear` recall from 40% to 80% and i
    Q1, handles the awkward categories (`unclear`, `talk_to_npc`, out-of-character), and is
    insensitive to option order. gemma-4-26b is a faster second at 90%. Today's game does no
    classification at all, so this is new capability rather than an improvement on something.
-2. **Skill checks: no accuracy gain over the narrator.** The narrator is slightly better at
-   deciding when to roll (83% vs 79%). What the adjudicator adds is discipline: the
-   narrator proposed rolls on 6 of 36 non-action turns (e.g. an out-of-character question),
-   Luna on none.
+2. **Skill checks: no accuracy gain over the free-pool narrator.** It is slightly better at
+   deciding when to roll (83% vs Luna's 79%). An earlier draft of this page credited the
+   adjudicator with never rolling at the wrong moment; that was mostly an artefact of the
+   question scheme (see the note under the skill-check table), not a demonstrated
+   advantage. The member-pool narrator (DeepSeek V3.2, chosen for prose) is clearly worse at
+   skill checks than the free one: 36% on the skill, 18% on exact difficulty.
 3. **Q4 scores are depressed by a labelling policy, not only by models.** Most "extra" roll
    calls are on auto-labelled harness item searches, labelled "no roll" because the engine
    grants quest items; the models call them Investigation checks. Open decision: keep "no
@@ -93,13 +104,14 @@ production shares; later runs moved to OpenRouter for that reason.
 - Harness labels are unverified auto-labels; no second-pass (`--pass2`) agreement yet.
 - Many hand-written labels began as Claude suggestions (anchoring risk).
 - Skill-check comparisons rest on 24 turns (11 with a roll).
-- The narrator baseline is the free-pool model only; the member pool (DeepSeek V3.2 via
-  OpenRouter) is untested.
+- Narrator baselines are one sample each at temperature 0.7 (free pool via OpenRouter on
+  CoreWeave; member pool on its production-pinned hosts, served by DeepInfra).
 - Scenes come from July harness transcripts (no NPC roster, no inventory in the state).
 
 ## Next
 
 - Decide the quest-item roll policy; spot-check the harness labels; run `--pass2`.
-- Baseline the member-pool narrator (DeepSeek V3.2) on the same turns.
+- Label Q4-Q6 for the 12 hand-written `talk_to_npc` turns, then rescore the skill-check
+  table under prompt v3.
 - Design question before more testing: which decisions should be code, which a typed LLM
   question, and which left to the narrator (see plan §6.1).
