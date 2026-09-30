@@ -124,14 +124,13 @@ interface Env {
 
 ## Production Models (July 2026)
 
-Five models across three tiers. Trimmed from 15 after benchmark runs (commit `2a9ac5f`) and pared down further since.
+Four models across three tiers. Trimmed from 15 after benchmark runs (commit `2a9ac5f`) and pared down further since (`gemma-3-12b-it` dropped 2026-09-29 after Workers AI began refusing access).
 
 | Tier     | Model ID                                      | Display Name        | maxTokens | Notes |
 |----------|------------------------------------------------|---------------------|-----------|-------|
 | ultra    | `@cf/openai/gpt-oss-120b`                      | GPT-OSS 120B        | 4096      | **DEFAULT_MODEL_ID** — best narrative quality (3.7s). |
 | quality  | `@cf/openai/gpt-oss-20b`                       | GPT-OSS 20B         | 4096      | Recommended pick (⭐) in the frontend model picker. |
 | quality  | `@cf/meta/llama-4-scout-17b-16e-instruct`      | Llama 4 Scout 17B   | 4096      | 17B MoE, multimodal-capable. |
-| quality  | `@cf/google/gemma-3-12b-it`                    | Gemma 3 12B         | 4096      | Lightweight quality-tier option. |
 | balanced | `@cf/meta/llama-3.1-8b-instruct-fast`          | Llama 3.1 8B Fast   | 2048      | Low-latency baseline (2.6s). |
 
 ### Fallback chain
@@ -160,7 +159,7 @@ Some Workers AI models emit chain-of-thought into `choices[0].message.reasoning`
 
 **Operational signal:** the warning in worker logs means a caller's `maxTokens` is too low for that model. Bump `DEFAULT_MAX_TOKENS` or have the caller pass a larger value. The reasoning text is not real DM narration.
 
-None of the current five models are R1-style reasoners, but the handler is defensive for future additions.
+None of the current four models are R1-style reasoners, but the handler is defensive for future additions.
 
 ---
 
@@ -191,7 +190,7 @@ Test script: `scripts/test-cf-models-simple.mjs` — set its `TEST_MODELS` array
 
 ### Phase 1 — Automated protocol compliance
 
-Run `test-cf-models-simple.mjs` against all 5 models. Scenarios: opening, interaction, movement, milestone, combat, town, skill_check, invalid_action.
+Run `test-cf-models-simple.mjs` against all 4 models. Scenarios: opening, interaction, movement, milestone, combat, town, skill_check, invalid_action.
 
 | Gate | Production-ready | Minimum |
 |------|------------------|---------|

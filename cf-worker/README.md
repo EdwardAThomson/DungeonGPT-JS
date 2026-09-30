@@ -57,7 +57,6 @@ Source of truth: `cf-worker/src/services/models.ts` (`MODEL_REGISTRY`).
 | `@cf/openai/gpt-oss-120b` (default) | GPT-OSS 120B | ultra | 4096 |
 | `@cf/openai/gpt-oss-20b` | GPT-OSS 20B | quality | 4096 |
 | `@cf/meta/llama-4-scout-17b-16e-instruct` | Llama 4 Scout 17B | quality | 4096 |
-| `@cf/google/gemma-3-12b-it` | Gemma 3 12B | quality | 4096 |
 | `@cf/meta/llama-3.1-8b-instruct-fast` | Llama 3.1 8B Fast | balanced | 2048 |
 
 ## API Reference
