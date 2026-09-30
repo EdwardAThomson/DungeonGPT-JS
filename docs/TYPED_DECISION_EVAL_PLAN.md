@@ -1,6 +1,7 @@
 # Typed Decision Eval Plan (Jev / Jev-like adjudication)
 
-Status: draft, 2026-09-29 (revised same day against the local tree)
+Status: draft, 2026-09-29 (revised same day against the local tree). Pilot results:
+[TYPED_DECISION_EVAL_RESULTS.md](TYPED_DECISION_EVAL_RESULTS.md) (2026-09-30).
 Related: `AI_NARRATION_CONTRACT.md` (open questions 3 and 5, "Future: NPC direct-talk uses
 bounded judgment"), `SKILL_CHECK_PLAN.md`, `TIERED_NARRATION_PLAN.md`,
 `scripts/quest-harness.mjs`, `scripts/eval-premium-models.mjs` (local, gitignored)
@@ -68,6 +69,12 @@ location + NPC roster, party, active locks, resolved check) plus the player's me
 "go on": the narrator advances the scene with no roll. Such replies are unreadable without
 the DM's previous message, so every question is asked against the state *plus the last
 narration*; pilot fixtures carry it as `last_dm`, and `turnMeta` must carry it too.
+Precedence (2026-09-30): a message addressed to a named NPC is `talk_to_npc` even when it
+is also an acceptance ("we hear Ulric out and tell him we accept") or includes a move ("go
+to the hall and speak with Ulric"); `continue` is for bare acknowledgements only. This is
+not cosmetic: `talk_to_npc` routes to the talk path, which completes talk objectives, while
+`continue` only lets the narrator carry on.
+
 `unclear` (same date) labels turns whose right response is a clarifying question from the DM
 (a place addressed as a person, "him" with no referent). It gives the §7 "ask instead of
 guess" path labelled ground truth rather than relying on adjudicator confidence alone.

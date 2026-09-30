@@ -33,6 +33,9 @@
 //      whether they are actually here); "I ask around" is action/persuade.
 //   Q4 = would a human DM call for a roll? trivial/obvious = no; contested/uncertain = yes.
 //      Unsure -> yes with tier trivial.
+//   Precedence: addressed to a named NPC -> talk_to_npc, even if it is also an acceptance or
+//      includes a move ("go to X and speak with Y"); continue = bare acknowledgement only.
+//      It matters: talk_to_npc routes to the talk path, which completes talk objectives.
 //   Q1 unclear = no clear reading (place addressed as a person, "him" with no referent):
 //      the DM should ask. A clear request that cannot happen is action + Q7 instead.
 //   Q7 = physically impossible or contradicts the state (target not present, ability the
