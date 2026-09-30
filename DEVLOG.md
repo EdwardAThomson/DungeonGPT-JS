@@ -1,5 +1,13 @@
 # Dev Log
 
+## 2026-09-29
+
+The day set up groundwork for moving more adjudication out of the narrator and into the engine. A new plan, `docs/TYPED_DECISION_EVAL_PLAN.md`, proposes replacing the model's in-narration skill-check proposals and message routing with a cheap typed-question pass, staged as corpus labelling, an offline multi-backend eval, shadow mode, and a flagged switch-over; it also records findings from probing Workers AI (logprobs come back through the AI binding on several models, but only non-reasoning ones give usable confidence) plus a per-turn cost comparison. To make that eval possible, the turn-context prompt builders (milestone status/prompt text, side-quest text, location context) were extracted from `useGameInteraction.js` into a pure `src/game/turnContext.js` with no behaviour change, and a new `buildNpcRoster` exposes the town NPCs with their persisted ids for id-based target questions. The quest-harness now imports those real builders instead of a drifted replica that was still emitting the pre-#76 "you may mark this complete" talk cue. Pilot tooling then landed in `scripts/adjudication/`: a converter from harness transcripts into deduped eval fixtures, a resumable terminal labeller for the Q1-Q7 question set with a second-pass sample and agreement stats, and shared fixture helpers, with the fixture and label data kept in gitignored `harness-transcripts/turns/`.
+
+Separately, `gemma-3-12b-it` was dropped from the worker registry, UI model list, debug page and CF test scripts after live calls started returning a 5018 access error; players who had picked it were being silently served another model through the fallback chain.
+
+**Decisions & notes:** `llama-3.1-8b-instruct-fast` is also unlisted in the Workers AI catalog but still answers, so it stays for now because its listed `-fp8` sibling took 11-14 s versus about 1.8 s on a narration probe. Worth rechecking if it starts failing the same way gemma did.
+
 ## 2026-08-10
 
 A small README touch-up: the intro paragraph dropped its sentence detailing the AI model pools (Workers AI open-weights lineup plus the OpenRouter premium pool), leaving a simpler one-line description of the app, and the YouTube list gained a new "DungeonGPT goes live!" launch video alongside the existing overview and non-determinism videos.
