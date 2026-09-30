@@ -1,11 +1,15 @@
 // Shared helpers for the typed-decision eval fixtures (docs/TYPED_DECISION_EVAL_PLAN.md).
 //
 // A fixture file is JSONL, one turn per line:
-//   { id, source, context, summary?, player_text, targets, context_ref?, notes?, ... }
+//   { id, source, context, summary?, last_dm?, player_text, dm_response?, targets, context_ref?, ... }
+// `last_dm` is the DM message the player is replying to: without it replies like "ok" or
+// "continue" are unreadable. `dm_response` is the narration that answered this turn.
 // `context` is the rendered [CONTEXT] block the narrator saw (pilot fixtures come from
 // harness transcripts, which only have the rendered prompt; real turns from turn_log will
 // carry structured state instead). A turn may set `context_ref` to another fixture's id
-// to reuse its scene; resolveFixtures() fills `context`/`targets` in from it.
+// to reuse its scene; resolveFixtures() fills `context`/`targets` in from it, and
+// `last_dm` from the referenced turn's `dm_response` (the scene as the DM left it), with
+// `context_after` (objectives after that response) so state and narration agree.
 //
 // Labels live in a separate `<fixtures>.labels.jsonl` (see label-turns.mjs) so fixtures
 // can be regenerated without losing labelling work.
@@ -25,14 +29,39 @@ export const turnsDir = path.join(repoRoot, 'harness-transcripts', 'turns');
 export const CHECK_TIERS = ['trivial', 'easy', 'medium', 'hard', 'deadly'];
 export const QUESTIONS = [
   { key: 'q1', text: 'What kind of message is this?', type: 'choice',
-    options: ['action', 'npc_dialogue', 'world_question', 'ooc', 'clarification'] },
+    // `continue` = acceptance/acknowledgement ("ok", "go on"): the narrator advances the
+    // scene, no roll. `unclear` = the right response is for the DM to ask what the player
+    // means (misread names, no clear referent); distinct from a clear-but-impossible action
+    // (action + Q7). New options are appended so earlier labels' numbers are unchanged.
+    options: ['action', 'talk_to_npc', 'world_question', 'ooc', 'clarification', 'continue', 'unclear'],
+    help: {
+      action: 'the party does something (incl. "I ask around" / unnamed people)',
+      talk_to_npc: 'speech or questions TO a specific NPC (present or not; Q7 says if possible)',
+      world_question: 'a question to the DM/narrator about the world or story',
+      ooc: 'out of character: about the game, UI, rules, or the player themself',
+      clarification: 'the PLAYER asks the DM to explain what the DM just said',
+      continue: 'acceptance / acknowledgement: "ok", "go on", "yes"',
+      unclear: "can't tell what the player means / makes no sense here: the DM should ask",
+    } },
   { key: 'q2', text: 'Action category', type: 'choice', onlyIf: 'action',
-    options: ['move', 'attack', 'interact', 'persuade', 'stealth', 'investigate', 'other'] },
+    options: ['move', 'attack', 'interact', 'persuade', 'stealth', 'investigate', 'other'],
+    help: {
+      move: 'go somewhere, travel, climb, cross',
+      attack: 'violence against someone or something',
+      interact: 'use or change something (open, take, buy, light), routine dealings with people',
+      persuade: 'change someone\'s mind: persuade, intimidate, deceive, bargain',
+      stealth: 'avoid notice: sneak, hide, pickpocket',
+      investigate: 'find or learn something: search, examine, track, read people',
+      other: 'flavour with no effect on the world: emote, rest, wait, make camp',
+    } },
   { key: 'q3', text: 'Target', type: 'target' },
   { key: 'q4', text: 'Does this need a skill check?', type: 'yesno', onlyIf: 'action' },
   { key: 'q5', text: 'Which skill', type: 'skill', onlyIf: 'check' },
   { key: 'q6', text: 'Difficulty', type: 'choice', onlyIf: 'check', options: CHECK_TIERS },
-  { key: 'q7', text: 'Impossible given the state?', type: 'yesno', onlyIf: 'action' },
+  // Asked for actions AND talk_to_npc: Q1 is what the player is trying to do, Q7 whether
+  // the scene allows it. Includes player mistakes with a clear intent (NPC not here, wrong
+  // place): the DM corrects the premise. Unreadable intent is Q1 `unclear` instead.
+  { key: 'q7', text: 'Impossible given the scene? (e.g. that NPC is not here, the party lacks the ability: the DM explains/corrects)', type: 'yesno', onlyIf: 'action_or_talk' },
 ];
 
 export const shortHash = (s) => crypto.createHash('sha256').update(s).digest('hex').slice(0, 10);
@@ -73,9 +102,11 @@ export function resolveFixtures(rows, pools = []) {
     if (!r.context_ref) return { ...r, targets: r.targets || extractTargets(r.context) };
     const base = byId.get(r.context_ref);
     if (!base) throw new Error(`${r.id}: unknown context_ref ${r.context_ref}`);
-    const context = r.context || base.context;
+    // Borrowing the scene's dm_response means the scene as the DM left it: use the state
+    // after that response (context_after), not before it.
+    const context = r.context || base.context_after || base.context;
     return { ...r, context, summary: r.summary ?? base.summary, template: r.template || base.template,
-      targets: r.targets || extractTargets(context) };
+      last_dm: r.last_dm ?? base.dm_response ?? null, targets: r.targets || extractTargets(context) };
   });
 }
 

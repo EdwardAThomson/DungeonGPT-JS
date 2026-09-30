@@ -56,13 +56,21 @@ location + NPC roster, party, active locks, resolved check) plus the player's me
 
 | # | Question | Type | Options | Consumer |
 |---|---|---|---|---|
-| Q1 | What kind of message is this? | Choice | `action`, `npc_dialogue`, `world_question`, `ooc`, `clarification` | Router (new) |
+| Q1 | What kind of message is this? | Choice | `action`, `talk_to_npc`, `world_question`, `ooc`, `clarification`, `continue`, `unclear` | Router (new) |
 | Q2 | Action category | Choice | `move`, `attack`, `interact`, `persuade`, `stealth`, `investigate`, `other` | Engine |
-| Q3 | Target | Choice | entity IDs from the id-bearing roster (§3.0) + `none` | Engine; fixes contract Q3 |
+| Q3 | Target | Choice | entity IDs from the id-bearing roster (§3.0) + `unnamed_locals` (background people plausibly present, e.g. tavern patrons) + `party_member` + `object_or_place` + `other` + `none` | Engine; fixes contract Q3 |
 | Q4 | Does this need a skill check? | Yes/No | — | Replaces `[CHECK:]` |
 | Q5 | Which skill | Choice | keys of `SKILLS` (`utils/rules.js`) | Replaces `[CHECK:]` |
 | Q6 | Difficulty | Score | `CHECK_TIERS` = trivial … deadly | Replaces `[CHECK:]` |
 | Q7 | Is the player attempting something impossible given the state? | Yes/No | — | Narrator instruction |
+
+`continue` (added during pilot labelling, 2026-09-30) covers acknowledgements such as "ok" or
+"go on": the narrator advances the scene with no roll. Such replies are unreadable without
+the DM's previous message, so every question is asked against the state *plus the last
+narration*; pilot fixtures carry it as `last_dm`, and `turnMeta` must carry it too.
+`unclear` (same date) labels turns whose right response is a clarifying question from the DM
+(a place addressed as a person, "him" with no referent). It gives the §7 "ask instead of
+guess" path labelled ground truth rather than relying on adjudicator confidence alone.
 
 Q2–Q7 are only *used* when Q1 = `action`, but are always *asked*. On the logit and Jev
 backends adding a question is nearly free, because prefill of the shared state dominates cost
@@ -102,7 +110,7 @@ never report headline metrics from it.
 The worker cannot build the structured state itself: `/api/ai/generate` receives only the
 rendered prompt, and `gameContext` is assembled on the client in `useGameInteraction.js`.
 So the client attaches an optional `turnMeta` object to free-text generate requests
-(`{ sessionId, playerText, state, checkMarker? }`, where `state` is the output of the §3.0
+(`{ sessionId, playerText, lastNarration, state, checkMarker? }`, where `state` is the output of the §3.0
 builders' inputs). Add it to `generateAiRequestSchema` as optional with a size cap; older
 clients that omit it simply produce no log row. `turnMeta` is client-supplied and
 untrusted: fine for eval data, never used to make an authoritative decision.
@@ -149,12 +157,27 @@ Notes:
 `scripts/label-turns.mjs`: a minimal terminal labeller (or a Claude Code session) that shows
 state + player text and prompts for Q1–Q7. Label rules to keep consistent:
 
-- Q1 `npc_dialogue` = speech directed at a named NPC in the roster; generic "I ask around" is
+- Q1 `talk_to_npc` = speech directed at a specific named NPC, present or not (Q7 records
+  whether they are actually in the scene); generic "I ask around" is
   `action`/`persuade`.
 - Q4 = "would a human DM call for a roll here": obvious/trivial actions = no, contested or
   uncertain = yes. When unsure, label yes with tier trivial.
 - Q7 = physically impossible or contradicts state (attacking an NPC not present, casting
   without a class ability). Not "unwise".
+- Q1 says what the player is trying to do; Q7 (asked for `action` and `talk_to_npc`) says
+  whether the scene allows it. Clear intent with a wrong premise (asking an innkeeper who is
+  not in the scene) is Q7 =
+  yes: the DM corrects the premise. Intent that cannot be read at all is Q1 = `unclear`: the
+  DM asks.
+
+**Speed-ups (2026-09-30) and their bias controls.** Harness turns follow four scripted
+patterns, so `autolabel-harness.mjs` labels them from the turn type (rows marked `auto`);
+a human confirms a random sample with `label-turns.mjs --spot-check N`. Hand-written turns
+can carry suggested answers (`<fixtures>.suggested.jsonl`, written by Claude) that Enter
+accepts. Suggestions anchor the labeller, so each row records which answers overrode a
+suggestion, `--stats` reports override rates, and the `--pass2` double-labelled sample runs
+without suggestions: if pass-2 agreement is much lower than the acceptance rate, the
+suggestions were steering the labels.
 
 Also label 10–20% of turns twice (self or a second person) to get inter-annotator agreement.
 That number is the ceiling any backend can be expected to reach.
@@ -239,6 +262,10 @@ Per backend and per question:
 - **Paraphrase consistency**: fraction whose argmax survives the paraphrase.
 - **Schema validity** (gen-json only): fraction of calls producing parseable, in-range JSON.
 - **Latency** p50/p95, **cost per turn**.
+- **Invented-name rate** (narrator, not adjudicator): capitalised person names in the
+  narration that are not in the scene's roster or the objectives. Baseline it on the current
+  flow before Phase 3, then re-measure after §6.1 rules 1–3 (`eval-premium-models.mjs` has a
+  name-grounding check to borrow).
 - **Calibration** (logit and Jev; gen-json only if it returns a confidence): reliability
   diagram and ECE per question; then choose an abstain threshold τ such that precision above
   τ ≥ 0.95 and report coverage at τ. Coverage is the number that matters: it is the fraction
@@ -318,7 +345,7 @@ measures its latency cost. Moving the roll server-side is out of scope.
    paths coexist. Remove "SKILL CHECKS (you propose, the game rolls)" from `DM_PROTOCOL`
    once stable.
 2. **Routing.** Q1 = `ooc`/`world_question` → the assistant path (`AiAssistantPanel` prompt,
-   short answer, no narration). Q1 = `npc_dialogue` with Q3 = milestone NPC → the talk-milestone
+   short answer, no narration). Q1 = `talk_to_npc` with Q3 = milestone NPC → the talk-milestone
    path (`handleTalkToNpc`), which fixes contract Q3.
 3. **Impossible actions.** Q7 = yes → narrator is told to narrate the attempt failing for a
    stated reason; no roll, no state change.
@@ -326,6 +353,38 @@ measures its latency cost. Moving the roll server-side is out of scope.
    `scripts/test-cf-models-multiturn.mjs` (regex contract checks + consistency/tone scorers)
    across the free pool. Promote the smallest model that passes to free default. Re-evaluate
    whether the premium pool is now a prose-quality tier only.
+
+### 6.1 Design rules for the switch-over (from pilot labelling, 2026-09-30)
+
+1. **Presence is the engine's call, not the model's.** For `talk_to_npc` the adjudicator only
+   identifies *who* the player means (Q3); whether that NPC is in the scene comes from the
+   roster (`buildNpcRoster().here`) and the NPC's placed location. An absent target (asking
+   Captain Ulric from Willowdale) never reaches the narrator as dialogue: it gets a fact
+   instead ("Captain Ulric is not here; he is at Briarwood Militia Hall") and corrects the
+   premise, steering toward the objective. This also closes contract open question 3.
+2. **Name people accurately and say where they are; never hide them.** Absent milestone
+   NPCs stay in the objectives line (the grounding that stops invented names), but marked
+   explicitly, e.g. "speak with Captain Ulric at Briarwood Militia Hall (not in this
+   scene)". The present-NPC list contains only people actually present.
+3. **Background people are promoted by the engine, never named by the model.** The
+   narrator may describe unnamed locals ("a farmer", tavern patrons; Q3
+   `unnamed_locals`) but never name them. When the player engages one directly, the engine
+   creates a real NPC with `npcGenerator.js` (the game's name tables, role, personality),
+   adds it to the town's `npcs` so it persists in `townMapsCache`, and hands it to the
+   narrator. Names stay consistent with the game's naming, survive save/load, and the
+   model never invents a person.
+4. **`trivial` checks pass automatically.** Today `[CHECK: skill, trivial]` rolls against DC
+   5 with natural-1 critical failure, so a +0 hero fails a routine action ~20% of the time.
+   Under the adjudicator, a `trivial` verdict is recorded (skill + tier, for the data) but
+   resolved as an automatic success: no roll, no check lock, and the narrator gets a plain
+   success fact. This makes the "unsure → yes, trivial" label rule harmless in play.
+   Worth considering for the existing `[CHECK:]` path now, independent of this plan.
+5. **The adjudicator's state includes the party's inventory.** Q7 on item claims ("I use my
+   airship", "Sable unrolls the map we bought") can only be judged against what the party
+   actually carries; today's context has objectives and classes but no inventory, so
+   impossibility is inferred from silence. Serialise notable and quest items per hero
+   (capped for tokens) into the state the adjudicator sees, and into `turnMeta`. Pilot
+   fixtures lack it, so item-claim labels there rest on the story so far.
 
 ## 7. Open questions
 
