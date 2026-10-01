@@ -287,7 +287,7 @@ If a milestone says "find the map in the archives", the archives must exist as a
 
 **Approach:**
 - The `spawn` field can include a `building` property that ensures a specific building type exists in the target town
-- `spawnMilestoneEntities()` checks if the building exists in the town; if not, it adds it
+- `injectQuestBuildings()` (`milestoneSpawner.js`, at lazy town generation) checks if the building exists in the town; if not, it adds it
 - The item/NPC is then placed inside that building
 - When the player visits the building, they can interact with the item/NPC
 
@@ -477,7 +477,7 @@ const checkMilestones = (milestones, event) => {
 2. Templates define milestones **with types, triggers, encounters, and rewards**
 3. Map is generated with named towns/mountains
 4. `resolveMilestoneCoords()` maps milestone locations to map coordinates (unchanged)
-5. **NEW: `spawnMilestoneEntities()`** ensures required buildings exist in towns, places items/NPCs in buildings, and marks POI/enemy locations on the map
+5. **NEW: `spawnWorldMapEntities()` + `injectQuestBuildings()`** (`milestoneSpawner.js`) mark POI/enemy locations on the map at generation time, and ensure required buildings exist in towns with items/NPCs placed in them at lazy town generation
 6. Game starts with all milestone-related entities in the world (locked ones are non-interactive)
 
 ### Campaign Creator UI: Tabbed Design
@@ -537,7 +537,7 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [x] Update `storyTemplates.js` with typed milestones for all 4 templates
 
 ### Phase 2: Spawning & Integration ✅
-- [x] Build `spawnMilestoneEntities()` to place items/NPCs/POIs at map generation
+- [x] Build `spawnWorldMapEntities()` / `injectQuestBuildings()` (`milestoneSpawner.js`) to place items/NPCs/POIs
 - [x] Ensure quest-critical buildings exist in target towns
 - [x] Wire milestone checker into the game loop (listen for inventory changes, combat results, movement)
 - [x] Connect combat milestones to the encounter system (`resolveEncounter()`)
@@ -594,9 +594,9 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 | `NewGame.js` | Campaign creation UI | Add milestone type editor for Custom Tale |
 | `MilestoneTest.js` | Tests AI marker detection | Keep as-is for narrative milestone testing |
 | `CampaignMilestoneTest.js` | Tests deterministic milestone system | Prototype for encounter + reward integration |
-| `promptComposer.js` | Builds AI prompts with milestone context | **Done:** Shows Active/Completed/Locked with type tags |
+| `turnContext.js` | Builds the turn prompt's milestone context (`formatMilestonePromptText`, used by `useGameInteraction.js`) | **Done:** Shows Active/Completed/Locked with type tags. (`promptComposer.js` keeps a smaller Active/Completed formatter for movement and NPC-meeting prompts) |
 | `saveController.js` | Saves game state | Should already preserve new fields via settings |
-| `useGameSession.js` | Manages game session state | Wire in milestone checker events |
+| `Game.js` | Main game loop | **Done:** `checkMilestoneEvent()` wires milestone checker events (movement, combat, items, talk) |
 | `inventorySystem.js` | Tracks items and rewards | Emit events when quest items are acquired |
 | `encounterController.js` | Applies encounter rewards/penalties | Handle milestone encounter outcomes |
 | `encounterResolver.js` | Resolves encounter dice/combat | Feed in quest encounter definitions |
@@ -626,11 +626,13 @@ Themes (Heroic Fantasy, Grimdark, etc.) and difficulty tiers are **separate axes
 | Theme | Tier 1 (Lv 1-2) | Tier 2 (Lv 3-4) | Tier 3 (Lv 5+) |
 |-------|-----------------|-----------------|----------------|
 | **Heroic Fantasy** | The Goblin Threat | Crown of Sunfire | The Shattered Throne *(coming soon)* |
+| **Desert Expedition** | The Sunscorched Road | The Waking Sands | (none) |
+| **Frozen Frontier** | The Deepening Frost | The Hungering Thaw | (none) |
 | **Grimdark Survival** | The Blighted Village | The Rot-Heart | The Last Winter *(coming soon)* |
 | **Arcane Renaissance** | The Rogue Automaton | Herald of the Old Gods | The Clockwork God *(coming soon)* |
 | **Eldritch Horror** | The Blackwood Cult | The Great Dreamer | The Drowned City *(coming soon)* |
 
-All themes have Tier 1 and Tier 2 templates with full milestone data. Tier 3 templates exist as stubs (coming soon).
+All six public themes have Tier 1 and Tier 2 templates with full milestone data. Tier 3 entries in the public bundle are card-face stubs; playable premium campaigns (Tier 3 and the premium Tidewater line) are server-delivered (`premiumContentApi.js`) and replace their stub by id.
 
 #### Why separate stories instead of scaling
 

@@ -4,7 +4,7 @@
 **URL:** `https://dungeongpt-api.steep-mountain-8753.workers.dev`
 **Stack:** Hono + Zod + TypeScript, deployed on Cloudflare Workers
 **Source of truth:** `cf-worker/src/` — if this doc and the code disagree, the code wins.
-**Last updated:** July 2026
+**Last updated:** October 2026
 
 ---
 
@@ -12,7 +12,7 @@
 
 ### Entry point and middleware
 
-`cf-worker/src/index.ts` — Hono app with global CORS middleware. Allowed origins: `localhost:3000/8787/8788`, `dungeongpt.xyz`, `*.dungeongpt-js.pages.dev`, and an optional `CUSTOM_DOMAIN` env var.
+`cf-worker/src/index.ts` — Hono app with global CORS middleware. Allowed origins: `localhost:3000/8787/8788`, `127.0.0.1:3000`, `dungeongpt.xyz`, `dungeongpt-js.pages.dev` and its `*.dungeongpt-js.pages.dev` previews, and an optional `CUSTOM_DOMAIN` env var.
 
 ### Routes
 
@@ -186,7 +186,7 @@ Four files, none derived from the others — missing one leaves the model invisi
 cd cf-worker && nvm use 20 && npm run dev   # local worker on :8787
 ```
 
-Test script: `scripts/test-cf-models-simple.mjs` — set its `TEST_MODELS` array to match the 5 production IDs.
+Test script: `scripts/test-cf-models-simple.mjs` — set its `TEST_MODELS` array to match the 4 production IDs.
 
 ### Phase 1 — Automated protocol compliance
 
@@ -198,13 +198,13 @@ Run `test-cf-models-simple.mjs` against all 4 models. Scenarios: opening, intera
 
 ### Phase 2 — Multi-turn consistency (10 turns)
 
-Test models: GPT-OSS 20B (primary), Gemma 3 12B, Llama 3.1 8B Fast. Optional: GPT-OSS 120B, Llama 4 Scout 17B.
+Test models: GPT-OSS 20B (primary), Llama 3.1 8B Fast. Optional: GPT-OSS 120B, Llama 4 Scout 17B, plus non-registry candidates under evaluation (Gemma 4 26B MoE, GLM 4.7 Flash).
 
 Scenario "The Cursed Village": war-torn kingdom, level-5 party (Kael/Lyra/Bram), 10 turns covering arrival through combat to milestone completion. Score on Consistency, Tone, Milestone Tracking, Combat Handling, NPC Characterization (5 each). Target: >=20/25, minimum 16/25.
 
 ### Phase 3 — Comparative quality (4 scenarios)
 
-Models: GPT-OSS 20B, Gemma 3 12B, Llama 3.1 8B Fast. Four scenarios (Mysterious Artifact, Destroyed Bridge, Nervous Innkeeper, Moral Dilemma) scoring Creativity, Detail, Player Agency, etc. Target: >=45/60, minimum 36/60.
+Models: GPT-OSS 120B, GPT-OSS 20B, Llama 4 Scout, Llama 3.1 8B Fast (`ALL_MODELS` in `scripts/test-cf-models.mjs`). Four scenarios (Mysterious Artifact, Destroyed Bridge, Nervous Innkeeper, Moral Dilemma) scoring Creativity, Detail, Player Agency, etc. Target: >=45/60, minimum 36/60.
 
 ### Phase 4 — Stress
 
@@ -306,5 +306,7 @@ path), no credentials needed. Branch-gated premium tests in test/premium/
 self-activate when the premium modules exist (probe import + skipIf). The
 config deliberately does not inherit wrangler.toml bindings (the [ai] binding
 would demand a Cloudflare token at pool startup); it parses compatibility
-date/flags from wrangler.toml instead. CI: run the suite before wrangler
-deploy in .github/workflows/deploy-worker.yml.
+date/flags from wrangler.toml instead. CI does not run this suite yet:
+.github/workflows/deploy-worker.yml runs the migration guard, `npm ci`,
+`tsc --noEmit`, `wrangler deploy` and the post-deploy smoke test, so run
+`npm run test:worker` locally before deploying.
