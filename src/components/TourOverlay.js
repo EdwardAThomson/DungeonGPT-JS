@@ -82,9 +82,14 @@ const TourOverlay = () => {
     if (!needsRect) return;
     window.addEventListener('resize', measure);
     window.addEventListener('scroll', measure, true);
+    // Late layout shifts (web fonts, hero images) move the target without a
+    // resize or scroll event, leaving the ring offset from it; re-measure then too.
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    if (ro) ro.observe(document.body);
     return () => {
       window.removeEventListener('resize', measure);
       window.removeEventListener('scroll', measure, true);
+      if (ro) ro.disconnect();
     };
   }, [needsRect, measure]);
 

@@ -1,19 +1,47 @@
-// OverviewPage — "The Game" overview (#82 §12.4). The sell: what DungeonGPT actually is —
-// a generated world threaded with an authored, milestone-tracked campaign, played by a party
-// of real classes. Campaigns content is folded in here (not its own page). Styles: .rd-page.
+// OverviewPage: "The Game" (#82 §12.4). A walkthrough of one session, start to finish:
+// party → campaign → world → town → fights → milestones. The front page pitches and the
+// Engine page proves; this page SHOWS, so it leans on the game's own art and live-rendered
+// maps rather than repeating the home sections. Deliberately no screenshots of in-game UI
+// chrome: the game workspace is being redesigned (#84), so everything here is either art
+// or rendered through the real generators, and survives that change. Styles: .rd-page.
 
 import React from "react";
 import { Link } from "react-router-dom";
 import HomeWorldMap from "../components/HomeWorldMap";
+import HomeTownMap from "../components/HomeTownMap";
 import "../styles/redesign.css";
 
 const Tick = () => (
   <svg className="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
 );
 
+const PARTY = [
+  { cls: "Barbarian", img: "barbarian" },
+  { cls: "Bard", img: "female_bard" },
+  { cls: "Cleric", img: "cleric" },
+  { cls: "Druid", img: "female_druid" },
+  { cls: "Wizard", img: "female_wizard" },
+  { cls: "Ranger", img: "ranger" },
+];
+
+const REALMS = [
+  { name: "Heroic Fantasy", art: "heroic-fantasy-t1", tier: "Free", blurb: "Goblin raiders are attacking the farms around Willowdale. Track them to their hideout and end the raids." },
+  { name: "Grimdark Survival", art: "grimdark-survival-t1", tier: "Free", blurb: "Ashford is dying: blackened crops, collapsing livestock, a foul smell from the old well. Find the source before winter." },
+  { name: "Arcane Renaissance", art: "arcane-renaissance-t1", tier: "Free", blurb: "A haywire automaton is smashing up Cogsworth, and the artificer who built it has vanished from his workshop." },
+  { name: "Desert Expedition", art: "desert-expedition-t1", tier: "Members", blurb: "The caravans out of Sandreach have stopped arriving, swallowed by the dunes and the robed figures who command the storms." },
+  { name: "Frozen Frontier", art: "frozen-frontier-t1", tier: "Members", blurb: "Hearthmere is freezing to death, and something cold and patient stalks the drifts at night." },
+  { name: "Eldritch Horror", art: "eldritch-horror-t1", tier: "Members", blurb: "Livestock vanish near Hollowmarsh, robed figures haunt the marsh, and a cult's ritual is nearly complete." },
+];
+
+const FIGHTS = [
+  { label: "Goblin ambush", img: "goblin_ambush" },
+  { label: "Giant spiders", img: "giant_spiders" },
+  { label: "The Bandit King", img: "bosses/bandit_king", boss: true },
+];
+
 const OverviewPage = () => (
-  <div className="rd-page">
-    {/* PAGE HEADER — background scene + scrim (placeholder art, swap freely) */}
+  <div className="rd-page rd-overview">
+    {/* PAGE HEADER */}
     <section
       className="page-header"
       style={{
@@ -25,39 +53,111 @@ const OverviewPage = () => (
       <div className="wrap">
         <div className="crumb"><Link to="/">← Home</Link></div>
         <p className="eyebrow">The game</p>
-        <h1>A generated world, and a campaign that goes somewhere in it.</h1>
-        <p className="lede">Every game rolls a seeded overworld of biomes, towns and points of interest, then threads an authored campaign through it, tracked as real milestones the engine can see. Not a chat box, a place.</p>
+        <h1>One session, start to finish.</h1>
+        <p className="lede">Build a party, pick a campaign, and set out across a world generated for your game. Here is what you will actually see along the way.</p>
       </div>
     </section>
 
-    {/* THE WORLD */}
+    {/* 01 PARTY */}
     <section className="band">
-      <div className="wrap">
-        <div className="head-split">
-          <div className="section-head">
-            <p className="eyebrow purple">The world</p>
-            <h2>Rolled fresh, rendered by the game's own tile art.</h2>
-            <p>Roads, rivers, lakes, towns and mountains are placed by the real generator. Explore it a tile at a time; towns open into their own maps.</p>
-          </div>
-          <div className="head-map">
-            <HomeWorldMap />
-            <div className="map-caption">The real <code style={{ color: "var(--gold)" }}>generateMapData()</code> output, rendered with the game's own tile art.</div>
-          </div>
+      <div className="wrap head-split">
+        <div className="section-head">
+          <p className="eyebrow"><span className="step-num">01</span> Build your party</p>
+          <h2>Twelve classes, with real numbers behind them.</h2>
+          <p>Spend 27 points across six ability scores, or apply a class template and go. Every modifier on the sheet feeds the same engine that resolves your rolls. Take one hero, or a party of up to four.</p>
+        </div>
+        <div className="portrait-grid">
+          {PARTY.map((h) => (
+            <article key={h.cls} className="hero-card">
+              <div className="portrait" style={{ backgroundImage: `url('/assets/characters/${h.img}.webp')` }} />
+              <div className="label"><div className="cls">{h.cls}</div></div>
+            </article>
+          ))}
         </div>
       </div>
     </section>
 
-    {/* CAMPAIGNS / MILESTONES */}
+    {/* 02 CAMPAIGN */}
     <section className="band band-alt">
       <div className="wrap">
-        <div className="head-split">
-          <div className="section-head">
-            <p className="eyebrow">Campaigns</p>
-            <h2>An authored story, tracked as milestones the engine enforces.</h2>
-            <p>Each campaign threads objectives through the world. The engine, not the model, decides when one is met, so the story can never quietly skip a beat.</p>
-          </div>
-          {/* placeholder: real campaign key art from the in-game roster; swap freely */}
-          <div className="band-art" style={{ backgroundImage: "url('/assets/templates/heroic-fantasy-t1.webp')" }} role="img" aria-label="Campaign key art" />
+        <div className="section-head">
+          <p className="eyebrow purple"><span className="step-num">02</span> Pick a campaign</p>
+          <h2>Six realms, each with its own story and foes.</h2>
+          <p>Every campaign is authored: named towns, people to find, a villain at the end. Three are free; Members unlock the desert, the frozen north and the eldritch marshes.</p>
+        </div>
+        <div className="realm-grid">
+          {REALMS.map((r) => (
+            <article key={r.name} className="realm">
+              <div className="art" style={{ backgroundImage: `url('/assets/templates/${r.art}.webp')` }}>
+                <span className={`price-badge ${r.tier === "Free" ? "price-badge-gold" : "price-badge-muted"}`}>{r.tier}</span>
+              </div>
+              <div className="body">
+                <h3>{r.name}</h3>
+                <p>{r.blurb}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    {/* 03 WORLD */}
+    <section className="band">
+      <div className="wrap head-split">
+        <div className="section-head">
+          <p className="eyebrow"><span className="step-num">03</span> Travel the world</p>
+          <h2>A map rolled for your game, not a backdrop.</h2>
+          <p>Biomes, rivers, roads, towns and mountains come from a seeded generator, with your campaign's towns placed into it. Objectives stay hidden until you have earned them, then appear on the map.</p>
+        </div>
+        <div className="head-map">
+          <HomeWorldMap seed={101} />
+          <div className="map-caption">Rendered live by the game's own generator and tile art.</div>
+        </div>
+      </div>
+    </section>
+
+    {/* 04 TOWN */}
+    <section className="band band-alt">
+      <div className="wrap head-split reverse">
+        <div className="head-map">
+          <HomeTownMap seed={21} size="city" hasRiver name="Goldencaster" tile={20} />
+          <div className="map-caption">A river city, generated the first time you arrive.</div>
+        </div>
+        <div className="section-head">
+          <p className="eyebrow purple"><span className="step-num">04</span> Walk into town</p>
+          <h2>Every town opens into a map of its own.</h2>
+          <p>Streets, a market, the inn, the smithy, the temple. Walk to any building, step inside, and meet the people who work there: a quest giver, a merchant with real stock, a bed for the night.</p>
+        </div>
+      </div>
+    </section>
+
+    {/* 05 FIGHTS */}
+    <section className="band">
+      <div className="wrap">
+        <div className="section-head">
+          <p className="eyebrow"><span className="step-num">05</span> Fight on the engine's terms</p>
+          <h2>Ambushes on the road, bosses at the end of the trail.</h2>
+          <p>Choose who leads, and the engine rolls the round: hits, damage and loot are settled in code before the AI writes a word of the scene. Bosses fight across several rounds, with the rest of the party in support.</p>
+        </div>
+        <div className="fight-grid">
+          {FIGHTS.map((f) => (
+            <figure key={f.label} className={`fight${f.boss ? " boss" : ""}`}>
+              <div className="art" style={{ backgroundImage: `url('/assets/encounters/${f.img}.webp')` }} />
+              <figcaption>{f.boss && <span className="price-badge price-badge-gold">Boss</span>}{f.label}</figcaption>
+            </figure>
+          ))}
+        </div>
+        <Link className="learn" to="/engine">See how a round is resolved</Link>
+      </div>
+    </section>
+
+    {/* 06 MILESTONES */}
+    <section className="band band-alt">
+      <div className="wrap">
+        <div className="section-head">
+          <p className="eyebrow purple"><span className="step-num">06</span> See it through</p>
+          <h2>A campaign that keeps track, so the story can't skip a beat.</h2>
+          <p>Objectives unlock in order, and each one completes on something you actually did: an item found, a person met, a place reached, a fight won. Finish a campaign and its next chapter opens.</p>
         </div>
         <div className="chain" aria-label="Campaign milestone chain">
           <div className="step done"><div className="k"><Tick /> Cleared</div><div className="t">Find the scout's map in the Willowdale tavern</div></div>
@@ -68,30 +168,8 @@ const OverviewPage = () => (
       </div>
     </section>
 
-    {/* HEROES */}
-    <section className="band">
-      <div className="wrap">
-        <div className="head-split">
-          <div className="section-head">
-            <p className="eyebrow">Your party</p>
-            <h2>Twelve classes, and a character sheet with real numbers behind it.</h2>
-            <p>Roll a hero, equip them, and watch the stats matter: every modifier on the sheet feeds the same engine that resolves your rolls.</p>
-          </div>
-          {/* placeholder art; swap freely */}
-          <div className="band-art" style={{ backgroundImage: "url('/assets/buildings/town_interior_hero.webp')" }} role="img" aria-label="A hero in a town hall" />
-        </div>
-        <div className="heroes-row">
-          <article className="hero-card"><div className="portrait" style={{ backgroundImage: "url('/assets/characters/fighter.webp')" }} /><div className="label"><div className="cls">Fighter</div></div></article>
-          <article className="hero-card"><div className="portrait" style={{ backgroundImage: "url('/assets/characters/female_ranger.webp')" }} /><div className="label"><div className="cls">Ranger</div></div></article>
-          <article className="hero-card"><div className="portrait" style={{ backgroundImage: "url('/assets/characters/wizard.webp')" }} /><div className="label"><div className="cls">Wizard</div></div></article>
-          <article className="hero-card"><div className="portrait" style={{ backgroundImage: "url('/assets/characters/female_paladin.webp')" }} /><div className="label"><div className="cls">Paladin</div></div></article>
-        </div>
-        <p className="price-note">Class portraits from the in-game roster. Every hero is human; choose from twelve classes.</p>
-      </div>
-    </section>
-
     {/* CTA */}
-    <section className="band band-alt">
+    <section className="band">
       <div className="wrap final">
         <p className="eyebrow">Your table is ready</p>
         <h2>Roll a world and start a campaign in under a minute.</h2>

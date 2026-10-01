@@ -16,7 +16,6 @@ import EncounterModalDebug from './pages/EncounterModalDebug';
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import Profile from './pages/Profile';
-import HowToPlay from './pages/HowToPlay';
 import GettingStarted from './pages/GettingStarted';
 import { useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -39,8 +38,7 @@ const DebugRoutes = lazy(() => import('./pages/DebugRoutes'));
 // Redesign marketing depth pages (#82 §12.4), reached from the "The Game" nav dropdown.
 const EnginePage = lazy(() => import('./pages/EnginePage'));
 const OverviewPage = lazy(() => import('./pages/OverviewPage'));
-// Premium tier page: mounted at /premium but deliberately NOT linked from any
-// nav yet (billing is not live); it becomes discoverable when #6 ships.
+// Membership / tier page: /premium with a /membership alias (the nav's Subscribe).
 const PremiumPage = lazy(() => import('./pages/PremiumPage'));
 
 const AppContent = () => {
@@ -49,7 +47,7 @@ const AppContent = () => {
   const isDebugEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEBUG_ROUTES === 'true';
   const isGamePage = location.pathname === '/game';
   // Redesign marketing routes (#82 §12.3) go full-bleed; other pages keep the container.
-  const isBleedPage = ['/', '/overview', '/engine'].includes(location.pathname);
+  const isBleedPage = ['/', '/overview', '/engine', '/premium', '/membership', '/getting-started'].includes(location.pathname);
 
   const {
     selectedProvider,
@@ -130,7 +128,8 @@ const AppContent = () => {
               <Route path="/engine" element={<EnginePage />} />
               <Route path="/premium" element={<PremiumPage />} />
               <Route path="/membership" element={<PremiumPage />} />
-              <Route path="/features" element={<HowToPlay />} />
+              {/* Features & FAQ retired into How to Play (#82 §12 step 5) */}
+              <Route path="/features" element={<Navigate to="/getting-started#faq" replace />} />
               <Route path="/how-to-play" element={<Navigate to="/getting-started" replace />} />
               <Route path="/hero-creation" element={<HeroCreation />} />
               <Route path="/hero-summary" element={<HeroSummary />} />

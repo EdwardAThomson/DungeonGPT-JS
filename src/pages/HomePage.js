@@ -15,6 +15,7 @@ import "../styles/redesign.css";
 
 const HERO_IMG = "/assets/redesign/hero.jpg";
 const GITHUB_URL = "https://github.com/EdwardAThomson/DungeonGPT-JS";
+const COMBAT_URL = `${GITHUB_URL}/blob/master/src/utils/encounterResolver.js`;
 
 const Tick = () => (
   <svg className="tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -32,7 +33,7 @@ const GuestHome = () => (
         <div className="hero-copy">
           <h1>The AI tells the story.<br /><span className="accent">The rules decide what happens.</span></h1>
           <div className="hero-actions">
-            <Link to="/new-game" className="btn btn-primary" onClick={() => sendEvent('play_click')}>Play now</Link>
+            <Link to="/new-game" className="btn btn-primary" data-tour="home-play" onClick={() => sendEvent('play_click')}>Play now</Link>
             <Link to="/engine" className="btn btn-ghost">See how the engine works</Link>
           </div>
           <p className="hero-note"><span className="dot" /> No sign-up to start · play instantly as a guest</p>
@@ -80,10 +81,13 @@ const GuestHome = () => (
     {/* WEDGE */}
     <section className="band band-alt">
       <div className="wrap">
-        <div className="section-head">
-          <p className="eyebrow">Why trust it</p>
-          <h2>Most AI game masters ask you to trust the dice. Ours run on rules you can read.</h2>
-          <p>"The AI can't fudge outcomes" is the most-repeated promise in this category, and almost nowhere can you check it. Our rules engine is open source, so you can see how the game is designed to work.</p>
+        <div className="head-split">
+          <div className="section-head">
+            <p className="eyebrow">Why trust it</p>
+            <h2>Most AI game masters ask you to trust the dice. Ours run on rules you can read.</h2>
+            <p>"The AI can't fudge outcomes" is the most-repeated promise in this category, and almost nowhere can you check it. Our rules engine is open source, so you can see how the game is designed to work.</p>
+          </div>
+          <div className="band-art" style={{ backgroundImage: "url('/assets/encounters/bandit_roadblock.webp')" }} role="img" aria-label="Bandits blocking a forest road" />
         </div>
         <div className="cards-3">
           <article className="feat">
@@ -95,8 +99,8 @@ const GuestHome = () => (
           <article className="feat">
             <div className="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l7 4v6c0 4-3 7-7 10-4-3-7-6-7-10V6z" /><path d="M9 12l2 2 4-4" /></svg></div>
             <h3>Open source</h3>
-            <p>The engine is Apache-2.0. The rules code is public. DungeonGPT is the only shipped AI GM where you can read exactly how checks and combat are resolved.</p>
-            <div className="foot"><a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">Apache-2.0 · view the repo on GitHub</a></div>
+            <p>The engine is Apache-2.0 and public. You can read the exact file that resolves every fight. No other shipped AI GM lets you check.</p>
+            <div className="foot"><a href={COMBAT_URL} target="_blank" rel="noopener noreferrer">Read the combat resolver on GitHub →</a></div>
           </article>
           <article className="feat">
             <div className="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H7l-3 3z" /><path d="M8 10h8M8 13h5" /></svg></div>
@@ -168,11 +172,46 @@ const GuestHome = () => (
         <div className="section-head">
           <p className="eyebrow purple">Pricing</p>
           <h2>Playtime-legible. No opaque credits.</h2>
-          <p>Free is live today, on the house model pool. Members below is the first paid tier.</p>
+          <p>Play free on the house model pool, or join Members for premium AI storytelling and extra realms.</p>
+        </div>
+        <div className="price-row">
+          <div className="price">
+            <span className="price-badge price-badge-gold">Live now</span>
+            <div className="tier">Free</div>
+            <div className="cost"><span className="amt">$0</span></div>
+            <ul>
+              <li><Tick /> Full campaigns: heroes, world exploration, milestones, no account needed</li>
+              <li><Tick /> Sign in free for the AI Dungeon Master (shared pool)</li>
+              <li><Tick /> Saves and heroes synced across your devices</li>
+            </ul>
+            <Link to="/new-game" className="btn btn-ghost" onClick={() => sendEvent('play_click')}>Play now</Link>
+          </div>
+          <div className="price feature">
+            <span className="price-badge price-badge-gold">Live now</span>
+            <div className="tier">Members</div>
+            <div className="cost"><span className="amt">$5</span> <span className="per">/ month</span></div>
+            <ul>
+              <li><Tick /> AI storytelling on the members' model pool, generous monthly allowance</li>
+              <li><Tick /> Eldritch, desert and snow realms with their own campaigns and foes</li>
+              <li><Tick /> River cities: settlements grown around island districts</li>
+              <li><Tick /> Higher-tier campaigns for seasoned parties</li>
+            </ul>
+            <a href="https://octonion.io/membership" className="btn btn-primary" target="_blank" rel="noopener noreferrer">Become a Member</a>
+          </div>
+          <div className="price">
+            <span className="price-badge price-badge-muted">Planned</span>
+            <div className="tier">Premium</div>
+            <div className="cost"><span className="amt">$10</span> <span className="per">/ month</span></div>
+            <ul>
+              <li><Tick /> A canal city at the river mouth, and its flagship campaign</li>
+              <li><Tick /> A larger premium AI allowance</li>
+              <li><Tick /> Sea-faring maps with ships, and bigger world maps</li>
+            </ul>
+            <span className="btn btn-disabled">Not open yet</span>
+          </div>
         </div>
         <p className="price-note">
-          Full campaigns, heroes, world exploration and milestones are free with no account. Sign in
-          free for the AI Dungeon Master. <Link className="learn" style={{ marginTop: 0, display: "inline-flex" }} to="/membership">See the full membership page</Link>
+          One octonion.io membership covers DungeonGPT and every other Octonion game. <Link className="learn" style={{ marginTop: 0, display: "inline-flex" }} to="/membership">See the full membership page</Link>
         </p>
       </div>
     </section>
@@ -204,7 +243,7 @@ const Dashboard = ({ user }) => {
             <Link to="/game" className="btn btn-primary" style={{ marginTop: "0.4rem" }}>Continue →</Link>
           </article>
           <div className="quick">
-            <Link to="/new-game" className="quick-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg> New campaign</Link>
+            <Link to="/new-game" className="quick-item" data-tour="home-play"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg> New campaign</Link>
             <Link to="/hero-creation" className="quick-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg> Create a hero</Link>
             <Link to="/saved-conversations" className="quick-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg> Saved games</Link>
             <Link to="/all-heroes" className="quick-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-3-3.87" /><path d="M9 21v-2a4 4 0 0 1 3-3.87" /><circle cx="9" cy="7" r="4" /></svg> All heroes</Link>
@@ -218,7 +257,7 @@ const Dashboard = ({ user }) => {
 const HomePage = () => {
   const { user } = useAuth();
   return (
-    <div className="rd-page">
+    <div className="rd-page rd-home">
       {user ? <Dashboard user={user} /> : <GuestHome />}
     </div>
   );

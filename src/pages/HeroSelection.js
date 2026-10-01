@@ -252,11 +252,6 @@ const HeroSelection = () => {
         <div className="page-header-titles">
           <h2>Select Your Party</h2>
           <p className="selection-instructions">Click a hero to add them to your party — choose 1 to 4.</p>
-          {/* States the real mechanics (support bonuses vs the shared XP pot)
-              rather than nudging a "right" party size. */}
-          <p className="party-size-tip">
-            Bigger parties fight stronger together, but share the XP. A lone hero levels fastest and risks the most.
-          </p>
         </div>
         <div className="page-header-actions">
           <button onClick={handleCreateHero} className="create-new-button">

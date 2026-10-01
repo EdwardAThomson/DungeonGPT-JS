@@ -152,6 +152,7 @@ const NewGame = () => {
   // the template from the previous launch. Same guards as above, but silent —
   // a locked/teaser/missing remembered template just means no preselect (e.g. a
   // server-delivered premium template not registered this session).
+  const DEFAULT_TEMPLATE_ID = 'heroic-fantasy-t1';
   const [lastPlayedTemplateId] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('dungeongpt:lastLaunch') || 'null')?.templateId || null;
@@ -159,11 +160,18 @@ const NewGame = () => {
       return null;
     }
   });
+  // With no usable last-played template (e.g. a first visit), fall back to the
+  // starter campaign so the page opens with a story already picked. Skipped when
+  // returning with story text in settings, so a custom tale isn't overwritten.
   useEffect(() => {
-    if (navState?.preselectTemplateId || !lastPlayedTemplateId) return;
-    const template = storyTemplates.find((t) => t.id === lastPlayedTemplateId && !t.comingSoon);
-    if (!template || template.teaser === true || !canUseTemplate(template)) return;
-    applyTemplate(template);
+    if (navState?.preselectTemplateId) return;
+    const usable = (id) => {
+      const template = id && storyTemplates.find((t) => t.id === id && !t.comingSoon);
+      return template && template.teaser !== true && canUseTemplate(template) ? template : null;
+    };
+    const template = usable(lastPlayedTemplateId)
+      || (!settings?.shortDescription && usable(DEFAULT_TEMPLATE_ID));
+    if (template) applyTemplate(template);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

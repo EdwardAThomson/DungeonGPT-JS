@@ -9,6 +9,7 @@ import "../styles/redesign.css";
 
 const GITHUB_URL = "https://github.com/EdwardAThomson/DungeonGPT-JS";
 const DICE_URL = `${GITHUB_URL}/blob/master/src/utils/dice.js`;
+const COMBAT_URL = `${GITHUB_URL}/blob/master/src/utils/encounterResolver.js`;
 
 const Check = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
@@ -17,10 +18,37 @@ const Cross = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
 );
 
+const ShieldCheck = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 2l7 4v6c0 4-3 7-7 10-4-3-7-6-7-10V6z" /><path d="M9 12l2 2 4-4" /></svg>
+);
+const Hourglass = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 2h12M6 22h12M7 2c0 5 10 7 10 10s-10 5-10 10M17 2c0 5-10 7-10 10s10 5 10 10" /></svg>
+);
+
+// Ruleset icons, drawn in the same gold "mark" squares as the home page's feature cards.
+const RULE_ICONS = {
+  stats: <><path d="M4 20V12" /><path d="M10 20V5" /><path d="M16 20v-9" /><path d="M22 20v-5" /><path d="M2 20h21" /></>,
+  target: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="5" /><circle cx="12" cy="12" r="1" /></>,
+  dice: <><rect x="2" y="7" width="12" height="12" rx="2" /><path d="M10 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-6" /><circle cx="6" cy="11" r=".6" /><circle cx="10" cy="15" r=".6" /><circle cx="18" cy="7" r=".6" /></>,
+  star: <polygon points="12 2 15 9 22 9.3 16.5 14 18.5 21 12 17 5.5 21 7.5 14 2 9.3 9 9" />,
+  crown: <><path d="M3 18l-1-11 6 4 4-7 4 7 6-4-1 11z" /><path d="M3 21h18" /></>,
+  eye: <><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" /><circle cx="12" cy="12" r="3" /></>,
+};
+const RuleIcon = ({ name }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{RULE_ICONS[name]}</svg>
+);
+
 const EnginePage = () => (
-  <div className="rd-page">
-    {/* PAGE HEADER */}
-    <section className="page-header">
+  <div className="rd-page rd-engine">
+    {/* PAGE HEADER — background scene + scrim (placeholder art, swap freely) */}
+    <section
+      className="page-header"
+      style={{
+        backgroundImage: "linear-gradient(rgba(14,13,19,.7), rgba(14,13,19,.9)), url('/assets/templates/heroic-fantasy-t2.webp')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
       <div className="wrap">
         <div className="crumb"><Link to="/">← Home</Link></div>
         <p className="eyebrow">The Engine</p>
@@ -43,6 +71,7 @@ const EnginePage = () => (
             <div className="flow-step">
               <div className="flow-num">1</div>
               <div>
+                <span className="actor">You</span>
                 <h3>You act</h3>
                 <p>"Persuade the harbor master to tell you where the ship sailed." The game reads your intent and the relevant skill.</p>
                 <span className="tag muted">your input</span>
@@ -51,6 +80,7 @@ const EnginePage = () => (
             <div className="flow-step engine">
               <div className="flow-num">2</div>
               <div>
+                <span className="actor engine">Engine</span>
                 <h3>The engine rolls, in code</h3>
                 <p>A real d20, plus your Charisma modifier and any support, against a difficulty the encounter set. Computed in JavaScript. No model call.</p>
                 <span className="tag">deterministic · dice.js</span>
@@ -59,14 +89,16 @@ const EnginePage = () => (
             <div className="flow-step engine">
               <div className="flow-num">3</div>
               <div>
+                <span className="actor engine">Engine</span>
                 <h3>The outcome is decided</h3>
                 <p>Pass or fail, any damage, any loot, all settled by the engine before a word of prose exists. This is the part the model cannot touch.</p>
-                <span className="tag">encounterResolver.js</span>
+                <a className="tag" href={COMBAT_URL} target="_blank" rel="noopener noreferrer">encounterResolver.js →</a>
               </div>
             </div>
-            <div className="flow-step">
+            <div className="flow-step ai">
               <div className="flow-num">4</div>
               <div>
+                <span className="actor ai">AI</span>
                 <h3>The AI narrates it</h3>
                 <p>The model is handed the result and writes the scene: the harbor master relents, or doesn't. It colors what happened. It never changes it.</p>
                 <span className="tag muted">the model, at last</span>
@@ -74,7 +106,7 @@ const EnginePage = () => (
             </div>
           </div>
 
-          <div className="roll-card" style={{ alignSelf: "start" }} aria-label="The resolved skill check the model was handed">
+          <div className="roll-card" style={{ alignSelf: "start", position: "sticky", top: "6rem" }} aria-label="The resolved skill check the model was handed">
             <div className="roll-head">
               <span className="roll-tag">The result, before prose</span>
               <span className="roll-quest">Persuade the harbor master</span>
@@ -105,7 +137,6 @@ const EnginePage = () => (
                 </div>
               </div>
             </div>
-            <p className="roll-foot">Every number here was fixed by the engine. The model receives this object and narrates from it.</p>
           </div>
         </div>
       </div>
@@ -140,38 +171,8 @@ const EnginePage = () => (
       </div>
     </section>
 
-    {/* THREE PILLARS */}
-    <section className="band">
-      <div className="wrap">
-        <div className="section-head">
-          <p className="eyebrow">Why it holds</p>
-          <h2>Three things that are true here and almost nowhere else.</h2>
-        </div>
-        <div className="cards-3">
-          <article className="feat">
-            <div className="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></svg></div>
-            <h3>Resolved in code</h3>
-            <p>Combat and skill checks are computed in deterministic JavaScript. The combat path makes zero model calls: the engine rolls, applies damage, and pays out loot on its own.</p>
-            <div className="foot">dice.js · encounterResolver.js · multiRoundEncounter.js</div>
-          </article>
-          <article className="feat">
-            <div className="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l7 4v6c0 4-3 7-7 10-4-3-7-6-7-10V6z" /><path d="M9 12l2 2 4-4" /></svg></div>
-            <h3>Open source</h3>
-            <p>The engine is Apache-2.0. The dice code is public. DungeonGPT is the only shipped AI GM where anyone can read exactly how checks and combat are resolved.</p>
-            <div className="foot"><a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">Apache-2.0 · auditable repo</a></div>
-          </article>
-          <article className="feat">
-            <div className="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v11H7l-3 3z" /><path d="M8 10h8M8 13h5" /></svg></div>
-            <h3>Narrated, not judged</h3>
-            <p>The model's whole job is prose. It is told what the engine decided, then writes the scene. Storytelling and integrity, kept firmly apart.</p>
-            <div className="foot">engine referees · model narrates</div>
-          </article>
-        </div>
-      </div>
-    </section>
-
     {/* HONESTY */}
-    <section className="band band-alt">
+    <section className="band">
       <div className="wrap">
         <div className="section-head">
           <p className="eyebrow purple">Straight about the limits</p>
@@ -180,7 +181,7 @@ const EnginePage = () => (
         </div>
         <div className="claims">
           <div className="claim do">
-            <h3>What is true today</h3>
+            <h3><ShieldCheck /> What is true today</h3>
             <ul>
               <li><Check /> Dice and combat are resolved in open code you can read.</li>
               <li><Check /> That code runs in your browser: you can open dev tools and watch a roll happen.</li>
@@ -188,7 +189,7 @@ const EnginePage = () => (
             </ul>
           </div>
           <div className="claim dont">
-            <h3>What we do not claim (yet)</h3>
+            <h3><Hourglass /> What we do not claim (yet)</h3>
             <ul>
               <li><Cross /> A cryptographic proof that the deployed build byte-for-byte matches the public source.</li>
               <li><Cross /> Per-roll "provably fair" verification. It's a natural next step, and on the roadmap, not shipped.</li>
@@ -199,25 +200,25 @@ const EnginePage = () => (
     </section>
 
     {/* RULESET */}
-    <section className="band">
+    <section className="band band-alt">
       <div className="wrap">
         <div className="section-head">
           <p className="eyebrow">The ruleset</p>
           <h2>A custom d20 system. 5e-inspired, deliberately not the SRD.</h2>
         </div>
         <div className="rules-grid">
-          <div className="rule"><div className="k">Six ability scores</div><div className="v">Str, Dex, Con, Int, Wis, Cha. Modifier = <code>(score − 10) / 2</code>.</div></div>
-          <div className="rule"><div className="k">Checks vs DC</div><div className="v">d20 + modifier against a difficulty class the encounter sets.</div></div>
-          <div className="rule"><div className="k">Advantage / disadvantage</div><div className="v">Roll twice, take the higher or the lower.</div></div>
-          <div className="rule"><div className="k">Crits</div><div className="v">Natural 20 and natural 1 swing the outcome, win or lose.</div></div>
-          <div className="rule"><div className="k">Multi-round bosses</div><div className="v">A lead hero rolls; the party adds support; enemy HP is a real knob.</div></div>
-          <div className="rule"><div className="k">No hidden numbers</div><div className="v">Every modifier that touched a roll is shown in its breakdown.</div></div>
+          <div className="rule"><div className="mark"><RuleIcon name="stats" /></div><div className="k">Six ability scores</div><div className="v">Str, Dex, Con, Int, Wis, Cha. Modifier = <code>Math.floor((score − 10) / 2)</code>.</div></div>
+          <div className="rule"><div className="mark"><RuleIcon name="target" /></div><div className="k">Checks vs DC</div><div className="v">d20 + modifier against a difficulty class the encounter sets.</div></div>
+          <div className="rule"><div className="mark"><RuleIcon name="dice" /></div><div className="k">Advantage / disadvantage</div><div className="v">Roll twice, take the higher or the lower.</div></div>
+          <div className="rule"><div className="mark"><RuleIcon name="star" /></div><div className="k">Crits</div><div className="v">Natural 20 and natural 1 swing the outcome, win or lose.</div></div>
+          <div className="rule"><div className="mark"><RuleIcon name="crown" /></div><div className="k">Multi-round bosses</div><div className="v">A lead hero rolls; the party adds support; enemy HP is a real knob.</div></div>
+          <div className="rule"><div className="mark"><RuleIcon name="eye" /></div><div className="k">No hidden numbers</div><div className="v">Every modifier that touched a roll is shown in its breakdown.</div></div>
         </div>
       </div>
     </section>
 
     {/* CTA */}
-    <section className="band band-alt">
+    <section className="band">
       <div className="wrap final">
         <p className="eyebrow">See it for yourself</p>
         <h2>Play a turn, then go read the code that resolved it.</h2>

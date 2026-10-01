@@ -26,9 +26,9 @@ export const TOUR_STEPS = [
   {
     id: 'home-start',
     route: '/',
-    target: '[data-tour="start-adventure"]',
+    target: '[data-tour="home-play"]',
     title: 'Welcome — start here',
-    body: 'New here? Click Start Adventure to pick your first adventure. You choose your hero right after.',
+    body: 'New here? Click here to pick your first adventure. You choose your hero right after.',
   },
   {
     id: 'create-hero-basics',
