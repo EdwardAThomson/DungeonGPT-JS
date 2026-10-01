@@ -1,9 +1,9 @@
 .login-page {
-  min-height: 100vh;
+  min-height: 60vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--bg);
+  background-color: transparent; /* the page bg already sits behind; a second --bg panel read as an empty box */
   padding: 20px;
 }
 
@@ -175,6 +175,12 @@
 
 .how-to-play-link,
 .back-home-link {
+  /* border-box + centred flex: the mobile 44px touch-target min-height otherwise adds
+     to the padding (66px tall, text stuck at the top) */
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   padding: 10px;
   border-radius: 4px;

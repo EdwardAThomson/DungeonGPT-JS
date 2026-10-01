@@ -583,6 +583,12 @@
   color: var(--bg);
 }
 
+/* The hover rule above recolours the text gold; on a selected (gold) button that hid the
+   label entirely, and touch screens keep :hover after a tap, so it was always blank there. */
+.hero-item:hover .hero-select-cta.is-selected {
+  color: var(--bg);
+}
+
 .hero-item.at-limit {
   opacity: 0.55;
 }

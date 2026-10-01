@@ -98,6 +98,18 @@ describe('composeIntro', () => {
         const b = composeIntro({ grimnessLevel: 'Bleak' }, heroes, opts);
         expect(a).toBe(b);
     });
+
+    it('agrees the arrival verb with party size and reads "amid the <land>"', () => {
+        const town = { startPlaceName: 'Willowdale', isTown: true, startSize: 'city', biome: 'beach', currentMilestone: null };
+        const solo = composeIntro({}, heroes, town);
+        expect(solo).toContain('comes at last within sight of Willowdale');
+        expect(solo).toContain('set amid the wave-battered coast');
+        const pair = [...heroes, { characterName: 'Lyra', characterClass: 'Rogue' }];
+        expect(composeIntro({}, pair, town)).toContain(' come at last within sight of Willowdale');
+        const wild = { startPlaceName: 'the wilds', isTown: false, biome: 'forest', currentMilestone: null };
+        expect(composeIntro({}, heroes, wild)).toContain('arrives in the deep woodland');
+        expect(composeIntro({}, pair, wild)).toContain(' arrive in the deep woodland');
+    });
 });
 
 describe('formatStartObjective', () => {

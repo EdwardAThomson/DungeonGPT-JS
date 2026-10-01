@@ -257,9 +257,6 @@ const HeroSelection = () => {
           <button onClick={handleCreateHero} className="create-new-button">
             New Hero
           </button>
-          <button onClick={handleNext} className="next-button" disabled={selectedHeroes.length === 0 || selectedHeroes.length > 4} data-tour="start-game">
-            Start Game ({selectedHeroes.length})
-          </button>
         </div>
       </div>
 
@@ -361,10 +358,7 @@ const HeroSelection = () => {
       <div className="form-actions hero-selection-actions">
         {levelWarningBanner}
         {selectionError && <p className="error-message">{selectionError}</p>}
-        <button onClick={handleBack} className="back-button">
-          ← Back to Story Setup
-        </button>
-        <button onClick={handleNext} className="next-button" disabled={selectedHeroes.length === 0 || selectedHeroes.length > 4}>
+        <button onClick={handleNext} className="next-button" disabled={selectedHeroes.length === 0 || selectedHeroes.length > 4} data-tour="start-game">
           Start Game with Selected Heroes
         </button>
       </div>

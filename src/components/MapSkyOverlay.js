@@ -98,8 +98,8 @@ const MapSkyOverlay = () => {
 
   return (
     <div className="mapsky-overlay" aria-hidden="true">
-      {clouds.map((c) => <Cloud key={c.key} {...c} />)}
-      {birds.map((b) => <Bird key={b.key} {...b} />)}
+      {clouds.map(({ key, ...c }) => <Cloud key={key} {...c} />)}
+      {birds.map(({ key, ...b }) => <Bird key={key} {...b} />)}
     </div>
   );
 };

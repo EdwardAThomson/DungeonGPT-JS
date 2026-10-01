@@ -36,7 +36,7 @@ const Login = () => {
           Continue to Sign In
         </button>
         <div className="login-links">
-          <Link to="/how-to-play" className="how-to-play-link">
+          <Link to="/getting-started" className="how-to-play-link">
             📚 How to Play
           </Link>
           <Link to="/" className="back-home-link">

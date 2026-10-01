@@ -219,6 +219,14 @@
   color: var(--text);
 }
 
+/* Phones: one compact row ("Playing as a guest." + Sign in + close) instead of a
+   ~180px block on every page; the full explanation stays on wider screens. */
+@media (max-width: 600px) {
+  .guest-banner { flex-wrap: nowrap; padding: 8px 12px; gap: 10px; }
+  .guest-banner-detail { display: none; }
+  .guest-banner-cta { padding: 6px 12px; }
+}
+
 /* Local-hero import confirmation toast */
 .local-sync-toast {
   position: fixed;

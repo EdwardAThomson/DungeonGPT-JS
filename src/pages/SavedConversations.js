@@ -125,8 +125,8 @@ const SavedConversations = () => {
 
   return (
     <div className="page-container">
-      <h1>Saved Conversations</h1>
-      <p className="page-instructions">Manage your saved game sessions. Click "Load" to continue a previous adventure.</p>
+      <h1>Your Games</h1>
+      <p className="page-instructions">Pick up any campaign where you left off. Click "Load" to continue.</p>
 
       {conversations.length === 0 ? (
         !user && hasHadAccount() ? (
@@ -331,14 +331,17 @@ const SavedConversations = () => {
         />
       </Suspense>
 
-      <div className="navigation-buttons">
-        <button onClick={() => navigate('/')} className="back-button">
-          Back to Home
-        </button>
-        <button onClick={() => navigate('/new-game')} className="new-game-button">
-          Start New Game
-        </button>
-      </div>
+      {/* Hidden when empty: the empty state already carries the one "Start a New Game" CTA. */}
+      {conversations.length > 0 && (
+        <div className="navigation-buttons">
+          <button onClick={() => navigate('/')} className="back-button">
+            Back to Home
+          </button>
+          <button onClick={() => navigate('/new-game')} className="new-game-button">
+            Start New Game
+          </button>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmId && (
