@@ -38,6 +38,7 @@ const ROWS = [
 
 const WorldFixedMapTest = () => {
   const cols = ROWS[0].length;
+  const grid = ROWS.map((row, y) => row.split('').map((ch, x) => ({ x, y, ...(LEGEND[ch] || LEGEND['.'])() })));
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>World Fixed Map <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>— render test (not generated)</span></h2>
@@ -50,13 +51,12 @@ const WorldFixedMapTest = () => {
         display: 'grid', gridTemplateColumns: `repeat(${cols}, ${TILE}px)`, width: cols * TILE,
         border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden',
       }}>
-        {ROWS.flatMap((row, y) =>
-          row.split('').map((ch, x) => {
-            const tile = { x, y, ...(LEGEND[ch] || LEGEND['.'])() };
+        {grid.flatMap((row, y) =>
+          row.map((tile, x) => {
             const poi = poiSprite(tile);
             return (
               <div key={`${x},${y}`} style={{
-                width: TILE, height: TILE, backgroundImage: biomeBackground(tile, x, y), backgroundSize: 'cover', position: 'relative',
+                width: TILE, height: TILE, backgroundImage: biomeBackground(tile, x, y, grid), backgroundSize: 'cover', position: 'relative',
               }} title={`(${x},${y}) ${tile.biome}${tile.poi ? ` / ${tile.poi}` : ''}${tile.townSize ? ` [${tile.townSize}]` : ''}`}>
                 {poi && <div style={{ position: 'absolute', inset: 0, backgroundImage: poi, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }} />}
               </div>

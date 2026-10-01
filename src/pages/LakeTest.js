@@ -57,8 +57,8 @@ const DIR_NAME = {
   8: 'NE out', 9: 'SE out', 10: 'SW out', 11: 'NW out', // convex outer corners
 };
 
-const Cell = ({ tile, showLabels }) => (
-  <div style={{ width: TILE, height: TILE, position: 'relative', backgroundImage: biomeBackground(tile, tile.x, tile.y), backgroundSize: 'cover' }}>
+const Cell = ({ tile, grid, showLabels }) => (
+  <div style={{ width: TILE, height: TILE, position: 'relative', backgroundImage: biomeBackground(tile, tile.x, tile.y, grid), backgroundSize: 'cover' }}>
     {showLabels && tile.biome === 'beach' && (
       <span style={{
         position: 'absolute', top: 2, left: 3, fontSize: 11, fontWeight: 700,
@@ -107,7 +107,7 @@ const LakeTest = () => {
             display: 'grid', gridTemplateColumns: `repeat(${map[0].length}, ${TILE}px)`, width: map[0].length * TILE,
             border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden',
           }}>
-            {map.flat().map((t) => <Cell key={`${t.x},${t.y}`} tile={t} showLabels={showLabels} />)}
+            {map.flat().map((t) => <Cell key={`${t.x},${t.y}`} tile={t} grid={map} showLabels={showLabels} />)}
           </div>
         </section>
       ))}

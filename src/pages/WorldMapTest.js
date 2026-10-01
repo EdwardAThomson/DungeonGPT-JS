@@ -1,17 +1,23 @@
 import React, { useState, useEffect } from "react";
 import WorldMapDisplay from "../components/WorldMapDisplay";
 import { generateMapData } from "../utils/mapGenerator";
+import { useDebugMapSettings } from "../utils/debugMapSettings";
 
 const WorldMapTest = () => {
     const [mapData, setMapData] = useState(null);
-    const [seed, setSeed] = useState(Math.floor(Math.random() * 1000000).toString());
-    const [width, setWidth] = useState(10);
-    const [height, setHeight] = useState(10);
+    // Shared across all world-map debug pages (sessionStorage-backed) so switching between
+    // this page and world-map-art/river-path-test keeps you looking at the SAME map, and
+    // navigating away and back doesn't reset seed/size back to page defaults.
+    const [applied, setApplied] = useDebugMapSettings();
+    const [seed, setSeed] = useState(String(applied.seed));
+    const [width, setWidth] = useState(applied.width);
+    const [height, setHeight] = useState(applied.height);
 
     const handleGenerate = () => {
         const numericSeed = parseInt(seed) || 0;
         const newMap = generateMapData(width, height, numericSeed);
         setMapData(newMap);
+        setApplied({ seed: numericSeed, width, height });
     };
 
     // Generate initial map

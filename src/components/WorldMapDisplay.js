@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { biomeBackground, poiSprite } from '../utils/worldTileArt';
 import WorldMapLabels from './WorldMapLabels';
+import MapSkyOverlay from './MapSkyOverlay';
 import {
   CLOSE_TILE,
   CLICK_DRAG_THRESHOLD,
@@ -97,7 +98,13 @@ const renderRiverOverlay = (tile) => {
 
 // Helper function to render path overlay
 const renderPathOverlay = (tile, beachShift) => {
-  if (!tile.hasPath) return null;
+  // Pathfinding treats water as a very costly but not forbidden tile (a last-resort
+  // route around a lake with no other way through, see pathfinding.js), so hasPath can
+  // legitimately be true on a water tile. There's no bridge/ford art for that case, so
+  // rendering the plain road stroke straight over the water reads as a rendering defect
+  // (a road-colored line cutting across open water) rather than a road. Skip it here,
+  // same as renderRiverOverlay already does for rivers on water tiles above.
+  if (!tile.hasPath || tile.biome === 'water') return null;
 
   const pathD = pathSVGs[tile.pathDirection] || pathSVGs.NORTH_SOUTH;
 
@@ -335,7 +342,17 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
         key={`${tile.x}-${tile.y}`}
         className={`map-tile ${isPlayerHere ? 'player-tile' : ''} ${!tile.isExplored ? 'unexplored' : ''} ${isActiveMilestonePoi ? 'milestone-poi-tile' : ''}`}
         style={{
-          backgroundImage: biomeBackground(tile, tile.x, tile.y),
+          // Explicit size (belt-and-braces alongside the grid track size below): keeps
+          // each tile's box an exact integer CSS-pixel square rather than relying on grid
+          // stretch to size it. The actual seam-bleed fix is the tile having NO border
+          // (see .map-tile in maps.css) — verified across five browser zoom levels
+          // (75/90/100/110/125%) that a bordered tile abutting a plain-content neighbour
+          // produces a stray sand/water-coloured line along the shared edge (independent
+          // subpixel rounding of each grid track at fractional zoom becomes visible right
+          // at the border), while an unbordered tile is clean at every level tested.
+          width: tileSize,
+          height: tileSize,
+          backgroundImage: biomeBackground(tile, tile.x, tile.y, mapData),
           backgroundSize: 'cover',
           cursor: 'pointer', // Indicate clickable
           position: 'relative', // For overlays / player marker positioning
@@ -345,28 +362,38 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
         onClick={() => handleTileClick(tile.x, tile.y)}
         title={`${tile.townName || tile.mountainName || `(${tile.x}, ${tile.y})`} - ${tile.biome}${tile.poi && !isSiteHidden && !isMilestoneHidden ? ` (${tile.poi})` : ''}${tile.townSize ? ` [${tile.townSize}]` : ''}${tile.isExplored ? ' (Explored)' : ''}`} // Tooltip
       >
-        {/* Render river overlay (below POI) */}
-        {renderRiverOverlay(tile)}
+        {/* River/path overlays and the POI sprite all get a beachShift nudge (translateX/Y)
+            toward the land side on beach tiles. That shift moves the WHOLE absolutely-
+            positioned box, not just its internal content — with nothing clipping it, the
+            shifted box visually paints over the neighbouring tile (found via playtest: a
+            road/river-coloured line bleeding into an adjacent tile that has no path/river
+            of its own). Contained here so only this shiftable layer gets clipped to the
+            tile's own box; the player marker below is deliberately larger than one tile
+            (it overlaps neighbours on purpose for visibility) and must stay unclipped. */}
+        <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          {/* Render river overlay (below POI) */}
+          {renderRiverOverlay(tile)}
 
-        {/* Render path overlay (below POI) */}
-        {renderPathOverlay(tile, beachShift)}
+          {/* Render path overlay (below POI) */}
+          {renderPathOverlay(tile, beachShift)}
 
-        {/* POI sprite overlay */}
-        {poi && (
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              zIndex: 2,
-              backgroundImage: poi,
-              backgroundSize: 'contain',
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'center',
-              pointerEvents: 'none',
-              transform: beachShift,
-            }}
-          />
-        )}
+          {/* POI sprite overlay */}
+          {poi && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 2,
+                backgroundImage: poi,
+                backgroundSize: 'contain',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+                pointerEvents: 'none',
+                transform: beachShift,
+              }}
+            />
+          )}
+        </div>
 
         {/* Display player marker when on this tile */}
         {isPlayerHere && (
@@ -437,6 +464,11 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
       } : {})}
     >
       {tiles}
+
+      {/* Ambient clouds + occasional birds over the FULL (zoom-scaled) grid — sized the
+          same way as WorldMapLabels below, so it pans/zooms in lockstep with the tiles
+          rather than staying fixed to the visible pane. */}
+      <MapSkyOverlay />
 
       {/* Name labels drawn as parchment scrolls over the (position:relative) grid */}
       <WorldMapLabels labels={labels} tile={tileSize} fontSize={Math.max(7, Math.round(10 * scale))} />

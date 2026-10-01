@@ -7,10 +7,11 @@ import React, { useMemo } from 'react';
 import { generateMapData } from '../utils/mapGenerator';
 import { biomeBackground, poiSprite } from '../utils/worldTileArt';
 import WorldMapLabels from './WorldMapLabels';
+import MapSkyOverlay from './MapSkyOverlay';
 
 const TILE = 40;
 const WIDTH = 10;
-const HEIGHT = 8;
+const HEIGHT = 10;
 const SEED = 90210;
 const HERO_MARKER = '/assets/characters/fighter.webp';
 
@@ -34,19 +35,20 @@ const Overlay = ({ d, stroke, width, opacity, transform }) => (
   </svg>
 );
 
-const HomeWorldMap = () => {
-  const world = useMemo(() => generateMapData(WIDTH, HEIGHT, SEED, {}, 'grassland'), []);
+const HomeWorldMap = ({ seed = SEED }) => {
+  const world = useMemo(() => generateMapData(WIDTH, HEIGHT, seed, {}, 'grassland'), [seed]);
   const cols = world[0].length;
 
   // Stand the party marker on a land tile ADJACENT to the starting town, so the marker
   // (which is larger than a tile) doesn't cover the town's own icon. Prefer below, then
-  // the sides, then up, then diagonals; fall back to the town tile itself.
+  // the sides, then up, then diagonals; fall back to the town tile itself. Edge tiles are
+  // skipped: the marker is bigger than a tile and the map clips its overflow.
   const markerPos = useMemo(() => {
     let town = null;
     world.flat().forEach((t) => { if (t.isStartingTown) town = t; });
     if (!town) return null;
     const isLand = (x, y) => {
-      if (y < 0 || y >= world.length || x < 0 || x >= world[0].length) return false;
+      if (y < 1 || y >= world.length - 1 || x < 1 || x >= world[0].length - 1) return false;
       const t = world[y][x];
       return t && t.biome !== 'water' && !t.isStartingTown && !t.poi;
     };
@@ -81,14 +83,31 @@ const HomeWorldMap = () => {
           const poi = poiSprite(tile);
           const beachShift = (tile.biome === 'beach' && tile.beachDirection != null) ? BEACH_SHIFT[tile.beachDirection] : 'none';
           return (
-            <div key={`${tile.x},${tile.y}`} style={{ width: TILE, height: TILE, backgroundImage: biomeBackground(tile, tile.x, tile.y), backgroundSize: 'cover', position: 'relative' }}>
-              {tile.hasRiver && tile.biome !== 'water' && (
-                <Overlay d={pathSVGs[tile.riverDirection] || pathSVGs.NORTH_SOUTH} stroke="#3f7cc2" width={4} opacity={0.85} />
-              )}
-              {tile.hasPath && (
-                <Overlay d={pathSVGs[tile.pathDirection] || pathSVGs.NORTH_SOUTH} stroke="#7a5230" width={3} opacity={0.8} transform={beachShift} />
-              )}
-              {poi && <div style={{ position: 'absolute', inset: 0, zIndex: 2, backgroundImage: poi, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', transform: beachShift }} />}
+            <div key={`${tile.x},${tile.y}`} style={{ width: TILE, height: TILE, backgroundImage: biomeBackground(tile, tile.x, tile.y, world), backgroundSize: 'cover', position: 'relative' }}>
+              {/* River/path overlays and the POI sprite all get a beachShift nudge
+                  (translateX/Y) toward the land side on beach tiles. That shift moves the
+                  WHOLE absolutely-positioned box, not just its internal content — with
+                  nothing clipping it, the shifted box visually paints over the neighbouring
+                  tile (found via playtest: a road/river-coloured line bleeding into an
+                  adjacent tile that has no path/river of its own). Contained here so only
+                  this shiftable layer gets clipped to the tile's own box; the hero marker
+                  below is deliberately larger than one tile (TILE*1.25, overlapping
+                  neighbours on purpose for visibility) and must stay unclipped. */}
+              <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+                {tile.hasRiver && tile.biome !== 'water' && (
+                  <Overlay d={pathSVGs[tile.riverDirection] || pathSVGs.NORTH_SOUTH} stroke="#3f7cc2" width={4} opacity={0.85} />
+                )}
+                {/* Pathfinding treats water as a very costly but not forbidden tile (a
+                    last-resort route around a lake with no other way through), so hasPath
+                    can legitimately be true on a water tile — with no bridge/ford art for
+                    that case, drawing the road stroke over the water reads as a rendering
+                    defect (a road-colored line across open water), not a road. Skip it,
+                    same as the river overlay already does above. */}
+                {tile.hasPath && tile.biome !== 'water' && (
+                  <Overlay d={pathSVGs[tile.pathDirection] || pathSVGs.NORTH_SOUTH} stroke="#7a5230" width={3} opacity={0.8} transform={beachShift} />
+                )}
+                {poi && <div style={{ position: 'absolute', inset: 0, zIndex: 2, backgroundImage: poi, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', transform: beachShift }} />}
+              </div>
               {markerPos && tile.x === markerPos.x && tile.y === markerPos.y && (
                 <div
                   aria-hidden="true"
@@ -104,6 +123,7 @@ const HomeWorldMap = () => {
             </div>
           );
         })}
+        <MapSkyOverlay />
         <WorldMapLabels labels={mapLabels} tile={TILE} />
       </div>
     </div>

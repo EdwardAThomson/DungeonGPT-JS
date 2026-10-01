@@ -991,8 +991,8 @@ function stampCoast(mapData, width, height, edge, depth) {
 // depths[i] is the total band thickness (water strips + one beach strip). The water rows
 // are stamped directly; the beach then comes from addLakeShores — the exact same
 // directional shore ring lakes use — so every depth STEP in the profile gets the lake
-// visual language (worldTileArt BEACH_CORNERS): a concave diagonal chamfer on the inner
-// corner (beachDirection 4-7) and a convex diagonal wedge on the outer corner (8-11),
+// visual language (worldTileArt CORNER_GEOM): a concave rounded chamfer on the inner
+// corner (beachDirection 4-7) and a convex rounded wedge on the outer corner (8-11),
 // instead of a hard right-angle stair. Straight sections come out identical to the
 // uniform band (beachDirection = edge). Works for both step directions and needs no new
 // tile field or art: coast corners and lake corners share one representation.
