@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sendEvent } from '../services/telemetry';
 import SafeMarkdownMessage from './SafeMarkdownMessage';
 import NarrativeHookChips from './NarrativeHookChips';
 import SaveSyncIndicator from './SaveSyncIndicator';
+import RdDialog from './RdDialog';
 
 // Player-action length guard (maintainer 2026-07-06): the worker rejects
 // composed prompts over 32k chars, of which the typed action is one slice
@@ -13,6 +14,29 @@ import SaveSyncIndicator from './SaveSyncIndicator';
 // counter turns red and Send is blocked.
 export const MAX_ACTION_CHARS = 2000;
 const COUNTER_SHOW_AT = 1700;
+
+// Readable place line for the header ("Open plains", "Willowdale · The Crooked Pint").
+// The world coordinates stay as a small suffix: they orient the player on the map and the
+// guest save/resume e2e reads this line to detect a move.
+const BIOME_LABEL = {
+  plains: 'Open plains', grassland: 'Open grassland', grass: 'Open grassland', forest: 'Forest',
+  woodland: 'Woodland', hills: 'Hills', mountain: 'Mountains', mountains: 'Mountains',
+  beach: 'Coast', water: 'Open water', desert: 'Desert', snow: 'Snowfields', swamp: 'Marsh',
+};
+const biomeLabel = (b) => BIOME_LABEL[b] || (b ? b.charAt(0).toUpperCase() + b.slice(1) : 'The wilds');
+
+const ICON = {
+  map: <><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4z" /><path d="M8 2v16M16 6v16" /></>,
+  journal: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></>,
+  look: <><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></>,
+  pack: <><path d="M5 8h14l-1 13H6z" /><path d="M9 8V6a3 3 0 0 1 6 0v2" /></>,
+  help: <><circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></>,
+  save: <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><path d="M17 21v-8H7v8M7 3v5h8" /></>,
+  send: <><path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4z" /></>,
+};
+const Icon = ({ name }) => (
+  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICON[name]}</svg>
+);
 
 const GameMainPanel = ({
   campaignGoal,
@@ -64,61 +88,73 @@ const GameMainPanel = ({
 }) => {
   // High-intent conversion prompt: fired when a guest reaches for the gated AI chat.
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  // Keep the newest entry in view as the log grows (new narration, the thinking line).
+  const logRef = useRef(null);
+  useEffect(() => {
+    const el = logRef.current;
+    if (!el) return;
+    if (typeof el.scrollTo === 'function') el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    else el.scrollTop = el.scrollHeight;
+  }, [conversation.length, isLoading]);
   return (
-    <div className="game-main">
-      <div className="game-top">
-        <h2>Adventure Log</h2>
-        <div className="game-info-header">
-          <div>
-            <p><strong>Location:</strong> {townName
-              ? `(${worldPosition.x}, ${worldPosition.y}) - ${currentBiome} | ${townName} - ${subLocationName}`
-              : `(${worldPosition.x}, ${worldPosition.y}) - ${currentBiome}`
-            }</p>
-          </div>
-          <div className="header-button-group">
-            <button onClick={onOpenMap} className="view-map-button" data-tour="open-map" aria-label={townName ? `View ${townName} map` : 'View world map'}>
-              <span aria-hidden="true">🗺️</span> {townName ? `${townName} Map` : 'Map'}
-            </button>
-            <button onClick={onOpenSettings} className="view-settings-button" aria-label="Open journal">
-              <span aria-hidden="true">📖</span> Journal
-            </button>
-            {hasAdventureStarted && (
-              <button onClick={onLookAround} className="look-around-button" disabled={isLoading} aria-label="Look around the current location">
-                <span aria-hidden="true">🔍</span> Look around
-              </button>
-            )}
-            <button onClick={onOpenInventory} className="view-settings-button" aria-label="Open party inventory">
-              <span aria-hidden="true">📦</span> Inventory
-            </button>
-            <button onClick={onOpenHowToPlay} className="how-to-play-button" aria-label="Open how to play guide">
-              <span aria-hidden="true">📜</span> How to Play
-            </button>
-            <button onClick={onManualSave} className="manual-save-button" disabled={!canManualSave} aria-label="Save game manually">
-              <span aria-hidden="true">💾</span> Save
-            </button>
-            <SaveSyncIndicator status={saveStatus} isSaving={isSaving} signedIn={signedIn} />
-          </div>
+    <div className="gm-main">
+      <header className="gm-head">
+        <div className="game-info-header gm-place">
+          <h2 className="gm-eyebrow">Adventure Log</h2>
+          <p>
+            <span className="gm-place-name">{townName || biomeLabel(currentBiome)}</span>
+            {townName && subLocationName && <span className="gm-place-sub"> · {subLocationName}</span>}
+            <span className="gm-place-coords"> ({worldPosition.x}, {worldPosition.y})</span>
+          </p>
         </div>
-      </div>
-
-      <div className="conversation">
-        {!hasAdventureStarted && !isLoading && (
-          <div className="start-adventure-overlay">
-            <button onClick={onStartAdventure} className="start-adventure-button" aria-label="Start the adventure" data-tour="start-adventure">
-              Start the Adventure!
+        <nav className="gm-tools" aria-label="Game actions">
+          <button type="button" onClick={onOpenMap} className="gm-tool primary" data-tour="open-map" aria-label={townName ? `View ${townName} map` : 'View world map'}>
+            <Icon name="map" /><span>{townName ? 'Town map' : 'Map'}</span>
+          </button>
+          <button type="button" onClick={onOpenSettings} className="gm-tool" aria-label="Open journal">
+            <Icon name="journal" /><span>Journal</span>
+          </button>
+          {hasAdventureStarted && (
+            <button type="button" onClick={onLookAround} className="gm-tool" disabled={isLoading} aria-label="Look around the current location">
+              <Icon name="look" /><span>Look around</span>
             </button>
-          </div>
-        )}
+          )}
+          <button type="button" onClick={onOpenInventory} className="gm-tool" aria-label="Open party inventory">
+            <Icon name="pack" /><span>Inventory</span>
+          </button>
+          <button type="button" onClick={onOpenHowToPlay} className="gm-tool" aria-label="Open how to play guide">
+            <Icon name="help" /><span>Help</span>
+          </button>
+          <button type="button" onClick={onManualSave} className="gm-tool" disabled={!canManualSave} aria-label="Save game manually">
+            <Icon name="save" /><span>Save</span>
+          </button>
+          <SaveSyncIndicator status={saveStatus} isSaving={isSaving} signedIn={signedIn} />
+        </nav>
+      </header>
 
-        {/* Quest reminder as virtual first message - not stored in DB */}
-        {campaignGoal && (
-          <div className="message system quest-message">
-            <SafeMarkdownMessage content={`**Quest:** ${campaignGoal}`} />
+      {/* Quest reminder: pinned above the log, not stored in the conversation */}
+      {campaignGoal && (
+        <div className="gm-quest quest-message">
+          <span className="gm-quest-label">Quest</span>
+          <span>{campaignGoal}</span>
+        </div>
+      )}
+
+      <div className="gm-log conversation" aria-live="polite" ref={logRef}>
+        {!hasAdventureStarted && !isLoading && (
+          <div className="gm-start">
+            <div className="gm-start-card">
+              <p className="gm-eyebrow">Your story begins</p>
+              <h3>The road is open.</h3>
+              <button onClick={onStartAdventure} className="btn btn-primary gm-start-btn" aria-label="Start the adventure" data-tour="start-adventure">
+                Start the Adventure
+              </button>
+            </div>
           </div>
         )}
 
         {conversation.map((msg, index) => (
-          <div key={index} className={`message ${msg.role}`}>
+          <div key={index} className={`gm-msg message ${msg.role}`}>
             <SafeMarkdownMessage content={msg.content} />
             {hookChips && hookChips.message === msg && (
               <NarrativeHookChips
@@ -130,52 +166,52 @@ const GameMainPanel = ({
           </div>
         ))}
         {isLoading && (
-          <p className="message system">
+          <p className="gm-msg message system gm-thinking">
+            <span className="gm-dots" aria-hidden="true"><i /><i /><i /></span>
             {progressStatus?.elapsed > 5
-              ? `AI is working... (${progressStatus.elapsed}s)`
-              : 'AI is thinking...'}
+              ? `The Dungeon Master is working... (${progressStatus.elapsed}s)`
+              : 'The Dungeon Master is thinking...'}
           </p>
         )}
-        {error && <p className="message error">{error}</p>}
+        {error && <p className="gm-msg message error">{error}</p>}
       </div>
 
-      <div className="game-lower-section">
+      <div className="gm-compose">
         <form onSubmit={aiAvailable ? onSubmit : (e) => e.preventDefault()}>
           <label htmlFor="user-action-input" className="sr-only">Your action</label>
-          <div className="user-input-wrap" style={{ position: 'relative' }}>
+          <div className="gm-input-wrap">
             <textarea
               id="user-action-input"
               value={userInput}
               onChange={onInputChange}
+              onKeyDown={(e) => {
+                // Enter sends, Shift+Enter adds a line (the form's own submit handler runs).
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && aiAvailable) {
+                  e.preventDefault();
+                  e.currentTarget.form?.requestSubmit();
+                }
+              }}
               placeholder={
                 !aiAvailable
                   ? "Sign in to type actions and unlock the AI Dungeon Master…"
-                  : hasAdventureStarted ? "Type your action..." : "Click 'Start Adventure' above..."
+                  : hasAdventureStarted ? "What do you do?" : "Start the adventure first…"
               }
-              rows="4"
-              className="user-input"
+              rows="2"
+              className="gm-input"
               disabled={!aiAvailable || !hasAdventureStarted || isLoading}
               aria-label="Type your action or command"
             />
             {aiAvailable && userInput.length >= COUNTER_SHOW_AT && (
-              <div
-                className="action-char-counter"
-                style={{
-                  position: 'absolute', right: 10, bottom: 6, fontSize: 11,
-                  color: userInput.length > MAX_ACTION_CHARS ? '#c33' : 'var(--text-secondary)',
-                  fontWeight: userInput.length > MAX_ACTION_CHARS ? 700 : 400,
-                }}
-                role="status"
-              >
+              <div className={`gm-counter${userInput.length > MAX_ACTION_CHARS ? ' over' : ''}`} role="status">
                 {userInput.length.toLocaleString()} / {MAX_ACTION_CHARS.toLocaleString()}
                 {userInput.length > MAX_ACTION_CHARS ? ': too long to send' : ''}
               </div>
             )}
-            {/* Guests can't type to the DM — a click here is peak intent, so prompt to sign in. */}
+            {/* Guests can't type to the DM; a click here is peak intent, so prompt to sign in. */}
             {!aiAvailable && (
               <button
                 type="button"
-                className="guest-ai-overlay"
+                className="gm-guest-overlay"
                 onClick={() => {
                   sendEvent('ai_gate_shown', {}, { once: true });
                   setShowAuthPrompt(true);
@@ -185,46 +221,46 @@ const GameMainPanel = ({
             )}
           </div>
           {aiAvailable ? (
-            <button type="submit" className="game-send-button" disabled={!hasAdventureStarted || !userInput.trim() || isLoading || userInput.length > MAX_ACTION_CHARS}>
-              {isLoading ? '...' : '↑ Send'}
+            <button type="submit" className="btn btn-primary gm-send" aria-label="Send" disabled={!hasAdventureStarted || !userInput.trim() || isLoading || userInput.length > MAX_ACTION_CHARS}>
+              {isLoading ? '...' : <><Icon name="send" /><span>Send</span></>}
             </button>
           ) : (
-            <Link to="/login" className="game-send-button guest-ai-gate-btn">Sign in</Link>
+            <Link to="/login" className="btn btn-primary gm-send">Sign in</Link>
           )}
         </form>
         {aiAvailable ? (
-          <p className="info">AI responses may not always be accurate or coherent.</p>
+          <p className="gm-note">The engine decides outcomes; the AI narrates. Narration may not always be accurate.</p>
         ) : (
-          <p className="info guest-ai-info">✨ <strong>The AI Dungeon Master is resting.</strong> Keep exploring and fighting as a guest — sign in to type free-form actions and unlock full AI narration.</p>
+          <p className="gm-note guest"><strong>The AI Dungeon Master is resting.</strong> Keep exploring and fighting as a guest; sign in to type your own actions.</p>
         )}
 
         {showAuthPrompt && (
-          <div className="modal-overlay" onClick={() => setShowAuthPrompt(false)}>
-            <div className="modal-content guest-ai-prompt" onClick={(e) => e.stopPropagation()}>
-              <h2>✨ Unlock the AI Dungeon Master</h2>
-              {partyLeadName ? (
-                <p>
-                  Sign in free to keep {partyLeadName}&apos;s
-                  {templateName ? ` ${templateName}` : ''} adventure in your account,
-                  and the AI Dungeon Master will narrate your every move. Right now this
-                  story lives only in this browser.
-                </p>
-              ) : (
-                <p>Sign in to type free-form actions and get live AI narration — and your adventures save to your account so you can keep playing across devices.</p>
-              )}
-              <div className="guest-ai-prompt-actions">
-                <Link to="/login" className="primary-button" onClick={() => sendEvent('ai_gate_signin_click')}>Sign in</Link>
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() => {
-                    sendEvent('ai_gate_dismissed');
-                    setShowAuthPrompt(false);
-                  }}
-                >Maybe later</button>
-              </div>
-            </div>
-          </div>
+          <RdDialog
+            title="Unlock the AI Dungeon Master"
+            onClose={() => setShowAuthPrompt(false)}
+            actions={<>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  sendEvent('ai_gate_dismissed');
+                  setShowAuthPrompt(false);
+                }}
+              >Maybe later</button>
+              <Link to="/login" className="btn btn-primary" onClick={() => sendEvent('ai_gate_signin_click')}>Sign in</Link>
+            </>}
+          >
+            {partyLeadName ? (
+              <p>
+                Sign in free to keep {partyLeadName}&apos;s
+                {templateName ? ` ${templateName}` : ''} adventure in your account,
+                and the AI Dungeon Master will narrate your every move. Right now this
+                story lives only in this browser.
+              </p>
+            ) : (
+              <p>Sign in to type free-form actions and get live AI narration, and your adventures save to your account so you can keep playing across devices.</p>
+            )}
+          </RdDialog>
         )}
 
         {showDebugInfo && (

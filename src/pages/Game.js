@@ -2201,7 +2201,7 @@ const Game = ({ resumeConversation = null }) => {
   }
 
   return (
-    <div className="game-page-wrapper">
+    <div className="gm-page">
       {isBackfilling && backfillProgress && (
         <div style={{
           position: 'fixed',
@@ -2236,7 +2236,7 @@ const Game = ({ resumeConversation = null }) => {
           </div>
         </div>
       )}
-      <div className="game-container">
+      <div className="gm-shell">
         <GameMainPanel
           campaignGoal={settings.campaignGoal}
           partyLeadName={selectedHeroes?.[0]?.heroName || selectedHeroes?.[0]?.characterName || null}
@@ -2321,7 +2321,7 @@ const Game = ({ resumeConversation = null }) => {
 
         {/* Mobile party toggle button - uses first hero portrait */}
         <button
-          className="mobile-party-toggle"
+          className="gm-party-toggle"
           onClick={() => setIsMobilePartySidebarOpen(!isMobilePartySidebarOpen)}
           aria-label="Toggle party sidebar"
         >
@@ -2331,7 +2331,7 @@ const Game = ({ resumeConversation = null }) => {
             <img
               src={resolveProfilePicture(selectedHeroes[0].profilePicture)}
               alt="Party"
-              className="mobile-party-toggle-portrait"
+              className="gm-party-toggle-portrait"
             />
           ) : (
             '⚔️'
@@ -2341,7 +2341,7 @@ const Game = ({ resumeConversation = null }) => {
         {/* Mobile overlay */}
         {isMobilePartySidebarOpen && (
           <div
-            className="mobile-party-overlay"
+            className="gm-party-scrim"
             onClick={() => setIsMobilePartySidebarOpen(false)}
           />
         )}
