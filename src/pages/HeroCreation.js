@@ -10,6 +10,7 @@ import { sanitizeHeroName } from "../utils/validation";
 import { calculateMaxHP } from "../utils/healthSystem";
 import OnboardingSteps from "../components/OnboardingSteps";
 import PortraitPickerModal from "../components/PortraitPickerModal";
+import { resolveProfilePicture } from "../utils/assetHelper";
 import {
   heroGenders,
   heroClasses,
@@ -46,7 +47,10 @@ const HeroCreation = () => {
 
   const [heroName, setHeroName] = useState(heroToEdit?.heroName || "");
   const [selectedGender, setSelectedGender] = useState(heroToEdit?.heroGender || "");
-  const [selectedProfilePicture, setSelectedProfilePicture] = useState(heroToEdit?.profilePicture || null);
+  // Older heroes store a legacy picture value ("barbarian.png"); normalise it to the
+  // current "assets/characters/<name>.webp" form so the preview renders, the gender check
+  // below can match it against profilePictures, and saving the edit migrates the field.
+  const [selectedProfilePicture, setSelectedProfilePicture] = useState(resolveProfilePicture(heroToEdit?.profilePicture) || null);
   // Race selector is hidden (human-only portraits); new heroes default to Human. Legacy
   // heroes keep their saved race. setSelectedRace is still driven by the class template.
   const [selectedRace, setSelectedRace] = useState(heroToEdit?.heroRace || "Human");
@@ -160,9 +164,12 @@ const HeroCreation = () => {
       stats,
     };
 
-    // Enforce the point-buy budget only when creating a brand-new character;
-    // editing an existing one stays lenient (structural checks only).
-    const { valid, reasons } = validateHero(newHero, { enforcePointBuy: !state?.editing });
+    // Point-buy applies to new heroes and to any edit that changes the stats. An edit
+    // that leaves the stats alone (rename, new portrait) stays lenient, so a legacy hero
+    // made before the budget existed can still be saved without a forced respec.
+    const statsChanged = !state?.editing
+      || JSON.stringify(stats) !== JSON.stringify(heroToEdit?.stats || INITIAL_STATS);
+    const { valid, reasons } = validateHero(newHero, { enforcePointBuy: statsChanged });
     if (!valid) {
       setAlertMessage(reasons);
       return;
