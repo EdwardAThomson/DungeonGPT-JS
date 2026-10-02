@@ -53,8 +53,8 @@ const AuthCallback = () => {
           return;
         }
 
-        // Success — go to home page
-        navigate('/', { replace: true });
+        // Success: go to the player's dashboard (the front page stays public at /)
+        navigate('/play', { replace: true });
       } catch (err) {
         setError(err.message || 'Failed to complete authentication');
       }

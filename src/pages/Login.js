@@ -18,7 +18,7 @@ const Login = () => {
 
   // If already logged in, redirect to home
   if (user) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/play" replace />;
   }
 
   return (

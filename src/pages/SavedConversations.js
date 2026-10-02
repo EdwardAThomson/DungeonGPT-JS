@@ -6,9 +6,7 @@ import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { useAuth } from '../contexts/AuthContext';
 import { hasHadAccount } from '../services/accountFlag';
-import { getCampaignProgress } from '../game/milestoneEngine';
-import { resolveCompletedTemplateId } from '../game/campaignChain';
-import { storyTemplates } from '../data/storyTemplates';
+import { saveCardInfo, timeAgo } from '../game/saveCardInfo';
 import '../styles/redesign.css';
 
 // "Your Games": the saved-campaign list, the pilot page for moving the in-app pages onto the
@@ -19,22 +17,6 @@ import '../styles/redesign.css';
 const SavedGameDetailsModal = lazy(() => import('../components/SavedGameDetailsModal'));
 
 const logger = createLogger('saved-conversations');
-
-// "3 hours ago" style label for the last-played line; falls back to a date after a week.
-const timeAgo = (timestamp) => {
-  const then = new Date(timestamp);
-  const mins = Math.round((Date.now() - then.getTime()) / 60000);
-  if (!Number.isFinite(mins)) return '';
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  const days = Math.round(hours / 24);
-  if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`;
-  return then.toLocaleDateString();
-};
-
-const parseMaybe = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
 
 const PageHeader = ({ onNewGame }) => (
   <section className="page-header app-header">
@@ -197,32 +179,12 @@ const SavedConversations = () => {
           ) : (
             <div className="save-grid">
               {conversations.map((conversation) => {
-                const heroes = conversation.selected_heroes ? parseMaybe(conversation.selected_heroes) : [];
-                const settings = conversation.game_settings ? parseMaybe(conversation.game_settings) : null;
+                const { heroes, settings, chapter, progress, art } = saveCardInfo(conversation);
                 // Merged-list honesty badge (SAVE_SYNC_PLAN Phase 2): the newest copy of
                 // this save is local and still awaiting its cloud push. Signed-in players
-                // only; guests see their local list exactly as before (no badge).
+                // only; guests see their local list exactly as before (no badge). A completed
+                // save continues IN the save: load it and use the Journal's "Continue your legend".
                 const showOnThisDeviceBadge = !!user && !!conversation.pendingCloudSync;
-                // Quest-chaining badges (additive settings fields; old saves render none).
-                // currentChapter is the in-save chain record; chain.chapter tolerates saves
-                // made by the retired linked-save build. A completed save continues IN the
-                // save: load it and use the Journal's "Continue your legend".
-                const chapter = settings?.currentChapter || settings?.chain?.chapter;
-                const milestones = Array.isArray(settings?.milestones) ? settings.milestones : [];
-                const progress = milestones.length ? getCampaignProgress(milestones) : null;
-                // Campaign art is keyed by template id. Saves from before templateId was
-                // stamped (2026-07-03) resolve it from their templateName label instead
-                // (the resolver returns the raw label when nothing matches), and a
-                // realm-only label ("Heroic Fantasy", no chapter) gets that realm's first
-                // chapter art. Custom tales, saves with no label, and server-delivered
-                // templates without a card fall through to the generic scene underneath.
-                const resolvedId = resolveCompletedTemplateId(settings);
-                const templateId = /^[a-z0-9-]+$/.test(resolvedId || '')
-                  ? resolvedId
-                  : storyTemplates.find((t) => t.name === settings?.templateName)?.id;
-                const art = templateId && templateId !== 'custom'
-                  ? `url('/assets/templates/${templateId}.webp'), url('/assets/redesign/hero.jpg')`
-                  : `url('/assets/redesign/hero.jpg')`;
                 const isEditing = editingName === conversation.sessionId;
 
                 return (

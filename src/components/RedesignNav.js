@@ -65,7 +65,7 @@ const RedesignNav = ({ isDebugEnabled }) => {
             <Link to="/membership" className="btn btn-ghost" onClick={close}>Subscribe</Link>
             {user ? (
               <>
-                <Link to="/game" className="btn btn-primary" onClick={close}>Play</Link>
+                <Link to="/play" className="btn btn-primary" onClick={close}>Play</Link>
                 <ul className="rd-nav-links rd-profile">
                   <NavDropdown label={accountLabel} items={profileMenu} onNavClose={close} />
                 </ul>

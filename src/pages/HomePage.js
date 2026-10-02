@@ -1,10 +1,10 @@
-// HomePage.js — redesign (#82 §12.3). Auth-aware front door:
-//   logged-out -> marketing landing (dark hero + wedge + world + lineup + pricing + CTA)
-//   logged-in  -> dashboard (continue your campaign + quick actions)
+// HomePage.js: redesign (#82 §12.3). The public front page, the same page for everyone so
+// a shared link shows what the visitor will see. Signed-in players only get a different
+// primary CTA ("Continue playing" -> /play); their dashboard lives at /play (PlayPage.js).
 // Ported from docs/private/landing-mockup/index.html; styles in src/styles/redesign.css.
 // KNOWN §12.3 follow-ups (branch-only): the hero d20 is static (animation later); the world
 // map-card is a placeholder (live generateMapData render = §12.3c); the dashboard shows
-// neutral copy rather than fake save data (real continue-campaign wiring = §12.3c).
+// neutral copy rather than fake save data (real continue-campaign wiring = §12.3c, PlayPage).
 
 import React from "react";
 import { Link } from "react-router-dom";
@@ -23,7 +23,7 @@ const Tick = () => (
   </svg>
 );
 
-const GuestHome = () => (
+const FrontPage = ({ signedIn }) => (
   <>
     {/* HERO */}
     <section className="hero">
@@ -33,10 +33,12 @@ const GuestHome = () => (
         <div className="hero-copy">
           <h1>The AI tells the story.<br /><span className="accent">The rules decide what happens.</span></h1>
           <div className="hero-actions">
-            <Link to="/new-game" className="btn btn-primary" data-tour="home-play" onClick={() => sendEvent('play_click')}>Play now</Link>
+            {signedIn
+              ? <Link to="/play" className="btn btn-primary">Continue playing</Link>
+              : <Link to="/new-game" className="btn btn-primary" data-tour="home-play" onClick={() => sendEvent('play_click')}>Play now</Link>}
             <Link to="/engine" className="btn btn-ghost">See how the engine works</Link>
           </div>
-          <p className="hero-note"><span className="dot" /> No sign-up to start · play instantly as a guest</p>
+          {!signedIn && <p className="hero-note"><span className="dot" /> No sign-up to start · play instantly as a guest</p>}
         </div>
 
         {/* Option B: the die IS the roll (14); the math reads left-to-right as one equation,
@@ -222,43 +224,19 @@ const GuestHome = () => (
         <p className="eyebrow">Your table is ready</p>
         <h2>The only dice you have to trust are your own.</h2>
         <p>Create a hero, roll a world, and start a campaign in under a minute. No download, nothing to install.</p>
-        <Link to="/new-game" className="btn btn-primary" onClick={() => sendEvent('play_click')}>Start free</Link>
+        {signedIn
+          ? <Link to="/play" className="btn btn-primary">Continue playing</Link>
+          : <Link to="/new-game" className="btn btn-primary" onClick={() => sendEvent('play_click')}>Start free</Link>}
       </div>
     </section>
   </>
 );
 
-const Dashboard = ({ user }) => {
-  const name = (user?.email || "adventurer").split("@")[0];
-  return (
-    <section className="band">
-      <div className="wrap">
-        <p className="eyebrow">Welcome back</p>
-        <h2 style={{ fontSize: "clamp(1.8rem,3.4vw,2.6rem)" }}>Ready when you are, {name}.</h2>
-        <div className="dash-grid">
-          <article className="continue-card">
-            <div className="who">Continue your campaign</div>
-            <h3>Jump back in</h3>
-            <p>Pick up your most recent campaign where you left off.</p>
-            <Link to="/game" className="btn btn-primary" style={{ marginTop: "0.4rem" }}>Continue →</Link>
-          </article>
-          <div className="quick">
-            <Link to="/new-game" className="quick-item" data-tour="home-play"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg> New campaign</Link>
-            <Link to="/hero-creation" className="quick-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg> Create a hero</Link>
-            <Link to="/saved-conversations" className="quick-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg> Saved games</Link>
-            <Link to="/all-heroes" className="quick-item"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-3-3.87" /><path d="M9 21v-2a4 4 0 0 1 3-3.87" /><circle cx="9" cy="7" r="4" /></svg> All heroes</Link>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-};
-
 const HomePage = () => {
   const { user } = useAuth();
   return (
     <div className="rd-page rd-home">
-      {user ? <Dashboard user={user} /> : <GuestHome />}
+      <FrontPage signedIn={!!user} />
     </div>
   );
 };

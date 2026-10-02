@@ -38,6 +38,8 @@ const DebugRoutes = lazy(() => import('./pages/DebugRoutes'));
 // Redesign marketing depth pages (#82 §12.4), reached from the "The Game" nav dropdown.
 const EnginePage = lazy(() => import('./pages/EnginePage'));
 const OverviewPage = lazy(() => import('./pages/OverviewPage'));
+// Player dashboard, split from the public front page (#82).
+const PlayPage = lazy(() => import('./pages/PlayPage'));
 // Membership / tier page: /premium with a /membership alias (the nav's Subscribe).
 const PremiumPage = lazy(() => import('./pages/PremiumPage'));
 
@@ -47,7 +49,7 @@ const AppContent = () => {
   const isDebugEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEBUG_ROUTES === 'true';
   const isGamePage = location.pathname === '/game';
   // Redesign marketing routes (#82 §12.3) go full-bleed; other pages keep the container.
-  const isBleedPage = ['/', '/overview', '/engine', '/premium', '/membership', '/getting-started', '/saved-conversations', '/all-heroes', '/login'].includes(location.pathname);
+  const isBleedPage = ['/', '/overview', '/engine', '/premium', '/membership', '/getting-started', '/saved-conversations', '/all-heroes', '/login', '/play'].includes(location.pathname);
 
   const {
     selectedProvider,
@@ -124,6 +126,7 @@ const AppContent = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/getting-started" element={<GettingStarted />} />
+              <Route path="/play" element={<PlayPage />} />
               <Route path="/overview" element={<OverviewPage />} />
               <Route path="/engine" element={<EnginePage />} />
               <Route path="/premium" element={<PremiumPage />} />

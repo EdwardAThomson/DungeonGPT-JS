@@ -542,3 +542,19 @@
 [data-theme='redesign'] .rd-app .login-note b { color: var(--muted); }
 [data-theme='redesign'] .rd-app .login-links { display: flex; gap: 1.4rem; flex-wrap: wrap; justify-content: center; padding-top: .9rem; margin-top: .2rem; border-top: 1px solid var(--line-soft); width: 100%; font-family: var(--font-ui); font-size: .95rem; }
 [data-theme='redesign'] .rd-app .login-links a { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
+
+/* /play dashboard: the newest save as a full-art feature card */
+[data-theme='redesign'] .rd-app .play-title { font-size: clamp(1.8rem, 3.4vw, 2.6rem); margin-bottom: .4rem; }
+[data-theme='redesign'] .rd-app .play-feature { display: flex; flex-direction: column; gap: .7rem; min-height: 22rem; padding: clamp(1.4rem, 3vw, 2rem); border: 1px solid var(--gold); border-radius: 12px; background-color: var(--surface); background-size: cover; background-position: center; box-shadow: 0 26px 64px -42px rgba(212, 175, 55, .45); }
+[data-theme='redesign'] .rd-app .play-feature.loading { justify-content: center; align-items: center; }
+[data-theme='redesign'] .rd-app .play-feature .who { font-family: var(--font-ui); font-size: .8rem; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); }
+[data-theme='redesign'] .rd-app .play-feature h2 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); line-height: 1.2; max-width: 28ch; }
+[data-theme='redesign'] .rd-app .play-meta { display: flex; flex-wrap: wrap; gap: .3rem 1rem; margin: 0; font-family: var(--font-ui); font-size: .9rem; color: #cdc7d3; }
+[data-theme='redesign'] .rd-app .play-meta span:first-child { color: var(--gold); font-weight: 600; }
+[data-theme='redesign'] .rd-app .play-blurb { margin: 0; color: #cdc7d3; max-width: 40ch; }
+[data-theme='redesign'] .rd-app .play-party { display: flex; align-items: center; gap: 0; flex-wrap: wrap; }
+[data-theme='redesign'] .rd-app .play-party img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid var(--gold); margin-right: -8px; background: var(--surface); }
+[data-theme='redesign'] .rd-app .play-party span { margin-left: 1rem; font-family: var(--font-ui); font-size: .9rem; color: #cdc7d3; }
+[data-theme='redesign'] .rd-app .play-feature .save-progress { max-width: 30rem; }
+[data-theme='redesign'] .rd-app .play-feature .save-progress p { color: #cdc7d3; }
+[data-theme='redesign'] .rd-app .play-actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: auto; padding-top: .6rem; }
