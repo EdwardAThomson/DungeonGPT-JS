@@ -35,7 +35,7 @@ const TABS = [
   { id: 'campaign', label: 'Campaign' },
   { id: 'quests', label: 'Side Quests' },
   { id: 'codex', label: 'Codex' },
-  { id: 'party', label: 'Party' },
+  { id: 'party', label: 'Inventory' },
   { id: 'ai', label: 'AI' }
 ];
 
@@ -307,7 +307,7 @@ const AdventureBook = ({
       // Fixed frame height (not content-driven): the tabs hold very different
       // content volumes, and a shrink-to-fit modal jarringly resizes on every
       // tab switch. All tabs share this silhouette; content scrolls within.
-      style={{ maxWidth: '900px', width: '95%', height: 'min(95vh, 1200px)', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
+      style={{ maxWidth: '1180px', width: '95%', height: 'min(95vh, 1200px)', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
     >
       <div style={{ padding: '20px 20px 0 20px', borderBottom: '1px solid var(--border)' }}>
         <h2 style={{ margin: '0 0 12px 0', textAlign: 'left', fontSize: '1.5rem' }}>Adventure Book</h2>

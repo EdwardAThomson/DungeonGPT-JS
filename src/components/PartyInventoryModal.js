@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ITEM_CATALOG, getRarityColor, consumeHealingItem } from '../utils/inventorySystem';
 import { getHPStatus } from '../utils/healthSystem';
 import { heroUid } from '../utils/partyUtils';
+import { resolveProfilePicture } from '../utils/assetHelper';
 import { useModal } from '../contexts/ModalContext';
 import {
   EQUIP_SLOTS,
@@ -150,7 +151,7 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
   };
 
   return (
-    <div style={{ color: 'var(--text)', maxWidth: '640px', margin: '0 auto' }}>
+    <div style={{ color: 'var(--text)', maxWidth: '1080px', margin: '0 auto', textAlign: 'left' }}>
         {/* Themed Gold Section */}
         <div
           style={{
@@ -493,8 +494,9 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
             // here nested inside that body produced a double scrollbar (matches the item shelf).
             border: '1px solid var(--border)',
             boxShadow: 'inset 0 4px 15px rgba(0,0,0,0.8)',
-            display: 'flex',
-            flexDirection: 'column',
+            // One card per hero, two across when the book is wide enough.
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',
             gap: '14px'
           }}>
             {party.length === 0 ? (
@@ -513,8 +515,18 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
                 borderRadius: '8px',
                 padding: '12px 14px'
               }}>
-                <div style={{ fontWeight: 'bold', color: 'var(--primary)', marginBottom: '8px', fontFamily: 'var(--header-font)' }}>
-                  {heroName}{heroClass ? ` (${heroClass})` : ''}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  {hero.profilePicture && (
+                    <img
+                      src={resolveProfilePicture(hero.profilePicture)}
+                      alt=""
+                      style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center 20%', border: '2px solid var(--gold, var(--primary))', flexShrink: 0 }}
+                    />
+                  )}
+                  <div style={{ fontWeight: 'bold', color: 'var(--text)', fontFamily: 'var(--font-display, var(--header-font))', fontSize: '1.05rem' }}>
+                    {heroName}
+                    {heroClass ? <span style={{ display: 'block', fontFamily: 'var(--font-ui)', fontWeight: 400, fontSize: '0.84rem', color: 'var(--text-secondary)' }}>{heroClass}</span> : null}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {EQUIP_SLOTS.map((slot) => {
