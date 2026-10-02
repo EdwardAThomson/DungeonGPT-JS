@@ -15,6 +15,7 @@ import { createLogger } from "../utils/logger";
 import { resolveProfilePicture } from "../utils/assetHelper";
 import { useAuth } from "../contexts/AuthContext";
 import { PREGEN_HEROES, buildPregenHero } from "../data/pregenHeroes";
+import RdDialog from '../components/RdDialog';
 import "../styles/redesign.css";
 
 const logger = createLogger('all-heroes');
@@ -221,36 +222,29 @@ const AllHeroes = () => {
         </div>
       </section>
 
-      {/* Alert Modal */}
       {alertMessage && (
-        <div className="modal-overlay" onClick={() => setAlertMessage(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', textAlign: 'center' }}>
-            <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', margin: '0 0 16px 0' }}>Alas!</h2>
-            <p style={{ color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0' }}>{alertMessage}</p>
-            <button className="modal-close-button" onClick={() => setAlertMessage(null)} style={{ width: '100%', padding: '12px' }}>
-              Understood
-            </button>
-          </div>
-        </div>
+        <RdDialog
+          title="Alas!"
+          tone="warning"
+          onClose={() => setAlertMessage(null)}
+          actions={<button type="button" className="btn btn-primary" onClick={() => setAlertMessage(null)}>Understood</button>}
+        >
+          <p>{alertMessage}</p>
+        </RdDialog>
       )}
 
-      {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="modal-overlay" onClick={handleDeleteCancel}>
-          <div className="modal-content delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Delete Hero?</h3>
-            <p>Are you sure you want to delete <strong>{deleteConfirm.heroName}</strong>?</p>
-            <p className="warning-text">This action cannot be undone.</p>
-            <div className="modal-actions">
-              <button onClick={handleDeleteCancel} className="action-button cancel-button">
-                Cancel
-              </button>
-              <button onClick={handleDeleteConfirm} className="action-button delete-button">
-                Delete Hero
-              </button>
-            </div>
-          </div>
-        </div>
+        <RdDialog
+          title="Delete Hero?"
+          tone="danger"
+          onClose={handleDeleteCancel}
+          actions={<>
+            <button type="button" className="btn btn-ghost" onClick={handleDeleteCancel}>Cancel</button>
+            <button type="button" className="btn btn-danger" onClick={handleDeleteConfirm}>Delete Hero</button>
+          </>}
+        >
+          <p>Delete <strong>{deleteConfirm.heroName}</strong> from your roster? This can't be undone. Saved games that include them are not affected.</p>
+        </RdDialog>
       )}
     </div>
   );

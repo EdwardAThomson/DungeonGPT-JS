@@ -7,6 +7,7 @@ import { resolveProfilePicture } from '../utils/assetHelper';
 import { useAuth } from '../contexts/AuthContext';
 import { hasHadAccount } from '../services/accountFlag';
 import { saveCardInfo, timeAgo } from '../game/saveCardInfo';
+import RdDialog from '../components/RdDialog';
 import '../styles/redesign.css';
 
 // "Your Games": the saved-campaign list, the pilot page for moving the in-app pages onto the
@@ -304,32 +305,18 @@ const SavedConversations = () => {
         />
       </Suspense>
 
-      {/* Delete Confirmation Modal (old modal shell; moves with the ModalContext migration) */}
       {deleteConfirmId && (
-        <div className="modal-overlay" onClick={() => setDeleteConfirmId(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <h3 style={{ marginBottom: '15px' }}>Delete Saved Game?</h3>
-            <p style={{ marginBottom: '20px', color: 'var(--text-secondary)' }}>
-              This will permanently delete this saved game. This action cannot be undone.
-            </p>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => setDeleteConfirmId(null)}
-                className="secondary-button"
-                style={{ padding: '10px 20px' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => deleteConversation(deleteConfirmId)}
-                className="danger-button"
-                style={{ padding: '10px 20px' }}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+        <RdDialog
+          title="Delete Saved Game?"
+          tone="danger"
+          onClose={() => setDeleteConfirmId(null)}
+          actions={<>
+            <button type="button" className="btn btn-ghost" onClick={() => setDeleteConfirmId(null)}>Cancel</button>
+            <button type="button" className="btn btn-danger" onClick={() => deleteConversation(deleteConfirmId)}>Delete</button>
+          </>}
+        >
+          <p>This permanently deletes this saved game. It can't be undone.</p>
+        </RdDialog>
       )}
     </div>
   );

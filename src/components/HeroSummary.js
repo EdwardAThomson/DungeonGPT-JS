@@ -10,6 +10,7 @@ import { heroesApi } from "../services/heroesApi";
 import { createLogger } from "../utils/logger";
 import { resolveProfilePicture } from "../utils/assetHelper";
 import OnboardingSteps from "./OnboardingSteps";
+import RdDialog from './RdDialog';
 import { validateHero } from "../game/heroValidation";
 import { calculateModifier } from "../utils/rules";
 import "../styles/redesign.css";
@@ -189,28 +190,22 @@ const HeroSummary = () => {
       </section>
 
       {feedbackModal && (
-        <div className="modal-overlay" onClick={closeFeedbackModal}>
-          <div className="modal-content summary-feedback-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{feedbackModal.title}</h3>
-            <p>{feedbackModal.message}</p>
-            <div className="summary-feedback-actions">
-              {/* Standalone creation ends at the Hall of Heroes; offer the jump
-                  into play so hero-first crafting isn't a dead end. The in-flow
-                  path (returnToHeroSelection) already continues to the party. */}
-              {feedbackModal.showStartAdventure && (
-                <button
-                  className="modal-close-button summary-start-adventure-btn"
-                  onClick={() => navigate('/new-game')}
-                >
-                  ⚔️ Start an Adventure
-                </button>
-              )}
-              <button className="modal-close-button" onClick={closeFeedbackModal}>
-                Continue
-              </button>
-            </div>
-          </div>
-        </div>
+        <RdDialog
+          title={feedbackModal.title}
+          tone="success"
+          onClose={closeFeedbackModal}
+          actions={<>
+            {/* Standalone creation ends at the roster; offer the jump into play so
+                hero-first crafting isn't a dead end. The in-flow path
+                (returnToHeroSelection) already continues to the party. */}
+            {feedbackModal.showStartAdventure && (
+              <button type="button" className="btn btn-ghost" onClick={() => navigate('/new-game')}>Start an Adventure</button>
+            )}
+            <button type="button" className="btn btn-primary" onClick={closeFeedbackModal}>Continue</button>
+          </>}
+        >
+          <p>{feedbackModal.message}</p>
+        </RdDialog>
       )}
 
     </div>

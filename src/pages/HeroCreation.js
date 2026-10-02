@@ -13,6 +13,7 @@ import { sanitizeHeroName } from "../utils/validation";
 import { calculateMaxHP } from "../utils/healthSystem";
 import OnboardingSteps from "../components/OnboardingSteps";
 import PortraitPickerModal from "../components/PortraitPickerModal";
+import RdDialog from '../components/RdDialog';
 import { resolveProfilePicture } from "../utils/assetHelper";
 import { calculateModifier } from "../utils/rules";
 import "../styles/redesign.css";
@@ -418,54 +419,44 @@ const HeroCreation = () => {
         />
       )}
 
-      {/* Validation Alert Modal */}
+      {/* Validation alert */}
       {alertMessage && (
-        <div className="modal-overlay" onClick={() => setAlertMessage(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
-            <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', margin: '0 0 16px 0', textAlign: 'center' }}>Hold, Adventurer!</h2>
-            {Array.isArray(alertMessage) ? (
-              <ul style={{ color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0', paddingLeft: '20px' }}>
-                {alertMessage.map((reason, i) => <li key={i}>{reason}</li>)}
-              </ul>
-            ) : (
-              <p style={{ color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0', textAlign: 'center' }}>{alertMessage}</p>
-            )}
-            <button className="modal-close-button" onClick={() => setAlertMessage(null)} style={{ width: '100%', padding: '12px' }}>
-              Understood
-            </button>
-          </div>
-        </div>
+        <RdDialog
+          title="Hold, Adventurer!"
+          tone="warning"
+          onClose={() => setAlertMessage(null)}
+          actions={<button type="button" className="btn btn-primary" onClick={() => setAlertMessage(null)}>Understood</button>}
+        >
+          {Array.isArray(alertMessage)
+            ? <ul>{alertMessage.map((reason, i) => <li key={i}>{reason}</li>)}</ul>
+            : <p>{alertMessage}</p>}
+        </RdDialog>
       )}
 
       {/* Unspent points warning (non-blocking) */}
       {confirmUnspent && (
-        <div className="modal-overlay" onClick={() => setConfirmUnspent(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', textAlign: 'center' }}>
-            <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', margin: '0 0 16px 0' }}>Unspent Points</h2>
-            <p style={{ color: 'var(--text)', lineHeight: '1.6', margin: '0 0 20px 0' }}>
-              You still have <strong>{confirmUnspent.points}</strong> unspent stat point{confirmUnspent.points === 1 ? '' : 's'}. Spending them now makes your hero stronger — you can't add them later.
-            </p>
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-              <button
-                className="modal-close-button"
-                onClick={() => setConfirmUnspent(null)}
-                style={{ background: 'transparent', color: 'var(--text)' }}
-              >
-                Keep editing
-              </button>
-              <button
-                className="modal-close-button"
-                onClick={() => {
-                  const hero = confirmUnspent.hero;
-                  setConfirmUnspent(null);
-                  navigate('/hero-summary', { state: { newCharacter: hero, ...heroSelectionReturnState } });
-                }}
-              >
-                Create anyway
-              </button>
-            </div>
-          </div>
-        </div>
+        <RdDialog
+          title="Unspent Points"
+          onClose={() => setConfirmUnspent(null)}
+          actions={<>
+            <button type="button" className="btn btn-ghost" onClick={() => setConfirmUnspent(null)}>Keep editing</button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                const hero = confirmUnspent.hero;
+                setConfirmUnspent(null);
+                navigate('/hero-summary', { state: { newCharacter: hero, ...heroSelectionReturnState } });
+              }}
+            >
+              Create anyway
+            </button>
+          </>}
+        >
+          <p>
+            You still have <strong>{confirmUnspent.points}</strong> unspent stat point{confirmUnspent.points === 1 ? '' : 's'}. Spending them now makes your hero stronger; you can't add them later.
+          </p>
+        </RdDialog>
       )}
     </div>
   );

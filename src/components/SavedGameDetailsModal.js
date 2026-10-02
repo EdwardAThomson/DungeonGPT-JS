@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { getIndexStatus, backfill } from '../game/ragEngine';
 import { ragStore } from '../services/ragStore';
+import RdDialog from './RdDialog';
 
 const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate }) => {
   const [ragStatus, setRagStatus] = useState(null); // { status, indexed, total }
@@ -80,178 +81,100 @@ const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate }) =>
     return `(${position.x}, ${position.y})`;
   };
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div
-        className="modal-content"
-        onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '800px', width: '95%', maxHeight: '90vh', overflow: 'auto' }}
-      >
-        <h2 style={{ fontFamily: 'var(--header-font)', color: 'var(--primary)', marginBottom: '20px' }}>
-          {conversation.conversation_name || 'Untitled Adventure'}
-        </h2>
+  const ragLabel = ragStatus?.status === 'current' ? 'Fully indexed'
+    : ragStatus?.status === 'partial' ? 'Partially indexed' : 'Not indexed';
 
-        <div className="modal-section">
-          <h3 style={{ color: 'var(--primary)', fontSize: '1.1rem', marginBottom: '10px' }}>Session Information</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.9rem' }}>
-            <p><strong>Date Saved:</strong> {formatDate(conversation.timestamp)}</p>
-            <p><strong>Session ID:</strong> <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{conversation.sessionId}</span></p>
-            {/* Campaign arc name is stamped into settings at save time; older
-                saves predating campaign tracking omit it gracefully. */}
-            {settings?.templateName && (
-              <p style={{ gridColumn: '1 / -1' }}><strong>Campaign:</strong> {settings.templateName}</p>
-            )}
-            <p><strong>Location:</strong> {getLocationString()}</p>
-          </div>
-        </div>
+  return (
+    <RdDialog
+      title={conversation.conversation_name || 'Untitled Adventure'}
+      wide
+      onClose={onClose}
+      actions={<button type="button" className="btn btn-primary" onClick={onClose}>Close</button>}
+    >
+      <div className="sgd">
+        <section>
+          <h3>Session</h3>
+          <dl className="sgd-facts">
+            <div><dt>Saved</dt><dd>{formatDate(conversation.timestamp)}</dd></div>
+            {/* Campaign arc name is stamped into settings at save time; older saves
+                predating campaign tracking omit it gracefully. */}
+            {settings?.templateName && <div><dt>Campaign</dt><dd>{settings.templateName}</dd></div>}
+            <div><dt>Location</dt><dd>{getLocationString()}</dd></div>
+            <div><dt>Session ID</dt><dd className="mono">{conversation.sessionId}</dd></div>
+          </dl>
+        </section>
 
         {heroes.length > 0 && (
-          <div className="modal-section" style={{ marginTop: '20px' }}>
-            <h3 style={{ color: 'var(--primary)', fontSize: '1.1rem', marginBottom: '10px' }}>Party Members</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
+          <section>
+            <h3>Party</h3>
+            <ul className="sgd-party">
               {heroes.map((hero, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: 'var(--surface)',
-                    padding: '15px',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px'
-                  }}
-                >
+                <li key={idx}>
                   {hero.profilePicture && (
-                    <img
-                      src={resolveProfilePicture(hero.profilePicture)}
-                      alt={hero.heroName || hero.characterName || 'Hero'}
-                      style={{
-                        width: '50px',
-                        height: '50px',
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                        border: '2px solid var(--primary)'
-                      }}
-                    />
+                    <img src={resolveProfilePicture(hero.profilePicture)} alt="" />
                   )}
-                  <div style={{ flex: 1 }}>
-                    <p style={{ fontWeight: 'bold', marginBottom: '4px' }}>{hero.heroName || hero.characterName || 'Unknown'}</p>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                      Level {hero.level || hero.heroLevel || hero.characterLevel || 1} {hero.heroRace || hero.characterRace || ''} {hero.heroClass || hero.characterClass || ''}
-                    </p>
-                    {hero.currentHP !== undefined && hero.maxHP && (
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                        HP: {hero.currentHP}/{hero.maxHP}
-                      </p>
-                    )}
-                  </div>
-                </div>
+                  <span>
+                    <b>{hero.heroName || hero.characterName || 'Unknown'}</b>
+                    <small>
+                      Level {hero.level || hero.heroLevel || hero.characterLevel || 1} {hero.heroClass || hero.characterClass || ''}
+                      {hero.currentHP !== undefined && hero.maxHP ? ` · HP ${hero.currentHP}/${hero.maxHP}` : ''}
+                    </small>
+                  </span>
+                </li>
               ))}
-            </div>
-          </div>
+            </ul>
+          </section>
         )}
 
         {settings && (
-          <div className="modal-section" style={{ marginTop: '20px' }}>
-            <h3 style={{ color: 'var(--primary)', fontSize: '1.1rem', marginBottom: '10px' }}>Game Settings</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.9rem' }}>
-              {settings.shortDescription && (
-                <p style={{ gridColumn: '1 / -1' }}><strong>Story:</strong> {settings.shortDescription}</p>
-              )}
-              {settings.campaignGoal && (
-                <p style={{ gridColumn: '1 / -1' }}><strong>Quest:</strong> {settings.campaignGoal}</p>
-              )}
-              {settings.grimnessLevel && <p><strong>Grimness:</strong> {settings.grimnessLevel}</p>}
-              {settings.darknessLevel && <p><strong>Darkness:</strong> {settings.darknessLevel}</p>}
-              {settings.magicLevel && <p><strong>Magic:</strong> {settings.magicLevel}</p>}
-              {settings.technologyLevel && <p><strong>Technology:</strong> {settings.technologyLevel}</p>}
-              {settings.responseVerbosity && <p><strong>Verbosity:</strong> {settings.responseVerbosity}</p>}
-              {settings.worldSeed && (
-                <p><strong>World Seed:</strong> <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{settings.worldSeed}</span></p>
-              )}
-            </div>
-          </div>
+          <section>
+            <h3>Story</h3>
+            {settings.shortDescription && <p>{settings.shortDescription}</p>}
+            {settings.campaignGoal && <p className="sgd-goal">{settings.campaignGoal}</p>}
+            <dl className="sgd-facts">
+              {settings.grimnessLevel && <div><dt>Grimness</dt><dd>{settings.grimnessLevel}</dd></div>}
+              {settings.darknessLevel && <div><dt>Darkness</dt><dd>{settings.darknessLevel}</dd></div>}
+              {settings.magicLevel && <div><dt>Magic</dt><dd>{settings.magicLevel}</dd></div>}
+              {settings.technologyLevel && <div><dt>Technology</dt><dd>{settings.technologyLevel}</dd></div>}
+              {settings.responseVerbosity && <div><dt>Narration</dt><dd>{settings.responseVerbosity}</dd></div>}
+              {settings.worldSeed && <div><dt>World seed</dt><dd className="mono">{settings.worldSeed}</dd></div>}
+            </dl>
+          </section>
         )}
 
         {conversation.summary && (
-          <div className="modal-section" style={{ marginTop: '20px' }}>
-            <h3 style={{ color: 'var(--primary)', fontSize: '1.1rem', marginBottom: '10px' }}>Adventure Summary</h3>
-            <p style={{ fontSize: '0.9rem', lineHeight: '1.6', color: 'var(--text)' }}>
-              {conversation.summary}
-            </p>
-          </div>
+          <section>
+            <h3>Adventure summary</h3>
+            <p>{conversation.summary}</p>
+          </section>
         )}
 
         {ragStatus && (
-          <div className="modal-section" style={{ marginTop: '20px' }}>
-            <h3 style={{ color: 'var(--primary)', fontSize: '1.1rem', marginBottom: '10px' }}>DM Memory Index</h3>
-            <div style={{ fontSize: '0.9rem' }}>
-              <p style={{ marginBottom: '8px' }}>
-                <strong>Status:</strong>{' '}
-                <span style={{
-                  color: ragStatus.status === 'current' ? 'var(--success, #4caf50)' :
-                    ragStatus.status === 'partial' ? 'var(--warning, #ff9800)' : 'var(--text-secondary)'
-                }}>
-                  {ragStatus.status === 'current' ? 'Fully indexed' :
-                    ragStatus.status === 'partial' ? 'Partially indexed' : 'Not indexed'}
-                </span>
-              </p>
-              <p style={{ marginBottom: '12px' }}>
-                <strong>Events indexed:</strong> {ragStatus.indexed} / {ragStatus.total}
-              </p>
-
-              {/* Progress bar */}
-              {ragStatus.total > 0 && (
-                <div style={{
-                  background: 'var(--surface)',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                  height: '8px',
-                  marginBottom: '12px',
-                  border: '1px solid var(--border)'
-                }}>
-                  <div style={{
-                    width: `${Math.round((ragStatus.indexed / ragStatus.total) * 100)}%`,
-                    height: '100%',
-                    background: ragStatus.status === 'current' ? 'var(--success, #4caf50)' : 'var(--primary)',
-                    transition: 'width 0.3s ease'
-                  }} />
-                </div>
-              )}
-
-              {/* Rebuild progress */}
-              {isRebuilding && rebuildProgress && (
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                  Indexing... {rebuildProgress.indexed} / {rebuildProgress.total}
-                </p>
-              )}
-
-              <button
-                onClick={handleRebuild}
-                disabled={isRebuilding}
-                className="secondary-button"
-                style={{ padding: '8px 16px', fontSize: '0.85rem' }}
-              >
-                {isRebuilding ? 'Rebuilding...' : ragStatus.status === 'current' ? 'Rebuild Index' : 'Build Index'}
-              </button>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                The memory index helps the DM recall past events during gameplay.
-                {ragStatus.status !== 'current' && ' Loading this game will automatically build the index.'}
-              </p>
-            </div>
-          </div>
+          <section>
+            <h3>DM memory index</h3>
+            <p>
+              <span className={`sgd-status ${ragStatus.status}`}>{ragLabel}</span>
+              {' '}{ragStatus.indexed} of {ragStatus.total} events indexed
+            </p>
+            {ragStatus.total > 0 && (
+              <div className="save-progress-bar sgd-bar">
+                <span style={{ width: `${Math.round((ragStatus.indexed / ragStatus.total) * 100)}%` }} />
+              </div>
+            )}
+            {isRebuilding && rebuildProgress && (
+              <p className="sgd-note">Indexing... {rebuildProgress.indexed} / {rebuildProgress.total}</p>
+            )}
+            <button type="button" className="btn btn-ghost sgd-rebuild" onClick={handleRebuild} disabled={isRebuilding}>
+              {isRebuilding ? 'Rebuilding...' : ragStatus.status === 'current' ? 'Rebuild Index' : 'Build Index'}
+            </button>
+            <p className="sgd-note">
+              The memory index helps the DM recall past events during play.
+              {ragStatus.status !== 'current' && ' Loading this game builds it automatically.'}
+            </p>
+          </section>
         )}
-
-        <button
-          className="modal-close-button"
-          onClick={onClose}
-          style={{ marginTop: '20px', width: '100%' }}
-        >
-          Close
-        </button>
       </div>
-    </div>
+    </RdDialog>
   );
 };
 
