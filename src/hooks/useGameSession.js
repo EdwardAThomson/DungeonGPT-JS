@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { conversationsApi } from '../services/conversationsApi';
-import { buildSaveName } from '../game/saveController';
+import { buildSaveName, saveRootFor } from '../game/saveController';
 import { applySideQuestBackfill } from '../game/questEngine';
 import { createLogger } from '../utils/logger';
 
@@ -104,7 +104,7 @@ const useGameSession = (loadedConversation, setSettings, setSelectedProvider, se
             // Adjust URL to your backend endpoint
             // Derive the display name from the player-editable root (game_settings.saveName)
             // so a renamed campaign keeps its name across saves; only the timestamp refreshes.
-            const saveRoot = gameState?.gameSettings?.saveName;
+            const saveRoot = saveRootFor(gameState?.gameSettings);
             const result = await conversationsApi.save({
                 sessionId: currentSessionId,
                 timestamp: new Date().toISOString(),
