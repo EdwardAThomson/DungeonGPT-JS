@@ -868,7 +868,7 @@
    ============================================================ */
 [data-theme='redesign'] .gm-page { height: calc(100dvh - 69px); min-height: 480px; background: var(--ground); }
 /* Full viewport width, like the pre-redesign game screen; the sidebar grows a little on
-   wide screens. Narration keeps a readable line length inside the wide column. */
+   wide screens. Narration spans the full log width. */
 [data-theme='redesign'] .gm-shell { display: grid; grid-template-columns: minmax(0, 1fr) 300px; height: 100%; }
 @media (min-width: 1600px) { [data-theme='redesign'] .gm-shell { grid-template-columns: minmax(0, 1fr) 340px; } }
 [data-theme='redesign'] .gm-eyebrow { margin: 0; font-family: var(--font-ui); font-size: .76rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); }
@@ -893,9 +893,9 @@
 
 /* the log */
 [data-theme='redesign'] .gm-log { position: relative; flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: .9rem; margin: .9rem 0; padding: .3rem .4rem .3rem 0; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-[data-theme='redesign'] .gm-msg { max-width: 90ch; margin: 0; line-height: 1.6; overflow-wrap: anywhere; }
-[data-theme='redesign'] .gm-msg.ai { align-self: flex-start; padding: .9rem 1.1rem; border-radius: 4px 10px 10px 4px; border-left: 3px solid color-mix(in srgb, var(--gold) 70%, transparent); background: var(--surface); font-family: var(--font-body); font-size: 1.04rem; color: #e6e1ea; white-space: pre-line; }
-[data-theme='redesign'] .gm-msg.user { align-self: flex-end; max-width: 60ch; padding: .6rem 1rem; border-radius: 12px 12px 3px 12px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); background: color-mix(in srgb, var(--gold) 12%, var(--surface)); font-family: var(--font-ui); font-size: .96rem; color: var(--text); }
+[data-theme='redesign'] .gm-msg { max-width: 100%; margin: 0; line-height: 1.6; overflow-wrap: anywhere; }
+[data-theme='redesign'] .gm-msg.ai { align-self: stretch; padding: .9rem 1.1rem; border-radius: 4px 10px 10px 4px; border-left: 3px solid color-mix(in srgb, var(--gold) 70%, transparent); background: var(--surface); font-family: var(--font-body); font-size: 1.04rem; color: #e6e1ea; white-space: pre-line; }
+[data-theme='redesign'] .gm-msg.user { align-self: flex-end; max-width: min(70%, 80ch); padding: .6rem 1rem; border-radius: 12px 12px 3px 12px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); background: color-mix(in srgb, var(--gold) 12%, var(--surface)); font-family: var(--font-ui); font-size: .96rem; color: var(--text); }
 [data-theme='redesign'] .gm-msg.system { align-self: center; max-width: 64ch; padding: .3rem .8rem; text-align: center; font-family: var(--font-ui); font-size: .9rem; font-style: normal; color: var(--muted); }
 [data-theme='redesign'] .gm-msg.error { align-self: center; padding: .55rem .9rem; border-radius: 8px; border: 1px solid rgba(239, 107, 107, .45); background: rgba(239, 107, 107, .08); font-family: var(--font-ui); font-size: .92rem; color: #ef8b8b; }
 [data-theme='redesign'] .gm-msg .safe-markdown-message strong { color: var(--gold-bright); }
@@ -996,3 +996,4 @@ body:has(.gm-page) .app-footer { display: none; }
   [data-theme='redesign'] .map-modal-content .map-modal-actions { position: sticky; bottom: 0; z-index: 5; width: calc(100% + 24px); margin: 12px -12px 0; padding: 12px; background: var(--surface); border-top: 1px solid var(--line-soft); }
   [data-theme='redesign'] .map-modal-content .map-modal-actions button { flex: 1; }
 }
+[data-theme='redesign'] .gm-log .gm-msg.ai { margin: 0; width: 100%; box-sizing: border-box; }
