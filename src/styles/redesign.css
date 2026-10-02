@@ -1003,3 +1003,29 @@ body:has(.gm-page) .app-footer { display: none; }
 [data-theme='redesign'] .gm-log .gm-msg.ai.combat { background: #140c0e; border-color: rgba(214, 96, 96, .28); border-left-color: #d66060; }
 [data-theme='redesign'] .gm-log .gm-msg.ai.combat .safe-markdown-message strong { color: #f19a9a; }
 @media (max-width: 900px) { [data-theme='redesign'] .gm-log .gm-msg.ai { max-width: 100%; } }
+
+/* Hero details pop-up: identity + vitals share the top row; six stats in one row */
+[data-theme='redesign'] .hero-sheet-head { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(170px, 230px); align-items: center; gap: 1rem; padding-bottom: 1rem; margin-bottom: .4rem; border-bottom: 1px solid var(--line-soft); text-align: left; }
+[data-theme='redesign'] .hero-sheet-pic { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; object-position: center 20%; border: 2px solid var(--gold); }
+[data-theme='redesign'] .hero-sheet-id h2 { margin: 0 0 .2rem; text-align: left; font-size: 1.5rem; }
+[data-theme='redesign'] .hero-sheet-id .hero-subtitle { margin: 0 0 .45rem; font-family: var(--font-ui); font-size: .92rem; color: var(--muted); }
+[data-theme='redesign'] .hero-sheet-chip { display: inline-block; padding: .15rem .55rem; border-radius: 4px; border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent); font-family: var(--font-ui); font-size: .8rem; font-weight: 600; color: var(--gold); }
+[data-theme='redesign'] .hero-sheet-vitals { display: flex; flex-direction: column; gap: .6rem; }
+[data-theme='redesign'] .hero-vital { font-family: var(--font-ui); font-size: .85rem; }
+[data-theme='redesign'] .hero-vital-row { display: flex; justify-content: space-between; margin-bottom: .25rem; color: var(--text); }
+[data-theme='redesign'] .hero-vital-label { font-weight: 700; letter-spacing: .08em; color: var(--muted-2); }
+[data-theme='redesign'] .hero-vital small { display: block; margin-top: .2rem; font-size: .76rem; color: var(--muted-2); }
+[data-theme='redesign'] .hero-vital .hero-hp-bar { height: 7px; border-radius: 4px; overflow: hidden; background: var(--ground-2); }
+[data-theme='redesign'] .hero-vital .hero-hp-fill, [data-theme='redesign'] .hero-vital .hero-xp-fill { height: 100%; border-radius: inherit; transition: width .5s ease; }
+[data-theme='redesign'] .hero-vital .hero-xp-fill { background: linear-gradient(90deg, var(--gold), var(--gold-bright)); }
+[data-theme='redesign'] .hero-details-modal .stats-grid-modal { grid-template-columns: repeat(6, 1fr); gap: .45rem; }
+[data-theme='redesign'] .hero-details-modal .modal-section { margin-bottom: 12px; padding-bottom: 10px; }
+@media (max-width: 600px) {
+  [data-theme='redesign'] .hero-sheet-head { grid-template-columns: auto minmax(0, 1fr); }
+  [data-theme='redesign'] .hero-sheet-vitals { grid-column: 1 / -1; }
+  [data-theme='redesign'] .hero-details-modal .stats-grid-modal { grid-template-columns: repeat(6, 1fr); gap: .3rem; }
+  [data-theme='redesign'] .hero-details-modal .stat-item-modal { padding: .35rem 0; }
+  [data-theme='redesign'] .hero-details-modal.modal-content { padding: 18px 16px; }
+  [data-theme='redesign'] .hero-sheet-pic { width: 64px; height: 64px; }
+  [data-theme='redesign'] .hero-sheet-id h2 { font-size: 1.25rem; }
+}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { calculateMaxHP, getHPStatus } from '../utils/healthSystem';
-import { getLevelProgress, calculateLevel } from '../utils/progressionSystem';
+import { getLevelProgress } from '../utils/progressionSystem';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { getRarityColor } from '../utils/inventorySystem';
 import { useModal } from '../contexts/ModalContext';
@@ -61,26 +61,62 @@ const HeroModal = () => {
 
     return (
         <ModalShell modalId="hero" className="hero-details-modal" ariaLabel="Hero Details" style={{ maxWidth: '700px', width: '90%' }}>
-                <div className="modal-header-with-image">
-                    {hero.profilePicture && (
-                        <div className="modal-profile-pic-container">
-                            <img
-                                src={resolveProfilePicture(hero.profilePicture)}
-                                alt={`${hero.heroName}'s profile`}
-                                className="modal-profile-pic"
-                            />
+                {/* Header: portrait, identity + alignment, and the vitals (HP, XP) on one line,
+                    so the sheet fits without scrolling. */}
+                {(() => {
+                    const maxHP = hero.stats ? (hero.maxHP || calculateMaxHP(hero)) : null;
+                    const currentHP = maxHP != null ? (hero.currentHP ?? maxHP) : null;
+                    const status = maxHP != null ? getHPStatus(currentHP, maxHP) : null;
+                    const xp = hero.xp || 0;
+                    const progress = getLevelProgress(xp);
+                    return (
+                        <div className="hero-sheet-head">
+                            {hero.profilePicture && (
+                                <img
+                                    src={resolveProfilePicture(hero.profilePicture)}
+                                    alt={`${hero.heroName}'s profile`}
+                                    className="hero-sheet-pic"
+                                />
+                            )}
+                            <div className="hero-sheet-id">
+                                <h2>{hero.characterName || hero.heroName}</h2>
+                                <p className="hero-subtitle">
+                                    {getGenderEmoji(heroGender)} Level {heroLevel} {heroRace} {heroClass}
+                                </p>
+                                {hero.heroAlignment && <span className="hero-sheet-chip">{hero.heroAlignment}</span>}
+                            </div>
+                            <div className="hero-sheet-vitals">
+                                {status && (
+                                    <div className="hero-vital">
+                                        <div className="hero-vital-row">
+                                            <span className="hero-vital-label">HP</span>
+                                            <span style={{ color: status.color, fontWeight: 700 }}>{currentHP}/{maxHP}</span>
+                                        </div>
+                                        <div className="hero-hp-bar"><div className="hero-hp-fill" style={{ width: `${(currentHP / maxHP) * 100}%`, background: status.color }} /></div>
+                                        <small style={{ color: status.color }}>{status.description}</small>
+                                    </div>
+                                )}
+                                <div className="hero-vital">
+                                    <div className="hero-vital-row">
+                                        <span className="hero-vital-label">XP</span>
+                                        <span>{xp}</span>
+                                    </div>
+                                    {!progress.isMaxLevel ? (
+                                        <>
+                                            <div className="hero-hp-bar"><div className="hero-xp-fill" style={{ width: `${progress.percentage}%` }} /></div>
+                                            <small>{progress.current} / {progress.required} to next level</small>
+                                        </>
+                                    ) : (
+                                        <small>Maximum level reached</small>
+                                    )}
+                                </div>
+                            </div>
                         </div>
-                    )}
-                    <div className="modal-header-text">
-                        <h2>{hero.characterName || hero.heroName}</h2>
-                        <p className="hero-subtitle">
-                            {getGenderEmoji(heroGender)} Level {heroLevel} {heroRace} {heroClass}
-                        </p>
-                    </div>
-                </div>
+                    );
+                })()}
 
                 <div className="modal-section scrollable-modal-section">
-                    <h4>Hero Stats</h4>
+                    <h4>Ability scores</h4>
                     {hero.stats && (
                         <div className="stats-grid-modal">
                             {Object.entries(hero.stats).map(([stat, value]) => (
@@ -163,76 +199,7 @@ const HeroModal = () => {
                     </div>
                 )}
 
-                {hero.stats && (() => {
-                    const maxHP = hero.maxHP || calculateMaxHP(hero);
-                    const currentHP = hero.currentHP ?? maxHP;
-                    const status = getHPStatus(currentHP, maxHP);
-                    return (
-                        <div className="modal-section">
-                            <h4>Health</h4>
-                            <div className="hero-hp-display">
-                                <div className="hero-hp-label">
-                                    <span>HP </span>
-                                    <span style={{ color: status.color, fontWeight: 'bold' }}>{currentHP}/{maxHP}</span>
-                                </div>
-                                <div className="hero-hp-bar">
-                                    <div className="hero-hp-fill" style={{
-                                        width: `${(currentHP / maxHP) * 100}%`,
-                                        background: status.color
-                                    }} />
-                                </div>
-                                <p style={{ fontSize: '12px', color: status.color, margin: '6px 0 0', fontStyle: 'italic' }}>
-                                    {status.description}
-                                </p>
-                            </div>
-                        </div>
-                    );
-                })()}
-
-                {(() => {
-                    const xp = hero.xp || 0;
-                    const level = hero.level || calculateLevel(xp);
-                    const progress = getLevelProgress(xp);
-                    return (
-                        <div className="modal-section">
-                            <h4>Experience</h4>
-                            <div className="hero-xp-display">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                    <span><strong>Level {level}</strong></span>
-                                    <span style={{ color: 'var(--state-highlight)', fontWeight: 'bold' }}>{xp} XP</span>
-                                </div>
-                                {!progress.isMaxLevel ? (
-                                    <>
-                                        <div className="hero-hp-bar" style={{ background: 'var(--ink-strong)' }}>
-                                            <div style={{
-                                                width: `${progress.percentage}%`,
-                                                height: '100%',
-                                                background: 'linear-gradient(90deg, var(--state-warning), var(--state-highlight))',
-                                                borderRadius: '4px',
-                                                transition: 'width 0.5s ease'
-                                            }} />
-                                        </div>
-                                        <p style={{ fontSize: '12px', color: 'var(--state-muted)', margin: '6px 0 0' }}>
-                                            {progress.current} / {progress.required} XP to next level ({progress.percentage}%)
-                                        </p>
-                                    </>
-                                ) : (
-                                    <p style={{ fontSize: '12px', color: 'var(--state-highlight)', margin: '6px 0 0', fontStyle: 'italic' }}>
-                                        ⭐ Maximum Level Reached!
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })()}
-
-                {hero.heroAlignment && (
-                    <div className="modal-section">
-                        <p><strong>Alignment:</strong> {hero.heroAlignment}</p>
-                    </div>
-                )}
-
-                <button className="modal-close-button" onClick={close} style={{ marginTop: '20px' }}>
+                <button className="modal-close-button" onClick={close} style={{ marginTop: '14px' }}>
                     Close
                 </button>
         </ModalShell>
