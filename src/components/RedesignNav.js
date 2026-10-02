@@ -36,9 +36,16 @@ const RedesignNav = ({ isDebugEnabled }) => {
     { label: 'Sign Out', onClick: () => { signOut(); close(); } },
   ];
 
-  const accountLabel = user
-    ? `${(user.email || '?').charAt(0).toUpperCase()} ${(user.email || 'Account').split('@')[0]}`
-    : '';
+  // Account chip: the initial in a round badge plus the username, which CSS truncates
+  // (and hides on narrow screens) so a long name never crowds the bar. The full address
+  // stays in the tooltip and the accessible name.
+  const username = (user?.email || 'Account').split('@')[0];
+  const accountLabel = user ? (
+    <span className="rd-account" title={user.email || username}>
+      <span className="rd-avatar" aria-hidden="true">{username.charAt(0).toUpperCase()}</span>
+      <span className="rd-account-name">{username}</span>
+    </span>
+  ) : '';
 
   return (
     <header className="rd-nav" data-theme="redesign">
@@ -67,7 +74,7 @@ const RedesignNav = ({ isDebugEnabled }) => {
               <>
                 <Link to="/play" className="btn btn-primary" onClick={close}>Play</Link>
                 <ul className="rd-nav-links rd-profile">
-                  <NavDropdown label={accountLabel} items={profileMenu} onNavClose={close} />
+                  <NavDropdown label={accountLabel} ariaLabel={`Account (${username})`} items={profileMenu} onNavClose={close} />
                 </ul>
               </>
             ) : (

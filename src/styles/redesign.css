@@ -1044,3 +1044,9 @@ body:has(.gm-page) .app-footer { display: none; }
 }
 [data-theme='redesign'] .gm-look:focus:not(:focus-visible) { outline: none; border-color: var(--line); color: var(--muted); }
 [data-theme='redesign'] .gm-look:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* Nav account chip: round initial + username truncated to ~12 characters */
+[data-theme='redesign'] .rd-account { display: inline-flex; align-items: center; gap: .5rem; max-width: 100%; vertical-align: middle; }
+[data-theme='redesign'] .rd-avatar { display: grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(160deg, #f6d27a, #e3a93f); color: #1d1505; font-family: var(--font-ui); font-size: .85rem; font-weight: 800; }
+[data-theme='redesign'] .rd-account-name { text-transform: none; letter-spacing: normal; font-family: var(--font-ui); font-weight: 600; max-width: 12ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1100px) and (min-width: 769px) { [data-theme='redesign'] .rd-account-name { display: none; } }
