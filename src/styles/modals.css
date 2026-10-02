@@ -12,8 +12,8 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: var(--overlay-dark-60);
-  /* Black background with opacity */
+  background-color: rgba(8, 7, 12, .78);
+  backdrop-filter: blur(3px);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -23,9 +23,11 @@
 
 .modal-content {
   background-color: var(--surface);
-  padding: 30px 40px;
-  border-radius: 8px;
-  box-shadow: 0 8px 32px var(--shadow);
+  color: var(--text);
+  padding: 28px 32px;
+  border-radius: 12px;
+  border-top: 3px solid var(--gold, var(--primary)) !important;
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .9);
   width: 90%;
   max-width: 600px;
   /* Limit maximum width */
@@ -34,20 +36,21 @@
   overflow-y: auto;
   /* Enable scroll if content is too long */
   position: relative;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--gold, var(--primary)) 55%, transparent);
   /* For positioning the close button */
 }
 
 .modal-content h2 {
   margin-top: 0;
-  margin-bottom: 20px;
-  color: var(--primary);
+  margin-bottom: 18px;
+  color: var(--text);
   text-align: center;
-  font-family: var(--header-font);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  border-bottom: 2px solid var(--border);
-  padding-bottom: 10px;
+  font-family: var(--font-display, var(--header-font));
+  font-size: 1.6rem;
+  letter-spacing: normal;
+  text-transform: none;
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 .modal-section {
@@ -86,30 +89,16 @@
 
 .modal-close-button {
   display: block;
-  /* Make it a block element */
-  margin: 25px auto 0 auto;
-  /* Center the button horizontally with top margin */
-  padding: 10px 30px;
-  background-color: var(--primary);
-  color: var(--bg);
-  border: 1px solid var(--primary);
-  border-radius: 4px;
-  font-family: var(--header-font);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 1rem;
-}
-
-.modal-close-button:hover {
-  background-color: transparent;
-  color: var(--primary);
+  /* Block + auto margins centre it under the content; look comes from the base button. */
+  margin: 22px auto 0 auto;
+  padding: 11px 30px;
+  font-size: 0.95rem;
 }
 
 /* Optional: Specific styles for the map modal content area */
 .map-modal-content {
   background-color: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: 0 8px 32px var(--shadow);
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .9);
   color: var(--text);
   padding: 30px;
   border-radius: 12px;

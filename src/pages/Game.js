@@ -126,7 +126,7 @@ const SaveConfirmationModal = () => {
 
   return (
     <ModalShell modalId="saveConfirmation" ariaLabel="Save Confirmation" style={{ maxWidth: '420px', textAlign: 'center' }}>
-      <h3 style={{ marginBottom: '15px', color: headingColor }}>{heading}</h3>
+      <h3 style={{ margin: '0 0 12px', color: headingColor, fontFamily: 'var(--font-display)', fontSize: '1.4rem', letterSpacing: 'normal', textTransform: 'none' }}>{heading}</h3>
       <p style={{ marginBottom: '10px', color: 'var(--text)' }}>
         {blurb}
       </p>

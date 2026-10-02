@@ -980,3 +980,16 @@ body:has(.gm-page) .app-footer { display: none; }
   /* responsive.css pads every .main-content on phones; the game fills the viewport */
   [data-theme='redesign'] .main-content.game-page-content { padding: 0 !important; }
 }
+
+/* Adventure Book tabs */
+[data-theme='redesign'] .book-tab { padding: .5rem .95rem; border-radius: 7px 7px 0 0; border: 1px solid transparent; border-bottom: 0; background: transparent; box-shadow: none; color: var(--muted); font-family: var(--font-ui); font-size: .92rem; font-weight: 600; letter-spacing: normal; text-transform: none; }
+[data-theme='redesign'] .book-tab:hover { color: var(--text); filter: none; }
+[data-theme='redesign'] .book-tab.on { border-color: var(--line); background: var(--ground); color: var(--gold); box-shadow: inset 0 2px 0 var(--gold); }
+
+/* Map pop-up on phones: tighter frame, and the action row (Enter / Close Map) pinned to
+   the bottom of the scrolling pop-up so it's reachable without scrolling past the key. */
+@media (max-width: 600px) {
+  [data-theme='redesign'] .modal-content.map-modal-content { padding: 16px 12px 0; max-height: calc(100dvh - 16px); }
+  [data-theme='redesign'] .map-modal-content .map-modal-actions { position: sticky; bottom: 0; z-index: 5; width: calc(100% + 24px); margin: 12px -12px 0; padding: 12px; background: var(--surface); border-top: 1px solid var(--line-soft); }
+  [data-theme='redesign'] .map-modal-content .map-modal-actions button { flex: 1; }
+}

@@ -154,10 +154,11 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
         {/* Themed Gold Section */}
         <div
           style={{
-            padding: '20px',
-            background: 'var(--primary)',
-            color: 'var(--bg)', /* High contrast text against primary */
-            borderRadius: '8px',
+            padding: '16px 20px',
+            background: 'color-mix(in srgb, var(--gold) 9%, var(--ground))',
+            border: '1px solid color-mix(in srgb, var(--gold) 55%, transparent)',
+            color: 'var(--text)',
+            borderRadius: '10px',
             marginBottom: '24px',
             display: 'flex',
             alignItems: 'center',
@@ -184,19 +185,19 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
           />
           <div style={{ flex: 1 }}>
             <div style={{
-              fontSize: '14px',
+              fontSize: '12px',
               textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              opacity: 0.9,
-              fontWeight: 'bold',
-              fontFamily: 'var(--header-font)'
+              letterSpacing: '0.14em',
+              fontWeight: 700,
+              color: 'var(--gold)',
+              fontFamily: 'var(--font-ui)'
             }}>
               Treasury
             </div>
             <div style={{
               fontSize: '28px',
               fontWeight: 'bold',
-              fontFamily: 'var(--header-font)',
+              fontFamily: 'var(--font-ui)',
               display: 'flex',
               alignItems: 'baseline',
               gap: '8px'
@@ -204,7 +205,7 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
               {totalGold} <span style={{ fontSize: '18px', opacity: 0.8 }}>GP</span>
             </div>
           </div>
-          <div style={{ fontSize: '24px', opacity: 0.7 }}>🔍</div>
+          <div style={{ fontFamily: 'var(--font-ui)', fontSize: '0.85rem', color: 'var(--muted)' }}>View</div>
         </div>
 
         {/* Tabs: collected items vs per-hero loadout */}
@@ -217,7 +218,7 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
             onClick={() => setActiveTab('items')}
             style={{ flex: 1 }}
           >
-            ⚔️ Items
+            Items
           </button>
           <button
             type="button"
@@ -227,7 +228,7 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
             onClick={() => setActiveTab('loadout')}
             style={{ flex: 1 }}
           >
-            🛡️ Loadout
+            Loadout
           </button>
         </div>
 

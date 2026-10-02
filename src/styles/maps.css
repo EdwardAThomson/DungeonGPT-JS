@@ -5,9 +5,7 @@
  */
 
 .world-map-container {
-  margin-top: 20px;
-  padding-top: 15px;
-  border-top: 1px solid var(--state-muted-strong);
+  margin-top: 8px;
   text-align: center;
   /* larger tiles can exceed the modal width — scroll instead of clipping */
   max-width: 100%;

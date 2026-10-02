@@ -267,7 +267,7 @@ const EncounterActionModal = ({ party, character, onResolve, onCharacterUpdate, 
               </button>
             </div>
 
-            <button className="modal-close-button" onClick={handleFleeBeforeCombat}>
+            <button className="modal-close-button secondary-button" onClick={handleFleeBeforeCombat}>
               Flee Encounter
             </button>
           </>

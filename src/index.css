@@ -210,18 +210,11 @@ h6 {
   color: var(--primary);
   margin-top: 1.5em;
   margin-bottom: 0.8em;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.01em;
 }
 
-/* h1 does not use text-transform to preserve proper capitalization like "DungeonGPT" */
-
-h2,
-h3,
-h4,
-h5,
-h6 {
-  text-transform: uppercase;
-}
+/* Headings keep their written capitalisation (#82): Cinzel already reads as small
+   capitals, and the old forced uppercase made every pop-up title shout. */
 
 h1 {
   font-size: 2.22rem;
@@ -235,23 +228,48 @@ h3 {
   font-size: 1.55rem;
 }
 
+/* Base button = the redesign's gold primary (#82). Components that need another look
+   (ghost, danger, icon, tile) set their own class; .secondary-button / .danger-button
+   below cover the legacy class names used across the game's pop-ups. */
 button {
-  background-color: var(--primary);
-  color: var(--bg);
-  border: 1px solid var(--primary);
-  padding: 10px 24px;
-  border-radius: 4px;
+  /* Solid colour, not a gradient image: many legacy component classes recolour buttons
+     with background-color alone, which an inherited background-image would cover. */
+  background-color: #ecb44f;
+  color: #1d1505;
+  border: 1px solid #f0c564;
+  padding: 10px 22px;
+  border-radius: 6px;
   cursor: pointer;
-  font-family: var(--header-font);
-  font-size: 0.9rem;
-  letter-spacing: 0.1em;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 4px var(--shadow);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 0.92rem;
+  letter-spacing: 0.01em;
+  transition: filter 0.2s ease, transform 0.15s ease, border-color 0.2s ease, background 0.2s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 6px 18px -10px rgba(227, 169, 63, .7);
 }
 
 button:hover {
-  background-color: transparent;
-  color: var(--primary);
+  filter: brightness(1.07);
+}
+
+.secondary-button {
+  background-color: var(--surface);
+  color: var(--text);
+  border-color: var(--line, var(--border));
+  box-shadow: none;
+}
+
+.secondary-button:hover {
+  border-color: var(--gold, var(--primary));
+  color: var(--gold, var(--primary));
+  filter: none;
+}
+
+.danger-button {
+  background-color: #b9414a;
+  color: #fff;
+  border-color: #d4555f;
+  box-shadow: none;
 }
 
 button:active {
@@ -259,9 +277,12 @@ button:active {
 }
 
 button:disabled {
-  background-color: var(--text-secondary);
-  border-color: var(--text-secondary);
-  opacity: 0.5;
+  background-color: var(--surface-2, var(--surface));
+  color: var(--muted-2, var(--text-secondary));
+  border-color: var(--line, var(--border));
+  box-shadow: none;
+  filter: none;
+  opacity: 0.8;
   cursor: not-allowed;
 }
 

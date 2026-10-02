@@ -32,11 +32,11 @@ import { AiEngineSettings, ShareQRCode } from './Modals';
 // shell only unmounts its children's DOM when closed).
 
 const TABS = [
-  { id: 'campaign', label: '📜 Campaign' },
-  { id: 'quests', label: '🗺️ Side Quests' },
-  { id: 'codex', label: '📚 Codex' },
-  { id: 'party', label: '🎒 Party' },
-  { id: 'ai', label: '⚙️ AI' }
+  { id: 'campaign', label: 'Campaign' },
+  { id: 'quests', label: 'Side Quests' },
+  { id: 'codex', label: 'Codex' },
+  { id: 'party', label: 'Party' },
+  { id: 'ai', label: 'AI' }
 ];
 
 // Normalize legacy milestone arrays (plain strings) for display.
@@ -310,7 +310,7 @@ const AdventureBook = ({
       style={{ maxWidth: '900px', width: '95%', height: 'min(95vh, 1200px)', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}
     >
       <div style={{ padding: '20px 20px 0 20px', borderBottom: '1px solid var(--border)' }}>
-        <h2 style={{ margin: '0 0 10px 0', color: 'var(--primary)', fontFamily: 'var(--header-font)', fontSize: '1.4rem' }}>📖 Adventure Book</h2>
+        <h2 style={{ margin: '0 0 12px 0', textAlign: 'left', fontSize: '1.5rem' }}>Adventure Book</h2>
         <div role="tablist" aria-label="Adventure Book sections" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {TABS.map(tab => (
             <button
@@ -319,16 +319,7 @@ const AdventureBook = ({
               role="tab"
               aria-selected={activeTab === tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: '8px 14px',
-                background: 'none',
-                border: 'none',
-                borderBottom: activeTab === tab.id ? '3px solid var(--primary)' : '3px solid transparent',
-                color: activeTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
-                fontWeight: 700,
-                cursor: 'pointer',
-                fontFamily: 'var(--header-font)'
-              }}
+              className={`book-tab${activeTab === tab.id ? ' on' : ''}`}
             >
               {tabLabel(tab)}
             </button>
@@ -362,8 +353,8 @@ const AdventureBook = ({
       </div>
 
       <div style={{ padding: '20px', borderTop: '1px solid var(--border)', textAlign: 'center', background: 'var(--bg)' }}>
-        <button className="modal-close-button" onClick={close} style={{ padding: '12px 60px', borderRadius: '30px', fontFamily: 'var(--header-font)', textTransform: 'uppercase', letterSpacing: '2px' }}>
-          Accept & Close
+        <button className="modal-close-button" onClick={close} style={{ marginTop: 0, padding: '11px 48px' }}>
+          Close
         </button>
         <ShareQRCode />
       </div>
