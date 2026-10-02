@@ -47,7 +47,7 @@ const AppContent = () => {
   const isDebugEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEBUG_ROUTES === 'true';
   const isGamePage = location.pathname === '/game';
   // Redesign marketing routes (#82 §12.3) go full-bleed; other pages keep the container.
-  const isBleedPage = ['/', '/overview', '/engine', '/premium', '/membership', '/getting-started', '/saved-conversations', '/all-heroes'].includes(location.pathname);
+  const isBleedPage = ['/', '/overview', '/engine', '/premium', '/membership', '/getting-started', '/saved-conversations', '/all-heroes', '/login'].includes(location.pathname);
 
   const {
     selectedProvider,

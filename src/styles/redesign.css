@@ -527,3 +527,18 @@
 [data-theme='redesign'] .rd-app .pregen-section-head p { margin: .4rem 0 0; color: var(--muted); }
 [data-theme='redesign'] .rd-app .roster-card.ready { border-color: var(--line-soft); }
 [data-theme='redesign'] .rd-app .roster-card.ready:hover { border-color: color-mix(in srgb, var(--gold) 55%, transparent); }
+
+/* Sign-in landing */
+[data-theme='redesign'] .rd-app.login-screen { min-height: 70vh; display: flex; align-items: center; background-size: cover; background-position: center; }
+[data-theme='redesign'] .rd-app.login-screen > .band { width: 100%; }
+[data-theme='redesign'] .rd-app .login-card { max-width: 30rem; margin-inline: auto; display: flex; flex-direction: column; align-items: center; text-align: center; gap: .9rem; padding: clamp(1.8rem, 5vw, 2.6rem); background: color-mix(in srgb, var(--surface) 92%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent); border-radius: 12px; box-shadow: 0 30px 70px -35px rgba(0, 0, 0, .9); }
+[data-theme='redesign'] .rd-app .login-card .eyebrow { margin: 0; }
+[data-theme='redesign'] .rd-app .login-card h1 { font-size: clamp(1.6rem, 3.4vw, 2rem); line-height: 1.15; }
+[data-theme='redesign'] .rd-app .login-perks { display: flex; flex-direction: column; gap: .55rem; margin: .3rem 0 .4rem; text-align: left; color: var(--muted); font-size: .98rem; }
+[data-theme='redesign'] .rd-app .login-perks li { display: flex; gap: .6rem; align-items: flex-start; }
+[data-theme='redesign'] .rd-app .login-perks svg { flex: 0 0 auto; margin-top: .3rem; color: var(--gold); }
+[data-theme='redesign'] .rd-app .login-cta { width: 100%; justify-content: center; padding-block: .95rem; }
+[data-theme='redesign'] .rd-app .login-note { margin: 0; font-family: var(--font-ui); font-size: .88rem; color: var(--muted-2); line-height: 1.5; }
+[data-theme='redesign'] .rd-app .login-note b { color: var(--muted); }
+[data-theme='redesign'] .rd-app .login-links { display: flex; gap: 1.4rem; flex-wrap: wrap; justify-content: center; padding-top: .9rem; margin-top: .2rem; border-top: 1px solid var(--line-soft); width: 100%; font-family: var(--font-ui); font-size: .95rem; }
+[data-theme='redesign'] .rd-app .login-links a { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
