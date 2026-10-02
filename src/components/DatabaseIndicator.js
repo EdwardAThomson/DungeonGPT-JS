@@ -9,10 +9,13 @@ const DatabaseIndicator = () => {
   if (isProduction && !forceSQLite) return null;
 
   return (
+    // Sits above the fixed bottom docks (new game, party) and ignores pointer events,
+    // so this dev-only badge never covers or blocks their buttons.
     <div style={{
       position: 'fixed',
-      bottom: '10px',
+      bottom: '84px',
       right: '10px',
+      pointerEvents: 'none',
       padding: '6px 12px',
       backgroundColor: usingSQLite ? 'var(--state-warning)' : 'var(--state-success)',
       color: 'var(--bg)',

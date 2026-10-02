@@ -85,19 +85,19 @@ test('frozen-frontier-t1: The Hearthmere Trading Post exists in Hearthmere and o
   await mockAi(page);
 
   await page.goto('/new-game');
-  await expect(page.getByRole('heading', { name: /New Game Setup/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Choose your adventure/i })).toBeVisible();
 
   // Re-enact the playtest bug flow: build a preview map on ANOTHER tab first (the
-  // seed input + Generate button only exist on Custom/Freeform). This preview has
+  // seed input + Generate button only exist on the Custom tab). This preview has
   // NO Hearthmere on it; before the fix, picking the template kept it and the
   // trading post never existed anywhere.
-  await page.getByRole('button', { name: /Freeform/i }).click();
+  await page.getByRole('tab', { name: /^Custom$/i }).click();
   await page.locator('#worldSeed').fill(WORLD_SEED); // pinned: Hearthmere is the starting town
-  await page.getByRole('button', { name: /Generate World Map|Build Map from Seed/i }).click();
+  await page.getByRole('button', { name: /Generate world map|Rebuild map from seed/i }).click();
   await expect(page.getByText(/Map generated!/i)).toBeVisible();
 
   // Now pick the Frozen Frontier arc (its entry chapter is t1).
-  await page.getByRole('button', { name: /Ready-Made/i }).click();
+  await page.getByRole('tab', { name: /Ready-made/i }).click();
   await page.locator('[data-testid^="arc-card-frozen"]').first().click();
 
   await page.getByRole('button', { name: /Next: Select Heroes/i }).click();
