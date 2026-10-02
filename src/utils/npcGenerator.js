@@ -627,7 +627,10 @@ export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
 
     // 2. TOWN LEADER LOGIC
     let leaderSet = false;
-    let mainResidence = residentialSites.find(r => r.type === 'keep' || r.type === 'manor');
+    // The lord lives in the keep when there is one; only keep-less towns seat the leader in
+    // a manor. (Scanning for "keep or manor" took whichever came first on the map, so a
+    // manor could win and the keep then fell through to the commoner branch below.)
+    let mainResidence = residentialSites.find(r => r.type === 'keep') || residentialSites.find(r => r.type === 'manor');
 
     if (mainResidence) {
         // High Noble Leader and Family
@@ -844,8 +847,9 @@ export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
     residentialSites.forEach(home => {
         if (occupiedHomes.has(`${home.x},${home.y}`)) return; // Skip if already populated (e.g. leader)
 
-        // Manor residents: lesser nobility / gentry families
-        if (home.type === 'manor') {
+        // Manor residents: lesser nobility / gentry families. A keep is never a commoner home:
+        // if one is somehow still empty here it gets a noble household too.
+        if (home.type === 'manor' || home.type === 'keep') {
             // The family is the one the manor is named for ("Ashwood Hall" -> Ashwood).
             const named = home.name && home.name.split(' ')[0];
             const familyName = named && NOBLE_LAST_NAMES.includes(named) ? named : rng.pick(NOBLE_LAST_NAMES);
