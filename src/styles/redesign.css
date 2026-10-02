@@ -738,3 +738,85 @@
   [data-theme='redesign'] .arc-modal-foot { flex-wrap: wrap; }
   [data-theme='redesign'] .arc-modal-foot .btn { flex: 1 1 auto; justify-content: center; padding-inline: .8rem; font-size: .92rem; }
 }
+
+/* Hero creation ("forge") */
+[data-theme='redesign'] .rd-app.hero-forge .band { padding-bottom: 7rem; }
+[data-theme='redesign'] .rd-app .forge-label,
+[data-theme='redesign'] .rd-app .forge-label-text { display: block; margin: 0 0 .6rem; font-family: var(--font-ui); font-size: .8rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); }
+[data-theme='redesign'] .rd-app h2.forge-label { font-family: var(--font-ui); font-size: .8rem; color: var(--gold); }
+[data-theme='redesign'] .rd-app .forge-quick { margin-bottom: 1.4rem; }
+[data-theme='redesign'] .rd-app .forge-chips { display: flex; flex-wrap: wrap; gap: .45rem; }
+[data-theme='redesign'] .rd-app .forge-chip { min-height: 0; padding: .5rem .95rem; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); box-shadow: none; color: var(--text); font-family: var(--font-ui); font-size: .92rem; font-weight: 600; letter-spacing: normal; text-transform: none; cursor: pointer; transition: border-color .2s ease, background .2s ease; }
+[data-theme='redesign'] .rd-app .forge-chip:hover { border-color: var(--gold); }
+[data-theme='redesign'] .rd-app .forge-chip.on { border-color: var(--gold); background: var(--gold); color: #211a0a; }
+[data-theme='redesign'] .rd-app .forge-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 1.2rem; align-items: start; }
+@media (max-width: 900px) { [data-theme='redesign'] .rd-app .forge-grid { grid-template-columns: 1fr; } }
+[data-theme='redesign'] .rd-app .forge-card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: 12px; padding: clamp(1.1rem, 2.5vw, 1.6rem); }
+[data-theme='redesign'] .rd-app .forge-card label { display: block; margin-bottom: .35rem; font-family: var(--font-ui); font-size: .88rem; font-weight: 600; color: var(--muted); letter-spacing: normal; text-transform: none; }
+[data-theme='redesign'] .rd-app .forge-card label small { font-weight: 400; color: var(--muted-2); margin-left: .3rem; }
+[data-theme='redesign'] .rd-app .forge-card :is(input, select, textarea) { margin: 0; width: 100%; box-sizing: border-box; padding: .65rem .8rem; border-radius: 6px; border: 1px solid var(--line); background: var(--ground); color: var(--text); font-family: var(--font-ui); font-size: 1rem; }
+[data-theme='redesign'] .rd-app .forge-card textarea { font-family: var(--font-body); resize: vertical; line-height: 1.5; }
+[data-theme='redesign'] .rd-app .forge-card :is(input, select, textarea):focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 22%, transparent); }
+[data-theme='redesign'] .rd-app .forge-portrait-row { display: flex; gap: 1.2rem; align-items: flex-start; }
+[data-theme='redesign'] .rd-app .forge-portrait { position: relative; flex: 0 0 auto; width: 150px; height: 180px; min-height: 0; padding: 0; border-radius: 10px; overflow: hidden; border: 1px dashed var(--line); background: var(--ground); box-shadow: none; cursor: pointer; }
+[data-theme='redesign'] .rd-app .forge-portrait.has-pic { border: 2px solid var(--gold); }
+[data-theme='redesign'] .rd-app .forge-portrait:disabled { cursor: not-allowed; opacity: .6; }
+[data-theme='redesign'] .rd-app .forge-portrait img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; display: block; }
+[data-theme='redesign'] .rd-app .forge-portrait-empty { display: grid; place-items: center; height: 100%; font-family: var(--font-display); font-size: 2.6rem; color: var(--muted-2); }
+[data-theme='redesign'] .rd-app .forge-portrait-cta { position: absolute; left: 0; right: 0; bottom: 0; padding: .4rem; background: rgba(14, 13, 19, .78); font-family: var(--font-ui); font-size: .82rem; font-weight: 600; color: var(--gold); letter-spacing: normal; text-transform: none; }
+[data-theme='redesign'] .rd-app .forge-name { flex: 1; min-width: 0; }
+[data-theme='redesign'] .rd-app .forge-inline { display: flex; gap: .5rem; margin-bottom: 1rem; }
+[data-theme='redesign'] .rd-app .forge-roll { flex: 0 0 auto; padding: .6rem 1rem; }
+[data-theme='redesign'] .rd-app .forge-seg { display: inline-flex; gap: .3rem; padding: .25rem; border-radius: 8px; border: 1px solid var(--line); background: var(--ground); }
+[data-theme='redesign'] .rd-app .forge-seg button { min-height: 0; padding: .45rem 1.1rem; border: 0; border-radius: 5px; background: transparent; box-shadow: none; color: var(--muted); font-family: var(--font-ui); font-size: .95rem; font-weight: 600; letter-spacing: normal; text-transform: none; cursor: pointer; }
+[data-theme='redesign'] .rd-app .forge-seg button.on { background: var(--gold); color: #211a0a; }
+[data-theme='redesign'] .rd-app .forge-identity .field-hint { margin: .5rem 0 0; font-family: var(--font-ui); font-size: .85rem; color: var(--muted-2); }
+[data-theme='redesign'] .rd-app .forge-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; margin-top: 1.3rem; }
+[data-theme='redesign'] .rd-app .forge-field { margin-top: 1rem; }
+[data-theme='redesign'] .rd-app .forge-sheet-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+[data-theme='redesign'] .rd-app .forge-sheet-head h2 { font-size: 1.3rem; }
+[data-theme='redesign'] .rd-app .forge-points { font-family: var(--font-ui); font-size: .95rem; color: var(--muted); }
+[data-theme='redesign'] .rd-app .forge-points b { font-size: 1.3rem; color: var(--gold); margin-right: .2rem; }
+[data-theme='redesign'] .rd-app .forge-points.done b { color: var(--success); }
+[data-theme='redesign'] .rd-app .forge-points.over b { color: #ef8b8b; }
+[data-theme='redesign'] .rd-app .forge-hint { margin: .3rem 0 1rem; font-family: var(--font-ui); font-size: .86rem; color: var(--muted-2); }
+[data-theme='redesign'] .rd-app .forge-stats { display: flex; flex-direction: column; gap: .4rem; }
+[data-theme='redesign'] .rd-app .forge-stat { display: grid; grid-template-columns: 1fr 36px 2.4rem 36px 3rem 5.6rem; align-items: center; gap: .4rem; padding: .45rem .6rem; border-radius: 8px; background: var(--ground); }
+[data-theme='redesign'] .rd-app .forge-stat .name { font-family: var(--font-ui); font-weight: 600; color: var(--text); }
+[data-theme='redesign'] .rd-app .forge-stat .step { display: grid; place-items: center; width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); box-shadow: none; color: var(--text); font-size: 1.2rem; line-height: 1; cursor: pointer; }
+[data-theme='redesign'] .rd-app .forge-stat .step:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+[data-theme='redesign'] .rd-app .forge-stat .step:disabled { opacity: .3; cursor: not-allowed; background: var(--surface); }
+[data-theme='redesign'] .rd-app .forge-stat .score { text-align: center; font-family: var(--font-ui); font-size: 1.2rem; font-weight: 700; color: var(--text); }
+[data-theme='redesign'] .rd-app .forge-stat .mod { text-align: center; font-family: var(--font-ui); font-weight: 700; color: var(--gold); }
+[data-theme='redesign'] .rd-app .forge-stat .cost { font-family: var(--font-ui); font-size: .78rem; color: var(--muted-2); text-align: right; }
+[data-theme='redesign'] .rd-app .forge-derived { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin-top: 1rem; }
+[data-theme='redesign'] .rd-app .forge-derived > div { display: flex; flex-direction: column; align-items: center; padding: .6rem; border-radius: 8px; border: 1px solid var(--line-soft); }
+[data-theme='redesign'] .rd-app .forge-derived span { font-family: var(--font-ui); font-size: .76rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-2); }
+[data-theme='redesign'] .rd-app .forge-derived b { font-family: var(--font-ui); font-size: 1.15rem; color: var(--text); }
+@media (max-width: 520px) {
+  [data-theme='redesign'] .rd-app .forge-portrait-row { flex-direction: column; }
+  [data-theme='redesign'] .rd-app .forge-portrait { width: 120px; height: 144px; }
+  [data-theme='redesign'] .rd-app .forge-fields { grid-template-columns: 1fr; }
+  [data-theme='redesign'] .rd-app .forge-stat { grid-template-columns: 1fr 34px 2.2rem 34px 2.6rem; }
+  [data-theme='redesign'] .rd-app .forge-stat .cost { display: none; }
+}
+[data-theme='redesign'] .rd-app .forge-inline { align-items: stretch; }
+[data-theme='redesign'] .rd-app .forge-roll { padding-block: 0; }
+
+/* Hero review (HeroSummary) */
+[data-theme='redesign'] .rd-app .review-card { display: grid; grid-template-columns: 280px 1fr; max-width: 880px; overflow: hidden; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent); background: var(--surface); }
+[data-theme='redesign'] .rd-app .review-portrait { background: var(--ground-2); }
+[data-theme='redesign'] .rd-app .review-portrait img { width: 100%; height: 100%; min-height: 320px; object-fit: cover; object-position: center 20%; display: block; }
+[data-theme='redesign'] .rd-app .review-body { display: flex; flex-direction: column; gap: .7rem; padding: clamp(1.2rem, 3vw, 1.8rem); }
+[data-theme='redesign'] .rd-app .review-body h2 { font-size: clamp(1.5rem, 3vw, 2rem); }
+[data-theme='redesign'] .rd-app .review-facts { display: flex; flex-wrap: wrap; gap: .5rem 1.6rem; margin: .2rem 0 0; }
+[data-theme='redesign'] .rd-app .review-facts dt { font-family: var(--font-ui); font-size: .76rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-2); }
+[data-theme='redesign'] .rd-app .review-facts dd { margin: .1rem 0 0; font-family: var(--font-ui); font-weight: 600; color: var(--text); }
+[data-theme='redesign'] .rd-app .review-bg { margin: 0; padding: .7rem .9rem; border-left: 3px solid var(--gold); border-radius: 0 6px 6px 0; background: var(--ground); font-style: italic; color: #cdc7d3; }
+[data-theme='redesign'] .rd-app .review-stats { grid-template-columns: repeat(6, 1fr); }
+[data-theme='redesign'] .rd-app .review-actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: auto; padding-top: .6rem; }
+@media (max-width: 720px) {
+  [data-theme='redesign'] .rd-app .review-card { grid-template-columns: 1fr; }
+  [data-theme='redesign'] .rd-app .review-portrait img { min-height: 0; aspect-ratio: 4 / 3; }
+  [data-theme='redesign'] .rd-app .review-stats { grid-template-columns: repeat(3, 1fr); }
+}

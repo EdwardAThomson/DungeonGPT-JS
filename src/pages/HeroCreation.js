@@ -1,4 +1,7 @@
 // HeroCreation.js
+// Create / edit a hero, on the redesign primitives (#82): an identity card (portrait, name,
+// gender, alignment, background), one-click class templates, and a live character sheet
+// (point-buy with modifiers and HP). Styles: .rd-page / .rd-app in src/styles/redesign.css.
 
 import React, { useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -11,6 +14,8 @@ import { calculateMaxHP } from "../utils/healthSystem";
 import OnboardingSteps from "../components/OnboardingSteps";
 import PortraitPickerModal from "../components/PortraitPickerModal";
 import { resolveProfilePicture } from "../utils/assetHelper";
+import { calculateModifier } from "../utils/rules";
+import "../styles/redesign.css";
 import {
   heroGenders,
   heroClasses,
@@ -72,8 +77,7 @@ const HeroCreation = () => {
     setShowPortraitModal(false); // pick + close in one click
   };
 
-  const handleGenderChange = (e) => {
-    const newGender = e.target.value;
+  const handleGenderChange = (newGender) => {
     setSelectedGender(newGender);
 
     // Clear profile picture if it doesn't match the new gender
@@ -103,13 +107,15 @@ const HeroCreation = () => {
   };
 
   // --- Apply a class template (level 1, valid 27-point spread) ---
-  const handleApplyTemplate = () => {
-    if (!selectedTemplate || !heroTemplates[selectedTemplate]) {
+  // One click on a class chip applies it (the old select-then-Apply was two steps).
+  const handleApplyTemplate = (templateName) => {
+    if (!templateName || !heroTemplates[templateName]) {
       setAlertMessage("Please select a class template to apply.");
       return;
     }
-    const template = heroTemplates[selectedTemplate];
-    setSelectedClass(selectedTemplate);
+    setSelectedTemplate(templateName);
+    const template = heroTemplates[templateName];
+    setSelectedClass(templateName);
     setSelectedRace(template.race);
     setStats(template.stats);
     setAlignment(template.alignment);
@@ -130,7 +136,7 @@ const HeroCreation = () => {
         const pool = profilePictures.filter((pic) => pic.gender === gender);
         // Prefer the portrait drawn for this class when one exists (portraits are
         // named by class); otherwise any portrait matching the gender.
-        const classPic = pool.find((pic) => pic.src.includes(selectedTemplate.toLowerCase()));
+        const classPic = pool.find((pic) => pic.src.includes(templateName.toLowerCase()));
         const pick = classPic || pool[Math.floor(Math.random() * pool.length)];
         if (pick) setSelectedProfilePicture(pick.src);
       }
@@ -200,218 +206,206 @@ const HeroCreation = () => {
     setHeroName(generateName(gender));
   };
 
+  const fmtMod = (score) => {
+    const m = calculateModifier(score);
+    return m >= 0 ? `+${m}` : `${m}`;
+  };
+  const isEditing = !!state?.editing;
+  const inJourney = !isEditing && state?.returnToHeroSelection;
+
   return (
-    <div className="Home-page hero-creation-form">
-      {/* The journey bar only renders when creation is part of the game-start flow
-          (entered from party selection). Standalone creation (Create Hero card,
-          Hall of Heroes) is roster management, not the journey — no bar. */}
-      {!state?.editing && state?.returnToHeroSelection && (
-        <OnboardingSteps currentStep={2} completedSteps={[1]} />
-      )}
-      <h1 className="hero-creation-title">{state?.editing ? "Edit Hero" : "Create Your Hero"}</h1>
-
-      {/* Top Container: Name + Gender (left), Profile Picture (right) */}
-      <div className="top-container" data-tour="hero-identity">
-        <div className="top-left">
-          {/* Name */}
-          <div className="form-section">
-            <div className="name-section">
-              <label htmlFor="heroName">Hero Name:</label>
-              <input
-                type="text"
-                id="heroName"
-                maxLength="50"
-                placeholder="Enter or Generate Name"
-                value={heroName}
-                onChange={handleNameChange}
-                required
-              />
-              <button
-                type="button"
-                onClick={generateRandomName}
-                className="generate-name-btn"
-                title="Generate a random name (picks a gender if none is set)"
-              >
-                🎲 Random name
-              </button>
-            </div>
-          </div>
-
-          {/* Gender Selection */}
-          <div className="form-section">
-            <label htmlFor="gender">Gender:</label>
-            <select id="gender" value={selectedGender} onChange={handleGenderChange} required>
-              <option value="">Select Gender</option>
-              {heroGenders.map((heroGender) => (
-                <option key={heroGender} value={heroGender}>
-                  {heroGender}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Picture Selection — opens a modal grid */}
-        <div className="form-section profile-pictures">
-          <label>Profile Picture:</label>
-          {selectedProfilePicture ? (
-            <div className="picture-selected">
-              <img src={selectedProfilePicture} alt="Selected portrait" className="picture-selected-img" />
-              <button
-                type="button"
-                className="change-portrait-btn"
-                onClick={() => setShowPortraitModal(true)}
-                disabled={!selectedGender}
-              >
-                Change picture
-              </button>
-            </div>
-          ) : (
-            <div className="picture-empty">
-              <div className="picture-placeholder" aria-hidden="true">?</div>
-              <button
-                type="button"
-                className="change-portrait-btn"
-                onClick={() => setShowPortraitModal(true)}
-                disabled={!selectedGender}
-              >
-                Choose picture
-              </button>
-            </div>
-          )}
-          {!selectedGender && (
-            <p className="field-hint">Choose a gender first to pick a portrait.</p>
-          )}
-        </div>
-      </div> {/* End Top Container */}
-
-      {/* Middle Container: Details Left, Stats Right */}
-      <div className="middle-container">
-        {/* Middle Left Column */}
-        <div className="middle-left">
-          {/* Apply Template Section */}
-          <div className="form-section">
-            <label htmlFor="template-select">Quick start — apply a class template:</label>
-            <div className="template-controls" data-tour="hero-template">
-              <select
-                id="template-select"
-                value={selectedTemplate}
-                onChange={(e) => setSelectedTemplate(e.target.value)}
-              >
-                <option value="">Select Class Template</option>
-                {Object.keys(heroTemplates).map(className => (
-                  <option key={className} value={className}>{className}</option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={handleApplyTemplate}
-                disabled={!selectedTemplate}
-                className="apply-template-btn"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-
-          {/* Details Row (Class, Level, Alignment) */}
-          {/* Race selector is hidden for now — we only have human portraits, so every hero is
-              created as Human. The heroRace field is kept on the data model (legacy saves keep
-              their race; restore this <select> to re-enable choosing a race). */}
-          <div className="form-row">
-            {/* Class */}
-            <div className="form-item">
-              <label htmlFor="class">Class:</label>
-              <select id="class" value={selectedClass} onChange={handleClassChange} required>
-                <option value="">Select Class</option>
-                {heroClasses.map((cls) => (
-                  <option key={cls} value={cls}>{cls}</option>
-                ))}
-              </select>
-            </div>
-            {/* Level (fixed at 1) */}
-            <div className="form-item form-item-level">
-              <label htmlFor="level">Level:</label>
-              <span id="level" className="level-fixed" title="All heroes start at level 1">{heroLevel}</span>
-            </div>
-            {/* Alignment */}
-            <div className="form-item form-item-alignment">
-              <label htmlFor="alignment">Alignment:</label>
-              <select id="alignment" value={alignment} onChange={handleAlignmentChange} required>
-                <option value="">Choose Alignment</option>
-                {alignmentOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div> {/* End Details Row */}
-
-          {/* Background Story */}
-          <div className="form-section">
-            <label htmlFor="background">Background Story:</label>
-            <textarea
-              id="background"
-              value={heroBackground}
-              onChange={handleBackgroundChange}
-              maxLength="200"
-              placeholder="Enter hero background"
-              rows="4"
-              required
-            />
-          </div>
-        </div> {/* End Middle Left */}
-
-        {/* Middle Right Column */}
-        <div className="middle-right" data-tour="hero-stats">
-          {/* Stats — point-buy */}
-          <h2>Stats</h2>
-          <p className={`points-remaining${remainingPoints < 0 ? ' over-budget' : ''}`}>
-            Points remaining: <strong>{remainingPoints}</strong> / {POINT_BUY_BUDGET}
+    <div className="rd-page rd-app hero-forge">
+      <section className="page-header app-header">
+        <div className="wrap">
+          {/* The journey bar only renders when creation is part of the game-start flow
+              (entered from party selection). Standalone creation is roster management. */}
+          {inJourney && <OnboardingSteps currentStep={2} completedSteps={[1]} />}
+          <p className="eyebrow">{isEditing ? 'Edit hero' : 'New hero'}</p>
+          <h1 className="hero-creation-title">{isEditing ? 'Edit Hero' : 'Create Your Hero'}</h1>
+          <p className="lede">
+            {isEditing
+              ? 'Change anything. Stat changes must still fit the 27-point budget.'
+              : 'Start from a class template for a ready hero in one click, or build every detail yourself.'}
           </p>
-          <p className="points-hint">Scores 14 and 15 cost 2 points each.</p>
-          <div className="stats-section">
-            {STAT_KEYS.map((stat) => {
-              const upCost = increaseCost(stats[stat]);
-              const downRefund = decreaseRefund(stats[stat]);
-              return (
-                <div key={stat} className="stat-input pointbuy-row">
-                  <label>{stat}:</label>
-                  <div className="pointbuy-controls">
+        </div>
+      </section>
+
+      <section className="band">
+        <div className="wrap">
+          {/* Quick start: one click applies a class template */}
+          <div className="forge-quick" data-tour="hero-template">
+            <h2 className="forge-label">Quick start: pick a class template</h2>
+            <div className="forge-chips" role="group" aria-label="Class templates">
+              {Object.keys(heroTemplates).map((className) => (
+                <button
+                  key={className}
+                  type="button"
+                  className={`forge-chip${selectedTemplate === className ? ' on' : ''}`}
+                  onClick={() => handleApplyTemplate(className)}
+                  title={`Apply the ${className} template: class, stats, alignment and background`}
+                >
+                  {className}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="forge-grid">
+            {/* Identity */}
+            <div className="forge-card forge-identity" data-tour="hero-identity">
+              <div className="forge-portrait-row">
+                <button
+                  type="button"
+                  className={`forge-portrait${selectedProfilePicture ? ' has-pic' : ''}`}
+                  onClick={() => setShowPortraitModal(true)}
+                  disabled={!selectedGender}
+                  aria-label={selectedProfilePicture ? 'Change portrait' : 'Choose portrait'}
+                >
+                  {selectedProfilePicture
+                    ? <img src={selectedProfilePicture} alt="Selected portrait" className="picture-selected-img" />
+                    : <span className="forge-portrait-empty" aria-hidden="true">?</span>}
+                  <span className="forge-portrait-cta">{selectedProfilePicture ? 'Change' : 'Choose portrait'}</span>
+                </button>
+                <div className="forge-name">
+                  <label htmlFor="heroName">Name</label>
+                  <div className="forge-inline">
+                    <input
+                      type="text"
+                      id="heroName"
+                      maxLength="50"
+                      placeholder="Enter or roll a name"
+                      value={heroName}
+                      onChange={handleNameChange}
+                      required
+                    />
                     <button
                       type="button"
-                      className="pointbuy-btn"
-                      onClick={() => decreaseStat(stat)}
-                      disabled={!canDecreaseStat(stats, stat)}
-                      aria-label={`Decrease ${stat}${downRefund ? ` (refunds ${downRefund})` : ''}`}
+                      onClick={generateRandomName}
+                      className="btn btn-ghost forge-roll"
+                      title="Generate a random name (picks a gender if none is set)"
                     >
-                      {downRefund ? `−${downRefund}` : '−'}
-                    </button>
-                    <span className="pointbuy-value">{stats[stat]}</span>
-                    <button
-                      type="button"
-                      className="pointbuy-btn"
-                      onClick={() => increaseStat(stat)}
-                      disabled={!canIncreaseStat(stats, stat)}
-                      aria-label={`Increase ${stat}${upCost ? ` (costs ${upCost})` : ''}`}
-                    >
-                      {upCost ? `+${upCost}` : '+'}
+                      Roll
                     </button>
                   </div>
+                  <span className="forge-label-text" id="gender-label">Gender</span>
+                  <div className="forge-seg" role="radiogroup" aria-labelledby="gender-label">
+                    {heroGenders.map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        role="radio"
+                        aria-checked={selectedGender === g}
+                        className={selectedGender === g ? 'on' : ''}
+                        onClick={() => handleGenderChange(g)}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                  {!selectedGender && <p className="field-hint">Choose a gender to pick a portrait.</p>}
                 </div>
-              );
-            })}
-          </div>
-          <p className="max-hp-text">
-            <span className="detail-label">Max HP:</span> {calculateMaxHP({ stats })}
-          </p>
-        </div> {/* End Middle Right */}
-      </div> {/* End Middle Container */}
+              </div>
 
-      {/* Actions Row */}
-      <div className="form-actions">
-        <button type="button" onClick={handleSubmit} data-tour="create-hero">{state?.editing ? "Update Hero" : "Create Hero"}</button>
+              {/* Race selector is hidden for now: we only have human portraits, so every hero
+                  is created as Human. heroRace stays on the data model (legacy heroes keep it). */}
+              <div className="forge-fields">
+                <div>
+                  <label htmlFor="class">Class</label>
+                  <select id="class" value={selectedClass} onChange={handleClassChange} required>
+                    <option value="">Select class</option>
+                    {heroClasses.map((cls) => (
+                      <option key={cls} value={cls}>{cls}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="alignment">Alignment</label>
+                  <select id="alignment" value={alignment} onChange={handleAlignmentChange} required>
+                    <option value="">Choose alignment</option>
+                    {alignmentOptions.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="forge-field">
+                <label htmlFor="background">Background <small>{heroBackground.length}/200</small></label>
+                <textarea
+                  id="background"
+                  value={heroBackground}
+                  onChange={handleBackgroundChange}
+                  maxLength="200"
+                  placeholder="Where they come from, and what drives them"
+                  rows="3"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Live character sheet */}
+            <div className="forge-card forge-sheet" data-tour="hero-stats">
+              <div className="forge-sheet-head">
+                <h2>Ability scores</h2>
+                <span className={`forge-points${remainingPoints < 0 ? ' over' : remainingPoints === 0 ? ' done' : ''}`}>
+                  <b>{remainingPoints}</b> / {POINT_BUY_BUDGET} points left
+                </span>
+              </div>
+              <p className="forge-hint">Each score starts at 8. Raising to 14 or 15 costs 2 points per step.</p>
+              <div className="forge-stats">
+                {STAT_KEYS.map((stat) => {
+                  const upCost = increaseCost(stats[stat]);
+                  const downRefund = decreaseRefund(stats[stat]);
+                  return (
+                    <div key={stat} className="forge-stat">
+                      <span className="name">{stat}</span>
+                      <button
+                        type="button"
+                        className="step"
+                        onClick={() => decreaseStat(stat)}
+                        disabled={!canDecreaseStat(stats, stat)}
+                        aria-label={`Decrease ${stat}${downRefund ? ` (refunds ${downRefund})` : ''}`}
+                      >
+                        −
+                      </button>
+                      <span className="score">{stats[stat]}</span>
+                      <button
+                        type="button"
+                        className="step"
+                        onClick={() => increaseStat(stat)}
+                        disabled={!canIncreaseStat(stats, stat)}
+                        aria-label={`Increase ${stat}${upCost ? ` (costs ${upCost})` : ''}`}
+                      >
+                        +
+                      </button>
+                      <span className="mod">{fmtMod(stats[stat])}</span>
+                      <span className="cost">{canIncreaseStat(stats, stat) && upCost ? `+1 costs ${upCost}` : ''}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="forge-derived">
+                <div><span>Level</span><b>{heroLevel}</b></div>
+                <div><span>Max HP</span><b>{calculateMaxHP({ stats })}</b></div>
+                <div><span>Class</span><b>{selectedClass || 'None yet'}</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="party-dock" role="region" aria-label="Hero actions">
+        <div className="wrap party-dock-inner">
+          {selectedProfilePicture && (
+            <ol className="party-slots"><li className="slot filled"><img src={selectedProfilePicture} alt="" /></li></ol>
+          )}
+          <div className="party-dock-text">
+            <span><b>{heroName.trim() || 'Unnamed hero'}</b>{selectedClass ? ` · Level ${heroLevel} ${selectedClass}` : ''}</span>
+          </div>
+          <button type="button" className="btn btn-primary party-start" onClick={handleSubmit} data-tour="create-hero">
+            {isEditing ? 'Update Hero' : 'Create Hero'}
+          </button>
+        </div>
       </div>
 
       {/* Portrait Picker Modal */}
