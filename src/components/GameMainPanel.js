@@ -154,7 +154,9 @@ const GameMainPanel = ({
         )}
 
         {conversation.map((msg, index) => (
-          <div key={index} className={`gm-msg message ${msg.role}`}>
+          // Encounter results are stored as ai messages prefixed "⚔️ **Name**:"; tag them so
+          // the log can set combat apart from narration (view-only, works on old saves too).
+          <div key={index} className={`gm-msg message ${msg.role}${msg.role === 'ai' && typeof msg.content === 'string' && msg.content.startsWith('⚔️') ? ' combat' : ''}`}>
             <SafeMarkdownMessage content={msg.content} />
             {hookChips && hookChips.message === msg && (
               <NarrativeHookChips

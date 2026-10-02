@@ -996,4 +996,10 @@ body:has(.gm-page) .app-footer { display: none; }
   [data-theme='redesign'] .map-modal-content .map-modal-actions { position: sticky; bottom: 0; z-index: 5; width: calc(100% + 24px); margin: 12px -12px 0; padding: 12px; background: var(--surface); border-top: 1px solid var(--line-soft); }
   [data-theme='redesign'] .map-modal-content .map-modal-actions button { flex: 1; }
 }
-[data-theme='redesign'] .gm-log .gm-msg.ai { margin: 0; width: 100%; box-sizing: border-box; }
+/* Narration: near-white on near-black (the old log's contrast, which read more easily),
+   full-ish width but stopping short of the right edge so the player's own actions,
+   right-aligned, stay visibly separate. Combat results get a red edge and tint. */
+[data-theme='redesign'] .gm-log .gm-msg.ai { margin: 0 auto 0 0; width: auto; max-width: min(88%, 110ch); box-sizing: border-box; align-self: flex-start; background: #0c0b11; border: 1px solid var(--line-soft); border-left: 3px solid color-mix(in srgb, var(--gold) 75%, transparent); color: #f3f0f6; }
+[data-theme='redesign'] .gm-log .gm-msg.ai.combat { background: #140c0e; border-color: rgba(214, 96, 96, .28); border-left-color: #d66060; }
+[data-theme='redesign'] .gm-log .gm-msg.ai.combat .safe-markdown-message strong { color: #f19a9a; }
+@media (max-width: 900px) { [data-theme='redesign'] .gm-log .gm-msg.ai { max-width: 100%; } }
