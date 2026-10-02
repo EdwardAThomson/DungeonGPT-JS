@@ -207,9 +207,6 @@ const CampaignTab = ({ settings, onContinueLegend }) => (
         </span>
       </div>
     </div>
-    <p style={{ margin: '10px 0 0 0', fontSize: '0.7rem', color: 'var(--text-secondary)', fontStyle: 'italic', textAlign: 'center', opacity: 0.6 }}>
-      * Story settings are woven at the start and cannot be changed here.
-    </p>
   </div>
 );
 

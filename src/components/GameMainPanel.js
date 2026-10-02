@@ -114,11 +114,6 @@ const GameMainPanel = ({
           <button type="button" onClick={onOpenSettings} className="gm-tool" aria-label="Open journal">
             <Icon name="journal" /><span>Journal</span>
           </button>
-          {hasAdventureStarted && (
-            <button type="button" onClick={onLookAround} className="gm-tool" disabled={isLoading} aria-label="Look around the current location">
-              <Icon name="look" /><span>Look around</span>
-            </button>
-          )}
           <button type="button" onClick={onOpenInventory} className="gm-tool" aria-label="Open party inventory">
             <Icon name="pack" /><span>Inventory</span>
           </button>
@@ -222,13 +217,22 @@ const GameMainPanel = ({
               />
             )}
           </div>
-          {aiAvailable ? (
-            <button type="submit" className="btn btn-primary gm-send" aria-label="Send" disabled={!hasAdventureStarted || !userInput.trim() || isLoading || userInput.length > MAX_ACTION_CHARS}>
-              {isLoading ? '...' : <><Icon name="send" /><span>Send</span></>}
-            </button>
-          ) : (
-            <Link to="/login" className="btn btn-primary gm-send">Sign in</Link>
-          )}
+          {/* Actions column: Look around (an in-world action, not navigation) sits above
+              Send; side by side on phones. */}
+          <div className="gm-actions">
+            {hasAdventureStarted && (
+              <button type="button" onClick={onLookAround} className="gm-look" disabled={isLoading} aria-label="Look around the current location">
+                <Icon name="look" /><span>Look around</span>
+              </button>
+            )}
+            {aiAvailable ? (
+              <button type="submit" className="btn btn-primary gm-send" aria-label="Send" disabled={!hasAdventureStarted || !userInput.trim() || isLoading || userInput.length > MAX_ACTION_CHARS}>
+                {isLoading ? '...' : <><Icon name="send" /><span>Send</span></>}
+              </button>
+            ) : (
+              <Link to="/login" className="btn btn-primary gm-send">Sign in</Link>
+            )}
+          </div>
         </form>
         {aiAvailable ? (
           <p className="gm-note">The engine decides outcomes; the AI narrates. Narration may not always be accurate.</p>

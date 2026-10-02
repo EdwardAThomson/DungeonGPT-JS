@@ -1029,3 +1029,18 @@ body:has(.gm-page) .app-footer { display: none; }
   [data-theme='redesign'] .hero-sheet-pic { width: 64px; height: 64px; }
   [data-theme='redesign'] .hero-sheet-id h2 { font-size: 1.25rem; }
 }
+
+/* Composer actions: Look around above Send */
+[data-theme='redesign'] .gm-actions { flex: 0 0 auto; display: flex; flex-direction: column; gap: .45rem; min-width: 8.5rem; }
+[data-theme='redesign'] .gm-actions .gm-send { flex: 1; }
+[data-theme='redesign'] .gm-look { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 0; padding: .5rem .8rem; border-radius: 10px; border: 1px solid var(--line); background: transparent; box-shadow: none; color: var(--muted); font-family: var(--font-ui); font-size: .88rem; font-weight: 600; letter-spacing: normal; text-transform: none; white-space: nowrap; cursor: pointer; transition: border-color .2s ease, color .2s ease; }
+[data-theme='redesign'] .gm-look:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); filter: none; }
+[data-theme='redesign'] .gm-look:disabled { opacity: .45; cursor: not-allowed; background: transparent; }
+@media (max-width: 900px) {
+  [data-theme='redesign'] .gm-compose form { flex-wrap: wrap; }
+  [data-theme='redesign'] .gm-input-wrap { flex-basis: 100%; }
+  [data-theme='redesign'] .gm-actions { flex-direction: row; width: 100%; }
+  [data-theme='redesign'] .gm-actions > * { flex: 1; }
+}
+[data-theme='redesign'] .gm-look:focus:not(:focus-visible) { outline: none; border-color: var(--line); color: var(--muted); }
+[data-theme='redesign'] .gm-look:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
