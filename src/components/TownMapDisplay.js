@@ -9,6 +9,9 @@ import { resolveProfilePicture } from '../utils/assetHelper';
 const logger = createLogger('town-map-display');
 
 const TILE = 34; // bigger than the original 30 but small enough that a 20x20 town fits a laptop
+// How close (Manhattan tiles) the party must be to identify and enter a building. 3, not 2:
+// a keep sits behind its own wall, so 2 could leave it out of reach from every open tile.
+const INSPECT_RANGE = 3;
 
 // Decoration / POI overlay emoji live in townTileArt (the art module) so the live
 // renderer, the tileset gallery, and themed towns share one source of truth.
@@ -88,8 +91,8 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
 
     logger.debug('Building click debug:', { tileCoords: coordString, discoveredBuildings, isDiscovered, distance });
 
-    // Allow seeing info if close enough (within 2 tiles) OR if already discovered
-    if (distance <= 2 || isDiscovered) {
+    // Allow seeing info if close enough (within INSPECT_RANGE tiles) OR if already discovered
+    if (distance <= INSPECT_RANGE || isDiscovered) {
       // Visiting a tavern/inn may erupt into a brawl (its own cooldown, handled in
       // Game.js). When it fires, show the fight instead of the normal building view.
       if ((tile.buildingType === 'tavern' || tile.buildingType === 'inn') && onVisitTavern && onVisitTavern(tile.buildingType)) {
@@ -107,7 +110,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
       setSelectedBuilding({ ...tile, npcs: buildingNpcs });
 
       // Mark as discovered if not already and within range
-      if (!isDiscovered && distance <= 2 && markBuildingDiscovered) {
+      if (!isDiscovered && distance <= INSPECT_RANGE && markBuildingDiscovered) {
         markBuildingDiscovered(townMapData.townName, tile.x, tile.y);
       }
     } else {
@@ -144,7 +147,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
 
           const distance = playerPosition ? Math.abs(col - playerPosition.x) + Math.abs(row - playerPosition.y) : 999;
           const isDiscovered = discoveredBuildings.includes(`${tile.x},${tile.y}`);
-          const canSeeName = distance <= 2 || isDiscovered;
+          const canSeeName = distance <= INSPECT_RANGE || isDiscovered;
           const displayName = canSeeName && tile.buildingName ? tile.buildingName : (tile.buildingType || tile.type);
           // The party now walks to ANY reachable tile (the 5-tile cap is gone); a tile is
           // clickable if it is walkable ground (or a building, which opens its info popup).

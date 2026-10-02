@@ -2080,6 +2080,8 @@ function placeTownCenter(mapData, centerPos, townSize) {
 
 // Place buildings around the town - COMPLETELY REWRITTEN
 function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = false, pathOpts = null, forkInfo = null, canalInfo = null, riversideInfo = null) {
+  // Noble surnames already used by a manor/keep in this town: one family per house.
+  const usedNobleSurnames = new Set();
   if (!centerPos) {
     logger.warn('[TOWN_MAP] placeBuildings called with undefined centerPos, using map defaults');
     centerPos = { x: Math.floor(mapData[0].length / 2), y: Math.floor(mapData.length / 2) };
@@ -2206,7 +2208,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
       && !occupied.has(`${x},${y}`) && !onIsland(x, y);
     const placeKeep = (x, y) => {
       const t = mapData[y][x];
-      t.type = 'building'; t.buildingType = 'keep'; t.buildingName = generateManorName(rng);
+      t.type = 'building'; t.buildingType = 'keep'; t.buildingName = generateManorName(rng, usedNobleSurnames);
       t.walkable = false; t.poi = null; markOccupied(x, y);
     };
     // keep_wall is placed only on FREE GRASS, so it stops at water (a clean terminus) and
@@ -2326,7 +2328,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
               if (!isOccupied(x, y) && !onIsland(x, y) && (!canalInfo || hasFreeSide(x, y))) {
                 mapData[y][x].type = 'building';
                 mapData[y][x].buildingType = manorType;
-                mapData[y][x].buildingName = generateManorName(rng);
+                mapData[y][x].buildingName = generateManorName(rng, usedNobleSurnames);
                 mapData[y][x].walkable = false;
                 mapData[y][x].poi = null;
                 markOccupied(x, y);
@@ -2378,7 +2380,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
           if (!isOccupied(pos.x, pos.y) && !onIsland(pos.x, pos.y) && (!canalInfo || hasFreeSide(pos.x, pos.y))) {
             mapData[pos.y][pos.x].type = 'building';
             mapData[pos.y][pos.x].buildingType = manorType;
-            mapData[pos.y][pos.x].buildingName = generateManorName(rng);
+            mapData[pos.y][pos.x].buildingName = generateManorName(rng, usedNobleSurnames);
             mapData[pos.y][pos.x].walkable = false;
             mapData[pos.y][pos.x].poi = null;
             markOccupied(pos.x, pos.y);
@@ -2447,7 +2449,7 @@ function placeBuildings(mapData, count, townSize, rng, centerPos, hasWater = fal
       const blacksmithNames = ["Iron Anvil", "Heavy Hammer", "Strong Forge", "Dragon Sunder", "Steel Strike", "The Hearth Forge"];
       tile.buildingName = uniqueName(() => blacksmithNames[Math.floor(rng() * blacksmithNames.length)]);
     } else if (buildingType === 'manor' || buildingType === 'keep') {
-      tile.buildingName = uniqueName(() => generateManorName(rng));
+      tile.buildingName = uniqueName(() => generateManorName(rng, usedNobleSurnames));
     } else if (buildingType === 'temple') {
       tile.buildingName = uniqueName(() => generateTempleName(rng));
     } else if (buildingType === 'archives' || buildingType === 'library') {

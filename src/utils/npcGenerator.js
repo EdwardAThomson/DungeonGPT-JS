@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 import { calculateModifier } from './rules';
-import { HUMAN_NAMES_MALE, HUMAN_NAMES_FEMALE, HUMAN_LAST_NAMES, NOBLE_LAST_NAMES } from './nameData';
+import { HUMAN_NAMES_MALE, HUMAN_NAMES_FEMALE, COMMON_LAST_NAMES, NOBLE_LAST_NAMES } from './nameData';
 
 /**
  * A simple Linear Congruential Generator (LCG) for deterministic randomness.
@@ -368,7 +368,8 @@ export const generateName = (gender, rng = null, lastName = null) => {
         firstName = pick([...HUMAN_NAMES_MALE, ...HUMAN_NAMES_FEMALE]);
     }
 
-    const selectedLastName = lastName || pick(HUMAN_LAST_NAMES);
+    // Commoners draw from the common pool; noble surnames belong to the houses that bear them.
+    const selectedLastName = lastName || pick(COMMON_LAST_NAMES);
     return `${firstName} ${selectedLastName}`;
 };
 
@@ -845,7 +846,9 @@ export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
 
         // Manor residents: lesser nobility / gentry families
         if (home.type === 'manor') {
-            const familyName = rng.pick(NOBLE_LAST_NAMES);
+            // The family is the one the manor is named for ("Ashwood Hall" -> Ashwood).
+            const named = home.name && home.name.split(' ')[0];
+            const familyName = named && NOBLE_LAST_NAMES.includes(named) ? named : rng.pick(NOBLE_LAST_NAMES);
 
             // Head of household — mix of landed knights and wealthy merchants
             const isKnight = rng.random() < 0.6;
@@ -887,7 +890,7 @@ export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
             return;
         }
 
-        const familyName = rng.pick(HUMAN_LAST_NAMES);
+        const familyName = rng.pick(COMMON_LAST_NAMES);
         const childCount = rng.range(1, 4);
 
         // Generate house name based on family and town size

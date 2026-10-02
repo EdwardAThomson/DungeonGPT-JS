@@ -344,12 +344,17 @@ export const generateShopName = (rng = Math.random) => {
 /**
  * Generate a manor or estate name
  * @param {Function} rng - Random number generator function (optional)
+ * @param {Set<string>} [usedSurnames] - noble surnames already taken in this town; the pick
+ *   avoids them (one family per house) and records the new one. Same number of rng draws
+ *   either way, so passing it never shifts the rest of a seeded town.
  * @returns {string} Generated manor name
  */
-export const generateManorName = (rng = Math.random) => {
+export const generateManorName = (rng = Math.random, usedSurnames = null) => {
   const types = ["Manor", "Hall", "Estate", "House", "Keep", "Lodge", "Chateau", "Villa", "Palace", "Castle"];
 
-  const surname = randomElement(NOBLE_LAST_NAMES, rng);
+  const free = usedSurnames ? NOBLE_LAST_NAMES.filter((n) => !usedSurnames.has(n)) : NOBLE_LAST_NAMES;
+  const surname = randomElement(free.length ? free : NOBLE_LAST_NAMES, rng);
+  if (usedSurnames) usedSurnames.add(surname);
   const type = randomElement(types, rng);
 
   return `${surname} ${type}`;

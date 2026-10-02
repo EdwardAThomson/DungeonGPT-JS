@@ -70,7 +70,7 @@ const TURN = [
 const TRAVEL = [
   { icon: "map", k: "Travel the world map", v: "Open the Map and click a neighbouring tile to move there, diagonals included. Any step on the road can turn into an encounter." },
   { icon: "walk", k: "Walk around town", v: "Towns and sites open into their own maps. Click any tile you can reach and the party walks there." },
-  { icon: "door", k: "Go inside", v: "Get within two tiles of a building to see what it is and step in. Once found, you can open it from anywhere in town. Inside are the people who work there." },
+  { icon: "door", k: "Go inside", v: "Get within three tiles of a building to see what it is and step in. Once found, you can open it from anywhere in town. Inside are the people who work there." },
   { icon: "flag", k: "Follow the objectives", v: "Campaign locations appear on the world map once you have earned them, so the map grows as the story does." },
 ];
 
