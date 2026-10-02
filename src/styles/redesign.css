@@ -558,3 +558,59 @@
 [data-theme='redesign'] .rd-app .play-feature .save-progress { max-width: 30rem; }
 [data-theme='redesign'] .rd-app .play-feature .save-progress p { color: #cdc7d3; }
 [data-theme='redesign'] .rd-app .play-actions { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: auto; padding-top: .6rem; }
+
+/* Onboarding stepper inside redesigned pages */
+[data-theme='redesign'] .rd-app .onboarding-steps { display: flex; list-style: none; margin: 0 0 1.4rem; padding: 0; gap: 0; max-width: 34rem; }
+[data-theme='redesign'] .rd-app .onboarding-step { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .4rem; position: relative; font-family: var(--font-ui); font-size: .82rem; color: var(--muted-2); text-align: center; }
+[data-theme='redesign'] .rd-app .onboarding-step-connector { position: absolute; top: 15px; left: 50%; width: 100%; height: 2px; background: var(--line); z-index: 0; }
+[data-theme='redesign'] .rd-app .onboarding-step-marker { position: relative; z-index: 1; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-weight: 700; }
+[data-theme='redesign'] .rd-app .onboarding-step.active { color: var(--text); font-weight: 600; }
+[data-theme='redesign'] .rd-app .onboarding-step.active .onboarding-step-marker { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 20%, transparent); }
+[data-theme='redesign'] .rd-app .onboarding-step.done .onboarding-step-marker { border-color: transparent; background: var(--gold); color: #211a0a; }
+/* each step's connector runs to the NEXT step; gold once this step is done */
+[data-theme='redesign'] .rd-app .onboarding-step.done .onboarding-step-connector { background: var(--gold); }
+[data-theme='redesign'] .rd-app .crumb-button { padding: 0; min-height: 0; border: 0; background: none; box-shadow: none; cursor: pointer; letter-spacing: normal; text-transform: none; font-family: var(--font-ui); }
+[data-theme='redesign'] .rd-app .crumb-button:hover { color: var(--gold); }
+[data-theme='redesign'] .rd-app .app-callout.warning { border-color: #c98a2c; background: rgba(201, 138, 44, .1); }
+[data-theme='redesign'] .rd-app .app-callout.warning b { color: #e8a94a; }
+
+/* Choose your party */
+[data-theme='redesign'] .rd-app .campaign-name { color: var(--gold); font-weight: 600; }
+[data-theme='redesign'] .rd-app.party-page .band { padding-bottom: 7rem; }
+[data-theme='redesign'] .rd-app .roster-card.pickable { cursor: pointer; position: relative; }
+[data-theme='redesign'] .rd-app .roster-card.pickable:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+[data-theme='redesign'] .rd-app .roster-card.selected { border-color: var(--gold-bright); box-shadow: 0 0 0 2px var(--gold), 0 20px 46px -26px rgba(212, 175, 55, .6); }
+[data-theme='redesign'] .rd-app .roster-card.at-limit { opacity: .5; }
+[data-theme='redesign'] .rd-app .roster-card.at-limit:hover { transform: none; }
+[data-theme='redesign'] .rd-app .pick-check { position: absolute; top: .6rem; right: .6rem; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--gold); color: #211a0a; font-weight: 800; box-shadow: 0 4px 10px rgba(0, 0, 0, .5); }
+[data-theme='redesign'] .rd-app .pick-state { margin-top: auto; padding: .5rem .7rem; border-radius: 6px; border: 1px dashed var(--line); text-align: center; font-family: var(--font-ui); font-size: .9rem; font-weight: 600; color: var(--muted); }
+[data-theme='redesign'] .rd-app .roster-card.pickable:hover .pick-state { border-color: var(--gold); color: var(--gold); }
+[data-theme='redesign'] .rd-app .pick-state.on,
+[data-theme='redesign'] .rd-app .roster-card.pickable:hover .pick-state.on { border-style: solid; border-color: var(--gold); background: var(--gold); color: #211a0a; }
+[data-theme='redesign'] .rd-app .roster-card.just-added { animation: rd-pop .5s ease-out; }
+@keyframes rd-pop { 0% { transform: scale(.94); } 60% { transform: scale(1.03); } 100% { transform: none; } }
+[data-theme='redesign'] .rd-app .pick-ready { letter-spacing: normal; text-transform: none; display: flex; flex-direction: column; flex: 1; width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+[data-theme='redesign'] .rd-app .pick-ready:disabled { cursor: default; }
+
+/* fixed, not sticky: the mobile shell sets overflow-x: hidden on .App, which disables sticky */
+[data-theme='redesign'] .rd-app .party-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; border-top: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); background: color-mix(in srgb, var(--ground) 92%, transparent); backdrop-filter: blur(10px); }
+[data-theme='redesign'] .rd-app .party-dock-inner { display: flex; align-items: center; gap: 1rem; padding-block: .8rem; }
+[data-theme='redesign'] .rd-app .party-slots { display: flex; gap: .5rem; list-style: none; margin: 0; padding: 0; flex: 0 0 auto; }
+[data-theme='redesign'] .rd-app .party-slots .slot { width: 48px; height: 48px; border-radius: 50%; border: 1px dashed var(--line); background: var(--surface); }
+[data-theme='redesign'] .rd-app .party-slots .slot.filled { border: 2px solid var(--gold); overflow: hidden; }
+[data-theme='redesign'] .rd-app .party-slots .slot button { width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+[data-theme='redesign'] .rd-app .party-slots .slot img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; display: block; }
+[data-theme='redesign'] .rd-app .party-dock-text { flex: 1; min-width: 0; font-family: var(--font-ui); font-size: .95rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-theme='redesign'] .rd-app .party-dock-text b { color: var(--text); margin-right: .4rem; }
+[data-theme='redesign'] .rd-app .party-error { color: #ef8b8b; white-space: normal; }
+[data-theme='redesign'] .rd-app .party-start { flex: 0 0 auto; padding-inline: 1.6rem; }
+@media (max-width: 600px) {
+  /* one row: the slots already show who is in; the text line only appears for errors */
+  [data-theme='redesign'] .rd-app .party-dock-inner { flex-wrap: wrap; gap: .4rem .6rem; padding-block: .6rem; }
+  [data-theme='redesign'] .rd-app .party-slots { gap: .35rem; }
+  [data-theme='redesign'] .rd-app .party-slots .slot { width: 40px; height: 40px; }
+  [data-theme='redesign'] .rd-app .party-dock-text { display: none; }
+  [data-theme='redesign'] .rd-app .party-dock-text:has(.party-error) { display: block; order: 3; flex-basis: 100%; white-space: normal; font-size: .88rem; }
+  [data-theme='redesign'] .rd-app .party-start { margin-left: auto; padding-inline: 1.2rem; }
+  [data-theme='redesign'] .rd-app .onboarding-step-label { font-size: .74rem; }
+}

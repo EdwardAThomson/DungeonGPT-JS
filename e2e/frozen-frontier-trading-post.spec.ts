@@ -102,8 +102,8 @@ test('frozen-frontier-t1: The Hearthmere Trading Post exists in Hearthmere and o
 
   await page.getByRole('button', { name: /Next: Select Heroes/i }).click();
   await expect(page).toHaveURL(/hero-selection/, { timeout: 15_000 });
-  await page.locator('.hero-item', { hasText: 'Sigrid the Guest' }).first().click();
-  await page.getByRole('button', { name: /Start Game with Selected Heroes/i }).click();
+  await page.getByRole('button', { name: /^Sigrid the Guest,/ }).click();
+  await page.getByRole('button', { name: /^Start game$/i }).click();
 
   await expect(page.getByRole('heading', { name: 'Adventure Log' })).toBeVisible({ timeout: 15_000 });
   const startBtn = page.getByRole('button', { name: /Start the Adventure/i });

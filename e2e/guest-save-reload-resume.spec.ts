@@ -108,8 +108,8 @@ test('guest save persists to IndexedDB and a hard reload resumes with progress',
   await page.getByRole('button', { name: /Next: Select Heroes/i }).click();
 
   await expect(page).toHaveURL(/hero-selection/, { timeout: 15_000 });
-  await page.locator('.hero-item', { hasText: 'Kael the Guest' }).first().click();
-  await page.getByRole('button', { name: /Start Game with Selected Heroes/i }).click();
+  await page.getByRole('button', { name: /^Kael the Guest,/ }).click();
+  await page.getByRole('button', { name: /^Start game$/i }).click();
 
   await expect(page.getByRole('heading', { name: 'Adventure Log' })).toBeVisible({ timeout: 15_000 });
   const startBtn = page.getByRole('button', { name: /Start the Adventure/i });
