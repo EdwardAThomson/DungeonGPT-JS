@@ -1,4 +1,7 @@
 // AllHeroes.js
+// "Your Heroes": the roster, on the redesign primitives (#82, in-app pages after the Your
+// Games pilot). A portrait card per hero, ready-made heroes offered in the same card style,
+// and a create tile. Styles: .rd-page / .rd-app in src/styles/redesign.css.
 
 import React, { useContext, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -6,12 +9,13 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { hasHadAccount } from "../services/accountFlag";
 import HeroContext from "../contexts/HeroContext";
 import { calculateMaxHP } from "../utils/healthSystem";
+import { calculateModifier } from "../utils/rules";
 import { heroesApi } from "../services/heroesApi";
 import { createLogger } from "../utils/logger";
 import { resolveProfilePicture } from "../utils/assetHelper";
 import { useAuth } from "../contexts/AuthContext";
 import { PREGEN_HEROES, buildPregenHero } from "../data/pregenHeroes";
-import { PregenBand } from "../components/ReadyMadeHeroes";
+import "../styles/redesign.css";
 
 const logger = createLogger('all-heroes');
 
@@ -94,141 +98,128 @@ const AllHeroes = () => {
     }
   };
 
+  const STAT_ORDER = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
+  const fmtMod = (score) => {
+    const m = calculateModifier(score);
+    return m >= 0 ? `+${m}` : `${m}`;
+  };
+
+  const lede = heroes.length === 0
+    ? 'Build a hero from scratch, or add a ready-made one in a click.'
+    : `${heroes.length} hero${heroes.length === 1 ? '' : 'es'} ready for a campaign. Take up to four into each game.`;
+
   return (
-    <div className="page-container all-heroes-page">
-      {/* No onboarding bar here: the Hall of Heroes is roster management, not the
-          adventure-first journey (Choose Adventure -> Choose Heroes -> Begin Quest).
-          The next-step banner below carries the "Ready to play?" guidance. */}
-      {/* Add a header container for Title + Button */}
-      <div className="page-header">
-        <h2>All Heroes</h2>
-        {/* Wrapper for header buttons */}
-        <div className="page-header-actions">
-          <button onClick={() => navigate("/new-game")} className="primary-button">
-            New Game
-          </button>
-          <button onClick={() => navigate("/hero-creation")} className="secondary-button">
-            New Hero
-          </button>
-        </div>
-      </div>
-
-      {!user && heroes.length > 0 && (
-        <div className="guest-roster-note">
-          🔒 These heroes live only in this browser. <button className="link-button" onClick={() => navigate('/login')}>Sign in</button> free to keep them across devices.
-        </div>
-      )}
-
-      {heroes.length > 0 && (
-        <div className={`next-step-banner${justAdded ? ' highlight' : ''}`}>
-          <div className="next-step-banner-text">
-            <span className="next-step-banner-title">
-              {justAdded ? "Hero added to your roster!" : "Ready to play?"}
-            </span>
-            <span className="next-step-banner-subtitle">
-              Start a new game, choose a story, and pick your party.
-            </span>
+    <div className="rd-page rd-app">
+      {/* No onboarding bar here: the roster is roster management, not the adventure-first
+          journey (Choose Adventure -> Choose Heroes -> Begin Quest). */}
+      <section className="page-header app-header">
+        <div className="wrap">
+          <p className="eyebrow">Your heroes</p>
+          <div className="app-header-row">
+            <div>
+              <h1>Your roster.</h1>
+              <p className="lede">{lede}</p>
+            </div>
+            <div className="app-header-actions">
+              <button type="button" onClick={() => navigate("/hero-creation")} className="btn btn-ghost">New hero</button>
+              {heroes.length > 0 && (
+                <button type="button" onClick={() => navigate("/new-game")} className="btn btn-primary" data-tour="start-new-game">Start a new game</button>
+              )}
+            </div>
           </div>
-          <button onClick={() => navigate("/new-game")} className="primary-button" data-tour="start-new-game">
-            Start a New Game →
-          </button>
         </div>
-      )}
+      </section>
 
-      {heroes.length === 0 ? (
-        !user && hasHadAccount() ? (
-          <div className="onboarding-empty">
-            <div className="onboarding-empty-icon">🔒</div>
-            <h3>Your heroes are in your account</h3>
-            <p>You're browsing as a guest on this device. Sign in to access the heroes saved to your account.</p>
-            <button onClick={() => navigate("/login")} className="primary-button">
-              Sign In →
-            </button>
-          </div>
-        ) : (
-          <PregenBand
-            pregens={availablePregens}
-            disabled={addingPregen}
-            onPick={handleAddPregen}
-            title="⚔ Add a ready-made hero to your roster"
-            note={
-              <>
-                One click adds them to your roster, fully yours to edit. Or{' '}
-                <button type="button" className="pregen-link-button" onClick={() => navigate("/hero-creation")}>
-                  craft your own from scratch
-                </button>
-                .
-              </>
-            }
-          />
-        )
-      ) : (
-        <ul className="all-heroes-list">
-          {heroes.map((hero) => (
-            <li key={hero.heroId} className="hero-item">
-              <div className="hero-item-image">
-                <img
-                  src={resolveProfilePicture(hero.profilePicture)}
-                  alt={`${hero.heroName}'s profile`}
-                  loading="lazy"
-                  width="150"
-                  height="150"
-                />
-              </div>
+      <section className="band">
+        <div className="wrap">
+          {justAdded && heroes.length > 0 && (
+            <div className="app-callout success" role="status">
+              <span><b>Hero added to your roster.</b> Start a new game, choose a story, and pick your party.</span>
+              <button type="button" onClick={() => navigate("/new-game")} className="btn btn-primary">Start a new game</button>
+            </div>
+          )}
 
-              <div className="hero-item-info">
-                <h3>{hero.heroName}</h3>
-                <p>
-                  <span className="detail-label">Level:</span> {hero.heroLevel} {hero.heroClass}
-                </p>
-                <p>
-                  <span className="detail-label">Gender:</span> {hero.heroGender || 'N/A'}
-                </p>
-                <p>
-                  <span className="detail-label">Race:</span> {hero.heroRace}
-                </p>
-                <p>
-                  <span className="detail-label">Alignment:</span> {hero.heroAlignment}
-                </p>
-                {/* Uncommented Background Display */}
-                <p><span className="detail-label">BG:</span> {hero.heroBackground ? `${hero.heroBackground.substring(0, 60)}...` : 'N/A'}</p>
-                {hero.stats && (
-                  <ul className="hero-item-stats">
-                    {Object.entries(hero.stats).map(([stat, value]) => (
-                      <li key={stat}>{stat.substring(0, 3)}: {value}</li>
+          {heroes.length === 0 && !user && hasHadAccount() ? (
+            <div className="app-empty">
+              <div className="app-empty-icon" aria-hidden="true">🔒</div>
+              <h2>Your heroes are in your account</h2>
+              <p>You're browsing as a guest on this device. Sign in to see the heroes saved to your account.</p>
+              <button type="button" onClick={() => navigate("/login")} className="btn btn-primary">Sign in</button>
+            </div>
+          ) : (
+            <>
+              {heroes.length > 0 && (
+                <ul className="roster-grid">
+                  {heroes.map((hero) => (
+                    <li key={hero.heroId} className="roster-card">
+                      <div className="roster-portrait">
+                        <img src={resolveProfilePicture(hero.profilePicture)} alt={`${hero.heroName}'s portrait`} loading="lazy" />
+                      </div>
+                      <div className="roster-body">
+                        <h3>{hero.heroName}</h3>
+                        <p className="roster-sub">Level {hero.heroLevel} {hero.heroClass}</p>
+                        {hero.stats && (
+                          <dl className="roster-stats">
+                            {STAT_ORDER.filter((k) => hero.stats[k] != null).map((k) => (
+                              <div key={k}>
+                                <dt>{k.substring(0, 3)}</dt>
+                                <dd>{hero.stats[k]}<small>{fmtMod(hero.stats[k])}</small></dd>
+                              </div>
+                            ))}
+                          </dl>
+                        )}
+                        {hero.stats && <p className="roster-hp">{hero.maxHP || calculateMaxHP(hero)} HP</p>}
+                        <div className="roster-actions">
+                          <button type="button" onClick={() => handleEdit(hero)} className="btn btn-ghost">Edit</button>
+                          {/* Download: hidden for now (unused); re-enable with downloadJSONFile if requested. */}
+                          <button type="button" onClick={() => handleDeleteClick(hero)} className="icon-button danger" title="Delete" aria-label={`Delete ${hero.heroName}`}>
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg>
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                  <li className="roster-card roster-new">
+                    <button type="button" onClick={() => navigate("/hero-creation")}>
+                      <span className="plus" aria-hidden="true">+</span>
+                      <span>Create a hero</span>
+                      <small>Twelve classes, 27 points</small>
+                    </button>
+                  </li>
+                </ul>
+              )}
+
+              {/* Ready-made heroes not yet on the roster: the main content for an empty
+                  roster, a quieter section under a stocked one. Optimistic add. */}
+              {availablePregens.length > 0 && (
+                <div className={`pregen-section${heroes.length === 0 ? ' primary' : ''}`}>
+                  <div className="pregen-section-head">
+                    <h2>{heroes.length === 0 ? 'Start with a ready-made hero' : 'Ready-made heroes'}</h2>
+                    <p>One click adds them to your roster, fully yours to edit.{heroes.length === 0 && <> Or <button type="button" className="inline-link" onClick={() => navigate("/hero-creation")}>build your own from scratch</button>.</>}</p>
+                  </div>
+                  <ul className="roster-grid">
+                    {availablePregens.map((p) => (
+                      <li key={p.heroName} className="roster-card ready">
+                        <div className="roster-portrait">
+                          <img src={resolveProfilePicture(p.profilePicture)} alt="" loading="lazy" />
+                          <span className="price-badge price-badge-muted">Ready-made</span>
+                        </div>
+                        <div className="roster-body">
+                          <h3>{p.heroName}</h3>
+                          <p className="roster-sub">Level 1 {p.heroClass}</p>
+                          <div className="roster-actions">
+                            <button type="button" className="btn btn-primary" onClick={() => handleAddPregen(p)} disabled={addingPregen}>Add to roster</button>
+                          </div>
+                        </div>
+                      </li>
                     ))}
                   </ul>
-                )}
-                {hero.stats && (
-                  <p>
-                    <span className="detail-label">Max HP:</span> {hero.maxHP || calculateMaxHP(hero)}
-                  </p>
-                )}
-              </div>
-
-              <div className="hero-item-actions">
-                <button onClick={() => handleEdit(hero)} className="action-button edit-button">
-                  Edit
-                </button>
-                {/* Download — hidden for now (unused); re-enable if requested.
-                <button
-                  onClick={() => downloadJSONFile(`${hero.heroName}-hero.json`, hero)}
-                  className="action-button download-button"
-                >
-                  Download
-                </button>
-                */}
-                <button
-                  onClick={() => handleDeleteClick(hero)}
-                  className="action-button delete-button"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </section>
 
       {/* Alert Modal */}
       {alertMessage && (

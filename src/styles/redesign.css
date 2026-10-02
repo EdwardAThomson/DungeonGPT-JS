@@ -486,3 +486,44 @@
 [data-theme='redesign'] .rd-app .save-heroes { margin: 0; font-family: var(--font-ui); font-size: .88rem; color: var(--muted-2); }
 [data-theme='redesign'] .rd-app .save-actions { display: flex; align-items: center; gap: .6rem; margin-top: auto; padding-top: .6rem; }
 [data-theme='redesign'] .rd-app .save-actions .icon-button { margin-left: auto; }
+
+/* Shared in-app bits added with Your Heroes */
+[data-theme='redesign'] .rd-app .app-header-actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+[data-theme='redesign'] .rd-app .app-callout { display: flex; align-items: center; justify-content: space-between; gap: .8rem 1.4rem; flex-wrap: wrap; margin-bottom: 1.4rem; padding: 1rem 1.2rem; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); font-family: var(--font-ui); color: var(--muted); }
+[data-theme='redesign'] .rd-app .app-callout b { color: var(--text); }
+[data-theme='redesign'] .rd-app .app-callout.success { border-color: color-mix(in srgb, var(--success) 50%, transparent); background: color-mix(in srgb, var(--success) 7%, var(--surface)); }
+[data-theme='redesign'] .rd-app .inline-link { padding: 0; border: 0; background: none; color: var(--gold); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+/* Your Heroes: roster cards */
+[data-theme='redesign'] .rd-app .roster-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.1rem; }
+@media (max-width: 1000px) { [data-theme='redesign'] .rd-app .roster-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px) { [data-theme='redesign'] .rd-app .roster-grid { grid-template-columns: repeat(2, 1fr); gap: .8rem; } }
+[data-theme='redesign'] .rd-app .roster-card { display: flex; flex-direction: column; background: var(--surface); border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent); border-radius: 8px; overflow: hidden; transition: border-color .2s ease, transform .2s ease; }
+[data-theme='redesign'] .rd-app .roster-card:hover { border-color: var(--gold); transform: translateY(-2px); }
+[data-theme='redesign'] .rd-app .roster-portrait { position: relative; aspect-ratio: 4 / 4.2; overflow: hidden; background: var(--ground-2); }
+[data-theme='redesign'] .rd-app .roster-portrait img { width: 100%; height: 100%; object-fit: cover; object-position: center 20%; display: block; }
+[data-theme='redesign'] .rd-app .roster-portrait .price-badge { top: auto; bottom: .6rem; left: .6rem; }
+[data-theme='redesign'] .rd-app .roster-body { display: flex; flex-direction: column; gap: .45rem; flex: 1; padding: .9rem 1rem 1rem; }
+[data-theme='redesign'] .rd-app .roster-body h3 { font-size: 1.08rem; line-height: 1.25; }
+[data-theme='redesign'] .rd-app .roster-sub { margin: 0; font-family: var(--font-ui); font-size: .88rem; color: var(--gold); }
+[data-theme='redesign'] .rd-app .roster-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .3rem; margin: .2rem 0 0; }
+[data-theme='redesign'] .rd-app .roster-stats > div { display: flex; flex-direction: column; align-items: center; padding: .3rem 0; border-radius: 5px; background: var(--ground-2); }
+[data-theme='redesign'] .rd-app .roster-stats dt { font-family: var(--font-ui); font-size: .74rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-2); }
+[data-theme='redesign'] .rd-app .roster-stats dd { margin: 0; font-family: var(--font-ui); font-weight: 700; color: var(--text); font-size: .95rem; }
+[data-theme='redesign'] .rd-app .roster-stats dd small { margin-left: .2rem; font-weight: 500; font-size: .76rem; color: var(--muted); }
+[data-theme='redesign'] .rd-app .roster-hp { margin: 0; font-family: var(--font-ui); font-size: .88rem; color: var(--muted); }
+[data-theme='redesign'] .rd-app .roster-actions { display: flex; align-items: center; gap: .5rem; margin-top: auto; padding-top: .5rem; }
+[data-theme='redesign'] .rd-app .roster-actions .btn { flex: 1; justify-content: center; padding: .6rem .8rem; white-space: nowrap; }
+[data-theme='redesign'] .rd-app .roster-new { border-style: dashed; border-color: var(--line); background: transparent; }
+[data-theme='redesign'] .rd-app .roster-new button { flex: 1; letter-spacing: normal; text-transform: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .4rem; min-height: 14rem; padding: 1rem; border: 0; background: none; color: var(--muted); font-family: var(--font-ui); font-size: 1rem; font-weight: 600; cursor: pointer; }
+[data-theme='redesign'] .rd-app .roster-new button:hover { color: var(--gold); }
+[data-theme='redesign'] .rd-app .roster-new .plus { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; border: 1px dashed currentColor; font-size: 1.8rem; line-height: 1; }
+[data-theme='redesign'] .rd-app .roster-new small { font-weight: 400; font-size: .88rem; color: var(--muted-2); }
+[data-theme='redesign'] .rd-app .pregen-section { margin-top: clamp(2rem, 5vw, 3rem); }
+[data-theme='redesign'] .rd-app .pregen-section.primary { margin-top: 0; }
+[data-theme='redesign'] .rd-app .pregen-section-head { margin-bottom: 1.1rem; }
+[data-theme='redesign'] .rd-app .pregen-section-head h2 { font-size: 1.35rem; }
+[data-theme='redesign'] .rd-app .pregen-section.primary .pregen-section-head h2 { font-size: clamp(1.5rem, 2.6vw, 1.9rem); }
+[data-theme='redesign'] .rd-app .pregen-section-head p { margin: .4rem 0 0; color: var(--muted); }
+[data-theme='redesign'] .rd-app .roster-card.ready { border-color: var(--line-soft); }
+[data-theme='redesign'] .rd-app .roster-card.ready:hover { border-color: color-mix(in srgb, var(--gold) 55%, transparent); }
