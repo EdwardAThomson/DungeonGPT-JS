@@ -6,11 +6,50 @@ import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { useAuth } from '../contexts/AuthContext';
 import { hasHadAccount } from '../services/accountFlag';
+import { getCampaignProgress } from '../game/milestoneEngine';
+import { resolveCompletedTemplateId } from '../game/campaignChain';
+import { storyTemplates } from '../data/storyTemplates';
+import '../styles/redesign.css';
+
+// "Your Games": the saved-campaign list, the pilot page for moving the in-app pages onto the
+// redesign primitives (#82). Each save is a card with its campaign art, party, objective
+// progress and actions. Styles: .rd-page / .rd-app in src/styles/redesign.css.
 
 // Lazy load the details modal for better performance
 const SavedGameDetailsModal = lazy(() => import('../components/SavedGameDetailsModal'));
 
 const logger = createLogger('saved-conversations');
+
+// "3 hours ago" style label for the last-played line; falls back to a date after a week.
+const timeAgo = (timestamp) => {
+  const then = new Date(timestamp);
+  const mins = Math.round((Date.now() - then.getTime()) / 60000);
+  if (!Number.isFinite(mins)) return '';
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`;
+  return then.toLocaleDateString();
+};
+
+const parseMaybe = (v) => (typeof v === 'string' ? JSON.parse(v) : v);
+
+const PageHeader = ({ onNewGame }) => (
+  <section className="page-header app-header">
+    <div className="wrap">
+      <p className="eyebrow">Your games</p>
+      <div className="app-header-row">
+        <div>
+          <h1>Pick up where you left off.</h1>
+          <p className="lede">Every campaign you have started, newest first.</p>
+        </div>
+        {onNewGame && <button type="button" className="btn btn-primary" onClick={onNewGame}>Start a new game</button>}
+      </div>
+    </div>
+  </section>
+);
 
 const SavedConversations = () => {
   const [conversations, setConversations] = useState([]);
@@ -116,208 +155,180 @@ const SavedConversations = () => {
   };
 
   if (loading) {
-    return <div className="page-container">Loading conversations...</div>;
+    return (
+      <div className="rd-page rd-app">
+        <PageHeader />
+        <section className="band"><div className="wrap"><p className="app-status">Loading your games...</p></div></section>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="page-container">Error: {error}</div>;
+    return (
+      <div className="rd-page rd-app">
+        <PageHeader />
+        <section className="band"><div className="wrap"><p className="app-status error">Couldn't load your games: {error}</p></div></section>
+      </div>
+    );
   }
 
   return (
-    <div className="page-container">
-      <h1>Your Games</h1>
-      <p className="page-instructions">Pick up any campaign where you left off. Click "Load" to continue.</p>
+    <div className="rd-page rd-app">
+      <PageHeader onNewGame={conversations.length > 0 ? () => navigate('/new-game') : null} />
 
-      {conversations.length === 0 ? (
-        !user && hasHadAccount() ? (
-          <div className="onboarding-empty">
-            <div className="onboarding-empty-icon">🔒</div>
-            <h3>Your adventures are in your account</h3>
-            <p>You're browsing as a guest on this device. Sign in to access the games saved to your account.</p>
-            <button onClick={() => navigate("/login")} className="primary-button">
-              Sign In →
-            </button>
-          </div>
-        ) : (
-          <div className="onboarding-empty">
-            <div className="onboarding-empty-icon">📖</div>
-            <h3>No chronicles yet</h3>
-            <p>Your saved adventures will appear here. Start a new game to create your first one.</p>
-            <button onClick={() => navigate("/new-game")} className="primary-button">
-              Start a New Game →
-            </button>
-          </div>
-        )
-      ) : (
-        <div className="conversations-list">
-          {conversations.map((conversation) => {
-            const heroes = conversation.selected_heroes ? (typeof conversation.selected_heroes === 'string' ? JSON.parse(conversation.selected_heroes) : conversation.selected_heroes) : [];
-            const settings = conversation.game_settings
-              ? (typeof conversation.game_settings === 'string' ? JSON.parse(conversation.game_settings) : conversation.game_settings)
-              : null;
-            // Merged-list honesty badge (SAVE_SYNC_PLAN Phase 2): the newest copy of
-            // this save is local and still awaiting its cloud push. Signed-in players
-            // only; guests see their local list exactly as before (no badge).
-            const showOnThisDeviceBadge = !!user && !!conversation.pendingCloudSync;
-
-            return (
-              <div key={conversation.sessionId} className="conversation-item" style={{ padding: '25px', minHeight: '180px', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', gap: '20px', marginBottom: '15px', flex: 1 }}>
-                  {/* Hero Portraits */}
-                  {heroes.length > 0 && (
-                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                      {heroes.slice(0, 4).map((hero, idx) => {
-                        const heroName = hero.heroName || hero.characterName || 'Unknown';
-                        return hero.profilePicture ? (
-                          <img
-                            key={idx}
-                            src={resolveProfilePicture(hero.profilePicture)}
-                            alt={heroName}
-                            title={heroName}
-                            style={{
-                              width: '60px',
-                              height: '60px',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                              border: '2px solid var(--primary)',
-                              boxShadow: '0 2px 8px var(--shadow)'
-                            }}
-                          />
-                        ) : null;
-                      })}
-                    </div>
-                  )}
-
-                  {/* Content */}
-                  <div style={{ flex: 1 }}>
-                    {editingName === conversation.sessionId ? (
-                      <div className="edit-name-form" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input
-                          type="text"
-                          value={newName}
-                          onChange={(e) => setNewName(e.target.value)}
-                          placeholder="Campaign name"
-                          title="The date and time are added automatically"
-                          maxLength={60}
-                          autoFocus
-                          style={{ flex: 1 }}
-                        />
-                        <button
-                          onClick={() => updateConversationName(conversation.sessionId, newName)}
-                          disabled={!newName.trim()}
-                          className="save-name-button"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingName(null);
-                            setNewName('');
-                          }}
-                          className="cancel-name-button"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <h3
-                        onClick={() => {
-                          setEditingName(conversation.sessionId);
-                          setNewName(settings?.saveName || parseSaveRoot(conversation.conversation_name));
-                        }}
-                        className="conversation-title"
-                        title="Click to edit name"
-                        style={{ margin: '0 0 12px 0', cursor: 'pointer', color: 'var(--primary)', fontSize: '1.2rem' }}
-                      >
-                        {conversation.conversation_name || 'Untitled Adventure'}
-                      </h3>
-                    )}
-                    {/* Quest-chaining badges (all additive settings fields; old saves
-                        without them render nothing). currentChapter is the in-save chain
-                        record; chain.chapter tolerates saves made by the retired
-                        linked-save build. A completed save continues IN the save: load
-                        it and use the Journal's "Continue your legend". */}
-                    {((settings?.currentChapter || settings?.chain?.chapter) > 1 || settings?.campaignComplete || showOnThisDeviceBadge) && (
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '0 0 8px 0' }}>
-                        {showOnThisDeviceBadge && (
-                          <span
-                            title="This save is stored on this device and will sync to your account automatically"
-                            style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 'bold', background: 'var(--warning-tint-15, rgba(224,168,0,0.15))', color: 'var(--state-warning, #e0a800)', border: '1px solid var(--state-warning, #e0a800)' }}
-                          >
-                            💾 On this device
-                          </span>
-                        )}
-                        {(settings?.currentChapter || settings?.chain?.chapter) > 1 && (
-                          <span style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 'bold', background: 'var(--primary-tint-10, rgba(100,100,255,0.15))', color: 'var(--primary)', border: '1px solid var(--primary)' }}>
-                            📖 Chapter {settings?.currentChapter || settings?.chain?.chapter}
-                          </span>
-                        )}
-                        {settings?.campaignComplete && (
-                          <span
-                            title="Load this game and open the Journal to continue your legend in the same world"
-                            style={{ padding: '2px 10px', borderRadius: '10px', fontSize: '0.72rem', fontWeight: 'bold', background: 'var(--success-tint-20, rgba(80,180,80,0.2))', color: 'var(--state-success, #4caf50)', border: '1px solid var(--state-success, #4caf50)' }}
-                          >
-                            🏆 Campaign complete: load to continue your legend
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {/* Campaign arc name (settings.templateName is stamped at save
-                        time by campaignLauncher/NewGame). Older saves predating
-                        campaign tracking simply omit this line. */}
-                    {settings?.templateName && (
-                      <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                        <strong>Campaign:</strong> {settings.templateName}
-                      </p>
-                    )}
-                    {settings?.shortDescription && (
-                      <p style={{ margin: '8px 0', fontSize: '0.9rem', lineHeight: '1.5', color: 'var(--text)' }}>
-                        {settings.shortDescription.length > 120
-                          ? settings.shortDescription.substring(0, 120) + '...'
-                          : settings.shortDescription}
-                      </p>
-                    )}
-                    {heroes.length > 0 && (
-                      <p style={{ margin: '10px 0 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                        <strong>Party:</strong> {heroes.map(h => h.heroName || h.characterName || 'Unknown').join(', ')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="conversation-actions" style={{ display: 'flex', gap: '10px', marginTop: 'auto', flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => loadConversation(conversation.sessionId)}
-                    className="primary-button"
-                    style={{ padding: '10px 20px', fontSize: '0.9rem' }}
-                  >
-                    Load Game
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedConversation(conversation);
-                      setIsDetailsModalOpen(true);
-                    }}
-                    className="secondary-button"
-                    style={{ padding: '10px 20px', fontSize: '0.9rem' }}
-                  >
-                    Details
-                  </button>
-                  <button
-                    onClick={() => setDeleteConfirmId(conversation.sessionId)}
-                    className="danger-button"
-                    style={{ padding: '10px 20px', fontSize: '0.9rem' }}
-                    title="Delete"
-                  >
-                    <span className="button-text">Delete</span>
-                    <span className="button-icon">🗑️</span>
-                  </button>
-                </div>
+      <section className="band">
+        <div className="wrap">
+          {conversations.length === 0 ? (
+            !user && hasHadAccount() ? (
+              <div className="app-empty">
+                <div className="app-empty-icon" aria-hidden="true">🔒</div>
+                <h2>Your adventures are in your account</h2>
+                <p>You're browsing as a guest on this device. Sign in to see the games saved to your account.</p>
+                <button type="button" onClick={() => navigate('/login')} className="btn btn-primary">Sign in</button>
               </div>
-            );
-          })}
+            ) : (
+              <div className="app-empty">
+                <div className="app-empty-icon" aria-hidden="true">📖</div>
+                <h2>No campaigns yet</h2>
+                <p>Your saved adventures will appear here. Start a new game to create your first one.</p>
+                <button type="button" onClick={() => navigate('/new-game')} className="btn btn-primary">Start a new game</button>
+              </div>
+            )
+          ) : (
+            <div className="save-grid">
+              {conversations.map((conversation) => {
+                const heroes = conversation.selected_heroes ? parseMaybe(conversation.selected_heroes) : [];
+                const settings = conversation.game_settings ? parseMaybe(conversation.game_settings) : null;
+                // Merged-list honesty badge (SAVE_SYNC_PLAN Phase 2): the newest copy of
+                // this save is local and still awaiting its cloud push. Signed-in players
+                // only; guests see their local list exactly as before (no badge).
+                const showOnThisDeviceBadge = !!user && !!conversation.pendingCloudSync;
+                // Quest-chaining badges (additive settings fields; old saves render none).
+                // currentChapter is the in-save chain record; chain.chapter tolerates saves
+                // made by the retired linked-save build. A completed save continues IN the
+                // save: load it and use the Journal's "Continue your legend".
+                const chapter = settings?.currentChapter || settings?.chain?.chapter;
+                const milestones = Array.isArray(settings?.milestones) ? settings.milestones : [];
+                const progress = milestones.length ? getCampaignProgress(milestones) : null;
+                // Campaign art is keyed by template id. Saves from before templateId was
+                // stamped (2026-07-03) resolve it from their templateName label instead
+                // (the resolver returns the raw label when nothing matches), and a
+                // realm-only label ("Heroic Fantasy", no chapter) gets that realm's first
+                // chapter art. Custom tales, saves with no label, and server-delivered
+                // templates without a card fall through to the generic scene underneath.
+                const resolvedId = resolveCompletedTemplateId(settings);
+                const templateId = /^[a-z0-9-]+$/.test(resolvedId || '')
+                  ? resolvedId
+                  : storyTemplates.find((t) => t.name === settings?.templateName)?.id;
+                const art = templateId && templateId !== 'custom'
+                  ? `url('/assets/templates/${templateId}.webp'), url('/assets/redesign/hero.jpg')`
+                  : `url('/assets/redesign/hero.jpg')`;
+                const isEditing = editingName === conversation.sessionId;
+
+                return (
+                  <article key={conversation.sessionId} className="save-card">
+                    <div className="save-art" style={{ backgroundImage: art }}>
+                      <div className="save-badges">
+                        {showOnThisDeviceBadge && (
+                          <span className="price-badge price-badge-muted" title="This save is stored on this device and will sync to your account automatically">On this device</span>
+                        )}
+                        {chapter > 1 && <span className="price-badge price-badge-muted">Chapter {chapter}</span>}
+                        {settings?.campaignComplete && (
+                          <span className="price-badge price-badge-gold" title="Load this game and open the Journal to continue your legend in the same world">Complete</span>
+                        )}
+                      </div>
+                      {heroes.length > 0 && (
+                        <div className="save-party">
+                          {heroes.slice(0, 4).map((hero, idx) => {
+                            const heroName = hero.heroName || hero.characterName || 'Unknown';
+                            return hero.profilePicture ? (
+                              <img key={idx} src={resolveProfilePicture(hero.profilePicture)} alt={heroName} title={heroName} />
+                            ) : null;
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="save-body">
+                      {isEditing ? (
+                        <div className="save-rename">
+                          <input
+                            type="text"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                            placeholder="Campaign name"
+                            title="The date and time are added automatically"
+                            maxLength={60}
+                            autoFocus
+                            aria-label="Campaign name"
+                          />
+                          <button type="button" className="btn btn-primary" onClick={() => updateConversationName(conversation.sessionId, newName)} disabled={!newName.trim()}>Save</button>
+                          <button type="button" className="btn btn-ghost" onClick={() => { setEditingName(null); setNewName(''); }}>Cancel</button>
+                        </div>
+                      ) : (
+                        <div className="save-title-row">
+                          <h3>{conversation.conversation_name || 'Untitled Adventure'}</h3>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            title="Rename"
+                            aria-label="Rename this game"
+                            onClick={() => {
+                              setEditingName(conversation.sessionId);
+                              setNewName(settings?.saveName || parseSaveRoot(conversation.conversation_name));
+                            }}
+                          >
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Campaign arc name (settings.templateName is stamped at save time by
+                          campaignLauncher/NewGame); older saves simply omit this line. */}
+                      <p className="save-meta">
+                        {settings?.templateName && <span>{settings.templateName}</span>}
+                        {conversation.timestamp && <span>Played {timeAgo(conversation.timestamp)}</span>}
+                      </p>
+
+                      {progress && (
+                        <div className="save-progress" aria-label={`${progress.completed.length} of ${progress.total} objectives complete`}>
+                          <div className="save-progress-bar"><span style={{ width: `${Math.round((progress.completed.length / progress.total) * 100)}%` }} /></div>
+                          <p>
+                            <b>{progress.completed.length} of {progress.total}</b> objectives
+                            {progress.current?.text && !settings?.campaignComplete ? <> · Next: {progress.current.text}</> : null}
+                          </p>
+                        </div>
+                      )}
+
+                      {!progress && settings?.shortDescription && (
+                        <p className="save-desc">{settings.shortDescription}</p>
+                      )}
+
+                      {heroes.length > 0 && (
+                        <p className="save-heroes">{heroes.map((h) => h.heroName || h.characterName || 'Unknown').join(', ')}</p>
+                      )}
+
+                      <div className="save-actions">
+                        <button type="button" className="btn btn-primary" onClick={() => loadConversation(conversation.sessionId)}>Continue</button>
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => { setSelectedConversation(conversation); setIsDetailsModalOpen(true); }}
+                        >
+                          Details
+                        </button>
+                        <button type="button" className="icon-button danger" onClick={() => setDeleteConfirmId(conversation.sessionId)} title="Delete" aria-label="Delete this game">
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </div>
-      )}
+      </section>
 
       <Suspense fallback={<div style={{ textAlign: 'center', padding: '20px' }}>Loading details...</div>}>
         <SavedGameDetailsModal
@@ -331,19 +342,7 @@ const SavedConversations = () => {
         />
       </Suspense>
 
-      {/* Hidden when empty: the empty state already carries the one "Start a New Game" CTA. */}
-      {conversations.length > 0 && (
-        <div className="navigation-buttons">
-          <button onClick={() => navigate('/')} className="back-button">
-            Back to Home
-          </button>
-          <button onClick={() => navigate('/new-game')} className="new-game-button">
-            Start New Game
-          </button>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal (old modal shell; moves with the ModalContext migration) */}
       {deleteConfirmId && (
         <div className="modal-overlay" onClick={() => setDeleteConfirmId(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
@@ -374,4 +373,4 @@ const SavedConversations = () => {
   );
 };
 
-export default SavedConversations; 
+export default SavedConversations;

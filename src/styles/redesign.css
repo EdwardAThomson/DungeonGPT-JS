@@ -435,3 +435,54 @@
 @media (max-width: 480px) {
   [data-theme='redesign'] .rd-page .realmap { zoom: .8; }
 }
+
+/* ============================================================
+   In-app pages on the redesign primitives (#82). Scoped by .rd-app so nothing here
+   reaches the game screen or its modals before #84. Pilot: Your Games.
+   ============================================================ */
+[data-theme='redesign'] .rd-app .app-header { padding-block: clamp(1.8rem, 4vw, 2.8rem) clamp(1.2rem, 3vw, 1.8rem); }
+[data-theme='redesign'] .rd-app .app-header .eyebrow { margin-bottom: .6rem; }
+[data-theme='redesign'] .rd-app .app-header h1 { font-size: clamp(1.7rem, 3.2vw, 2.4rem); max-width: none; }
+[data-theme='redesign'] .rd-app .app-header .lede { margin-top: .5rem; }
+[data-theme='redesign'] .rd-app .app-header-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem 2rem; flex-wrap: wrap; }
+[data-theme='redesign'] .rd-app .band { padding-block: clamp(1.6rem, 4vw, 2.6rem) clamp(3rem, 6vw, 4.5rem); }
+[data-theme='redesign'] .rd-app .app-status { font-family: var(--font-ui); color: var(--muted); }
+[data-theme='redesign'] .rd-app .app-status.error { color: #e88; }
+
+[data-theme='redesign'] .rd-app .app-empty { max-width: 34rem; margin: 1rem auto; text-align: center; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 10px; padding: 2.4rem 1.8rem; }
+[data-theme='redesign'] .rd-app .app-empty-icon { font-size: 2.2rem; margin-bottom: .6rem; }
+[data-theme='redesign'] .rd-app .app-empty h2 { font-size: 1.4rem; margin-bottom: .6rem; }
+[data-theme='redesign'] .rd-app .app-empty p { color: var(--muted); margin: 0 0 1.4rem; }
+
+[data-theme='redesign'] .rd-app .icon-button { display: inline-grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto; padding: 0; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; transition: color .2s ease, border-color .2s ease, background .2s ease; }
+[data-theme='redesign'] .rd-app .icon-button:hover { color: var(--gold); border-color: var(--gold); }
+[data-theme='redesign'] .rd-app .icon-button.danger:hover { color: #ef6b6b; border-color: #ef6b6b; background: rgba(239, 107, 107, .08); }
+
+/* Your Games: one card per save */
+[data-theme='redesign'] .rd-app .save-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.2rem; }
+@media (max-width: 860px) { [data-theme='redesign'] .rd-app .save-grid { grid-template-columns: 1fr; } }
+[data-theme='redesign'] .rd-app .save-card { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 10px; overflow: hidden; transition: border-color .2s ease; }
+[data-theme='redesign'] .rd-app .save-card:hover { border-color: color-mix(in srgb, var(--gold) 55%, transparent); }
+[data-theme='redesign'] .rd-app .save-art { position: relative; aspect-ratio: 16 / 6; background-size: cover; background-position: center; border-bottom: 1px solid color-mix(in srgb, var(--gold) 50%, transparent); }
+[data-theme='redesign'] .rd-app .save-art::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(14, 13, 19, .75)); pointer-events: none; }
+[data-theme='redesign'] .rd-app .save-badges { position: absolute; top: .7rem; left: .8rem; z-index: 1; display: flex; gap: .4rem; flex-wrap: wrap; }
+[data-theme='redesign'] .rd-app .save-badges .price-badge { position: static; }
+[data-theme='redesign'] .rd-app .save-party { position: absolute; left: 1rem; bottom: -22px; z-index: 1; display: flex; }
+[data-theme='redesign'] .rd-app .save-party img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--gold); background: var(--surface); box-shadow: 0 6px 14px -6px rgba(0, 0, 0, .8); margin-right: -10px; }
+[data-theme='redesign'] .rd-app .save-body { display: flex; flex-direction: column; gap: .55rem; flex: 1; padding: 2rem 1.3rem 1.3rem; }
+[data-theme='redesign'] .rd-app .save-title-row { display: flex; align-items: flex-start; gap: .6rem; }
+[data-theme='redesign'] .rd-app .save-title-row h3 { flex: 1; font-size: 1.15rem; line-height: 1.3; }
+[data-theme='redesign'] .rd-app .save-title-row .icon-button { width: 32px; height: 32px; }
+[data-theme='redesign'] .rd-app .save-rename { display: flex; gap: .5rem; flex-wrap: wrap; }
+[data-theme='redesign'] .rd-app .save-rename input { flex: 1 1 12rem; min-width: 0; padding: .6rem .8rem; border-radius: 6px; border: 1px solid var(--line); background: var(--ground); color: var(--text); font: inherit; }
+[data-theme='redesign'] .rd-app .save-rename input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 25%, transparent); }
+[data-theme='redesign'] .rd-app .save-meta { display: flex; flex-wrap: wrap; gap: .3rem 1rem; margin: 0; font-family: var(--font-ui); font-size: .88rem; color: var(--muted); }
+[data-theme='redesign'] .rd-app .save-meta span:first-child { color: var(--gold); font-weight: 600; }
+[data-theme='redesign'] .rd-app .save-progress p { margin: .45rem 0 0; font-size: .92rem; color: var(--muted); line-height: 1.45; }
+[data-theme='redesign'] .rd-app .save-progress b { color: var(--text); }
+[data-theme='redesign'] .rd-app .save-progress-bar { height: 6px; border-radius: 3px; background: var(--ground-2); overflow: hidden; }
+[data-theme='redesign'] .rd-app .save-progress-bar span { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-bright)); }
+[data-theme='redesign'] .rd-app .save-desc { margin: 0; color: var(--muted); font-size: .94rem; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+[data-theme='redesign'] .rd-app .save-heroes { margin: 0; font-family: var(--font-ui); font-size: .88rem; color: var(--muted-2); }
+[data-theme='redesign'] .rd-app .save-actions { display: flex; align-items: center; gap: .6rem; margin-top: auto; padding-top: .6rem; }
+[data-theme='redesign'] .rd-app .save-actions .icon-button { margin-left: auto; }
