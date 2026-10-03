@@ -9,6 +9,7 @@ import React, { useMemo, useState } from 'react';
 import { generateMapData } from '../utils/mapGenerator';
 import { biomeBackground, poiSprite, sampleBiomes, samplePois } from '../utils/worldTileArt';
 import WorldMapLabels from '../components/WorldMapLabels';
+import { useDebugMapSettings } from '../utils/debugMapSettings';
 
 const TILE = 40;
 
@@ -47,15 +48,22 @@ const Toggle = ({ on, set, children }) => (
 );
 
 const WorldMapArtTest = () => {
-  const [seed, setSeed] = useState(4242);
-  const [dim, setDim] = useState(20);
+  // Shared across all world-map debug pages (sessionStorage-backed) so switching between
+  // this page and river-path-test/world-map-test keeps you looking at the SAME map, and
+  // navigating away and back doesn't reset seed/size/theme back to page defaults.
+  const [applied, setApplied] = useDebugMapSettings();
+  const { seed, theme } = applied;
+  const dim = applied.width;
+  const setSeed = (s) => setApplied({ seed: s });
+  const setDim = (d) => setApplied({ width: d, height: Math.round(d * 0.7) });
+  const setTheme = (t) => setApplied({ theme: t });
+
   const [zoom, setZoom] = useState(1);
   const [showRivers, setShowRivers] = useState(true);
   const [showPaths, setShowPaths] = useState(true);
   const [showPois, setShowPois] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
   const [showGrid, setShowGrid] = useState(false);
-  const [theme, setTheme] = useState('grassland');
 
   // Pass the theme to the real generator (desert is wired end-to-end). For themes whose
   // generation isn't wired yet (snow/swamp/woodland), override the land base biome here so
@@ -145,15 +153,25 @@ const WorldMapArtTest = () => {
               const beachShift = (tile.biome === 'beach' && tile.beachDirection != null) ? BEACH_SHIFT[tile.beachDirection] : 'none';
               return (
                 <div key={`${tile.x},${tile.y}`} style={{
-                  width: TILE, height: TILE, backgroundImage: biomeBackground(tile, tile.x, tile.y), backgroundSize: 'cover', position: 'relative',
+                  width: TILE, height: TILE, backgroundImage: biomeBackground(tile, tile.x, tile.y, world), backgroundSize: 'cover', position: 'relative',
                 }}>
-                  {showRivers && tile.hasRiver && tile.biome !== 'water' && (
-                    <Overlay d={pathSVGs[tile.riverDirection] || pathSVGs.NORTH_SOUTH} stroke="#3f7cc2" width={4} opacity={0.85} />
-                  )}
-                  {showPaths && tile.hasPath && (
-                    <Overlay d={pathSVGs[tile.pathDirection] || pathSVGs.NORTH_SOUTH} stroke="#7a5230" width={3} opacity={0.8} transform={beachShift} />
-                  )}
-                  {poi && <div style={{ position: 'absolute', inset: 0, zIndex: 2, backgroundImage: poi, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', transform: beachShift }} />}
+                  {/* River/path overlays and the POI sprite get a beachShift nudge
+                      (translateX/Y) on beach tiles — that moves the WHOLE absolutely-
+                      positioned box, and with nothing clipping it, the shifted box paints
+                      over the neighbouring tile (a road/river-coloured line bleeding into
+                      a tile with no path/river of its own). Contained here so only this
+                      shiftable layer clips to the tile's own box; the starting-town star
+                      below is deliberately nudged outside the tile corner and must stay
+                      unclipped. */}
+                  <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+                    {showRivers && tile.hasRiver && tile.biome !== 'water' && (
+                      <Overlay d={pathSVGs[tile.riverDirection] || pathSVGs.NORTH_SOUTH} stroke="#3f7cc2" width={4} opacity={0.85} />
+                    )}
+                    {showPaths && tile.hasPath && tile.biome !== 'water' && (
+                      <Overlay d={pathSVGs[tile.pathDirection] || pathSVGs.NORTH_SOUTH} stroke="#7a5230" width={3} opacity={0.8} transform={beachShift} />
+                    )}
+                    {poi && <div style={{ position: 'absolute', inset: 0, zIndex: 2, backgroundImage: poi, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', transform: beachShift }} />}
+                  </div>
                   {tile.isStartingTown && (
                     <>
                       <div style={{ position: 'absolute', inset: 0, zIndex: 3, border: '2px solid #ffcf4d', borderRadius: 2, boxShadow: '0 0 4px rgba(255,207,77,0.8)', pointerEvents: 'none' }} />

@@ -1,6 +1,6 @@
 # Roadmap — DungeonGPT (JS)
 
-_Status: active · updated 2026-07-24_
+_Status: active · updated 2026-07-31_
 
 The production rewrite of DungeonGPT — a React web app for creating fantasy
 characters and playing AI-narrated RPG campaigns. Deployed at dungeongpt.xyz on
@@ -11,14 +11,14 @@ backlog; see the `docs/` design docs for each system.
 
 ## Shipped
 
-- [x] Hero creation (8 stats, 9 races, 12 classes, 9 alignments) + management (list / edit / delete)
+- [x] Hero creation (6 stats on a 27-point buy, 12 classes, 9 alignments) + management (list / edit / delete); heroes are created Human while portrait art is limited, and the 9-race list stays on the data model for legacy saves
 - [x] Party formation + game session setup (world seed, story description, difficulty)
 - [x] Procedurally generated world map (biomes, towns, POIs) with persistent town discovery
 - [x] Party movement + sub-map exploration scaffolding
 - [x] Encounter system (item / location / combat milestones) with d20 skill checks + combat rolls
 - [x] Town NPC interactions (merchants, healers, bankers, …); defeated-hero handling + temple resurrection
 - [x] Multi-provider LLM narration (CF Workers AI in prod; OpenAI / Gemini / Claude in dev)
-- [x] Deterministic campaign-milestone engine (game-verifiable vs narrative milestones)
+- [x] Deterministic campaign-milestone engine (item / combat / location / talk objectives, all engine-refereed since #76 Phase 1)
 - [x] Multi-turn conversation memory + prompt composition (party / location / history)
 - [x] Postgres persistence (heroes, sessions, conversations) with row ownership enforced by the CF Worker proxy (Supabase originally; self-hosted via Cloudflare Hyperdrive since 2026-07)
 - [x] Manual save (with confirmation) + auto-save
@@ -64,7 +64,7 @@ backlog; see the `docs/` design docs for each system.
 - [x] Add missing assets: dedicated quest-item icons + hide/studded-leather armour and pine-resin art delivered (placeholders cleared); the `workshop` building interior (Henry #26) is delivered
 - [x] Replace fragile keyword-based encounter-engagement detection: superseded by the two-tier narration redesign; the keyword matching no longer exists (OUTSTANDING_ISSUES #13)
 - [x] Deploy product analytics (#86): migration 007 applied + Worker deployed; pipeline verified live 2026-07-22 (funnel events recording)
-- [ ] Landing page + UI redesign (#82, HIGH PRIORITY): visibly behind competitors; art slots + mockup in the private plan
+- [ ] Landing page + UI redesign (#82, HIGH PRIORITY): in progress on a dedicated `redesign` branch (build-then-cutover, live site untouched until done) — dark token layer + auth-aware nav (§12.1-2), the auth-aware home (guest landing + signed-in dashboard, §12.3a), the live world map + Subscribe CTA (§12.3c), The Engine + Overview depth pages with GitHub wired (§12.4), and the Overview walkthrough + How to Play manual (absorbing Features & FAQ) polish pass (2026-10-01), shipped there; not yet merged to master/live
 - [ ] Map & Adventure Log layout: promote the map to the main stage (#84, HIGH PRIORITY)
 - [ ] Combat UX continuation (#79): dockable map-context HUD (§0 step 2), then the remaining animation/refine threads (`docs/COMBAT_UX_PLAN.md`)
 - [ ] In-flight phase work: AI narration contract Phase 2 (#76), skill checks Phases 3-4 (#83), arc cards Phases 2-4 (#73)
@@ -74,7 +74,7 @@ backlog; see the `docs/` design docs for each system.
 ## Backlog
 
 - [ ] Billing + credit system + AI usage tracking (the OpenRouter premium pool itself shipped with #7; redemption codes shipped the first slice — time-boxed tier grants via `POST /api/db/redeem-code` + a Profile redeem flow, `docs/REDEMPTION_CODES.md`; payment rails are now LIVE via the Octonion hub with server-side enforcement of hub tiers (`mergedTier.ts`, 2026-07-22) and a read-only usage meter on Profile; the consumption wiring (a `consume:<game>` debit against hub credits) remains)
-- [ ] Tiered narration — local templated prose for routine moves, AI for notable moments, as a cost/latency lever; subsumes guest movement narration / Guest Mode B3 (`docs/TIERED_NARRATION_PLAN.md`)
+- [ ] Tiered narration: the smart-by-default half shipped (B3a/B3b, `src/game/localNarrator.js`): every world-map move, guest or signed-in, gets a local templated line and no longer auto-calls the AI. What remains is the weighted routing scorer and a player-facing Full-AI / Smart / Local-only setting (`docs/TIERED_NARRATION_PLAN.md`)
 - [ ] Streaming AI responses
 - [ ] Dungeon sub-maps (procedural caves / dungeons)
 - [ ] Layered terrain generation (heightmaps, rivers, erosion) — prototype exists

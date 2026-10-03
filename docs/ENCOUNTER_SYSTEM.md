@@ -6,7 +6,7 @@ The encounter system is the primary gameplay loop beyond exploration. It uses a 
 
 The core resolution pipeline (`encounterResolver.js`) handles single-action encounters, while `multiRoundEncounter.js` manages multi-round combat with enemy HP, morale tracking, and contextual actions that evolve as combat progresses. The `encounterGenerator.js` module handles random encounter triggering based on biome, grimness settings, visit history, and moves-since-last-encounter. Encounter data is organized across eight category files under `src/data/encounters/` (base, wilderness, town, cave, ruins, grove, mountain, environmental), merged through an index. The `encounterController.js` module applies rewards (XP via `progressionSystem.js`, gold and items via `inventorySystem.js`) and penalties after resolution.
 
-Phase 1 (core encounters), Phase 2 (random generation + movement integration), and Phase 3 (enhanced POI encounters) are complete. Phase 4 (progression) is partially shipped -- XP/leveling and inventory exist but loot narration is incomplete. The two-tier narrative encounter system (Phase 2.4) is now wired through every movement path: the authored `encounterTier` is honored as the source of truth in all three roll paths, and `Game.js` branches on it for world, town, and site movement (immediate blocks with the action modal, narrative flows into narration/flavor). Keyword-based engagement detection in chat was dropped as a goal (superseded by the Look-around delivery). The team encounter system (Lead+Support model, Phase 5) shipped 2026-07-03 as part of the combat-depth program (#43): boss fights are party fights, enemies deal explicit profile damage, and player damage to enemies is flat per outcome (enemy HP is a real difficulty knob).
+Phase 1 (core encounters), Phase 2 (random generation + movement integration), Phase 3 (enhanced POI encounters), and Phase 4 (progression) are complete: XP/leveling and inventory shipped, and loot narration landed 2026-07-06 as seeded templated prose (`src/game/rewardNarrator.js`) after AI loot narration was deliberately de-scoped (#8). The two-tier narrative encounter system (Phase 2.4) is now wired through every movement path: the authored `encounterTier` is honored as the source of truth in all three roll paths, and `Game.js` branches on it for world, town, and site movement (immediate blocks with the action modal, narrative flows into narration/flavor). Keyword-based engagement detection in chat was dropped as a goal (superseded by the Look-around delivery). The team encounter system (Lead+Support model, Phase 5) shipped 2026-07-03 as part of the combat-depth program (#43): boss fights are party fights, enemies deal explicit profile damage, and player damage to enemies is flat per outcome (enemy HP is a real difficulty knob).
 
 ### Key Files
 
@@ -26,7 +26,7 @@ Phase 1 (core encounters), Phase 2 (random generation + movement integration), a
 | `src/utils/inventorySystem.js` | Gold management, item drops, dice notation rolling; consumable dispatch (`isConsumable`, `consumeConsumable`) over the shared heal path (`consumeHealingItem`) and offensive spell scrolls (`consumeSpellItem`) |
 | `src/hooks/useEncounterFight.js` | Headless fight-flow controller (#79 keystone): owns the phase machine (formation → initiative → action → resolving → roundResult → final) previously trapped in the modal. Presentation-free; engine semantics stay in `encounterResolver`/`multiRoundEncounter` |
 | `src/components/EncounterActionModal.js` | Choice-driven encounter UI (HP bars, damage, threat badge, in-combat Use Item); renders the state `useEncounterFight` exposes and calls its handlers |
-| `src/pages/EncounterTest.js` | Isolated encounter testing page (`/encounter-test`) |
+| `src/pages/EncounterTest.js` | Isolated encounter testing page (`/debug/encounter-test`, via `DebugRoutes.js`) |
 
 ---
 
@@ -147,7 +147,7 @@ on the first move away, then silent expiry; a failed Look-around re-parks the ho
 
 ---
 
-## Phase 4: Progression and Inventory (Partially Shipped)
+## Phase 4: Progression and Inventory (Shipped)
 
 ### Experience System (Shipped)
 - **File:** `src/utils/progressionSystem.js`

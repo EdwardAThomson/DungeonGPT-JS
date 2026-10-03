@@ -33,8 +33,9 @@ const GuestBanner = () => {
   return (
     <div className="guest-banner" role="region" aria-label="Guest account notice">
       <span className="guest-banner-text">
-        🎲 <strong>Playing as a guest.</strong> Your heroes &amp; games live only in this
-        browser. Sign in free to keep them across devices and unlock the AI Dungeon Master.
+        🎲 <strong>Playing as a guest.</strong>
+        <span className="guest-banner-detail"> Your heroes &amp; games live only in this
+        browser. Sign in free to keep them across devices and unlock the AI Dungeon Master.</span>
       </span>
       <span className="guest-banner-actions">
         <button className="guest-banner-cta" onClick={() => navigate('/login')}>Sign in</button>

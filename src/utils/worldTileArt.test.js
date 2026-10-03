@@ -50,7 +50,7 @@ describe('worldTileArt', () => {
     const seen = new Set();
     [4, 5, 6, 7, 8, 9, 10, 11].forEach((dir) => {
       const svg = decode(biomeBackground({ biome: 'beach', beachDirection: dir }));
-      expect(svg).toContain('<polygon'); // diagonal sand/water boundary
+      expect(svg).toContain('<path'); // rounded sand/water boundary
       expect(svg).not.toBe(straight);
       seen.add(svg);
     });

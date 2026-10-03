@@ -4,7 +4,7 @@
 **URL:** `https://dungeongpt-api.steep-mountain-8753.workers.dev`
 **Stack:** Hono + Zod + TypeScript, deployed on Cloudflare Workers
 **Source of truth:** `cf-worker/src/` — if this doc and the code disagree, the code wins.
-**Last updated:** July 2026
+**Last updated:** October 2026
 
 ---
 
@@ -12,7 +12,7 @@
 
 ### Entry point and middleware
 
-`cf-worker/src/index.ts` — Hono app with global CORS middleware. Allowed origins: `localhost:3000/8787/8788`, `dungeongpt.xyz`, `*.dungeongpt-js.pages.dev`, and an optional `CUSTOM_DOMAIN` env var.
+`cf-worker/src/index.ts` — Hono app with global CORS middleware. Allowed origins: `localhost:3000/8787/8788`, `127.0.0.1:3000`, `dungeongpt.xyz`, `dungeongpt-js.pages.dev` and its `*.dungeongpt-js.pages.dev` previews, and an optional `CUSTOM_DOMAIN` env var.
 
 ### Routes
 
@@ -29,6 +29,7 @@
 | `GET  /api/entitlements` | `routes/entitlements.ts` | Yes | Caller's **merged** entitlements snapshot: `{ tier, updatedAt, expiresAt, hub, usage }`. Reports `MAX(local game-ladder tier, hub billing tier)` via the shared `services/mergedTier.ts` resolver (the SAME resolver the server enforcement points use since hub payments Phase 3, so the snapshot and the gates cannot drift) so manual grants and redemption codes never regress while billing moves to the Octonion hub. `tier` is the effective game-ladder tier; `updatedAt`/`expiresAt` keep the `GET /api/db/entitlements` contract; `hub` is the raw hub snapshot (display metadata only, every gate keys on `tier`); `usage` (additive, #6 visibility slice) is the premium-pool allowance meter for member+ callers: `{ premiumDaily: { used, limit }, premiumMonthly: { used, limit } }`, a read-only peek at the same `request_counters` rows the `routes/ai.ts` gate bumps, `null` for free tier or when the counter read fails (display only; enforcement stays in `routes/ai.ts`). Both tier sources fail closed independently → both failing yields `free` with a `200`, never a `500`. `Cache-Control: no-store`. Client: `src/services/entitlementsApi.js` (the app now fetches this route, not `/api/db/entitlements`); the Profile page renders the meter plus the hub credit balance |
 | `POST /api/db/redeem-code` | `routes/db.ts`      | Yes  | Redeem a membership code (billing MVP #6, migration `006_redemption_codes.sql`): body `{ code }`, success `200 { tier, expiresAt }` grants a time-boxed `tier_grants` row atomically. Generic `400 code_invalid` for any dead code, `409 already_redeemed`, per-user `429 rate_limited` (10/day, fails CLOSED). See `docs/REDEMPTION_CODES.md` |
 | `GET  /api/db/premium-templates` | `routes/db.ts` | Yes  | Server-delivered premium story templates (#40): `{ templates: [...] }` with all enabled `premium_templates` rows: the full template when the caller's tier covers `min_tier`, otherwise a marketing-safe **teaser** (card-face metadata only: id, name, subtitle, tier, levelRange, shortDescription, theme, minTier, `teaser: true`; authored content (settings, milestones, customNames, NPCs, rewards) never leaves the server below tier). Free/no-row accounts get teasers, never an error. Since hub payments Phase 3 the tier check is the merged tier (`services/mergedTier.ts`, local MAX hub), so a hub subscriber with no local `account_tiers` row still receives full templates. Read-only (content loaded/disabled via psql, see the `cf-worker/migrations/004_premium_templates.sql` runbook); smoke test: `scripts/test-cf-premium.mjs` (manual, not auto-run) |
+| `POST /api/events`     | `routes/events.ts`      | No   | Anonymous product-analytics ingestion (#86) — the Worker's **only unauthenticated route**, protected instead by the CORS origin allowlist, a server-side event-name allowlist, a 1KB props cap, and an IP-keyed rate limit over `request_counters`. Stores `anon_id`/`event`/`props` only (no user id, no IP); always `204`. Migration `007_app_events.sql`. Client: `src/services/telemetry.js` |
 
 *Image generate currently has `requireAuth` commented out (TODO in code).
 
@@ -123,14 +124,13 @@ interface Env {
 
 ## Production Models (July 2026)
 
-Five models across three tiers. Trimmed from 15 after benchmark runs (commit `2a9ac5f`) and pared down further since.
+Four models across three tiers. Trimmed from 15 after benchmark runs (commit `2a9ac5f`) and pared down further since (`gemma-3-12b-it` dropped 2026-09-29 after Workers AI began refusing access).
 
 | Tier     | Model ID                                      | Display Name        | maxTokens | Notes |
 |----------|------------------------------------------------|---------------------|-----------|-------|
 | ultra    | `@cf/openai/gpt-oss-120b`                      | GPT-OSS 120B        | 4096      | **DEFAULT_MODEL_ID** — best narrative quality (3.7s). |
 | quality  | `@cf/openai/gpt-oss-20b`                       | GPT-OSS 20B         | 4096      | Recommended pick (⭐) in the frontend model picker. |
 | quality  | `@cf/meta/llama-4-scout-17b-16e-instruct`      | Llama 4 Scout 17B   | 4096      | 17B MoE, multimodal-capable. |
-| quality  | `@cf/google/gemma-3-12b-it`                    | Gemma 3 12B         | 4096      | Lightweight quality-tier option. |
 | balanced | `@cf/meta/llama-3.1-8b-instruct-fast`          | Llama 3.1 8B Fast   | 2048      | Low-latency baseline (2.6s). |
 
 ### Fallback chain
@@ -159,7 +159,7 @@ Some Workers AI models emit chain-of-thought into `choices[0].message.reasoning`
 
 **Operational signal:** the warning in worker logs means a caller's `maxTokens` is too low for that model. Bump `DEFAULT_MAX_TOKENS` or have the caller pass a larger value. The reasoning text is not real DM narration.
 
-None of the current five models are R1-style reasoners, but the handler is defensive for future additions.
+None of the current four models are R1-style reasoners, but the handler is defensive for future additions.
 
 ---
 
@@ -186,11 +186,11 @@ Four files, none derived from the others — missing one leaves the model invisi
 cd cf-worker && nvm use 20 && npm run dev   # local worker on :8787
 ```
 
-Test script: `scripts/test-cf-models-simple.mjs` — set its `TEST_MODELS` array to match the 5 production IDs.
+Test script: `scripts/test-cf-models-simple.mjs` — set its `TEST_MODELS` array to match the 4 production IDs.
 
 ### Phase 1 — Automated protocol compliance
 
-Run `test-cf-models-simple.mjs` against all 5 models. Scenarios: opening, interaction, movement, milestone, combat, town, skill_check, invalid_action.
+Run `test-cf-models-simple.mjs` against all 4 models. Scenarios: opening, interaction, movement, milestone, combat, town, skill_check, invalid_action.
 
 | Gate | Production-ready | Minimum |
 |------|------------------|---------|
@@ -198,13 +198,13 @@ Run `test-cf-models-simple.mjs` against all 5 models. Scenarios: opening, intera
 
 ### Phase 2 — Multi-turn consistency (10 turns)
 
-Test models: GPT-OSS 20B (primary), Gemma 3 12B, Llama 3.1 8B Fast. Optional: GPT-OSS 120B, Llama 4 Scout 17B.
+Test models: GPT-OSS 20B (primary), Llama 3.1 8B Fast. Optional: GPT-OSS 120B, Llama 4 Scout 17B, plus non-registry candidates under evaluation (Gemma 4 26B MoE, GLM 4.7 Flash).
 
 Scenario "The Cursed Village": war-torn kingdom, level-5 party (Kael/Lyra/Bram), 10 turns covering arrival through combat to milestone completion. Score on Consistency, Tone, Milestone Tracking, Combat Handling, NPC Characterization (5 each). Target: >=20/25, minimum 16/25.
 
 ### Phase 3 — Comparative quality (4 scenarios)
 
-Models: GPT-OSS 20B, Gemma 3 12B, Llama 3.1 8B Fast. Four scenarios (Mysterious Artifact, Destroyed Bridge, Nervous Innkeeper, Moral Dilemma) scoring Creativity, Detail, Player Agency, etc. Target: >=45/60, minimum 36/60.
+Models: GPT-OSS 120B, GPT-OSS 20B, Llama 4 Scout, Llama 3.1 8B Fast (`ALL_MODELS` in `scripts/test-cf-models.mjs`). Four scenarios (Mysterious Artifact, Destroyed Bridge, Nervous Innkeeper, Moral Dilemma) scoring Creativity, Detail, Player Agency, etc. Target: >=45/60, minimum 36/60.
 
 ### Phase 4 — Stress
 
@@ -306,5 +306,7 @@ path), no credentials needed. Branch-gated premium tests in test/premium/
 self-activate when the premium modules exist (probe import + skipIf). The
 config deliberately does not inherit wrangler.toml bindings (the [ai] binding
 would demand a Cloudflare token at pool startup); it parses compatibility
-date/flags from wrangler.toml instead. CI: run the suite before wrangler
-deploy in .github/workflows/deploy-worker.yml.
+date/flags from wrangler.toml instead. CI does not run this suite yet:
+.github/workflows/deploy-worker.yml runs the migration guard, `npm ci`,
+`tsc --noEmit`, `wrangler deploy` and the post-deploy smoke test, so run
+`npm run test:worker` locally before deploying.

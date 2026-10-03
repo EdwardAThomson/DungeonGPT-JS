@@ -1,8 +1,8 @@
 // App.js
 
-import React, { useContext, useEffect, Suspense, lazy, useState } from "react";
+import React, { useContext, useEffect, Suspense, lazy } from "react";
 import { sendEvent } from "./services/telemetry";
-import { BrowserRouter as Router, Route, Link, Routes, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter as Router, Route, Routes, Navigate, useLocation } from "react-router-dom";
 import HeroCreation from "./pages/HeroCreation";
 import HeroSummary from "./components/HeroSummary";
 import AllHeroes from "./pages/AllHeroes";
@@ -16,21 +16,18 @@ import EncounterModalDebug from './pages/EncounterModalDebug';
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import Profile from './pages/Profile';
-import HowToPlay from './pages/HowToPlay';
 import GettingStarted from './pages/GettingStarted';
 import { useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import UserProfileIndicator from './components/UserProfileIndicator';
 
 import "./styles/index.css";
 
-import DebugMenu from './components/DebugMenu';
 import SettingsContext from "./contexts/SettingsContext";
 import { AISettingsModalContent } from "./components/Modals";
 import ErrorBoundary from "./components/ErrorBoundary";
-import NavDropdown from "./components/NavDropdown";
+import RedesignNav from "./components/RedesignNav";
 import DatabaseIndicator from "./components/DatabaseIndicator";
-import { GuidedTourProvider, useGuidedTour } from "./contexts/GuidedTourContext";
+import { GuidedTourProvider } from "./contexts/GuidedTourContext";
 import TourOverlay from "./components/TourOverlay";
 import LocalHeroSync from "./components/LocalHeroSync";
 import LocalGameSync from "./components/LocalGameSync";
@@ -38,17 +35,21 @@ import GuestBanner from "./components/GuestBanner";
 import ScrollToTop from "./components/ScrollToTop";
 
 const DebugRoutes = lazy(() => import('./pages/DebugRoutes'));
-// Premium tier page: mounted at /premium but deliberately NOT linked from any
-// nav yet (billing is not live); it becomes discoverable when #6 ships.
+// Redesign marketing depth pages (#82 §12.4), reached from the "The Game" nav dropdown.
+const EnginePage = lazy(() => import('./pages/EnginePage'));
+const OverviewPage = lazy(() => import('./pages/OverviewPage'));
+// Player dashboard, split from the public front page (#82).
+const PlayPage = lazy(() => import('./pages/PlayPage'));
+// Membership / tier page: /premium with a /membership alias (the nav's Subscribe).
 const PremiumPage = lazy(() => import('./pages/PremiumPage'));
 
 const AppContent = () => {
   const location = useLocation();
-  const { user, loading } = useAuth();
+  const { loading } = useAuth();
   const isDebugEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEBUG_ROUTES === 'true';
   const isGamePage = location.pathname === '/game';
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  const { startTour } = useGuidedTour();
+  // Redesign marketing routes (#82 §12.3) go full-bleed; other pages keep the container.
+  const isBleedPage = ['/', '/overview', '/engine', '/premium', '/membership', '/getting-started', '/saved-conversations', '/all-heroes', '/login', '/play', '/hero-selection', '/new-game', '/hero-creation', '/hero-summary'].includes(location.pathname);
 
   const {
     selectedProvider,
@@ -61,13 +62,15 @@ const AppContent = () => {
     setAssistantModel,
     isSettingsModalOpen,
     setIsSettingsModalOpen,
-    theme,
-    setTheme
+    theme
   } = useContext(SettingsContext);
 
-  // Sync theme to document.body so Portal content inherits CSS variables
+  // Sync theme to document.body so Portal content inherits CSS variables.
+  // Redesign branch (#82 §12): the whole app runs on the dark redesign theme; the
+  // light-fantasy/dark-fantasy `theme` state machinery is preserved but overridden here
+  // (the §12.6 "keep the light/dark toggle?" decision can restore it).
   useEffect(() => {
-    document.body.setAttribute('data-theme', theme);
+    document.body.setAttribute('data-theme', 'redesign');
   }, [theme]);
 
   // Funnel: one app_open per page load (anonymous; D1/D7 return comes from
@@ -79,7 +82,7 @@ const AppContent = () => {
   // Show loading screen while checking authentication
   if (loading) {
     return (
-      <div className="App" data-theme={theme}>
+      <div className="App" data-theme="redesign">
         <div style={{
           display: 'flex',
           justifyContent: 'center',
@@ -94,89 +97,10 @@ const AppContent = () => {
   }
 
   return (
-    <div className="App" data-theme={theme}>
+    <div className="App" data-theme="redesign">
       <a href="#main-content" className="skip-link">Skip to main content</a>
 
-      {/* Hamburger button - visible on mobile for all pages */}
-      <button
-        className="hamburger-btn"
-        onClick={() => setIsMobileNavOpen(!isMobileNavOpen)}
-        aria-label="Toggle navigation menu"
-        aria-expanded={isMobileNavOpen}
-      >
-        {isMobileNavOpen ? '✕' : '☰'}
-      </button>
-
-      {/* Add className="main-nav" here for the nav styles */}
-      <nav className={`main-nav ${isGamePage ? 'game-page-nav' : ''} ${isMobileNavOpen ? 'mobile-nav-open' : ''}`}>
-        <ul>
-          <li><Link to="/" onClick={() => setIsMobileNavOpen(false)}>Home</Link></li>
-          <NavDropdown
-            label="How to Play"
-            items={[
-              { label: "Getting Started", path: "/getting-started" },
-              { label: "Features & FAQ", path: "/features" },
-              { label: "Replay Tutorial", onClick: startTour }
-            ]}
-            onNavClose={() => setIsMobileNavOpen(false)}
-          />
-          <NavDropdown
-            label="Heroes"
-            items={[
-              { label: "Create New Hero", path: "/hero-creation" },
-              { label: "All Heroes", path: "/all-heroes" }
-            ]}
-            onNavClose={() => setIsMobileNavOpen(false)}
-          />
-          <NavDropdown
-            label="Games"
-            items={[
-              { label: "New Game", path: "/new-game" },
-              { label: "Saved Games", path: "/saved-conversations" }
-            ]}
-            onNavClose={() => setIsMobileNavOpen(false)}
-          />
-          {/* Membership: linked since 2026-07-22 — billing is live at the hub. */}
-          <li><Link to="/membership" onClick={() => setIsMobileNavOpen(false)}>Membership</Link></li>
-          <li className="nav-settings-item">
-            <button
-              onClick={() => setTheme(theme === 'light-fantasy' ? 'dark-fantasy' : 'light-fantasy')}
-              className="nav-settings-btn"
-              title={theme === 'light-fantasy' ? 'Switch to dark mode' : 'Switch to light mode'}
-              aria-label="Toggle light/dark theme"
-            >
-              {theme === 'light-fantasy' ? '🌙' : '☀️'} <span className="settings-text">{theme === 'light-fantasy' ? 'Dark' : 'Light'}</span>
-            </button>
-          </li>
-          {isGamePage && user && (
-            <li className="nav-settings-item">
-              <button
-                onClick={() => window.dispatchEvent(new CustomEvent('open-ai-assistant'))}
-                className="nav-settings-btn nav-ai-btn"
-                title="Open AI Assistant"
-              >
-                🤖 AI Assistant
-              </button>
-            </li>
-          )}
-          {isDebugEnabled && (
-            <li className="nav-settings-item nav-debug-item">
-              <DebugMenu inNav />
-            </li>
-          )}
-          <li className="nav-profile-item">
-            <UserProfileIndicator isMobileNavOpen={isMobileNavOpen} onNavClose={() => setIsMobileNavOpen(false)} />
-          </li>
-        </ul>
-      </nav>
-
-      {/* Mobile nav overlay - moved outside nav to prevent filter nesting issues */}
-      {isMobileNavOpen && (
-        <div
-          className="mobile-nav-overlay"
-          onClick={() => setIsMobileNavOpen(false)}
-        />
-      )}
+      <RedesignNav isDebugEnabled={isDebugEnabled} />
 
       <AISettingsModalContent
         isOpen={isSettingsModalOpen}
@@ -192,7 +116,7 @@ const AppContent = () => {
       />
 
       {/* === Add this wrapper div === */}
-      <div id="main-content" className={`main-content ${isGamePage ? 'game-page-content' : ''}`}>
+      <div id="main-content" className={`main-content ${isGamePage ? 'game-page-content' : ''} ${isBleedPage ? 'redesign-bleed' : ''}`}>
         <GuestBanner />
         <ErrorBoundary>
           <Suspense fallback={<div className="page-container">Loading...</div>}>
@@ -202,9 +126,13 @@ const AppContent = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/getting-started" element={<GettingStarted />} />
+              <Route path="/play" element={<PlayPage />} />
+              <Route path="/overview" element={<OverviewPage />} />
+              <Route path="/engine" element={<EnginePage />} />
               <Route path="/premium" element={<PremiumPage />} />
               <Route path="/membership" element={<PremiumPage />} />
-              <Route path="/features" element={<HowToPlay />} />
+              {/* Features & FAQ retired into How to Play (#82 §12 step 5) */}
+              <Route path="/features" element={<Navigate to="/getting-started#faq" replace />} />
               <Route path="/how-to-play" element={<Navigate to="/getting-started" replace />} />
               <Route path="/hero-creation" element={<HeroCreation />} />
               <Route path="/hero-summary" element={<HeroSummary />} />

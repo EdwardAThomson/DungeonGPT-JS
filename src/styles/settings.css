@@ -242,6 +242,8 @@
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
+  box-shadow: none;
+  letter-spacing: normal;
 }
 
 .segmented-option:hover:not(:disabled) {

@@ -42,12 +42,189 @@ const shade = (hex, f) => {
   return `rgb(${c((n >> 16) & 255)},${c((n >> 8) & 255)},${c(n & 255)})`;
 };
 
-// speckle texture so sandy areas aren't a flat fill
-const sandNoise = (seed) => {
+// --- animation helpers (SMIL) -------------------------------------------------
+// These tiles are rendered as CSS `background-image` from a data-URI, so ordinary
+// CSS @keyframes/`animation` can never reach inside them — an external stylesheet
+// has no way to target a node inside a background-image. SVG's own native SMIL
+// animation elements (<animate>/<animateTransform>) sidestep that entirely: they're
+// self-contained inside the SVG document, so they keep playing wherever the SVG is
+// used (background-image, <img src>, ...) — like a tiny looping video baked into the
+// image itself. SMIL is legacy-flagged but fully supported in current Chrome/
+// Firefox/Safari, and it's the only mechanism that reaches inside a background-image
+// tile, so reach for these helpers (rather than hand-rolling a raw `<animate>`
+// string at the call site) whenever something in this file needs motion — ripples
+// today, a flag/reeds/lava glow/etc. later.
+const animateAttr = (attributeName, values, dur, opts = {}) => {
+  const { repeatCount = 'indefinite', begin, calcMode, keySplines, keyTimes } = opts;
+  let extra = '';
+  if (begin != null) extra += ` begin='${begin}'`;
+  if (calcMode) extra += ` calcMode='${calcMode}'`;
+  if (keySplines) extra += ` keySplines='${keySplines}'`;
+  if (keyTimes) extra += ` keyTimes='${keyTimes}'`;
+  return `<animate attributeName='${attributeName}' values='${values}' dur='${dur}' repeatCount='${repeatCount}'${extra}/>`;
+};
+
+const animateTransform = (type, values, dur, opts = {}) => {
+  const { repeatCount = 'indefinite', begin, additive } = opts;
+  let extra = '';
+  if (begin != null) extra += ` begin='${begin}'`;
+  if (additive) extra += ` additive='${additive}'`;
+  return `<animateTransform attributeName='transform' type='${type}' values='${values}' dur='${dur}' repeatCount='${repeatCount}'${extra}/>`;
+};
+
+// A "flowing line" march: pair with `stroke-dasharray="<dash> <gap>"` on the same
+// path (`cycle` = dash + gap, the length of one full repeat) and this animates
+// stroke-dashoffset through exactly one repeat, so it loops with no visible seam —
+// reads as a glint/current travelling along a line (e.g. a conveyor, a magic rune
+// trail). NOTE: tested for the ripple lines below and rejected there — on a short,
+// curvy path a "mostly dash" ratio like '7 2' still rendered as bold, evenly-spaced
+// dashes (not a subtle solid-with-glint look), which read more "decorative dashed
+// line" than "gentle water". Kept here as an available, verified-working technique
+// for whatever's animated next; just proof the dash/gap/cycle numbers on your own
+// path before trusting them to look subtle.
+const flowDash = (cycle, dur, opts = {}) => animateAttr('stroke-dashoffset', `0;${-cycle}`, dur, opts);
+
+// A gentle back-and-forth "bob"/"sway": translates an element by (dx, dy) and back
+// to rest, looping smoothly (starts and ends at rest, so it splices invisibly).
+// Cheaper and safer than reshaping `d`, and — unlike a one-directional drift —
+// never carries the shape past the tile's edge, so it can't clip against the
+// viewBox. Good for ripples/reeds/a hanging sign/etc: anything that should read as
+// swaying in place rather than travelling.
+const bob = (dx, dy, dur, opts = {}) => animateTransform('translate', `0,0;${dx},${dy};0,0;${-dx},${-dy};0,0`, dur, opts);
+
+// A one-directional "flow": steadily translates an element from rest to (dx, dy)
+// over the full duration, while `opacity` rides along in lockstep (0 -> peak -> peak
+// -> 0, same `dur`/`begin` on both animations) — so the element fades IN as it starts
+// its travel, fades OUT again before it finishes, and only then does SMIL's implicit
+// snap back to the first keyframe happen (repeatCount='indefinite' has no built-in
+// return path, it just jumps). Because that jump lands while opacity is ~0, the reset
+// is invisible: what actually reads is "a ripple travels one way, dissolves, a new one
+// fades in and starts the same trip" — a conveyor, not `bob`'s there-and-back sway.
+// Replaces `bob` for anything that should read as water actually flowing (rather than
+// lapping in place): the ripple lines in water()/lake()/beachRipples() below.
+const flow = (dx, dy, dur, opts = {}) => {
+  const { repeatCount = 'indefinite', begin, peak = 0.8 } = opts;
+  const shared = { repeatCount, begin };
+  return (
+    animateTransform('translate', `0,0;${dx},${dy}`, dur, shared) +
+    animateAttr('opacity', `0;${peak};${peak};0`, dur, { ...shared, keyTimes: '0;0.18;0.82;1' })
+  );
+};
+
+// A gentle back-and-forth ROTATION about a fixed pivot (cx, cy): rocks +/-angleDeg and
+// back to rest, looping smoothly (same there-and-back shape `bob` uses, just for `rotate`
+// instead of `translate`). For anything that bends at a fixed base rather than moving as a
+// rigid body — a reed rooted in mud, a flag on a pole, a grass blade — this reads right
+// where `bob` would not: translating the whole element would slide the base sideways too,
+// which looks like it's sliding on ice rather than bending at the root. `cx`/`cy` should be
+// the element's own base/anchor point (e.g. a reed's rooted end), not the tile center.
+const sway = (angleDeg, cx, cy, dur, opts = {}) =>
+  animateTransform(
+    'rotate',
+    `0 ${cx} ${cy};${angleDeg} ${cx} ${cy};0 ${cx} ${cy};${-angleDeg} ${cx} ${cy};0 ${cx} ${cy}`,
+    dur,
+    opts
+  );
+
+// A per-tile phase offset for wind-driven `sway`, derived from the tile's REAL map x
+// (not a hashed variant/seed). Reeds and lily pads only need to sway in place, but
+// trees are dense/tall enough that the eye reads a whole row of them at once — and if
+// every tile picked its phase from a hash of (x, y), the hash scrambles left-to-right
+// ordering and the row would look like independent jitter, not wind. Keying the phase
+// on real x instead means neighbouring tiles are always close in phase and distant
+// tiles are far apart, which is what makes a gust legible as it sweeps across the map.
+// The offset is negative (like the reed sway above) so a tile is already partway
+// through its cycle at t=0 instead of waiting `x * WIND_K` seconds to start moving —
+// with a positive offset, tiles far to the east would visibly sit still until their
+// delay elapsed, which reads as broken rather than windy. `jitter` (seconds) folds in
+// a small per-tree offset so trees sharing one tile don't look perfectly synced,
+// without disturbing the across-tile progression that reads as the gust.
+// WIND_K is tuned by eye: bigger = adjacent tiles are more out-of-phase at any instant
+// (gust reads as sweeping faster / more visibly); too big and neighbours look
+// uncorrelated (jitter, not wind); too small and the whole map sways in unison with no
+// visible travel. 0.4 puts a full sway cycle's worth of phase spread across roughly a
+// 10-tile span, which reads as a gust crossing a screenful of map every few seconds.
+const WIND_K = 0.4;
+const windBegin = (x, jitter = 0) => `${(-(x * WIND_K + jitter)).toFixed(2)}s`;
+
+// Ground colour beyond the sand fringe of a coastline/lake tile, so the fringe reads as
+// a thin beach rather than a solid sand block. Keyed by the land biome on the far side;
+// unknown/missing biome (no grid context, e.g. isolated preview swatches) defaults to plains.
+const GROUND_COLOR = {
+  plains: C.plains, woodland: shade(C.plains, 0.9), desert: C.desert, swamp: C.swamp, snow: C.snow,
+};
+const groundColorFor = (biome) => GROUND_COLOR[biome] || C.plains;
+
+const inBounds = (grid, x, y) => !!(grid && grid[y] && grid[y][x] != null);
+const isLandTile = (t) => t && t.biome !== 'water' && t.biome !== 'beach' && !t.isLake;
+
+// The land biome touching a shoreline tile (beach edge or single-tile pond), used to
+// colour the ground beyond the sand fringe so it matches the surrounding map instead of
+// always reading as generic sand. Scans orthogonal then diagonal neighbours; falls back
+// to plains when there's no grid context or no land neighbour is found.
+const landBiomeNear = (grid, x, y) => {
+  if (!grid) return 'plains';
+  const ring = [[x, y - 1], [x, y + 1], [x - 1, y], [x + 1, y],
+    [x - 1, y - 1], [x + 1, y - 1], [x - 1, y + 1], [x + 1, y + 1]];
+  for (const [nx, ny] of ring) {
+    if (inBounds(grid, nx, ny) && isLandTile(grid[ny][nx])) return grid[ny][nx].biome;
+  }
+  return 'plains';
+};
+
+// Which axis the nearest coastline runs along, AND which side of the tile it's on, so
+// open-water ripples read as lapping ALONG the shore (not crossing straight into it) AND
+// flow TOWARD it, matching the direction the adjacent beach tile's own ripples already
+// flow (beachRipples' `sign`, below) — without this, a beach tile correctly flowing
+// toward its shore sat right next to open-ocean tiles all defaulting to the same fixed
+// (+y/+x) direction regardless of which side their coast was actually on, so roughly half
+// the time the ocean beyond the coast flowed the opposite way from the coast itself
+// (playtest feedback: "the coastal tiles look correct, but the ocean tiles have water in
+// the wrong direction"). Scans outward (not just the immediate neighbour) in all 4
+// cardinal directions for the nearest beach tile, since a water tile several rows out from
+// shore still sits in front of a coastline running one way or the other — checking only
+// adjacency left every non-adjacent water tile (i.e. most of a wide ocean band) defaulting
+// to horizontal regardless of the real coast orientation ("outermost ocean tiles facing
+// the wrong way", a separate earlier bug). Nearest beach N/S -> the shared edge there is
+// horizontal (coast runs horizontal -> 'h' ripples, sign toward whichever of N/S is
+// closer); nearest beach E/W -> a vertical coast -> 'v' (sign toward whichever of E/W is
+// closer); roughly equidistant on both axes -> a diagonal cove, split the difference with
+// 'd' (sign toward whichever single direction is closest overall). No grid context / no
+// beach anywhere keeps the previous default ('h', sign 1).
+const coastFlowNear = (grid, x, y) => {
+  if (!grid) return { axis: 'h', sign: 1 };
+  const maxSteps = Math.max(grid.length, (grid[0] || []).length);
+  const nearestBeach = (dx, dy) => {
+    for (let i = 1; i <= maxSteps; i++) {
+      const nx = x + dx * i, ny = y + dy * i;
+      if (!inBounds(grid, nx, ny)) return Infinity;
+      if (grid[ny][nx].biome === 'beach') return i;
+    }
+    return Infinity;
+  };
+  const distN = nearestBeach(0, -1), distS = nearestBeach(0, 1);
+  const distE = nearestBeach(1, 0), distW = nearestBeach(-1, 0);
+  const vDist = Math.min(distN, distS); // beach N/S -> horizontal coast
+  const hDist = Math.min(distE, distW); // beach E/W -> vertical coast
+  if (vDist === Infinity && hDist === Infinity) return { axis: 'h', sign: 1 };
+  if (Math.abs(vDist - hDist) <= 1) {
+    const best = Math.min(distN, distS, distE, distW);
+    // south/east -> positive (+y/+x, matching beachRipples' dir0/dir3 sign); north/west -> negative
+    const sign = (best === distS || best === distE) ? 1 : -1;
+    return { axis: 'd', sign };
+  }
+  if (vDist < hDist) return { axis: 'h', sign: distS <= distN ? 1 : -1 };
+  return { axis: 'v', sign: distE <= distW ? 1 : -1 };
+};
+
+// speckle texture so sandy areas aren't a flat fill. bounds [minX, maxX, minY, maxY]
+// confines the dots to a sand band/ring rather than scattering across the whole tile.
+const sandNoise = (seed, bounds = [0, 40, 0, 40]) => {
   const r = rng(seed + 9);
+  const [minX, maxX, minY, maxY] = bounds;
   let s = '';
   for (let i = 0; i < 16; i++) {
-    const x = (r() * 40).toFixed(1), y = (r() * 40).toFixed(1);
+    const x = (minX + r() * (maxX - minX)).toFixed(1), y = (minY + r() * (maxY - minY)).toFixed(1);
     const c = r() > 0.5 ? C.sandDark : shade(C.sand, 1.08);
     s += `<circle cx='${x}' cy='${y}' r='${(r() * 0.9 + 0.4).toFixed(1)}' fill='${c}' opacity='0.7'/>`;
   }
@@ -83,63 +260,334 @@ const plains = (seed) => {
   return wrap(`<rect width='40' height='40' fill='${C.plains}'/>${m}`);
 };
 
-const water = (seed) => {
+// axis: 'h' (default, ripples running horizontal), 'v' (rotated 90 for a coast running
+// N-S), or 'd' (a cove with coast on two adjacent sides -> ripples rotated 45).
+// Each ripple line gets a one-directional `flow`: the wave's own bulge already runs
+// perpendicular to the line's travel direction (y for a horizontal line, x for a
+// vertical one), so translating + fading along that same axis reads as the crest
+// itself advancing ("flowing") rather than sliding the line sideways or touching its
+// endpoints. For the 'd' (diagonal cove) case the lines are built as plain horizontal
+// ripples and then wrapped in a 45-degree rotation group, so a plain y-flow inside that
+// group comes out as diagonal travel for free. Duration/phase/distance are drawn
+// per-line from the tile's own seeded rng so the three lines don't move in lockstep —
+// still fully deterministic/memoisable per tile, only real wall-clock time drives the
+// loop itself. `sign` (from coastFlowNear, below) points every line toward whichever
+// side the nearest coast is actually on, so open ocean flows the SAME direction as the
+// beach ripples right next to it instead of contradicting them.
+// isInlandLake (from `tile.descriptionSeed === 'A clear lake'`, the same string-based
+// convention mapGenerator.js already uses to distinguish a lake body from open sea —
+// see its comment on why lakes don't set the legacy single-tile `isLake` flag): real
+// multi-tile lakes render through this same open-water sprite, not the standalone
+// `lake()` pond (that one only fires for old saves' single-tile ponds, which current
+// generation no longer produces — so its lily pads were effectively unreachable in any
+// new game). Gives a plain, uncommonly-placed lily pad a chance to appear on lake water
+// tiles specifically (not open sea), so real lakes get some too. Sparse (~1 in 4 tiles)
+// so a multi-tile lake reads as a few scattered pads, not a lily farm.
+const water = (seed, axis = 'h', sign = 1, isInlandLake = false) => {
   const r = rng(seed + 2);
   let w = '';
   for (let i = 0; i < 3; i++) {
-    const y = 9 + i * 11 + Math.floor(r() * 3);
-    w += `<path d='M0 ${y} q10 -3.5 20 0 t20 0' stroke='${C.waterLight}' stroke-width='1.6' fill='none' opacity='0.8'/>`;
+    const o = 9 + i * 11 + Math.floor(r() * 3);
+    const dur = `${(3.6 + r() * 1.8).toFixed(1)}s`;
+    const begin = `${(-(r() * 4)).toFixed(1)}s`;
+    const dist = (sign * (3 + r() * 3)).toFixed(1);
+    const anim = axis === 'v' ? flow(dist, 0, dur, { begin }) : flow(0, dist, dur, { begin });
+    w += axis === 'v'
+      ? `<path d='M${o} 0 q-3.5 10 0 20 t0 20' stroke='${C.waterLight}' stroke-width='1.6' fill='none'>${anim}</path>`
+      : `<path d='M0 ${o} q10 -3.5 20 0 t20 0' stroke='${C.waterLight}' stroke-width='1.6' fill='none'>${anim}</path>`;
   }
-  return wrap(`<rect width='40' height='40' fill='${C.water}'/>${w}`);
+  if (axis === 'd') w = `<g transform='rotate(45 20 20)'>${w}</g>`;
+  let pad = '';
+  if (isInlandLake && r() > 0.75) {
+    const px = (8 + r() * 24).toFixed(1), py = (8 + r() * 24).toFixed(1);
+    const prx = (1.8 + r() * 0.8).toFixed(1), pry = (1.2 + r() * 0.5).toFixed(1);
+    const padAnim = bob((0.2 + r() * 0.3).toFixed(2), (0.2 + r() * 0.3).toFixed(2), `${(3.4 + r() * 1.6).toFixed(1)}s`, { begin: `${(-(r() * 3)).toFixed(1)}s` });
+    pad = `<ellipse cx='${px}' cy='${py}' rx='${prx}' ry='${pry}' fill='${C.leafLo}' opacity='0.85'>${padAnim}</ellipse>`;
+  }
+  return wrap(`<rect width='40' height='40' fill='${C.water}'/>${w}${pad}`);
 };
 
-const lake = (seed) => {
+const lake = (seed, landBiome) => {
   const r = rng(seed + 7);
-  // a pond: sandy shore base, rounded water body, ripples, a couple of lily pads
+  // a pond: land-coloured ground, a thin sandy shore ring, rounded water body, ripples,
+  // a couple of lily pads. The ellipse stops well short of the tile edge so land shows
+  // through in the corners instead of a boxy leftover sand fill (playtest feedback).
   const padX = 11 + Math.floor(r() * 6), padY = 12 + Math.floor(r() * 6);
+  const anim1 = flow(0, (2 + r() * 2).toFixed(1), `${(3.8 + r() * 1.4).toFixed(1)}s`, { peak: 0.75 });
+  const anim2 = flow(0, (2 + r() * 2).toFixed(1), `${(3.8 + r() * 1.4).toFixed(1)}s`, { begin: `${(-(r() * 3)).toFixed(1)}s`, peak: 0.75 });
+  // Lily pads float in place on the water's surface (they don't travel and dissolve like
+  // the ripple lines above), so `bob` — a small there-and-back translate — is the right
+  // tool here, not `flow`. Both pads sit entirely inside the uniform water ellipse (no hard
+  // colour seam to catch), so a couple tenths of a unit of sway reads as gentle bobbing.
+  const padAnim1 = bob((0.2 + r() * 0.3).toFixed(2), (0.3 + r() * 0.3).toFixed(2), `${(3.4 + r() * 1.6).toFixed(1)}s`);
+  const padAnim2 = bob((0.3 + r() * 0.3).toFixed(2), (0.2 + r() * 0.3).toFixed(2), `${(3.4 + r() * 1.6).toFixed(1)}s`, { begin: `${(-(r() * 2.5)).toFixed(1)}s` });
   return wrap(
-    `<rect width='40' height='40' fill='${C.sand}'/>${sandNoise(seed)}` +
-    `<ellipse cx='20' cy='20' rx='19.5' ry='18' fill='${shade(C.sand, 0.92)}'/>` +
-    `<ellipse cx='20' cy='20' rx='18.5' ry='17' fill='${C.water}'/>` +
-    `<path d='M8 16 q7 -2.5 14 0' stroke='${C.waterLight}' stroke-width='1.4' fill='none' opacity='0.75'/>` +
-    `<path d='M11 27 q7 -2.5 14 0' stroke='${C.waterLight}' stroke-width='1.4' fill='none' opacity='0.75'/>` +
-    `<ellipse cx='${padX}' cy='${padY}' rx='2.3' ry='1.5' fill='${C.leafLo}' opacity='0.85'/>` +
-    `<ellipse cx='${padX + 11}' cy='${padY + 9}' rx='2' ry='1.3' fill='${C.leafLo}' opacity='0.85'/>`
+    `<rect width='40' height='40' fill='${groundColorFor(landBiome)}'/>` +
+    `<ellipse cx='20' cy='20' rx='16' ry='15' fill='${C.sand}'/>${sandNoise(seed, [5, 35, 6, 34])}` +
+    `<ellipse cx='20' cy='20' rx='12.5' ry='11.5' fill='${C.water}'/>` +
+    `<path d='M8 16 q7 -2.5 14 0' stroke='${C.waterLight}' stroke-width='1.4' fill='none'>${anim1}</path>` +
+    `<path d='M11 27 q7 -2.5 14 0' stroke='${C.waterLight}' stroke-width='1.4' fill='none'>${anim2}</path>` +
+    `<ellipse cx='${padX}' cy='${padY}' rx='2.3' ry='1.5' fill='${C.leafLo}' opacity='0.85'>${padAnim1}</ellipse>` +
+    `<ellipse cx='${padX + 11}' cy='${padY + 9}' rx='2' ry='1.3' fill='${C.leafLo}' opacity='0.85'>${padAnim2}</ellipse>`
   );
 };
 
 // beachDirection: 0 = water North, 1 = East, 2 = South, 3 = West
 // Straight edges use dir 0-3 (water N/E/S/W). Corner shores use 4-7 (water wraps two
-// adjacent sides) and render a diagonal sand/water boundary so lake corners aren't a hard
+// adjacent sides) and render a rounded sand/water boundary so lake corners aren't a hard
 // 90 degrees: 4 = water NE, 5 = SE, 6 = SW, 7 = NW.
-// Chamfer through the edge MIDPOINTS (20) so corner tiles meet the half-water straight
-// tiles exactly at the shared borders (no notches at the seams).
-const BEACH_CORNERS = {
-  // 4-7: concave corners (water on two adjacent sides) — water fills most of the tile
-  4: { poly: '0,0 40,0 40,40 20,40 0,20', foam: 'M20 40 L0 20' }, // water NE, sand SW
-  5: { poly: '20,0 40,0 40,40 0,40 0,20', foam: 'M20 0 L0 20' },  // water SE, sand NW
-  6: { poly: '0,0 20,0 40,20 40,40 0,40', foam: 'M20 0 L40 20' }, // water SW, sand NE
-  7: { poly: '0,0 40,0 40,20 20,40 0,40', foam: 'M40 20 L20 40' }, // water NW, sand SE
-  // 8-11: convex outer corners (lake touches only this diagonal) — small water bite in the corner
-  8: { poly: '40,0 20,0 40,20', foam: 'M20 0 L40 20' },   // water NE corner
-  9: { poly: '40,40 20,40 40,20', foam: 'M20 40 L40 20' }, // water SE corner
-  10: { poly: '0,40 20,40 0,20', foam: 'M20 40 L0 20' },   // water SW corner
-  11: { poly: '0,0 20,0 0,20', foam: 'M20 0 L0 20' },      // water NW corner
+// The boundary curve is anchored through the edge MIDPOINTS (20) so corner tiles meet the
+// half-water straight tiles exactly at the shared borders (no notches at the seams); only
+// the middle of the diagonal bows, always toward whichever tile corner holds the "point"
+// being rounded off (the land tip on concave corners, the water tip on convex ones), so a
+// concave/convex pair sharing a diagonal (4/10, 5/11, 6/8, 7/9) rounds identically.
+const SAND_BAND = 9; // width, in tile units, of the sand fringe on straight coast edges
+const CORNER_GEOM = {
+  4: { fill: 'M0,0 L40,0 L40,40 L20,40 Q5.76,34.24 0,20 Z', curve: 'M20,40 Q5.76,34.24 0,20' },
+  5: { fill: 'M20,0 L40,0 L40,40 L0,40 L0,20 Q5.76,5.76 20,0 Z', curve: 'M0,20 Q5.76,5.76 20,0' },
+  6: { fill: 'M0,0 L20,0 Q34.24,5.76 40,20 L40,40 L0,40 Z', curve: 'M20,0 Q34.24,5.76 40,20' },
+  7: { fill: 'M0,0 L40,0 L40,20 Q34.24,34.24 20,40 L0,40 Z', curve: 'M40,20 Q34.24,34.24 20,40' },
+  8: { fill: 'M40,0 L20,0 Q34.24,5.76 40,20 Z', curve: 'M20,0 Q34.24,5.76 40,20' },
+  9: { fill: 'M40,40 L20,40 Q34.24,34.24 40,20 Z', curve: 'M40,20 Q34.24,34.24 20,40' },
+  10: { fill: 'M0,40 L20,40 Q5.76,34.24 0,20 Z', curve: 'M20,40 Q5.76,34.24 0,20' },
+  11: { fill: 'M0,0 L20,0 Q5.76,5.76 0,20 Z', curve: 'M20,0 Q5.76,5.76 0,20' },
 };
-const beach = (dir) => {
-  const base = `<rect width='40' height='40' fill='${C.sand}'/>${sandNoise(dir)}`;
-  const corner = BEACH_CORNERS[dir];
-  if (corner) {
-    return wrap(`${base}<polygon points='${corner.poly}' fill='${C.water}'/>` +
-      `<path d='${corner.foam}' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`);
+// --- corner sand/water band geometry ----------------------------------------------
+// A corner tile's SAND fringe must land on the exact same numbers a real straight-tile
+// neighbour uses at the shared border (see the note above `beach()` for why the old
+// stroke-based approximation didn't). Both CONCAVE (4-7) and CONVEX (8-11) corners
+// build their sand fringe from the same primitive: `bandSpan(low)` returns the exact
+// interval a straight tile's own sand-or-water zone occupies along its axis (dir0/
+// West-facing-along-that-axis directions run from the tile's low edge out to
+// 20+SAND_BAND; dir1/2-style "high" directions run from 20-SAND_BAND out to the high
+// edge) — reused here so a corner's sand rects land on the exact same numbers a real
+// straight neighbour shows at the shared border.
+//
+// CONCAVE corners (water on two adjacent sides) get their sand fringe "for free" as
+// the UNION of the two component straight directions' own sand-or-water rects — a
+// union of axis-aligned full-tile rects needs no path math, just draw both with the
+// same fill and let them overlap. That union has a re-entrant notch (a hard 90-degree
+// bend) exactly SAND_BAND units in from the corner tile's "land tip" (the corner
+// opposite the two water sides); `notchPatch` rounds it off by re-painting the small
+// sliver between that hard bend and a smooth curve back to ground colour, using the
+// same control-point math CORNER_GEOM's own (already-correct) water curves use.
+//
+// CONVEX corners (water touching only a diagonal neighbour) instead need the
+// INTERSECTION of the same two spans, restricted to a square anchored at the tile's
+// real corner (the same corner point CORNER_GEOM's water wedge is anchored at): an
+// earlier attempt built this as a wedge (same shape as the water fill, just bigger)
+// but that tapers to a knife-thin sliver at its far ends, well short of the required
+// SAND_BAND width right where it meets the straight-tile edges — a real, if narrow,
+// seam. A plain axis-aligned square (one straight span per axis, intersected) has
+// none of that: it's flat along both tile edges at the correct width the whole way,
+// with the small water wedge (unchanged, from CORNER_GEOM) simply painted on top.
+const BULGE_K = 0.288; // matches CORNER_GEOM's hand-tuned control points (5.76 = 20*0.288)
+const TILE_CORNER = {
+  NE: { c: [40, 0], u1: [-1, 0], u2: [0, 1] },
+  SE: { c: [40, 40], u1: [0, -1], u2: [-1, 0] },
+  SW: { c: [0, 40], u1: [1, 0], u2: [0, -1] },
+  NW: { c: [0, 0], u1: [0, 1], u2: [1, 0] },
+};
+const n2 = (v) => Math.round(v * 100) / 100;
+const bandSpan = (low) => (low ? [0, 20 + SAND_BAND] : [20 - SAND_BAND, 40]);
+// The ground-coloured sliver that rounds off a CONCAVE sand union's re-entrant notch.
+// The notch sits `s` units from the tile's land-tip corner `name` along both edges
+// (s = 20 - SAND_BAND) so this traces flank -> hard-corner notch -> flank, then curves
+// directly back between the two flanks (same control-point math CORNER_GEOM's water
+// curves use), leaving a small lens between the hard bend and the curve to be filled
+// with ground colour.
+const notchPatch = (name, s) => {
+  const { c, u1, u2 } = TILE_CORNER[name];
+  const p1 = [c[0] + u1[0] * s, c[1] + u1[1] * s];
+  const p2 = [c[0] + u2[0] * s, c[1] + u2[1] * s];
+  const notch = [c[0] + (u1[0] + u2[0]) * s, c[1] + (u1[1] + u2[1]) * s];
+  const ctrl = [c[0] + (u1[0] + u2[0]) * s * BULGE_K, c[1] + (u1[1] + u2[1]) * s * BULGE_K];
+  return `M${n2(p1[0])},${n2(p1[1])} L${n2(notch[0])},${n2(notch[1])} L${n2(p2[0])},${n2(p2[1])} Q${n2(ctrl[0])},${n2(ctrl[1])} ${n2(p1[0])},${n2(p1[1])} Z`;
+};
+// dir -> [nsDir, ewDir], the two component straight directions a concave corner
+// unions, and the tile corner (named per TILE_CORNER) opposite them (the "land tip")
+// — derived directly from addLakeShores' CORNER table ({'0,1':4,'1,2':5,'2,3':6,
+// '0,3':7}: dir4 = water N+E, land tip SW; etc).
+const CONCAVE_PARTS = { 4: [0, 1], 5: [2, 1], 6: [2, 3], 7: [0, 3] };
+const CONCAVE_LAND_TIP = { 4: 'SW', 5: 'NW', 6: 'NE', 7: 'SE' };
+// A straight tile's sand-or-water span along its own axis.
+const sandOrWaterSpan = (dir) => bandSpan(dir === 0 || dir === 3);
+// CONVEX corners (8-11) do NOT need the union-of-straight-spans treatment concave
+// corners use: per addLakeShores, a convex code only fires when NONE of the tile's 4
+// orthogonal neighbours are water (only a diagonal one is) — so a convex corner's N/E/
+// S/W neighbours are always plain land, never a straight beach tile with a sand band of
+// its own to line up against. There's no seam to match, only a cosmetic fringe around a
+// small water nub, so a `SAND_BAND*2`-wide stroke straddling `corner.curve` (identical
+// to how the original, pre-redesign code drew every corner's fringe) is both correct
+// and simpler. An earlier attempt reused `bandSpan` (built for the concave union, where
+// each span reaches all the way to the SAND_BAND-inset opposite edge, ~29 units) and
+// intersected two of those into a rect — but that produces a ~29x29-unit block, not a
+// ~9-unit fringe: nowhere near "hugging the curve," it swallows most of the tile in
+// sand. Confirmed as the cause of a "the lake corners' sand looks too big/blocky"
+// report; the stroke reproduces the original (never complained-about) convex look.
+
+// Ripple lines for the visible water portion of a beach tile — a beach's water rect was
+// previously left flat/textureless, which reads as an obvious seam next to a fully-
+// rippled open-water neighbour tile (playtest feedback: "the coast tiles have no waves in
+// the water... it looks highly noticeable and off"). These are safe to animate with `flow`
+// (unlike the shore/land-edge highlight lines below): they float entirely inside the
+// uniformly-colored water fill, not on a two-color seam, so translating+fading them can't
+// expose a gap. axis picks the travel axis (matches the wave's own bulge axis, same
+// reasoning as water()'s ripples); positions are the fixed sweep-perpendicular offsets,
+// already margined to stay clear of the sand seam and the tile edge. `sign` flips the
+// travel direction so straight-edge callers can send ripples drifting toward the actual
+// shore on their side of the tile (+1/-1 picked per `dir` at the call site below); the
+// corner caller leaves it at the default since that water area isn't a simple one-sided
+// strip, so no single "toward shore" direction applies more than any other.
+const beachRipples = (seed, axis, positions, clipId = null, sign = 1) => {
+  const r = rng(seed + 2);
+  const clip = clipId ? ` clip-path='url(#${clipId})'` : '';
+  let w = '';
+  for (const o of positions) {
+    const dur = `${(3.6 + r() * 1.8).toFixed(1)}s`;
+    const begin = `${(-(r() * 4)).toFixed(1)}s`;
+    const dist = (sign * (3 + r() * 3)).toFixed(1);
+    const anim = axis === 'v' ? flow(dist, 0, dur, { begin }) : flow(0, dist, dur, { begin });
+    w += axis === 'v'
+      ? `<path d='M${o} 0 q-3.5 10 0 20 t0 20' stroke='${C.waterLight}' stroke-width='1.6' fill='none'${clip}>${anim}</path>`
+      : `<path d='M0 ${o} q10 -3.5 20 0 t20 0' stroke='${C.waterLight}' stroke-width='1.6' fill='none'${clip}>${anim}</path>`;
   }
-  let waterRect = '';
-  let shore = '';
-  if (dir === 0) { waterRect = `<rect x='0' y='0' width='40' height='20' fill='${C.water}'/>`; shore = `<path d='M0 20 q10 -3 20 0 t20 0' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`; }
-  else if (dir === 1) { waterRect = `<rect x='20' y='0' width='20' height='40' fill='${C.water}'/>`; shore = `<path d='M20 0 q3 10 0 20 t0 20' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`; }
-  else if (dir === 2) { waterRect = `<rect x='0' y='20' width='40' height='20' fill='${C.water}'/>`; shore = `<path d='M0 20 q10 3 20 0 t20 0' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`; }
-  else { waterRect = `<rect x='0' y='0' width='20' height='40' fill='${C.water}'/>`; shore = `<path d='M20 0 q-3 10 0 20 t0 20' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`; }
-  return wrap(`${base}${waterRect}${shore}`);
+  return w;
+};
+
+// A reed or two poking out of the sand on a lakeshore (not an ocean coast — reeds don't
+// belong on an open sea beach). Sparse (~40% of tiles, 1-2 reeds) and confined to the
+// same sand-band bounds `sandNoise` already uses for this direction, so they never land
+// in the water or on the grass. Reuses the swamp reeds' base-pivot `sway` (bends at the
+// root rather than sliding), same reasoning as the tree wind-sway. Straight edges only
+// for now (dir 0-3) — corner tiles build their sand fringe from rects too (see the block
+// above `beachRipples`), but as an L-shaped union or an intersection square rather than a
+// single simple rect, so placing reeds precisely on-sand there would need its own
+// geometry; skipped for this pass rather than guessing.
+// `seed` here must vary per TILE POSITION, not just per direction: the rest of beach()
+// (sand speckle noise, ripple/foam phase) is deliberately seeded only by `dir`, so every
+// beach tile sharing a direction+landBiome+isLakeShore already renders as one repeating
+// "wallpaper" tile — fine for those, since they're meant to look uniform. But the whole
+// point of these reeds is to look scattered/occasional across a lakeshore, and a
+// dir-only seed would make the roll (and the reed's exact position) identical on EVERY
+// tile of that direction across the whole map — either every north-facing lakeshore
+// tile has the same reed in the same spot, or none do. So the caller passes a
+// position-derived seed (variantSeed(x,y)) instead of `dir`, same convention water()
+// already uses for its own per-tile variation.
+const lakeReeds = (seed, bounds) => {
+  const r = rng(seed + 51);
+  if (r() <= 0.6) return '';
+  const [x0, x1, y0, y1] = bounds;
+  const n = 1 + Math.floor(r() * 2);
+  let s = '';
+  for (let i = 0; i < n; i++) {
+    const x = (x0 + r() * (x1 - x0)).toFixed(1);
+    const by = (y0 + r() * (y1 - y0)).toFixed(1);
+    const h = (3 + r() * 3).toFixed(1);
+    const angle = (2 + r() * 2).toFixed(1);
+    const dur = `${(2.4 + r() * 1.6).toFixed(1)}s`;
+    const begin = `${(-(r() * 2.5)).toFixed(1)}s`;
+    s += `<rect x='${(x - 0.5).toFixed(1)}' y='${(by - h).toFixed(1)}' width='1' height='${h}' fill='${C.reed}'>${sway(angle, x, by, dur, { begin })}</rect>`;
+  }
+  return s;
+};
+
+const beach = (dir, landBiome, isLakeShore = false, posSeed = 0) => {
+  const ground = groundColorFor(landBiome);
+  const base = `<rect width='40' height='40' fill='${ground}'/>`;
+  const corner = CORNER_GEOM[dir];
+  if (corner) {
+    // Sand fringe built from the same rect/wedge primitives as the straight tiles
+    // (see the block above `beachRipples`), then the water shape painted on top —
+    // the water-side portion of the sand layer disappears under the water fill,
+    // leaving only a land-side sand fringe behind, exactly SAND_BAND units wide at
+    // every point along the shared border with a real straight-tile neighbour.
+    // NOTE: don't animate the foam line below with a positional sway (bob) — it's a
+    // decorative highlight drawn exactly ON a hard, flat, unanimated color seam (the
+    // CORNER_GEOM fill edge). Sliding the highlight away from the seam it's meant to
+    // trace exposes the flat seam underneath as a visible gap (found via playtest
+    // after wiring this up — the ripples inside water()/lake() don't have this
+    // problem because they float over one uniform-colored region, not a two-color
+    // boundary).
+    // Ripple texture for the corner's water fill: three full-width horizontal ripple
+    // lines, clipped to the SAME `corner.fill` shape the water itself uses, so whatever
+    // portion of each line happens to fall inside the (possibly small/oddly-shaped)
+    // water area shows through — no per-corner-shape line geometry needed.
+    // Both the ripple and the foam highlight are ALSO clipped to `edgeClip` (a rect
+    // inset 1.5 units from every tile edge): right at a tile's actual border the water
+    // fill legitimately (and correctly) bulges a little past the straight-tile
+    // threshold for a short stretch — that's the intentional rounding, not a bug — but
+    // an animated ripple/foam line happening to cross that sliver reads as a much
+    // bigger, more solid-looking color mismatch against the straight neighbour's flat
+    // sand than the sliver itself actually is. Keeping the decorative texture off the
+    // outermost rim avoids that without touching the (already-correct) fill geometry.
+    const clipId = `wclip${dir}`;
+    const edgeClipId = `wedge${dir}`;
+    const ripple = beachRipples(dir + 41, 'h', [12, 20, 28], clipId);
+    let sandLayer;
+    if (CONCAVE_PARTS[dir]) {
+      const [nsDir, ewDir] = CONCAVE_PARTS[dir];
+      const [y0, y1] = sandOrWaterSpan(nsDir);
+      const [x0, x1] = sandOrWaterSpan(ewDir);
+      const patch = notchPatch(CONCAVE_LAND_TIP[dir], 20 - SAND_BAND);
+      sandLayer =
+        `<rect x='0' y='${y0}' width='40' height='${y1 - y0}' fill='${C.sand}'/>` +
+        `<rect x='${x0}' y='0' width='${x1 - x0}' height='40' fill='${C.sand}'/>` +
+        `<path d='${patch}' fill='${ground}'/>`;
+    } else {
+      sandLayer = `<path d='${corner.curve}' stroke='${C.sand}' stroke-width='${SAND_BAND * 2}' fill='none' stroke-linecap='round'/>`;
+    }
+    return wrap(
+      `${base}` +
+      `<defs>` +
+      `<clipPath id='${clipId}'><path d='${corner.fill}'/></clipPath>` +
+      `<clipPath id='${edgeClipId}'><rect x='1.5' y='1.5' width='37' height='37'/></clipPath>` +
+      `</defs>` +
+      sandLayer +
+      `<path d='${corner.fill}' fill='${C.water}'/>` +
+      `<g clip-path='url(#${edgeClipId})'>` +
+      ripple +
+      `<path d='${corner.curve}' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>` +
+      `</g>`
+    );
+  }
+  const B = SAND_BAND;
+  const edgeTone = shade(C.sand, 0.85);
+  let sandRect = '', waterRect = '', shore = '', landEdge = '', noise = '', ripple = '', reeds = '';
+  if (dir === 0) {
+    sandRect = `<rect x='0' y='20' width='40' height='${B}' fill='${C.sand}'/>`;
+    waterRect = `<rect x='0' y='0' width='40' height='20' fill='${C.water}'/>`;
+    ripple = beachRipples(dir, 'h', [6, 14], null, 1); // water North of shore -> flow toward +y (down, toward the coast)
+    shore = `<path d='M0 20 q10 -3 20 0 t20 0' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`;
+    landEdge = `<path d='M0 ${20 + B} q10 3 20 0 t20 0' stroke='${edgeTone}' stroke-width='1.5' fill='none' opacity='0.5'/>`;
+    noise = sandNoise(dir, [0, 40, 20, 20 + B]);
+    if (isLakeShore) reeds = lakeReeds(posSeed, [0, 40, 20, 20 + B]);
+  } else if (dir === 1) {
+    sandRect = `<rect x='${20 - B}' y='0' width='${B}' height='40' fill='${C.sand}'/>`;
+    waterRect = `<rect x='20' y='0' width='20' height='40' fill='${C.water}'/>`;
+    ripple = beachRipples(dir, 'v', [26, 34], null, -1); // water East of shore -> flow toward -x (left, toward the coast)
+    shore = `<path d='M20 0 q3 10 0 20 t0 20' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`;
+    landEdge = `<path d='M${20 - B} 0 q-3 10 0 20 t0 20' stroke='${edgeTone}' stroke-width='1.5' fill='none' opacity='0.5'/>`;
+    noise = sandNoise(dir, [20 - B, 20, 0, 40]);
+    if (isLakeShore) reeds = lakeReeds(posSeed, [20 - B, 20, 0, 40]);
+  } else if (dir === 2) {
+    sandRect = `<rect x='0' y='${20 - B}' width='40' height='${B}' fill='${C.sand}'/>`;
+    waterRect = `<rect x='0' y='20' width='40' height='20' fill='${C.water}'/>`;
+    ripple = beachRipples(dir, 'h', [26, 34], null, -1); // water South of shore -> flow toward -y (up, toward the coast)
+    shore = `<path d='M0 20 q10 3 20 0 t20 0' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`;
+    landEdge = `<path d='M0 ${20 - B} q10 -3 20 0 t20 0' stroke='${edgeTone}' stroke-width='1.5' fill='none' opacity='0.5'/>`;
+    noise = sandNoise(dir, [0, 40, 20 - B, 20]);
+    if (isLakeShore) reeds = lakeReeds(posSeed, [0, 40, 20 - B, 20]);
+  } else {
+    sandRect = `<rect x='20' y='0' width='${B}' height='40' fill='${C.sand}'/>`;
+    waterRect = `<rect x='0' y='0' width='20' height='40' fill='${C.water}'/>`;
+    ripple = beachRipples(dir, 'v', [6, 14], null, 1); // water West of shore -> flow toward +x (right, toward the coast)
+    shore = `<path d='M20 0 q-3 10 0 20 t0 20' stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'/>`;
+    landEdge = `<path d='M${20 + B} 0 q3 10 0 20 t0 20' stroke='${edgeTone}' stroke-width='1.5' fill='none' opacity='0.5'/>`;
+    noise = sandNoise(dir, [20, 20 + B, 0, 40]);
+    if (isLakeShore) reeds = lakeReeds(posSeed, [20, 20 + B, 0, 40]);
+  }
+  return wrap(`${base}${sandRect}${noise}${waterRect}${ripple}${reeds}${shore}${landEdge}`);
 };
 
 const desert = (seed) => {
@@ -163,7 +611,14 @@ const swamp = (seed) => {
   s += `<ellipse cx='28' cy='27' rx='9' ry='5' fill='${C.swampLite}' opacity='0.45'/>`;
   for (let i = 0; i < 7; i++) {
     const x = Math.floor(r() * 36) + 2, by = Math.floor(r() * 18) + 18, h = Math.floor(r() * 6) + 5;
-    s += `<rect x='${x}' y='${by - h}' width='1' height='${h}' fill='${C.reed}'/>`;
+    // Reeds are rooted at their base and bend at the top in a breeze — a rotation about
+    // that base (rather than a `bob` translate, which would slide the whole reed sideways,
+    // root included) is what makes it read as bending rather than sliding. Keep the angle
+    // small: a light breeze, not a storm.
+    const angle = (2 + r() * 2).toFixed(1);
+    const swayDur = `${(2.4 + r() * 1.6).toFixed(1)}s`;
+    const swayBegin = `${(-(r() * 2.5)).toFixed(1)}s`;
+    s += `<rect x='${x}' y='${by - h}' width='1' height='${h}' fill='${C.reed}'>${sway(angle, x + 0.5, by, swayDur, { begin: swayBegin })}</rect>`;
   }
   return wrap(s);
 };
@@ -200,20 +655,50 @@ const roundT = (cx, cy, s, lo = C.leafLo, hi = C.leafHi) =>
 // single tree (pine) for town clusters
 const tree = (cx, cy, s) => pineT(cx, cy, s);
 
-// a varied forest cluster: 2-4 trees, mixed pine/round, varied size + green, drawn
+// Wraps a tree's markup (trunk + foliage from pineT/roundT/snowPine) in a `<g>` that
+// gently rotates the WHOLE tree about its own ground-contact point (where the trunk
+// meets the ground, not the tile/tree centre) — a tree bending at the root reads as
+// wind the same way the swamp reeds' base-pivot sway does, and is simpler than
+// splitting trunk vs foliage into separately-animated parts. `groundY` differs by tree
+// shape (see the callers below, derived from each shape's own trunk rect) so pass it
+// in rather than recomputing it here. Trees are heavier than reeds, so the angle is
+// smaller and the swing a little slower. `x` is the tile's real map x (see `windBegin`
+// above) and `r` is the caller's own seeded rng, so each tree's exact angle/duration/
+// jitter stays deterministic per (v, x) while the phase still progresses smoothly
+// across tiles.
+const treeWindSway = (cx, groundY, x, r) =>
+  sway((3 + r() * 2).toFixed(1), cx, groundY, `${(3.4 + r() * 1.8).toFixed(1)}s`, { begin: windBegin(x, r() * 0.6) });
+const treeG = (markup, cx, groundY, x, r) => `<g>${markup}${treeWindSway(cx, groundY, x, r)}</g>`;
+// Ground-contact y for each tree shape, derived from that shape's own trunk rect
+// (pineT/snowPine trunk bottom = cy + s; roundT trunk bottom = cy + 0.9s — see their
+// `y`/`height` above). Kept as one helper so forest/beachForest/woodland agree.
+const pineGroundY = (cy, s) => cy + s;
+const roundGroundY = (cy, s) => cy + s * 0.9;
+
+// Shared base positions for the temperate/snow forest POI cluster (9 slots, jittered
+// ±2px per tree). Kept well inside the 40x40 viewBox (x: 9-31, y: 17-29) so the
+// tallest/widest tree (s=9) plus max jitter never clips an edge. Shared between
+// `forest()` and `snowForest()` so both stay in sync if the layout is retuned.
+const FOREST_SLOTS = [
+  [13, 17], [27, 17], [20, 19], [9, 22], [20, 24], [31, 22], [12, 27], [28, 27], [20, 29],
+];
+
+// a varied forest cluster: 4-9 trees, mixed pine/round, varied size + green, drawn
 // back-to-front so lower trees overlap correctly
-const forest = (v = 0) => {
+const forest = (v = 0, x = 0) => {
   const r = rng(v + 11);
-  const slots = [[12, 18], [28, 20], [19, 24], [9, 28], [30, 29], [20, 31]];
-  const n = 2 + Math.floor(r() * 3);
+  const n = 4 + Math.floor(r() * 6);
   let s = '';
   for (let i = 0; i < n; i++) {
-    const [bx, by] = slots[i];
+    const [bx, by] = FOREST_SLOTS[i];
     const cx = bx + (Math.floor(r() * 5) - 2);
     const cy = by + (Math.floor(r() * 5) - 2);
     const sz = 6 + Math.floor(r() * 4);
     const [lo, hi] = GREENS[Math.floor(r() * GREENS.length)];
-    s += (r() > 0.45 ? pineT : roundT)(cx, cy, sz, lo, hi);
+    const isPine = r() > 0.45;
+    const markup = (isPine ? pineT : roundT)(cx, cy, sz, lo, hi);
+    const groundY = isPine ? pineGroundY(cy, sz) : roundGroundY(cy, sz);
+    s += treeG(markup, cx, groundY, x, r);
   }
   return wrap(s);
 };
@@ -221,7 +706,7 @@ const forest = (v = 0) => {
 // forest POI stranded on a beach tile (legacy saves): 2-3 slightly smaller trees
 // confined to the SAND half for the tile's beachDirection (0 = water North, so
 // trees south; 1 = water East -> trees west; 2 = water South -> north; 3 -> east).
-const beachForest = (v = 0, dir = 2) => {
+const beachForest = (v = 0, dir = 2, x = 0) => {
   const r = rng(v * 7 + dir + 23);
   // slot boxes [minX, maxX, minY, maxY] on the sand side, margin off the shoreline
   const SAND = {
@@ -231,28 +716,35 @@ const beachForest = (v = 0, dir = 2) => {
     3: [24, 34, 8, 32], // water W -> right band
   };
   const [x0, x1, y0, y1] = SAND[dir] || SAND[2];
-  const n = 2 + Math.floor(r() * 2);
+  const n = 3 + Math.floor(r() * 3);
   let s = '';
   for (let i = 0; i < n; i++) {
     const cx = x0 + Math.floor(r() * (x1 - x0 + 1));
     const cy = y0 + Math.floor(r() * (y1 - y0 + 1));
     const sz = 5 + Math.floor(r() * 3);
     const [lo, hi] = GREENS[Math.floor(r() * GREENS.length)];
-    s += (r() > 0.45 ? pineT : roundT)(cx, cy, sz, lo, hi);
+    const isPine = r() > 0.45;
+    const markup = (isPine ? pineT : roundT)(cx, cy, sz, lo, hi);
+    const groundY = isPine ? pineGroundY(cy, sz) : roundGroundY(cy, sz);
+    s += treeG(markup, cx, groundY, x, r);
   }
   return wrap(s);
 };
 
 // woodland biome: a grass floor densely filled with mixed trees (a forest *region*,
 // vs the single-cluster forest POI)
-const woodland = (seed) => {
+const woodland = (seed, x = 0) => {
   const r = rng(seed + 14);
   let s = `<rect width='40' height='40' fill='${shade(C.plains, 0.9)}'/>`;
   const slots = [[8, 13], [21, 11], [33, 14], [14, 22], [27, 22], [7, 30], [20, 31], [33, 30]];
   for (const [bx, by] of slots) {
     const sz = 6 + Math.floor(r() * 3);
     const [lo, hi] = GREENS[Math.floor(r() * GREENS.length)];
-    s += (r() > 0.5 ? pineT : roundT)(bx + (Math.floor(r() * 3) - 1), by, sz, lo, hi);
+    const isPine = r() > 0.5;
+    const cx = bx + (Math.floor(r() * 3) - 1);
+    const markup = (isPine ? pineT : roundT)(cx, by, sz, lo, hi);
+    const groundY = isPine ? pineGroundY(by, sz) : roundGroundY(by, sz);
+    s += treeG(markup, cx, groundY, x, r);
   }
   return wrap(s);
 };
@@ -296,26 +788,60 @@ const desertMountain = (v = 0) => wrap(DESERT_MOUNTAIN_VARIANTS[v % DESERT_MOUNT
 // rolling green hills — shaded mounds (dark base, mid body, sunlit top-left) so they read
 // as raised humps, not flat blobs. Several variants for variety.
 const HILL = { lo: '#4f7d3c', mid: '#6aa84f', hi: '#88c468' };
-const hump = (cx, by, rx, ry) =>
-  `<ellipse cx='${cx}' cy='${by}' rx='${rx}' ry='${ry}' fill='${HILL.lo}'/>` +
-  `<ellipse cx='${cx}' cy='${(by - ry * 0.2).toFixed(1)}' rx='${(rx * 0.9).toFixed(1)}' ry='${(ry * 0.8).toFixed(1)}' fill='${HILL.mid}'/>` +
-  `<ellipse cx='${(cx - rx * 0.32).toFixed(1)}' cy='${(by - ry * 0.55).toFixed(1)}' rx='${(rx * 0.4).toFixed(1)}' ry='${(ry * 0.3).toFixed(1)}' fill='${HILL.hi}'/>`;
+// Half-ellipse "dome" silhouette: curved across the top, flat along the bottom edge (the
+// mound's foot, at `by`). That flat base is what makes it read as a hill rising out of the
+// ground instead of a self-contained oval floating on top of it (an "upside-down U").
+const dome = (cx, by, rx, ry) => {
+  cx = Number(cx); by = Number(by);
+  return `M${(cx - rx).toFixed(1)} ${by} A${rx.toFixed(1)} ${ry.toFixed(1)} 0 0 1 ${(cx + rx).toFixed(1)} ${by} Z`;
+};
+// Shading is a radial gradient painted directly onto the dome's own fill, not a second
+// shape layered on top of it: light near the sun-facing upper-left of the mound's
+// bounding box, smoothly darkening toward the lower-right and the outer edge. Because
+// there is only ever one silhouette (the dome path itself), there is no second outline
+// for the eye to read as a smaller nested oval ("egg inside an egg") — just one tonal
+// sweep across one shape. Gradient units default to objectBoundingBox, which maps the
+// gradient's circle to the dome's own (wider-than-tall) bounding box, so the highlight
+// naturally stretches to match each hump's own proportions instead of looking like a
+// separate round blob; it also means one gradient definition works for every hump size.
+// Each hump gets its own gradient id (keyed off its cx/by so multiple humps composited
+// into one tile never collide, and so each can carry its own palette) — ids are scoped
+// to their own SVG document anyway (every wrap() call is an independent `<svg>` root, see
+// `wrap()` above), so there is no risk of collision across tiles either way.
+const domeFill = (cx, by, rx, ry, pal) => {
+  const id = `hg${cx}_${by}`;
+  // Stops front-load the highlight into a small sun-facing patch (0-30%) then push most
+  // of the sweep into the lo→edge falloff, with a final stop darker than `lo` itself —
+  // that extra contrast at the rim is what keeps the silhouette reading as a grounded,
+  // shadowed mound rather than a uniformly-lit ball (a flat hi->lo gradient alone still
+  // looked glossy/spherical, even with no second outline).
+  return (
+    `<defs><radialGradient id='${id}' cx='18%' cy='10%' r='75%'>` +
+    `<stop offset='0%' stop-color='${pal.hi}'/>` +
+    `<stop offset='18%' stop-color='${pal.mid}'/>` +
+    `<stop offset='50%' stop-color='${pal.lo}'/>` +
+    `<stop offset='100%' stop-color='${shade(pal.lo, 0.68)}'/>` +
+    `</radialGradient></defs>` +
+    `<path d='${dome(cx, by, rx, ry)}' fill='url(#${id})'/>`
+  );
+};
+const hump = (cx, by, rx, ry) => domeFill(cx, by, rx, ry, HILL);
 const tuft = (x, y) => `<path d='M${x} ${y} q1 -2.4 2 0' stroke='${HILL.lo}' stroke-width='1' fill='none' stroke-linecap='round'/>`;
+// Tufts sit on the open ground in front of/beside the mounds (below every dome's flat
+// foot line), never on the dome's face — a tuft placed above a `by` baseline lands inside
+// the filled silhouette and reads as a stray mark on the hillside instead of foreground grass.
 const HILL_VARIANTS = [
-  hump(20, 31, 16, 12) + tuft(15, 24) + tuft(24, 23),                                   // one broad hill
-  hump(12, 32, 11, 9) + hump(28, 31, 12, 10) + tuft(25, 24),                            // twin hills
-  hump(9, 33, 8, 6) + hump(20, 31, 10, 8) + hump(31, 33, 8, 6) + tuft(18, 25),          // three low hills
-  hump(25, 31, 14, 12) + hump(9, 34, 7, 5) + tuft(22, 23),                              // big + foothill
+  hump(20, 31, 16, 12) + tuft(4, 34) + tuft(34, 33),                                    // one broad hill
+  hump(12, 32, 11, 9) + hump(28, 31, 12, 10) + tuft(1, 35),                             // twin hills
+  hump(9, 33, 8, 6) + hump(20, 31, 10, 8) + hump(31, 33, 8, 6) + tuft(18, 37),          // three low hills
+  hump(25, 31, 14, 12) + hump(9, 34, 7, 5) + tuft(33, 35),                              // big + foothill
 ];
 const hills = (v = 0) => wrap(HILL_VARIANTS[v % HILL_VARIANTS.length]);
 
 // --- theme-aware POI variants -------------------------------------------------
 // poiSprite picks these by tile.biome: desert → sand dunes + cacti, snow → snow-capped
 // hills + snow-laden pines. (Temperate keeps the green forest/hills above.)
-const shadedHump = (cx, by, rx, ry, pal) =>
-  `<ellipse cx='${cx}' cy='${by}' rx='${rx}' ry='${ry}' fill='${pal.lo}'/>` +
-  `<ellipse cx='${cx}' cy='${(by - ry * 0.2).toFixed(1)}' rx='${(rx * 0.9).toFixed(1)}' ry='${(ry * 0.8).toFixed(1)}' fill='${pal.mid}'/>` +
-  `<ellipse cx='${(cx - rx * 0.32).toFixed(1)}' cy='${(by - ry * 0.55).toFixed(1)}' rx='${(rx * 0.4).toFixed(1)}' ry='${(ry * 0.3).toFixed(1)}' fill='${pal.hi}'/>`;
+const shadedHump = (cx, by, rx, ry, pal) => domeFill(cx, by, rx, ry, pal);
 const hillVariantsFor = (pal) => [
   shadedHump(20, 31, 16, 12, pal),
   shadedHump(12, 32, 11, 9, pal) + shadedHump(28, 31, 12, 10, pal),
@@ -334,25 +860,31 @@ const snowPine = (cx, cy, s) =>
   `<polygon points='${cx},${(cy - s * 1.35).toFixed(1)} ${(cx - s * 0.55).toFixed(1)},${cy} ${(cx + s * 0.55).toFixed(1)},${cy}' fill='#4a805f' ${ES}/>` +
   `<polygon points='${cx},${(cy - s * 1.35).toFixed(1)} ${(cx - s * 0.34).toFixed(1)},${(cy - s * 0.55).toFixed(1)} ${(cx + s * 0.34).toFixed(1)},${(cy - s * 0.55).toFixed(1)}' fill='#ffffff'/>` +
   `<polygon points='${cx},${(cy - s * 0.62).toFixed(1)} ${(cx - s * 0.5).toFixed(1)},${(cy + s * 0.32).toFixed(1)} ${(cx + s * 0.5).toFixed(1)},${(cy + s * 0.32).toFixed(1)}' fill='#ffffff' opacity='0.7'/>`;
-const snowForest = (v = 0) => {
+const snowForest = (v = 0, x = 0) => {
   const r = rng(v + 21);
-  const slots = [[12, 18], [28, 20], [19, 24], [9, 28], [30, 29], [20, 31]];
-  const n = 2 + Math.floor(r() * 3);
+  const n = 4 + Math.floor(r() * 6);
   let s = '';
-  for (let i = 0; i < n; i++) { const [bx, by] = slots[i]; s += snowPine(bx + (Math.floor(r() * 5) - 2), by, 6 + Math.floor(r() * 4)); }
+  for (let i = 0; i < n; i++) {
+    const [bx, by] = FOREST_SLOTS[i];
+    const cx = bx + (Math.floor(r() * 5) - 2);
+    const cy = by + (Math.floor(r() * 5) - 2);
+    const sz = 6 + Math.floor(r() * 4);
+    const markup = snowPine(cx, cy, sz);
+    s += treeG(markup, cx, pineGroundY(cy, sz), x, r);
+  }
   return wrap(s);
 };
 
 // desert saguaro cactus
 const cactus = (cx, by, h) =>
-  `<rect x='${(cx - 1.7).toFixed(1)}' y='${(by - h).toFixed(1)}' width='3.4' height='${h.toFixed(1)}' rx='1.7' fill='#4e8b4a'/>` +
+  `<rect x='${(cx - 1.7).toFixed(1)}' y='${(by - h).toFixed(1)}' width='3.4' height='${h.toFixed(1)}' rx='1.7' fill='#4e8b4a' stroke='${EDGE}' stroke-width='0.8'/>` +
   `<rect x='${(cx - 1.7).toFixed(1)}' y='${(by - h).toFixed(1)}' width='1.3' height='${h.toFixed(1)}' rx='0.6' fill='#5fa05a'/>` +
   `<path d='M${(cx - 1.7).toFixed(1)} ${(by - h * 0.55).toFixed(1)} h-3 v-${(h * 0.32).toFixed(1)}' stroke='#4e8b4a' stroke-width='2.8' fill='none' stroke-linecap='round'/>` +
   `<path d='M${(cx + 1.7).toFixed(1)} ${(by - h * 0.42).toFixed(1)} h3 v-${(h * 0.26).toFixed(1)}' stroke='#4e8b4a' stroke-width='2.8' fill='none' stroke-linecap='round'/>`;
 const desertForest = (v = 0) => {
   const r = rng(v + 22);
-  const slots = [[13, 31], [26, 32], [20, 29], [9, 30]];
-  const n = 2 + Math.floor(r() * 2);
+  const slots = [[13, 31], [26, 32], [20, 29], [9, 30], [32, 30], [16, 25], [24, 25]];
+  const n = 3 + Math.floor(r() * 5);
   let s = '';
   for (let i = 0; i < n; i++) { const [bx, by] = slots[i]; s += cactus(bx + (Math.floor(r() * 4) - 2), by, 12 + Math.floor(r() * 6)); }
   return wrap(s);
@@ -723,16 +1255,40 @@ const MILESTONE_POI_SPRITES = {
 const _bgCache = new Map();
 const _poiCache = new Map();
 
-export function biomeBackground(tile, x = 0, y = 0) {
+// grid: the full 2D tile array (optional) — lets water/beach/lake tiles read their
+// neighbours to orient ripples with the coast and colour the sand fringe to match the
+// surrounding land. Omitting it (isolated previews, old call sites) degrades gracefully
+// to the previous defaults (horizontal ripples, plains-coloured fringe).
+export function biomeBackground(tile, x = 0, y = 0, grid = null) {
   const seed = variantSeed(x, y);
   let key, build;
-  if (tile.isLake) { key = `lake|${seed}`; build = () => lake(seed); }
-  else if (tile.biome === 'water') { key = `water|${seed}`; build = () => water(seed); }
-  else if (tile.biome === 'beach' && tile.beachDirection != null) { key = `beach|${tile.beachDirection}`; build = () => beach(tile.beachDirection); }
+  if (tile.isLake) {
+    const landBiome = landBiomeNear(grid, x, y);
+    key = `lake|${seed}|${landBiome}`; build = () => lake(seed, landBiome);
+  }
+  else if (tile.biome === 'water') {
+    const { axis, sign } = coastFlowNear(grid, x, y);
+    // Real multi-tile lakes are marked semantically via descriptionSeed (mapGenerator.js
+    // deliberately doesn't set the legacy single-tile isLake flag on them — see its
+    // comment), so this is the same convention the generator already uses to tell a lake
+    // body apart from open sea.
+    const isInlandLake = tile.descriptionSeed === 'A clear lake';
+    key = `water|${seed}|${axis}|${sign}|${isInlandLake}`; build = () => water(seed, axis, sign, isInlandLake);
+  }
+  else if (tile.biome === 'beach' && tile.beachDirection != null) {
+    const landBiome = landBiomeNear(grid, x, y);
+    const isLakeShore = tile.descriptionSeed === 'A sandy lakeshore';
+    // Ordinary (non-lakeshore) beach tiles keep the pre-existing dir-only cache key —
+    // they intentionally "wallpaper" repeat across the map, unaffected by this. Lakeshore
+    // tiles need the real per-tile seed so the reeds vary/scatter by position instead of
+    // being identical (or identically absent) on every tile of that direction.
+    key = isLakeShore ? `beach|${tile.beachDirection}|${landBiome}|${isLakeShore}|${seed}` : `beach|${tile.beachDirection}|${landBiome}|${isLakeShore}`;
+    build = () => beach(tile.beachDirection, landBiome, isLakeShore, seed);
+  }
   else if (tile.biome === 'desert') { key = `desert|${seed}`; build = () => desert(seed); }
   else if (tile.biome === 'swamp') { key = `swamp|${seed}`; build = () => swamp(seed); }
   else if (tile.biome === 'snow') { key = `snow|${seed}`; build = () => snow(seed); }
-  else if (tile.biome === 'woodland') { key = `woodland|${seed}`; build = () => woodland(seed); }
+  else if (tile.biome === 'woodland') { key = `woodland|${seed}|${x}`; build = () => woodland(seed, x); }
   else { key = `plains|${seed}`; build = () => plains(seed); }
   let bg = _bgCache.get(key);
   if (bg === undefined) { bg = build(); _bgCache.set(key, bg); }
@@ -743,17 +1299,23 @@ export function poiSprite(tile) {
   let key, build;
   if (tile.poi === 'town') { key = `town|${tile.townSize || 'village'}`; build = () => townSprite(tile.townSize || 'village'); }
   else if (tile.poi === 'forest') {
+    const tx = tile.x || 0;
     const v = variantSeed(tile.x || 0, tile.y || 0) % 8;
     if (tile.biome === 'beach') {
       // Retroactive heal (playtest 2026-07-06): old saves have forest POIs on
       // beach tiles; clamp the trees to the sand half so none stand in the sea.
       // New maps no longer place forests on beach at all.
       const dir = tile.beachDirection != null ? tile.beachDirection : 2;
-      key = `forest-b|${dir}|${v}`; build = () => beachForest(v, dir);
+      // Real x (not just the hashed `v`) threaded through so the wind-sway phase
+      // progresses smoothly tile-to-tile instead of jumping around with the hash —
+      // see `windBegin` above for why that distinction matters.
+      key = `forest-b|${dir}|${v}|${tx}`; build = () => beachForest(v, dir, tx);
     }
+    // desertForest (cacti) intentionally excluded from the wind-sway threading below —
+    // rigid succulents, not swaying trees — so its key/call stay hash-only.
     else if (tile.biome === 'desert') { key = `forest-d|${v}`; build = () => desertForest(v); }
-    else if (tile.biome === 'snow') { key = `forest-s|${v}`; build = () => snowForest(v); }
-    else { key = `forest|${v}`; build = () => forest(v); }
+    else if (tile.biome === 'snow') { key = `forest-s|${v}|${tx}`; build = () => snowForest(v, tx); }
+    else { key = `forest|${v}|${tx}`; build = () => forest(v, tx); }
   }
   else if (tile.poi === 'mountain') {
     const v = variantSeed(tile.x || 0, tile.y || 0) % MOUNTAIN_VARIANTS.length;

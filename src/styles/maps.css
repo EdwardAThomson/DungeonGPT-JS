@@ -5,9 +5,7 @@
  */
 
 .world-map-container {
-  margin-top: 20px;
-  padding-top: 15px;
-  border-top: 1px solid var(--state-muted-strong);
+  margin-top: 8px;
   text-align: center;
   /* larger tiles can exceed the modal width — scroll instead of clipping */
   max-width: 100%;
@@ -91,18 +89,24 @@
 }
 
 .map-tile {
-  border: 1px solid var(--shadow-black-10);
+  /* No border: a bordered tile abutting a neighbour with different SVG background art
+   * produced a stray sand/water-coloured line along the shared edge at non-100% browser
+   * zoom (each grid track's fractional device-pixel position rounds independently, and
+   * the border made the resulting 1px misalignment visible as a color bleed). Confirmed
+   * fixed across 75/90/100/110/125% zoom on the real WorldMapDisplay component; tile
+   * separation is still readable from the art itself (biome edges, sand fringes) without
+   * a drawn border. */
+  border: none;
   transition: all 0.3s ease;
 }
 
 .map-tile:hover {
-  filter: brightness(1.1);
-  transform: scale(1.05);
+  filter: brightness(1.25);
 }
 
 .map-tile:active {
-  transform: scale(0.95);
-  transition: transform 0.1s ease;
+  filter: brightness(0.85);
+  transition: filter 0.1s ease;
 }
 
 .player-tile {
@@ -220,5 +224,109 @@
   100% {
     transform: scale(1) translateY(0);
     opacity: 1;
+  }
+}
+
+/* Ambient sky overlay (MapSkyOverlay.js): drifting clouds + occasional birds over the
+ * FULL world map grid — one layer, same footprint as the WorldMapLabels overlay it sits
+ * alongside, so it pans/zooms in lockstep with the tiles. Real DOM (not a tile
+ * background-image data-URI), so plain @keyframes animate it, unlike the SMIL used inside
+ * worldTileArt.js's per-tile SVGs. `overflow: hidden` keeps drifting shapes from ever
+ * expanding the scrollable region of WorldMapDisplay's pannable/zoomable pane, and
+ * `pointer-events: none` keeps the whole layer out of the way of tile clicks, drags, and
+ * the party marker underneath. */
+.mapsky-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.mapsky-cloud {
+  position: absolute;
+  left: -30%;
+  animation-name: mapsky-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: left;
+}
+
+/* left is a % of the overlay's own width (the whole map), so this traverses the entire
+ * grid regardless of zoom step; the hard loop reset from 130% back to -30% happens while
+ * the cloud is off-screen in both directions (clipped by .mapsky-overlay's overflow),
+ * so there's no visible pop. */
+@keyframes mapsky-drift {
+  from { left: -30%; }
+  to { left: 130%; }
+}
+
+.mapsky-bird {
+  position: absolute;
+  left: -12%;
+  opacity: 0;
+  animation-name: mapsky-flyby;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: left, transform, opacity;
+}
+
+.mapsky-bird-rev {
+  animation-name: mapsky-flyby-rev;
+}
+
+/* Wing flap: two static poses (wing-up / wing-down, drawn in MapSkyOverlay.js)
+ * crossfaded in strict alternation via steps(1, end) — a clean 2-frame flap rather than
+ * a smooth curve morph, since CSS can't reliably animate an SVG `d` attribute across
+ * browsers. Independent of (and multiplies with) the parent .mapsky-bird's own
+ * fade-in/out, so wings only visibly flap while the bird itself is faded in. */
+.mapsky-wing-up {
+  animation: mapsky-flap-up 0.4s steps(1, end) infinite;
+}
+.mapsky-wing-down {
+  animation: mapsky-flap-down 0.4s steps(1, end) infinite;
+}
+@keyframes mapsky-flap-up {
+  0%, 49.9% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+@keyframes mapsky-flap-down {
+  0%, 49.9% { opacity: 0; }
+  50%, 100% { opacity: 1; }
+}
+
+/* "Occasional" is achieved with pure CSS timing, not JS spawn/despawn: each bird's full
+ * animation-duration is long (see MapSkyOverlay.js, 22-40s), but the flight itself only
+ * happens in the first ~15% of that cycle — the bird is invisible/off-screen for the
+ * remaining ~85%, so a handful of birds with staggered durations/delays read as
+ * occasional flocks passing by rather than one repeating loop. */
+@keyframes mapsky-flyby {
+  0%   { left: -12%; transform: translateY(0); opacity: 0; }
+  2%   { opacity: 0.75; }
+  6%   { left: 22%;  transform: translateY(-6px); }
+  10%  { left: 56%;  transform: translateY(4px); }
+  13%  { left: 90%;  transform: translateY(-4px); opacity: 0.75; }
+  15%  { left: 112%; transform: translateY(0); opacity: 0; }
+  100% { left: 112%; transform: translateY(0); opacity: 0; }
+}
+
+/* Mirror image of mapsky-flyby for the alternating "reverse" birds, so not every bird
+ * crosses the map in the same direction. */
+@keyframes mapsky-flyby-rev {
+  0%   { left: 112%; transform: translateY(0); opacity: 0; }
+  2%   { opacity: 0.75; }
+  6%   { left: 78%;  transform: translateY(5px); }
+  10%  { left: 44%;  transform: translateY(-4px); }
+  13%  { left: 10%;  transform: translateY(5px); opacity: 0.75; }
+  15%  { left: -12%; transform: translateY(0); opacity: 0; }
+  100% { left: -12%; transform: translateY(0); opacity: 0; }
+}
+
+/* Respect reduced-motion: keep the sky layer out of the render entirely rather than
+ * freezing shapes mid-position (a static translucent blob mid-drift reads as a stray
+ * smudge, not weather). */
+@media (prefers-reduced-motion: reduce) {
+  .mapsky-overlay {
+    display: none;
   }
 }

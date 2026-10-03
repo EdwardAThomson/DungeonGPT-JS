@@ -16,7 +16,8 @@ export const NOBLE_LAST_NAMES = [
 
 export const COMMON_LAST_NAMES = [
     "Smith", "Miller", "Baker", "Carter", "Fisher", "Hunter", "Mason", "Potter", "Shepherd", "Tailor", "Weaver",
-    "Crowley", "Darkmoor", "Ember", "Falconer", "Grimm", "Hawk", "Ivy", "Juniper", "Knight", "Lance", "Moss", "North", "Owl", "Pike", "Quarrel", "Raven", "Steel", "Torrent", "Vance", "West", "York", "Youngblood", "Zephyrson"
+    "Crowley", "Darkmoor", "Ember", "Falconer", "Grimm", "Hawk", "Ivy", "Juniper", "Knight", "Lance", "Moss", "North", "Owl", "Pike", "Quarrel", "Raven", "Steel", "Torrent", "Vance", "West", "York", "Youngblood", "Zephyrson",
+    "Archer", "Barley", "Bell", "Brewer", "Brook", "Butler", "Chandler", "Cooper", "Cotton", "Dyer", "Fletcher", "Ford", "Gardner", "Glover", "Hale", "Hayward", "Hill", "Holt", "Kemp", "Lamb", "Marsh", "Meadows", "Nash", "Page", "Reed", "Rook", "Sawyer", "Stone", "Thatcher", "Turner", "Wade", "Webb", "Wells", "Wood", "Wren"
 ];
 
 export const HUMAN_LAST_NAMES = [...NOBLE_LAST_NAMES, ...COMMON_LAST_NAMES];

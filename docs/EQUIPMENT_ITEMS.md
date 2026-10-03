@@ -45,8 +45,10 @@ All icons reuse existing art (no new images). New keys added; existing items buf
 
 **Armour ladder** (the real gap: previously one item, no bonus)
 - `leather_armor` buffed to `+1 defense` (common)
-- `studded_leather` NEW `+2` uncommon, icon `hard_leather.webp`
-- `hide_armor` NEW `+2` uncommon, icon `beast_hide.webp`
+- `studded_leather` NEW `+2` uncommon, icon `hard_leather.webp` (reused at the time; since
+  replaced with a dedicated `studded_leather.webp`)
+- `hide_armor` NEW `+2` uncommon, icon `beast_hide.webp` (reused at the time; since replaced
+  with a dedicated `hide_armor.webp`)
 - `scale_mail` NEW `+3` rare, icon `dragon_scale.webp` (blacksmith)
 - `dragonscale_plate` NEW `+4` very rare, icon `dragon_scale.webp` (reused) -- initially
   unobtainable; sourced later by #44/#49 (see the #44 section below).

@@ -15,102 +15,53 @@ const getXpProgress = (hero) => {
 
 const PartySidebar = ({ selectedHeroes = [], onOpenCharacter, className = '' }) => {
   return (
-    <div className={`party-bar ${className}`.trim()}>
-      <h2>Party Members</h2>
+    <aside className={`gm-party ${className}`.trim()} aria-label="Party">
+      <h2 className="gm-eyebrow">Party</h2>
       {selectedHeroes.length > 0 ? (
-        selectedHeroes.map((hero) => {
-          // Support both legacy (character*) and new (hero*) field names
-          const name = hero.heroName || hero.characterName || 'Unknown';
-          const level = hero.heroLevel || hero.characterLevel || 1;
-          const race = hero.heroRace || hero.characterRace || '';
-          const charClass = hero.heroClass || hero.characterClass || '';
-          const id = hero.heroId || name;
+        <ul className="gm-party-list">
+          {selectedHeroes.map((hero) => {
+            // Support both legacy (character*) and new (hero*) field names
+            const name = hero.heroName || hero.characterName || 'Unknown';
+            const level = hero.level || hero.heroLevel || hero.characterLevel || 1;
+            const charClass = hero.heroClass || hero.characterClass || '';
+            const id = hero.heroId || name;
+            const defeated = hero.currentHP === 0 || hero.isDefeated;
+            const hp = hero.maxHP ? getHPStatus(hero.currentHP, hero.maxHP) : null;
+            const lowHp = hero.maxHP && hero.currentHP > 0 && hero.currentHP <= hero.maxHP * 0.25;
 
-          const defeated = hero.currentHP === 0 || hero.isDefeated;
-
-          return (
-            <div key={id} className="party-member" style={defeated ? { opacity: 0.45, filter: 'grayscale(70%)' } : undefined}>
-              {hero.profilePicture && (
-                <img
-                  src={resolveProfilePicture(hero.profilePicture)}
-                  alt={`${name}'s profile`}
-                  onClick={() => onOpenCharacter(hero)}
-                />
-              )}
-              <h3>{name}</h3>
-              <p>Level {level} {race} {charClass}</p>
-
-              {hero.maxHP && (
-                <div style={{ margin: '10px 0', padding: '8px', background: 'var(--surface-light)', borderRadius: '6px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: 'bold' }}>HP:</span>
-                    <span style={{ color: getHPStatus(hero.currentHP, hero.maxHP).color, fontWeight: 'bold' }}>
-                      {hero.currentHP}/{hero.maxHP}
-                    </span>
-                  </div>
-                  <div style={{
-                    width: '100%',
-                    height: '12px',
-                    background: 'var(--border)',
-                    borderRadius: '6px',
-                    overflow: 'hidden',
-                    border: '1px solid var(--border)'
-                  }}>
-                    <div style={{
-                      width: `${(hero.currentHP / hero.maxHP) * 100}%`,
-                      height: '100%',
-                      background: getHPStatus(hero.currentHP, hero.maxHP).color,
-                      transition: 'width 0.5s ease'
-                    }} />
-                  </div>
-                  {hero.currentHP <= hero.maxHP * 0.25 && hero.currentHP > 0 && (
-                    <div style={{ fontSize: '10px', color: 'var(--state-danger)', marginTop: '4px', fontStyle: 'italic' }}>
-                      {getHPStatus(hero.currentHP, hero.maxHP).description}
-                    </div>
-                  )}
-                  {hero.currentHP === 0 && (
-                    <div style={{ fontSize: '10px', color: 'var(--state-danger)', marginTop: '4px', fontWeight: 'bold' }}>
-                      💀 DEFEATED
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div style={{ margin: '8px 0', padding: '8px', background: 'var(--surface-light)', borderRadius: '6px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
-                  <span style={{ fontWeight: 'bold' }}>XP:</span>
-                  <span style={{ color: 'var(--state-highlight)', fontWeight: 'bold' }}>
-                    {hero.xp || 0} (Lvl {hero.level || 1})
+            return (
+              <li key={id} className={`gm-hero${defeated ? ' defeated' : ''}`}>
+                <button type="button" className="gm-hero-main" onClick={() => onOpenCharacter(hero)} aria-label={`${name}: view details`}>
+                  {hero.profilePicture && <img src={resolveProfilePicture(hero.profilePicture)} alt="" />}
+                  <span className="gm-hero-id">
+                    <b>{name}</b>
+                    <small>Level {level} {charClass}</small>
                   </span>
-                </div>
-                <div style={{
-                  width: '100%',
-                  height: '8px',
-                  background: 'var(--ink-strong)',
-                  borderRadius: '4px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    width: `${getXpProgress(hero)}%`,
-                    height: '100%',
-                    background: 'linear-gradient(90deg, var(--state-warning), var(--state-highlight))',
-                    transition: 'width 0.5s ease'
-                  }} />
-                </div>
-              </div>
-
-              <div style={{ textAlign: 'center', marginTop: '5px' }}>
-                <button className="view-details-btn" onClick={() => onOpenCharacter(hero)}>
-                  View Details
                 </button>
-              </div>
-            </div>
-          );
-        })
+
+                {hero.maxHP && (
+                  <div className="gm-bar-row">
+                    <span className="gm-bar-label">HP</span>
+                    <div className="gm-bar"><span style={{ width: `${(hero.currentHP / hero.maxHP) * 100}%`, background: hp.color }} /></div>
+                    <span className="gm-bar-val" style={{ color: hp.color }}>{hero.currentHP}/{hero.maxHP}</span>
+                  </div>
+                )}
+                {lowHp && <p className="gm-hero-warn">{hp.description}</p>}
+                {defeated && <p className="gm-hero-warn">Defeated</p>}
+
+                <div className="gm-bar-row xp">
+                  <span className="gm-bar-label">XP</span>
+                  <div className="gm-bar thin"><span style={{ width: `${getXpProgress(hero)}%` }} /></div>
+                  <span className="gm-bar-val">{hero.xp || 0}</span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       ) : (
-        <p>No heroes selected.</p>
+        <p className="gm-note">No heroes selected.</p>
       )}
-    </div>
+    </aside>
   );
 };
 

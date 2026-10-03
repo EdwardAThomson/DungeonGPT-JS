@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import HeroContext from "../contexts/HeroContext";
 import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from "../contexts/AuthContext";
@@ -8,6 +8,7 @@ import WorldMapDisplay from "../components/WorldMapDisplay";
 import OnboardingSteps from "../components/OnboardingSteps";
 import { sendEvent } from "../services/telemetry";
 import SegmentedControl from "../components/SegmentedControl";
+import "../styles/redesign.css";
 import RaritySelect from "../components/RaritySelect";
 import { storyTemplates } from "../data/storyTemplates";
 import { launchCampaign, mergeLocationNames } from "../game/campaignLauncher";
@@ -152,6 +153,7 @@ const NewGame = () => {
   // the template from the previous launch. Same guards as above, but silent —
   // a locked/teaser/missing remembered template just means no preselect (e.g. a
   // server-delivered premium template not registered this session).
+  const DEFAULT_TEMPLATE_ID = 'heroic-fantasy-t1';
   const [lastPlayedTemplateId] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('dungeongpt:lastLaunch') || 'null')?.templateId || null;
@@ -159,11 +161,18 @@ const NewGame = () => {
       return null;
     }
   });
+  // With no usable last-played template (e.g. a first visit), fall back to the
+  // starter campaign so the page opens with a story already picked. Skipped when
+  // returning with story text in settings, so a custom tale isn't overwritten.
   useEffect(() => {
-    if (navState?.preselectTemplateId || !lastPlayedTemplateId) return;
-    const template = storyTemplates.find((t) => t.id === lastPlayedTemplateId && !t.comingSoon);
-    if (!template || template.teaser === true || !canUseTemplate(template)) return;
-    applyTemplate(template);
+    if (navState?.preselectTemplateId) return;
+    const usable = (id) => {
+      const template = id && storyTemplates.find((t) => t.id === id && !t.comingSoon);
+      return template && template.teaser !== true && canUseTemplate(template) ? template : null;
+    };
+    const template = usable(lastPlayedTemplateId)
+      || (!settings?.shortDescription && usable(DEFAULT_TEMPLATE_ID));
+    if (template) applyTemplate(template);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -437,115 +446,60 @@ const NewGame = () => {
     applyTemplate(entry.template);
   };
 
-  const ARC_BADGE_LABEL = { member: '🔒 MEMBERS', premium: '🔒 PREMIUM', elite: '🔒 ELITE' };
+  const ARC_BADGE_LABEL = { member: 'Members', premium: 'Premium', elite: 'Elite' };
 
   const renderArcCard = (arc, isFirst = false) => {
     const entry = arc.chapters[0];
     const isSelected = arc.chapters.some((c) => c.id === selectedTemplate);
     const isLockedArc = entry.locked;
+    const isLastPlayed = !isSelected && !isLockedArc && arc.chapters.some((c) => c.id === lastPlayedTemplateId);
     return (
-      <div
+      <article
         key={arc.id}
         data-testid={`arc-card-${arc.id}`}
         data-tour={isFirst ? 'first-adventure' : undefined}
+        className={`arc-card${isSelected ? ' selected' : ''}${isLockedArc ? ' locked' : ''}${entry.comingSoon ? ' soon' : ''}`}
         onClick={() => handleArcCardClick(arc)}
-        style={{
-          background: 'var(--surface)',
-          border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
-          borderRadius: '12px',
-          overflow: 'hidden',
-          cursor: entry.comingSoon ? 'default' : 'pointer',
-          transition: 'all 0.2s',
-          boxShadow: isSelected ? '0 0 0 1px var(--primary), 0 4px 12px var(--shadow)' : 'none',
-          opacity: isLockedArc ? 0.75 : 1,
-          filter: isLockedArc ? 'grayscale(0.5)' : 'none',
+        role="button"
+        tabIndex={0}
+        aria-pressed={isSelected}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleArcCardClick(arc); }
         }}
       >
         {/* Card art: the entry chapter's card until bespoke arc art lands (phase 2) */}
-        <div style={{
-          height: '120px',
-          background: `url(${arc.art}) center/cover no-repeat, linear-gradient(135deg, var(--surface), var(--bg))`,
-          position: 'relative',
-        }}>
-          <div style={{
-            position: 'absolute', top: 8, right: 8,
-            background: 'rgba(0,0,0,0.6)', color: '#fff',
-            padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
-          }}>
-            {arc.chapterCount} {arc.chapterCount === 1 ? 'chapter' : 'chapters'} · Lv {arc.levelSpan[0]}-{arc.levelSpan[1]}
-          </div>
-          {isSelected && (
-            <div style={{
-              position: 'absolute', top: 8, left: 8,
-              background: 'var(--primary)', color: '#fff',
-              padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
-            }}>SELECTED</div>
-          )}
-          {/* Same badge slot as SELECTED/lock; only shown when neither occupies it */}
-          {!isSelected && !isLockedArc && arc.chapters.some((c) => c.id === lastPlayedTemplateId) && (
-            <div style={{
-              position: 'absolute', top: 8, left: 8,
-              background: 'rgba(0,0,0,0.6)', color: 'var(--primary)',
-              padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
-              border: '1px solid var(--primary)',
-            }}>★ LAST PLAYED</div>
-          )}
-          {isLockedArc && (
-            <div style={{
-              position: 'absolute', top: 8, left: 8,
-              background: 'linear-gradient(135deg, #b8860b, #ffd700)', color: '#2b1d00',
-              padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
-            }}>{ARC_BADGE_LABEL[arc.minTierToEnter] || '🔒 MEMBERS'}</div>
-          )}
+        <div className="arc-art" style={{ backgroundImage: `url(${arc.art})` }}>
+          <span className="arc-span">{arc.chapterCount} {arc.chapterCount === 1 ? 'chapter' : 'chapters'} · Lv {arc.levelSpan[0]}-{arc.levelSpan[1]}</span>
+          {isSelected && <span className="price-badge price-badge-gold">Selected</span>}
+          {isLastPlayed && <span className="price-badge price-badge-muted">Last played</span>}
+          {isLockedArc && <span className="price-badge price-badge-gold">{ARC_BADGE_LABEL[arc.minTierToEnter] || 'Members'}</span>}
         </div>
-        {/* Card text: arc name, one-line tease, chapter ladder */}
-        <div style={{ padding: '10px 12px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2px' }}>
-            <div style={{ fontSize: '0.9rem', fontWeight: 'bold', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
-              {arc.icon} {arc.name}
-            </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); openArcModal(arc); }}
-              style={{
-                background: 'none', border: 'none', color: 'var(--text-secondary)',
-                cursor: 'pointer', fontSize: '0.7rem', padding: '2px 0', whiteSpace: 'nowrap',
-                textDecoration: 'underline', flexShrink: 0,
-              }}
-            >details</button>
+        <div className="arc-body">
+          <div className="arc-title-row">
+            <h3>{arc.name}</h3>
+            <button type="button" className="inline-link" onClick={(e) => { e.stopPropagation(); openArcModal(arc); }}>Details</button>
           </div>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.3, marginBottom: '8px' }}>
-            {arc.tagline}
-          </div>
+          <p className="arc-tagline">{arc.tagline}</p>
           {/* Chapter ladder: titles + level bands + status chips, never milestones (decision 1) */}
-          <div>
-            {arc.chapters.map((chapter, i) => {
+          <ol className="arc-chapters">
+            {arc.chapters.map((chapter) => {
               const chip = chapterChip(chapter, {
                 isSignedIn: !!user,
                 isRetrying: retryingChapterId === chapter.id,
               });
               return (
-                <div key={chapter.id} style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  fontSize: '0.72rem', padding: '3px 0',
-                  color: chapter.comingSoon ? 'var(--text-secondary)' : 'var(--text)',
-                  opacity: chapter.comingSoon ? 0.6 : 1,
-                }}>
-                  <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>{i + 1}.</span>
-                  <span style={{
-                    flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>{chapter.subtitle}</span>
-                  <span style={{ color: 'var(--text-secondary)', flexShrink: 0 }}>{chip.label}</span>
-                </div>
+                <li key={chapter.id} className={chapter.comingSoon ? 'soon' : ''}>
+                  <span className="name">{chapter.subtitle}</span>
+                  <span className="chip">{chip.label}</span>
+                </li>
               );
             })}
-          </div>
+          </ol>
           {!isLockedArc && entry.startable && partyMaxLevel > 0 && entry.levelRange && partyMaxLevel < entry.levelRange[0] && (
-            <div style={{ fontSize: '0.7rem', color: '#ff9800', marginTop: '6px', fontWeight: 600 }}>
-              ⚠ Requires Lv {entry.levelRange[0]}+ (your highest: Lv {partyMaxLevel})
-            </div>
+            <p className="arc-warn">Needs level {entry.levelRange[0]}+ (your highest: {partyMaxLevel})</p>
           )}
         </div>
-      </div>
+      </article>
     );
   };
 
@@ -567,79 +521,51 @@ const NewGame = () => {
       : `This campaign is made for ${band}; your party would start around Lv ${effectiveLevel}. The opening itself is level-gated; a fresh party will find it brutal, but you may still try.`;
   })();
 
-  const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' };
-
   const renderTemplateTab = () => (
-    <div className="form-section story-settings-section">
-      <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-        Each card below is a full campaign arc. Pick one to begin its first
-        chapter; later chapters unlock as your legend grows. Click a card to
-        begin, or "details" for the chapter ladder.
+    <div className="ng-panel">
+      <p className="ng-intro">
+        Each card is a full campaign. Pick one to start its first chapter; the rest unlock as
+        you play. Details lists every chapter.
       </p>
-      {waterTownNote && (
-        <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-          🌊 {waterTownNote}
-        </p>
-      )}
+      {waterTownNote && <p className="ng-note">🌊 {waterTownNote}</p>}
 
-      <div style={gridStyle}>
+      <div className="arc-grid">
         {arcSections.free.map((a, i) => renderArcCard(a, i === 0))}
       </div>
 
       {arcSections.member.length > 0 && (
-        <div style={{ marginTop: '28px' }} data-testid="member-arcs-section">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
-              ✨ Members' Arcs
-            </h3>
-            <span style={{
-              background: 'linear-gradient(135deg, #b8860b, #ffd700)', color: '#2b1d00',
-              padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
-            }}>{premiumUnlocked ? 'UNLOCKED' : 'MEMBERS'}</span>
+        <div className="arc-section" data-testid="member-arcs-section">
+          <div className="arc-section-head">
+            <h2>Members' campaigns</h2>
+            <span className="price-badge price-badge-gold">{premiumUnlocked ? 'Unlocked' : 'Members'}</span>
           </div>
           {!premiumUnlocked && (
-            <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-              Eldritch, desert and snow arcs are a Members unlock. Preview them below, or visit the Membership page.
-            </p>
+            <p className="ng-note">Eldritch, desert and snow campaigns are a Members unlock. Preview them below, or see <Link className="inline-link" to="/membership">Membership</Link>.</p>
           )}
-          <div style={gridStyle}>
+          <div className="arc-grid">
             {arcSections.member.map((a) => renderArcCard(a))}
           </div>
         </div>
       )}
 
       {arcSections.premium.length > 0 && (
-        <div style={{ marginTop: '28px' }} data-testid="premium-arcs-section">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-            <h3 style={{ margin: 0, fontSize: '1rem', fontFamily: 'var(--header-font)', color: 'var(--text)' }}>
-              🔱 Premium Arcs
-            </h3>
-            <span style={{
-              background: 'linear-gradient(135deg, #b8860b, #ffd700)', color: '#2b1d00',
-              padding: '2px 8px', borderRadius: '10px', fontSize: '0.65rem', fontWeight: 'bold',
-            }}>{hasTier('premium') ? 'UNLOCKED' : 'PREMIUM'}</span>
+        <div className="arc-section" data-testid="premium-arcs-section">
+          <div className="arc-section-head">
+            <h2>Premium campaigns</h2>
+            <span className="price-badge price-badge-muted">{hasTier('premium') ? 'Unlocked' : 'Premium'}</span>
           </div>
           {!hasTier('premium') && (
-            <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
-              The realm's flagship arcs, a Premium unlock (coming soon). Preview them below.
-            </p>
+            <p className="ng-note">The realm's flagship campaigns, a Premium unlock (coming soon). Preview them below.</p>
           )}
-          <div style={gridStyle}>
+          <div className="arc-grid">
             {arcSections.premium.map((a) => renderArcCard(a))}
           </div>
         </div>
       )}
 
       {higherTierNote && (
-        <div
-          data-testid="higher-tier-note"
-          style={{
-            marginTop: '20px', padding: '10px 14px',
-            background: 'rgba(255, 152, 0, 0.15)', border: '1px solid #ff9800',
-            borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text)',
-          }}
-        >
-          <strong style={{ color: '#ff9800' }}>⚠ Seasoned campaign:</strong> {higherTierNote}
+        <div className="app-callout warning" data-testid="higher-tier-note">
+          <span><b>Seasoned campaign.</b> {higherTierNote}</span>
         </div>
       )}
     </div>
@@ -901,20 +827,21 @@ const NewGame = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slot1Item, slot1Building, slot1Town, slot2Role, slot2Building, slot2Town, slot3Poi, slot3Mountain, slot4Enemy, customTier, customTheme, activeTab]);
 
+  // Custom-tab form styles, on the redesign tokens (inline because the slot markup uses them).
   const selectStyle = {
-    padding: '6px 10px', borderRadius: '6px', border: '1px solid var(--border)',
-    background: 'var(--surface)', color: 'var(--text)', fontSize: '0.8rem', width: '100%',
-    boxSizing: 'border-box',
+    padding: '.6rem .75rem', borderRadius: '6px', border: '1px solid var(--line)',
+    background: 'var(--ground)', color: 'var(--text)', fontSize: '.95rem', width: '100%',
+    boxSizing: 'border-box', fontFamily: 'var(--font-ui)',
   };
 
   const slotLabelStyle = {
-    fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600,
-    display: 'block', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.03em',
+    fontSize: '.82rem', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--font-ui)',
+    display: 'block', marginBottom: '.35rem',
   };
 
   const slotCardStyle = {
-    background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '10px',
-    padding: '14px', marginBottom: '10px',
+    background: 'var(--surface)', border: '1px solid var(--line-soft)', borderRadius: '10px',
+    padding: '1.1rem 1.2rem', marginBottom: '.8rem',
   };
 
   const availableEnemies = getEnemiesByTierAndTheme(customTier, customTheme);
@@ -949,8 +876,8 @@ const NewGame = () => {
   }, [activeTab, premiumUnlocked, worldTheme]);
 
   const renderCustomTab = () => (
-    <div className="form-section story-settings-section">
-      <p style={{ marginTop: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+    <div className="ng-panel">
+      <p className="ng-intro">
         Configure your adventure by selecting ingredients for each quest stage.
       </p>
 
@@ -1222,71 +1149,70 @@ const NewGame = () => {
   );
 
 
+  const dockTemplate = selectedTemplate && selectedTemplate !== 'custom'
+    ? storyTemplates.find((t) => t.id === selectedTemplate)
+    : null;
+
   return (
-    <div className="page-container new-game-page">
-      <OnboardingSteps currentStep={1} />
-      {/* Top action mirrors the bottom submit so picking a card doesn't require
-          scrolling past the whole tab to continue. Disabled until something is
-          selected; full validation (custom slots, gating) still runs in
-          handleSubmit, which surfaces formError. */}
-      <div className="page-header">
-        <h1>New Game Setup</h1>
-        <div className="page-header-actions">
-          <button
-            onClick={handleSubmit}
-            className="primary-button"
-            disabled={!selectedTemplate}
-            title={selectedTemplate ? 'Continue to hero selection' : 'Pick an adventure first'}
+    <div className="rd-page rd-app new-game-page">
+      <section className="page-header app-header">
+        <div className="wrap">
+          <OnboardingSteps currentStep={1} />
+          <div className="ng-head">
+          <div className="ng-head-text">
+          <p className="eyebrow">Step 1 · Choose your adventure</p>
+          <h1>Choose your adventure.</h1>
+          <p className="lede">Pick a ready-made campaign, or build your own quest from parts.</p>
+          {/* Tab navigation */}
+          <div className="ng-tabs" role="tablist">
+            {[
+              { id: 'templates', label: 'Ready-made' },
+              { id: 'custom', label: 'Custom' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
+                className={activeTab === tab.id ? 'on' : ''}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  if (tab.id === 'custom' && selectedTemplate && selectedTemplate !== 'custom') {
+                    setSelectedTemplate('custom');
+                  }
+                  // Custom has no biome picker, so a premium world theme here can only be a
+                  // leftover from a previewed template. Drop it back to grassland for free users
+                  // so they can't ride a premium (desert/snow) map into a custom tale.
+                  if (tab.id === 'custom' && !premiumUnlocked && isThemePremium(worldTheme)) {
+                    setWorldTheme('grassland');
+                  }
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          </div>
+          {/* Your pick: fills the header's right side and follows the selection. */}
+          <div
+            className="ng-pick"
+            style={{ backgroundImage: `linear-gradient(180deg, rgba(14,13,19,0) 35%, rgba(14,13,19,.9) 100%), url('${dockTemplate ? `/assets/templates/${dockTemplate.id}.webp` : '/assets/redesign/hero.jpg'}')` }}
+            aria-live="polite"
           >
-            Next: Select Heroes →
-          </button>
+            <div className="ng-pick-caption">
+              <span className="ng-pick-label">{dockTemplate ? 'Your pick' : (activeTab === 'custom' ? 'Your quest' : 'No campaign picked')}</span>
+              <strong>{dockTemplate ? dockTemplate.name : (activeTab === 'custom' ? 'Custom quest' : 'Choose a card below')}</strong>
+              {dockTemplate && (
+                <span>{dockTemplate.subtitle}{dockTemplate.levelRange ? ` · Lv ${dockTemplate.levelRange[0]}-${dockTemplate.levelRange[1]}` : ''}</span>
+              )}
+            </div>
+          </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* Tab Navigation */}
-      <div style={{
-        display: 'flex',
-        gap: '0',
-        marginBottom: '24px',
-        borderBottom: '2px solid var(--border)',
-      }}>
-        {[
-          { id: 'templates', label: 'Ready-Made', icon: '📜' },
-          { id: 'custom', label: 'Custom', icon: '🛠️' },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => {
-              setActiveTab(tab.id);
-              if (tab.id === 'custom' && selectedTemplate && selectedTemplate !== 'custom') {
-                setSelectedTemplate('custom');
-              }
-              // Custom has no biome picker, so a premium world theme here can only be a
-              // leftover from a previewed template. Drop it back to grassland for free users
-              // so they can't ride a premium (desert/snow) map into a custom tale.
-              if (tab.id === 'custom' && !premiumUnlocked && isThemePremium(worldTheme)) {
-                setWorldTheme('grassland');
-              }
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              borderBottom: activeTab === tab.id ? '2px solid var(--primary)' : '2px solid transparent',
-              padding: '10px 20px',
-              fontSize: '0.95rem',
-              fontWeight: activeTab === tab.id ? 700 : 400,
-              color: activeTab === tab.id ? 'var(--primary)' : 'var(--text-secondary)',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              marginBottom: '-2px',
-              fontFamily: 'var(--header-font)',
-            }}
-          >
-            {tab.icon} {tab.label}
-          </button>
-        ))}
-      </div>
-
+      <section className="band ng-band">
+      <div className="wrap">
       {/* Tab Content */}
       {activeTab === 'templates' && renderTemplateTab()}
       {activeTab === 'custom' && renderCustomTab()}
@@ -1324,8 +1250,8 @@ const NewGame = () => {
       {/* World Map Generation Section — hidden for Ready-Made adventures (the map
           is generated automatically on submit); shown for Custom/Freeform. */}
       {activeTab !== 'templates' && (
-      <div className="form-section map-generation-section">
-        <h2>World Map</h2>
+      <div className="ng-panel ng-map">
+        <h2>World map</h2>
         <p>Generate a random world map for your adventure. Each map is unique with forests, mountains, and towns.</p>
         {waterTownNote && (
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>
@@ -1343,15 +1269,14 @@ const NewGame = () => {
                 value={worldSeed || ''}
                 onChange={(e) => setWorldSeed(e.target.value)}
                 placeholder="Leave empty for random"
-                style={{ padding: '8px 10px', borderRadius: '6px', border: '1px solid var(--border-soft)', width: '180px', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                style={{ ...selectStyle, width: '200px' }}
               />
               <button
                 type="button"
                 onClick={() => setWorldSeed(Math.floor(Math.random() * 1000000))}
-                className="settings-submit-button"
-                style={{ padding: '8px 14px', fontSize: '0.9rem', boxSizing: 'border-box', letterSpacing: 'normal', textTransform: 'none', boxShadow: 'none', border: '1px solid var(--primary)' }}
+                className="btn btn-ghost"
               >
-                🎲 Randomize
+                Randomize
               </button>
               {/* Generate sits flush with Randomize, same row + same height (align-items: stretch). */}
               <button
@@ -1379,11 +1304,10 @@ const NewGame = () => {
                   setGeneratedMap(newMap);
                   setShowMapPreview(true);
                 }}
-                className="settings-submit-button generate-map-button"
+                className="btn btn-primary"
                 type="button"
-                style={{ padding: '8px 16px', fontSize: '0.9rem', boxSizing: 'border-box', letterSpacing: 'normal', textTransform: 'none' }}
               >
-                {generatedMap ? '🔄 Build Map from Seed' : '🗺️ Generate World Map'}
+                {generatedMap ? 'Rebuild map from seed' : 'Generate world map'}
               </button>
             </div>
           </div>
@@ -1426,12 +1350,31 @@ const NewGame = () => {
       </div>
       )}
 
-      {/* Action Button & Error Message */}
-      <div className="form-actions">
-        {formError && <p className="error-message">{formError}</p>}
-        <button onClick={handleSubmit} className="settings-submit-button" data-tour="newgame-submit">
-          Next: Select Heroes
-        </button>
+      </div>
+      </section>
+
+      {/* Fixed step dock: what's picked, any error, and the one Next button (the top
+          duplicate is gone; full validation still runs in handleSubmit). */}
+      <div className="party-dock" role="region" aria-label="Your adventure">
+        <div className="wrap party-dock-inner">
+          {dockTemplate ? (
+            <div className="dock-pick">
+              <span className="dock-thumb" style={{ backgroundImage: `url('/assets/templates/${dockTemplate.id}.webp')` }} aria-hidden="true" />
+            </div>
+          ) : null}
+          <div className="party-dock-text">
+            {formError
+              ? <span className="party-error" role="alert">{formError}</span>
+              : dockTemplate
+                ? <span><b>{dockTemplate.name}</b>{dockTemplate.subtitle ? ` · ${dockTemplate.subtitle}` : ''}</span>
+                : activeTab === 'custom'
+                  ? <span><b>Custom quest</b> · fill at least two slots</span>
+                  : <span>Pick a campaign to continue</span>}
+          </div>
+          <button onClick={handleSubmit} className="btn btn-primary party-start" data-tour="newgame-submit" disabled={activeTab === 'templates' && !dockTemplate}>
+            Next: Select Heroes
+          </button>
+        </div>
       </div>
     </div>
   );

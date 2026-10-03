@@ -123,12 +123,12 @@ const LargeWorldTest = () => {
             const isGate = gateSet.has(`${tile.x},${tile.y}`);
             return (
               <div key={`${tile.x},${tile.y}`} style={{
-                width: TILE, height: TILE, backgroundImage: biomeBackground(tile, tile.x, tile.y), backgroundSize: 'cover', position: 'relative',
+                width: TILE, height: TILE, backgroundImage: biomeBackground(tile, tile.x, tile.y, mapData), backgroundSize: 'cover', position: 'relative',
               }}>
                 {showRivers && tile.hasRiver && tile.biome !== 'water' && (
                   <Overlay d={pathSVGs[tile.riverDirection] || pathSVGs.NORTH_SOUTH} stroke="#3f7cc2" width={4} opacity={0.85} />
                 )}
-                {showPaths && tile.hasPath && (
+                {showPaths && tile.hasPath && tile.biome !== 'water' && (
                   <Overlay d={pathSVGs[tile.pathDirection] || pathSVGs.NORTH_SOUTH} stroke="#7a5230" width={3} opacity={0.8} />
                 )}
                 {poi && <div style={{ position: 'absolute', inset: 0, zIndex: 2, backgroundImage: poi, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }} />}

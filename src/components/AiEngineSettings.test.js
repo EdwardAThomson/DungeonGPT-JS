@@ -5,6 +5,7 @@
 import React from 'react';
 import '@testing-library/jest-dom';
 import { render, screen, fireEvent, act } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { AiEngineSettings } from './Modals';
 import {
     getPreferredPool,
@@ -15,7 +16,9 @@ import {
 import { setUserTier, _resetEntitlementsForTests } from '../game/entitlements';
 
 const renderSettings = () =>
+    // MemoryRouter: AiPoolPills renders a Membership <Link> for non-members.
     render(
+        <MemoryRouter>
         <AiEngineSettings
             selectedProvider="cf-workers"
             setSelectedProvider={jest.fn()}
@@ -26,6 +29,7 @@ const renderSettings = () =>
             assistantModel="@cf/openai/gpt-oss-120b"
             setAssistantModel={jest.fn()}
         />
+        </MemoryRouter>
     );
 
 describe('AiEngineSettings pool chips', () => {

@@ -186,7 +186,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                                 {isInsideTown ? `View ${currentTile.townName || currentTile.poi} Map` : `Enter ${currentTile.townName || currentTile.poi}`}
                             </button>
                         )}
-                        <button className="modal-close-button" onClick={onClose} aria-label="Close map modal">
+                        <button className="modal-close-button secondary-button" onClick={onClose} aria-label="Close map modal">
                             Close Map
                         </button>
                     </div>

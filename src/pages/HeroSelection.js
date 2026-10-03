@@ -1,4 +1,7 @@
 // HeroSelection.js
+// "Choose your party" (step 2 of New Game), on the redesign primitives (#82). One grid of
+// roster heroes plus ready-made heroes; a sticky party bar with four slots and the Start
+// button stays in reach while scrolling. Styles: .rd-page / .rd-app in redesign.css.
 
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -12,7 +15,8 @@ import OnboardingSteps from '../components/OnboardingSteps';
 import { validateHero } from '../game/heroValidation';
 import { getLevelFitNotice } from '../game/campaignChain';
 import { PREGEN_HEROES, buildPregenHero } from '../data/pregenHeroes';
-import { PregenBand, PregenStrip } from '../components/ReadyMadeHeroes';
+import { calculateModifier } from '../utils/rules';
+import '../styles/redesign.css';
 
 const logger = createLogger('hero-selection');
 
@@ -174,22 +178,13 @@ const HeroSelection = () => {
   const levelNotice = getLevelFitNotice(settings || {}, selectedHeroes);
 
   const levelWarningBanner = levelNotice && (
-    <div style={{
-      background: 'rgba(255, 152, 0, 0.15)',
-      border: '1px solid #ff9800',
-      borderRadius: '8px',
-      padding: '12px 16px',
-      marginBottom: '16px',
-      color: 'var(--text)',
-      fontSize: '0.9rem',
-      width: '100%',
-      boxSizing: 'border-box',
-    }}>
-      <strong style={{ color: '#ff9800' }}>Level Warning:</strong>{' '}
-      This adventure is made for Lv {levelNotice.levelRange[0]}-{levelNotice.levelRange[1]}; your party is Lv {levelNotice.partyLevel}.{' '}
-      {levelNotice.openingAccessible
-        ? 'The opening steps are within your reach, and rumours in nearby towns will strengthen you for the deeper chapters.'
-        : 'The opening may be deadly, but you may still try.'}
+    <div className="app-callout warning" role="note">
+      <span>
+        <b>Level warning.</b> This adventure is made for level {levelNotice.levelRange[0]}-{levelNotice.levelRange[1]}; your party is level {levelNotice.partyLevel}.{' '}
+        {levelNotice.openingAccessible
+          ? 'The opening steps are within reach, and rumours in nearby towns will strengthen you for the deeper chapters.'
+          : 'The opening may be deadly, but you may still try.'}
+      </span>
     </div>
   );
 
@@ -235,143 +230,142 @@ const HeroSelection = () => {
   // Redirecting (no launch context): render nothing rather than a flash of the page.
   if (!hasLaunchContext) return null;
 
+  const STAT_ORDER = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
+  const fmtMod = (score) => {
+    const m = calculateModifier(score);
+    return m >= 0 ? `+${m}` : `${m}`;
+  };
+  const campaignName = settings?.templateName;
+  const partyFull = selectedHeroes.length >= 4;
+
   return (
-    <div className="page-container hero-selection-page">
-      {/* Step 2 of the adventure-first journey. Step 1 (Choose Adventure) is
-          always truthfully done here: the launch-context guard above bounces any
-          entry that didn't come through New Game. Step 2 (Choose Heroes) ticks to
-          done from real state — the moment a hero is in the party — so the bar
-          counts what's actually complete rather than freezing on step 2 (#88b). */}
-      <OnboardingSteps currentStep={2} completedSteps={selectedHeroes.length > 0 ? [1, 2] : [1]} />
-      <div className="hero-selection-top-nav">
-        <button onClick={handleBack} className="back-button">
-          ← Back to Story Setup
-        </button>
-      </div>
-      <div className="page-header">
-        <div className="page-header-titles">
-          <h2>Select Your Party</h2>
-          <p className="selection-instructions">Click a hero to add them to your party — choose 1 to 4.</p>
-          {/* States the real mechanics (support bonuses vs the shared XP pot)
-              rather than nudging a "right" party size. */}
-          <p className="party-size-tip">
-            Bigger parties fight stronger together, but share the XP. A lone hero levels fastest and risks the most.
-          </p>
+    <div className="rd-page rd-app party-page">
+      <section className="page-header app-header">
+        <div className="wrap">
+          {/* Step 2 of the adventure-first journey. Step 1 (Choose Adventure) is always
+              truthfully done here: the launch-context guard above bounces any entry that
+              didn't come through New Game. Step 2 ticks to done from real state, the moment
+              a hero is in the party (#88b). */}
+          <OnboardingSteps currentStep={2} completedSteps={selectedHeroes.length > 0 ? [1, 2] : [1]} />
+          <button type="button" className="crumb crumb-button" onClick={handleBack}>← Back to story setup</button>
+          <p className="eyebrow">Step 2 · Choose your party</p>
+          <div className="app-header-row">
+            <div>
+              <h1>Who answers the call?</h1>
+              <p className="lede">
+                Pick one to four heroes{campaignName ? <> for <b className="campaign-name">{campaignName}</b></> : null}. Click a card to add or remove it.
+              </p>
+            </div>
+          </div>
         </div>
-        <div className="page-header-actions">
-          <button onClick={handleCreateHero} className="create-new-button">
-            New Hero
-          </button>
-          <button onClick={handleNext} className="next-button" disabled={selectedHeroes.length === 0 || selectedHeroes.length > 4} data-tour="start-game">
-            Start Game ({selectedHeroes.length})
-          </button>
-        </div>
-      </div>
+      </section>
 
-      {levelWarningBanner}
+      <section className="band">
+        <div className="wrap">
+          {levelWarningBanner}
 
-      {heroes.length > 0 && (
-        <div className="party-counter">
-          Party: <span className={selectedHeroes.length > 0 ? 'count-active' : ''}>{selectedHeroes.length}</span> of 4 selected
-        </div>
-      )}
+          <ul className="roster-grid party-grid">
+            {heroes.map((hero) => {
+              const isSelected = selectedHeroes.some(h => h.heroId === hero.heroId);
+              const atLimit = partyFull && !isSelected;
+              return (
+                <li
+                  key={hero.heroId}
+                  className={`roster-card pickable ${isSelected ? 'selected' : ''}${atLimit ? ' at-limit' : ''}${hero.heroId === justAddedId ? ' just-added' : ''}`}
+                  onAnimationEnd={() => { if (hero.heroId === justAddedId) setJustAddedId(null); }}
+                  onClick={() => toggleHeroSelection(hero)}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  aria-label={`${hero.heroName}, level ${hero.heroLevel} ${hero.heroClass}${isSelected ? ', in party' : ''}`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleHeroSelection(hero);
+                    }
+                  }}
+                >
+                  <div className="roster-portrait">
+                    <img src={resolveProfilePicture(hero.profilePicture)} alt="" loading="lazy" />
+                    {isSelected && <span className="pick-check" aria-hidden="true">✓</span>}
+                  </div>
+                  <div className="roster-body">
+                    <h3>{hero.heroName}</h3>
+                    <p className="roster-sub">Level {hero.heroLevel} {hero.heroClass}</p>
+                    {hero.stats && (
+                      <dl className="roster-stats">
+                        {STAT_ORDER.filter((k) => hero.stats[k] != null).map((k) => (
+                          <div key={k}>
+                            <dt>{k.substring(0, 3)}</dt>
+                            <dd>{hero.stats[k]}<small>{fmtMod(hero.stats[k])}</small></dd>
+                          </div>
+                        ))}
+                      </dl>
+                    )}
+                    <span className={`pick-state${isSelected ? ' on' : ''}`}>
+                      {isSelected ? 'In party' : (atLimit ? 'Party full' : 'Add to party')}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
 
-      {heroes.length === 0 ? (
-        <PregenBand
-          pregens={availablePregens}
-          disabled={addingPregen}
-          onPick={handleAddPregen}
-          note={
-            <>
-              Ready to play, and fully yours to edit later. Or{' '}
-              <button type="button" className="pregen-link-button" onClick={handleCreateHero}>
-                craft your own from scratch
-              </button>
-              .
-            </>
-          }
-        />
-      ) : (
-        <ul className="all-heroes-list hero-selection-list">
-          {heroes.map((hero) => {
-            const isSelected = selectedHeroes.some(h => h.heroId === hero.heroId);
-            const atLimit = selectedHeroes.length >= 4 && !isSelected;
-            return (
-              <li
-                key={hero.heroId}
-                className={`hero-item ${isSelected ? 'selected' : ''}${atLimit ? ' at-limit' : ''}${hero.heroId === justAddedId ? ' just-added' : ''}`}
-                onAnimationEnd={() => { if (hero.heroId === justAddedId) setJustAddedId(null); }}
-                onClick={() => toggleHeroSelection(hero)}
-                role="button"
-                tabIndex={0}
-                aria-pressed={isSelected}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    toggleHeroSelection(hero);
-                  }
-                }}
-              >
-                <div className="hero-item-image">
-                  <img 
-                    src={resolveProfilePicture(hero.profilePicture)}
-                    alt={`${hero.heroName}'s profile`}
-                    loading="lazy"
-                    width="150"
-                    height="150"
-                  />
-                </div>
-
-                <div className="hero-item-info">
-                  <h3>{hero.heroName}</h3>
-                  <p>
-                    <span className="detail-label">Level:</span> {hero.heroLevel} {hero.heroClass}
-                  </p>
-                  <p>
-                    <span className="detail-label">Race:</span> {hero.heroRace}
-                  </p>
-                  <p>
-                    <span className="detail-label">Gender:</span> {hero.heroGender || 'N/A'}
-                  </p>
-                  <p>
-                    <span className="detail-label">Alignment:</span> {hero.heroAlignment || 'N/A'}
-                  </p>
-                  <p>
-                    <span className="detail-label">BG:</span> {hero.heroBackground ? `${hero.heroBackground.substring(0, 60)}...` : 'N/A'}
-                  </p>
-                </div>
-
-                {hero.stats && (
-                  <ul className="hero-item-stats">
-                    {Object.entries(hero.stats).map(([stat, value]) => (
-                      <li key={stat}>{stat.substring(0, 3)}: {value}</li>
-                    ))}
-                  </ul>
-                )}
-                {isSelected && <div className="selection-indicator">✓</div>}
-
-                <div className={`hero-select-cta ${isSelected ? 'is-selected' : ''}`}>
-                  {isSelected ? '✓ In party — click to remove' : (atLimit ? 'Party full (max 4)' : '➕ Add to party')}
-                </div>
+            {/* Ready-made heroes not yet on the roster, in the same grid: one click adds
+                them to the roster AND the party. Pregens already on the roster (matched
+                by name) are hidden rather than disabled, so none is offered twice. */}
+            {availablePregens.map((p) => (
+              <li key={p.heroName} className={`roster-card pickable ready${partyFull ? ' at-limit' : ''}`}>
+                <button type="button" className="pick-ready" onClick={() => handleAddPregen(p)} disabled={addingPregen || partyFull}>
+                  <div className="roster-portrait">
+                    <img src={resolveProfilePicture(p.profilePicture)} alt="" loading="lazy" />
+                    <span className="price-badge price-badge-muted">Ready-made</span>
+                  </div>
+                  <div className="roster-body">
+                    <h3>{p.heroName}</h3>
+                    <p className="roster-sub">Level 1 {p.heroClass}</p>
+                    <span className="pick-state">{partyFull ? 'Party full' : 'Add to party'}</span>
+                  </div>
+                </button>
               </li>
-            );
-          })}
-        </ul>
-      )}
+            ))}
 
-      {heroes.length > 0 && availablePregens.length > 0 && (
-        <PregenStrip pregens={availablePregens} disabled={addingPregen} onPick={handleAddPregen} />
-      )}
+            <li className="roster-card roster-new">
+              <button type="button" onClick={handleCreateHero}>
+                <span className="plus" aria-hidden="true">+</span>
+                <span>Create a hero</span>
+                <small>Your party is kept while you're away</small>
+              </button>
+            </li>
+          </ul>
+        </div>
+      </section>
 
-      <div className="form-actions hero-selection-actions">
-        {levelWarningBanner}
-        {selectionError && <p className="error-message">{selectionError}</p>}
-        <button onClick={handleBack} className="back-button">
-          ← Back to Story Setup
-        </button>
-        <button onClick={handleNext} className="next-button" disabled={selectedHeroes.length === 0 || selectedHeroes.length > 4}>
-          Start Game with Selected Heroes
-        </button>
+      {/* Sticky party dock (not .party-bar: that is the in-game sidebar): the four slots, any error, and the one Start button. */}
+      <div className="party-dock" role="region" aria-label="Your party">
+        <div className="wrap party-dock-inner">
+          <ol className="party-slots">
+            {[0, 1, 2, 3].map((i) => {
+              const h = selectedHeroes[i];
+              return h ? (
+                <li key={h.heroId} className="slot filled">
+                  <button type="button" onClick={() => toggleHeroSelection(h)} title={`Remove ${h.heroName}`} aria-label={`Remove ${h.heroName} from the party`}>
+                    <img src={resolveProfilePicture(h.profilePicture)} alt="" />
+                  </button>
+                </li>
+              ) : (
+                <li key={`empty-${i}`} className="slot" aria-hidden="true" />
+              );
+            })}
+          </ol>
+          <div className="party-dock-text">
+            {selectionError
+              ? <span className="party-error" role="alert">{selectionError}</span>
+              : <span><b>{selectedHeroes.length} of 4</b> {selectedHeroes.length ? selectedHeroes.map((h) => h.heroName.split(' ')[0]).join(', ') : 'Pick at least one hero'}</span>}
+          </div>
+          <button onClick={handleNext} className="btn btn-primary party-start" disabled={selectedHeroes.length === 0 || selectedHeroes.length > 4} data-tour="start-game">
+            Start game
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,0 +1,15 @@
+# LOCAL-ONLY eval worker for scripts/adjudication/adjudication-eval.mjs.
+# Run from cf-worker/ (for its wrangler install):
+#   npx wrangler dev --config ../scripts/adjudication/worker/wrangler.eval.toml --port 8798
+# It has no auth: NEVER `wrangler deploy` it. Named *.eval.toml because the repo
+# .gitignore excludes every file called wrangler.toml.
+# The [ai] binding always calls Cloudflare remotely, so calls count against the account's
+# Workers AI allowance even in dev.
+name = "dgpt-adjudication-eval-local"
+main = "index.js"
+compatibility_date = "2025-02-14"
+workers_dev = false
+
+[ai]
+binding = "AI"
+remote = true

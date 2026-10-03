@@ -209,14 +209,13 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
 
     return (
         <>
-            <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1000, backgroundColor: 'rgba(0,0,0,0.7)' }}>
+            <div className="modal-overlay" onClick={onClose} style={{ zIndex: 1000 }}>
                 <div
                     className="modal-content building-modal"
                     onClick={(e) => e.stopPropagation()}
                     style={{
                         maxWidth: '780px',
                         width: '95%',
-                        border: '3px solid var(--primary)',
                         padding: '0',
                         overflow: 'hidden',
                         maxHeight: '90vh',
@@ -224,30 +223,33 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                         flexDirection: 'column',
                         backgroundColor: 'var(--surface)',
                         color: 'var(--text)',
-                        boxShadow: '0 15px 40px var(--shadow)',
                         borderRadius: '12px'
                     }}
                 >
                     {/* Header Section - Above the image */}
                     <div style={{ padding: '25px 25px 15px 25px', textAlign: 'center' }}>
-                        <h2 style={{
-                            color: 'var(--primary)',
-                            margin: '0 0 8px 0',
-                            fontSize: '2.2rem',
-                            letterSpacing: '2px',
-                            textTransform: 'uppercase',
-                            fontFamily: 'var(--header-font)'
-                        }}>
-                            {building.buildingName ? building.buildingName : (building.buildingType.charAt(0).toUpperCase() + building.buildingType.slice(1))}{building.buildingName && building.buildingType ? ` (${building.buildingType.charAt(0).toUpperCase() + building.buildingType.slice(1)})` : ''}
-                        </h2>
+                        {/* Name as the title; the type moves into the eyebrow above it. */}
                         <div style={{
-                            fontSize: '14px',
-                            color: 'var(--text-secondary)',
-                            fontStyle: 'italic',
-                            fontFamily: 'var(--body-font)'
+                            fontFamily: 'var(--font-ui)',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            letterSpacing: '0.16em',
+                            textTransform: 'uppercase',
+                            color: 'var(--gold)',
+                            marginBottom: '6px'
                         }}>
-                            {building.buildingType} | Location: ({building.x}, {building.y})
+                            {building.buildingType} · ({building.x}, {building.y})
                         </div>
+                        <h2 style={{
+                            color: 'var(--text)',
+                            margin: 0,
+                            fontSize: '1.9rem',
+                            letterSpacing: 'normal',
+                            textTransform: 'none',
+                            fontFamily: 'var(--font-display)'
+                        }}>
+                            {building.buildingName ? building.buildingName : (building.buildingType.charAt(0).toUpperCase() + building.buildingType.slice(1))}
+                        </h2>
                     </div>
 
                     {/* Image Section - real image or placeholder for houses */}

@@ -91,12 +91,14 @@ Rather than letting the AI freely decide if a narrative goal is met, we constrai
 
 > **Marker path retired (shipped 2026-07-19, #76 Phase 1 — see `AI_NARRATION_CONTRACT.md`).**
 > The `[COMPLETE_MILESTONE]`/`[COMPLETE_CAMPAIGN]` markers, their client parsing
-> (`MILESTONE_COMPLETE_REGEX`, `resolveTalkMarkerMilestone`, the talk dual-completion path) and
-> the prompt instructions described in the two notes above are all removed: the engine referees
+> (`MILESTONE_COMPLETE_REGEX` in `useGameInteraction.js`, the talk dual-completion path) and
+> the prompt instructions described in the two notes above are all gone from the game loop: the engine referees
 > every completion, the LLM only narrates, and both `sanitizeResponse` passes plus the client
 > strip any leaked completion marker. Legacy saves' `narrative` milestones are migrated to
 > engine types on load (`migrateNarrativeMilestones` off their spawn: npc→talk, poi→location,
-> item→item), so no old save is stranded.
+> item→item), so no old save is stranded. `findMarkerMilestoneIndex` /
+> `resolveTalkMarkerMilestone` survive in `milestoneEngine.js` as unused exports (only their
+> unit tests still call them); removing them is #76 Phase 2's dead-helper cleanup.
 
 > **`location` is search-to-complete (shipped 2026-07-10).** Reaching the milestone tile no
 > longer completes it on its own. The POI arrival modal offers a "Search this location" action,
@@ -125,7 +127,7 @@ Rather than letting the AI freely decide if a narrative goal is met, we constrai
   id: 1,
   text: 'Find the hidden map in the archives of Oakhaven',
   location: 'Oakhaven',
-  type: 'item',                // 'item' | 'combat' | 'location' | 'talk' | 'narrative'
+  type: 'item',                // 'item' | 'combat' | 'location' | 'talk'  ('narrative' retired by #76 Phase 1; legacy saves migrate on load)
   requires: [],                // IDs of milestones that must be completed first
   trigger: {
     item: 'hidden_map',        // what to check for
@@ -285,7 +287,7 @@ If a milestone says "find the map in the archives", the archives must exist as a
 
 **Approach:**
 - The `spawn` field can include a `building` property that ensures a specific building type exists in the target town
-- `spawnMilestoneEntities()` checks if the building exists in the town; if not, it adds it
+- `injectQuestBuildings()` (`milestoneSpawner.js`, at lazy town generation) checks if the building exists in the town; if not, it adds it
 - The item/NPC is then placed inside that building
 - When the player visits the building, they can interact with the item/NPC
 
@@ -475,7 +477,7 @@ const checkMilestones = (milestones, event) => {
 2. Templates define milestones **with types, triggers, encounters, and rewards**
 3. Map is generated with named towns/mountains
 4. `resolveMilestoneCoords()` maps milestone locations to map coordinates (unchanged)
-5. **NEW: `spawnMilestoneEntities()`** ensures required buildings exist in towns, places items/NPCs in buildings, and marks POI/enemy locations on the map
+5. **NEW: `spawnWorldMapEntities()` + `injectQuestBuildings()`** (`milestoneSpawner.js`) mark POI/enemy locations on the map at generation time, and ensure required buildings exist in towns with items/NPCs placed in them at lazy town generation
 6. Game starts with all milestone-related entities in the world (locked ones are non-interactive)
 
 ### Campaign Creator UI: Tabbed Design
@@ -535,7 +537,7 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [x] Update `storyTemplates.js` with typed milestones for all 4 templates
 
 ### Phase 2: Spawning & Integration ✅
-- [x] Build `spawnMilestoneEntities()` to place items/NPCs/POIs at map generation
+- [x] Build `spawnWorldMapEntities()` / `injectQuestBuildings()` (`milestoneSpawner.js`) to place items/NPCs/POIs
 - [x] Ensure quest-critical buildings exist in target towns
 - [x] Wire milestone checker into the game loop (listen for inventory changes, combat results, movement)
 - [x] Connect combat milestones to the encounter system (`resolveEncounter()`)
@@ -548,7 +550,7 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [ ] ~~Custom tab: milestone editor with registry-backed entity pickers~~ (deferred to Phase 3+)
 
 ### Phase 3: Custom Campaign Builder & Registries
-- [x] Extract quest enemies into shared data file (`questEnemies.js`) — 31 bosses, 4 themes × 2 tiers, `getEnemiesByTierAndTheme()` helper
+- [x] Extract quest enemies into shared data file (`questEnemies.js`) — 35 bosses, 4 themes × 2 tiers, `getEnemiesByTierAndTheme()` helper
 - [x] Extract quest items into shared registry — `QUEST_ITEMS` + `SEARCHABLE_ITEMS` in `questPickerData.js`
 - [x] Extract quest POIs into shared registry — `POI_TYPES` in `questPickerData.js` (10 types with terrain tags)
 - [x] Build menu-driven Custom tab with registry-backed pickers (not free text) — theme, tier, enemy, item, building, NPC, POI, town/mountain name pickers
@@ -557,8 +559,8 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [x] Per-slot town/mountain name selection feeding into `customNames` for map generation
 - [x] Template modal contextual progression buttons (Generate Map → Hero Selection)
 - [x] Entity validation at campaign creation time — pickers prevent invalid picks; `validateCustomSlots()` catches partial slots and requires ≥2 complete milestone slots (raised from 1 on 2026-07-06); `shortDescription` auto-generated from selections
-- [x] Design team/party encounter system — Lead + Support model, see [`TEAM_ENCOUNTER_DESIGN.md`](TEAM_ENCOUNTER_DESIGN.md)
-- [ ] Implement team encounter system (support roles, formation UI, team damage/rewards)
+- [x] Design team/party encounter system — Lead + Support model, see [`ENCOUNTER_SYSTEM.md` Phase 5](ENCOUNTER_SYSTEM.md#phase-5-team-encounters----lead--support-model-shipped-2026-07-03-43)
+- [x] Implement team encounter system (support roles, formation UI, team damage/rewards) — shipped 2026-07-03 as part of the #43 combat-depth program, see `ENCOUNTER_SYSTEM.md` Phase 5
 - [ ] Add encounter images for quest bosses
 
 ### Phase 4: Narrative Milestones
@@ -579,7 +581,7 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [ ] Flesh out Tier 3 templates with full milestone data
 - [ ] AI-assisted campaign creation that outputs structured milestone data
 - [ ] Player customization options (difficulty, milestone count, theme)
-- [ ] Combo attacks: class-pair synergy actions in combat — see [`TEAM_ENCOUNTER_DESIGN.md` Appendix A](TEAM_ENCOUNTER_DESIGN.md#appendix-a-combo-attacks-future--phase-5)
+- [ ] Combo attacks: class-pair synergy actions in combat — see [`ENCOUNTER_SYSTEM.md`](ENCOUNTER_SYSTEM.md) (deferred past the team MVP)
 - [ ] Party synergy hints on Hero Selection page
 
 ---
@@ -592,9 +594,9 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 | `NewGame.js` | Campaign creation UI | Add milestone type editor for Custom Tale |
 | `MilestoneTest.js` | Tests AI marker detection | Keep as-is for narrative milestone testing |
 | `CampaignMilestoneTest.js` | Tests deterministic milestone system | Prototype for encounter + reward integration |
-| `promptComposer.js` | Builds AI prompts with milestone context | **Done:** Shows Active/Completed/Locked with type tags |
+| `turnContext.js` | Builds the turn prompt's milestone context (`formatMilestonePromptText`, used by `useGameInteraction.js`) | **Done:** Shows Active/Completed/Locked with type tags. (`promptComposer.js` keeps a smaller Active/Completed formatter for movement and NPC-meeting prompts) |
 | `saveController.js` | Saves game state | Should already preserve new fields via settings |
-| `useGameSession.js` | Manages game session state | Wire in milestone checker events |
+| `Game.js` | Main game loop | **Done:** `checkMilestoneEvent()` wires milestone checker events (movement, combat, items, talk) |
 | `inventorySystem.js` | Tracks items and rewards | Emit events when quest items are acquired |
 | `encounterController.js` | Applies encounter rewards/penalties | Handle milestone encounter outcomes |
 | `encounterResolver.js` | Resolves encounter dice/combat | Feed in quest encounter definitions |
@@ -624,11 +626,13 @@ Themes (Heroic Fantasy, Grimdark, etc.) and difficulty tiers are **separate axes
 | Theme | Tier 1 (Lv 1-2) | Tier 2 (Lv 3-4) | Tier 3 (Lv 5+) |
 |-------|-----------------|-----------------|----------------|
 | **Heroic Fantasy** | The Goblin Threat | Crown of Sunfire | The Shattered Throne *(coming soon)* |
+| **Desert Expedition** | The Sunscorched Road | The Waking Sands | (none) |
+| **Frozen Frontier** | The Deepening Frost | The Hungering Thaw | (none) |
 | **Grimdark Survival** | The Blighted Village | The Rot-Heart | The Last Winter *(coming soon)* |
 | **Arcane Renaissance** | The Rogue Automaton | Herald of the Old Gods | The Clockwork God *(coming soon)* |
 | **Eldritch Horror** | The Blackwood Cult | The Great Dreamer | The Drowned City *(coming soon)* |
 
-All themes have Tier 1 and Tier 2 templates with full milestone data. Tier 3 templates exist as stubs (coming soon).
+All six public themes have Tier 1 and Tier 2 templates with full milestone data. Tier 3 entries in the public bundle are card-face stubs; playable premium campaigns (Tier 3 and the premium Tidewater line) are server-delivered (`premiumContentApi.js`) and replace their stub by id.
 
 #### Why separate stories instead of scaling
 

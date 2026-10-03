@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ITEM_CATALOG, getRarityColor, consumeHealingItem } from '../utils/inventorySystem';
 import { getHPStatus } from '../utils/healthSystem';
 import { heroUid } from '../utils/partyUtils';
+import { resolveProfilePicture } from '../utils/assetHelper';
 import { useModal } from '../contexts/ModalContext';
 import {
   EQUIP_SLOTS,
@@ -150,14 +151,15 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
   };
 
   return (
-    <div style={{ color: 'var(--text)', maxWidth: '640px', margin: '0 auto' }}>
+    <div style={{ color: 'var(--text)', maxWidth: '1080px', margin: '0 auto', textAlign: 'left' }}>
         {/* Themed Gold Section */}
         <div
           style={{
-            padding: '20px',
-            background: 'var(--primary)',
-            color: 'var(--bg)', /* High contrast text against primary */
-            borderRadius: '8px',
+            padding: '16px 20px',
+            background: 'color-mix(in srgb, var(--gold) 9%, var(--ground))',
+            border: '1px solid color-mix(in srgb, var(--gold) 55%, transparent)',
+            color: 'var(--text)',
+            borderRadius: '10px',
             marginBottom: '24px',
             display: 'flex',
             alignItems: 'center',
@@ -184,19 +186,19 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
           />
           <div style={{ flex: 1 }}>
             <div style={{
-              fontSize: '14px',
+              fontSize: '12px',
               textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              opacity: 0.9,
-              fontWeight: 'bold',
-              fontFamily: 'var(--header-font)'
+              letterSpacing: '0.14em',
+              fontWeight: 700,
+              color: 'var(--gold)',
+              fontFamily: 'var(--font-ui)'
             }}>
               Treasury
             </div>
             <div style={{
               fontSize: '28px',
               fontWeight: 'bold',
-              fontFamily: 'var(--header-font)',
+              fontFamily: 'var(--font-ui)',
               display: 'flex',
               alignItems: 'baseline',
               gap: '8px'
@@ -204,7 +206,7 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
               {totalGold} <span style={{ fontSize: '18px', opacity: 0.8 }}>GP</span>
             </div>
           </div>
-          <div style={{ fontSize: '24px', opacity: 0.7 }}>🔍</div>
+          <div style={{ fontFamily: 'var(--font-ui)', fontSize: '0.85rem', color: 'var(--muted)' }}>View</div>
         </div>
 
         {/* Tabs: collected items vs per-hero loadout */}
@@ -217,7 +219,7 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
             onClick={() => setActiveTab('items')}
             style={{ flex: 1 }}
           >
-            ⚔️ Items
+            Items
           </button>
           <button
             type="button"
@@ -227,7 +229,7 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
             onClick={() => setActiveTab('loadout')}
             style={{ flex: 1 }}
           >
-            🛡️ Loadout
+            Loadout
           </button>
         </div>
 
@@ -492,8 +494,9 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
             // here nested inside that body produced a double scrollbar (matches the item shelf).
             border: '1px solid var(--border)',
             boxShadow: 'inset 0 4px 15px rgba(0,0,0,0.8)',
-            display: 'flex',
-            flexDirection: 'column',
+            // One card per hero, two across when the book is wide enough.
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))',
             gap: '14px'
           }}>
             {party.length === 0 ? (
@@ -512,8 +515,18 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
                 borderRadius: '8px',
                 padding: '12px 14px'
               }}>
-                <div style={{ fontWeight: 'bold', color: 'var(--primary)', marginBottom: '8px', fontFamily: 'var(--header-font)' }}>
-                  {heroName}{heroClass ? ` (${heroClass})` : ''}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                  {hero.profilePicture && (
+                    <img
+                      src={resolveProfilePicture(hero.profilePicture)}
+                      alt=""
+                      style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center 20%', border: '2px solid var(--gold, var(--primary))', flexShrink: 0 }}
+                    />
+                  )}
+                  <div style={{ fontWeight: 'bold', color: 'var(--text)', fontFamily: 'var(--font-display, var(--header-font))', fontSize: '1.05rem' }}>
+                    {heroName}
+                    {heroClass ? <span style={{ display: 'block', fontFamily: 'var(--font-ui)', fontWeight: 400, fontSize: '0.84rem', color: 'var(--text-secondary)' }}>{heroClass}</span> : null}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {EQUIP_SLOTS.map((slot) => {

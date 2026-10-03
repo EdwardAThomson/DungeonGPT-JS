@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import '../styles/navigation.css';
 
-const NavDropdown = ({ label, items, onNavClose }) => {
+const NavDropdown = ({ label, ariaLabel, items, onNavClose }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
@@ -75,7 +75,7 @@ const NavDropdown = ({ label, items, onNavClose }) => {
         onKeyDown={handleButtonKeyDown}
         aria-expanded={isOpen}
         aria-haspopup="true"
-        aria-label={`${label} menu`}
+        aria-label={`${ariaLabel || label} menu`}
       >
         {label} <span className="dropdown-arrow" aria-hidden="true">{isOpen ? '▲' : '▼'}</span>
       </button>

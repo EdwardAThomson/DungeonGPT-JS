@@ -3,9 +3,9 @@
 Ready-to-run prompts for building interiors (see `MISSING_BUILDING_IMAGES.md`). A building
 renders the placeholder in `BuildingModal` until its `.webp` exists.
 
-**Status:** the original 9 missing roster images and the 10 expansion buildings below have
-been generated and wired into map gen. The only outstanding roster image is **`workshop`**
-(quest building — see below).
+**Status:** the original 9 missing roster images, the 10 expansion buildings below, and
+`workshop` (quest building — see below) have all been generated and wired into map gen.
+No outstanding roster images remain; prompts below are kept as the generation record.
 
 ## Style (shared)
 Painterly digital fantasy art; warm, dramatic lighting; detailed medieval/fantasy **interior**;

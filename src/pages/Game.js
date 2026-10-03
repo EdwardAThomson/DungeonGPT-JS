@@ -27,7 +27,7 @@ import { getStepHint, getQuestObjectiveStep, summarizeQuestReward, describeTurnI
 import { generateMovementNarrative } from '../game/movementController';
 import { computeWalkPath, runTileWalk, TILE_STEP_MS } from '../game/tileWalk';
 import { stepMobs, spawnWanderingMob, countActiveWanderingMobs, WANDERING_MOB_CAP } from '../game/mobMovement';
-import { buildSaveName } from '../game/saveController';
+import { buildSaveName, saveRootFor } from '../game/saveController';
 import { conversationsApi } from '../services/conversationsApi';
 import {
   applyWorldMapMove,
@@ -126,7 +126,7 @@ const SaveConfirmationModal = () => {
 
   return (
     <ModalShell modalId="saveConfirmation" ariaLabel="Save Confirmation" style={{ maxWidth: '420px', textAlign: 'center' }}>
-      <h3 style={{ marginBottom: '15px', color: headingColor }}>{heading}</h3>
+      <h3 style={{ margin: '0 0 12px', color: headingColor, fontFamily: 'var(--font-display)', fontSize: '1.4rem', letterSpacing: 'normal', textTransform: 'none' }}>{heading}</h3>
       <p style={{ marginBottom: '10px', color: 'var(--text)' }}>
         {blurb}
       </p>
@@ -2201,7 +2201,7 @@ const Game = ({ resumeConversation = null }) => {
   }
 
   return (
-    <div className="game-page-wrapper">
+    <div className="gm-page">
       {isBackfilling && backfillProgress && (
         <div style={{
           position: 'fixed',
@@ -2236,7 +2236,7 @@ const Game = ({ resumeConversation = null }) => {
           </div>
         </div>
       )}
-      <div className="game-container">
+      <div className="gm-shell">
         <GameMainPanel
           campaignGoal={settings.campaignGoal}
           partyLeadName={selectedHeroes?.[0]?.heroName || selectedHeroes?.[0]?.characterName || null}
@@ -2258,8 +2258,7 @@ const Game = ({ resumeConversation = null }) => {
           // above pins the Party tab because its intent is unambiguous.
           onOpenSettings={() => openAdventureBook()}
           onManualSave={async () => {
-            const currentRoot = (settings?.saveName || '').trim();
-            const title = buildSaveName(currentRoot);
+            const title = buildSaveName(saveRootFor(settings));
             // performSave reports what actually happened so the confirmation is honest:
             // 'saved' | 'savedLocal' | 'forked' | 'nochange' | 'skipped' | 'error'.
             const status = await performSave();
@@ -2267,7 +2266,7 @@ const Game = ({ resumeConversation = null }) => {
               status,
               title,
               signedIn: !!user, // drives the "where did it save" indicator
-              root: settings?.saveName || '',
+              root: saveRootFor(settings),
               // Change the campaign root name: keep it for future saves (settings) and
               // update the just-saved row's name immediately.
               onRename: async (newRoot) => {
@@ -2322,7 +2321,7 @@ const Game = ({ resumeConversation = null }) => {
 
         {/* Mobile party toggle button - uses first hero portrait */}
         <button
-          className="mobile-party-toggle"
+          className="gm-party-toggle"
           onClick={() => setIsMobilePartySidebarOpen(!isMobilePartySidebarOpen)}
           aria-label="Toggle party sidebar"
         >
@@ -2332,7 +2331,7 @@ const Game = ({ resumeConversation = null }) => {
             <img
               src={resolveProfilePicture(selectedHeroes[0].profilePicture)}
               alt="Party"
-              className="mobile-party-toggle-portrait"
+              className="gm-party-toggle-portrait"
             />
           ) : (
             '⚔️'
@@ -2342,7 +2341,7 @@ const Game = ({ resumeConversation = null }) => {
         {/* Mobile overlay */}
         {isMobilePartySidebarOpen && (
           <div
-            className="mobile-party-overlay"
+            className="gm-party-scrim"
             onClick={() => setIsMobilePartySidebarOpen(false)}
           />
         )}

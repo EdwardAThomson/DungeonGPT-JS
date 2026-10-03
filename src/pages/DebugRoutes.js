@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import TownMapTest from './TownMapTest';
 import DiceTest from './DiceTest';
@@ -11,6 +11,7 @@ import WorldFixedMapTest from './WorldFixedMapTest';
 import LargeWorldTest from './LargeWorldTest';
 import LargeWorldViewportTest from './LargeWorldViewportTest';
 import LakeTest from './LakeTest';
+import RiverPathTest from './RiverPathTest';
 import TownWaterTest from './TownWaterTest';
 import SiteMapTest from './SiteMapTest';
 import QuestTest from './QuestTest';
@@ -59,6 +60,7 @@ const debugSections = [
       { to: 'large-world', label: 'Large World (chunk assembly)' },
       { to: 'large-world-viewport', label: 'Large World Viewport (scroll+zoom)' },
       { to: 'lake-test', label: 'Lake Test (corners)' },
+      { to: 'river-path-test', label: 'River / Path Test (seeded scan)' },
       { to: 'town-water', label: 'Town Water (lake/coast)' },
       { to: 'site-map', label: 'Site Map (caves/ruins)' },
     ],
@@ -165,48 +167,80 @@ const DebugIndex = () => (
   </div>
 );
 
+// Which section (if any) contains the given pathname — used both to auto-expand the
+// section you're currently in and to highlight the active link.
+const sectionForPath = (pathname) =>
+  debugSections.find((section) => section.links.some((item) => (item.external ? item.to : `/debug/${item.to}`) === pathname));
+
 const DebugRoutes = () => {
   const location = useLocation();
+
+  // Collapsed by default (this list was getting long enough to be "hard on the eyes" open
+  // all at once) — only the section containing whatever page you're currently on starts
+  // expanded. Navigating into a different section expands that one too, without forcibly
+  // collapsing sections you opened yourself.
+  const [openSections, setOpenSections] = useState(() => {
+    const initial = {};
+    const active = sectionForPath(location.pathname);
+    if (active) initial[active.title] = true;
+    return initial;
+  });
+
+  useEffect(() => {
+    const active = sectionForPath(location.pathname);
+    if (active) setOpenSections((prev) => (prev[active.title] ? prev : { ...prev, [active.title]: true }));
+  }, [location.pathname]);
+
+  const toggleSection = (title) => setOpenSections((prev) => ({ ...prev, [title]: !prev[title] }));
 
   return (
     <div className="page-container" style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 16 }}>
       <aside style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, height: 'fit-content' }}>
         <h3 style={{ marginTop: 0 }}>Debug Tools</h3>
-        {debugSections.map((section) => (
-          <div key={section.title} style={{ marginBottom: 16 }}>
-            <div style={{
-              fontSize: 11,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              color: 'var(--text-muted, #888)',
-              marginBottom: 6,
-            }}>
-              {section.title}
+        {debugSections.map((section) => {
+          const isOpen = !!openSections[section.title];
+          return (
+            <div key={section.title} style={{ marginBottom: 8 }}>
+              <button
+                type="button"
+                onClick={() => toggleSection(section.title)}
+                aria-expanded={isOpen}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+                  background: 'none', border: 'none', padding: '4px 0', cursor: 'pointer',
+                  fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+                  color: 'var(--text-muted, #888)', textAlign: 'left',
+                }}
+              >
+                <span style={{ display: 'inline-block', transition: 'transform 0.15s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>▸</span>
+                {sectionIcons[section.title]} {section.title}
+              </button>
+              {isOpen && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                  {section.links.map((item) => {
+                    const target = item.external ? item.to : `/debug/${item.to}`;
+                    const isActive = location.pathname === target;
+                    return (
+                      <Link
+                        key={item.to}
+                        to={target}
+                        style={{
+                          textDecoration: 'none',
+                          color: isActive ? 'var(--primary)' : 'var(--text)',
+                          fontWeight: isActive ? 700 : 400,
+                          fontSize: 13,
+                          paddingLeft: 14,
+                        }}
+                      >
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {section.links.map((item) => {
-                const target = item.external ? item.to : `/debug/${item.to}`;
-                const isActive = location.pathname === target;
-                return (
-                  <Link
-                    key={item.to}
-                    to={target}
-                    style={{
-                      textDecoration: 'none',
-                      color: isActive ? 'var(--primary)' : 'var(--text)',
-                      fontWeight: isActive ? 700 : 400,
-                      fontSize: 13,
-                      paddingLeft: 8,
-                    }}
-                  >
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </aside>
       <section style={{ minWidth: 0 }}>
         <Routes>
@@ -226,6 +260,7 @@ const DebugRoutes = () => {
           <Route path="large-world" element={<LargeWorldTest />} />
           <Route path="large-world-viewport" element={<LargeWorldViewportTest />} />
           <Route path="lake-test" element={<LakeTest />} />
+          <Route path="river-path-test" element={<RiverPathTest />} />
           <Route path="town-water" element={<TownWaterTest />} />
           <Route path="site-map" element={<SiteMapTest />} />
           <Route path="npc-test" element={<NPCTest />} />

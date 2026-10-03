@@ -13,9 +13,14 @@ jest.mock('../contexts/AuthContext', () => ({
   useAuth: jest.fn(),
 }));
 
+// Keep the real router exports (AiPoolPills renders a <Link>, which needs both
+// the real component and a Router context); only stub navigation.
 jest.mock('react-router-dom', () => ({
+  ...jest.requireActual('react-router-dom'),
   useNavigate: () => jest.fn(),
 }));
+const { MemoryRouter } = require('react-router-dom');
+const renderProfile = () => render(<MemoryRouter><Profile /></MemoryRouter>);
 
 jest.mock('../services/redemptionApi', () => {
   class RedemptionError extends Error {
@@ -70,7 +75,7 @@ describe('Profile redemption', () => {
   it('success: confirms the granted tier and end date, and refreshes the tier state', async () => {
     const auth = mockAuth();
     redeemCode.mockResolvedValue({ tier: 'member', expiresAt: '2026-08-06T12:00:00.000Z' });
-    render(<Profile />);
+    renderProfile();
 
     typeAndRedeem('abcd efgh jklm');
 
@@ -90,7 +95,7 @@ describe('Profile redemption', () => {
   it('invalid code: one friendly line covering expired/disabled/exhausted/unknown', async () => {
     mockAuth();
     redeemCode.mockRejectedValue(new RedemptionError('That code is not valid', 'code_invalid'));
-    render(<Profile />);
+    renderProfile();
 
     typeAndRedeem();
 
@@ -103,7 +108,7 @@ describe('Profile redemption', () => {
   it('already redeemed: its own distinct message', async () => {
     mockAuth();
     redeemCode.mockRejectedValue(new RedemptionError('already', 'already_redeemed'));
-    render(<Profile />);
+    renderProfile();
 
     typeAndRedeem();
 
@@ -117,7 +122,7 @@ describe('Profile redemption', () => {
   it('rate limited: "too many attempts today"', async () => {
     mockAuth();
     redeemCode.mockRejectedValue(new RedemptionError('slow down', 'rate_limited'));
-    render(<Profile />);
+    renderProfile();
 
     typeAndRedeem();
 
@@ -128,7 +133,7 @@ describe('Profile redemption', () => {
 
   it('shows the grant end date on the Membership row when the tier is grant-backed', () => {
     mockAuth({ tier: 'member', tierExpiresAt: '2026-08-06T12:00:00.000Z' });
-    render(<Profile />);
+    renderProfile();
 
     expect(screen.getByText('🔱 Member')).toBeInTheDocument();
     expect(
@@ -140,7 +145,7 @@ describe('Profile redemption', () => {
 
   it('shows no end date for a stored (not time-boxed) tier', () => {
     mockAuth({ tier: 'premium', tierExpiresAt: null });
-    render(<Profile />);
+    renderProfile();
 
     expect(screen.getByText('💎 Premium')).toBeInTheDocument();
     expect(screen.queryByText(/active until/i)).not.toBeInTheDocument();
@@ -148,7 +153,7 @@ describe('Profile redemption', () => {
 
   it('disables the Redeem button while the input is empty', () => {
     mockAuth();
-    render(<Profile />);
+    renderProfile();
     expect(screen.getByRole('button', { name: /^redeem$/i })).toBeDisabled();
   });
 });
@@ -164,7 +169,7 @@ describe('Profile AI usage row (#6 visibility slice)', () => {
       premiumDaily: { used: 7, limit: 100 },
       premiumMonthly: { used: 42, limit: 800 },
     });
-    render(<Profile />);
+    renderProfile();
 
     expect(screen.getByText('AI usage')).toBeInTheDocument();
     expect(
@@ -178,7 +183,7 @@ describe('Profile AI usage row (#6 visibility slice)', () => {
       tier: 'members',
       credits: { month: '2026-07', balance: 800 },
     });
-    render(<Profile />);
+    renderProfile();
 
     expect(screen.getByText(/AI credits granted this month: 800/)).toBeInTheDocument();
     expect(screen.getByText(/managed at octonion\.io/)).toBeInTheDocument();
@@ -186,7 +191,7 @@ describe('Profile AI usage row (#6 visibility slice)', () => {
 
   it('hides the row entirely when there is no usage and no credit data (free/guest)', () => {
     mockAuth({ tier: 'free' });
-    render(<Profile />);
+    renderProfile();
 
     expect(screen.queryByText('AI usage')).not.toBeInTheDocument();
     expect(screen.queryByText(/Premium generations/)).not.toBeInTheDocument();

@@ -16,6 +16,21 @@ export const buildSaveName = (root, date = new Date()) => {
   return `${trimmed} - ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
 };
 
+// The root to save under: the player's own name for the campaign when they have set one
+// (game_settings.saveName), otherwise the campaign chapter's title, so an unnamed save
+// reads "The Goblin Threat - <date>" rather than "Adventure - <date>". templateName is
+// "<Realm> — <Chapter>" for authored campaigns (campaignLauncher), and the chapter part is
+// the distinctive bit; it is derived at save time, so a continued campaign picks up the
+// new chapter's title. Custom tales and settings without a known template keep the default.
+export const saveRootFor = (settings) => {
+  const own = typeof settings?.saveName === 'string' ? settings.saveName.trim() : '';
+  if (own) return own;
+  const label = typeof settings?.templateName === 'string' ? settings.templateName.trim() : '';
+  if (!label || /^(custom tale|unknown template)$/i.test(label)) return DEFAULT_SAVE_ROOT;
+  const parts = label.split(/\s+[—–]\s+/);
+  return parts[parts.length - 1].trim() || DEFAULT_SAVE_ROOT;
+};
+
 // Recover the editable root from a full save name by stripping a trailing
 // " - <date> <time>" suffix. Used only as a fallback for older saves that predate the
 // stored `saveName` root; prefer game_settings.saveName when it exists.

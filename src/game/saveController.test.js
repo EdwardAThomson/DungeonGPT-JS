@@ -1,4 +1,4 @@
-import { buildSaveFingerprint, buildSubMapsPayload, buildSaveName, parseSaveRoot, DEFAULT_SAVE_ROOT } from './saveController';
+import { buildSaveFingerprint, buildSubMapsPayload, buildSaveName, parseSaveRoot, saveRootFor, DEFAULT_SAVE_ROOT } from './saveController';
 
 describe('buildSaveName', () => {
   const date = new Date('2026-07-02T14:30:00');
@@ -18,6 +18,34 @@ describe('buildSaveName', () => {
 
   it('trims the root', () => {
     expect(buildSaveName('  My Saga  ', date).startsWith('My Saga - ')).toBe(true);
+  });
+});
+
+describe('saveRootFor', () => {
+  it("prefers the player's own campaign name", () => {
+    expect(saveRootFor({ saveName: '  My Saga ', templateName: 'Heroic Fantasy — The Goblin Threat' })).toBe('My Saga');
+  });
+
+  it('falls back to the chapter title of an authored campaign', () => {
+    expect(saveRootFor({ templateName: 'Heroic Fantasy — The Goblin Threat' })).toBe('The Goblin Threat');
+    expect(saveRootFor({ templateName: 'Grimdark Survival – The Blighted Village' })).toBe('The Blighted Village');
+    expect(saveRootFor({ templateName: 'Tidewater' })).toBe('Tidewater');
+  });
+
+  it('keeps a hyphenated title intact (only em/en dashes separate realm and chapter)', () => {
+    expect(saveRootFor({ templateName: 'Heroic Fantasy — Twice-Born King' })).toBe('Twice-Born King');
+  });
+
+  it('uses the default for custom tales, unknown templates and missing settings', () => {
+    expect(saveRootFor({ templateName: 'Custom Tale' })).toBe(DEFAULT_SAVE_ROOT);
+    expect(saveRootFor({ templateName: 'Unknown Template' })).toBe(DEFAULT_SAVE_ROOT);
+    expect(saveRootFor({ saveName: '   ' })).toBe(DEFAULT_SAVE_ROOT);
+    expect(saveRootFor(null)).toBe(DEFAULT_SAVE_ROOT);
+  });
+
+  it('round-trips through buildSaveName / parseSaveRoot', () => {
+    const date = new Date(2026, 9, 2, 9, 48, 56);
+    expect(parseSaveRoot(buildSaveName(saveRootFor({ templateName: 'Heroic Fantasy — The Goblin Threat' }), date))).toBe('The Goblin Threat');
   });
 });
 

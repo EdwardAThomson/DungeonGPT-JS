@@ -93,8 +93,12 @@ prompt by `generateResponse()` (`useGameInteraction.js`). What changes:
 
 ## Work items
 
-Direction is decided; none of this is scheduled. Sequencing is roughly as listed since
-each item reduces risk for the next.
+Phase 1 shipped 2026-07-19 (PR #152): items 2, 3 (client parsing; the dead helpers in
+`milestoneEngine.js` remain for Phase 2 cleanup), 5 and 6, plus the judgment-block removal
+from item 1. The "Today" column in the table above records the pre-Phase-1 state. The
+rest (few-shot rewrite and rule 8 from item 1, items 4, 7 beyond the opening, 8 and 9) is
+Phase 2 and not yet scheduled. Sequencing is roughly as listed since each item reduces
+risk for the next.
 
 1. **DM_PROTOCOL rewrite** (`src/data/prompts.js`): remove the MILESTONE TRACKING and
    CAMPAIGN COMPLETION blocks and rule 8; reframe the model's job as narrating
@@ -189,6 +193,9 @@ should inherit this constraint.
 
 ## Related docs
 
+- [AI_DM_DESIGN_DIRECTION.md](AI_DM_DESIGN_DIRECTION.md): extends this contract from
+  milestones to the whole turn (code holds state, decides and picks context; the model reads
+  free text and narrates), with buttons and free text resolving through one rulebook.
 - [CAMPAIGN_MILESTONE_SYSTEM.md](CAMPAIGN_MILESTONE_SYSTEM.md): the milestone engine.
   Its "Narrative Milestones (Guided Flexibility)" section (marker system retained as the
   lower-priority path) is superseded by this decision.

@@ -75,92 +75,6 @@
   background: var(--primary);
 }
 
-/* Next-step prompt banner (roster, summary confirmation, etc.) */
-.next-step-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px 20px;
-  margin-bottom: 20px;
-}
-
-.next-step-banner.highlight {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(125, 90, 200, 0.12);
-}
-
-.next-step-banner-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.next-step-banner-title {
-  font-family: var(--header-font);
-  color: var(--text);
-  font-size: 1.05rem;
-}
-
-.next-step-banner-subtitle {
-  color: var(--text-secondary);
-  font-size: 0.88rem;
-}
-
-/* Empty-state card (no heroes / no saved games) */
-.onboarding-empty {
-  text-align: center;
-  max-width: 460px;
-  margin: 32px auto;
-  padding: 28px 24px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-
-.onboarding-empty-icon {
-  font-size: 2.4rem;
-  margin-bottom: 8px;
-}
-
-.onboarding-empty h3 {
-  font-family: var(--header-font);
-  color: var(--text);
-  margin: 0 0 8px 0;
-}
-
-.onboarding-empty p {
-  color: var(--text-secondary);
-  margin: 0 0 20px 0;
-  line-height: 1.5;
-}
-
-/* Guest roster note ("saved on this device") */
-.guest-roster-note {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 14px;
-  margin-bottom: 16px;
-  color: var(--text-secondary);
-  font-size: 0.88rem;
-}
-
-.guest-roster-note .link-button {
-  background: none;
-  border: none;
-  color: var(--primary);
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
-}
-
 /* Guest conversion banner (app-wide, dismissible) */
 .guest-banner {
   display: flex;
@@ -219,6 +133,14 @@
   color: var(--text);
 }
 
+/* Phones: one compact row ("Playing as a guest." + Sign in + close) instead of a
+   ~180px block on every page; the full explanation stays on wider screens. */
+@media (max-width: 600px) {
+  .guest-banner { flex-wrap: nowrap; padding: 8px 12px; gap: 10px; }
+  .guest-banner-detail { display: none; }
+  .guest-banner-cta { padding: 6px 12px; }
+}
+
 /* Local-hero import confirmation toast */
 .local-sync-toast {
   position: fixed;
@@ -252,5 +174,4 @@
   .onboarding-step-label { font-size: 0.72rem; }
   .onboarding-step-marker { width: 30px; height: 30px; }
   .onboarding-step-connector { top: 14px; }
-  .next-step-banner { flex-direction: column; align-items: stretch; text-align: center; }
 }

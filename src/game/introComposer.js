@@ -143,10 +143,12 @@ export const composeIntro = (settings = {}, selectedHeroes = [], opts = {}) => {
     const sceneLines = [];
     if (setting) sceneLines.push(setting);
 
-    // Arrival, grounded to the real start place + biome.
+    // Arrival, grounded to the real start place + biome. A lone hero (or the generic
+    // "Your party" fallback) takes the singular verb: "Marius comes", not "Marius come".
+    const plural = selectedHeroes.length > 1;
     const arrival = isTown
-      ? `${party} come at last within sight of ${startPlaceName}, ${startSize ? `a ${startSize} ` : 'a settlement '}set amid ${bio.land}.`
-      : `${party} arrive in the ${bio.land}, at the threshold of the journey ahead.`;
+      ? `${party} ${plural ? 'come' : 'comes'} at last within sight of ${startPlaceName}, ${startSize ? `a ${startSize} ` : 'a settlement '}set amid the ${bio.land}.`
+      : `${party} ${plural ? 'arrive' : 'arrives'} in the ${bio.land}, at the threshold of the journey ahead.`;
     sceneLines.push(arrival);
 
     // Atmosphere: biome detail, then light qualifier, then tone/mood.

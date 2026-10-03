@@ -2,13 +2,14 @@
 
 **🎮 Live App:** https://dungeongpt.xyz/
 
-This is a web application built with React that allows users to create detailed characters for role-playing games, manage them, and use them in an interactive game session powered by an AI dungeon master. The live app runs on Cloudflare Workers AI with a curated set of open-weights models (including GPT-OSS, Llama, and Gemma); members additionally get a premium model pool served via OpenRouter.
+This is a web application built with React that allows users to create detailed characters for role-playing games, manage them, and use them in an interactive game session powered by an AI dungeon master.
 
 This project is based upon the [Python version of the same name](https://github.com/EdwardAThomson/DungeonGPT).
 
 YouTube Videos 🎥:
 
 * [How To Play / Overview](https://youtu.be/CGskdUTQnMo)
+* [DungeonGPT goes live!](https://youtu.be/0Dvaz9yULuA)
 * [AI-powered quests: How can we solve non-determinism with LLM outputs?](https://youtu.be/Rzv3Rh3aOkM)
 
 
@@ -35,7 +36,7 @@ YouTube Videos 🎥:
 *   **Conversation Memory (RAG):** The AI recalls earlier story beats via on-device retrieval over embedded history.
 *   **Guest / Local-First Play:** Try the game without an account; heroes and saves live in the browser and sync to the cloud on sign-in.
 *   **Onboarding:** A guided tour and a 27-point-buy hero creator.
-*   **AI Models:** Runs on Cloudflare Workers AI with a curated 5-model lineup (GPT-OSS 120B/20B, Llama 4 Scout, Gemma 3 12B, Llama 3.1 8B Fast). Local development additionally supports OpenAI, Gemini, and Claude. Member+ accounts get a premium model pool via OpenRouter (server-side, with a daily allowance and automatic fallback to the free pool).
+*   **AI Models:** Runs on Cloudflare Workers AI with a curated 4-model lineup (GPT-OSS 120B/20B, Llama 4 Scout, Llama 3.1 8B Fast). Local development additionally supports OpenAI, Gemini, and Claude. Member+ accounts get a premium model pool via OpenRouter (server-side, with a daily allowance and automatic fallback to the free pool).
 *   **User Authentication:** Secure sign-in via Octonion hub (centralized auth across games).
 *   **Membership Tiers:** Account tiers (Free / Member / Premium / Elite) stored server-side; premium story templates are delivered from the server to entitled accounts, and the profile page shows the current tier. Members can redeem a code on the Profile page for time-boxed membership (with the active-until date shown) and pick their AI pool (Free / Premium) there too.
 *   **Persistent Sessions:** Characters and game sessions saved to a self-hosted PostgreSQL database, accessed through the CF Worker (via Cloudflare Hyperdrive) with row-level access enforcement.
@@ -61,7 +62,7 @@ src/
 ├── game/            # Game logic controllers (movement, encounters, saves)
 ├── hooks/           # Custom React hooks (useGameMap, useGameSession, etc.)
 ├── llm/             # LLM integration (model resolver, constants)
-├── pages/           # Page components (Game, CharacterCreation, Login, etc.)
+├── pages/           # Page components (Game, HeroCreation, Login, etc.)
 ├── services/        # API client services (auth, heroes, conversations, LLM)
 ├── styles/          # Feature-based CSS files
 └── utils/           # Utility functions (map generation, health system, etc.)
@@ -164,7 +165,7 @@ This is a guide for deploying the app locally.
 
     ```bash
     cd cf-worker && npx wrangler dev   # local worker on :8787
-    npm run deploy                     # build + deploy (run from repo root)
+    cd cf-worker && npm run deploy     # manual worker deploy (CI deploys on push to master)
     ```
 
 ### Production Deployment
@@ -175,12 +176,12 @@ The app is deployed on:
 - **Backend:** Cloudflare Workers
 - **Database:** Self-hosted PostgreSQL via Cloudflare Hyperdrive
 
-For deployment instructions, see the deployment guides in `/docs`.
+The frontend deploys automatically to Cloudflare Pages on push to `master`; the Worker is deployed by CI. For deploys, rollbacks and backups, see `docs/OPS_RUNBOOK.md`.
 
 ## Usage
 
-1.  **Create a hero** using the "Hero Creator" form with detailed stats, class, and background
-2.  **View and manage** your heroes under "All Heroes"
+1.  **Create a hero** from "Your Heroes" (Create Hero) with detailed stats, class, and background
+2.  **View and manage** your heroes under "Your Heroes"
 3.  **Start a new game** by going to "New Game", configuring settings, and selecting your party
 4.  **Explore the world** with a procedurally generated map featuring biomes, towns, and encounters
 5.  **Play the game** by interacting with the AI Dungeon Master through text commands
@@ -216,9 +217,8 @@ For deployment instructions, see the deployment guides in `/docs`.
 
 ## Potential Future Improvements
 
-*   💳 **Billing Integration** — Credit-based system with Lemon Squeezy
-*   📊 **Usage Tracking** — AI usage analytics and cost monitoring
-*   🚀 **Rate Limiting** — Request throttling and abuse prevention
+*   💳 **Billing completion** — payment rails are live via the Octonion hub (redemption codes + hub-enforced tiers); the remaining piece is wiring in-game AI usage to debit hub credits
+*   📊 **Usage Tracking** — a read-only premium-AI usage meter is live on Profile; per-generation cost accounting is not yet built
 *   📈 **Monitoring** — Error tracking and performance metrics
 *   🎬 **Streaming AI Responses** — Real-time text generation for better UX
 *   🧪 **Expanded Testing** — Unit and integration tests for core game loops
@@ -250,4 +250,4 @@ This project uses d20-based game mechanics (rolling a 20-sided die for skill che
 
 This project uses various open-source libraries (React, Express, SQLite3, etc.) under their respective licenses. See [CREDITS.md](./CREDITS.md) for a complete list.
 
-For contribution guidelines, see [CONTRIBUTING.md](./CONTRIBUTING.md) if available.
+For contribution guidelines, see [CONTRIBUTING.md](./CONTRIBUTING.md).

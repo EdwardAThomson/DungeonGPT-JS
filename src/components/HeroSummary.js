@@ -10,7 +10,10 @@ import { heroesApi } from "../services/heroesApi";
 import { createLogger } from "../utils/logger";
 import { resolveProfilePicture } from "../utils/assetHelper";
 import OnboardingSteps from "./OnboardingSteps";
+import RdDialog from './RdDialog';
 import { validateHero } from "../game/heroValidation";
+import { calculateModifier } from "../utils/rules";
+import "../styles/redesign.css";
 
 const logger = createLogger('hero-summary');
 
@@ -106,7 +109,7 @@ const HeroSummary = () => {
   };
 
   if (!newHero) {
-    return <p className="page-container">No hero data found. Please create a hero first.</p>;
+    return <div className="rd-page rd-app"><section className="band"><div className="wrap"><p className="app-status">No hero data found. Please create a hero first.</p></div></section></div>;
   }
 
   const closeFeedbackModal = () => {
@@ -115,128 +118,94 @@ const HeroSummary = () => {
     if (onConfirm) onConfirm();
   };
 
+  const STAT_ORDER = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
+  const fmtMod = (score) => {
+    const m = calculateModifier(score);
+    return m >= 0 ? `+${m}` : `${m}`;
+  };
+  const backToEdit = () => {
+    navigate("/hero-creation", {
+      state: {
+        newCharacter: newHero,
+        editing: true,
+        // Keep the hero-selection return flow alive through an edit loop.
+        returnToHeroSelection: state?.returnToHeroSelection,
+        settingsData: state?.settingsData,
+        launchState: state?.launchState,
+      },
+    });
+  };
+
   return (
-    // Use a specific container class
-    <div className="summary-container">
-      {/* Journey bar only when this summary is part of the game-start flow (came
-          from party selection); standalone crafting shows no bar, matching
-          HeroCreation. */}
-      {!isEditing && state?.returnToHeroSelection && (
-        <OnboardingSteps currentStep={2} completedSteps={[1]} />
-      )}
-      {/* Removed main h2, using name as header */}
-      <div className="summary-content">
-        {/* Image Column */}
-        <div className="summary-image">
-          <img
-            src={resolveProfilePicture(newHero.profilePicture)}
-            alt={`${newHero.heroName}'s profile`}
-            loading="lazy"
-            width="300"
-            height="300"
-          />
+    <div className="rd-page rd-app hero-review">
+      <section className="page-header app-header">
+        <div className="wrap">
+          {/* Journey bar only when this summary is part of the game-start flow (came from
+              party selection); standalone crafting shows no bar, matching HeroCreation. */}
+          {!isEditing && state?.returnToHeroSelection && (
+            <OnboardingSteps currentStep={2} completedSteps={[1]} />
+          )}
+          <p className="eyebrow">{isEditing ? 'Review changes' : 'Review your hero'}</p>
+          <h1>Ready to {isEditing ? 'save' : 'join the roster'}?</h1>
         </div>
+      </section>
 
-        {/* Details Column */}
-        <div className="summary-details">
-          <h2>{newHero.heroName}</h2>
-          <div className="summary-info-grid">
-            <p className="kv-row">
-              <span className="detail-label">Level:</span> {newHero.heroLevel}
-            </p>
-            <p className="kv-row">
-              <span className="detail-label">Class:</span> {newHero.heroClass}
-            </p>
-            <p className="kv-row">
-              <span className="detail-label">Race:</span> {newHero.heroRace}
-            </p>
-            <p className="kv-row">
-              <span className="detail-label">Alignment:</span> {newHero.heroAlignment}
-            </p>
-          </div>
-          <p className="kv-row summary-background">
-            <span className="detail-label">Background:</span> {newHero.heroBackground}
-          </p>
-          {/* Stats List */}
-          {newHero.stats && (
-            <div className="summary-stats-list">
-              <h4>Stats:</h4>
-              <ul>
-                {Object.entries(newHero.stats).map(([stat, value]) => (
-                  <li key={stat}>
-                    {stat}: {value}
-                  </li>
-                ))}
-              </ul>
+      <section className="band">
+        <div className="wrap">
+          <article className="review-card">
+            <div className="review-portrait">
+              <img src={resolveProfilePicture(newHero.profilePicture)} alt={`${newHero.heroName}'s portrait`} loading="lazy" />
             </div>
-          )}
-          {newHero.stats && (
-            <p className="kv-row summary-max-hp">
-              <span className="detail-label">Max HP:</span> {newHero.maxHP || calculateMaxHP(newHero)}
-            </p>
-          )}
+            <div className="review-body">
+              <h2>{newHero.heroName}</h2>
+              <p className="roster-sub">Level {newHero.heroLevel} {newHero.heroClass}</p>
+              <dl className="review-facts">
+                <div><dt>Alignment</dt><dd>{newHero.heroAlignment}</dd></div>
+                <div><dt>Race</dt><dd>{newHero.heroRace}</dd></div>
+                {newHero.stats && <div><dt>Max HP</dt><dd>{newHero.maxHP || calculateMaxHP(newHero)}</dd></div>}
+              </dl>
+              {newHero.heroBackground && <p className="review-bg">{newHero.heroBackground}</p>}
+              {newHero.stats && (
+                <dl className="roster-stats review-stats">
+                  {STAT_ORDER.filter((k) => newHero.stats[k] != null).map((k) => (
+                    <div key={k}>
+                      <dt>{k.substring(0, 3)}</dt>
+                      <dd>{newHero.stats[k]}<small>{fmtMod(newHero.stats[k])}</small></dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+              <div className="review-actions">
+                <button type="button" onClick={backToEdit} className="btn btn-ghost">Back (Edit)</button>
+                {/* Download Hero JSON: hidden for now (unused); re-enable with downloadJSONFile if requested. */}
+                <button type="button" onClick={handleSaveOrUpdate} className="btn btn-primary" data-tour="save-hero">
+                  {state?.returnToHeroSelection
+                    ? (isEditing ? "Save Changes & Continue" : "Add & Continue to Party")
+                    : (isEditing ? "Save Changes" : "Add to Roster")}
+                </button>
+              </div>
+            </div>
+          </article>
         </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="summary-actions">
-        {/* Back Button - always takes you back to edit */}
-        <button
-          onClick={() => {
-            navigate("/hero-creation", {
-              state: {
-                newCharacter: newHero,
-                editing: true,
-                // Keep the hero-selection return flow alive through an edit loop.
-                returnToHeroSelection: state?.returnToHeroSelection,
-                settingsData: state?.settingsData,
-                launchState: state?.launchState,
-              },
-            });
-          }}
-          className="summary-action-btn summary-back-btn"
-        >
-          Back (Edit)
-        </button>
-        {/* Save/Add Button - Text changes based on isEditing */}
-        <button onClick={handleSaveOrUpdate} className="summary-action-btn summary-primary-btn" data-tour="save-hero">
-          {state?.returnToHeroSelection
-            ? (isEditing ? "Save Changes & Continue" : "Add & Continue to Party")
-            : (isEditing ? "Save Changes" : "Add to Roster")}
-        </button>
-        {/* Download Button — hidden for now (unused); re-enable if requested.
-        <button
-          onClick={() => downloadJSONFile(`${newHero.heroName}-hero.json`, newHero)}
-          className="summary-action-btn summary-download-btn"
-        >
-          Download Hero JSON
-        </button>
-        */}
-      </div>
+      </section>
 
       {feedbackModal && (
-        <div className="modal-overlay" onClick={closeFeedbackModal}>
-          <div className="modal-content summary-feedback-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{feedbackModal.title}</h3>
-            <p>{feedbackModal.message}</p>
-            <div className="summary-feedback-actions">
-              {/* Standalone creation ends at the Hall of Heroes; offer the jump
-                  into play so hero-first crafting isn't a dead end. The in-flow
-                  path (returnToHeroSelection) already continues to the party. */}
-              {feedbackModal.showStartAdventure && (
-                <button
-                  className="modal-close-button summary-start-adventure-btn"
-                  onClick={() => navigate('/new-game')}
-                >
-                  ⚔️ Start an Adventure
-                </button>
-              )}
-              <button className="modal-close-button" onClick={closeFeedbackModal}>
-                Continue
-              </button>
-            </div>
-          </div>
-        </div>
+        <RdDialog
+          title={feedbackModal.title}
+          tone="success"
+          onClose={closeFeedbackModal}
+          actions={<>
+            {/* Standalone creation ends at the roster; offer the jump into play so
+                hero-first crafting isn't a dead end. The in-flow path
+                (returnToHeroSelection) already continues to the party. */}
+            {feedbackModal.showStartAdventure && (
+              <button type="button" className="btn btn-ghost" onClick={() => navigate('/new-game')}>Start an Adventure</button>
+            )}
+            <button type="button" className="btn btn-primary" onClick={closeFeedbackModal}>Continue</button>
+          </>}
+        >
+          <p>{feedbackModal.message}</p>
+        </RdDialog>
       )}
 
     </div>

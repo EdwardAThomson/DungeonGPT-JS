@@ -101,15 +101,15 @@ test('guest save persists to IndexedDB and a hard reload resumes with progress',
 
   // New game via a ready-made template.
   await page.goto('/new-game');
-  await expect(page.getByRole('heading', { name: /New Game Setup/i })).toBeVisible();
-  const readyTab = page.getByRole('button', { name: /Ready-Made/i });
+  await expect(page.getByRole('heading', { name: /Choose your adventure/i })).toBeVisible();
+  const readyTab = page.getByRole('tab', { name: /Ready-made/i });
   if (await readyTab.count()) await readyTab.click().catch(() => {});
   await page.getByText('The Goblin Threat', { exact: true }).first().click(); // select the card (not "details")
   await page.getByRole('button', { name: /Next: Select Heroes/i }).click();
 
   await expect(page).toHaveURL(/hero-selection/, { timeout: 15_000 });
-  await page.locator('.hero-item', { hasText: 'Kael the Guest' }).first().click();
-  await page.getByRole('button', { name: /Start Game with Selected Heroes/i }).click();
+  await page.getByRole('button', { name: /^Kael the Guest,/ }).click();
+  await page.getByRole('button', { name: /^Start game$/i }).click();
 
   await expect(page.getByRole('heading', { name: 'Adventure Log' })).toBeVisible({ timeout: 15_000 });
   const startBtn = page.getByRole('button', { name: /Start the Adventure/i });
