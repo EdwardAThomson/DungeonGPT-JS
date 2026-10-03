@@ -84,8 +84,13 @@ const GameMainPanel = ({
   // object identity, so saved/reloaded conversations never resurrect live chips.
   hookChips = null,
   onHookChipAction,
-  onHookChipIgnore
+  onHookChipIgnore,
+  // #84 workspace spike: 'docked' = the right-hand log pane (tools live in the rail, the
+  // quest on the map stage); onCollapse folds the pane away.
+  variant,
+  onCollapse
 }) => {
+  const docked = variant === 'docked';
   // High-intent conversion prompt: fired when a guest reaches for the gated AI chat.
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   // Keep the newest entry in view as the log grows (new narration, the thinking line).
@@ -97,7 +102,7 @@ const GameMainPanel = ({
     else el.scrollTop = el.scrollHeight;
   }, [conversation.length, isLoading]);
   return (
-    <div className="gm-main">
+    <div className={`gm-main${docked ? ' ws-log' : ''}`}>
       <header className="gm-head">
         <div className="game-info-header gm-place">
           <h2 className="gm-eyebrow">Adventure Log</h2>
@@ -107,7 +112,10 @@ const GameMainPanel = ({
             <span className="gm-place-coords"> ({worldPosition.x}, {worldPosition.y})</span>
           </p>
         </div>
-        <nav className="gm-tools" aria-label="Game actions">
+        {docked && onCollapse && (
+          <button type="button" className="ws-collapse" onClick={onCollapse} aria-label="Collapse the adventure log" title="Collapse log (the map fills the screen)">»</button>
+        )}
+        {!docked && <nav className="gm-tools" aria-label="Game actions">
           <button type="button" onClick={onOpenMap} className="gm-tool primary" data-tour="open-map" aria-label={townName ? `View ${townName} map` : 'View world map'}>
             <Icon name="map" /><span>{townName ? 'Town map' : 'Map'}</span>
           </button>
@@ -124,11 +132,11 @@ const GameMainPanel = ({
             <Icon name="save" /><span>Save</span>
           </button>
           <SaveSyncIndicator status={saveStatus} isSaving={isSaving} signedIn={signedIn} />
-        </nav>
+        </nav>}
       </header>
 
       {/* Quest reminder: pinned above the log, not stored in the conversation */}
-      {campaignGoal && (
+      {campaignGoal && !docked && (
         <div className="gm-quest quest-message">
           <span className="gm-quest-label">Quest</span>
           <span>{campaignGoal}</span>

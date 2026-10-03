@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from '../contexts/AuthContext';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
-import { useModal } from '../contexts/ModalContext';
+import ModalContext, { useModal } from '../contexts/ModalContext';
 import { checkForEncounter, rollSiteWanderingEncounter } from '../utils/encounterGenerator';
 import { encounterTemplates } from '../data/encounters';
 import { isTownTileWalkable } from '../utils/townMapGenerator';
@@ -38,6 +38,7 @@ import {
   isAdjacentWorldMove,
   trackAreaVisits
 } from '../game/worldMoveController';
+import { planTravelRoute, TRAVEL_STEP_MS } from '../game/worldTravel';
 import {
   ageNarrativeHook,
   applyEncounterOutcomeToParty,
@@ -227,7 +228,7 @@ const QuestOfferModal = () => {
   );
 };
 
-const Game = ({ resumeConversation = null }) => {
+const Game = ({ resumeConversation = null, layout = 'classic' }) => {
   const { state } = useLocation();
   // On a hard reload BrowserRouter restores location.state, but that is the STALE starting
   // snapshot (initial heroes / generated map / seed from when the game began). When the
@@ -1600,8 +1601,12 @@ const Game = ({ resumeConversation = null }) => {
   };
 
   // --- Map Movement Handler (Smart narration: local line per move, AI on demand) ---
-  const handleMoveOnWorldMap = async (clickedX, clickedY) => {
-    if (!hasAdventureStarted || interactionHook.isLoading) return;
+  // `passThrough` (workspace auto-travel, #84): an intermediate tile on a route. It is a
+  // full move (narration, encounter roll, hooks) but skips the arrival prompt and rumour
+  // offer, which only the destination gets. Returns 'moved' | 'interrupted' (an
+  // encounter or narrative hook fired, so travel must stop) | 'blocked'.
+  const handleMoveOnWorldMap = async (clickedX, clickedY, { passThrough = false } = {}) => {
+    if (!hasAdventureStarted || interactionHook.isLoading) return 'blocked';
 
     if (!isAdjacentWorldMove(mapHook.playerPosition, clickedX, clickedY)) {
       // Clicking the tile you're STANDING ON re-opens its location modal — needed when
@@ -1611,7 +1616,7 @@ const Game = ({ resumeConversation = null }) => {
       if (clickedX === x && clickedY === y) {
         const tile = getTile(mapHook.worldMap, x, y);
         openPoiLocationModal(tile);
-        return; // same-tile click is never a move; no "adjacent only" nag
+        return 'blocked'; // same-tile click is never a move; no "adjacent only" nag
       }
       // Append to the conversation (a positioned log entry) rather than the sticky error
       // banner, which always shows the latest message regardless of where it happened.
@@ -1619,7 +1624,7 @@ const Game = ({ resumeConversation = null }) => {
         role: 'system',
         content: 'You can only move to an adjacent tile.'
       }]);
-      return;
+      return 'blocked';
     }
 
     // Capture the tile we are LEAVING before the move commits. If an encounter fires on
@@ -1634,7 +1639,7 @@ const Game = ({ resumeConversation = null }) => {
     mapHook.setWorldMap(newMap);
     mapHook.setPlayerPosition({ x: clickedX, y: clickedY });
     recordTurn(sessionId);
-    if (!targetTile) return;
+    if (!targetTile) return 'moved';
 
     const { biomeType, townName } = getAreaIdentifiers(targetTile);
     const { isBiomeVisited, isTownVisited } = getAreaVisitState({
@@ -1664,7 +1669,7 @@ const Game = ({ resumeConversation = null }) => {
     // If an ACTIVE milestone boss lairs on this tile (stamped enemy, or a combat milestone
     // authored at this milestone POI's location), the modal offers the fight. If a random
     // encounter interrupts this modal, clicking the tile you stand on re-opens it.
-    const poiShown = openPoiLocationModal(targetTile, effectiveMilestones);
+    const poiShown = passThrough ? false : openPoiLocationModal(targetTile, effectiveMilestones);
 
     // --- Random Encounter Check (Phase 2.4: Two-Tier System) ---
     const isFirstVisitToTile = !wasExplored;
@@ -1720,7 +1725,7 @@ const Game = ({ resumeConversation = null }) => {
 
     if (plannedEncounterFlow.flowType === 'immediate') {
       setPendingNarrativeTile(plannedEncounterFlow.pendingNarrativeTile || null);
-      return; // local narration triggers after encounter resolution
+      return 'interrupted'; // local narration triggers after encounter resolution
     }
 
     // A narrative-tier encounter on this tile is parked for the Look-around button
@@ -1758,7 +1763,10 @@ const Game = ({ resumeConversation = null }) => {
     }
 
     // On a quiet move (no POI prompt, no encounter), a rumour may offer a side quest.
-    if (!poiShown && !plannedEncounterFlow.openActionEncounter) maybeOfferRumour();
+    if (!passThrough && !poiShown && !plannedEncounterFlow.openActionEncounter) maybeOfferRumour();
+    return (plannedEncounterFlow.openActionEncounter || plannedEncounterFlow.flowType === 'narrative_context')
+      ? 'interrupted'
+      : 'moved';
   };
 
   // --- Look-around: on-demand description of the CURRENT tile ---
@@ -2200,6 +2208,133 @@ const Game = ({ resumeConversation = null }) => {
     }
   }
 
+  // Manual save, shared by the classic toolbar and the workspace rail.
+  const handleManualSave = async () => {
+    const title = buildSaveName(saveRootFor(settings));
+    // performSave reports what actually happened so the confirmation is honest:
+    // 'saved' | 'savedLocal' | 'forked' | 'nochange' | 'skipped' | 'error'.
+    const status = await performSave();
+    openSaveConfirmation({
+      status,
+      title,
+      signedIn: !!user, // drives the "where did it save" indicator
+      root: saveRootFor(settings),
+      // Change the campaign root name: keep it for future saves (settings) and
+      // update the just-saved row's name immediately.
+      onRename: async (newRoot) => {
+        setSettings(prev => ({ ...prev, saveName: newRoot }));
+        try {
+          await conversationsApi.updateName(sessionId, newRoot);
+        } catch (e) {
+          logger.error('Failed to rename save', e);
+        }
+      }
+    });
+  };
+
+  // ---- #84 workspace spike: map-as-stage layout + auto-travel --------------------------
+  const isWorkspace = layout === 'workspace';
+  const [stageEl, setStageEl] = useState(null);
+  const [logCollapsed, setLogCollapsed] = useState(false);
+  const [wsTab, setWsTab] = useState('map'); // phones: Map | Log (Log is forced before the start, where the Start button lives)
+  const [travel, setTravel] = useState(null); // { path:[{x,y}], dest:{x,y}, label }
+  const [resumeTravel, setResumeTravel] = useState(null); // { dest, label } after an interruption
+  const [travelSpeed, setTravelSpeed] = useState(1);
+  const [wsToast, setWsToast] = useState(null);
+  // Any pop-up open (encounter, location prompt, dialog)? Travel waits for it, and the
+  // resume control is hidden until it closes. Legacy boolean modals are caught by the DOM check.
+  const modalStack = useContext(ModalContext)?.stack || [];
+  const popupOpen = () => modalStack.length > 0 || !!document.querySelector('.modal-overlay, .rd-dialog-overlay');
+
+  const placeLabel = (x, y) => {
+    const t = getTile(mapHook.worldMap, x, y);
+    return t?.townName || (t?.mountainName && t.isFirstMountainInRange ? t.mountainName : null) || `(${x}, ${y})`;
+  };
+
+  const startTravel = (x, y) => {
+    if (popupOpen()) return;
+    const from = mapHook.playerPosition;
+    const path = planTravelRoute(mapHook.worldMap, from, { x, y });
+    if (!path) {
+      interactionHook.setConversation((prev) => [...prev, { role: 'system', content: 'There is no way across the water to there.' }]);
+      return;
+    }
+    if (path.length === 0) { handleMoveOnWorldMap(x, y); return; }
+    setResumeTravel(null);
+    setTravel({ path, dest: { x, y }, label: placeLabel(x, y) });
+  };
+
+  // World clicks in the workspace: adjacent = one ordinary move; farther = auto-travel;
+  // any click while travelling stops the party where it stands.
+  const handleWorkspaceWorldClick = (x, y) => {
+    if (!hasAdventureStarted || interactionHook.isLoading) return;
+    if (travel) { setTravel(null); return; }
+    const p = mapHook.playerPosition;
+    if ((x === p.x && y === p.y) || isAdjacentWorldMove(p, x, y)) { setResumeTravel(null); handleMoveOnWorldMap(x, y); return; }
+    startTravel(x, y);
+  };
+
+  // Walk the route one tile per step. Each step is a full move (encounters roll per tile);
+  // intermediate tiles pass through (no arrival prompt), the last one arrives normally.
+  // The effect re-runs after every step with fresh closures (position/map changed).
+  useEffect(() => {
+    if (!travel || interactionHook.isLoading || modalStack.length > 0) return undefined;
+    const timer = setTimeout(async () => {
+      if (popupOpen()) { setTravel({ ...travel }); return; } // re-check after the pop-up closes
+      const [next, ...rest] = travel.path;
+      const status = await handleMoveOnWorldMap(next.x, next.y, { passThrough: rest.length > 0 });
+      if (status === 'moved' && rest.length > 0) {
+        setTravel({ ...travel, path: rest });
+        return;
+      }
+      setTravel(null);
+      if (status === 'interrupted' && rest.length > 0) setResumeTravel({ dest: travel.dest, label: travel.label });
+    }, Math.round(TRAVEL_STEP_MS / travelSpeed));
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [travel, interactionHook.isLoading, mapHook.playerPosition, travelSpeed, modalStack.length]);
+
+  // Leaving the world map (entering a town/site) ends any travel.
+  useEffect(() => {
+    if (mapHook.currentMapLevel !== 'world') { setTravel(null); setResumeTravel(null); }
+  }, [mapHook.currentMapLevel]);
+
+  // Collapsed log: surface each new log entry as a brief toast over the map.
+  const lastLogLenRef = useRef(interactionHook.conversation.length);
+  useEffect(() => {
+    const len = interactionHook.conversation.length;
+    if (isWorkspace && logCollapsed && len > lastLogLenRef.current) {
+      const msg = interactionHook.conversation[len - 1];
+      const text = String(msg?.content || '').replace(/[*_#>`]/g, '').trim();
+      if (text) setWsToast({ id: len, text: text.length > 160 ? `${text.slice(0, 157)}...` : text });
+    }
+    lastLogLenRef.current = len;
+  }, [interactionHook.conversation, logCollapsed, isWorkspace]);
+  useEffect(() => {
+    if (!wsToast) return undefined;
+    const t = setTimeout(() => setWsToast(null), 4500);
+    return () => clearTimeout(t);
+  }, [wsToast]);
+
+  // Enter summons the action input from anywhere (opens the log if collapsed / on phones).
+  useEffect(() => {
+    if (!isWorkspace) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+      const tag = (e.target?.tagName || '').toLowerCase();
+      if (['input', 'textarea', 'select', 'button', 'a'].includes(tag)) return;
+      if (document.querySelector('.modal-overlay, .rd-dialog-overlay')) return;
+      e.preventDefault();
+      setLogCollapsed(false);
+      setWsTab('log');
+      // The input is disabled while generating or with narration off; still reopen the log.
+      const input = document.getElementById('user-action-input');
+      if (input && !input.disabled) setTimeout(() => input.focus(), 0);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isWorkspace]);
+
   return (
     <div className="gm-page">
       {isBackfilling && backfillProgress && (
@@ -2236,8 +2371,70 @@ const Game = ({ resumeConversation = null }) => {
           </div>
         </div>
       )}
-      <div className="gm-shell">
+      <div className={`gm-shell${isWorkspace ? ' ws-shell' : ''}${isWorkspace && logCollapsed ? ' log-collapsed' : ''}`} data-wstab={isWorkspace ? (hasAdventureStarted ? wsTab : 'log') : undefined}>
+        {isWorkspace && (
+          <nav className="ws-rail" aria-label="Game menu">
+            <button type="button" className="ws-rail-btn" onClick={() => openAdventureBook()} title="Adventure Book: journal, quests, codex">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+              <span>Journal</span>
+            </button>
+            <button type="button" className="ws-rail-btn" onClick={() => openAdventureBook({ tab: 'party' })}>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 8h14l-1 13H6z" /><path d="M9 8V6a3 3 0 0 1 6 0v2" /></svg>
+              <span>Inventory</span>
+            </button>
+            <button type="button" className="ws-rail-btn" onClick={handleManualSave} disabled={!sessionId} title="Save game manually">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><path d="M17 21v-8H7v8M7 3v5h8" /></svg>
+              <span>Save</span>
+            </button>
+            <button type="button" className="ws-rail-btn" onClick={openHowToPlay} title="How to play">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
+              <span>Help</span>
+            </button>
+          </nav>
+        )}
+        {isWorkspace && (
+          <section className="ws-stage" aria-label="Map">
+            {settings.campaignGoal && (
+              <div className="ws-quest"><span className="gm-quest-label">Quest</span><span>{settings.campaignGoal}</span></div>
+            )}
+            <div className="ws-stage-map" ref={setStageEl} />
+            {(travel || (resumeTravel && modalStack.length === 0)) && (
+              <div className="ws-travel" role="status">
+                {travel ? (
+                  <>
+                    <span>Travelling to <b>{travel.label}</b> · {travel.path.length} {travel.path.length === 1 ? 'tile' : 'tiles'} to go</span>
+                    <button type="button" className="ws-chip" onClick={() => setTravelSpeed((v) => (v === 1 ? 2 : 1))}>{travelSpeed}x</button>
+                    <button type="button" className="ws-chip" onClick={() => setTravel(null)}>Stop</button>
+                  </>
+                ) : (
+                  <>
+                    <span>Travel to <b>{resumeTravel.label}</b> was interrupted.</span>
+                    <button type="button" className="ws-chip gold" onClick={() => startTravel(resumeTravel.dest.x, resumeTravel.dest.y)} disabled={interactionHook.isLoading}>Continue</button>
+                    <button type="button" className="ws-chip" onClick={() => setResumeTravel(null)}>Dismiss</button>
+                  </>
+                )}
+              </div>
+            )}
+            {wsToast && <div className="ws-toast" key={wsToast.id}>{wsToast.text}</div>}
+            <div className="ws-party">
+              {(selectedHeroes || []).map((hero, i) => {
+                const name = hero.heroName || hero.characterName || 'Hero';
+                return (
+                  <button key={hero.heroId || name} type="button" className={`ws-party-hero${i === 0 ? ' lead' : ''}`} onClick={() => openHero({ hero, onHeroUpdate: handleHeroUpdate })} title={`${name}${hero.maxHP ? ` · HP ${hero.currentHP}/${hero.maxHP}` : ''}`} aria-label={`${name}: view details`}>
+                    {hero.profilePicture && <img src={resolveProfilePicture(hero.profilePicture)} alt="" />}
+                    {hero.maxHP ? <span className="ws-hp"><span style={{ width: `${(hero.currentHP / hero.maxHP) * 100}%` }} /></span> : null}
+                  </button>
+                );
+              })}
+            </div>
+            {logCollapsed && (
+              <button type="button" className="ws-log-open" onClick={() => setLogCollapsed(false)} aria-label="Open the adventure log">Log ‹</button>
+            )}
+          </section>
+        )}
         <GameMainPanel
+          variant={isWorkspace ? 'docked' : undefined}
+          onCollapse={isWorkspace ? () => setLogCollapsed(true) : undefined}
           campaignGoal={settings.campaignGoal}
           partyLeadName={selectedHeroes?.[0]?.heroName || selectedHeroes?.[0]?.characterName || null}
           templateName={settings?.templateName || null}
@@ -2257,28 +2454,7 @@ const Game = ({ resumeConversation = null }) => {
           // last tab (#52); first open defaults to Campaign. The Inventory button
           // above pins the Party tab because its intent is unambiguous.
           onOpenSettings={() => openAdventureBook()}
-          onManualSave={async () => {
-            const title = buildSaveName(saveRootFor(settings));
-            // performSave reports what actually happened so the confirmation is honest:
-            // 'saved' | 'savedLocal' | 'forked' | 'nochange' | 'skipped' | 'error'.
-            const status = await performSave();
-            openSaveConfirmation({
-              status,
-              title,
-              signedIn: !!user, // drives the "where did it save" indicator
-              root: saveRootFor(settings),
-              // Change the campaign root name: keep it for future saves (settings) and
-              // update the just-saved row's name immediately.
-              onRename: async (newRoot) => {
-                setSettings(prev => ({ ...prev, saveName: newRoot }));
-                try {
-                  await conversationsApi.updateName(sessionId, newRoot);
-                } catch (e) {
-                  logger.error('Failed to rename save', e);
-                }
-              }
-            });
-          }}
+          onManualSave={handleManualSave}
           canManualSave={!!sessionId}
           saveStatus={saveStatus}
           isSaving={isSaving}
@@ -2310,17 +2486,17 @@ const Game = ({ resumeConversation = null }) => {
           onHookChipIgnore={handleHookChipIgnore}
         />
 
-        <PartySidebar
+        {!isWorkspace && <PartySidebar
           selectedHeroes={selectedHeroes}
           onOpenCharacter={(hero) => {
             openHero({ hero, onHeroUpdate: handleHeroUpdate });
             setIsMobilePartySidebarOpen(false); // Close sidebar when opening modal
           }}
           className={isMobilePartySidebarOpen ? 'mobile-open' : ''}
-        />
+        />}
 
         {/* Mobile party toggle button - uses first hero portrait */}
-        <button
+        {!isWorkspace && <button
           className="gm-party-toggle"
           onClick={() => setIsMobilePartySidebarOpen(!isMobilePartySidebarOpen)}
           aria-label="Toggle party sidebar"
@@ -2336,7 +2512,14 @@ const Game = ({ resumeConversation = null }) => {
           ) : (
             '⚔️'
           )}
-        </button>
+        </button>}
+        {/* Phones (workspace): Map | Log tabs */}
+        {isWorkspace && hasAdventureStarted && (
+          <div className="ws-tabs" role="tablist" aria-label="View">
+            <button type="button" role="tab" aria-selected={wsTab === 'map'} className={wsTab === 'map' ? 'on' : ''} onClick={() => setWsTab('map')}>Map</button>
+            <button type="button" role="tab" aria-selected={wsTab === 'log'} className={wsTab === 'log' ? 'on' : ''} onClick={() => setWsTab('log')}>Log</button>
+          </div>
+        )}
 
         {/* Mobile overlay */}
         {isMobilePartySidebarOpen && (
@@ -2348,6 +2531,8 @@ const Game = ({ resumeConversation = null }) => {
       </div>
 
       <GameModals
+        mapDockTarget={isWorkspace ? stageEl : null}
+        onWorldTileClick={isWorkspace ? handleWorkspaceWorldClick : null}
         onContinueLegend={() => {
           closeAdventureBook();
           setLegendPicker({ open: true, celebrate: false });

@@ -42,6 +42,9 @@ const GameModals = ({
   selectedHeroes,
   mapHook,
   handleMoveOnWorldMap,
+  // #84 workspace spike: dock the map into this element, and route world clicks here.
+  mapDockTarget = null,
+  onWorldTileClick = null,
   interactionHook,
   currentTile,
   hasAdventureStarted,
@@ -135,7 +138,8 @@ const GameModals = ({
         onClose={() => mapHook.setIsMapModalOpen(false)}
         mapData={mapHook.worldMap}
         playerPosition={mapHook.playerPosition}
-        onTileClick={handleMoveOnWorldMap}
+        onTileClick={onWorldTileClick || handleMoveOnWorldMap}
+        dockTarget={mapDockTarget}
         firstHero={selectedHeroes && selectedHeroes.length > 0 ? selectedHeroes[0] : null}
         mapLevel={mapHook.currentMapLevel}
         townMapData={mapHook.currentTownMap}

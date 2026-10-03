@@ -141,7 +141,9 @@ export const _resetRememberedZoom = () => { rememberedZoom = 'close'; };
 
 const ZOOM_LABELS = { fit: 'Fit', medium: 'Mid', close: 'Close' };
 
-const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visibleMilestonePois, activeMilestonePois, revealedSiteTypes }) => {
+// tileSizeOverride (#84 workspace stage): an integer tile size chosen by the container so a
+// 10x10 world fills the stage. Whole pixels avoid the tile-edge seams a transform scale gives.
+const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visibleMilestonePois, activeMilestonePois, revealedSiteTypes, tileSizeOverride = null }) => {
   const mapHeight = mapData ? mapData.length : 0;
   const mapWidth = mapHeight > 0 ? mapData[0].length : 0;
 
@@ -160,7 +162,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
 
   const tileSize = viewportActive
     ? tileSizeForStep(zoomStep, mapWidth, mapHeight, paneBox.w, paneBox.h)
-    : TILE;
+    : (tileSizeOverride || TILE);
   const scale = tileSize / TILE;
   const culling = viewportActive && shouldCull(mapWidth, mapHeight);
 

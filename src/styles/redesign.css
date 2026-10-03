@@ -1050,3 +1050,68 @@ body:has(.gm-page) .app-footer { display: none; }
 [data-theme='redesign'] .rd-avatar { display: grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(160deg, #f6d27a, #e3a93f); color: #1d1505; font-family: var(--font-ui); font-size: .85rem; font-weight: 800; }
 [data-theme='redesign'] .rd-account-name { text-transform: none; letter-spacing: normal; font-family: var(--font-ui); font-weight: 600; max-width: 12ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 1100px) and (min-width: 769px) { [data-theme='redesign'] .rd-account-name { display: none; } }
+
+/* ============================================================
+   #84 workspace spike (/workspace-debug/play): rail | map stage | docked log.
+   Scoped by .ws-shell so the live game (.gm-shell alone) is unaffected.
+   ============================================================ */
+[data-theme='redesign'] .gm-shell.ws-shell { grid-template-columns: 78px minmax(0, 1fr) minmax(340px, 30%); }
+[data-theme='redesign'] .gm-shell.ws-shell.log-collapsed { grid-template-columns: 78px minmax(0, 1fr) 0; }
+[data-theme='redesign'] .ws-shell.log-collapsed .ws-log { display: none; }
+[data-theme='redesign'] .ws-rail { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: .9rem 0; border-right: 1px solid var(--line-soft); background: color-mix(in srgb, var(--surface) 55%, var(--ground)); }
+[data-theme='redesign'] .ws-rail-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .3rem; width: 66px; height: auto; min-height: 0; padding: .5rem 0 .45rem; border-radius: 10px; border: 1px solid transparent; background: transparent; box-shadow: none; color: var(--muted); cursor: pointer; }
+[data-theme='redesign'] .ws-rail-btn span { font-family: var(--font-ui); font-size: .72rem; font-weight: 600; letter-spacing: .01em; text-transform: none; line-height: 1; }
+[data-theme='redesign'] .ws-rail-btn:hover:not(:disabled) { border-color: var(--line); color: var(--gold); background: var(--surface); filter: none; }
+[data-theme='redesign'] .ws-rail-btn:disabled { opacity: .35; background: transparent; }
+
+[data-theme='redesign'] .ws-stage { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: radial-gradient(ellipse at center, #15131c 0%, var(--ground) 75%); }
+[data-theme='redesign'] .ws-quest { display: flex; align-items: baseline; gap: .7rem; margin: .8rem 1rem 0; padding: .55rem .9rem; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-left: 3px solid var(--gold); background: color-mix(in srgb, var(--gold) 6%, var(--surface)); font-size: .95rem; color: var(--text); }
+[data-theme='redesign'] .ws-stage-map { position: relative; flex: 1; min-height: 0; }
+[data-theme='redesign'] .ws-map { position: absolute; inset: 0; display: flex; flex-direction: column; }
+[data-theme='redesign'] .ws-map-bar { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; padding: .6rem 1rem 0; }
+[data-theme='redesign'] .ws-map-title { margin-right: .4rem; font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; color: var(--text); }
+[data-theme='redesign'] .ws-map-body { position: relative; flex: 1; min-height: 0; }
+[data-theme='redesign'] .ws-map-body .world-map-container { margin: 0; }
+[data-theme='redesign'] .ws-legend { position: absolute; top: .6rem; right: .8rem; z-index: 6; max-height: calc(100% - 1.2rem); overflow-y: auto; }
+[data-theme='redesign'] .ws-map-error { margin: 0 1rem .6rem; padding: .5rem .8rem; border-radius: 8px; border: 1px solid rgba(239, 107, 107, .45); color: #ef8b8b; font-family: var(--font-ui); font-size: .9rem; }
+[data-theme='redesign'] .ws-chip { display: inline-flex; align-items: center; gap: .35rem; min-height: 0; padding: .4rem .8rem; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); box-shadow: none; color: var(--text); font-family: var(--font-ui); font-size: .85rem; font-weight: 600; letter-spacing: normal; text-transform: none; cursor: pointer; }
+[data-theme='redesign'] .ws-chip:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); filter: none; }
+[data-theme='redesign'] .ws-chip.on { border-color: var(--gold); color: var(--gold); }
+[data-theme='redesign'] .ws-chip.gold { border-color: #f0c564; background: #ecb44f; color: #1d1505; }
+[data-theme='redesign'] .ws-chip.gold:hover:not(:disabled) { color: #1d1505; filter: brightness(1.07); }
+
+[data-theme='redesign'] .ws-travel { position: absolute; left: 50%; bottom: 5.5rem; z-index: 8; transform: translateX(-50%); display: flex; align-items: center; gap: .6rem; padding: .55rem .6rem .55rem 1rem; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent); background: color-mix(in srgb, var(--surface) 94%, transparent); box-shadow: 0 14px 30px -14px rgba(0, 0, 0, .8); font-family: var(--font-ui); font-size: .9rem; color: var(--muted); white-space: nowrap; }
+[data-theme='redesign'] .ws-travel b { color: var(--text); }
+[data-theme='redesign'] .ws-toast { position: absolute; top: 4.2rem; left: 50%; z-index: 9; transform: translateX(-50%); max-width: min(560px, 90%); padding: .7rem 1rem; border-radius: 10px; border: 1px solid var(--line); border-left: 3px solid var(--gold); background: color-mix(in srgb, var(--surface) 96%, transparent); box-shadow: 0 16px 34px -14px rgba(0, 0, 0, .85); font-family: var(--font-body); font-size: .95rem; color: #f3f0f6; animation: ws-toast-in .25s ease-out; }
+@keyframes ws-toast-in { from { opacity: 0; transform: translate(-50%, -6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+[data-theme='redesign'] .ws-party { position: absolute; left: 1rem; bottom: 1rem; z-index: 7; display: flex; align-items: flex-end; gap: .45rem; }
+[data-theme='redesign'] .ws-party-hero { position: relative; display: block; width: 44px; height: 44px; min-height: 0; padding: 0; border-radius: 50%; border: 2px solid var(--line); background: var(--surface); box-shadow: 0 6px 14px -6px rgba(0, 0, 0, .8); overflow: visible; cursor: pointer; }
+[data-theme='redesign'] .ws-party-hero.lead { width: 64px; height: 64px; border-color: var(--gold); }
+[data-theme='redesign'] .ws-party-hero img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; object-position: center 20%; display: block; }
+[data-theme='redesign'] .ws-hp { position: absolute; left: 10%; right: 10%; bottom: -7px; height: 5px; border-radius: 3px; background: var(--ground-2); overflow: hidden; }
+[data-theme='redesign'] .ws-hp span { display: block; height: 100%; background: var(--success); }
+[data-theme='redesign'] .ws-log-open { position: absolute; top: 4.2rem; right: 0; z-index: 8; min-height: 0; padding: .55rem .8rem; border-radius: 8px 0 0 8px; border: 1px solid var(--line); border-right: 0; background: var(--surface); box-shadow: none; color: var(--gold); font-family: var(--font-ui); font-weight: 700; letter-spacing: normal; text-transform: none; cursor: pointer; }
+
+[data-theme='redesign'] .ws-shell .ws-log { border-right: 0; border-left: 1px solid var(--line-soft); padding-top: .8rem; }
+[data-theme='redesign'] .ws-shell .ws-log .gm-head { position: relative; padding-right: 2.6rem; }
+[data-theme='redesign'] .ws-collapse { position: absolute; top: 0; right: 0; display: grid; place-items: center; width: 32px; height: 32px; min-height: 0; padding: 0; border-radius: 7px; border: 1px solid var(--line); background: transparent; box-shadow: none; color: var(--muted); font-size: 1.1rem; cursor: pointer; }
+[data-theme='redesign'] .ws-collapse:hover { color: var(--gold); border-color: var(--gold); filter: none; }
+[data-theme='redesign'] .ws-shell .gm-msg.ai { max-width: 100%; }
+[data-theme='redesign'] .ws-tabs { display: none; }
+
+@media (max-width: 900px) {
+  [data-theme='redesign'] .gm-shell.ws-shell, [data-theme='redesign'] .gm-shell.ws-shell.log-collapsed { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto auto; }
+  [data-theme='redesign'] .ws-rail { grid-row: 3; flex-direction: row; justify-content: space-around; padding: .3rem; border-right: 0; border-top: 1px solid var(--line-soft); }
+  [data-theme='redesign'] .ws-shell .ws-stage, [data-theme='redesign'] .ws-shell .ws-log { grid-row: 1; }
+  [data-theme='redesign'] .ws-shell[data-wstab='map'] .ws-log { display: none; }
+  [data-theme='redesign'] .ws-shell[data-wstab='log'] .ws-stage { display: none; }
+  [data-theme='redesign'] .ws-shell[data-wstab='log'] .ws-log, [data-theme='redesign'] .ws-shell.log-collapsed[data-wstab='log'] .ws-log { display: flex; border-left: 0; }
+  [data-theme='redesign'] .ws-collapse, [data-theme='redesign'] .ws-log-open { display: none; }
+  [data-theme='redesign'] .ws-tabs { grid-row: 2; display: flex; gap: .4rem; padding: .4rem .6rem; border-top: 1px solid var(--line-soft); background: var(--ground); }
+  [data-theme='redesign'] .ws-tabs button { flex: 1; min-height: 0; padding: .55rem; border-radius: 8px; border: 1px solid var(--line); background: transparent; box-shadow: none; color: var(--muted); font-family: var(--font-ui); font-weight: 700; letter-spacing: normal; text-transform: none; }
+  [data-theme='redesign'] .ws-tabs button.on { border-color: var(--gold); background: var(--gold); color: #211a0a; }
+  [data-theme='redesign'] .ws-travel { bottom: 4.6rem; font-size: .82rem; }
+  [data-theme='redesign'] .ws-party { bottom: .6rem; }
+}
+[data-theme='redesign'] .ws-fit-world { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; }

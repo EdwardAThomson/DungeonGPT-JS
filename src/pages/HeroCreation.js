@@ -14,7 +14,7 @@ import { calculateMaxHP } from "../utils/healthSystem";
 import OnboardingSteps from "../components/OnboardingSteps";
 import PortraitPickerModal from "../components/PortraitPickerModal";
 import RdDialog from '../components/RdDialog';
-import { resolveProfilePicture } from "../utils/assetHelper";
+import { storedProfilePicture } from "../utils/assetHelper";
 import { calculateModifier } from "../utils/rules";
 import "../styles/redesign.css";
 import {
@@ -56,7 +56,7 @@ const HeroCreation = () => {
   // Older heroes store a legacy picture value ("barbarian.png"); normalise it to the
   // current "assets/characters/<name>.webp" form so the preview renders, the gender check
   // below can match it against profilePictures, and saving the edit migrates the field.
-  const [selectedProfilePicture, setSelectedProfilePicture] = useState(resolveProfilePicture(heroToEdit?.profilePicture) || null);
+  const [selectedProfilePicture, setSelectedProfilePicture] = useState(storedProfilePicture(heroToEdit?.profilePicture) || null);
   // Race selector is hidden (human-only portraits); new heroes default to Human. Legacy
   // heroes keep their saved race. setSelectedRace is still driven by the class template.
   const [selectedRace, setSelectedRace] = useState(heroToEdit?.heroRace || "Human");

@@ -13,7 +13,7 @@ const DISMISS_KEY = 'guestBannerDismissed';
 
 // Pages where the banner adds noise or fights the layout: the landing/auth pages
 // (their own CTAs) and the full-height game view (already has its own guest notice).
-const HIDDEN_PATHS = ['/', '/login', '/auth/callback', '/game'];
+const HIDDEN_PATHS = ['/', '/login', '/auth/callback', '/game', '/workspace-debug/play'];
 
 const GuestBanner = () => {
   const { user, loading } = useAuth();

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { tileBackground, waterwayMask, OFF_MAP, POI_EMOJI } from '../utils/townTileArt';
 import { isTownTileWalkable } from '../utils/townMapGenerator';
 import { getReadyTurnIns } from '../game/questEngine';
@@ -253,7 +254,9 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
         </div>
       )}
 
-      {selectedBuilding && (
+      {/* Pop-ups portal to <body>: in the docked workspace (#84) this map sits inside a
+          transform-scaled box, which would trap a position:fixed overlay inside it. */}
+      {selectedBuilding && createPortal(
         <BuildingModal
           building={selectedBuilding}
           npcs={selectedBuilding.npcs}
@@ -271,10 +274,11 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           townName={townMapData?.townName}
           milestones={milestones}
           onTalkToNpc={onTalkToNpc}
-        />
+        />,
+        document.body
       )}
 
-      {distanceWarning && (
+      {distanceWarning && createPortal(
         <div className="modal-overlay" onClick={() => setDistanceWarning(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
             <h2>Too Far Away</h2>
@@ -285,7 +289,8 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
