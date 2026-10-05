@@ -3,31 +3,47 @@ import { resolveProfilePicture } from '../utils/assetHelper';
 import { getIndexStatus, backfill } from '../game/ragEngine';
 import { ragStore } from '../services/ragStore';
 import RdDialog from './RdDialog';
+import { conversationsApi } from '../services/conversationsApi';
+
+// A save row's messages, whether stored as a JSON string or already parsed.
+const messagesOf = (row) => {
+  const raw = row?.conversation_data;
+  try { return typeof raw === 'string' ? JSON.parse(raw) : (raw || []); } catch (e) { return []; }
+};
 
 const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate }) => {
   const [ragStatus, setRagStatus] = useState(null); // { status, indexed, total }
   const [isRebuilding, setIsRebuilding] = useState(false);
   const [rebuildProgress, setRebuildProgress] = useState(null);
 
-  // Check RAG index status when modal opens
+  // The saved-games list carries metadata only (the server list skips the heavy columns,
+  // PR #102), so fetch the full save on open for its messages (memory index) and summary.
+  const [full, setFull] = useState(null);
   useEffect(() => {
-    if (!isOpen || !conversation?.sessionId) {
-      setRagStatus(null);
-      return;
-    }
-    const raw = conversation.conversation_data;
-    const convData = typeof raw === 'string' ? JSON.parse(raw) : (raw || []);
-    if (convData.length === 0) return;
+    setFull(null);
+    setRagStatus(null);
+    if (!isOpen || !conversation?.sessionId) return undefined;
+    let cancelled = false;
+    const load = conversation.conversation_data
+      ? Promise.resolve(conversation)
+      : conversationsApi.getById(conversation.sessionId).catch(() => null);
+    load.then((row) => { if (!cancelled && row) setFull(row); });
+    return () => { cancelled = true; };
+  }, [isOpen, conversation]);
 
+  // Check RAG index status once the full save is in hand.
+  useEffect(() => {
+    if (!full || !conversation?.sessionId) return;
+    const convData = messagesOf(full);
+    if (convData.length === 0) return;
     getIndexStatus(conversation.sessionId, convData)
       .then(setRagStatus)
       .catch(() => setRagStatus(null));
-  }, [isOpen, conversation?.sessionId]);
+  }, [full, conversation?.sessionId]);
 
   const handleRebuild = useCallback(async () => {
     if (!conversation?.sessionId || isRebuilding) return;
-    const raw = conversation.conversation_data;
-    const convData = typeof raw === 'string' ? JSON.parse(raw) : (raw || []);
+    const convData = messagesOf(full);
     if (convData.length === 0) return;
 
     setIsRebuilding(true);
@@ -49,7 +65,7 @@ const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate }) =>
       setIsRebuilding(false);
       setRebuildProgress(null);
     }
-  }, [conversation, isRebuilding]);
+  }, [conversation, full, isRebuilding]);
 
   if (!isOpen || !conversation) return null;
 
@@ -142,10 +158,10 @@ const SavedGameDetailsModal = ({ isOpen, onClose, conversation, formatDate }) =>
           </section>
         )}
 
-        {conversation.summary && (
+        {(full?.summary || conversation.summary) && (
           <section>
             <h3>Adventure summary</h3>
-            <p>{conversation.summary}</p>
+            <p>{full?.summary || conversation.summary}</p>
           </section>
         )}
 

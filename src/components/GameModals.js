@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useMemo } from 'react';
 import { computeVisibleMilestonePois, computeActiveMilestonePois } from '../game/milestoneEngine';
+import { computeSideQuestMarkers } from '../game/questHints';
 import { getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
 
 // Lazy load modal components for better performance
@@ -42,6 +43,13 @@ const GameModals = ({
   selectedHeroes,
   mapHook,
   handleMoveOnWorldMap,
+  // #84 workspace spike: dock the map into this element, and route world clicks here.
+  mapDockTarget = null,
+  suggestedTravelTargets = null,
+  mapGlideMs = null,
+  buildingRequest = null,
+  onBuildingRequestHandled,
+  onWorldTileClick = null,
   interactionHook,
   currentTile,
   hasAdventureStarted,
@@ -77,6 +85,12 @@ const GameModals = ({
   const activeMilestonePois = useMemo(
     () => computeActiveMilestonePois(settings?.milestones),
     [settings?.milestones]
+  );
+
+  // Side-quest markers for the world map (sites still needed, towns to hand in at).
+  const sideQuestMarkers = useMemo(
+    () => computeSideQuestMarkers(settings?.sideQuests),
+    [settings?.sideQuests]
   );
 
   // Which site types (cave/ruins) a quest has revealed — for hiding un-quested sites.
@@ -135,7 +149,12 @@ const GameModals = ({
         onClose={() => mapHook.setIsMapModalOpen(false)}
         mapData={mapHook.worldMap}
         playerPosition={mapHook.playerPosition}
-        onTileClick={handleMoveOnWorldMap}
+        onTileClick={onWorldTileClick || handleMoveOnWorldMap}
+        dockTarget={mapDockTarget}
+        suggestedTravelTargets={suggestedTravelTargets}
+        glideMs={mapGlideMs}
+        buildingRequest={buildingRequest}
+        onBuildingRequestHandled={onBuildingRequestHandled}
         firstHero={selectedHeroes && selectedHeroes.length > 0 ? selectedHeroes[0] : null}
         mapLevel={mapHook.currentMapLevel}
         townMapData={mapHook.currentTownMap}
@@ -151,6 +170,7 @@ const GameModals = ({
         visibleMilestonePois={visibleMilestonePois}
         activeMilestonePois={activeMilestonePois}
         revealedSiteTypes={revealedSiteTypes}
+        sideQuestMarkers={sideQuestMarkers}
         onQuestItemFound={onQuestItemFound}
         onRest={onRest}
         sideQuests={sideQuests}

@@ -28,6 +28,9 @@ describe('legacy byte-identical guard', () => {
   // RE-CAPTURED again 2026-07-06: coast-aware lake sizing (budget 8% minus coast
   // water, coastal maps single-lake) and the forest-on-beach exclusion landed, both
   // deliberate generation changes (maintainer: "reduce the size of the lakes...").
+  // RE-CAPTURED 2026-10-04: roads now record their route on non-town feature tiles
+  // (forest, hills...) so they draw continuously (roadArms.js). Only road fields changed;
+  // every other tile field was asserted identical during the re-capture.
   // A legacy-shaped call must still produce the exact same maps as an options call.
   it('generateMapData(10,10,4242) is unchanged by the generator modifications', () => {
     expect(generateMapData(10, 10, 4242)).toEqual(legacy4242);

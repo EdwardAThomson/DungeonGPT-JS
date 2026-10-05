@@ -616,12 +616,17 @@ export const composeNpcMeeting = ({
   building = null,
   townName = null,
   personality = null,
-  worldSeed = null
+  worldSeed = null,
+  // Authored scene for this meeting (story template meetingText); replaces the
+  // generic closer so the beat says something specific.
+  meetingText = null
 } = {}) => {
   if (!name) return '';
   const rng = mulberry32(hashSeed([worldSeed == null ? 'noseed' : worldSeed, 'npc-meeting', name]));
 
-  const who = role ? `**${name}**, the ${String(role).toLowerCase()}` : `**${name}**`;
+  // The role is an appositive, so it closes with a comma too ("Ulric, the militia
+  // captain, looks up"); every opener puts {who} mid-sentence.
+  const who = role ? `**${name}**, the ${String(role).toLowerCase()},` : `**${name}**`;
   // "the Briarwood Militia Hall" (but never "the The Crooked Pint"); fall back to the
   // town name, then a generic hall, so the sentence always reads whole.
   const where = building
@@ -638,7 +643,7 @@ export const composeNpcMeeting = ({
     const trait = personality.charAt(0).toUpperCase() + personality.slice(1);
     sentences.push(`*${trait}.*`);
   }
-  sentences.push(closer);
+  sentences.push(meetingText || closer);
 
   return sentences.join(' ');
 };

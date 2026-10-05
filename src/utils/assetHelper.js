@@ -1,10 +1,19 @@
+// Display URL for a hero portrait. Root-relative ("/assets/...") so it resolves from any
+// route depth: a bare "assets/..." breaks under nested paths such as /workspace-debug/play.
+// Stored values stay in the bare "assets/characters/<name>.webp" form (see storedProfilePicture).
 export const resolveProfilePicture = (path) => {
-    if (!path) return null;
+    const stored = storedProfilePicture(path);
+    return stored ? `/${stored}` : null;
+};
 
-    // If it already contains the correct new format, return it
+// Canonical STORED form of a portrait value: "assets/characters/<name>.webp". Normalises
+// legacy values ("barbarian.png") and tolerates a leading slash.
+export const storedProfilePicture = (path) => {
+    if (!path) return null;
+    path = String(path).replace(/^\/+/, '');
+
+    // Already in the stored format
     if (path.includes('assets/characters/') && path.endsWith('.webp')) {
-        // Make sure it has a leading slash or not, depending on app structure. 
-        // In HeroCreation it is saved as "assets/characters/barbarian.webp"
         return path;
     }
 

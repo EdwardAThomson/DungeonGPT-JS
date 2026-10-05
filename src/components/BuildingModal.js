@@ -396,7 +396,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                                             return (
                                                                 <button
                                                                     className="primary-button quest-talk-button"
-                                                                    onClick={() => onTalkToNpc(npc.milestoneNpcId, npc)}
+                                                                    onClick={() => { onTalkToNpc(npc.milestoneNpcId, npc); onClose(); }}
                                                                     style={{ padding: '4px 12px', fontWeight: 'bold', fontSize: '12px' }}
                                                                     title={talkMs.text}
                                                                 >
@@ -504,7 +504,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                         <button
                                             key={m.id}
                                             className="primary-button quest-talk-button"
-                                            onClick={() => onTalkToNpc(m.trigger.npc, null)}
+                                            onClick={() => { onTalkToNpc(m.trigger.npc, null); onClose(); }}
                                             title={m.text}
                                             style={{ width: '100%', padding: '12px', fontWeight: 'bold', letterSpacing: '1px' }}
                                         >
@@ -658,7 +658,12 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                             <div key={q.id} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 14px' }}>
                                                 <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>{q.title}</div>
                                                 <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: '10px' }}>"{q.giver?.hook || q.description}"</div>
-                                                <button className="primary-button" onClick={() => onAcceptSideQuest(q.id)}>Accept Quest</button>
+                                                <button
+                                                    className="primary-button"
+                                                    // Anchor the quest to THIS building, so its hand-in names
+                                                    // it (not the first building of its type in town).
+                                                    onClick={() => onAcceptSideQuest(q.id, townName ? { town: townName, buildingName: building.buildingName || null } : null)}
+                                                >Accept Quest</button>
                                             </div>
                                         ))}
                                     </div>

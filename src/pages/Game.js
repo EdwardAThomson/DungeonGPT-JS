@@ -1,9 +1,9 @@
-import React, { useContext, useEffect, useState, useRef } from 'react';
+import React, { useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from '../contexts/AuthContext';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
-import { useModal } from '../contexts/ModalContext';
+import ModalContext, { useModal } from '../contexts/ModalContext';
 import { checkForEncounter, rollSiteWanderingEncounter } from '../utils/encounterGenerator';
 import { encounterTemplates } from '../data/encounters';
 import { isTownTileWalkable } from '../utils/townMapGenerator';
@@ -38,6 +38,12 @@ import {
   isAdjacentWorldMove,
   trackAreaVisits
 } from '../game/worldMoveController';
+import { planTravelRoute, TRAVEL_STEP_MS } from '../game/worldTravel';
+import { getSuggestedActions } from '../game/suggestedActions';
+import { visitLeaveMessage } from '../game/logGroups';
+import { scaleEncounterXP, scaleMilestoneRewards, scaleWorldRewards } from '../game/xpScaling';
+import { INSPECT_RANGE } from '../components/TownMapDisplay';
+import WorkspaceHints from '../components/WorkspaceHints';
 import {
   ageNarrativeHook,
   applyEncounterOutcomeToParty,
@@ -178,6 +184,7 @@ const SaveConfirmationModal = () => {
 
 const QuestOfferModal = () => {
   const { data, close } = useModal('questOffer');
+  const { settings: campaignSettings } = useContext(SettingsContext); // tier, for the XP preview
   const quest = data?.quest;
   // Same modal, source-flavoured heading: a town Quest Board posting vs a travelling rumour.
   const heading = data?.source === 'board' ? '📜 A Posting Catches Your Eye' : '📜 A Rumour Reaches You';
@@ -193,7 +200,7 @@ const QuestOfferModal = () => {
   const giverLabel = giverBase
     ? (quest?.giver?.town ? `${giverBase} in ${quest.giver.town}` : giverBase)
     : '';
-  const rewardTotals = summarizeQuestReward(quest);
+  const rewardTotals = scaleWorldRewards(summarizeQuestReward(quest), campaignSettings);
   const rewardItemNames = (rewardTotals.items || []).map((id) => (ITEM_CATALOG[id]?.name) || id);
   const rewardSentence = composeRewardSentence({
     xp: rewardTotals.xp, gold: rewardTotals.gold, items: rewardItemNames, xpPartyWide: true
@@ -227,7 +234,7 @@ const QuestOfferModal = () => {
   );
 };
 
-const Game = ({ resumeConversation = null }) => {
+const Game = ({ resumeConversation = null, layout = 'classic' }) => {
   const { state } = useLocation();
   // On a hard reload BrowserRouter restores location.state, but that is the STALE starting
   // snapshot (initial heroes / generated map / seed from when the game began). When the
@@ -368,7 +375,7 @@ const Game = ({ resumeConversation = null }) => {
   const { open: openSaveConfirmation } = useModal('saveConfirmation');
   const { open: openEncounterInfo, close: closeEncounterInfo } = useModal('encounterInfo');
   const { open: openQuestOffer } = useModal('questOffer');
-  const { open: openEncounterAction, close: closeEncounterAction, data: encounterActionData } = useModal('encounterAction');
+  const { open: openEncounterActionRaw, close: closeEncounterAction, data: encounterActionData } = useModal('encounterAction');
   // #52: the Adventure Book hub (Journal / Side Quests / Codex / Party / AI). It
   // replaced the boolean-state Journal (settings) modal and the Party Inventory
   // modal; both the Journal and Inventory header buttons open it at their tab.
@@ -427,6 +434,12 @@ const Game = ({ resumeConversation = null }) => {
   // steps between brawls so back-to-back tavern visits don't brawl every time.
   const tavernBrawlAtRef = useRef(-999);
   const settingsRef = useRef(settings);
+  // Every in-game encounter opens here: scale its XP for the campaign tier first (a
+  // milestone boss by the milestone multiplier, anything else by the world one), so the
+  // result screen and the award agree (xpScaling.js).
+  const openEncounterAction = (data) => openEncounterActionRaw(
+    data?.encounter ? { ...data, encounter: scaleEncounterXP(data.encounter, settingsRef.current) } : data
+  );
   useEffect(() => { movesSinceEncounterRef.current = movesSinceEncounter; }, [movesSinceEncounter]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
@@ -838,7 +851,7 @@ const Game = ({ resumeConversation = null }) => {
       if (completions.length > 0) {
         let party = currentParty;
         completions.forEach(c => {
-          const stepRewards = c.rewards || { xp: 0, gold: 0, items: [] };
+          const stepRewards = scaleWorldRewards(c.rewards || { xp: 0, gold: 0, items: [] }, settingsRef.current);
           // Quest rewards are party-wide too (#55): full XP each, loot via lead.
           const stepResult = applyPartyRewardsToAll({ party, rewards: stepRewards });
           party = stepResult.updatedParty;
@@ -846,7 +859,7 @@ const Game = ({ resumeConversation = null }) => {
           const rewardLines = narrateRewardMessages(stepResult.rewardMessages);
           const grantEvents = [...(stepResult.ledgerEvents || [])];
           if (c.questCompleted && c.questRewards) {
-            const questResult = applyPartyRewardsToAll({ party, rewards: c.questRewards });
+            const questResult = applyPartyRewardsToAll({ party, rewards: scaleWorldRewards(c.questRewards, settingsRef.current) });
             party = questResult.updatedParty;
             rewardLines.push(...narrateRewardMessages(questResult.rewardMessages));
             grantEvents.push(...(questResult.ledgerEvents || []));
@@ -894,7 +907,7 @@ const Game = ({ resumeConversation = null }) => {
 
       // Milestones are party achievements (#55): full XP to every member;
       // gold/items still pool through the lead.
-      const rewards = getMilestoneRewards(result.milestone);
+      const rewards = scaleMilestoneRewards(getMilestoneRewards(result.milestone), settingsRef.current);
       if (rewards.items.length > 0) recordItemsInCodex(rewards.items); // codex (#51)
       if (rewards.xp > 0 || rewards.gold > 0 || rewards.items.length > 0) {
         const rewardResult = applyPartyRewardsToAll({ party: currentParty, rewards });
@@ -1046,8 +1059,10 @@ const Game = ({ resumeConversation = null }) => {
       return;
     }
 
-    // A new click cancels the in-progress walk and starts fresh from the current position.
+    // A new click cancels the in-progress walk and starts fresh from the current position
+    // (including a suggested-action walk to the gate: the player changed their mind).
     if (walkCancelRef.current) walkCancelRef.current();
+    pendingTravelRef.current = null;
     walkCancelRef.current = runTileWalk({
       path,
       stepIntervalMs: TILE_STEP_MS,
@@ -1376,6 +1391,16 @@ const Game = ({ resumeConversation = null }) => {
   const handleAcceptSideQuest = (questId, origin = null) => {
     const q = (settings?.sideQuests || []).find(x => x.id === questId);
     if (!q || q.status !== 'available') return;
+    // Accepted straight from a building's quest list (no offer modal): anchor it to the
+    // town the party is in, so the journal and suggestions know where to hand it in.
+    if (!origin) {
+      origin = resolveQuestOrigin(q, {
+        worldMap: mapHook.worldMap,
+        townMapsCache: mapHook.townMapsCache,
+        currentTownName: mapHook.currentTownTile?.townName || null,
+        playerPos: mapHook.playerPosition,
+      });
+    }
     setSettings(prev => {
       let sq = acceptSideQuest(prev.sideQuests || [], questId);
       // Persist the origin town stamped at offer time so the turn-in stays anchored there.
@@ -1452,13 +1477,13 @@ const Game = ({ resumeConversation = null }) => {
     let party = selectedHeroes;
     completions.forEach(c => {
       // Turn-in rewards are party-wide (#55): full XP each, loot via lead.
-      const stepResult = applyPartyRewardsToAll({ party, rewards: c.rewards || { xp: 0, gold: 0, items: [] } });
+      const stepResult = applyPartyRewardsToAll({ party, rewards: scaleWorldRewards(c.rewards || { xp: 0, gold: 0, items: [] }, settingsRef.current) });
       party = stepResult.updatedParty;
       // #8: display copy only; the machine rewardMessages stay untouched.
       const rewardLines = narrateRewardMessages(stepResult.rewardMessages);
       const grantEvents = [...(stepResult.ledgerEvents || [])];
       if (c.questCompleted && c.questRewards) {
-        const questResult = applyPartyRewardsToAll({ party, rewards: c.questRewards });
+        const questResult = applyPartyRewardsToAll({ party, rewards: scaleWorldRewards(c.questRewards, settingsRef.current) });
         party = questResult.updatedParty;
         rewardLines.push(...narrateRewardMessages(questResult.rewardMessages));
         grantEvents.push(...(questResult.ledgerEvents || []));
@@ -1531,6 +1556,19 @@ const Game = ({ resumeConversation = null }) => {
     interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
   };
 
+  // Fight an active milestone boss on the tile the party stands on (POI modal Confront,
+  // or the suggested-action chip).
+  const startMilestoneBossFight = (boss) => {
+    mapHook.setIsMapModalOpen(false);
+    reopenMapAfterEncounterRef.current = true;
+    // Stationary boss fight (party is standing on the POI): no move preceded it, so
+    // clear any stale pre-encounter tile so a flee here does not teleport the party.
+    preEncounterPosRef.current = null;
+    // enemyId rides on the encounter so handleEncounterResolve fires
+    // enemy_defeated with the right id and the milestone completes.
+    openEncounterAction({ encounter: { ...boss.encounter, enemyId: boss.enemyId } });
+  };
+
   // Open the location modal for a POI tile (arrival, or re-opened by clicking the tile
   // you stand on). Offers the Enter button and, when an active milestone boss lairs
   // here, the Confront action. `notice` is an optional outcome line shown at the top of
@@ -1561,16 +1599,7 @@ const Game = ({ resumeConversation = null }) => {
       notice,
       onGather: gather ? () => grantObjectiveItem({ id: gather.itemId, name: gather.name }) : null,
       onSearch: search ? () => searchMilestoneLocation(tile, search) : null,
-      onFight: boss ? () => {
-        mapHook.setIsMapModalOpen(false);
-        reopenMapAfterEncounterRef.current = true;
-        // Stationary boss fight (party is standing on the POI): no move preceded it, so
-        // clear any stale pre-encounter tile so a flee here does not teleport the party.
-        preEncounterPosRef.current = null;
-        // enemyId rides on the encounter so handleEncounterResolve fires
-        // enemy_defeated with the right id and the milestone completes.
-        openEncounterAction({ encounter: { ...boss.encounter, enemyId: boss.enemyId } });
-      } : null,
+      onFight: boss ? () => startMilestoneBossFight(boss) : null,
       onEnterLocation: () => mapHook.handleEnterLocation(poiEncounter, interactionHook.setConversation, interactionHook.conversation, effectivePartyLevel(selectedHeroes)),
       onViewMap: () => mapHook.setIsMapModalOpen(true)
     });
@@ -1607,8 +1636,12 @@ const Game = ({ resumeConversation = null }) => {
   };
 
   // --- Map Movement Handler (Smart narration: local line per move, AI on demand) ---
-  const handleMoveOnWorldMap = async (clickedX, clickedY) => {
-    if (!hasAdventureStarted || interactionHook.isLoading) return;
+  // `passThrough` (workspace auto-travel, #84): an intermediate tile on a route. It is a
+  // full move (narration, encounter roll, hooks) but skips the arrival prompt and rumour
+  // offer, which only the destination gets. Returns 'moved' | 'interrupted' (an
+  // encounter or narrative hook fired, so travel must stop) | 'blocked'.
+  const handleMoveOnWorldMap = async (clickedX, clickedY, { passThrough = false } = {}) => {
+    if (!hasAdventureStarted || interactionHook.isLoading) return 'blocked';
 
     if (!isAdjacentWorldMove(mapHook.playerPosition, clickedX, clickedY)) {
       // Clicking the tile you're STANDING ON re-opens its location modal — needed when
@@ -1618,7 +1651,7 @@ const Game = ({ resumeConversation = null }) => {
       if (clickedX === x && clickedY === y) {
         const tile = getTile(mapHook.worldMap, x, y);
         openPoiLocationModal(tile);
-        return; // same-tile click is never a move; no "adjacent only" nag
+        return 'blocked'; // same-tile click is never a move; no "adjacent only" nag
       }
       // Append to the conversation (a positioned log entry) rather than the sticky error
       // banner, which always shows the latest message regardless of where it happened.
@@ -1626,7 +1659,7 @@ const Game = ({ resumeConversation = null }) => {
         role: 'system',
         content: 'You can only move to an adjacent tile.'
       }]);
-      return;
+      return 'blocked';
     }
 
     // Capture the tile we are LEAVING before the move commits. If an encounter fires on
@@ -1641,7 +1674,7 @@ const Game = ({ resumeConversation = null }) => {
     mapHook.setWorldMap(newMap);
     mapHook.setPlayerPosition({ x: clickedX, y: clickedY });
     recordTurn(sessionId);
-    if (!targetTile) return;
+    if (!targetTile) return 'moved';
 
     const { biomeType, townName } = getAreaIdentifiers(targetTile);
     const { isBiomeVisited, isTownVisited } = getAreaVisitState({
@@ -1671,7 +1704,7 @@ const Game = ({ resumeConversation = null }) => {
     // If an ACTIVE milestone boss lairs on this tile (stamped enemy, or a combat milestone
     // authored at this milestone POI's location), the modal offers the fight. If a random
     // encounter interrupts this modal, clicking the tile you stand on re-opens it.
-    const poiShown = openPoiLocationModal(targetTile, effectiveMilestones);
+    const poiShown = passThrough ? false : openPoiLocationModal(targetTile, effectiveMilestones);
 
     // --- Random Encounter Check (Phase 2.4: Two-Tier System) ---
     const isFirstVisitToTile = !wasExplored;
@@ -1727,7 +1760,7 @@ const Game = ({ resumeConversation = null }) => {
 
     if (plannedEncounterFlow.flowType === 'immediate') {
       setPendingNarrativeTile(plannedEncounterFlow.pendingNarrativeTile || null);
-      return; // local narration triggers after encounter resolution
+      return 'interrupted'; // local narration triggers after encounter resolution
     }
 
     // A narrative-tier encounter on this tile is parked for the Look-around button
@@ -1765,7 +1798,10 @@ const Game = ({ resumeConversation = null }) => {
     }
 
     // On a quiet move (no POI prompt, no encounter), a rumour may offer a side quest.
-    if (!poiShown && !plannedEncounterFlow.openActionEncounter) maybeOfferRumour();
+    if (!passThrough && !poiShown && !plannedEncounterFlow.openActionEncounter) maybeOfferRumour();
+    return (plannedEncounterFlow.openActionEncounter || plannedEncounterFlow.flowType === 'narrative_context')
+      ? 'interrupted'
+      : 'moved';
   };
 
   // --- Look-around: on-demand description of the CURRENT tile ---
@@ -1906,14 +1942,15 @@ const Game = ({ resumeConversation = null }) => {
 
     // Meeting beat — canonical identity from the milestone; the placed NPC fills gaps.
     const name = milestone.spawn?.name || npc?.name || 'the contact';
-    const role = milestone.spawn?.role || npc?.job || npc?.title || null;
+    // The story's display title ("militia captain") beats the stat role ("Guard").
+    const role = milestone.spawn?.title || milestone.spawn?.role || npc?.job || npc?.title || null;
     const personality = milestone.spawn?.personality || npc?.personality || null;
     const buildingName = milestone.building?.name || null;
     const townName = mapHook.currentTownTile?.townName || milestone.location || null;
 
     // No-AI path (guests, or master toggle off): deterministic templated line.
     if (!aiAvailable || !aiNarrativeEnabled) {
-      const text = composeNpcMeeting({ name, role, building: buildingName, townName, personality, worldSeed });
+      const text = composeNpcMeeting({ name, role, building: buildingName, townName, personality, worldSeed, meetingText: milestone.meetingText || null });
       if (text) interactionHook.setConversation(prev => [...prev, { role: 'ai', content: text }]);
       return;
     }
@@ -1926,6 +1963,7 @@ const Game = ({ resumeConversation = null }) => {
       buildingName,
       townName,
       milestoneText: milestone.text,
+      meetingText: milestone.meetingText || null,
       settings,
       selectedHeroes,
       currentSummary: interactionHook.currentSummary
@@ -2118,8 +2156,10 @@ const Game = ({ resumeConversation = null }) => {
         currentHP: Math.max(1, Math.floor((h.maxHP || 20) * 0.5)),
       }));
       setSelectedHeroes(revived);
-      interactionHook.setConversation(prev => [...prev, { role: 'system', content:
-        `💀 Your party falls in battle. Kindly strangers carry you to safety; you awaken, battered but alive,${town ? ` in ${town.name}` : ' back in the wilds'}.` }]);
+      // Carried out of a site: this line also closes the site's log group.
+      const wipeLine = `💀 Your party falls in battle. Kindly strangers carry you to safety; you awaken, battered but alive,${town ? ` in ${town.name}` : ' back in the wilds'}.`;
+      interactionHook.setConversation(prev => [...prev,
+        mapHook.isInsideSite && town ? visitLeaveMessage(wipeLine) : { role: 'system', content: wipeLine }]);
       reopenMapAfterEncounterRef.current = false; // never reopen a site map onto a wiped party
       closeEncounterAction();
       if (town) {
@@ -2207,6 +2247,300 @@ const Game = ({ resumeConversation = null }) => {
     }
   }
 
+  // Manual save, shared by the classic toolbar and the workspace rail.
+  const handleManualSave = async () => {
+    const title = buildSaveName(saveRootFor(settings));
+    // performSave reports what actually happened so the confirmation is honest:
+    // 'saved' | 'savedLocal' | 'forked' | 'nochange' | 'skipped' | 'error'.
+    const status = await performSave();
+    openSaveConfirmation({
+      status,
+      title,
+      signedIn: !!user, // drives the "where did it save" indicator
+      root: saveRootFor(settings),
+      // Change the campaign root name: keep it for future saves (settings) and
+      // update the just-saved row's name immediately.
+      onRename: async (newRoot) => {
+        setSettings(prev => ({ ...prev, saveName: newRoot }));
+        try {
+          await conversationsApi.updateName(sessionId, newRoot);
+        } catch (e) {
+          logger.error('Failed to rename save', e);
+        }
+      }
+    });
+  };
+
+  // ---- #84 workspace spike: map-as-stage layout + auto-travel --------------------------
+  const isWorkspace = layout === 'workspace';
+  const [stageEl, setStageEl] = useState(null);
+  const [logCollapsed, setLogCollapsed] = useState(false);
+  const [wsTab, setWsTab] = useState('map'); // phones: Map | Log (Log is forced before the start, where the Start button lives)
+  const [travel, setTravel] = useState(null); // { path:[{x,y}], dest:{x,y}, label }
+  const [resumeTravel, setResumeTravel] = useState(null); // { dest, label } after an interruption
+  const [travelSpeed, setTravelSpeed] = useState(1);
+  const [wsToast, setWsToast] = useState(null);
+  // Any pop-up open (encounter, location prompt, dialog)? Travel waits for it, and the
+  // resume control is hidden until it closes. Legacy boolean modals are caught by the DOM check.
+  const modalStack = useContext(ModalContext)?.stack || [];
+  const popupOpen = () => modalStack.length > 0 || !!document.querySelector('.modal-overlay, .rd-dialog-overlay');
+
+  const placeLabel = (x, y) => {
+    const t = getTile(mapHook.worldMap, x, y);
+    return t?.townName || (t?.mountainName && t.isFirstMountainInRange ? t.mountainName : null) || `(${x}, ${y})`;
+  };
+
+  const startTravel = (x, y, label = null) => {
+    if (popupOpen()) return;
+    const from = mapHook.playerPosition;
+    const path = planTravelRoute(mapHook.worldMap, from, { x, y });
+    if (!path) {
+      interactionHook.setConversation((prev) => [...prev, { role: 'system', content: 'There is no way across the water to there.' }]);
+      return;
+    }
+    if (path.length === 0) { handleMoveOnWorldMap(x, y); return; }
+    setResumeTravel(null);
+    setTravel({ path, dest: { x, y }, label: label || placeLabel(x, y) });
+  };
+
+  // World clicks in the workspace: adjacent = one ordinary move; farther = auto-travel;
+  // any click while travelling stops the party where it stands.
+  const handleWorkspaceWorldClick = (x, y) => {
+    if (!hasAdventureStarted || interactionHook.isLoading) return;
+    if (travel) { setTravel(null); return; }
+    const p = mapHook.playerPosition;
+    if ((x === p.x && y === p.y) || isAdjacentWorldMove(p, x, y)) { setResumeTravel(null); handleMoveOnWorldMap(x, y); return; }
+    startTravel(x, y);
+  };
+
+  // --- Suggested actions (#91, docs/SUGGESTED_ACTIONS_PLAN.md) ---
+  // Engine-derived chips above the input. A click logs a "You" line, then runs the action.
+  const [buildingRequest, setBuildingRequest] = useState(null); // { x, y, nonce }: open on arrival
+  const pendingTravelRef = useRef(null); // travel queued behind leaving a town
+  // Same rule as handleLeaveTown: the gate tile or the tile just right of it.
+  const atTownGate = (pos, entry) => !!pos && !!entry && pos.y === entry.y && (pos.x === entry.x || pos.x === entry.x + 1);
+  const atSiteEntrance = (pos, entry) => !!pos && !!entry && Math.abs(pos.x - entry.x) + Math.abs(pos.y - entry.y) <= 1;
+  const suggestions = useMemo(() => {
+    if (!isWorkspace || !hasAdventureStarted) return [];
+    return getSuggestedActions({
+      mapLevel: mapHook.currentMapLevel,
+      worldMap: mapHook.worldMap,
+      playerPosition: mapHook.playerPosition,
+      townMap: mapHook.currentTownMap?.mapData,
+      townName: mapHook.isInsideTown ? mapHook.currentTownMap?.townName || mapHook.currentTownTile?.townName : null,
+      townPosition: mapHook.townPlayerPosition,
+      milestones: settings?.milestones,
+      sideQuests: settings?.sideQuests,
+      party: selectedHeroes,
+      hookWaiting: !!pendingLookEncounter,
+      levelRange: settings?.levelRange,
+      townMapsCache: mapHook.townMapsCache,
+      atTownExit: mapHook.isInsideTown && atTownGate(mapHook.townPlayerPosition, mapHook.currentTownMap?.entryPoint),
+      siteName: mapHook.currentSiteMap?.name,
+      siteMap: mapHook.currentSiteMap,
+      sitePosition: mapHook.sitePlayerPosition,
+      // Same reach as handleLeaveSite: on the entrance or next to it.
+      atSiteExit: mapHook.isInsideSite && atSiteEntrance(mapHook.sitePlayerPosition, mapHook.currentSiteMap?.entryPoint),
+    });
+  }, [isWorkspace, hasAdventureStarted, mapHook.currentMapLevel, mapHook.worldMap, mapHook.playerPosition, mapHook.currentTownMap, mapHook.isInsideTown, mapHook.currentTownTile, mapHook.townPlayerPosition, mapHook.isInsideSite, mapHook.currentSiteMap, mapHook.sitePlayerPosition, mapHook.townMapsCache, settings?.milestones, settings?.sideQuests, settings?.levelRange, selectedHeroes, pendingLookEncounter]);
+  const suggestedTravelTargets = useMemo(
+    () => suggestions.filter((c) => c.kind === 'travel').map((c) => c.target),
+    [suggestions]
+  );
+
+  // Walk toward a town building, then ask TownMapDisplay to open it. Some buildings are
+  // boxed in (walls, water, neighbours), so aim for the reachable tile nearest the
+  // building within inspect range, which is where a click on it works from anyway.
+  const walkToBuilding = ({ x, y }) => {
+    const townMap = mapHook.currentTownMap;
+    const start = mapHook.townPlayerPosition;
+    if (!townMap || !start) return;
+    const dist = (a) => Math.abs(a.x - x) + Math.abs(a.y - y);
+    const open = () => setBuildingRequest({ x, y, nonce: Date.now() });
+    if (dist(start) <= 1) { open(); return; }
+    let best = null;
+    let bestDist = Infinity;
+    for (let dy = -INSPECT_RANGE; dy <= INSPECT_RANGE; dy++) {
+      for (let dx = -INSPECT_RANGE; dx <= INSPECT_RANGE; dx++) {
+        const goal = { x: x + dx, y: y + dy };
+        const d = dist(goal);
+        if (d === 0 || d > INSPECT_RANGE || d > bestDist) continue;
+        const tile = townMap.mapData?.[goal.y]?.[goal.x];
+        if (!tile || !isTownTileWalkable(tile)) continue;
+        const path = (goal.x === start.x && goal.y === start.y) ? [] : computeWalkPath(townMap.mapData, start, goal, isTownTileWalkable);
+        const reachable = path.length > 0 || (goal.x === start.x && goal.y === start.y);
+        if (!reachable) continue;
+        if (d < bestDist || (d === bestDist && path.length < best.length)) { best = path; bestDist = d; }
+      }
+    }
+    if (best && best.length === 0) { open(); return; }
+    if (!best) { mapHook.setTownError('You cannot reach that building.'); return; }
+    if (walkCancelRef.current) walkCancelRef.current();
+    walkCancelRef.current = runTileWalk({
+      path: best,
+      stepIntervalMs: TILE_STEP_MS,
+      onEnterTile: (pos, index) => {
+        const result = runTownStep(pos, index);
+        if (result !== 'halt' && index === best.length - 1) open();
+        return result;
+      },
+    });
+  };
+
+  // "Travel to Ironhold (level 3 recommended)" -> "Ironhold" for the travel bar.
+  const travelLabel = (label) => label.replace(/^(Travel to|Return to|Head for|Hunt in) /, '').replace(/ \(level \d+ recommended\)$/, '');
+
+  const runSuggestedAction = (chip) => {
+    if (!chip || interactionHook.isLoading || popupOpen()) return;
+    const { setConversation } = interactionHook;
+    const youLine = { role: 'user', content: chip.label };
+    // Enter/leave town write the log from a snapshot, so hand them one that already has
+    // the "You" line instead of appending it separately (it would be overwritten).
+    const withYou = [...interactionHook.conversation, youLine];
+    if (chip.kind === 'enter') { mapHook.handleEnterCurrentTown(setConversation, withYou); return; }
+    if (chip.kind === 'enterSite') {
+      const tile = getTile(mapHook.worldMap, mapHook.playerPosition.x, mapHook.playerPosition.y);
+      const poiEncounter = tile ? buildPoiEncounter(tile) : null;
+      if (poiEncounter) mapHook.handleEnterLocation(poiEncounter, setConversation, withYou, effectivePartyLevel(selectedHeroes));
+      return;
+    }
+    if (chip.kind === 'leave') {
+      if (mapHook.isInsideSite) mapHook.handleLeaveSite(setConversation, withYou);
+      else mapHook.handleLeaveTown(setConversation, withYou);
+      return;
+    }
+    if (chip.kind === 'travel' && mapHook.currentMapLevel !== 'world') {
+      // Leaving only works from the gate: walk there first, then leave, then set off.
+      pendingTravelRef.current = { ...chip.target, label: travelLabel(chip.label), leaving: true };
+      const townMap = mapHook.currentTownMap;
+      const start = mapHook.townPlayerPosition;
+      if (!townMap?.entryPoint || !start || atTownGate(start, townMap.entryPoint)) {
+        pendingTravelRef.current.leaving = false;
+        mapHook.handleLeaveTown(setConversation, withYou);
+        return;
+      }
+      setConversation((prev) => [...prev, youLine]);
+      const path = computeWalkPath(townMap.mapData, start, townMap.entryPoint, isTownTileWalkable);
+      if (!path.length) {
+        pendingTravelRef.current = null;
+        mapHook.setTownError('You cannot reach the town gate from here.');
+        return;
+      }
+      if (walkCancelRef.current) walkCancelRef.current();
+      walkCancelRef.current = runTileWalk({
+        path,
+        stepIntervalMs: TILE_STEP_MS,
+        onEnterTile: (pos, index) => {
+          const result = runTownStep(pos, index);
+          if (result === 'halt') pendingTravelRef.current = null; // an encounter stopped the walk
+          return result;
+        },
+      });
+      return;
+    }
+    setConversation((prev) => [...prev, youLine]);
+    if (chip.kind === 'look') { handleLookAround(); return; }
+    if (chip.kind === 'siteWalk') { handleSiteTileClick(chip.target.x, chip.target.y); return; }
+    if (chip.kind === 'siteMob') {
+      const mob = (mapHook.currentSiteMap?.mobs || []).find((m) => m && m.id === chip.mobId);
+      if (mob) handleAttackSiteMob(mob);
+      return;
+    }
+    if (chip.kind === 'search' || chip.kind === 'gather' || chip.kind === 'fight') {
+      const tile = getTile(mapHook.worldMap, mapHook.playerPosition.x, mapHook.playerPosition.y);
+      const ms = settings?.milestones || [];
+      if (chip.kind === 'search') { const search = getMilestoneLocationForTile(ms, tile); if (search) searchMilestoneLocation(tile, search); return; }
+      if (chip.kind === 'gather') { const gather = getMilestoneItemForTile(ms, tile); if (gather) grantObjectiveItem({ id: gather.itemId, name: gather.name }); return; }
+      const boss = getMilestoneBossForTile(ms, tile);
+      if (boss) startMilestoneBossFight(boss);
+      return;
+    }
+    if (chip.kind === 'walk') { walkToBuilding(chip.target); return; }
+    if (chip.kind === 'travel') {
+      startTravel(chip.target.x, chip.target.y, travelLabel(chip.label));
+    }
+  };
+
+  // The gate walk for a travel chip has arrived: leave town (fresh closures here).
+  useEffect(() => {
+    const queued = pendingTravelRef.current;
+    if (!queued?.leaving || !mapHook.isInsideTown || !mapHook.currentTownMap?.entryPoint) return;
+    if (!atTownGate(mapHook.townPlayerPosition, mapHook.currentTownMap.entryPoint)) return;
+    queued.leaving = false;
+    mapHook.handleLeaveTown(interactionHook.setConversation, interactionHook.conversation);
+  }, [mapHook.townPlayerPosition]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A travel chip used inside a town leaves first; set off once back on the world map.
+  useEffect(() => {
+    const queued = pendingTravelRef.current;
+    if (!queued || queued.leaving || mapHook.currentMapLevel !== 'world') return;
+    pendingTravelRef.current = null;
+    startTravel(queued.x, queued.y, queued.label);
+  }, [mapHook.currentMapLevel]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Walk the route one tile per step. Each step is a full move (encounters roll per tile);
+  // intermediate tiles pass through (no arrival prompt), the last one arrives normally.
+  // The effect re-runs after every step with fresh closures (position/map changed).
+  useEffect(() => {
+    if (!travel || interactionHook.isLoading || modalStack.length > 0) return undefined;
+    const timer = setTimeout(async () => {
+      if (popupOpen()) { setTravel({ ...travel }); return; } // re-check after the pop-up closes
+      const [next, ...rest] = travel.path;
+      const status = await handleMoveOnWorldMap(next.x, next.y, { passThrough: rest.length > 0 });
+      if (status === 'moved' && rest.length > 0) {
+        setTravel({ ...travel, path: rest, moving: true });
+        return;
+      }
+      setTravel(null);
+      if (status === 'interrupted' && rest.length > 0) setResumeTravel({ dest: travel.dest, label: travel.label });
+      // Each move commits at the end of its wait and the marker then glides for one step
+      // duration, so the first step goes almost at once instead of idling a full step.
+    }, travel.moving ? Math.round(TRAVEL_STEP_MS / travelSpeed) : 120);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [travel, interactionHook.isLoading, mapHook.playerPosition, travelSpeed, modalStack.length]);
+
+  // Leaving the world map (entering a town/site) ends any travel.
+  useEffect(() => {
+    if (mapHook.currentMapLevel !== 'world') { setTravel(null); setResumeTravel(null); }
+  }, [mapHook.currentMapLevel]);
+
+  // Collapsed log: surface each new log entry as a brief toast over the map.
+  const lastLogLenRef = useRef(interactionHook.conversation.length);
+  useEffect(() => {
+    const len = interactionHook.conversation.length;
+    if (isWorkspace && logCollapsed && len > lastLogLenRef.current) {
+      const msg = interactionHook.conversation[len - 1];
+      const text = String(msg?.content || '').replace(/[*_#>`]/g, '').trim();
+      if (text) setWsToast({ id: len, text: text.length > 160 ? `${text.slice(0, 157)}...` : text });
+    }
+    lastLogLenRef.current = len;
+  }, [interactionHook.conversation, logCollapsed, isWorkspace]);
+  useEffect(() => {
+    if (!wsToast) return undefined;
+    const t = setTimeout(() => setWsToast(null), 4500);
+    return () => clearTimeout(t);
+  }, [wsToast]);
+
+  // Enter summons the action input from anywhere (opens the log if collapsed / on phones).
+  useEffect(() => {
+    if (!isWorkspace) return undefined;
+    const onKey = (e) => {
+      if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+      const tag = (e.target?.tagName || '').toLowerCase();
+      if (['input', 'textarea', 'select', 'button', 'a'].includes(tag)) return;
+      if (document.querySelector('.modal-overlay, .rd-dialog-overlay')) return;
+      e.preventDefault();
+      setLogCollapsed(false);
+      setWsTab('log');
+      // The input is disabled while generating or with narration off; still reopen the log.
+      const input = document.getElementById('user-action-input');
+      if (input && !input.disabled) setTimeout(() => input.focus(), 0);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isWorkspace]);
+
   return (
     <div className="gm-page">
       {isBackfilling && backfillProgress && (
@@ -2243,8 +2577,69 @@ const Game = ({ resumeConversation = null }) => {
           </div>
         </div>
       )}
-      <div className="gm-shell">
+      <div className={`gm-shell${isWorkspace ? ' ws-shell' : ''}${isWorkspace && logCollapsed ? ' log-collapsed' : ''}`} data-wstab={isWorkspace ? (hasAdventureStarted ? wsTab : 'log') : undefined}>
+        {isWorkspace && (
+          <nav className="ws-rail" aria-label="Game menu">
+            <button type="button" className="ws-rail-btn" onClick={() => openAdventureBook()} title="Adventure Book: journal, quests, codex">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>
+              <span>Journal</span>
+            </button>
+            <button type="button" className="ws-rail-btn" onClick={() => openAdventureBook({ tab: 'party' })}>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 8h14l-1 13H6z" /><path d="M9 8V6a3 3 0 0 1 6 0v2" /></svg>
+              <span>Inventory</span>
+            </button>
+            <button type="button" className="ws-rail-btn" onClick={handleManualSave} disabled={!sessionId} title="Save game manually">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><path d="M17 21v-8H7v8M7 3v5h8" /></svg>
+              <span>Save</span>
+            </button>
+            <button type="button" className="ws-rail-btn" onClick={openHowToPlay} title="How to play">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
+              <span>Help</span>
+            </button>
+          </nav>
+        )}
+        {isWorkspace && (
+          <section className="ws-stage" aria-label="Map">
+            <div className="ws-stage-map" ref={setStageEl} />
+            {(travel || (resumeTravel && modalStack.length === 0)) && (
+              <div className="ws-travel" role="status">
+                {travel ? (
+                  <>
+                    <span>Travelling to <b>{travel.label}</b> · {travel.path.length} {travel.path.length === 1 ? 'tile' : 'tiles'} to go</span>
+                    <button type="button" className="ws-chip" onClick={() => setTravelSpeed((v) => (v === 1 ? 2 : 1))}>{travelSpeed}x</button>
+                    <button type="button" className="ws-chip" onClick={() => setTravel(null)}>Stop</button>
+                  </>
+                ) : (
+                  <>
+                    <span>Travel to <b>{resumeTravel.label}</b> was interrupted.</span>
+                    <button type="button" className="ws-chip gold" onClick={() => startTravel(resumeTravel.dest.x, resumeTravel.dest.y)} disabled={interactionHook.isLoading}>Continue</button>
+                    <button type="button" className="ws-chip" onClick={() => setResumeTravel(null)}>Dismiss</button>
+                  </>
+                )}
+              </div>
+            )}
+            {wsToast && <div className="ws-toast" key={wsToast.id}>{wsToast.text}</div>}
+            <div className="ws-party">
+              {(selectedHeroes || []).map((hero, i) => {
+                const name = hero.heroName || hero.characterName || 'Hero';
+                return (
+                  <button key={hero.heroId || name} type="button" className={`ws-party-hero${i === 0 ? ' lead' : ''}`} onClick={() => openHero({ hero, onHeroUpdate: handleHeroUpdate })} title={`${name}${hero.maxHP ? ` · HP ${hero.currentHP}/${hero.maxHP}` : ''}`} aria-label={`${name}: view details`}>
+                    {hero.profilePicture && <img src={resolveProfilePicture(hero.profilePicture)} alt="" />}
+                    {hero.maxHP ? <span className="ws-hp"><span style={{ width: `${(hero.currentHP / hero.maxHP) * 100}%` }} /></span> : null}
+                  </button>
+                );
+              })}
+            </div>
+            {logCollapsed && (
+              <button type="button" className="ws-log-open" onClick={() => setLogCollapsed(false)} aria-label="Open the adventure log">Log ‹</button>
+            )}
+          </section>
+        )}
         <GameMainPanel
+          variant={isWorkspace ? 'docked' : undefined}
+          onCollapse={isWorkspace ? () => setLogCollapsed(true) : undefined}
+          suggestions={suggestions}
+          onSuggestion={isWorkspace ? runSuggestedAction : undefined}
           campaignGoal={settings.campaignGoal}
           partyLeadName={selectedHeroes?.[0]?.heroName || selectedHeroes?.[0]?.characterName || null}
           templateName={settings?.templateName || null}
@@ -2264,28 +2659,7 @@ const Game = ({ resumeConversation = null }) => {
           // last tab (#52); first open defaults to Campaign. The Inventory button
           // above pins the Party tab because its intent is unambiguous.
           onOpenSettings={() => openAdventureBook()}
-          onManualSave={async () => {
-            const title = buildSaveName(saveRootFor(settings));
-            // performSave reports what actually happened so the confirmation is honest:
-            // 'saved' | 'savedLocal' | 'forked' | 'nochange' | 'skipped' | 'error'.
-            const status = await performSave();
-            openSaveConfirmation({
-              status,
-              title,
-              signedIn: !!user, // drives the "where did it save" indicator
-              root: saveRootFor(settings),
-              // Change the campaign root name: keep it for future saves (settings) and
-              // update the just-saved row's name immediately.
-              onRename: async (newRoot) => {
-                setSettings(prev => ({ ...prev, saveName: newRoot }));
-                try {
-                  await conversationsApi.updateName(sessionId, newRoot);
-                } catch (e) {
-                  logger.error('Failed to rename save', e);
-                }
-              }
-            });
-          }}
+          onManualSave={handleManualSave}
           canManualSave={!!sessionId}
           saveStatus={saveStatus}
           isSaving={isSaving}
@@ -2317,17 +2691,17 @@ const Game = ({ resumeConversation = null }) => {
           onHookChipIgnore={handleHookChipIgnore}
         />
 
-        <PartySidebar
+        {!isWorkspace && <PartySidebar
           selectedHeroes={selectedHeroes}
           onOpenCharacter={(hero) => {
             openHero({ hero, onHeroUpdate: handleHeroUpdate });
             setIsMobilePartySidebarOpen(false); // Close sidebar when opening modal
           }}
           className={isMobilePartySidebarOpen ? 'mobile-open' : ''}
-        />
+        />}
 
         {/* Mobile party toggle button - uses first hero portrait */}
-        <button
+        {!isWorkspace && <button
           className="gm-party-toggle"
           onClick={() => setIsMobilePartySidebarOpen(!isMobilePartySidebarOpen)}
           aria-label="Toggle party sidebar"
@@ -2343,7 +2717,14 @@ const Game = ({ resumeConversation = null }) => {
           ) : (
             '⚔️'
           )}
-        </button>
+        </button>}
+        {/* Phones (workspace): Map | Log tabs */}
+        {isWorkspace && hasAdventureStarted && (
+          <div className="ws-tabs" role="tablist" aria-label="View">
+            <button type="button" role="tab" aria-selected={wsTab === 'map'} className={wsTab === 'map' ? 'on' : ''} onClick={() => setWsTab('map')}>Map</button>
+            <button type="button" role="tab" aria-selected={wsTab === 'log'} className={wsTab === 'log' ? 'on' : ''} onClick={() => setWsTab('log')}>Log</button>
+          </div>
+        )}
 
         {/* Mobile overlay */}
         {isMobilePartySidebarOpen && (
@@ -2354,7 +2735,22 @@ const Game = ({ resumeConversation = null }) => {
         )}
       </div>
 
+      {isWorkspace && (
+        <WorkspaceHints
+          started={hasAdventureStarted}
+          level={mapHook.currentMapLevel}
+          suggestions={suggestions.length}
+          sideSuggestions={suggestions.filter((c) => c.side).length}
+          paused={modalStack.length > 0}
+        />
+      )}
       <GameModals
+        mapDockTarget={isWorkspace ? stageEl : null}
+        onWorldTileClick={isWorkspace ? handleWorkspaceWorldClick : null}
+        suggestedTravelTargets={isWorkspace ? suggestedTravelTargets : null}
+        mapGlideMs={isWorkspace ? Math.round(TRAVEL_STEP_MS / travelSpeed) : null}
+        buildingRequest={isWorkspace ? buildingRequest : null}
+        onBuildingRequestHandled={() => setBuildingRequest(null)}
         onContinueLegend={() => {
           closeAdventureBook();
           setLegendPicker({ open: true, celebrate: false });
@@ -2379,8 +2775,9 @@ const Game = ({ resumeConversation = null }) => {
         handleAttackSiteMob={handleAttackSiteMob}
         handleEncounterResolve={handleEncounterResolve}
         handleHeroUpdate={handleHeroUpdate}
-        onUseItem={(heroId, itemKey, healedHero) => {
+        onUseItem={(heroId, itemKey, healedHero, logLine) => {
           setSelectedHeroes(prev => replaceHeroInParty(prev, healedHero));
+          if (logLine) interactionHook.setConversation(prev => [...prev, { role: 'system', content: logLine }]);
         }}
         onQuestItemFound={(itemId, itemName) => {
           // Route through grantObjectiveItem so the item actually lands in inventory:
@@ -2432,6 +2829,13 @@ const Game = ({ resumeConversation = null }) => {
             return healed;
           });
           setSelectedHeroes(updatedHeroes);
+          const recovered = healingResults.filter(r => r.after > r.before);
+          interactionHook.setConversation(prev => [...prev, {
+            role: 'system',
+            content: `🛏️ ${restType === 'long' ? 'Long' : 'Short'} rest: ${recovered.length
+              ? recovered.map(r => `${r.name} +${r.after - r.before} HP (${r.after}/${r.maxHP})`).join(', ')
+              : 'the party is already at full health'}.`
+          }]);
           // #83 Phase 2: a LONG rest is the deliberate "time passed" reset — clear every spent
           // check lock so the party can attempt those approaches afresh. A short rest does not.
           if (restType === 'long' && settings?.checkLocks?.length) {

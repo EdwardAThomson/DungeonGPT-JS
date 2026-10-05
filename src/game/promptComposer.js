@@ -138,6 +138,7 @@ export const composeNpcMeetingPrompt = ({
   buildingName = null,
   townName = null,
   milestoneText = null,
+  meetingText = null,
   settings = {},
   selectedHeroes = [],
   currentSummary = ''
@@ -152,9 +153,12 @@ export const composeNpcMeetingPrompt = ({
   const objectiveInfo = milestoneText
     ? ` This meeting fulfils the objective "${milestoneText}"; the game engine has already marked it complete, so do NOT emit any completion marker.`
     : '';
+  // Authored scene from the story template: the facts and direction to convey, in
+  // the model's own words.
+  const briefInfo = meetingText ? ` Authored brief for this scene (keep its facts and direction, retell it in your own words): ${meetingText}` : '';
   const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
   const gameContext = `Setting: ${settings.shortDescription || 'Fantasy Realm'}. Mood: ${settings.grimnessLevel || 'Normal'}.${goalInfo}\nParty: ${partyInfo}.`;
-  const task = `The party seeks out ${who} ${where}.${personaInfo}${objectiveInfo} Narrate the meeting: how ${name} receives the party, what is said about the matter at hand, and what direction ${name} offers for what comes next. Use ${name}'s exact name and do not invent other named officials. Keep it to 1-2 short paragraphs.`;
+  const task = `The party seeks out ${who} ${where}.${personaInfo}${objectiveInfo}${briefInfo} Narrate the meeting: how ${name} receives the party, what is said about the matter at hand, and what direction ${name} offers for what comes next. Use ${name}'s exact name and do not invent other named officials. Keep it to 1-2 short paragraphs.`;
   const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary || 'The tale unfolds.'}\n\n${task}`;
 
   return {

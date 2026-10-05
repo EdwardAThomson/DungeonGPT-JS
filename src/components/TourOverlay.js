@@ -11,7 +11,7 @@ import '../styles/tour.css';
 
 const TOOLTIP_WIDTH = 300;
 
-const Card = ({ step, pageInfo, hasNextOnPage, onNext, onSkip, onMinimize, anchored, style }) => (
+const Card = ({ step, pageInfo, hasNextOnPage, onNext, onSkip, onMinimize, anchored, style, skipLabel = 'Skip tour' }) => (
   <div
     className={`tour-tooltip${anchored ? '' : ' tour-tooltip-floating'}`}
     style={style}
@@ -25,7 +25,7 @@ const Card = ({ step, pageInfo, hasNextOnPage, onNext, onSkip, onMinimize, ancho
     <div className="tour-tooltip-title">{step.title}</div>
     <div className="tour-tooltip-body">{step.body}</div>
     <div className="tour-tooltip-actions">
-      <button className="tour-skip-link" onClick={onSkip}>Skip tour</button>
+      <button className="tour-skip-link" onClick={onSkip}>{skipLabel}</button>
       <button className="tour-next-btn" onClick={onNext}>{hasNextOnPage ? 'Next →' : 'Got it'}</button>
     </div>
   </div>
@@ -37,24 +37,30 @@ const Pill = ({ onExpand }) => (
   </button>
 );
 
-const TourOverlay = () => {
-  const { activeStep, pageInfo, hasNextOnPage, minimizedSteps, skipTour, advanceStep, minimizeStep, expandStep } = useGuidedTour();
+// Coachmark: one coach-mark, either ringing `step.target` with an anchored tooltip or,
+// untargeted / not found yet, a docked card. Minimized shows a small pill. Shared by
+// the cross-route tour (below) and the in-game workspace tips (WorkspaceHints).
+export const Coachmark = ({ step, minimized, pageInfo, hasNextOnPage, onNext, onSkip, onMinimize, onExpand, skipLabel }) => {
   const [rect, setRect] = useState(null);
 
-  const hasTarget = !!activeStep?.target;
-  const minimized = !!activeStep && minimizedSteps.includes(activeStep.id);
+  // `target` rings an element; `inside` instead floats the card at the top of an element
+  // with no ring (for big areas like the map, where a ring and an outside tooltip don't fit).
+  const selector = step?.target || step?.inside || null;
+  const hasTarget = !!selector;
   const needsRect = hasTarget && !minimized;
 
   const measure = useCallback(() => {
     if (!needsRect) { setRect(null); return; }
-    const el = document.querySelector(activeStep.target);
-    if (el) {
-      const r = el.getBoundingClientRect();
+    const el = document.querySelector(selector);
+    const r = el && el.getBoundingClientRect();
+    // A hidden target (display:none, e.g. the other tab on phones) measures 0x0: fall
+    // back to the docked card rather than ringing the top-left corner.
+    if (r && (r.width > 0 || r.height > 0)) {
       setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
     } else {
       setRect(null);
     }
-  }, [activeStep, needsRect]);
+  }, [selector, needsRect]);
 
   // Locate (and scroll to) the target when a targeted step activates; poll briefly
   // because the element may render a beat after the route does.
@@ -62,9 +68,9 @@ const TourOverlay = () => {
     if (!needsRect) { setRect(null); return; }
     let tries = 0;
     const locate = () => {
-      const el = document.querySelector(activeStep.target);
+      const el = document.querySelector(selector);
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (step.target) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
         measure();
         return true;
       }
@@ -76,7 +82,7 @@ const TourOverlay = () => {
       if (locate() || tries > 20) clearInterval(iv);
     }, 150);
     return () => clearInterval(iv);
-  }, [activeStep, needsRect, measure]);
+  }, [selector, step, needsRect, measure]);
 
   useEffect(() => {
     if (!needsRect) return;
@@ -93,24 +99,25 @@ const TourOverlay = () => {
     };
   }, [needsRect, measure]);
 
-  if (!activeStep) return null;
+  if (!step) return null;
 
   if (minimized) {
-    return <Pill onExpand={() => expandStep(activeStep.id)} />;
+    return <Pill onExpand={onExpand} />;
   }
 
-  const cardProps = {
-    step: activeStep,
-    pageInfo,
-    hasNextOnPage,
-    onNext: advanceStep,
-    onSkip: skipTour,
-    onMinimize: () => minimizeStep(activeStep.id),
-  };
+  const cardProps = { step, pageInfo, hasNextOnPage, onNext, onSkip, onMinimize, skipLabel };
 
   // Untargeted step, or target not located yet -> docked info card (non-blocking).
   if (!hasTarget || !rect) {
     return <Card {...cardProps} anchored={false} />;
+  }
+
+  if (step.inside) {
+    const insideStyle = {
+      top: rect.top + 16,
+      left: Math.max(12, Math.min(rect.left + rect.width / 2 - TOOLTIP_WIDTH / 2, window.innerWidth - TOOLTIP_WIDTH - 12)),
+    };
+    return <Card {...cardProps} anchored style={insideStyle} />;
   }
 
   const pad = 6;
@@ -134,6 +141,23 @@ const TourOverlay = () => {
       <div className="tour-ring" style={ringStyle} aria-hidden="true" />
       <Card {...cardProps} anchored style={tooltipStyle} />
     </>
+  );
+};
+
+const TourOverlay = () => {
+  const { activeStep, pageInfo, hasNextOnPage, minimizedSteps, skipTour, advanceStep, minimizeStep, expandStep } = useGuidedTour();
+  if (!activeStep) return null;
+  return (
+    <Coachmark
+      step={activeStep}
+      minimized={minimizedSteps.includes(activeStep.id)}
+      pageInfo={pageInfo}
+      hasNextOnPage={hasNextOnPage}
+      onNext={advanceStep}
+      onSkip={skipTour}
+      onMinimize={() => minimizeStep(activeStep.id)}
+      onExpand={() => expandStep(activeStep.id)}
+    />
   );
 };
 

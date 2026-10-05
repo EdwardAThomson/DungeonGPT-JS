@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sendEvent } from '../services/telemetry';
 import SafeMarkdownMessage from './SafeMarkdownMessage';
 import NarrativeHookChips from './NarrativeHookChips';
 import SaveSyncIndicator from './SaveSyncIndicator';
 import RdDialog from './RdDialog';
+import { groupLogByVisit } from '../game/logGroups';
 
 // Player-action length guard (maintainer 2026-07-06): the worker rejects
 // composed prompts over 32k chars, of which the typed action is one slice
@@ -84,8 +85,16 @@ const GameMainPanel = ({
   // object identity, so saved/reloaded conversations never resurrect live chips.
   hookChips = null,
   onHookChipAction,
-  onHookChipIgnore
+  onHookChipIgnore,
+  // #84 workspace spike: 'docked' = the right-hand log pane (tools live in the rail);
+  // onCollapse folds the pane away.
+  variant,
+  onCollapse,
+  // Engine-derived suggestion chips (#91), shown above the input in the workspace log.
+  suggestions = [],
+  onSuggestion,
 }) => {
+  const docked = variant === 'docked';
   // High-intent conversion prompt: fired when a guest reaches for the gated AI chat.
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   // Keep the newest entry in view as the log grows (new narration, the thinking line).
@@ -96,8 +105,47 @@ const GameMainPanel = ({
     if (typeof el.scrollTo === 'function') el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     else el.scrollTop = el.scrollHeight;
   }, [conversation.length, isLoading]);
+
+  // Log entries grouped by location visit (town / cave / ruin). A visit starts open and
+  // collapses once the party leaves; the player can flip any one, or all at once.
+  const logItems = useMemo(() => groupLogByVisit(conversation), [conversation]);
+  const [visitOpen, setVisitOpen] = useState({}); // id -> bool, overrides the default
+  const isVisitOpen = (g) => visitOpen[g.id] ?? !g.closed;
+  // Leaving a place always folds its group away, even if the player had opened it (or hit
+  // Expand all) while inside: drop the override on the visit that just closed.
+  const liveVisitIdsRef = useRef(new Set());
+  useEffect(() => {
+    const live = new Set(logItems.filter((i) => i.type === 'visit' && !i.closed).map((i) => i.id));
+    const justClosed = [...liveVisitIdsRef.current].filter((id) => !live.has(id));
+    liveVisitIdsRef.current = live;
+    if (justClosed.length === 0) return;
+    setVisitOpen((prev) => {
+      const next = { ...prev };
+      justClosed.forEach((id) => { delete next[id]; });
+      return next;
+    });
+  }, [logItems]);
+  const visits = logItems.filter((i) => i.type === 'visit');
+  const anyVisitOpen = visits.some(isVisitOpen);
+  const setAllVisits = (open) => setVisitOpen(Object.fromEntries(visits.map((g) => [g.id, open])));
+
+  const renderMsg = (msg, index) => (
+    // Encounter results are stored as ai messages prefixed "⚔️ **Name**:"; tag them so
+    // the log can set combat apart from narration (view-only, works on old saves too).
+    <div key={index} className={`gm-msg message ${msg.role}${msg.role === 'ai' && typeof msg.content === 'string' && msg.content.startsWith('⚔️') ? ' combat' : ''}`}>
+      <SafeMarkdownMessage content={msg.content} />
+      {hookChips && hookChips.message === msg && (
+        <NarrativeHookChips
+          encounter={hookChips.encounter}
+          onAction={onHookChipAction}
+          onIgnore={onHookChipIgnore}
+        />
+      )}
+    </div>
+  );
+
   return (
-    <div className="gm-main">
+    <div className={`gm-main${docked ? ' ws-log' : ''}`}>
       <header className="gm-head">
         <div className="game-info-header gm-place">
           <h2 className="gm-eyebrow">Adventure Log</h2>
@@ -107,7 +155,10 @@ const GameMainPanel = ({
             <span className="gm-place-coords"> ({worldPosition.x}, {worldPosition.y})</span>
           </p>
         </div>
-        <nav className="gm-tools" aria-label="Game actions">
+        {docked && onCollapse && (
+          <button type="button" className="ws-collapse" onClick={onCollapse} aria-label="Collapse the adventure log" title="Collapse log (the map fills the screen)">»</button>
+        )}
+        {!docked && <nav className="gm-tools" aria-label="Game actions">
           <button type="button" onClick={onOpenMap} className="gm-tool primary" data-tour="open-map" aria-label={townName ? `View ${townName} map` : 'View world map'}>
             <Icon name="map" /><span>{townName ? 'Town map' : 'Map'}</span>
           </button>
@@ -124,11 +175,11 @@ const GameMainPanel = ({
             <Icon name="save" /><span>Save</span>
           </button>
           <SaveSyncIndicator status={saveStatus} isSaving={isSaving} signedIn={signedIn} />
-        </nav>
+        </nav>}
       </header>
 
       {/* Quest reminder: pinned above the log, not stored in the conversation */}
-      {campaignGoal && (
+      {campaignGoal && !docked && (
         <div className="gm-quest quest-message">
           <span className="gm-quest-label">Quest</span>
           <span>{campaignGoal}</span>
@@ -148,20 +199,33 @@ const GameMainPanel = ({
           </div>
         )}
 
-        {conversation.map((msg, index) => (
-          // Encounter results are stored as ai messages prefixed "⚔️ **Name**:"; tag them so
-          // the log can set combat apart from narration (view-only, works on old saves too).
-          <div key={index} className={`gm-msg message ${msg.role}${msg.role === 'ai' && typeof msg.content === 'string' && msg.content.startsWith('⚔️') ? ' combat' : ''}`}>
-            <SafeMarkdownMessage content={msg.content} />
-            {hookChips && hookChips.message === msg && (
-              <NarrativeHookChips
-                encounter={hookChips.encounter}
-                onAction={onHookChipAction}
-                onIgnore={onHookChipIgnore}
-              />
-            )}
+        {visits.length > 0 && (
+          <div className="gm-log-tools">
+            <button type="button" className="gm-visit-all" onClick={() => setAllVisits(!anyVisitOpen)}>
+              {anyVisitOpen ? 'Collapse all places' : 'Expand all places'}
+            </button>
           </div>
-        ))}
+        )}
+        {logItems.map((item) => {
+          if (item.type === 'msg') return renderMsg(item.msg, item.index);
+          const open = isVisitOpen(item);
+          return (
+            <section key={`visit-${item.id}`} className={`gm-visit${open ? ' open' : ''}`}>
+              <button
+                type="button"
+                className="gm-visit-head"
+                aria-expanded={open}
+                onClick={() => setVisitOpen((prev) => ({ ...prev, [item.id]: !open }))}
+              >
+                <span className="gm-visit-caret" aria-hidden="true">{open ? '▾' : '▸'}</span>
+                <span className="gm-visit-name">{item.name}</span>
+                <span className="gm-visit-count">{item.items.length} {item.items.length === 1 ? 'entry' : 'entries'}</span>
+                {!item.closed && <span className="gm-visit-here">here now</span>}
+              </button>
+              {open && <div className="gm-visit-body">{item.items.map(({ msg, index }) => renderMsg(msg, index))}</div>}
+            </section>
+          );
+        })}
         {isLoading && (
           <p className="gm-msg message system gm-thinking">
             <span className="gm-dots" aria-hidden="true"><i /><i /><i /></span>
@@ -172,6 +236,16 @@ const GameMainPanel = ({
         )}
         {error && <p className="gm-msg message error">{error}</p>}
       </div>
+
+      {hasAdventureStarted && suggestions.length > 0 && onSuggestion && (
+        <div className="ws-chips" role="group" aria-label="Suggested actions">
+          {suggestions.map((chip) => (
+            <button type="button" key={chip.id} className={`ws-chip-action kind-${chip.kind}${chip.side ? ' side' : ''}`} onClick={() => onSuggestion(chip)} disabled={isLoading}>
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="gm-compose">
         <form onSubmit={aiAvailable ? onSubmit : (e) => e.preventDefault()}>

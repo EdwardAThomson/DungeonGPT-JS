@@ -7,6 +7,7 @@ import React, { useMemo } from 'react';
 import { generateMapData } from '../utils/mapGenerator';
 import { biomeBackground, poiSprite } from '../utils/worldTileArt';
 import WorldMapLabels from './WorldMapLabels';
+import { roadArms, roadPathD, roadBend } from '../utils/roadArms';
 import MapSkyOverlay from './MapSkyOverlay';
 
 const TILE = 40;
@@ -84,7 +85,7 @@ const HomeWorldMap = ({ seed = SEED }) => {
           const beachShift = (tile.biome === 'beach' && tile.beachDirection != null) ? BEACH_SHIFT[tile.beachDirection] : 'none';
           return (
             <div key={`${tile.x},${tile.y}`} style={{ width: TILE, height: TILE, backgroundImage: biomeBackground(tile, tile.x, tile.y, world), backgroundSize: 'cover', position: 'relative' }}>
-              {/* River/path overlays and the POI sprite all get a beachShift nudge
+              {/* The POI sprite gets a beachShift nudge (roads bend instead, see roadBend)
                   (translateX/Y) toward the land side on beach tiles. That shift moves the
                   WHOLE absolutely-positioned box, not just its internal content — with
                   nothing clipping it, the shifted box visually paints over the neighbouring
@@ -103,8 +104,9 @@ const HomeWorldMap = ({ seed = SEED }) => {
                     that case, drawing the road stroke over the water reads as a rendering
                     defect (a road-colored line across open water), not a road. Skip it,
                     same as the river overlay already does above. */}
-                {tile.hasPath && tile.biome !== 'water' && (
-                  <Overlay d={pathSVGs[tile.pathDirection] || pathSVGs.NORTH_SOUTH} stroke="#7a5230" width={3} opacity={0.8} transform={beachShift} />
+                {/* Road shape from roadArms (connection union + roads through features). */}
+                {tile.biome !== 'water' && roadPathD(roadArms(world, tile.x, tile.y)) && (
+                  <Overlay d={roadPathD(roadArms(world, tile.x, tile.y), roadBend(tile))} stroke="#7a5230" width={3} opacity={0.8} />
                 )}
                 {poi && <div style={{ position: 'absolute', inset: 0, zIndex: 2, backgroundImage: poi, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center', transform: beachShift }} />}
               </div>

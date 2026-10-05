@@ -266,6 +266,14 @@ describe('composeNpcMeeting', () => {
     expect(bare.length).toBeGreaterThan(0);
   });
 
+  it('uses an authored meetingText in place of the generic closer, and the display title', () => {
+    const scene = '"Find their den," Ulric says.';
+    const text = composeNpcMeeting({ ...ulric, role: 'militia captain', meetingText: scene });
+    expect(text).toContain('**Captain Ulric**, the militia captain');
+    expect(text.endsWith(scene)).toBe(true);
+    expect(text).not.toMatch(/Introductions made|states their business|listened to, word for word/);
+  });
+
   it('returns an empty string without a name', () => {
     expect(composeNpcMeeting({})).toBe('');
     expect(composeNpcMeeting()).toBe('');

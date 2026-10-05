@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
+import SettingsContext from '../contexts/SettingsContext';
 import { getStepHint, formatStepProgress, isQuestReadyToTurnIn } from '../game/questHints';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
@@ -36,7 +37,7 @@ const TABS = [
   { id: 'quests', label: 'Side Quests' },
   { id: 'codex', label: 'Codex' },
   { id: 'party', label: 'Inventory' },
-  { id: 'ai', label: 'AI' }
+  { id: 'ai', label: 'Settings' }
 ];
 
 // Normalize legacy milestone arrays (plain strings) for display.
@@ -46,6 +47,20 @@ const normalizeMilestones = (milestones) => {
     return milestones;
   }
   return milestones.map((text, index) => ({ id: index + 1, text, completed: false, location: null }));
+};
+
+// Per-viewer display options (Settings tab), kept in the browser, not the save.
+const DisplaySettings = () => {
+  const { showMapGrid, setShowMapGrid } = useContext(SettingsContext);
+  return (
+    <div style={{ marginBottom: '20px', background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+      <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>Display</h4>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: 'var(--text)', textTransform: 'none', letterSpacing: 'normal', fontFamily: 'var(--font-ui, inherit)', fontSize: '0.95rem', fontWeight: 500 }}>
+        <input type="checkbox" checked={showMapGrid} onChange={(e) => setShowMapGrid(e.target.checked)} />
+        Show gridlines on the world map
+      </label>
+    </div>
+  );
 };
 
 const CampaignTab = ({ settings, onContinueLegend }) => (
@@ -230,7 +245,9 @@ const SideQuestsTab = ({ settings }) => {
     const ready = isQuestReadyToTurnIn(q);
     const expanded = !!expandedQuests[q.id];
     return (
-      <div key={q.id} style={{ border: `1px solid ${ready ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '8px', marginBottom: '8px', background: 'var(--bg)' }}>
+      // Side-quest blue (matches the map border and the suggestion chips); a ready quest
+      // gets a heavier border, a finished one goes neutral.
+      <div key={q.id} style={{ border: `${ready ? 2 : 1}px solid ${q.status === 'completed' ? 'var(--border)' : 'var(--side-quest)'}`, borderRadius: '8px', marginBottom: '8px', background: 'var(--bg)' }}>
         <button
           onClick={() => setExpandedQuests(p => ({ ...p, [q.id]: !p[q.id] }))}
           style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text)' }}
@@ -238,7 +255,7 @@ const SideQuestsTab = ({ settings }) => {
           <span style={{ fontWeight: 700, textDecoration: q.status === 'completed' ? 'line-through' : 'none', opacity: q.status === 'completed' ? 0.7 : 1 }}>
             {q.status === 'completed' ? '✓ ' : ''}{q.title}
           </span>
-          <span style={{ fontSize: '0.85rem', color: ready ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: ready ? 700 : 400 }}>
+          <span style={{ fontSize: '0.85rem', color: ready ? 'var(--side-quest)' : 'var(--text-secondary)', fontWeight: ready ? 700 : 400 }}>
             {ready ? '✅ Ready to turn in' : `${done}/${total}`} {expanded ? '▲' : '▼'}
           </span>
         </button>
@@ -335,6 +352,7 @@ const AdventureBook = ({
             onHeroUpdate={onHeroUpdate}
           />
         )}
+        {activeTab === 'ai' && <DisplaySettings />}
         {activeTab === 'ai' && (
           <AiEngineSettings
             selectedProvider={selectedProvider}

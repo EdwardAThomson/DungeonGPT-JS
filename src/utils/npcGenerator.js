@@ -34,6 +34,13 @@ class SeededRNG {
 // --- Data Lists ---
 // Removed local constants (now imported from nameData.js)
 
+// Job label for an authored (milestone) NPC: the story's display title when it has one
+// ("Militia captain"), else the honorific from the name, else the stat role.
+const authoredJobTitle = (spec, npc) => {
+    if (spec.title) return spec.title.charAt(0).toUpperCase() + spec.title.slice(1);
+    return npc.title || spec.role;
+};
+
 const ROLES = {
     "Villager": {
         possibleTitles: ["Citizen", "Peasant", "Farmer", "Laborer", "Elder"],
@@ -620,7 +627,7 @@ export const populateTown = (townMapData, seed, milestoneNpcs = []) => {
         if (spec.personality) npc.personality = spec.personality;
         npc.milestoneNpcId = spec.id;
         npc.milestoneId = spec.milestoneId;
-        npc.job = `${npc.title || spec.role} at ${b.name || b.type}`;
+        npc.job = `${authoredJobTitle(spec, npc)} at ${b.name || b.type}`;
         placedAuthoredIds.add(spec.id);
         return npc;
     };
@@ -1059,7 +1066,7 @@ export const addAuthoredNpcToTown = (townMapData, spec, seed) => {
     npc.milestoneNpcId = spec.id;
     npc.milestoneId = spec.milestoneId;
     const buildingLabel = target.tile.buildingName || target.tile.buildingType;
-    npc.job = `${npc.title || spec.role} at ${buildingLabel}`;
+    npc.job = `${authoredJobTitle(spec, npc)} at ${buildingLabel}`;
     npc.location = {
         x: target.x,
         y: target.y,

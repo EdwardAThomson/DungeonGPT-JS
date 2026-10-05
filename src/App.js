@@ -10,6 +10,7 @@ import HomePage from "./pages/HomePage";
 import NewGame from "./pages/NewGame";
 import HeroSelection from './pages/HeroSelection';
 import GameResumeGate from './pages/GameResumeGate';
+import Game from './pages/Game';
 import SavedConversations from './pages/SavedConversations';
 import CFWorkerDebug from './pages/CFWorkerDebug';
 import EncounterModalDebug from './pages/EncounterModalDebug';
@@ -40,6 +41,8 @@ const EnginePage = lazy(() => import('./pages/EnginePage'));
 const OverviewPage = lazy(() => import('./pages/OverviewPage'));
 // Player dashboard, split from the public front page (#82).
 const PlayPage = lazy(() => import('./pages/PlayPage'));
+// #84 map-as-stage prototype (debug builds only).
+const WorkspaceSpike = lazy(() => import('./pages/WorkspaceSpike'));
 // Membership / tier page: /premium with a /membership alias (the nav's Subscribe).
 const PremiumPage = lazy(() => import('./pages/PremiumPage'));
 
@@ -47,7 +50,7 @@ const AppContent = () => {
   const location = useLocation();
   const { loading } = useAuth();
   const isDebugEnabled = process.env.NODE_ENV !== 'production' || process.env.REACT_APP_ENABLE_DEBUG_ROUTES === 'true';
-  const isGamePage = location.pathname === '/game';
+  const isGamePage = location.pathname === '/game' || location.pathname === '/workspace-debug/play';
   // Redesign marketing routes (#82 §12.3) go full-bleed; other pages keep the container.
   const isBleedPage = ['/', '/overview', '/engine', '/premium', '/membership', '/getting-started', '/saved-conversations', '/all-heroes', '/login', '/play', '/hero-selection', '/new-game', '/hero-creation', '/hero-summary'].includes(location.pathname);
 
@@ -149,6 +152,8 @@ const AppContent = () => {
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/cf-worker-debug" element={<ProtectedRoute><CFWorkerDebug /></ProtectedRoute>} />
               {isDebugEnabled && <Route path="/encounter-debug" element={<EncounterModalDebug />} />}
+              {isDebugEnabled && <Route path="/workspace-debug" element={<WorkspaceSpike />} />}
+              {isDebugEnabled && <Route path="/workspace-debug/play" element={<Game layout="workspace" />} />}
               {isDebugEnabled && <Route path="/debug/*" element={<ProtectedRoute><DebugRoutes /></ProtectedRoute>} />}
               {!isDebugEnabled && <Route path="/debug/*" element={<Navigate to="/" replace />} />}
             </Routes>

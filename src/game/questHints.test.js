@@ -102,9 +102,9 @@ describe('getStepHint', () => {
   it('turn-in steps show the target, and readiness once prerequisites complete', () => {
     const obj = { id: 'a', trigger: { item: 'x' }, completed: false };
     const turnin = { id: 'b', trigger: { turnIn: { building: ['inn', 'tavern'] } }, requires: ['a'], completed: false };
-    expect(getStepHint(turnin, quest([obj, turnin]))).toBe('Return to an inn or a tavern');
+    expect(getStepHint(turnin, quest([obj, turnin]))).toBe('Return to an inn or a tavern in any town');
     const done = { ...obj, completed: true };
-    expect(getStepHint(turnin, quest([done, turnin]))).toBe('✅ Ready — return to an inn or a tavern');
+    expect(getStepHint(turnin, quest([done, turnin]))).toBe('✅ Ready — return to an inn or a tavern in any town');
   });
 
   it('completed steps get no hint', () => {
@@ -166,5 +166,31 @@ describe('isQuestReadyToTurnIn', () => {
     expect(isQuestReadyToTurnIn({ ...mk(true), status: 'completed' })).toBe(false);
     expect(isQuestReadyToTurnIn({ ...mk(true), status: 'available' })).toBe(false);
     expect(isQuestReadyToTurnIn(null)).toBe(false);
+  });
+});
+
+describe('computeSideQuestMarkers', () => {
+  const { computeSideQuestMarkers } = require('./questHints');
+  it('marks site types still needed and towns a ready quest returns to', () => {
+    const quests = [
+      { id: 'a', status: 'active', milestones: [
+        { id: 1, completed: false, site: { type: 'cave' } },
+        { id: 2, requires: [1], completed: false, trigger: { turnIn: { building: 'guild', location: 'Ashford' } } },
+      ] },
+      { id: 'b', status: 'active', milestones: [
+        { id: 1, completed: true, site: { type: 'ruins' } },
+        { id: 2, requires: [1], completed: false, trigger: { turnIn: { building: 'inn', location: 'Mudhollow' } } },
+      ] },
+      { id: 'c', status: 'available', milestones: [{ id: 1, completed: false, site: { type: 'ruins' } }] },
+      { id: 'd', status: 'active', milestones: [{ id: 1, completed: false, trigger: { item: 'x' }, sites: ['ruins'] }] },
+    ];
+    const { siteTypes, handInTowns } = computeSideQuestMarkers(quests);
+    expect([...siteTypes].sort()).toEqual(['cave', 'ruins']); // a's cave, d's gather source
+    expect([...handInTowns]).toEqual(['Mudhollow']); // a's hand-in isn't ready yet
+  });
+
+  it('is empty without active quests', () => {
+    const { siteTypes, handInTowns } = computeSideQuestMarkers(undefined);
+    expect(siteTypes.size + handInTowns.size).toBe(0);
   });
 });

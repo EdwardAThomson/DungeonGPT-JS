@@ -75,6 +75,8 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onAttackMob,
         {mapData.flat().map((tile) => {
           const neighbours = { n: typeAt(tile.x, tile.y - 1), e: typeAt(tile.x + 1, tile.y), s: typeAt(tile.x, tile.y + 1), w: typeAt(tile.x - 1, tile.y) };
           const isPlayer = playerPosition && tile.x === playerPosition.x && tile.y === playerPosition.y;
+          // The way out, outlined like a town gate so the exit is easy to find.
+          const isEntry = !!siteMapData.entryPoint && tile.x === siteMapData.entryPoint.x && tile.y === siteMapData.entryPoint.y;
           const hasMob = mobCoords.has(`${tile.x},${tile.y}`);
           // Any walkable floor tile is clickable now (no 5-tile cap); the party walks the
           // shortest path to it. Walls stay unclickable so a stray click does not error.
@@ -88,6 +90,7 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onAttackMob,
                 backgroundImage: tileBackground(tile, neighbours, tile.x, tile.y, theme),
                 backgroundSize: 'cover',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: TILE * 0.6, lineHeight: 1,
+                outline: isEntry ? '2px solid #ffd34d' : 'none', outlineOffset: -2,
               }}
             >
               {tile.poi && !ART_POI.has(tile.poi) && SITE_POI[tile.poi]}

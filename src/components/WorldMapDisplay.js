@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import SettingsContext from '../contexts/SettingsContext';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { biomeBackground, poiSprite } from '../utils/worldTileArt';
 import WorldMapLabels from './WorldMapLabels';
+import { roadArms, roadPathD, roadBend } from '../utils/roadArms';
 import MapSkyOverlay from './MapSkyOverlay';
 import {
   CLOSE_TILE,
@@ -97,16 +99,19 @@ const renderRiverOverlay = (tile) => {
 };
 
 // Helper function to render path overlay
-const renderPathOverlay = (tile, beachShift) => {
+const renderPathOverlay = (tile, mapData) => {
   // Pathfinding treats water as a very costly but not forbidden tile (a last-resort
   // route around a lake with no other way through, see pathfinding.js), so hasPath can
   // legitimately be true on a water tile. There's no bridge/ford art for that case, so
   // rendering the plain road stroke straight over the water reads as a rendering defect
   // (a road-colored line cutting across open water) rather than a road. Skip it here,
   // same as renderRiverOverlay already does for rivers on water tiles above.
-  if (!tile.hasPath || tile.biome === 'water') return null;
-
-  const pathD = pathSVGs[tile.pathDirection] || pathSVGs.NORTH_SOUTH;
+  if (tile.biome === 'water') return null;
+  // Shape from roadArms: the union of the tile's connections, plus roads running in from
+  // neighbours through features generation skipped (heals older saves; see roadArms.js).
+  // On beaches the road bends landward instead of being translated (see roadBend).
+  const pathD = roadPathD(roadArms(mapData, tile.x, tile.y), roadBend(tile));
+  if (!pathD) return null;
 
   return (
     <svg
@@ -118,7 +123,6 @@ const renderPathOverlay = (tile, beachShift) => {
         height: '100%',
         pointerEvents: 'none',
         zIndex: 1,
-        transform: beachShift
       }}
       viewBox="0 0 40 40"
     >
@@ -141,7 +145,10 @@ export const _resetRememberedZoom = () => { rememberedZoom = 'close'; };
 
 const ZOOM_LABELS = { fit: 'Fit', medium: 'Mid', close: 'Close' };
 
-const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visibleMilestonePois, activeMilestonePois, revealedSiteTypes }) => {
+// tileSizeOverride (#84 workspace stage): an integer tile size chosen by the container so a
+// 10x10 world fills the stage. Whole pixels avoid the tile-edge seams a transform scale gives.
+const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visibleMilestonePois, activeMilestonePois, revealedSiteTypes, sideQuestMarkers = null, tileSizeOverride = null, suggestedTargets = null, glideMs = null }) => {
+  const { showMapGrid } = useContext(SettingsContext); // per-viewer display option
   const mapHeight = mapData ? mapData.length : 0;
   const mapWidth = mapHeight > 0 ? mapData[0].length : 0;
 
@@ -160,7 +167,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
 
   const tileSize = viewportActive
     ? tileSizeForStep(zoomStep, mapWidth, mapHeight, paneBox.w, paneBox.h)
-    : TILE;
+    : (tileSizeOverride || TILE);
   const scale = tileSize / TILE;
   const culling = viewportActive && shouldCull(mapWidth, mapHeight);
 
@@ -301,8 +308,51 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
   // and visible milestone POIs.
   const labels = [];
 
+  // The party marker. Drawn inside its tile normally; with glideMs (#84 workspace) it is
+  // one layer over the grid that slides between tiles instead of jumping.
+  const renderMarker = (beachShift) => (
+    firstHero ? (
+      <div
+        className="player-marker-portrait"
+        style={{
+          zIndex: 3,
+          transform: beachShift,
+          // The portrait's CSS size is tuned for 56px tiles; shrink it in step
+          // with the smaller zoom levels (scale 1 keeps the pure-CSS legacy look).
+          ...(scale !== 1 ? {
+            width: Math.round(32 * scale),
+            height: Math.round(32 * scale),
+            top: Math.round(-18 * scale),
+            left: Math.round(-18 * scale),
+          } : {}),
+        }}
+      >
+        <img
+          src={resolveProfilePicture(firstHero.profilePicture)}
+          alt={firstHero.characterName}
+          loading="lazy"
+          width="40"
+          height="40"
+        />
+        <div className="player-marker-pointer"></div>
+      </div>
+    ) : (
+      <span style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: `translate(-50%, -50%) ${beachShift === 'none' ? '' : beachShift}`.trim(),
+        fontSize: scale === 1 ? '20px' : `${Math.round(20 * scale)}px`,
+        zIndex: 3,
+        pointerEvents: 'none',
+      }}>⭐</span>
+    )
+  );
+
   const renderTile = (tile) => {
     const isPlayerHere = playerPosition.x === tile.x && playerPosition.y === tile.y;
+    // #91: a suggested-action travel destination gets a dashed gold ring.
+    const isSuggestedTarget = !!suggestedTargets && suggestedTargets.some((t) => t.x === tile.x && t.y === tile.y);
 
     // Hide milestone POIs (sprite + name) that aren't unlocked yet
     const isMilestoneHidden = tile.milestonePoi && visibleMilestonePois && !visibleMilestonePois.has(tile.poi);
@@ -324,6 +374,14 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
     const isActiveMilestonePoi = !!tile.milestonePoi && !isMilestoneHidden
       && !!activeMilestonePois && activeMilestonePois.has(tile.poi);
 
+    // Side-quest marker (steady blue border): a revealed cave/ruins an active side quest
+    // still needs, or a town where a ready one is handed in. Secondary to the main quest:
+    // a tile already glowing as a milestone objective keeps only the gold glow.
+    const siteType = tile.poi === 'cave_entrance' ? 'cave' : tile.poi === 'ruins' ? 'ruins' : null;
+    const isSideQuestTile = !!sideQuestMarkers && !isActiveMilestonePoi && (
+      (!!siteType && !isSiteHidden && sideQuestMarkers.siteTypes?.has(siteType))
+      || (!!tile.townName && sideQuestMarkers.handInTowns?.has(tile.townName)));
+
     // Collect a name label for this tile if applicable
     const labelText = tile.townName
       || (tile.mountainName && tile.isFirstMountainInRange ? tile.mountainName : null)
@@ -340,7 +398,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
     return (
       <div
         key={`${tile.x}-${tile.y}`}
-        className={`map-tile ${isPlayerHere ? 'player-tile' : ''} ${!tile.isExplored ? 'unexplored' : ''} ${isActiveMilestonePoi ? 'milestone-poi-tile' : ''}`}
+        className={`map-tile ${isPlayerHere ? 'player-tile' : ''} ${!tile.isExplored ? 'unexplored' : ''} ${isActiveMilestonePoi ? 'milestone-poi-tile' : ''} ${isSideQuestTile ? 'side-quest-tile' : ''}`}
         style={{
           // Explicit size (belt-and-braces alongside the grid track size below): keeps
           // each tile's box an exact integer CSS-pixel square rather than relying on grid
@@ -362,7 +420,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
         onClick={() => handleTileClick(tile.x, tile.y)}
         title={`${tile.townName || tile.mountainName || `(${tile.x}, ${tile.y})`} - ${tile.biome}${tile.poi && !isSiteHidden && !isMilestoneHidden ? ` (${tile.poi})` : ''}${tile.townSize ? ` [${tile.townSize}]` : ''}${tile.isExplored ? ' (Explored)' : ''}`} // Tooltip
       >
-        {/* River/path overlays and the POI sprite all get a beachShift nudge (translateX/Y)
+        {/* The POI sprite gets a beachShift nudge (roads bend instead, see roadBend) (translateX/Y)
             toward the land side on beach tiles. That shift moves the WHOLE absolutely-
             positioned box, not just its internal content — with nothing clipping it, the
             shifted box visually paints over the neighbouring tile (found via playtest: a
@@ -375,7 +433,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
           {renderRiverOverlay(tile)}
 
           {/* Render path overlay (below POI) */}
-          {renderPathOverlay(tile, beachShift)}
+          {renderPathOverlay(tile, mapData)}
 
           {/* POI sprite overlay */}
           {poi && (
@@ -395,45 +453,10 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
           )}
         </div>
 
+        {isSuggestedTarget && <div className="ws-suggest-ring" aria-hidden="true" />}
+
         {/* Display player marker when on this tile */}
-        {isPlayerHere && (
-          firstHero ? (
-            <div
-              className="player-marker-portrait"
-              style={{
-                zIndex: 3,
-                transform: beachShift,
-                // The portrait's CSS size is tuned for 56px tiles; shrink it in step
-                // with the smaller zoom levels (scale 1 keeps the pure-CSS legacy look).
-                ...(scale !== 1 ? {
-                  width: Math.round(32 * scale),
-                  height: Math.round(32 * scale),
-                  top: Math.round(-18 * scale),
-                  left: Math.round(-18 * scale),
-                } : {}),
-              }}
-            >
-              <img
-                src={resolveProfilePicture(firstHero.profilePicture)}
-                alt={firstHero.characterName}
-                loading="lazy"
-                width="40"
-                height="40"
-              />
-              <div className="player-marker-pointer"></div>
-            </div>
-          ) : (
-            <span style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: `translate(-50%, -50%) ${beachShift === 'none' ? '' : beachShift}`.trim(),
-              fontSize: scale === 1 ? '20px' : `${Math.round(20 * scale)}px`,
-              zIndex: 3,
-              pointerEvents: 'none',
-            }}>⭐</span>
-          )
-        )}
+        {isPlayerHere && !glideMs && renderMarker(beachShift)}
       </div>
     );
   };
@@ -464,6 +487,34 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
       } : {})}
     >
       {tiles}
+
+      {/* Gridlines as ONE overlay on top of the tiles, not tile borders: borders bled
+          neighbouring art along tile edges at non-100% zoom (see .map-tile in maps.css). */}
+      {showMapGrid && (
+        <div
+          className="world-map-gridlines"
+          aria-hidden="true"
+          style={{ backgroundSize: `${tileSize}px ${tileSize}px` }}
+        />
+      )}
+
+      {glideMs && playerPosition && (() => {
+        const t = mapData[playerPosition.y]?.[playerPosition.x];
+        const shift = (t && t.biome === 'beach' && t.beachDirection !== undefined) ? beachShiftFor(t.beachDirection, scale) : 'none';
+        return (
+          <div
+            className="world-map-glide"
+            aria-hidden="true"
+            style={{
+              position: 'absolute', left: 0, top: 0, width: tileSize, height: tileSize, zIndex: 16, pointerEvents: 'none',
+              transform: `translate(${playerPosition.x * tileSize}px, ${playerPosition.y * tileSize}px)`,
+              transition: `transform ${glideMs}ms linear`,
+            }}
+          >
+            {renderMarker(shift)}
+          </div>
+        );
+      })()}
 
       {/* Ambient clouds + occasional birds over the FULL (zoom-scaled) grid — sized the
           same way as WorldMapLabels below, so it pans/zooms in lockstep with the tiles
