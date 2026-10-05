@@ -1533,8 +1533,9 @@ const Game = ({ resumeConversation = null }) => {
 
   // Open the location modal for a POI tile (arrival, or re-opened by clicking the tile
   // you stand on). Offers the Enter button and, when an active milestone boss lairs
-  // here, the Confront action.
-  const openPoiLocationModal = (tile, milestones) => {
+  // here, the Confront action. `notice` is an optional outcome line shown at the top of
+  // the modal (e.g. the result of a Search that re-opened it).
+  const openPoiLocationModal = (tile, milestones, { notice = null } = {}) => {
     const poiEncounter = tile ? buildPoiEncounter(tile) : null;
     if (!poiEncounter || isSiteHidden(tile)) return false;
     const ms = milestones || settings?.milestones || [];
@@ -1557,6 +1558,7 @@ const Game = ({ resumeConversation = null }) => {
       boss,
       gather,
       search,
+      notice,
       onGather: gather ? () => grantObjectiveItem({ id: gather.itemId, name: gather.name }) : null,
       onSearch: search ? () => searchMilestoneLocation(tile, search) : null,
       onFight: boss ? () => {
@@ -1581,7 +1583,9 @@ const Game = ({ resumeConversation = null }) => {
   // engine ignores an already-completed milestone), so a stray double-click is safe.
   // After a successful search we re-open the POI modal with the fresh milestone state
   // so a now-unlocked boss fight (e.g. the Goblin Chieftain once the hideout is found)
-  // appears on the same visit, preserving the old arrive-and-confront flow.
+  // appears on the same visit, preserving the old arrive-and-confront flow. The re-opened
+  // modal carries the outcome as a notice; without it, a search that unlocks nothing new
+  // re-opened a modal that looked unchanged, so success was easy to miss.
   const searchMilestoneLocation = (tile, search) => {
     if (!search) return;
     interactionHook.setConversation(prev => [...prev, { role: 'system', content: `🔍 You search ${search.name}...` }]);
@@ -1596,7 +1600,10 @@ const Game = ({ resumeConversation = null }) => {
       return;
     }
     const freshMs = result?.updatedMilestones || settings?.milestones || [];
-    openPoiLocationModal(tile, freshMs);
+    const notice = result?.type === 'completed'
+      ? `🎉 Milestone achieved: ${result.milestone.text}. Your rewards are in the Adventure Log.`
+      : `You search ${search.name} but find nothing more.`;
+    openPoiLocationModal(tile, freshMs, { notice });
   };
 
   // --- Map Movement Handler (Smart narration: local line per move, AI on demand) ---
