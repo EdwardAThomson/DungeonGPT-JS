@@ -291,7 +291,14 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
                     boxShadow: `0 0 5px ${item.rarity !== 'common' ? (getRarityColor(item.rarity) + '33') : 'rgba(0,0,0,0.5)'}`
                   }}
                   title="View item details"
-                  onClick={() => openItemDetail({ item })}
+                  // The detail modal offers the same Use as the list row (same condition),
+                  // handing back to this component's hero picker.
+                  onClick={() => openItemDetail({
+                    item,
+                    onUse: isHealingItem(item) && injuredHeroes.length > 0 && onUseItem
+                      ? () => setUseItemState({ itemKey: key })
+                      : null
+                  })}
                 >
                   {item.icon && (
                     <img

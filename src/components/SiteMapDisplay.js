@@ -43,7 +43,10 @@ const threatRingStyle = (threat, isHunter) => {
  * + content-slot overlays, the moving mobs, and the player marker. Mirrors TownMapDisplay
  * but simpler (no buildings / NPC modals). Movement is driven by tile clicks via onTileClick.
  * `siteNotice` surfaces loot/objective/quest feedback INSIDE the map modal (the chat log
- * is hidden behind it, so without this a pickup looks like nothing happened).
+ * is hidden behind it, so without this a pickup looks like nothing happened). Notices and
+ * errors float over the bottom of the map rather than sitting below it: in flow they
+ * changed the component's height as they came and went, and the docked workspace rescales
+ * the map to fit, so the map visibly stuttered.
  *
  * MOVING MOBS (site.mobs) are drawn as an absolutely-positioned overlay keyed by mob id, so
  * a step animates the SAME element between tiles (a CSS transform transition) instead of
@@ -169,23 +172,31 @@ const SiteMapDisplay = ({ siteMapData, playerPosition, onTileClick, onAttackMob,
           </div>
           );
         })}
+        {(siteNotice || siteError) && (
+          <div style={{
+            position: 'absolute', left: 8, right: 8, bottom: 8, zIndex: 6,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+            pointerEvents: 'none', // tiles under the message stay clickable
+          }}>
+            {siteNotice && (
+              <div
+                role="status"
+                className="message system"
+                style={{
+                  margin: 0, display: 'block', maxWidth: 460, whiteSpace: 'pre-line',
+                  background: 'rgba(34, 58, 38, 0.95)', border: '1px solid #7fd08a', color: '#eaffea',
+                  padding: '8px 14px', borderRadius: 6, fontWeight: 600, textAlign: 'center',
+                }}
+              >
+                {siteNotice}
+              </div>
+            )}
+            {siteError && (
+              <div className="message system error" style={{ margin: 0, display: 'block', maxWidth: 400 }}>⚠️ {siteError}</div>
+            )}
+          </div>
+        )}
       </div>
-      {siteNotice && (
-        <div
-          role="status"
-          className="message system"
-          style={{
-            margin: '10px auto', display: 'block', maxWidth: 460, whiteSpace: 'pre-line',
-            background: 'rgba(34, 58, 38, 0.95)', border: '1px solid #7fd08a', color: '#eaffea',
-            padding: '8px 14px', borderRadius: 6, fontWeight: 600, textAlign: 'center',
-          }}
-        >
-          {siteNotice}
-        </div>
-      )}
-      {siteError && (
-        <div className="message system error" style={{ margin: '10px auto', display: 'block', maxWidth: 400 }}>⚠️ {siteError}</div>
-      )}
       {showLeaveButton && onLeaveSite && (
         <button className="secondary-button" onClick={onLeaveSite} style={{ marginTop: 10 }}>Leave</button>
       )}
