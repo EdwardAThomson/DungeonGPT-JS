@@ -41,6 +41,7 @@ import {
 import { planTravelRoute, TRAVEL_STEP_MS } from '../game/worldTravel';
 import { getSuggestedActions } from '../game/suggestedActions';
 import { visitLeaveMessage } from '../game/logGroups';
+import { grantPartyStarterKits, starterKitMessage } from '../game/starterKit';
 import { scaleEncounterXP, scaleMilestoneRewards, scaleWorldRewards } from '../game/xpScaling';
 import { INSPECT_RANGE } from '../components/TownMapDisplay';
 import WorkspaceHints from '../components/WorkspaceHints';
@@ -274,12 +275,17 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       }
       return hero;
     });
+    // Starter kit (once per hero per save): a basic weapon, armour, two healing items and
+    // a little gold, so new heroes meet fights at the gear level they are tuned for.
+    // Runs before the invariant pass, which keeps the equipped keys (they are carried).
+    let kit = { party: heroes, grantedNames: [], events: [] };
+    try { kit = grantPartyStarterKits(heroes); } catch (err) { logger.error('Starter kit grant failed; continuing without it', err); }
     try {
       const savedSettings = typeof loadedConversation?.game_settings === 'string'
         ? JSON.parse(loadedConversation.game_settings)
         : loadedConversation?.game_settings;
       const ledger = Array.isArray(savedSettings?.heroLedger) ? savedSettings.heroLedger : null;
-      const { party, healed } = healPartyUpward(heroes);
+      const { party, healed } = healPartyUpward(kit.party);
       let finalParty = party;
       const healedMessages = [...healed];
       const reportedMessages = [];
@@ -291,10 +297,10 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
           return result.hero;
         });
       }
-      return { heroes: finalParty, healedMessages, reportedMessages };
+      return { heroes: finalParty, healedMessages, reportedMessages, kit };
     } catch (err) {
       logger.error('Hero invariant check failed on load; using heroes as loaded', err);
-      return { heroes, healedMessages: [], reportedMessages: [] };
+      return { heroes: kit.party, healedMessages: [], reportedMessages: [], kit };
     }
   });
   const [selectedHeroes, setSelectedHeroes] = useState(initialPartyCheck.heroes);
@@ -629,7 +635,14 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
   useEffect(() => {
     if (healAnnouncedRef.current) return;
     healAnnouncedRef.current = true;
-    const { healedMessages, reportedMessages } = initialPartyCheck;
+    const { healedMessages, reportedMessages, kit } = initialPartyCheck;
+    // Starter kit granted on this load: one log line, and ledger the grants so gold
+    // reconciliation protects them like any other reward.
+    const kitLine = starterKitMessage(kit?.grantedNames);
+    if (kitLine) {
+      interactionHook.setConversation(prev => [...prev, { role: 'system', content: kitLine }]);
+      appendHeroLedger(kit.events, 'starter_kit');
+    }
     if (reportedMessages.length > 0) {
       logger.info(`[HERO LEDGER] ${reportedMessages.join(' · ')}`);
     }
