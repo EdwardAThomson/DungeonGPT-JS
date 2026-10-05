@@ -244,3 +244,40 @@ describe('props contract preserved', () => {
     expect(screen.getByText('Loading map...')).toBeInTheDocument();
   });
 });
+
+describe('side-quest markers', () => {
+  const tileAt = (container, x, y) => container.querySelectorAll('.map-tile')[y * 4 + x];
+
+  test('needed caves and hand-in towns get the side-quest border; the main quest glow wins', () => {
+    const map = makeMap(4);
+    map[0][1] = { ...map[0][1], poi: 'cave_entrance' };
+    map[0][2] = { ...map[0][2], poi: 'town', townName: 'Ashford' };
+    map[0][3] = { ...map[0][3], poi: 'rot_tunnels', milestonePoi: true, townName: 'Ashford' };
+    const { container } = render(
+      <WorldMapDisplay
+        mapData={map}
+        playerPosition={{ x: 0, y: 3 }}
+        onTileClick={() => {}}
+        firstHero={null}
+        activeMilestonePois={new Set(['rot_tunnels'])}
+        sideQuestMarkers={{ siteTypes: new Set(['cave']), handInTowns: new Set(['Ashford']) }}
+      />
+    );
+    expect(tileAt(container, 1, 0)).toHaveClass('side-quest-tile');
+    expect(tileAt(container, 2, 0)).toHaveClass('side-quest-tile');
+    // Main-quest objective: gold glow only, no blue border on top.
+    expect(tileAt(container, 3, 0)).toHaveClass('milestone-poi-tile');
+    expect(tileAt(container, 3, 0)).not.toHaveClass('side-quest-tile');
+    expect(tileAt(container, 0, 0)).not.toHaveClass('side-quest-tile');
+  });
+
+  test('a hidden (unrevealed) cave is never marked', () => {
+    const map = makeMap(4);
+    map[0][1] = { ...map[0][1], poi: 'cave_entrance' };
+    const { container } = render(
+      <WorldMapDisplay mapData={map} playerPosition={{ x: 0, y: 3 }} onTileClick={() => {}} firstHero={null}
+        revealedSiteTypes={{}} sideQuestMarkers={{ siteTypes: new Set(['cave']), handInTowns: new Set() }} />
+    );
+    expect(tileAt(container, 1, 0)).not.toHaveClass('side-quest-tile');
+  });
+});

@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useMemo } from 'react';
 import { computeVisibleMilestonePois, computeActiveMilestonePois } from '../game/milestoneEngine';
+import { computeSideQuestMarkers } from '../game/questHints';
 import { getRevealedSiteTypes, effectivePartyLevel } from '../game/questEngine';
 
 // Lazy load modal components for better performance
@@ -86,6 +87,12 @@ const GameModals = ({
     [settings?.milestones]
   );
 
+  // Side-quest markers for the world map (sites still needed, towns to hand in at).
+  const sideQuestMarkers = useMemo(
+    () => computeSideQuestMarkers(settings?.sideQuests),
+    [settings?.sideQuests]
+  );
+
   // Which site types (cave/ruins) a quest has revealed — for hiding un-quested sites.
   // null = no gating (old saves / campaigns with no side quests keep sites visible).
   const revealedSiteTypes = useMemo(
@@ -163,6 +170,7 @@ const GameModals = ({
         visibleMilestonePois={visibleMilestonePois}
         activeMilestonePois={activeMilestonePois}
         revealedSiteTypes={revealedSiteTypes}
+        sideQuestMarkers={sideQuestMarkers}
         onQuestItemFound={onQuestItemFound}
         onRest={onRest}
         sideQuests={sideQuests}

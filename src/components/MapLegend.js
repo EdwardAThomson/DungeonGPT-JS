@@ -11,6 +11,7 @@ const Swatch = ({ item }) => (
     ? <span style={{
         width: SWATCH, height: SWATCH, flex: '0 0 auto', borderRadius: 3,
         border: '1px solid rgba(0,0,0,0.35)', backgroundImage: item.bg, backgroundSize: 'cover',
+        ...(item.ring ? { boxShadow: `inset 0 0 0 2px ${item.ring}` } : {}),
       }} />
     : <span style={{
         width: SWATCH, height: SWATCH, flex: '0 0 auto', borderRadius: 3,

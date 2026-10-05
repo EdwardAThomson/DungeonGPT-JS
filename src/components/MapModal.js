@@ -31,7 +31,7 @@ const FitWorld = ({ mapData, render }) => {
     return <div ref={ref} className="ws-fit-world">{render(tile)}</div>;
 };
 
-const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered, visibleMilestonePois, activeMilestonePois, revealedSiteTypes, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, siteMapData, sitePlayerPosition, onSiteTileClick, onAttackSiteMob, onLeaveSite, siteError, siteNotice, partyLevel, sideQuests, onAcceptSideQuest, onTurnInQuest, milestones, onTalkToNpc, onVisitTavern, dockTarget = null, suggestedTravelTargets = null, glideMs = null, buildingRequest = null, onBuildingRequestHandled }) => {
+const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered, visibleMilestonePois, activeMilestonePois, revealedSiteTypes, sideQuestMarkers = null, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, siteMapData, sitePlayerPosition, onSiteTileClick, onAttackSiteMob, onLeaveSite, siteError, siteNotice, partyLevel, sideQuests, onAcceptSideQuest, onTurnInQuest, milestones, onTalkToNpc, onVisitTavern, dockTarget = null, suggestedTravelTargets = null, glideMs = null, buildingRequest = null, onBuildingRequestHandled }) => {
     // Docked (#84 workspace spike): render into the page's map stage instead of a modal.
     const docked = !!dockTarget;
     const previousFocusRef = useRef(null);
@@ -103,6 +103,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                                     visibleMilestonePois={visibleMilestonePois}
                                     activeMilestonePois={activeMilestonePois}
                                     revealedSiteTypes={revealedSiteTypes}
+                                    sideQuestMarkers={sideQuestMarkers}
                                     tileSizeOverride={tile}
                                     suggestedTargets={suggestedTravelTargets}
                                     glideMs={glideMs}
@@ -195,6 +196,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                             visibleMilestonePois={visibleMilestonePois}
                             activeMilestonePois={activeMilestonePois}
                             revealedSiteTypes={revealedSiteTypes}
+                            sideQuestMarkers={sideQuestMarkers}
                         />
                         {mapLevel === 'town' && (
                             <p className="map-planning-hint" style={{ textAlign: 'center', opacity: 0.75, fontSize: '0.85rem', margin: '8px 0 0' }}>

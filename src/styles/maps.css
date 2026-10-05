@@ -192,6 +192,14 @@
   animation: milestone-poi-glow 1.6s ease-in-out infinite;
 }
 
+/* Side-quest marker: a steady cool border, deliberately quieter than the main quest's
+   pulsing gold glow above. */
+.map-tile.side-quest-tile {
+  z-index: 3;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 2px rgba(110, 185, 255, 0.9), 0 0 4px 1px rgba(110, 185, 255, 0.45);
+}
+
 @keyframes milestone-poi-glow {
   0%,
   100% {

@@ -181,6 +181,27 @@ export const summarizeQuestReward = (quest) => {
 const isStepReady = (step, milestones) =>
   (step.requires || []).every((id) => (milestones || []).find((m) => m.id === id)?.completed);
 
+// Side-quest map markers (secondary to the main quest's glow). The SITE types an active
+// quest still needs (any cave / ruins of that type serves, since the objective is injected
+// into whichever one the party enters), and the TOWNS a ready quest is handed in at.
+// Unanchored hand-ins (no town) can't be pinned, so they are left out.
+export const computeSideQuestMarkers = (sideQuests) => {
+  const siteTypes = new Set();
+  const handInTowns = new Set();
+  (sideQuests || []).forEach((q) => {
+    if (q?.status !== 'active') return;
+    const steps = q.milestones || [];
+    steps.forEach((s) => {
+      if (s.completed || !isStepReady(s, steps)) return;
+      const location = s.trigger?.turnIn?.location;
+      if (s.trigger?.turnIn) { if (location) handInTowns.add(location); return; }
+      if (s.site?.type) siteTypes.add(s.site.type);
+      (s.sites || []).forEach((t) => siteTypes.add(t));
+    });
+  });
+  return { siteTypes, handInTowns };
+};
+
 /**
  * Is this quest waiting only on its turn-in (objective done, reward unclaimed)?
  * Drives the "ready" sort/badge in the journal.

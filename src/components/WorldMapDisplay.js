@@ -147,7 +147,7 @@ const ZOOM_LABELS = { fit: 'Fit', medium: 'Mid', close: 'Close' };
 
 // tileSizeOverride (#84 workspace stage): an integer tile size chosen by the container so a
 // 10x10 world fills the stage. Whole pixels avoid the tile-edge seams a transform scale gives.
-const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visibleMilestonePois, activeMilestonePois, revealedSiteTypes, tileSizeOverride = null, suggestedTargets = null, glideMs = null }) => {
+const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visibleMilestonePois, activeMilestonePois, revealedSiteTypes, sideQuestMarkers = null, tileSizeOverride = null, suggestedTargets = null, glideMs = null }) => {
   const { showMapGrid } = useContext(SettingsContext); // per-viewer display option
   const mapHeight = mapData ? mapData.length : 0;
   const mapWidth = mapHeight > 0 ? mapData[0].length : 0;
@@ -374,6 +374,14 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
     const isActiveMilestonePoi = !!tile.milestonePoi && !isMilestoneHidden
       && !!activeMilestonePois && activeMilestonePois.has(tile.poi);
 
+    // Side-quest marker (steady blue border): a revealed cave/ruins an active side quest
+    // still needs, or a town where a ready one is handed in. Secondary to the main quest:
+    // a tile already glowing as a milestone objective keeps only the gold glow.
+    const siteType = tile.poi === 'cave_entrance' ? 'cave' : tile.poi === 'ruins' ? 'ruins' : null;
+    const isSideQuestTile = !!sideQuestMarkers && !isActiveMilestonePoi && (
+      (!!siteType && !isSiteHidden && sideQuestMarkers.siteTypes?.has(siteType))
+      || (!!tile.townName && sideQuestMarkers.handInTowns?.has(tile.townName)));
+
     // Collect a name label for this tile if applicable
     const labelText = tile.townName
       || (tile.mountainName && tile.isFirstMountainInRange ? tile.mountainName : null)
@@ -390,7 +398,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
     return (
       <div
         key={`${tile.x}-${tile.y}`}
-        className={`map-tile ${isPlayerHere ? 'player-tile' : ''} ${!tile.isExplored ? 'unexplored' : ''} ${isActiveMilestonePoi ? 'milestone-poi-tile' : ''}`}
+        className={`map-tile ${isPlayerHere ? 'player-tile' : ''} ${!tile.isExplored ? 'unexplored' : ''} ${isActiveMilestonePoi ? 'milestone-poi-tile' : ''} ${isSideQuestTile ? 'side-quest-tile' : ''}`}
         style={{
           // Explicit size (belt-and-braces alongside the grid track size below): keeps
           // each tile's box an exact integer CSS-pixel square rather than relying on grid
