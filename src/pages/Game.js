@@ -4,7 +4,7 @@ import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from '../contexts/AuthContext';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
 import ModalContext, { useModal } from '../contexts/ModalContext';
-import { checkForEncounter, rollSiteWanderingEncounter } from '../utils/encounterGenerator';
+import { checkForEncounter, rollSiteWanderingEncounter, PASS_THROUGH_ENCOUNTER_MULTIPLIER } from '../utils/encounterGenerator';
 import { encounterTemplates } from '../data/encounters';
 import { isTownTileWalkable } from '../utils/townMapGenerator';
 import useGameSession from '../hooks/useGameSession';
@@ -529,6 +529,19 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
   // settings (loaded saves) and finally 'grassland' so older saves are unaffected.
   const mapTheme = settings?.theme || settingsObj?.theme || 'grassland';
   const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme, getActiveSiteObjectives(settings?.sideQuests), settings?.milestones, getActiveGatherResources(settings?.sideQuests));
+  // Back on the world map after a town or site: start the quiet-moves counter afresh. It
+  // is shared with town/site walking, so a long quiet cave crawl used to leave it maxed and
+  // the first world tiles rolled at their raised pity odds. Covers leaving by the gate,
+  // the Leave chip, and being carried out after a party wipe.
+  const prevMapLevelRef = useRef(mapHook.currentMapLevel);
+  useEffect(() => {
+    const prev = prevMapLevelRef.current;
+    prevMapLevelRef.current = mapHook.currentMapLevel;
+    if (mapHook.currentMapLevel === 'world' && prev && prev !== 'world') {
+      movesSinceEncounterRef.current = 0;
+      setMovesSinceEncounter(0);
+    }
+  }, [mapHook.currentMapLevel]);
 
   // #83 Phase 2: entering a town/site clears every OTHER location's spent check locks —
   // arriving somewhere else is what resets a prior place's approaches. Does NOTHING on the
@@ -1747,7 +1760,10 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       movesSinceEncounter,
       settings: { grimnessLevel: settings?.grimnessLevel }
     });
-    const randomEncounter = checkForEncounter(targetTile, isFirstVisitToTile, settings, movesSinceEncounter);
+    // Pass-through tiles on an auto-travel route roll at reduced odds; the destination
+    // (and every ordinary single-tile move) keeps the full chance.
+    const randomEncounter = checkForEncounter(targetTile, isFirstVisitToTile, settings, movesSinceEncounter,
+      { chanceMultiplier: passThrough ? PASS_THROUGH_ENCOUNTER_MULTIPLIER : 1 });
     logger.debug('checkForEncounter returned', randomEncounter ? randomEncounter.name : null);
 
     const plannedEncounterFlow = planWorldTileEncounterFlow({
