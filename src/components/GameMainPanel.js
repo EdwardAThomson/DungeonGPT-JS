@@ -240,7 +240,7 @@ const GameMainPanel = ({
       {hasAdventureStarted && suggestions.length > 0 && onSuggestion && (
         <div className="ws-chips" role="group" aria-label="Suggested actions">
           {suggestions.map((chip) => (
-            <button type="button" key={chip.id} className={`ws-chip-action kind-${chip.kind}`} onClick={() => onSuggestion(chip)} disabled={isLoading}>
+            <button type="button" key={chip.id} className={`ws-chip-action kind-${chip.kind}${chip.side ? ' side' : ''}`} onClick={() => onSuggestion(chip)} disabled={isLoading}>
               {chip.label}
             </button>
           ))}

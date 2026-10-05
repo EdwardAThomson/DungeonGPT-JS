@@ -23,6 +23,10 @@
   --dark-shadow: rgba(0, 0, 0, 0.5);
   --dark-inventory-shelf-bg: #0a0a0a;
 
+  /* Side quests: one cool blue everywhere they are marked (world map border, suggestion
+     chips, Adventure Book cards), deliberately apart from the main quest's gold. */
+  --side-quest: #6eb9ff;
+
   /* Font Families */
   --font-header: 'Cinzel', serif;
   --font-body: 'Lora', serif;

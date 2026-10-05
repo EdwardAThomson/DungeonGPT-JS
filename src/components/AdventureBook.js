@@ -245,7 +245,9 @@ const SideQuestsTab = ({ settings }) => {
     const ready = isQuestReadyToTurnIn(q);
     const expanded = !!expandedQuests[q.id];
     return (
-      <div key={q.id} style={{ border: `1px solid ${ready ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '8px', marginBottom: '8px', background: 'var(--bg)' }}>
+      // Side-quest blue (matches the map border and the suggestion chips); a ready quest
+      // gets a heavier border, a finished one goes neutral.
+      <div key={q.id} style={{ border: `${ready ? 2 : 1}px solid ${q.status === 'completed' ? 'var(--border)' : 'var(--side-quest)'}`, borderRadius: '8px', marginBottom: '8px', background: 'var(--bg)' }}>
         <button
           onClick={() => setExpandedQuests(p => ({ ...p, [q.id]: !p[q.id] }))}
           style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text)' }}
@@ -253,7 +255,7 @@ const SideQuestsTab = ({ settings }) => {
           <span style={{ fontWeight: 700, textDecoration: q.status === 'completed' ? 'line-through' : 'none', opacity: q.status === 'completed' ? 0.7 : 1 }}>
             {q.status === 'completed' ? '✓ ' : ''}{q.title}
           </span>
-          <span style={{ fontSize: '0.85rem', color: ready ? 'var(--primary)' : 'var(--text-secondary)', fontWeight: ready ? 700 : 400 }}>
+          <span style={{ fontSize: '0.85rem', color: ready ? 'var(--side-quest)' : 'var(--text-secondary)', fontWeight: ready ? 700 : 400 }}>
             {ready ? '✅ Ready to turn in' : `${done}/${total}`} {expanded ? '▲' : '▼'}
           </span>
         </button>

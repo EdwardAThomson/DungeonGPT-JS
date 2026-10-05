@@ -2740,6 +2740,7 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
           started={hasAdventureStarted}
           level={mapHook.currentMapLevel}
           suggestions={suggestions.length}
+          sideSuggestions={suggestions.filter((c) => c.side).length}
           paused={modalStack.length > 0}
         />
       )}

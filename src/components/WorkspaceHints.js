@@ -25,6 +25,13 @@ export const WORKSPACE_HINTS = [
     when: (s) => s.started && s.suggestions > 0,
   },
   {
+    id: 'ws-side',
+    target: '.ws-chip-action.side',
+    title: 'Side quests',
+    body: 'Blue marks side quests: blue buttons here, a blue border on the map, and blue cards in the Adventure Book. Gold is always the main quest.',
+    when: (s) => s.started && s.sideSuggestions > 0,
+  },
+  {
     id: 'ws-town',
     inside: '.ws-stage-map',
     title: 'Inside a town',
@@ -41,7 +48,7 @@ const readSeen = () => {
 export const pickHint = (state, seen = []) =>
   WORKSPACE_HINTS.find((h) => !seen.includes(h.id) && h.when(state)) || null;
 
-const WorkspaceHints = ({ started, level, suggestions = 0, paused = false }) => {
+const WorkspaceHints = ({ started, level, suggestions = 0, sideSuggestions = 0, paused = false }) => {
   const [seen, setSeen] = useState(readSeen);
   const [minimized, setMinimized] = useState(null);
   const remember = (ids) => {
@@ -50,7 +57,7 @@ const WorkspaceHints = ({ started, level, suggestions = 0, paused = false }) => 
     try { localStorage.setItem(SEEN_KEY, JSON.stringify(next)); } catch (e) { /* in-memory only */ }
   };
   if (paused) return null; // never sit over a pop-up
-  const hint = pickHint({ started, level, suggestions }, seen);
+  const hint = pickHint({ started, level, suggestions, sideSuggestions }, seen);
   if (!hint) return null;
   return (
     <div className="ws-hints">

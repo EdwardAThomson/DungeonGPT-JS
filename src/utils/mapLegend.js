@@ -41,7 +41,7 @@ export function worldLegendGroups() {
         tile(samplePois.city(), 'City'),
         tile(samplePois.milestone(), 'Quest site'),
         // Matches .side-quest-tile in maps.css.
-        { bg: samplePois.cave(), label: 'Side quest', ring: 'rgba(110, 185, 255, 0.9)' },
+        { bg: samplePois.cave(), label: 'Side quest', ring: 'var(--side-quest)' },
       ],
     },
   ];

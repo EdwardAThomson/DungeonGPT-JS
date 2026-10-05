@@ -197,7 +197,7 @@
 .map-tile.side-quest-tile {
   z-index: 3;
   border-radius: 3px;
-  box-shadow: inset 0 0 0 2px rgba(110, 185, 255, 0.9), 0 0 4px 1px rgba(110, 185, 255, 0.45);
+  box-shadow: inset 0 0 0 2px var(--side-quest), 0 0 4px 1px color-mix(in srgb, var(--side-quest) 45%, transparent);
 }
 
 @keyframes milestone-poi-glow {

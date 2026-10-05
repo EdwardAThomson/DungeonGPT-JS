@@ -1158,6 +1158,10 @@ body:has(.gm-page) .app-footer { display: none; }
 [data-theme='redesign'] .ws-chip-action { min-height: 0; padding: .45rem .8rem; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent); background: color-mix(in srgb, var(--gold) 8%, var(--surface)); box-shadow: none; color: var(--text); font-family: var(--font-ui); font-size: .88rem; font-weight: 600; letter-spacing: normal; text-transform: none; text-align: left; cursor: pointer; }
 [data-theme='redesign'] .ws-chip-action:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); filter: none; }
 [data-theme='redesign'] .ws-chip-action.kind-travel::before { content: '\2192\00a0'; color: var(--gold); }
+/* Side-quest chips: the side-quest blue, so they read apart from the main quest's gold. */
+[data-theme='redesign'] .ws-chip-action.side { border-color: color-mix(in srgb, var(--side-quest) 60%, transparent); background: color-mix(in srgb, var(--side-quest) 9%, var(--surface)); }
+[data-theme='redesign'] .ws-chip-action.side:hover:not(:disabled) { border-color: var(--side-quest); color: var(--side-quest); }
+[data-theme='redesign'] .ws-chip-action.side.kind-travel::before { color: var(--side-quest); }
 [data-theme='redesign'] .ws-chip-action:disabled { opacity: .45; background: var(--surface); color: var(--muted); }
 .ws-suggest-ring { position: absolute; inset: 3px; z-index: 2; border: 2px dashed #ecb44f; border-radius: 6px; pointer-events: none; animation: wsSuggest 2.4s ease-in-out infinite; }
 @keyframes wsSuggest { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
