@@ -4,6 +4,7 @@ import { getHPStatus } from '../utils/healthSystem';
 import { heroUid } from '../utils/partyUtils';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { useModal } from '../contexts/ModalContext';
+import { isStarterKitEligible, STARTER_KIT } from '../game/starterKit';
 import {
   EQUIP_SLOTS,
   getEquippedItem,
@@ -28,7 +29,7 @@ const formatSlotBonus = (slot, bonusStr) => {
 // tab is active, so transient UI state (hero picker, result toasts, overrides)
 // resets naturally on tab switch / hub close. Receives LIVE party props (not an
 // open-time snapshot), so external HP/inventory changes stay in sync.
-const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate }) => {
+const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate, onClaimStarterKit }) => {
   const [selectedImage, setSelectedImage] = useState(null);
   const { open: openItemDetail } = useModal('itemDetail'); // item-detail modal (child of adventureBook)
   const [useItemState, setUseItemState] = useState(null); // { itemKey } — hero picker
@@ -235,6 +236,17 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
             Loadout
           </button>
         </div>
+
+        {/* Existing saves: gearless heroes can claim the starter kit (new games get it
+            automatically). Hidden once everyone has had it or has gear. */}
+        {onClaimStarterKit && party.some(isStarterKitEligible) && (
+          <div role="status" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', margin: '0 0 14px', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--primary)', background: 'var(--surface)' }}>
+            <span style={{ flex: 1, minWidth: '200px', color: 'var(--text)' }}>
+              🎒 A starter kit is waiting for {party.filter(isStarterKitEligible).map((h) => h.heroName || h.characterName).join(', ')}: a shortsword and leather armour (equipped), two healing items and {STARTER_KIT.gold} gold each.
+            </span>
+            <button type="button" className="primary-button" onClick={onClaimStarterKit}>Claim starter kit</button>
+          </div>
+        )}
 
         {activeTab === 'items' && (
         <>

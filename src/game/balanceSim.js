@@ -34,6 +34,7 @@ import {
 } from '../utils/inventorySystem';
 import { heroTemplates } from '../data/heroData';
 import { XP_THRESHOLDS, getLevelBonus } from '../utils/progressionSystem';
+import { STARTER_KIT } from './starterKit';
 
 // --- Seeded RNG (mulberry32) ------------------------------------------------------
 // Same generator family as localNarrator's seeded prose RNG (reimplemented here so a
@@ -55,6 +56,8 @@ export const mulberry32 = (seed) => {
 // (Part II §16c: never a hypothetical loadout).
 export const LOADOUT_PRESETS = {
   none: { weapon: null, armor: null, accessory: null },
+  // What every hero now sets out with (src/game/starterKit.js).
+  starter: { weapon: STARTER_KIT.weapon, armor: STARTER_KIT.armor, accessory: null },
   mid: { weapon: 'silver_dagger', armor: 'studded_leather', accessory: 'enchanted_trinket' }
 };
 
