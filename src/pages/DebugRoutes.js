@@ -6,6 +6,7 @@ import NPCTest from './NPCTest';
 import SeedDebugTest from './SeedDebugTest';
 import WorldMapTest from './WorldMapTest';
 import TilesetTest from './TilesetTest';
+import Town3QTest from './Town3QTest';
 import WorldMapArtTest from './WorldMapArtTest';
 import WorldFixedMapTest from './WorldFixedMapTest';
 import LargeWorldTest from './LargeWorldTest';
@@ -55,6 +56,7 @@ const debugSections = [
       { to: 'town-map-test', label: 'Town Map Test' },
       { to: 'world-map-test', label: 'World Map Test' },
       { to: 'tileset', label: 'Tileset Preview (SVG)' },
+      { to: 'town-3q', label: 'Town 3/4 View (prototype)' },
       { to: 'world-map-art', label: 'World Map Art (SVG)' },
       { to: 'world-fixed', label: 'World Fixed Map (render test)' },
       { to: 'large-world', label: 'Large World (chunk assembly)' },
@@ -255,6 +257,7 @@ const DebugRoutes = () => {
           <Route path="town-map-test" element={<TownMapTest />} />
           <Route path="world-map-test" element={<WorldMapTest />} />
           <Route path="tileset" element={<TilesetTest />} />
+          <Route path="town-3q" element={<Town3QTest />} />
           <Route path="world-map-art" element={<WorldMapArtTest />} />
           <Route path="world-fixed" element={<WorldFixedMapTest />} />
           <Route path="large-world" element={<LargeWorldTest />} />
