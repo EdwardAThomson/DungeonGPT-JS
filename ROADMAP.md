@@ -89,3 +89,4 @@ backlog; see the `docs/` design docs for each system.
 - [ ] Larger world maps for paid tiers (#60, design done; chunk-assembly prototype behind `/debug/large-world`)
 - [ ] Game feel: audio + visual juice (#78); grimdark/eldritch mood theming (#80); TTS voice narration (#81) (ideas captured, not scheduled)
 - [ ] Combat-sim depth (backlog rows 27-33): attack-roll/AC loop, conditions, initiative, death saves, tactical positioning (known deficiencies, unscheduled)
+- [ ] Inventory cap (none today; heroes carry unlimited items, now including the starter kit from #177). Cap going forward only: block new additions over the limit, and let existing saves already over it keep their items (a backwards-compatibility allowance, not a forced cull). Decide the limit, stack rules and what happens to a full pack on loot or quest grants (unscheduled)
