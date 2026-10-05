@@ -367,10 +367,18 @@ const TEMPLATES = {
 const fallbackPool = TEMPLATES.plains;
 const poolFor = (key) => TEMPLATES[key] || fallbackPool;
 
+// How many recently-shown lines the callers keep in the avoid-window. One move
+// records up to three lines (opening, ambient, landmark), so this is about ten
+// moves of history: enough that a six-line ambient pool cycles fully before any
+// line comes back.
+export const RECENT_WINDOW = 30;
+
 // Pick a line from `set`, starting at the rng-chosen index and skipping any line
 // in `recent` (the recently-shown lines) so movement prose doesn't repeat back to
 // back or too soon. With an empty `recent` this is exactly the old
 // `set[floor(rng()*len)]`, so determinism per (worldSeed, coords) is preserved.
+// When the whole pool is in the window, the least recently shown line wins (it
+// used to fall back to the rng pick, which could be the line shown last move).
 const pickLine = (set, rng, recent = []) => {
   if (!set || !set.length) return undefined;
   const start = Math.floor(rng() * set.length);
@@ -379,7 +387,13 @@ const pickLine = (set, rng, recent = []) => {
     const cand = set[(start + n) % set.length];
     if (!recent.includes(cand)) return cand;
   }
-  return set[start]; // whole pool used recently; accept a repeat rather than nothing
+  let oldest = set[start];
+  let oldestAt = Infinity;
+  for (const cand of set) {
+    const at = recent.lastIndexOf(cand);
+    if (at < oldestAt) { oldestAt = at; oldest = cand; }
+  }
+  return oldest;
 };
 
 // --- Neighbour landmark clause ---------------------------------------------------
@@ -393,23 +407,37 @@ const DIRS = [
   { dx: -1, dy: 0, name: 'west' }
 ];
 
-const describeNeighbour = (tile, name) => {
+// A few phrasings per landmark. The first is the plain one and is always tried
+// first, so a tile's landmark line is unchanged until it has just been shown;
+// walking along a coast then rotates through the others instead of printing the
+// same shoreline sentence on every move, and once all have been shown recently
+// the clause is dropped for that move (the landmark hasn't changed; saying so
+// again adds nothing).
+const NEIGHBOUR_PHRASES = {
+  namedTown: (n, t) => [`the rooftops of **${t}** rise to the ${n}`, `smoke from **${t}** drifts up to the ${n}`, `**${t}** lies to the ${n}`],
+  town: (n) => [`a settlement sits to the ${n}`, `roofs cluster together to the ${n}`],
+  mountain: (n) => [`mountains rise to the ${n}`, `grey peaks stand to the ${n}`, `the ground climbs toward mountains to the ${n}`],
+  hills: (n) => [`low hills roll away to the ${n}`, `the land swells into hills to the ${n}`, `hills hump the skyline to the ${n}`],
+  forest: (n) => [`dark woods crowd the ${n}`, `a wall of trees stands to the ${n}`, `the treeline darkens the ${n}`],
+  ruins: (n) => [`broken ruins lie to the ${n}`, `old stones jut from the ground to the ${n}`, `the broken outline of a ruin shows to the ${n}`],
+  cave: (n) => [`a cave mouth gapes to the ${n}`, `a black opening shows in the rock to the ${n}`, `the ground splits open into a cave to the ${n}`],
+  water: (n) => [`water glints to the ${n}`, `open water lies to the ${n}`, `the light changes over water to the ${n}`],
+  beach: (n) => [`a pale shoreline runs to the ${n}`, `the land ends in sand to the ${n}`, `surf sounds faintly from the ${n}`],
+  desert: (n) => [`dunes roll away to the ${n}`, `the sand rises in dunes to the ${n}`, `heat shimmers over dunes to the ${n}`],
+  swamp: (n) => [`the bog stretches to the ${n}`, `reeds and standing water lie to the ${n}`, `mist hangs over the marsh to the ${n}`]
+};
+
+const neighbourPhrases = (tile, name) => {
   if (!tile) return null;
-  if (tile.poi === 'town' && tile.townName) return `the rooftops of **${tile.townName}** rise to the ${name}`;
-  if (tile.poi === 'town') return `a settlement sits to the ${name}`;
-  if (tile.poi === 'mountain') return `mountains rise to the ${name}`;
-  if (tile.poi === 'hills') return `low hills roll away to the ${name}`;
-  if (tile.poi === 'forest') return `dark woods crowd the ${name}`;
-  if (tile.poi === 'ruins') return `broken ruins lie to the ${name}`;
-  if (tile.poi === 'cave' || tile.poi === 'cave_entrance') return `a cave mouth gapes to the ${name}`;
-  if (tile.biome === 'water') return `water glints to the ${name}`;
-  if (tile.biome === 'beach') return `a pale shoreline runs to the ${name}`;
-  if (tile.biome === 'desert') return `dunes roll away to the ${name}`;
-  if (tile.biome === 'swamp') return `the bog stretches to the ${name}`;
+  if (tile.poi === 'town' && tile.townName) return NEIGHBOUR_PHRASES.namedTown(name, tile.townName);
+  if (tile.poi === 'town') return NEIGHBOUR_PHRASES.town(name);
+  if (tile.poi === 'cave' || tile.poi === 'cave_entrance') return NEIGHBOUR_PHRASES.cave(name);
+  if (NEIGHBOUR_PHRASES[tile.poi]) return NEIGHBOUR_PHRASES[tile.poi](name);
+  if (NEIGHBOUR_PHRASES[tile.biome] && tile.biome !== 'mountain' && tile.biome !== 'forest') return NEIGHBOUR_PHRASES[tile.biome](name);
   return null;
 };
 
-const buildNeighbourClause = (coords, worldMap, rng) => {
+const buildNeighbourClause = (coords, worldMap, rng, recent = []) => {
   if (!worldMap || !worldMap.length || !coords) return null;
   const { x, y } = coords;
   const found = [];
@@ -417,13 +445,16 @@ const buildNeighbourClause = (coords, worldMap, rng) => {
     const ny = y + dy;
     const nx = x + dx;
     if (ny >= 0 && ny < worldMap.length && worldMap[ny] && nx >= 0 && nx < worldMap[ny].length) {
-      const desc = describeNeighbour(worldMap[ny][nx], name);
-      if (desc) found.push(desc);
+      const phrases = neighbourPhrases(worldMap[ny][nx], name);
+      if (phrases) found.push(phrases);
     }
   }
   if (found.length === 0) return null;
-  const pick = found[Math.floor(rng() * found.length)];
-  return pick.charAt(0).toUpperCase() + pick.slice(1) + '.';
+  const phrases = found[Math.floor(rng() * found.length)];
+  const fresh = phrases.find((p) => !recent.includes(p));
+  if (!fresh) return null; // every phrasing shown lately: skip the clause this move
+  recent.push(fresh);
+  return fresh.charAt(0).toUpperCase() + fresh.slice(1) + '.';
 };
 
 // --- Party-state clause ----------------------------------------------------------
@@ -520,7 +551,7 @@ export const composeLocalMovementNarrative = ({
   }
 
   const ambient = pickLine(pool.ambient, rng, recent);
-  const neighbourClause = buildNeighbourClause({ x, y }, worldMap, rng);
+  const neighbourClause = buildNeighbourClause({ x, y }, worldMap, rng, recent);
   const partyClause = buildPartyClause(selectedHeroes, rng);
 
   // Assemble: opening sentence, then an italicised ambient detail, an optional
@@ -547,7 +578,9 @@ export const composeLocalMovementNarrative = ({
 // them as the party deliberately taking stock, and stacks two sensory details for a
 // richer beat than a passing movement line. A `nonce` lets the caller (e.g. a click
 // counter) vary repeated looks at the same tile; with the default nonce it stays
-// deterministic per (worldSeed, coords) like the movement composer.
+// deterministic per (worldSeed, coords) like the movement composer. `recent` is
+// the same avoid-window the movement composer uses, so a look never repeats the
+// detail the last move just gave (it used to draw from the pool blind).
 const LOOK_OPENERS = [
   'The party pauses to take in their surroundings.',
   'You stop and look around, letting your eyes settle on the place.',
@@ -562,7 +595,8 @@ export const composeLocalAmbientNarrative = ({
   worldSeed = null,
   worldMap = null,
   settings = {}, // eslint-disable-line no-unused-vars
-  nonce = 0
+  nonce = 0,
+  recent = []
 } = {}) => {
   if (!tile) return '';
   const x = coords.x != null ? coords.x : tile.x;
@@ -572,22 +606,25 @@ export const composeLocalAmbientNarrative = ({
   const key = resolveTerrainKey(tile);
   const pool = poolFor(key);
 
-  const opener = LOOK_OPENERS[Math.floor(rng() * LOOK_OPENERS.length)];
+  const opener = pickLine(LOOK_OPENERS, rng, recent);
 
   // Two distinct sensory details (avoid an immediate duplicate) for a fuller look.
-  const a1 = pool.ambient[Math.floor(rng() * pool.ambient.length)];
-  let a2 = pool.ambient[Math.floor(rng() * pool.ambient.length)];
+  const a1 = pickLine(pool.ambient, rng, recent);
+  let a2 = pickLine(pool.ambient, rng, [...recent, a1]);
   if (a2 === a1 && pool.ambient.length > 1) {
     a2 = pool.ambient[(pool.ambient.indexOf(a1) + 1) % pool.ambient.length];
   }
 
-  const neighbourClause = buildNeighbourClause({ x, y }, worldMap, rng);
+  const neighbourClause = buildNeighbourClause({ x, y }, worldMap, rng, recent);
 
   const tail = [a1];
   if (a2 && a2 !== a1) tail.push(a2);
 
   const sentences = [opener, `*${tail.join(' ')}*`];
   if (neighbourClause) sentences.push(neighbourClause);
+
+  if (opener) recent.push(opener);
+  recent.push(...tail);
 
   return sentences.join(' ');
 };

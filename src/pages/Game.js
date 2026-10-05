@@ -21,7 +21,7 @@ import { calculateMaxHP, shortRest, longRest } from '../utils/healthSystem';
 import { addGold, addItem, ITEM_CATALOG } from '../utils/inventorySystem';
 import { replaceHeroInParty, normalizeParty, heroUid } from '../utils/partyUtils';
 import { composeMovementNarrativePrompt, composeNpcMeetingPrompt } from '../game/promptComposer';
-import { composeLocalMovementNarrative, composeLocalAmbientNarrative, composeNpcMeeting } from '../game/localNarrator';
+import { composeLocalMovementNarrative, composeLocalAmbientNarrative, composeNpcMeeting, RECENT_WINDOW } from '../game/localNarrator';
 import { composeRewardSentence, composeLootSentence, narrateRewardMessages } from '../game/rewardNarrator';
 import { getStepHint, getQuestObjectiveStep, summarizeQuestReward, describeTurnInTarget } from '../game/questHints';
 import { generateMovementNarrative } from '../game/movementController';
@@ -1534,24 +1534,28 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       recent
     });
     // Keep the avoid-window bounded (the composer appends the lines it just used).
-    if (recent.length > 8) recent.splice(0, recent.length - 8);
+    if (recent.length > RECENT_WINDOW) recent.splice(0, recent.length - RECENT_WINDOW);
     if (!text || !text.trim()) return;
     interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
   };
 
   // On-demand local ambient line for the Look-around button on the no-AI path
   // (guests, or master toggle off). Deterministic per tile, but varied across
-  // repeated looks via a click nonce. No /api/ai call.
+  // repeated looks via a click nonce. No /api/ai call. Shares the movement
+  // avoid-window so a look doesn't echo the detail the last move just gave.
   const appendLocalAmbientNarrative = ({ tile, coords }) => {
     const nonce = lookNonceRef.current++;
+    const recent = recentNarrationRef.current;
     const text = composeLocalAmbientNarrative({
       tile,
       coords,
       worldSeed,
       worldMap: mapHook.worldMap,
       settings,
-      nonce
+      nonce,
+      recent
     });
+    if (recent.length > RECENT_WINDOW) recent.splice(0, recent.length - RECENT_WINDOW);
     if (!text || !text.trim()) return;
     interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
   };
