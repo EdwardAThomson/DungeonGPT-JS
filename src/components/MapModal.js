@@ -37,6 +37,12 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
     const previousFocusRef = useRef(null);
     const modalRef = useRef(null);
     const [showLegend, setShowLegend] = useState(!dockTarget);
+    // The dock target arrives after the first render (a callback ref), so the initial
+    // state above saw no dock and opened the key over the stage. Docked, the key starts
+    // closed: it is opt-in from the Key chip, not a pop-up on load or on entering a town.
+    useEffect(() => {
+        if (dockTarget) setShowLegend(false);
+    }, [dockTarget]);
     // While inside a town the player can flip to the world map for milestone planning.
     // `mapTab` only matters when mapLevel === 'town'; reset to the town view on entering one.
     const [mapTab, setMapTab] = useState('town');
@@ -82,7 +88,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                             {isInsideTown ? `View ${currentTile.townName || 'town'}` : `Enter ${currentTile.townName || 'town'}`}
                         </button>
                     )}
-                    <button type="button" className={`ws-chip${showLegend ? ' on' : ''}`} onClick={() => setShowLegend((v) => !v)} style={{ marginLeft: 'auto' }}>Key</button>
+                    <button type="button" className={`ws-chip key${showLegend ? ' on' : ''}`} onClick={() => setShowLegend((v) => !v)} style={{ marginLeft: 'auto' }}>Key</button>
                 </div>
                 <div className="ws-map-body">
                     {viewLevel === 'world' ? (

@@ -8,6 +8,7 @@ import { getTownWaterContext, getTownRoadEdges } from '../utils/townWater';
 import { generateSiteMap } from '../utils/siteMapGenerator';
 import { populateSite, injectSiteObjective, injectHarvestResource, repopulateSiteRoamers } from '../game/sitePopulator';
 import { healMobsToIdle, FLEE_DEAGGRO_STEPS } from '../game/mobMovement';
+import { visitEnterMessage, visitLeaveMessage } from '../game/logGroups';
 import { populateTown } from '../utils/npcGenerator';
 import { injectQuestBuildings } from '../game/milestoneSpawner';
 import { getMilestoneNpcsForTown } from '../game/milestoneEngine';
@@ -305,10 +306,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             setIsInsideTown(true);
             trackTownVisit(townName);
 
-            const enterMessage = {
-                role: 'system',
-                content: `You have entered ${townName}.`
-            };
+            const enterMessage = visitEnterMessage(`You have entered ${townName}.`, townName);
             setConversation([...conversation, enterMessage]);
             setIsMapModalOpen(true);
         } else if (['cave_entrance', 'cave', 'ruins', 'forest', 'hills', 'mountain'].includes(encounter.poiType)) {
@@ -393,7 +391,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
             setSiteError(null);
             setSiteNotice(null);
 
-            setConversation([...conversation, { role: 'system', content: `You venture into ${siteMap.name}.` }]);
+            setConversation([...conversation, visitEnterMessage(`You venture into ${siteMap.name}.`, siteMap.name)]);
             setIsMapModalOpen(true);
         }
     };
@@ -413,7 +411,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         setSitePlayerPosition(null);
         setCurrentSiteTile(null);
         setIsInsideSite(false);
-        setConversation([...conversation, { role: 'system', content: `You leave ${currentSiteMap.name} and return to the wilds.` }]);
+        setConversation([...conversation, visitLeaveMessage(`You leave ${currentSiteMap.name} and return to the wilds.`)]);
     };
 
     // Force the party back onto the WORLD map at `pos`, abandoning any site interior. Unlike
@@ -588,10 +586,10 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         setIsInsideTown(true);
         trackTownVisit(townName);
 
-        const enterMessage = {
-            role: 'system',
-            content: `You have entered ${townName}.`
-        };
+        // "View town" while already inside re-runs this; don't start a second log group.
+        const enterMessage = isInsideTown
+            ? { role: 'system', content: `You have entered ${townName}.` }
+            : visitEnterMessage(`You have entered ${townName}.`, townName);
         setConversation([...conversation, enterMessage]);
     };
 
@@ -617,10 +615,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         setCurrentTownTile(null);
         setIsInsideTown(false);
 
-        const exitMessage = {
-            role: 'system',
-            content: `You have left the town and returned to the world map.`
-        };
+        const exitMessage = visitLeaveMessage('You have left the town and returned to the world map.');
         setConversation([...conversation, exitMessage]);
     };
 

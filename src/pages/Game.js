@@ -40,7 +40,10 @@ import {
 } from '../game/worldMoveController';
 import { planTravelRoute, TRAVEL_STEP_MS } from '../game/worldTravel';
 import { getSuggestedActions } from '../game/suggestedActions';
+import { visitLeaveMessage } from '../game/logGroups';
+import { scaleEncounterXP, scaleMilestoneRewards, scaleWorldRewards } from '../game/xpScaling';
 import { INSPECT_RANGE } from '../components/TownMapDisplay';
+import WorkspaceHints from '../components/WorkspaceHints';
 import {
   ageNarrativeHook,
   applyEncounterOutcomeToParty,
@@ -181,6 +184,7 @@ const SaveConfirmationModal = () => {
 
 const QuestOfferModal = () => {
   const { data, close } = useModal('questOffer');
+  const { settings: campaignSettings } = useContext(SettingsContext); // tier, for the XP preview
   const quest = data?.quest;
   // Same modal, source-flavoured heading: a town Quest Board posting vs a travelling rumour.
   const heading = data?.source === 'board' ? '📜 A Posting Catches Your Eye' : '📜 A Rumour Reaches You';
@@ -196,7 +200,7 @@ const QuestOfferModal = () => {
   const giverLabel = giverBase
     ? (quest?.giver?.town ? `${giverBase} in ${quest.giver.town}` : giverBase)
     : '';
-  const rewardTotals = summarizeQuestReward(quest);
+  const rewardTotals = scaleWorldRewards(summarizeQuestReward(quest), campaignSettings);
   const rewardItemNames = (rewardTotals.items || []).map((id) => (ITEM_CATALOG[id]?.name) || id);
   const rewardSentence = composeRewardSentence({
     xp: rewardTotals.xp, gold: rewardTotals.gold, items: rewardItemNames, xpPartyWide: true
@@ -371,7 +375,7 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
   const { open: openSaveConfirmation } = useModal('saveConfirmation');
   const { open: openEncounterInfo, close: closeEncounterInfo } = useModal('encounterInfo');
   const { open: openQuestOffer } = useModal('questOffer');
-  const { open: openEncounterAction, close: closeEncounterAction, data: encounterActionData } = useModal('encounterAction');
+  const { open: openEncounterActionRaw, close: closeEncounterAction, data: encounterActionData } = useModal('encounterAction');
   // #52: the Adventure Book hub (Journal / Side Quests / Codex / Party / AI). It
   // replaced the boolean-state Journal (settings) modal and the Party Inventory
   // modal; both the Journal and Inventory header buttons open it at their tab.
@@ -430,6 +434,12 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
   // steps between brawls so back-to-back tavern visits don't brawl every time.
   const tavernBrawlAtRef = useRef(-999);
   const settingsRef = useRef(settings);
+  // Every in-game encounter opens here: scale its XP for the campaign tier first (a
+  // milestone boss by the milestone multiplier, anything else by the world one), so the
+  // result screen and the award agree (xpScaling.js).
+  const openEncounterAction = (data) => openEncounterActionRaw(
+    data?.encounter ? { ...data, encounter: scaleEncounterXP(data.encounter, settingsRef.current) } : data
+  );
   useEffect(() => { movesSinceEncounterRef.current = movesSinceEncounter; }, [movesSinceEncounter]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
@@ -841,7 +851,7 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       if (completions.length > 0) {
         let party = currentParty;
         completions.forEach(c => {
-          const stepRewards = c.rewards || { xp: 0, gold: 0, items: [] };
+          const stepRewards = scaleWorldRewards(c.rewards || { xp: 0, gold: 0, items: [] }, settingsRef.current);
           // Quest rewards are party-wide too (#55): full XP each, loot via lead.
           const stepResult = applyPartyRewardsToAll({ party, rewards: stepRewards });
           party = stepResult.updatedParty;
@@ -849,7 +859,7 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
           const rewardLines = narrateRewardMessages(stepResult.rewardMessages);
           const grantEvents = [...(stepResult.ledgerEvents || [])];
           if (c.questCompleted && c.questRewards) {
-            const questResult = applyPartyRewardsToAll({ party, rewards: c.questRewards });
+            const questResult = applyPartyRewardsToAll({ party, rewards: scaleWorldRewards(c.questRewards, settingsRef.current) });
             party = questResult.updatedParty;
             rewardLines.push(...narrateRewardMessages(questResult.rewardMessages));
             grantEvents.push(...(questResult.ledgerEvents || []));
@@ -897,7 +907,7 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
 
       // Milestones are party achievements (#55): full XP to every member;
       // gold/items still pool through the lead.
-      const rewards = getMilestoneRewards(result.milestone);
+      const rewards = scaleMilestoneRewards(getMilestoneRewards(result.milestone), settingsRef.current);
       if (rewards.items.length > 0) recordItemsInCodex(rewards.items); // codex (#51)
       if (rewards.xp > 0 || rewards.gold > 0 || rewards.items.length > 0) {
         const rewardResult = applyPartyRewardsToAll({ party: currentParty, rewards });
@@ -1381,6 +1391,16 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
   const handleAcceptSideQuest = (questId, origin = null) => {
     const q = (settings?.sideQuests || []).find(x => x.id === questId);
     if (!q || q.status !== 'available') return;
+    // Accepted straight from a building's quest list (no offer modal): anchor it to the
+    // town the party is in, so the journal and suggestions know where to hand it in.
+    if (!origin) {
+      origin = resolveQuestOrigin(q, {
+        worldMap: mapHook.worldMap,
+        townMapsCache: mapHook.townMapsCache,
+        currentTownName: mapHook.currentTownTile?.townName || null,
+        playerPos: mapHook.playerPosition,
+      });
+    }
     setSettings(prev => {
       let sq = acceptSideQuest(prev.sideQuests || [], questId);
       // Persist the origin town stamped at offer time so the turn-in stays anchored there.
@@ -1457,13 +1477,13 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     let party = selectedHeroes;
     completions.forEach(c => {
       // Turn-in rewards are party-wide (#55): full XP each, loot via lead.
-      const stepResult = applyPartyRewardsToAll({ party, rewards: c.rewards || { xp: 0, gold: 0, items: [] } });
+      const stepResult = applyPartyRewardsToAll({ party, rewards: scaleWorldRewards(c.rewards || { xp: 0, gold: 0, items: [] }, settingsRef.current) });
       party = stepResult.updatedParty;
       // #8: display copy only; the machine rewardMessages stay untouched.
       const rewardLines = narrateRewardMessages(stepResult.rewardMessages);
       const grantEvents = [...(stepResult.ledgerEvents || [])];
       if (c.questCompleted && c.questRewards) {
-        const questResult = applyPartyRewardsToAll({ party, rewards: c.questRewards });
+        const questResult = applyPartyRewardsToAll({ party, rewards: scaleWorldRewards(c.questRewards, settingsRef.current) });
         party = questResult.updatedParty;
         rewardLines.push(...narrateRewardMessages(questResult.rewardMessages));
         grantEvents.push(...(questResult.ledgerEvents || []));
@@ -1536,6 +1556,19 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
   };
 
+  // Fight an active milestone boss on the tile the party stands on (POI modal Confront,
+  // or the suggested-action chip).
+  const startMilestoneBossFight = (boss) => {
+    mapHook.setIsMapModalOpen(false);
+    reopenMapAfterEncounterRef.current = true;
+    // Stationary boss fight (party is standing on the POI): no move preceded it, so
+    // clear any stale pre-encounter tile so a flee here does not teleport the party.
+    preEncounterPosRef.current = null;
+    // enemyId rides on the encounter so handleEncounterResolve fires
+    // enemy_defeated with the right id and the milestone completes.
+    openEncounterAction({ encounter: { ...boss.encounter, enemyId: boss.enemyId } });
+  };
+
   // Open the location modal for a POI tile (arrival, or re-opened by clicking the tile
   // you stand on). Offers the Enter button and, when an active milestone boss lairs
   // here, the Confront action.
@@ -1564,16 +1597,7 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       search,
       onGather: gather ? () => grantObjectiveItem({ id: gather.itemId, name: gather.name }) : null,
       onSearch: search ? () => searchMilestoneLocation(tile, search) : null,
-      onFight: boss ? () => {
-        mapHook.setIsMapModalOpen(false);
-        reopenMapAfterEncounterRef.current = true;
-        // Stationary boss fight (party is standing on the POI): no move preceded it, so
-        // clear any stale pre-encounter tile so a flee here does not teleport the party.
-        preEncounterPosRef.current = null;
-        // enemyId rides on the encounter so handleEncounterResolve fires
-        // enemy_defeated with the right id and the milestone completes.
-        openEncounterAction({ encounter: { ...boss.encounter, enemyId: boss.enemyId } });
-      } : null,
+      onFight: boss ? () => startMilestoneBossFight(boss) : null,
       onEnterLocation: () => mapHook.handleEnterLocation(poiEncounter, interactionHook.setConversation, interactionHook.conversation, effectivePartyLevel(selectedHeroes)),
       onViewMap: () => mapHook.setIsMapModalOpen(true)
     });
@@ -2125,8 +2149,10 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
         currentHP: Math.max(1, Math.floor((h.maxHP || 20) * 0.5)),
       }));
       setSelectedHeroes(revived);
-      interactionHook.setConversation(prev => [...prev, { role: 'system', content:
-        `💀 Your party falls in battle. Kindly strangers carry you to safety; you awaken, battered but alive,${town ? ` in ${town.name}` : ' back in the wilds'}.` }]);
+      // Carried out of a site: this line also closes the site's log group.
+      const wipeLine = `💀 Your party falls in battle. Kindly strangers carry you to safety; you awaken, battered but alive,${town ? ` in ${town.name}` : ' back in the wilds'}.`;
+      interactionHook.setConversation(prev => [...prev,
+        mapHook.isInsideSite && town ? visitLeaveMessage(wipeLine) : { role: 'system', content: wipeLine }]);
       reopenMapAfterEncounterRef.current = false; // never reopen a site map onto a wiped party
       closeEncounterAction();
       if (town) {
@@ -2286,6 +2312,7 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
   const pendingTravelRef = useRef(null); // travel queued behind leaving a town
   // Same rule as handleLeaveTown: the gate tile or the tile just right of it.
   const atTownGate = (pos, entry) => !!pos && !!entry && pos.y === entry.y && (pos.x === entry.x || pos.x === entry.x + 1);
+  const atSiteEntrance = (pos, entry) => !!pos && !!entry && Math.abs(pos.x - entry.x) + Math.abs(pos.y - entry.y) <= 1;
   const suggestions = useMemo(() => {
     if (!isWorkspace || !hasAdventureStarted) return [];
     return getSuggestedActions({
@@ -2299,8 +2326,14 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       sideQuests: settings?.sideQuests,
       party: selectedHeroes,
       hookWaiting: !!pendingLookEncounter,
+      levelRange: settings?.levelRange,
+      townMapsCache: mapHook.townMapsCache,
+      atTownExit: mapHook.isInsideTown && atTownGate(mapHook.townPlayerPosition, mapHook.currentTownMap?.entryPoint),
+      siteName: mapHook.currentSiteMap?.name,
+      // Same reach as handleLeaveSite: on the entrance or next to it.
+      atSiteExit: mapHook.isInsideSite && atSiteEntrance(mapHook.sitePlayerPosition, mapHook.currentSiteMap?.entryPoint),
     });
-  }, [isWorkspace, hasAdventureStarted, mapHook.currentMapLevel, mapHook.worldMap, mapHook.playerPosition, mapHook.currentTownMap, mapHook.isInsideTown, mapHook.currentTownTile, mapHook.townPlayerPosition, settings?.milestones, settings?.sideQuests, selectedHeroes, pendingLookEncounter]);
+  }, [isWorkspace, hasAdventureStarted, mapHook.currentMapLevel, mapHook.worldMap, mapHook.playerPosition, mapHook.currentTownMap, mapHook.isInsideTown, mapHook.currentTownTile, mapHook.townPlayerPosition, mapHook.isInsideSite, mapHook.currentSiteMap, mapHook.sitePlayerPosition, mapHook.townMapsCache, settings?.milestones, settings?.sideQuests, settings?.levelRange, selectedHeroes, pendingLookEncounter]);
   const suggestedTravelTargets = useMemo(
     () => suggestions.filter((c) => c.kind === 'travel').map((c) => c.target),
     [suggestions]
@@ -2345,6 +2378,9 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     });
   };
 
+  // "Travel to Ironhold (level 3 recommended)" -> "Ironhold" for the travel bar.
+  const travelLabel = (label) => label.replace(/^(Travel to|Return to|Head for|Hunt in) /, '').replace(/ \(level \d+ recommended\)$/, '');
+
   const runSuggestedAction = (chip) => {
     if (!chip || interactionHook.isLoading || popupOpen()) return;
     const { setConversation } = interactionHook;
@@ -2353,9 +2389,14 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     // the "You" line instead of appending it separately (it would be overwritten).
     const withYou = [...interactionHook.conversation, youLine];
     if (chip.kind === 'enter') { mapHook.handleEnterCurrentTown(setConversation, withYou); return; }
+    if (chip.kind === 'leave') {
+      if (mapHook.isInsideSite) mapHook.handleLeaveSite(setConversation, withYou);
+      else mapHook.handleLeaveTown(setConversation, withYou);
+      return;
+    }
     if (chip.kind === 'travel' && mapHook.currentMapLevel !== 'world') {
       // Leaving only works from the gate: walk there first, then leave, then set off.
-      pendingTravelRef.current = { ...chip.target, label: chip.label.replace(/^(Travel to|Return to|Head for) /, ''), leaving: true };
+      pendingTravelRef.current = { ...chip.target, label: travelLabel(chip.label), leaving: true };
       const townMap = mapHook.currentTownMap;
       const start = mapHook.townPlayerPosition;
       if (!townMap?.entryPoint || !start || atTownGate(start, townMap.entryPoint)) {
@@ -2384,9 +2425,18 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     }
     setConversation((prev) => [...prev, youLine]);
     if (chip.kind === 'look') { handleLookAround(); return; }
+    if (chip.kind === 'search' || chip.kind === 'gather' || chip.kind === 'fight') {
+      const tile = getTile(mapHook.worldMap, mapHook.playerPosition.x, mapHook.playerPosition.y);
+      const ms = settings?.milestones || [];
+      if (chip.kind === 'search') { const search = getMilestoneLocationForTile(ms, tile); if (search) searchMilestoneLocation(tile, search); return; }
+      if (chip.kind === 'gather') { const gather = getMilestoneItemForTile(ms, tile); if (gather) grantObjectiveItem({ id: gather.itemId, name: gather.name }); return; }
+      const boss = getMilestoneBossForTile(ms, tile);
+      if (boss) startMilestoneBossFight(boss);
+      return;
+    }
     if (chip.kind === 'walk') { walkToBuilding(chip.target); return; }
     if (chip.kind === 'travel') {
-      startTravel(chip.target.x, chip.target.y, chip.label.replace(/^(Travel to|Return to|Head for) /, ''));
+      startTravel(chip.target.x, chip.target.y, travelLabel(chip.label));
     }
   };
 
@@ -2664,6 +2714,14 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
         )}
       </div>
 
+      {isWorkspace && (
+        <WorkspaceHints
+          started={hasAdventureStarted}
+          level={mapHook.currentMapLevel}
+          suggestions={suggestions.length}
+          paused={modalStack.length > 0}
+        />
+      )}
       <GameModals
         mapDockTarget={isWorkspace ? stageEl : null}
         onWorldTileClick={isWorkspace ? handleWorkspaceWorldClick : null}
@@ -2695,8 +2753,9 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
         handleAttackSiteMob={handleAttackSiteMob}
         handleEncounterResolve={handleEncounterResolve}
         handleHeroUpdate={handleHeroUpdate}
-        onUseItem={(heroId, itemKey, healedHero) => {
+        onUseItem={(heroId, itemKey, healedHero, logLine) => {
           setSelectedHeroes(prev => replaceHeroInParty(prev, healedHero));
+          if (logLine) interactionHook.setConversation(prev => [...prev, { role: 'system', content: logLine }]);
         }}
         onQuestItemFound={(itemId, itemName) => {
           // Route through grantObjectiveItem so the item actually lands in inventory:
@@ -2748,6 +2807,13 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
             return healed;
           });
           setSelectedHeroes(updatedHeroes);
+          const recovered = healingResults.filter(r => r.after > r.before);
+          interactionHook.setConversation(prev => [...prev, {
+            role: 'system',
+            content: `🛏️ ${restType === 'long' ? 'Long' : 'Short'} rest: ${recovered.length
+              ? recovered.map(r => `${r.name} +${r.after - r.before} HP (${r.after}/${r.maxHP})`).join(', ')
+              : 'the party is already at full health'}.`
+          }]);
           // #83 Phase 2: a LONG rest is the deliberate "time passed" reset — clear every spent
           // check lock so the party can attempt those approaches afresh. A short rest does not.
           if (restType === 'long' && settings?.checkLocks?.length) {

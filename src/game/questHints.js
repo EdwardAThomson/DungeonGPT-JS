@@ -109,7 +109,8 @@ export const getStepHint = (step, quest) => {
       ? quest.giver.buildingName
       : describeTurnInTarget(turnIn.building);
     if (!target) return '';
-    if (turnIn.location) target = `${target} in ${turnIn.location}`;
+    // Unanchored (older saves): any town with that building accepts the hand-in.
+    target = turnIn.location ? `${target} in ${turnIn.location}` : `${target} in any town`;
     const ready = quest ? isStepReady(step, quest.milestones) : false;
     return ready ? `✅ Ready — return to ${target}` : `Return to ${target}`;
   }

@@ -113,15 +113,18 @@ const PartyInventoryContent = ({ selectedHeroes = [], onUseItem, onHeroUpdate })
     if (!res.ok) { setUseItemState(null); return; }
 
     // Persist to the party state, and reflect it locally for instant UI updates.
+    const heroName = target.heroName || target.characterName || target.name;
     if (onUseItem) {
-      onUseItem(heroUid(target), itemKey, res.healedTarget);
+      // The 4th arg (target call only) is a log line for the Adventure Log.
+      onUseItem(heroUid(target), itemKey, res.healedTarget,
+        `🧪 ${heroName} uses ${res.itemName} and recovers ${res.actualHeal} HP (${res.healedTarget.currentHP}/${res.healedTarget.maxHP}).`);
       if (!res.sameOwner) onUseItem(heroUid(owner), itemKey, res.updatedOwner);
     }
     applyHeroes(res.sameOwner ? [res.healedTarget] : [res.healedTarget, res.updatedOwner]);
 
     const resultId = Date.now();
     setUseResults(prev => [...prev, {
-      heroName: target.heroName || target.characterName || target.name,
+      heroName,
       itemName: res.itemName,
       rolled: res.rolled,
       healed: res.actualHeal,

@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sendEvent } from '../services/telemetry';
 import SafeMarkdownMessage from './SafeMarkdownMessage';
 import NarrativeHookChips from './NarrativeHookChips';
 import SaveSyncIndicator from './SaveSyncIndicator';
 import RdDialog from './RdDialog';
+import { groupLogByVisit } from '../game/logGroups';
 
 // Player-action length guard (maintainer 2026-07-06): the worker rejects
 // composed prompts over 32k chars, of which the typed action is one slice
@@ -104,6 +105,31 @@ const GameMainPanel = ({
     if (typeof el.scrollTo === 'function') el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
     else el.scrollTop = el.scrollHeight;
   }, [conversation.length, isLoading]);
+
+  // Log entries grouped by location visit (town / cave / ruin). A visit starts open and
+  // collapses once the party leaves; the player can flip any one, or all at once.
+  const logItems = useMemo(() => groupLogByVisit(conversation), [conversation]);
+  const [visitOpen, setVisitOpen] = useState({}); // id -> bool, overrides the default
+  const isVisitOpen = (g) => visitOpen[g.id] ?? !g.closed;
+  const visits = logItems.filter((i) => i.type === 'visit');
+  const anyVisitOpen = visits.some(isVisitOpen);
+  const setAllVisits = (open) => setVisitOpen(Object.fromEntries(visits.map((g) => [g.id, open])));
+
+  const renderMsg = (msg, index) => (
+    // Encounter results are stored as ai messages prefixed "⚔️ **Name**:"; tag them so
+    // the log can set combat apart from narration (view-only, works on old saves too).
+    <div key={index} className={`gm-msg message ${msg.role}${msg.role === 'ai' && typeof msg.content === 'string' && msg.content.startsWith('⚔️') ? ' combat' : ''}`}>
+      <SafeMarkdownMessage content={msg.content} />
+      {hookChips && hookChips.message === msg && (
+        <NarrativeHookChips
+          encounter={hookChips.encounter}
+          onAction={onHookChipAction}
+          onIgnore={onHookChipIgnore}
+        />
+      )}
+    </div>
+  );
+
   return (
     <div className={`gm-main${docked ? ' ws-log' : ''}`}>
       <header className="gm-head">
@@ -159,20 +185,33 @@ const GameMainPanel = ({
           </div>
         )}
 
-        {conversation.map((msg, index) => (
-          // Encounter results are stored as ai messages prefixed "⚔️ **Name**:"; tag them so
-          // the log can set combat apart from narration (view-only, works on old saves too).
-          <div key={index} className={`gm-msg message ${msg.role}${msg.role === 'ai' && typeof msg.content === 'string' && msg.content.startsWith('⚔️') ? ' combat' : ''}`}>
-            <SafeMarkdownMessage content={msg.content} />
-            {hookChips && hookChips.message === msg && (
-              <NarrativeHookChips
-                encounter={hookChips.encounter}
-                onAction={onHookChipAction}
-                onIgnore={onHookChipIgnore}
-              />
-            )}
+        {visits.length > 0 && (
+          <div className="gm-log-tools">
+            <button type="button" className="gm-visit-all" onClick={() => setAllVisits(!anyVisitOpen)}>
+              {anyVisitOpen ? 'Collapse all places' : 'Expand all places'}
+            </button>
           </div>
-        ))}
+        )}
+        {logItems.map((item) => {
+          if (item.type === 'msg') return renderMsg(item.msg, item.index);
+          const open = isVisitOpen(item);
+          return (
+            <section key={`visit-${item.id}`} className={`gm-visit${open ? ' open' : ''}`}>
+              <button
+                type="button"
+                className="gm-visit-head"
+                aria-expanded={open}
+                onClick={() => setVisitOpen((prev) => ({ ...prev, [item.id]: !open }))}
+              >
+                <span className="gm-visit-caret" aria-hidden="true">{open ? '▾' : '▸'}</span>
+                <span className="gm-visit-name">{item.name}</span>
+                <span className="gm-visit-count">{item.items.length} {item.items.length === 1 ? 'entry' : 'entries'}</span>
+                {!item.closed && <span className="gm-visit-here">here now</span>}
+              </button>
+              {open && <div className="gm-visit-body">{item.items.map(({ msg, index }) => renderMsg(msg, index))}</div>}
+            </section>
+          );
+        })}
         {isLoading && (
           <p className="gm-msg message system gm-thinking">
             <span className="gm-dots" aria-hidden="true"><i /><i /><i /></span>

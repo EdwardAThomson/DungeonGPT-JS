@@ -102,9 +102,9 @@ describe('getStepHint', () => {
   it('turn-in steps show the target, and readiness once prerequisites complete', () => {
     const obj = { id: 'a', trigger: { item: 'x' }, completed: false };
     const turnin = { id: 'b', trigger: { turnIn: { building: ['inn', 'tavern'] } }, requires: ['a'], completed: false };
-    expect(getStepHint(turnin, quest([obj, turnin]))).toBe('Return to an inn or a tavern');
+    expect(getStepHint(turnin, quest([obj, turnin]))).toBe('Return to an inn or a tavern in any town');
     const done = { ...obj, completed: true };
-    expect(getStepHint(turnin, quest([done, turnin]))).toBe('✅ Ready — return to an inn or a tavern');
+    expect(getStepHint(turnin, quest([done, turnin]))).toBe('✅ Ready — return to an inn or a tavern in any town');
   });
 
   it('completed steps get no hint', () => {

@@ -1,6 +1,6 @@
 // suggestedActions (#91): engine-derived chips only point at places the player already knows.
 
-import { getSuggestedActions, MAX_SUGGESTIONS } from './suggestedActions';
+import { getSuggestedActions, MAX_SUGGESTIONS, recommendedLevel } from './suggestedActions';
 
 const grid = (w, h, fill = () => ({ biome: 'plains' })) =>
   Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => ({ x, y, ...fill(x, y) })));
@@ -42,6 +42,13 @@ describe('getSuggestedActions', () => {
     expect(labels(later)).toEqual(['Travel to Goblin Hideout']);
   });
 
+  it('sends a POI step to its POI even when its location names a town', () => {
+    const ms = [{ id: 1, type: 'location', location: 'Willowdale', requires: [],
+      trigger: { location: 'goblin_hideout' }, spawn: { type: 'poi', id: 'goblin_hideout', name: 'Goblin Hideout', location: 'Willowdale' } }];
+    const chips = getSuggestedActions({ worldMap: world(), playerPosition: { x: 0, y: 0 }, milestones: ms });
+    expect(chips.find((c) => c.kind === 'travel')).toMatchObject({ label: 'Travel to Goblin Hideout', target: { x: 4, y: 4 } });
+  });
+
   it('inside the milestone town, walks to the quest building (Talk to for NPC milestones)', () => {
     const town = grid(5, 5, () => ({ type: 'grass' }));
     town[1][3] = { ...town[1][3], type: 'building', buildingType: 'barracks', buildingName: 'Briarwood Militia Hall' };
@@ -53,6 +60,24 @@ describe('getSuggestedActions', () => {
     // The other active milestone's town is still offered, from inside town.
     expect(labels(chips)).toContain('Travel to Willowdale');
     expect(labels(chips)).not.toContain('Enter Briarwood');
+  });
+
+  it('offers Leave inside a site only at its entrance, ahead of Look around', () => {
+    const site = { mapLevel: 'site', worldMap: world(), playerPosition: { x: 0, y: 0 }, siteName: 'Mossy Cave', hookWaiting: true };
+    expect(labels(getSuggestedActions({ ...site, atSiteExit: true }))).toEqual(['Leave Mossy Cave', 'Look around']);
+    expect(labels(getSuggestedActions(site))).toEqual(['Look around']);
+  });
+
+  it('offers Leave first on the town exit tile, and not elsewhere in town', () => {
+    const town = grid(5, 5, () => ({ type: 'grass' }));
+    const inTown = { mapLevel: 'town', worldMap: world(), playerPosition: { x: 7, y: 7 },
+      townMap: town, townName: 'Briarwood', townPosition: { x: 2, y: 4 }, milestones: milestones() };
+    const chips = getSuggestedActions({ ...inTown, atTownExit: true });
+    expect(chips[0]).toEqual({ id: 'leave', label: 'Leave Briarwood', kind: 'leave' });
+    expect(labels(getSuggestedActions(inTown))).not.toContain('Leave Briarwood');
+    // Only inside a town: the flag means nothing on the world map.
+    expect(labels(getSuggestedActions({ worldMap: world(), playerPosition: { x: 0, y: 0 }, atTownExit: true })))
+      .not.toContain('Leave Snowley');
   });
 
   it('sends a ready side quest back to its turn-in town, then to the building once there', () => {
@@ -67,6 +92,55 @@ describe('getSuggestedActions', () => {
     const there = getSuggestedActions({ mapLevel: 'town', worldMap: world(), playerPosition: { x: 7, y: 7 },
       townMap: town, townName: 'Briarwood', townPosition: { x: 0, y: 3 }, sideQuests });
     expect(there[0]).toMatchObject({ label: "Hand in at Adventurers' Guild", kind: 'walk', target: { x: 2, y: 0 } });
+  });
+
+  it('routes an unanchored hand-in to the nearest visited town that has the building', () => {
+    const sideQuests = [{ id: 'q', status: 'active', milestones: [
+      { id: 1, completed: true, site: { type: 'cave' } },
+      { id: 2, requires: [1], trigger: { turnIn: { building: 'guild' } } },
+    ] }];
+    const withGuild = grid(3, 3, () => ({ type: 'grass' }));
+    withGuild[1][1] = { ...withGuild[1][1], type: 'building', buildingType: 'guild' };
+    const townMapsCache = { Briarwood: { mapData: withGuild }, Snowley: { mapData: grid(3, 3, () => ({ type: 'grass' })) } };
+    const chips = getSuggestedActions({ worldMap: world(), playerPosition: { x: 1, y: 1 }, sideQuests, townMapsCache });
+    // Snowley is nearer but has no guild; Briarwood does.
+    expect(labels(chips)).toEqual(['Return to Briarwood']);
+  });
+
+  it('aims a boss step at the nearest tile it can be fought from, not just its named town', () => {
+    const g = world();
+    g[2][2] = { ...g[2][2], poi: 'rot_tunnels', milestonePoi: true, poiName: 'The Rot Tunnels' };
+    g[7][7] = { ...g[7][7], milestoneEnemy: 'rot_heart' }; // also stamped on the town (Briarwood here)
+    const ms = [
+      { id: 3, type: 'location', completed: true, requires: [], location: 'Briarwood',
+        trigger: { location: 'rot_tunnels' }, spawn: { type: 'poi', id: 'rot_tunnels', name: 'The Rot Tunnels', location: 'Briarwood' } },
+      { id: 4, type: 'combat', completed: false, requires: [3], location: 'Briarwood',
+        trigger: { enemy: 'rot_heart' }, spawn: { type: 'enemy', id: 'rot_heart', name: 'The Rot-Heart', location: 'Briarwood' },
+        encounter: { name: 'The Rot-Heart', enemyHP: 60 } },
+    ];
+    // Standing on the tunnels: fight here, no "Travel to Briarwood".
+    const here = getSuggestedActions({ worldMap: g, playerPosition: { x: 2, y: 2 }, milestones: ms });
+    expect(here[0]).toMatchObject({ id: 'fight', label: 'Confront The Rot-Heart' });
+    expect(labels(here)).not.toContain('Travel to Briarwood');
+    // Further away, the nearer fight tile wins.
+    const away = getSuggestedActions({ worldMap: g, playerPosition: { x: 1, y: 3 }, milestones: ms });
+    expect(away.find((c) => c.kind === 'travel')).toMatchObject({ label: 'Travel to The Rot Tunnels', target: { x: 2, y: 2 } });
+  });
+
+  it('offers the milestone action when standing on its tile (Search, then Gather)', () => {
+    const g = world();
+    g[4][4] = { ...g[4][4], poi: 'goblin_hideout' };
+    const ms = [{ id: 3, type: 'location', completed: false, requires: [], location: 'Greenridge Hills',
+      trigger: { location: 'goblin_hideout' }, spawn: { type: 'poi', id: 'goblin_hideout', name: 'Goblin Hideout' } }];
+    const chips = getSuggestedActions({ worldMap: g, playerPosition: { x: 4, y: 4 }, milestones: ms });
+    expect(chips[0]).toMatchObject({ id: 'search', label: 'Search Goblin Hideout', kind: 'search' });
+
+    const moors = grid(3, 3);
+    moors[1][1] = { ...moors[1][1], poi: 'mountain', mountainName: 'Grey Moors' };
+    const herbs = [{ id: 1, type: 'item', completed: false, requires: [], location: 'Grey Moors',
+      trigger: { item: 'moorland_herbs' }, spawn: { type: 'item', id: 'moorland_herbs', name: 'Moorland Herbs', location: 'Grey Moors' }, building: null }];
+    const here = getSuggestedActions({ worldMap: moors, playerPosition: { x: 1, y: 1 }, milestones: herbs });
+    expect(here[0]).toMatchObject({ id: 'gather', label: 'Gather Moorland Herbs', kind: 'gather' });
   });
 
   it("heads for a taken side quest's revealed site, but not for one still only offered", () => {
@@ -94,5 +168,42 @@ describe('getSuggestedActions', () => {
   it('is empty without a world, and offers only Look around inside a site', () => {
     expect(getSuggestedActions({})).toEqual([]);
     expect(labels(getSuggestedActions({ mapLevel: 'site', hookWaiting: true }))).toEqual(['Look around']);
+  });
+});
+
+describe('levelling nudges', () => {
+  const bossStep = () => [{ id: 9, type: 'combat', location: 'Briarwood', requires: [], trigger: { enemy: 'boss' },
+    encounter: { name: 'Boss', rewards: { xp: 75 } }, spawn: { type: 'enemy', location: 'Briarwood' } }];
+
+  it('recommends a step minLevel, else the top of the range for a boss', () => {
+    expect(recommendedLevel({ minLevel: 3 }, [1, 2])).toBe(3);
+    expect(recommendedLevel({ type: 'combat', encounter: {} }, [1, 2])).toBe(2);
+    expect(recommendedLevel({ type: 'talk' }, [1, 2])).toBeNull();
+  });
+
+  it('flags an under-levelled step and offers a hunt on unexplored wild ground', () => {
+    const g = world();
+    g[2][2] = { ...g[2][2], poi: 'forest' };
+    g[1][1] = { ...g[1][1], poi: 'forest', isExplored: true }; // explored: low odds, skipped
+    const chips = getSuggestedActions({ worldMap: g, playerPosition: { x: 0, y: 0 }, milestones: bossStep(),
+      party: [{ level: 1 }], levelRange: [1, 2] });
+    expect(chips.map((c) => c.label)).toEqual(['Enter Snowley', 'Travel to Briarwood (level 2 recommended)', 'Hunt in the forest']);
+    expect(chips[2].target).toEqual({ x: 2, y: 2 });
+    // At the recommended level: plain travel, no hunt.
+    const ready = getSuggestedActions({ worldMap: g, playerPosition: { x: 0, y: 0 }, milestones: bossStep(),
+      party: [{ level: 2 }], levelRange: [1, 2] });
+    expect(ready.map((c) => c.label)).toEqual(['Enter Snowley', 'Travel to Briarwood']);
+  });
+
+  it('points at a building offering side-quest work, under the active-quest cap', () => {
+    const town = grid(4, 4, () => ({ type: 'grass' }));
+    town[1][2] = { ...town[1][2], type: 'building', buildingType: 'tavern', buildingName: 'The Crooked Pint' };
+    const offer = { id: 'q1', status: 'available', minLevel: 1, giver: { building: ['inn', 'tavern'] }, milestones: [] };
+    const base = { mapLevel: 'town', worldMap: world(), playerPosition: { x: 0, y: 0 }, townMap: town, townName: 'Snowley', townPosition: { x: 0, y: 3 }, party: [{ level: 1 }] };
+    expect(getSuggestedActions({ ...base, sideQuests: [offer] })[0]).toMatchObject({ label: 'Ask for work at The Crooked Pint', kind: 'walk', target: { x: 2, y: 1 } });
+    const busy = [offer, ...[1, 2, 3].map((i) => ({ id: `a${i}`, status: 'active', milestones: [] }))];
+    expect(getSuggestedActions({ ...base, sideQuests: busy })).toEqual([]);
+    const tooHard = { ...offer, minLevel: 4 };
+    expect(getSuggestedActions({ ...base, sideQuests: [tooHard] })).toEqual([]);
   });
 });
