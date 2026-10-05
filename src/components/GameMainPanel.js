@@ -111,6 +111,20 @@ const GameMainPanel = ({
   const logItems = useMemo(() => groupLogByVisit(conversation), [conversation]);
   const [visitOpen, setVisitOpen] = useState({}); // id -> bool, overrides the default
   const isVisitOpen = (g) => visitOpen[g.id] ?? !g.closed;
+  // Leaving a place always folds its group away, even if the player had opened it (or hit
+  // Expand all) while inside: drop the override on the visit that just closed.
+  const liveVisitIdsRef = useRef(new Set());
+  useEffect(() => {
+    const live = new Set(logItems.filter((i) => i.type === 'visit' && !i.closed).map((i) => i.id));
+    const justClosed = [...liveVisitIdsRef.current].filter((id) => !live.has(id));
+    liveVisitIdsRef.current = live;
+    if (justClosed.length === 0) return;
+    setVisitOpen((prev) => {
+      const next = { ...prev };
+      justClosed.forEach((id) => { delete next[id]; });
+      return next;
+    });
+  }, [logItems]);
   const visits = logItems.filter((i) => i.type === 'visit');
   const anyVisitOpen = visits.some(isVisitOpen);
   const setAllVisits = (open) => setVisitOpen(Object.fromEntries(visits.map((g) => [g.id, open])));
