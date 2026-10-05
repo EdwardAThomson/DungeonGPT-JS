@@ -39,14 +39,14 @@ Notes on reading this doc:
 | desert-expedition-t2 | member | 2 | 3-5 | 4 | 2 (M1, M2) | 2 parallel then chain |
 | frozen-frontier-t1 | member | 1 | 1-2 | 4 | 2 (M1, M2) | 2 parallel then chain |
 | frozen-frontier-t2 | member | 2 | 3-5 | 5 | 2 (M1, M2) | 2 parallel then chain |
-| grimdark-survival-t1 | free | 1 | 1-2 | 4 | 2 (M1, M2) | 2 parallel then chain |
+| grimdark-survival-t1 | free | 1 | 1-2 | 5 | 2 (M1, M3) | 2 parallel then chain |
 | grimdark-survival-t2 | free | 2 | 3-4 | 4 | 2 (M1, M2) | 2 parallel then chain |
 | arcane-renaissance-t1 | free | 1 | 1-2 | 4 | 2 (M1, M2) | 2 parallel then chain |
 | arcane-renaissance-t2 | free | 2 | 3-4 | 4 | 2 (M1, M2) | 2 parallel then chain |
 | eldritch-horror-t1 | member | 1 | 1-2 | 4 | 2 (M1, M2) | 2 parallel then chain |
 | eldritch-horror-t2 | member | 2 | 3-5 | 4 | 2 (M1, M2) | 2 parallel then chain |
 
-**Uniform openers:** every campaign opens with exactly **2** co-active milestones (M1 plus 1 more with `requires: []`). `frozen-frontier-t2` is the only campaign with **5** milestones (an extra gathering beat) rather than 4.
+**Uniform openers:** every campaign opens with exactly **2** co-active milestones (M1 plus 1 more with `requires: []`). `frozen-frontier-t2`, `grimdark-survival-t1` are the only campaigns with **5** milestones (an extra gathering beat) rather than 4.
 
 Teaser / coming-soon stubs (no milestones authored in the public bundle) are
 listed at the end.
@@ -168,11 +168,12 @@ Genre `grimdark-survival`. Access: free. Chapters do not share geography (fresh-
 | # | Type | Objective | Requires | Spawn (item/NPC/POI/enemy) | Building / Venue | Rewards |
 |---|---|---|---|---|---|---|
 | 1 | item | Gather healing herbs from the Grey Moors for the village healer | - | item: Moorland Herbs | - | 25 XP / 1d6 / herbal_remedy |
-| 2 | location | Search the abandoned well at Mudhollow for clues | - | poi: The Poisoned Well | - | 25 XP / 1d6 / quest_clue |
-| 3 | location | Track the blight to its source in the Grimstead cellar | 1, 2 | poi: Grimstead Cellar | - | 50 XP / 1d10 |
-| 4 | combat | Slay the Blightspawn lurking beneath Grimstead | 3 | enemy: Blightspawn (HP 25, medium) | - | boss loot: antidote (50 XP / 1d10) |
+| 2 | talk | Bring the moorland herbs to the healer in Ashford | 1 | npc: Mother Elspeth (Alchemist) | Mother Elspeth's Apothecary (apothecary, Ashford) | 25 XP / 1d6 |
+| 3 | location | Search the abandoned well at Mudhollow for clues | - | poi: The Poisoned Well | - | 25 XP / 1d6 / quest_clue |
+| 4 | location | Track the blight to its source in the Grimstead cellar | 2, 3 | poi: Grimstead Cellar | - | 50 XP / 1d10 |
+| 5 | combat | Slay the Blightspawn lurking beneath Grimstead | 4 | enemy: Blightspawn (HP 25, medium) | - | boss loot: antidote (50 XP / 1d10) |
 
-**Parallelism:** M1 (item) and M2 (location) open immediately. M3 requires [1, 2]; M4 requires [3]. 2 parallel openers, then a chain.
+**Parallelism:** M1 (item) and M3 (location) open immediately. M2 requires [1]; M4 requires [2, 3]; M5 requires [4]. 2 parallel openers, then a chain.
 
 ### grimdark-survival-t2: "The Rot-Heart"
 
