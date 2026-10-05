@@ -1,6 +1,6 @@
 # Roadmap — DungeonGPT (JS)
 
-_Status: active · updated 2026-07-31_
+_Status: active · updated 2026-10-05_
 
 The production rewrite of DungeonGPT — a React web app for creating fantasy
 characters and playing AI-narrated RPG campaigns. Deployed at dungeongpt.xyz on
@@ -57,6 +57,7 @@ backlog; see the `docs/` design docs for each system.
 - [x] Onboarding + setup streamlining (#88): ready-made starter heroes with adventure-first flow, last-played template + last-used party preselects, hero-creation prefill, state-driven progress bar (Choose Adventure → Choose Heroes → Begin Quest)
 - [x] Playtest fixes: quest-building injection for milestone towns (#74), Start Adventure retry (#75); 17 encounter/boss image mismatches corrected
 - [x] Hub payments enforcement + visibility (#6, 2026-07-22): billing live at the Octonion hub; the Worker's premium gates (AI pool, premium templates) and the client snapshot all admit on the merged tier MAX(local, hub) via `cf-worker/src/services/mergedTier.ts`; Profile shows a read-only premium-allowance meter (daily/monthly used vs limit) plus the hub credit balance; Membership page links the hub tier page with a live upgrade CTA
+- [x] World map animated tile art + sky overlay; town nobility fixes (the keep seats the lord, manor families match their manors); unnamed saves take the campaign chapter name
 
 ## Next
 
@@ -64,11 +65,11 @@ backlog; see the `docs/` design docs for each system.
 - [x] Add missing assets: dedicated quest-item icons + hide/studded-leather armour and pine-resin art delivered (placeholders cleared); the `workshop` building interior (Henry #26) is delivered
 - [x] Replace fragile keyword-based encounter-engagement detection: superseded by the two-tier narration redesign; the keyword matching no longer exists (OUTSTANDING_ISSUES #13)
 - [x] Deploy product analytics (#86): migration 007 applied + Worker deployed; pipeline verified live 2026-07-22 (funnel events recording)
-- [ ] Landing page + UI redesign (#82, HIGH PRIORITY): in progress on a dedicated `redesign` branch (build-then-cutover, live site untouched until done) — dark token layer + auth-aware nav (§12.1-2), the auth-aware home (guest landing + signed-in dashboard, §12.3a), the live world map + Subscribe CTA (§12.3c), The Engine + Overview depth pages with GitHub wired (§12.4), and the Overview walkthrough + How to Play manual (absorbing Features & FAQ) polish pass (2026-10-01), shipped there; not yet merged to master/live
-- [ ] Map & Adventure Log layout: promote the map to the main stage (#84, HIGH PRIORITY)
+- [x] Landing page + UI redesign (#82): merged to master and live 2026-10-03 (PR #172). Dark token layer + auth-aware nav, guest landing + player dashboard (split to `/play`), live world map + Subscribe CTA, The Engine + Overview depth pages, How to Play manual (absorbing Features & FAQ), and every in-app page restyled on the redesign primitives (Your Games, Your Heroes, sign-in, Choose your party, New game, Create Your Hero, game screen, pop-ups via a shared dialog); mobile overflow QA pass
+- [ ] Map & Adventure Log layout: promote the map to the main stage (#84, HIGH PRIORITY): nearly done on `feat/workspace-spike`. Docked map stage with auto-travel, suggested actions, smooth travel, and continuous roads built; final polish before merge
 - [ ] Combat UX continuation (#79): dockable map-context HUD (§0 step 2), then the remaining animation/refine threads (`docs/COMBAT_UX_PLAN.md`)
-- [ ] In-flight phase work: AI narration contract Phase 2 (#76), skill checks Phases 3-4 (#83), arc cards Phases 2-4 (#73)
-- [ ] Mobile UI fixes (sign-in/nav overlap, How-To-Play layout) (tracked only here, no backlog row)
+- [ ] In-flight phase work: AI narration contract Phase 2 (#76), skill checks Phases 3-4 (#83), arc cards Phases 2-4 (#73). Groundwork for moving adjudication engine-side: typed-decision eval plan, pilot runner + narrator baseline, and the AI DM design direction note (`docs/AI_DM_DESIGN_DIRECTION.md`, `docs/TYPED_DECISION_NEXT_STEPS.md`, 2026-09-30)
+- [ ] Mobile UI fixes (tracked only here, no backlog row): the #82 redesign rebuilt sign-in, nav, and How to Play and fixed phone overflow; needs a device re-check to confirm the original sign-in/nav overlap and How-To-Play layout issues are gone
 - [ ] Guest conversion: prompt at a high-intent moment (e.g. first milestone), beyond the persistent banner; #86's funnel now measures this (tracked only here, no backlog row)
 
 ## Backlog
