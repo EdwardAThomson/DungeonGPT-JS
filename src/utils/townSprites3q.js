@@ -1,0 +1,749 @@
+// townSprites3q.js
+// PROTOTYPE (debug-only, /debug/town-3q): a "3/4 top-down" sprite layer for towns.
+//
+// The live town art (townTileArt.js) draws every building as a flat roof icon inside
+// its own tile. This module instead draws buildings, trees, walls and townsfolk as
+// upright sprites that stand on their tile and overlap the tile above, so the map
+// reads as implied 3D (Ultima VII / classic JRPG camera) instead of a floor plan.
+//
+// How the depth is faked: each structure is built from small convex 3D solids
+// (boxes, roof prisms, pyramids, cones) projected with a cabinet-style oblique camera
+// (depth recedes up and slightly right). Faces are back-face culled and shaded from a
+// single light direction, so every building gets consistent lit fronts, dark right
+// sides, shingled slopes and a cast shadow, all generated from data.
+//
+// Still a pure view layer: sprites are keyed only by tile fields + coordinates, so
+// like the rest of the tile art this re-skins every existing save without touching
+// map data (CLAUDE.md, back-compat rule 1). Output is an SVG data-URI string for an
+// <img>/background; SMIL handles the ambient motion (smoke, flicker, sails, sway).
+
+// --- colour helpers -------------------------------------------------------------
+const hexToRgb = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+const rgbToHex = (r, g, b) =>
+  `#${[r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')}`;
+const shade = (hex, f) => {
+  const [r, g, b] = hexToRgb(hex);
+  return rgbToHex(r * f, g * f, b * f);
+};
+const mixHex = (a, b, t) => {
+  const A = hexToRgb(a), B = hexToRgb(b);
+  return rgbToHex(A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t);
+};
+
+const rng = (seed) => {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+const seedOf = (x = 0, y = 0) => (((x * 73856093) ^ (y * 19349663)) >>> 0);
+const pick = (r, arr) => arr[Math.floor(r() * arr.length) % arr.length];
+
+// --- palette: muted, painterly, pulled toward the encounter paintings --------------
+const P = {
+  plaster: '#d8c9a8', plasterWarm: '#cfb68e', timber: '#4a3424', stone: '#a39a8a',
+  stoneDark: '#7d7568', stonePale: '#c4bba8', wood: '#7a5638', woodDark: '#563c27',
+  glass: '#f2c46a', glassDim: '#3a3a44', door: '#4b3121', iron: '#3c3c42',
+  terracotta: '#9a5440', slate: '#525d66', thatch: '#a88a52', shingle: '#6e5a45',
+  moss: '#5d6b4a', gold: '#b89a48', violet: '#5d4a8c', teal: '#467268',
+  snow: '#eef2f6', sand: '#d8bf8c', adobe: '#c9a274',
+};
+// Muted version of the live tileset's per-type roof colours, so each building keeps
+// its identity colour from the flat art, just less candy-bright.
+const ROOF = {
+  house: null, // houses pick a varied vernacular roof per tile
+  manor: '#7a4c66', keep: '#5a5f66', barracks: '#4f5860', inn: '#9a6a34', tavern: '#94603a',
+  shop: '#3f6f63', market: '#b07a3a', temple: '#9a8448', bank: '#8d8676', guild: '#4f5f92',
+  library: '#475887', archives: '#655438', blacksmith: '#4e4a46', foundry: '#46423e',
+  barn: '#7d4a30', warehouse: '#6e4c30', alchemist: '#6a5088', apothecary: '#527a50',
+  fletcher: '#626c3a', harbormaster: '#3d6489', boathouse: '#46707f', jail: '#454548',
+  magetower: '#5a4696', mill: '#9a7a46', shrine: '#9a8640', stables: '#7a5e38',
+  tailor: '#86607a', townhall: '#857a52', workshop: '#467c7a',
+};
+const desat = (hex) => mixHex(hex, '#6b6358', 0.22);
+
+// --- the oblique camera + lighting ---------------------------------------------------
+// Sprite canvas: 60 x 100 units. One tile = 40 units; the footprint tile occupies
+// x 10..50, y 60..100. World coords: x right, y = depth (back), z = height.
+export const SPRITE_W = 60;
+export const SPRITE_H = 100;
+const RECEDE_X = 0.25; // depth shifts right on screen (shows the shaded east face)
+const RECEDE_Y = 0.7; // depth shifts up on screen
+const norm = (v) => { const l = Math.hypot(...v) || 1; return v.map((c) => c / l); };
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const LIGHT = norm([-0.55, -0.55, 0.65]); // from front-left and above: fronts lit, east faces dark
+
+// A camera maps world (x, y, z) to sprite units. `toward` (the direction from the scene
+// to the camera) drives back-face culling. Walls use rx=0, ry=1 so their ground footprint
+// maps 1:1 onto the square tile grid and neighbouring segments join up.
+const makeCam = (ox, oy, rx = RECEDE_X, ry = RECEDE_Y) => {
+  const cam = ([x, y, z]) => [ox + x + y * rx, oy - z - y * ry];
+  cam.toward = norm([rx, -1, ry]);
+  return cam;
+};
+const fmt = (n) => (Math.round(n * 10) / 10).toString();
+const ptsStr = (pts) => pts.map(([a, b]) => `${fmt(a)},${fmt(b)}`).join(' ');
+
+// Draws the visible faces of ONE convex solid. Each face: { pts: [[x,y,z]...], color,
+// rows? (shingle line count), stroke? }. Outward normals are derived from the solid's
+// centre, back faces are culled, the rest are lit by LIGHT. Faces of a convex solid
+// never overlap once culled, so draw order inside a solid does not matter.
+const solid = (cam, faces, center, opts = {}) => {
+  const { amb = 0.64, k = 0.48 } = opts;
+  let out = '';
+  for (const f of faces) {
+    const p = f.pts;
+    let n = norm(cross(sub(p[1], p[0]), sub(p[2], p[0])));
+    const c = p.reduce((s, q) => [s[0] + q[0] / p.length, s[1] + q[1] / p.length, s[2] + q[2] / p.length], [0, 0, 0]);
+    if (dot(n, sub(c, center)) < 0) n = n.map((v) => -v);
+    if (dot(n, cam.toward) <= 0.001) continue;
+    const lum = amb + k * Math.max(0, dot(n, LIGHT));
+    const fill = shade(f.color, lum);
+    const scr = p.map(cam);
+    out += `<polygon points='${ptsStr(scr)}' fill='${fill}'${f.edge ? ` stroke='${shade(f.color, lum * 0.6)}' stroke-width='0.4' stroke-linejoin='round'` : ''}/>`;
+    if (f.rows && p.length === 4) {
+      // shingle / plank courses: lines between edge p0->p3 and p1->p2
+      const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      for (let i = 1; i < f.rows; i++) {
+        const t = i / f.rows;
+        const a = lerp(scr[0], scr[3], t), b = lerp(scr[1], scr[2], t);
+        out += `<line x1='${fmt(a[0])}' y1='${fmt(a[1])}' x2='${fmt(b[0])}' y2='${fmt(b[1])}' stroke='${shade(f.color, lum * 0.62)}' stroke-width='0.55' opacity='0.75'/>`;
+      }
+    }
+  }
+  return out;
+};
+
+const box = (cam, x0, x1, y0, y1, z0, z1, color, opts = {}) => {
+  const c = [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2];
+  const v = (x, y, z) => [x, y, z];
+  return solid(cam, [
+    { pts: [v(x0, y0, z0), v(x1, y0, z0), v(x1, y0, z1), v(x0, y0, z1)], color: opts.front || color },
+    { pts: [v(x1, y0, z0), v(x1, y1, z0), v(x1, y1, z1), v(x1, y0, z1)], color: opts.side || color },
+    { pts: [v(x0, y0, z1), v(x1, y0, z1), v(x1, y1, z1), v(x0, y1, z1)], color: opts.top || color, rows: opts.topRows },
+    { pts: [v(x0, y1, z0), v(x0, y0, z0), v(x0, y0, z1), v(x0, y1, z1)], color: opts.side || color },
+  ], c, opts);
+};
+
+// Gable roof with its ridge running left-right (along x). Overhang `o` on all eaves.
+const gableX = (cam, x0, x1, D, H, R, roof, o = 2) => {
+  const v = (x, y, z) => [x, y, z];
+  const c = [(x0 + x1) / 2, D / 2, H + R / 3];
+  return solid(cam, [
+    { pts: [v(x0 - o, -o, H), v(x1 + o, -o, H), v(x1 + o, D / 2, H + R), v(x0 - o, D / 2, H + R)], color: roof, rows: 5 },
+    { pts: [v(x0 - o, D / 2, H + R), v(x1 + o, D / 2, H + R), v(x1 + o, D + o, H), v(x0 - o, D + o, H)], color: roof, rows: 4 },
+    { pts: [v(x1 + o, -o, H), v(x1 + o, D + o, H), v(x1 + o, D / 2, H + R)], color: roof },
+    { pts: [v(x0 - o, D + o, H), v(x0 - o, -o, H), v(x0 - o, D / 2, H + R)], color: roof },
+  ], c);
+};
+
+// Gable roof with its ridge running front-back: the triangular gable faces the viewer.
+const gableY = (cam, x0, x1, D, H, R, roof, gableWall, o = 2) => {
+  const v = (x, y, z) => [x, y, z];
+  const cx = (x0 + x1) / 2;
+  const c = [cx, D / 2, H + R / 3];
+  const L = x0 - o, Rr = x1 + o;
+  return solid(cam, [
+    { pts: [v(L, D + o, H), v(L, 0, H), v(cx, 0, H + R), v(cx, D + o, H + R)], color: roof, rows: 5 },
+    { pts: [v(cx, 0, H + R), v(Rr, 0, H), v(Rr, D + o, H), v(cx, D + o, H + R)], color: roof, rows: 5 },
+    { pts: [v(L, 0, H), v(Rr, 0, H), v(cx, 0, H + R)], color: gableWall, edge: true },
+    { pts: [v(L, D + o, H), v(Rr, D + o, H), v(cx, D + o, H + R)], color: gableWall },
+  ], c);
+};
+
+// Hip roof: ridge shortened by `h` at both ends.
+const hip = (cam, x0, x1, D, H, R, roof, o = 2, h = 7) => {
+  const v = (x, y, z) => [x, y, z];
+  const L = x0 - o, Rr = x1 + o, F = -o, B = D + o, m = D / 2;
+  const c = [(x0 + x1) / 2, m, H + R / 3];
+  return solid(cam, [
+    { pts: [v(L, F, H), v(Rr, F, H), v(x1 - h, m, H + R), v(x0 + h, m, H + R)], color: roof, rows: 5 },
+    { pts: [v(x0 + h, m, H + R), v(x1 - h, m, H + R), v(Rr, B, H), v(L, B, H)], color: roof, rows: 4 },
+    { pts: [v(Rr, F, H), v(Rr, B, H), v(x1 - h, m, H + R)], color: roof },
+    { pts: [v(L, B, H), v(L, F, H), v(x0 + h, m, H + R)], color: roof },
+  ], c);
+};
+
+const pyramid = (cam, x0, x1, y0, y1, H, R, roof, o = 1.5) => {
+  const v = (x, y, z) => [x, y, z];
+  const ap = v((x0 + x1) / 2, (y0 + y1) / 2, H + R);
+  const L = x0 - o, Rr = x1 + o, F = y0 - o, B = y1 + o;
+  const c = [(x0 + x1) / 2, (y0 + y1) / 2, H + R / 3];
+  return solid(cam, [
+    { pts: [v(L, F, H), v(Rr, F, H), ap], color: roof },
+    { pts: [v(Rr, F, H), v(Rr, B, H), ap], color: roof },
+    { pts: [v(Rr, B, H), v(L, B, H), ap], color: roof },
+    { pts: [v(L, B, H), v(L, F, H), ap], color: roof },
+  ], c);
+};
+
+// Faceted cone (a round tower roof). Facets are convex-solid faces, so the same culling
+// + lighting gives it a smooth light-to-dark sweep.
+const cone = (cam, cx, cy, r, H, R, roof, n = 12) => {
+  const ap = [cx, cy, H + R];
+  const faces = [];
+  for (let i = 0; i < n; i++) {
+    const a0 = (i / n) * Math.PI * 2, a1 = ((i + 1) / n) * Math.PI * 2;
+    faces.push({ pts: [[cx + Math.cos(a0) * r, cy + Math.sin(a0) * r, H], [cx + Math.cos(a1) * r, cy + Math.sin(a1) * r, H], ap], color: roof });
+  }
+  return solid(cam, faces, [cx, cy, H + R / 3]);
+};
+
+// Faceted cylinder (round tower body).
+const cylinder = (cam, cx, cy, r, z0, z1, color, n = 12) => {
+  const faces = [];
+  for (let i = 0; i < n; i++) {
+    const a0 = (i / n) * Math.PI * 2, a1 = ((i + 1) / n) * Math.PI * 2;
+    const p0 = [cx + Math.cos(a0) * r, cy + Math.sin(a0) * r], p1 = [cx + Math.cos(a1) * r, cy + Math.sin(a1) * r];
+    faces.push({ pts: [[p0[0], p0[1], z0], [p1[0], p1[1], z0], [p1[0], p1[1], z1], [p0[0], p0[1], z1]], color });
+  }
+  return solid(cam, faces, [cx, cy, (z0 + z1) / 2], { amb: 0.6, k: 0.55 });
+};
+
+// --- animation snippets (SMIL, self-contained inside the data-URI) ------------------
+const smoke = (x, y, dark = false, delay = 0) => {
+  let s = '';
+  for (let i = 0; i < 3; i++) {
+    const b = (delay + i * 1.3).toFixed(1);
+    s += `<circle cx='${fmt(x)}' cy='${fmt(y)}' r='1.6' fill='${dark ? '#55504a' : '#d9d6d0'}' opacity='0'>` +
+      `<animate attributeName='cy' values='${fmt(y)};${fmt(y - 16)}' dur='3.9s' begin='${b}s' repeatCount='indefinite'/>` +
+      `<animate attributeName='cx' values='${fmt(x)};${fmt(x + 2)};${fmt(x + 5)}' dur='3.9s' begin='${b}s' repeatCount='indefinite'/>` +
+      `<animate attributeName='r' values='1.4;3.6' dur='3.9s' begin='${b}s' repeatCount='indefinite'/>` +
+      `<animate attributeName='opacity' values='0;0.55;0' dur='3.9s' begin='${b}s' repeatCount='indefinite'/></circle>`;
+  }
+  return s;
+};
+const flicker = (seed) => {
+  const r = rng(seed);
+  const d = (2.2 + r() * 2.5).toFixed(1);
+  return `<animate attributeName='opacity' values='0.82;1;0.88;0.97;0.84' dur='${d}s' begin='${(r() * 2).toFixed(1)}s' repeatCount='indefinite'/>`;
+};
+
+// --- front-wall dressing (drawn in the y=0 plane, so screen = (ox+x, oy-z)) ----------
+const wallDressing = (ox, oy, x0, x1, H, style, color, r) => {
+  const X = (x) => ox + x, Z = (z) => oy - z;
+  let s = '';
+  // ambient occlusion at the wall foot + a stone plinth
+  s += `<rect x='${fmt(X(x0))}' y='${fmt(Z(1.6))}' width='${fmt(x1 - x0)}' height='1.6' fill='${shade(P.stoneDark, 0.85)}'/>`;
+  if (style === 'timber') {
+    const beam = P.timber;
+    const posts = [x0 + 0.6, (x0 + x1) / 2, x1 - 0.6];
+    for (const px of posts) s += `<rect x='${fmt(X(px) - 0.6)}' y='${fmt(Z(H))}' width='1.2' height='${fmt(H - 1.6)}' fill='${beam}' opacity='0.85'/>`;
+    s += `<rect x='${fmt(X(x0))}' y='${fmt(Z(H * 0.55))}' width='${fmt(x1 - x0)}' height='1' fill='${beam}' opacity='0.85'/>`;
+    s += `<line x1='${fmt(X(x0 + 0.6))}' y1='${fmt(Z(H * 0.55))}' x2='${fmt(X((x0 + x1) / 2 - 3))}' y2='${fmt(Z(H - 0.5))}' stroke='${beam}' stroke-width='0.8' opacity='0.7'/>`;
+    s += `<line x1='${fmt(X(x1 - 0.6))}' y1='${fmt(Z(H * 0.55))}' x2='${fmt(X((x0 + x1) / 2 + 3))}' y2='${fmt(Z(H - 0.5))}' stroke='${beam}' stroke-width='0.8' opacity='0.7'/>`;
+  } else if (style === 'stone') {
+    for (let z = 3.2, row = 0; z < H; z += 2.4, row++) {
+      s += `<line x1='${fmt(X(x0))}' y1='${fmt(Z(z))}' x2='${fmt(X(x1))}' y2='${fmt(Z(z))}' stroke='${shade(color, 0.72)}' stroke-width='0.35' opacity='0.8'/>`;
+      for (let x = x0 + (row % 2 ? 2 : 4); x < x1; x += 4.5) {
+        s += `<line x1='${fmt(X(x))}' y1='${fmt(Z(z))}' x2='${fmt(X(x))}' y2='${fmt(Z(Math.min(H, z + 2.4)))}' stroke='${shade(color, 0.72)}' stroke-width='0.3' opacity='0.6'/>`;
+      }
+    }
+  } else if (style === 'planks') {
+    for (let x = x0 + 2.2; x < x1; x += 2.2) s += `<line x1='${fmt(X(x))}' y1='${fmt(Z(H))}' x2='${fmt(X(x))}' y2='${fmt(Z(1.6))}' stroke='${shade(color, 0.7)}' stroke-width='0.35' opacity='0.8'/>`;
+  }
+  // soft grime/AO gradient up the wall
+  s += `<rect x='${fmt(X(x0))}' y='${fmt(Z(H * 0.45))}' width='${fmt(x1 - x0)}' height='${fmt(H * 0.45 - 1.6)}' fill='url(#ao)'/>`;
+  return s;
+};
+
+const windowAt = (ox, oy, x, z, w, h, lit, seed, glass = P.glass) => {
+  const X = ox + x, Y = oy - z - h;
+  return `<rect x='${fmt(X - 0.5)}' y='${fmt(Y - 0.5)}' width='${fmt(w + 1)}' height='${fmt(h + 1)}' fill='${P.timber}'/>` +
+    `<rect x='${fmt(X)}' y='${fmt(Y)}' width='${fmt(w)}' height='${fmt(h)}' fill='${lit ? glass : P.glassDim}'>${lit ? flicker(seed) : ''}</rect>` +
+    `<line x1='${fmt(X + w / 2)}' y1='${fmt(Y)}' x2='${fmt(X + w / 2)}' y2='${fmt(Y + h)}' stroke='${P.timber}' stroke-width='0.45'/>` +
+    `<line x1='${fmt(X)}' y1='${fmt(Y + h / 2)}' x2='${fmt(X + w)}' y2='${fmt(Y + h / 2)}' stroke='${P.timber}' stroke-width='0.45'/>` +
+    `<rect x='${fmt(X - 0.8)}' y='${fmt(Y + h + 0.3)}' width='${fmt(w + 1.6)}' height='0.7' fill='${shade(P.stone, 0.9)}'/>`;
+};
+const doorAt = (ox, oy, x, w, h, color = P.door, glow = null) => {
+  const X = ox + x, Y = oy - h;
+  const arch = `M${fmt(X)},${fmt(oy)} L${fmt(X)},${fmt(Y + w / 2)} Q${fmt(X + w / 2)},${fmt(Y - w * 0.15)} ${fmt(X + w)},${fmt(Y + w / 2)} L${fmt(X + w)},${fmt(oy)} Z`;
+  return `<path d='${arch}' fill='${shade(P.stoneDark, 0.8)}' transform='translate(-0.6,0) scale(1)'/>` +
+    `<path d='${arch}' fill='${glow || color}'>${glow ? flicker(Math.round(x * 13)) : ''}</path>` +
+    (glow ? '' : `<line x1='${fmt(X + w / 2)}' y1='${fmt(Y + w * 0.3)}' x2='${fmt(X + w / 2)}' y2='${fmt(oy)}' stroke='${shade(color, 0.6)}' stroke-width='0.4'/>` +
+      `<circle cx='${fmt(X + w * 0.75)}' cy='${fmt(oy - h * 0.45)}' r='0.4' fill='#c9a85a'/>`);
+};
+const hangingSign = (ox, oy, x, z, color) =>
+  `<line x1='${fmt(ox + x)}' y1='${fmt(oy - z)}' x2='${fmt(ox + x + 5)}' y2='${fmt(oy - z)}' stroke='${P.iron}' stroke-width='0.6'/>` +
+  `<g><animateTransform attributeName='transform' type='rotate' values='-4 ${fmt(ox + x + 4)} ${fmt(oy - z)};4 ${fmt(ox + x + 4)} ${fmt(oy - z)};-4 ${fmt(ox + x + 4)} ${fmt(oy - z)}' dur='3.4s' repeatCount='indefinite'/>` +
+  `<rect x='${fmt(ox + x + 2)}' y='${fmt(oy - z + 0.8)}' width='4.4' height='3.4' rx='0.4' fill='${color}' stroke='${P.timber}' stroke-width='0.4'/></g>`;
+const lantern = (x, y, seed) =>
+  `<circle cx='${fmt(x)}' cy='${fmt(y)}' r='3' fill='#ffcf6a' opacity='0.25'>${flicker(seed)}</circle>` +
+  `<rect x='${fmt(x - 0.8)}' y='${fmt(y - 1)}' width='1.6' height='2' fill='#ffd77a' stroke='${P.iron}' stroke-width='0.3'/>`;
+const flag = (x, y, color) =>
+  `<line x1='${fmt(x)}' y1='${fmt(y)}' x2='${fmt(x)}' y2='${fmt(y - 9)}' stroke='${P.iron}' stroke-width='0.5'/>` +
+  `<path fill='${color}'><animate attributeName='d' dur='1.8s' repeatCount='indefinite' values='` +
+  `M${fmt(x)},${fmt(y - 9)} q3,-1 6,0 q-1,1.5 0,3 q-3,-1 -6,0 Z;` +
+  `M${fmt(x)},${fmt(y - 9)} q3,1 6,0 q1,1.5 0,3 q-3,1 -6,0 Z;` +
+  `M${fmt(x)},${fmt(y - 9)} q3,-1 6,0 q-1,1.5 0,3 q-3,-1 -6,0 Z'/></path>`;
+
+// Cast shadow on the ground: footprint extruded away from the light (back-right).
+const castShadow = (cam, x0, x1, D, H) => {
+  const dx = H * 0.55, dy = H * 0.45;
+  const g = (x, y) => cam([x, y, 0]);
+  const pts = [g(x0, 0), g(x1, 0), g(x1 + dx, dy), g(x1 + dx, D + dy), g(x0 + dx, D + dy), g(x0, D)];
+  return `<polygon points='${ptsStr(pts)}' fill='#0d0f14' opacity='0.26' filter='url(#soft)'/>`;
+};
+
+const defs =
+  `<defs><linearGradient id='ao' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#000' stop-opacity='0'/><stop offset='1' stop-color='#000' stop-opacity='0.22'/></linearGradient>` +
+  `<filter id='soft' x='-20%' y='-20%' width='140%' height='140%'><feGaussianBlur stdDeviation='0.9'/></filter></defs>`;
+const wrap = (inner) =>
+  `url("data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${SPRITE_W} ${SPRITE_H}'>${defs}${inner}</svg>`
+  )}")`;
+
+// --- building specs ------------------------------------------------------------------
+// Specs are authored at 1x; SCALE sizes every footprint relative to the 40-unit tile.
+const SCALE = 1.2;
+// roof: 'gx' ridge along x | 'gy' gable to the front | 'hip' | 'flat' | 'pyr' | 'cone' | 'dome'
+const SPEC = {
+  house: { w: 24, d: 18, h: 12, r: 9, roof: 'mix', wall: 'mix', windows: 1, chimney: 0.7 },
+  inn: { w: 34, d: 22, h: 21, r: 11, roof: 'gx', wall: 'timber', windows: 2, rows2: true, chimney: 1, sign: '#9a6a34', lantern: true },
+  tavern: { w: 32, d: 22, h: 19, r: 11, roof: 'gx', wall: 'timber', windows: 2, rows2: true, chimney: 1, sign: '#7a3a2a', lantern: true },
+  barn: { w: 34, d: 24, h: 13, r: 13, roof: 'gx', wall: 'planks', wallColor: '#7a4a32', bigDoor: true },
+  warehouse: { w: 34, d: 22, h: 14, r: 9, roof: 'gx', wall: 'planks', wallColor: P.wood, bigDoor: true, crates: true },
+  stables: { w: 34, d: 20, h: 10, r: 9, roof: 'gx', wall: 'planks', wallColor: P.wood, stalls: true },
+  blacksmith: { w: 26, d: 20, h: 12, r: 9, roof: 'gy', wall: 'stone', forge: true, chimney: 1, darkSmoke: true },
+  foundry: { w: 32, d: 22, h: 15, r: 6, roof: 'gx', wall: 'stone', wallColor: P.stoneDark, forge: true, stack: true },
+  temple: { w: 30, d: 26, h: 18, r: 12, roof: 'gy', wall: 'stone', wallColor: P.stonePale, columns: true, belfry: true },
+  shrine: { w: 18, d: 16, h: 10, r: 8, roof: 'gy', wall: 'stone', wallColor: P.stonePale, candle: true },
+  bank: { w: 30, d: 22, h: 16, r: 5, roof: 'gy', wall: 'stone', wallColor: P.stonePale, columns: true },
+  manor: { w: 36, d: 24, h: 20, r: 10, roof: 'hip', wall: 'stone', windows: 3, rows2: true, chimney: 1 },
+  townhall: { w: 36, d: 24, h: 18, r: 9, roof: 'hip', wall: 'stone', windows: 3, rows2: true, clock: true },
+  keep: { w: 26, d: 24, h: 38, roof: 'flat', wall: 'stone', crenel: true, windows: 1, slit: true, flag: '#8a2f2a' },
+  barracks: { w: 34, d: 22, h: 15, roof: 'flat', wall: 'stone', crenel: true, windows: 2, slit: true, flag: '#4f5f92' },
+  jail: { w: 28, d: 22, h: 14, roof: 'flat', wall: 'stone', wallColor: P.stoneDark, windows: 2, bars: true },
+  magetower: { round: true, rad: 10, h: 36, r: 16, roof: 'cone', wall: 'stone', glass: '#b48cff', sparkle: true },
+  alchemist: { w: 26, d: 22, h: 13, roof: 'dome', wall: 'stone', glass: '#8ff0b0', chimney: 1 },
+  apothecary: { w: 26, d: 20, h: 13, r: 9, roof: 'gx', wall: 'timber', windows: 1, sign: '#527a50', herbs: true },
+  fletcher: { w: 26, d: 20, h: 12, r: 9, roof: 'gy', wall: 'planks', wallColor: P.wood, sign: '#626c3a' },
+  tailor: { w: 26, d: 20, h: 14, r: 9, roof: 'gy', wall: 'timber', windows: 1, sign: '#86607a', awning: '#86607a' },
+  workshop: { w: 28, d: 20, h: 13, r: 8, roof: 'gx', wall: 'stone', windows: 1, gear: true, chimney: 1 },
+  guild: { w: 30, d: 22, h: 18, r: 10, roof: 'gy', wall: 'stone', windows: 2, banner: '#4f5f92' },
+  archives: { w: 30, d: 22, h: 16, r: 8, roof: 'gx', wall: 'stone', windows: 2 },
+  library: { w: 32, d: 22, h: 18, r: 10, roof: 'gx', wall: 'stone', wallColor: P.stonePale, windows: 3, tall: true },
+  shop: { w: 24, d: 18, h: 12, r: 9, roof: 'gy', wall: 'timber', awning: '#3f6f63', crates: true },
+  market: { stall: true },
+  mill: { round: true, rad: 9, h: 24, r: 10, roof: 'cone', wall: 'stone', wallColor: P.stonePale, sails: true },
+  harbormaster: { w: 30, d: 22, h: 15, r: 10, roof: 'gx', wall: 'stone', windows: 2, flag: '#3d6489' },
+  boathouse: { w: 34, d: 24, h: 12, r: 10, roof: 'gx', wall: 'planks', wallColor: P.woodDark, bigDoor: true },
+};
+
+const HOUSE_ROOFS = [P.terracotta, P.slate, P.thatch, P.shingle, P.moss];
+const HOUSE_WALLS = ['timber', 'timber', 'stone', 'plaster'];
+
+const themeTint = (theme) => ({
+  wall: theme === 'desert' ? P.adobe : null,
+  roofMix: theme === 'snow' ? [P.snow, 0.72] : theme === 'desert' ? ['#b7704a', 0.35] : null,
+});
+
+const buildingSvg = (type, seed, theme) => {
+  const r = rng(seed ^ 0x9e3779b9);
+  const sp = SPEC[type] || SPEC.house;
+  const tint = themeTint(theme);
+  const ox = 30, oy = 92; // world origin: the front-left of the footprint, centred on the tile
+  const cam = makeCam(ox, oy);
+  if (sp.stall) return marketStall(cam, ox, oy, r);
+  if (sp.round) return roundTower(cam, ox, oy, sp, type, r, tint);
+
+  const w = Math.round((sp.w + (type === 'house' ? Math.round(r() * 6) - 2 : 0)) * SCALE);
+  const D = sp.d * SCALE, H = sp.h * SCALE, R = (sp.r || 0) * SCALE;
+  const x0 = -w / 2 - 2, x1 = x0 + w;
+  let roofKind = sp.roof === 'mix' ? (r() < 0.5 ? 'gx' : 'gy') : sp.roof;
+  if (theme === 'desert' && type === 'house') roofKind = 'flat';
+  let wallStyle = sp.wall === 'mix' ? pick(r, HOUSE_WALLS) : sp.wall;
+  if (theme === 'desert' && wallStyle === 'timber') wallStyle = 'plaster'; // adobe, not half-timber
+  let wallColor = sp.wallColor || (wallStyle === 'stone' ? P.stone : wallStyle === 'timber' ? P.plaster : wallStyle === 'plaster' ? P.plasterWarm : P.wood);
+  if (tint.wall && wallStyle !== 'planks') wallColor = mixHex(wallColor, tint.wall, 0.6);
+  let roof = type === 'house' ? pick(r, HOUSE_ROOFS) : desat(ROOF[type] || P.terracotta);
+  if (tint.roofMix) roof = mixHex(roof, tint.roofMix[0], tint.roofMix[1]);
+  const glass = sp.glass || P.glass;
+
+  let s = castShadow(cam, x0, x1, D, H + R * 0.6);
+  s += box(cam, x0, x1, 0, D, 0, H, wallColor);
+  s += wallDressing(ox, oy, x0, x1, H, wallStyle, wallColor, r);
+
+  // openings on the front wall
+  const mid = (x0 + x1) / 2;
+  if (sp.forge) s += doorAt(ox, oy, mid - 4, 8, 8, P.door, '#ff8a2a');
+  else if (sp.bigDoor) {
+    s += `<rect x='${fmt(ox + mid - 6)}' y='${fmt(oy - 9)}' width='12' height='9' fill='${P.woodDark}'/>` +
+      `<path d='M${fmt(ox + mid - 6)},${fmt(oy - 9)} L${fmt(ox + mid + 6)},${fmt(oy)} M${fmt(ox + mid + 6)},${fmt(oy - 9)} L${fmt(ox + mid - 6)},${fmt(oy)}' stroke='${shade(P.wood, 1.1)}' stroke-width='0.7'/>` +
+      `<line x1='${fmt(ox + mid)}' y1='${fmt(oy - 9)}' x2='${fmt(ox + mid)}' y2='${fmt(oy)}' stroke='${P.timber}' stroke-width='0.6'/>`;
+  } else if (sp.stalls) {
+    for (let i = 0; i < 3; i++) {
+      const sx = x0 + 3 + i * ((w - 6) / 3);
+      s += `<rect x='${fmt(ox + sx)}' y='${fmt(oy - 7)}' width='${fmt((w - 6) / 3 - 2)}' height='4' fill='#2a1d14'/>` +
+        `<rect x='${fmt(ox + sx)}' y='${fmt(oy - 3.6)}' width='${fmt((w - 6) / 3 - 2)}' height='3.6' fill='${P.woodDark}'/>`;
+    }
+    s += `<ellipse cx='${fmt(ox + x1 - 1)}' cy='${fmt(oy + 1)}' rx='3.5' ry='1.8' fill='#c9a64e'/>`;
+  } else if (sp.columns) {
+    s += doorAt(ox, oy, mid - 2.5, 5, 8);
+    const n = 4;
+    for (let i = 0; i < n; i++) {
+      const cx = x0 + 2.5 + i * ((w - 5) / (n - 1));
+      s += `<rect x='${fmt(ox + cx - 1.1)}' y='${fmt(oy - H + 1)}' width='2.2' height='${fmt(H - 2.6)}' fill='${shade(P.stonePale, 1.08)}'/>` +
+        `<rect x='${fmt(ox + cx - 1.1 + 1.4)}' y='${fmt(oy - H + 1)}' width='0.8' height='${fmt(H - 2.6)}' fill='${shade(P.stonePale, 0.8)}'/>`;
+    }
+    s += `<rect x='${fmt(ox + x0 - 0.5)}' y='${fmt(oy - 1.6)}' width='${fmt(w + 1)}' height='1.6' fill='${shade(P.stonePale, 0.9)}'/>`;
+  } else {
+    const dx = sp.windows >= 2 ? mid - 2 : (r() < 0.5 ? x0 + 3 : x1 - 8);
+    s += doorAt(ox, oy, dx, 5, 7.5);
+  }
+  const nWin = sp.windows ?? 1;
+  if (nWin && !sp.columns) {
+    const rowsZ = sp.rows2 ? [3.5, H * 0.58 + 1] : [3.5];
+    for (const z of rowsZ) {
+      for (let i = 0; i < nWin + (sp.rows2 && z > 4 ? 1 : 0); i++) {
+        const count = nWin + (sp.rows2 && z > 4 ? 1 : 0);
+        const wx = x0 + (i + 0.5) * (w / count) - 1.8;
+        if (z < 4 && Math.abs(wx + 1.8 - mid) < 5 && !sp.forge && !sp.bigDoor) continue; // keep clear of the door
+        if (sp.slit) { s += `<rect x='${fmt(ox + wx + 1.2)}' y='${fmt(oy - z - 4.5 - (sp.tall ? 2 : 0))}' width='1.2' height='4.5' fill='#1e1e24'/>`; continue; }
+        s += windowAt(ox, oy, wx, z, 3.6, sp.tall ? 5.5 : 3.6, r() < 0.55, seed + i * 7 + z, glass);
+        if (sp.bars) s += `<path d='M${fmt(ox + wx + 0.9)},${fmt(oy - z - 3.6)} v3.6 M${fmt(ox + wx + 2.7)},${fmt(oy - z - 3.6)} v3.6' stroke='${P.iron}' stroke-width='0.5'/>`;
+      }
+    }
+  }
+  if (sp.awning) {
+    const ay = oy - 8.5;
+    let st = '';
+    for (let i = 0; i < 6; i++) {
+      const ax = ox + x0 + 1 + i * ((w - 2) / 6);
+      st += `<path d='M${fmt(ax)},${fmt(ay)} h${fmt((w - 2) / 6)} l1,3 h${fmt(-(w - 2) / 6)} z' fill='${i % 2 ? '#e8dcc0' : sp.awning}'/>`;
+    }
+    s += st;
+  }
+  if (sp.crates) {
+    s += box(cam, x1 + 1, x1 + 5, -5, -1, 0, 3.5, '#8a6440') + box(cam, x1 + 1.5, x1 + 4.5, -4.5, -1.5, 3.5, 6, '#9a7048');
+  }
+  if (sp.herbs) {
+    for (let i = 0; i < 3; i++) s += `<path d='M${fmt(ox + x0 + 4 + i * 2.2)},${fmt(oy - H + 1)} v2.6' stroke='#5e7d3c' stroke-width='1.1' stroke-linecap='round'/>`;
+  }
+
+  // roof
+  const roofTop = H + R;
+  if (roofKind === 'gx') s += gableX(cam, x0, x1, D, H, R, roof);
+  else if (roofKind === 'gy') s += gableY(cam, x0, x1, D, H, R, roof, wallColor);
+  else if (roofKind === 'hip') s += hip(cam, x0, x1, D, H, R, roof);
+  else if (roofKind === 'dome') {
+    s += box(cam, x0, x1, 0, D, H, H + 1.2, shade(wallColor, 0.95));
+    const c = cam([mid, D / 2, H + 1.2]);
+    const rad = Math.min(w, D) * 0.42;
+    s += `<defs><radialGradient id='dm' cx='0.35' cy='0.3' r='0.8'><stop offset='0' stop-color='${shade(roof, 1.35)}'/><stop offset='1' stop-color='${shade(roof, 0.6)}'/></radialGradient></defs>` +
+      `<path d='M${fmt(c[0] - rad)},${fmt(c[1])} A${fmt(rad)},${fmt(rad * 0.95)} 0 0 1 ${fmt(c[0] + rad)},${fmt(c[1])} Z' fill='url(#dm)'/>` +
+      `<line x1='${fmt(c[0])}' y1='${fmt(c[1] - rad * 0.95)}' x2='${fmt(c[0])}' y2='${fmt(c[1] - rad * 0.95 - 3)}' stroke='${P.gold}' stroke-width='0.7'/>`;
+  } else {
+    // flat roof with parapet
+    const top = theme === 'snow' ? P.snow : shade(wallColor, 0.9);
+    s += box(cam, x0, x1, 0, D, H, H + 0.01, top, { topRows: 0 });
+    s += box(cam, x0 - 0.5, x1 + 0.5, -0.5, 1.2, H, H + 2, wallColor);
+    if (sp.crenel) {
+      for (let x = x0; x < x1 - 1; x += 3.2) s += box(cam, x, x + 1.8, -0.5, 1.2, H + 2, H + 3.6, wallColor);
+    }
+  }
+
+  // roof furniture
+  if (sp.chimney && r() < sp.chimney && roofKind !== 'flat') {
+    const cx = x1 - 6 - r() * 4, cy = D * 0.62;
+    const zBase = H + R * 0.7;
+    s += box(cam, cx, cx + 3, cy, cy + 3, zBase - 2, zBase + 5, P.stoneDark);
+    const top = cam([cx + 1.5, cy + 1.5, zBase + 5]);
+    s += smoke(top[0], top[1] - 1, !!sp.darkSmoke, r() * 2);
+  }
+  if (sp.stack) {
+    const cx = x1 - 5;
+    s += box(cam, cx, cx + 3.5, 4, 7.5, 0, H + 16, '#6a5a50');
+    const top = cam([cx + 1.7, 5.7, H + 16]);
+    s += smoke(top[0], top[1] - 1, true, 0.3);
+  }
+  if (sp.belfry) {
+    const bx = x1 - 2;
+    s += box(cam, bx, bx + 8, D - 9, D - 1, 0, H + 14, P.stonePale);
+    s += `<rect x='${fmt(cam([bx + 2.5, D - 9, 0])[0])}' y='${fmt(cam([bx, D - 9, H + 11])[1])}' width='3' height='4' fill='#2a2620'/>`;
+    s += pyramid(cam, bx, bx + 8, D - 9, D - 1, H + 14, 9, roof);
+  }
+  if (sp.clock) {
+    const tx = mid - 4;
+    s += box(cam, tx, tx + 8, D * 0.3, D * 0.3 + 8, H, roofTop + 7, shade(wallColor, 1.02));
+    const c = cam([tx + 4, D * 0.3, roofTop + 3]);
+    s += `<circle cx='${fmt(c[0])}' cy='${fmt(c[1])}' r='2.2' fill='#efe6cc' stroke='${P.timber}' stroke-width='0.4'/>` +
+      `<line x1='${fmt(c[0])}' y1='${fmt(c[1])}' x2='${fmt(c[0])}' y2='${fmt(c[1] - 1.6)}' stroke='${P.timber}' stroke-width='0.4'/>`;
+    s += pyramid(cam, tx, tx + 8, D * 0.3, D * 0.3 + 8, roofTop + 7, 7, roof);
+  }
+  if (sp.flag) {
+    const f = cam([x0 + 3, 3, roofKind === 'flat' ? H + (sp.crenel ? 3.6 : 2) : roofTop - 2]);
+    s += flag(f[0], f[1], sp.flag);
+  }
+  if (sp.banner) {
+    s += `<rect x='${fmt(ox + mid - 2)}' y='${fmt(oy - H + 1)}' width='4' height='7' fill='${sp.banner}'/>` +
+      `<path d='M${fmt(ox + mid - 2)},${fmt(oy - H + 8)} l2,-1.4 l2,1.4' fill='${sp.banner}'/>` +
+      `<circle cx='${fmt(ox + mid)}' cy='${fmt(oy - H + 4)}' r='1' fill='${P.gold}'/>`;
+  }
+  if (sp.sign) s += hangingSign(ox, oy, x1 - 1, H * 0.62, sp.sign);
+  if (sp.lantern) s += lantern(ox + x0 + 1.5, oy - 9, seed);
+  if (sp.candle) s += lantern(ox + mid, oy - 3, seed);
+  if (sp.gear) {
+    const g = [ox + mid + 5, oy - H + 4];
+    s += `<g><animateTransform attributeName='transform' type='rotate' values='0 ${fmt(g[0])} ${fmt(g[1])};360 ${fmt(g[0])} ${fmt(g[1])}' dur='9s' repeatCount='indefinite'/>` +
+      `<circle cx='${fmt(g[0])}' cy='${fmt(g[1])}' r='2.2' fill='none' stroke='#b08a4a' stroke-width='1.2' stroke-dasharray='1 0.8'/></g>`;
+  }
+  return wrap(s);
+};
+
+const roundTower = (cam, ox, oy, sp, type, r, tint) => {
+  const rad = sp.rad * SCALE, H = sp.h * SCALE, R = sp.r * SCALE;
+  let wallColor = sp.wallColor || P.stone;
+  if (tint.wall) wallColor = mixHex(wallColor, tint.wall, 0.5);
+  let roof = desat(ROOF[type] || P.slate);
+  if (tint.roofMix) roof = mixHex(roof, tint.roofMix[0], tint.roofMix[1]);
+  const cx = -2, cy = rad;
+  let s = castShadow(cam, cx - rad, cx + rad, rad * 2, H * 0.8);
+  s += cylinder(cam, cx, cy, rad, 0, H, wallColor);
+  // courses + windows on the visible front of the cylinder
+  for (let z = 4; z < H; z += 3) {
+    const a = cam([cx - rad, cy, z]), b = cam([cx + rad, cy, z]);
+    s += `<path d='M${fmt(a[0])},${fmt(a[1] - rad * 0.55 * 0.0)} Q${fmt((a[0] + b[0]) / 2)},${fmt(a[1] + rad * 0.55)} ${fmt(b[0])},${fmt(b[1])}' stroke='${shade(wallColor, 0.7)}' stroke-width='0.35' fill='none' opacity='0.7'/>`;
+  }
+  const front = cam([cx, cy - rad, 0]);
+  s += `<path d='M${fmt(front[0] - 2.5)},${fmt(oy - rad * 0.55 + rad * 0.55 - 0.2)} v-6 q2.5,-2.5 5,0 v6 z' fill='${P.door}'/>`;
+  const glass = sp.glass || P.glass;
+  for (let z = 12; z < H - 4; z += 9) {
+    s += `<rect x='${fmt(front[0] - 1.2)}' y='${fmt(front[1] - z)}' width='2.4' height='4' rx='1.2' fill='${glass}'>${flicker(z * 31 + 7)}</rect>`;
+  }
+  s += cone(cam, cx, cy, rad + 2, H, R, roof);
+  if (sp.sparkle) {
+    const tip = cam([cx, cy, H + R]);
+    s += `<circle cx='${fmt(tip[0])}' cy='${fmt(tip[1] - 2)}' r='1.3' fill='#d9c2ff'><animate attributeName='opacity' values='0.2;1;0.2' dur='2.6s' repeatCount='indefinite'/><animate attributeName='r' values='0.8;1.8;0.8' dur='2.6s' repeatCount='indefinite'/></circle>`;
+  }
+  if (sp.sails) {
+    const hub = cam([cx, cy - rad - 1, H - 6]);
+    let blades = '';
+    for (let i = 0; i < 4; i++) {
+      blades += `<g transform='rotate(${i * 90} ${fmt(hub[0])} ${fmt(hub[1])})'>` +
+        `<line x1='${fmt(hub[0])}' y1='${fmt(hub[1])}' x2='${fmt(hub[0])}' y2='${fmt(hub[1] - 17)}' stroke='${P.woodDark}' stroke-width='0.9'/>` +
+        `<rect x='${fmt(hub[0] + 0.4)}' y='${fmt(hub[1] - 16.5)}' width='3.6' height='12' fill='#e9e0c8' stroke='${P.woodDark}' stroke-width='0.35' opacity='0.92'/></g>`;
+    }
+    s += `<g><animateTransform attributeName='transform' type='rotate' values='0 ${fmt(hub[0])} ${fmt(hub[1])};360 ${fmt(hub[0])} ${fmt(hub[1])}' dur='14s' repeatCount='indefinite'/>${blades}</g>` +
+      `<circle cx='${fmt(hub[0])}' cy='${fmt(hub[1])}' r='1.3' fill='${P.woodDark}'/>`;
+  }
+  return wrap(s);
+};
+
+const marketStall = (cam, ox, oy, r) => {
+  const colors = ['#9a3f34', '#3f6f63', '#b07a3a', '#4f5f92'];
+  const c1 = pick(r, colors);
+  let s = '';
+  const x0 = -15, x1 = 11, D = 16;
+  s += castShadow(cam, x0, x1, D, 8);
+  // counter + goods
+  s += box(cam, x0 + 1, x1 - 1, 1, 6, 0, 4.5, P.wood);
+  const goods = ['#c84a3a', '#d9a640', '#7aa04a', '#e3d6b0', '#8a5aa0'];
+  for (let i = 0; i < 6; i++) {
+    const g = cam([x0 + 3 + i * 3.7, 3.5, 4.5]);
+    s += `<ellipse cx='${fmt(g[0])}' cy='${fmt(g[1] - 0.8)}' rx='1.5' ry='1.1' fill='${pick(r, goods)}'/>`;
+  }
+  // posts
+  for (const [px, py] of [[x0, 0], [x1, 0], [x1, D], [x0, D]]) {
+    const a = cam([px, py, 0]), b = cam([px, py, 13]);
+    s += `<line x1='${fmt(a[0])}' y1='${fmt(a[1])}' x2='${fmt(b[0])}' y2='${fmt(b[1])}' stroke='${P.woodDark}' stroke-width='0.9'/>`;
+  }
+  // striped canopy (two-colour gable)
+  const v = (x, y, z) => [x, y, z];
+  const canopy = (xa, xb, col) => solid(cam, [
+    { pts: [v(xa, -2, 12), v(xb, -2, 12), v(xb, D / 2, 16), v(xa, D / 2, 16)], color: col },
+    { pts: [v(xa, D / 2, 16), v(xb, D / 2, 16), v(xb, D + 2, 12), v(xa, D + 2, 12)], color: col },
+    { pts: [v(xb, -2, 12), v(xb, D + 2, 12), v(xb, D / 2, 16)], color: col },
+    { pts: [v(xa, D + 2, 12), v(xa, -2, 12), v(xa, D / 2, 16)], color: col },
+  ], [(xa + xb) / 2, D / 2, 13]);
+  const n = 6, step = (x1 - x0 + 2) / n;
+  for (let i = 0; i < n; i++) s += canopy(x0 - 1 + i * step, x0 - 1 + (i + 1) * step, i % 2 ? '#e9dfc6' : c1);
+  // scalloped valance
+  let val = '';
+  for (let i = 0; i < n; i++) {
+    const a = cam([x0 - 1 + i * step, -2, 12]);
+    val += `<path d='M${fmt(a[0])},${fmt(a[1])} q${fmt(step / 2)},2.2 ${fmt(step)},0 z' fill='${i % 2 ? '#e9dfc6' : c1}'/>`;
+  }
+  s += val;
+  s += box(cam, x1 + 1, x1 + 5, -4, 0, 0, 3.6, '#8a6440');
+  return wrap(s);
+};
+
+// --- trees / props -------------------------------------------------------------------
+const tree = (seed, kind) => {
+  const r = rng(seed);
+  const ox = 30, oy = 92;
+  const sway = (inner) => `<g><animateTransform attributeName='transform' type='rotate' values='-1.2 ${ox} ${oy};1.4 ${ox} ${oy};-1.2 ${ox} ${oy}' dur='${(4 + r() * 3).toFixed(1)}s' begin='${(r() * 3).toFixed(1)}s' repeatCount='indefinite'/>${inner}</g>`;
+  let s = `<ellipse cx='${ox + 6}' cy='${oy - 2}' rx='12' ry='4.5' fill='#0d0f14' opacity='0.24' filter='url(#soft)'/>`;
+  if (kind === 'pine') {
+    let p = `<rect x='${ox - 1.2}' y='${oy - 8}' width='2.4' height='8' fill='${P.woodDark}'/>`;
+    const base = r() < 0.5 ? '#2f5640' : '#365e44';
+    for (let i = 0; i < 4; i++) {
+      const y = oy - 6 - i * 7, w = 11 - i * 2.3;
+      p += `<polygon points='${ox - w},${y} ${ox + w},${y} ${ox},${y - 11}' fill='${shade(base, 0.85 + i * 0.07)}'/>` +
+        `<polygon points='${ox},${y} ${ox + w},${y} ${ox},${y - 11}' fill='${shade(base, 0.65)}' opacity='0.7'/>`;
+    }
+    s += sway(p);
+    return wrap(s);
+  }
+  if (kind === 'bush') {
+    const g = r() < 0.5 ? '#4f7340' : '#5a7a44';
+    s = `<ellipse cx='${ox + 3}' cy='${oy - 2}' rx='8' ry='3' fill='#0d0f14' opacity='0.22' filter='url(#soft)'/>`;
+    s += `<circle cx='${ox - 3}' cy='${oy - 5}' r='4.5' fill='${shade(g, 0.8)}'/><circle cx='${ox + 3}' cy='${oy - 5}' r='4.5' fill='${shade(g, 0.7)}'/><circle cx='${ox}' cy='${oy - 8}' r='4.6' fill='${shade(g, 1.05)}'/>`;
+    if (r() < 0.5) s += `<circle cx='${ox - 2}' cy='${oy - 9}' r='0.8' fill='#c94a5a'/><circle cx='${ox + 2}' cy='${oy - 6}' r='0.8' fill='#c94a5a'/>`;
+    return wrap(s);
+  }
+  if (kind === 'flowers') {
+    s = '';
+    const cols = ['#e8c95a', '#d96a7a', '#f2efe6', '#9a7ad0'];
+    for (let i = 0; i < 9; i++) {
+      const x = ox - 10 + r() * 20, y = oy - 4 - r() * 12;
+      s += `<line x1='${fmt(x)}' y1='${fmt(y)}' x2='${fmt(x)}' y2='${fmt(y + 2.5)}' stroke='#4f7340' stroke-width='0.5'/><circle cx='${fmt(x)}' cy='${fmt(y)}' r='1' fill='${pick(r, cols)}'/>`;
+    }
+    return wrap(s);
+  }
+  // broadleaf
+  const g = pick(r, ['#47703e', '#4f7a42', '#56763c', '#3f6a40']);
+  let t = `<path d='M${ox - 1.6},${oy} L${ox - 1},${oy - 14} L${ox + 1},${oy - 14} L${ox + 1.8},${oy} Z' fill='${P.woodDark}'/>`;
+  const blobs = [[-6, -18, 7], [6, -18, 7], [0, -25, 8], [-3, -13, 6], [4, -13, 6]];
+  for (const [dx, dy, rr] of blobs) t += `<circle cx='${ox + dx}' cy='${oy + dy}' r='${rr}' fill='${shade(g, 0.72)}'/>`;
+  for (const [dx, dy, rr] of blobs) t += `<circle cx='${ox + dx - 1.2}' cy='${oy + dy - 1.4}' r='${rr * 0.78}' fill='${g}'/>`;
+  t += `<circle cx='${ox - 3}' cy='${oy - 27}' r='3.6' fill='${shade(g, 1.25)}' opacity='0.8'/><circle cx='${ox - 7.5}' cy='${oy - 20}' r='2.6' fill='${shade(g, 1.2)}' opacity='0.7'/>`;
+  s += sway(t);
+  return wrap(s);
+};
+
+const fountain = () => {
+  const ox = 30, oy = 90;
+  const cam = makeCam(ox, oy);
+  let s = `<ellipse cx='${ox + 3}' cy='${oy - 4}' rx='15' ry='6' fill='#0d0f14' opacity='0.2' filter='url(#soft)'/>`;
+  s += cylinder(cam, -2, 9, 12, 0, 3, P.stonePale, 16);
+  const c = cam([-2, 9, 3]);
+  s += `<ellipse cx='${fmt(c[0])}' cy='${fmt(c[1])}' rx='10.5' ry='5.6' fill='#4a7fa8'/>` +
+    `<ellipse cx='${fmt(c[0])}' cy='${fmt(c[1])}' rx='7' ry='3.4' fill='none' stroke='#cfe6f5' stroke-width='0.5' opacity='0.6'><animate attributeName='rx' values='3;10' dur='2.4s' repeatCount='indefinite'/><animate attributeName='ry' values='1.5;5.4' dur='2.4s' repeatCount='indefinite'/><animate attributeName='opacity' values='0.8;0' dur='2.4s' repeatCount='indefinite'/></ellipse>`;
+  s += cylinder(cam, -2, 9, 2, 3, 11, P.stonePale, 10);
+  const top = cam([-2, 9, 11]);
+  s += `<path d='M${fmt(top[0])},${fmt(top[1])} q-5,-6 -8,4 M${fmt(top[0])},${fmt(top[1])} q5,-6 8,4' stroke='#d8eefa' stroke-width='0.9' fill='none' opacity='0.85'><animate attributeName='opacity' values='0.5;0.95;0.5' dur='1.2s' repeatCount='indefinite'/></path>`;
+  return wrap(s);
+};
+
+// --- town walls with height ------------------------------------------------------------
+// mask: N=1 E=2 S=4 W=8 (same as townTileArt's autotiler). A post at the tile centre plus
+// an arm toward every connected neighbour, each a crenellated stone box.
+const wallSprite = (mask, keep) => {
+  const ox = 30, oy = 100; // tile spans world x -20..20, y 0..40 (front edge at the tile bottom)
+  const cam = makeCam(ox, oy, 0, 1);
+  const H = keep ? 20 : 15, t = keep ? 5 : 4;
+  const col = keep ? '#8f877a' : P.stone;
+  const cx = 0, cy = 20;
+  const parts = [];
+  // back-to-front order: N arm, W/E arms, post, S arm
+  if (mask & 1) parts.push([cx - t, cx + t, cy, 40 + 0.01]);
+  if (mask & 8) parts.push([-20, cx, cy - t, cy + t]);
+  if (mask & 2) parts.push([cx, 20, cy - t, cy + t]);
+  parts.push([cx - t - 0.6, cx + t + 0.6, cy - t - 0.6, cy + t + 0.6, true]);
+  if (mask & 4) parts.push([cx - t, cx + t, 0, cy]);
+  let s = '';
+  // shadow first
+  for (const [x0, x1, y0, y1] of parts) {
+    const g = (x, y) => cam([x, y, 0]);
+    s += `<polygon points='${ptsStr([g(x0, y0), g(x1, y0), g(x1 + H * 0.55, y0 + H * 0.45), g(x1 + H * 0.55, y1 + H * 0.45), g(x0 + H * 0.55, y1 + H * 0.45), g(x0, y1)])}' fill='#0d0f14' opacity='0.22'/>`;
+  }
+  // sort: farther (larger y) first
+  const sorted = [...parts].sort((a, b) => b[3] - a[3]);
+  for (const [x0, x1, y0, y1, post] of sorted) {
+    const h = post ? H + 2 : H;
+    s += box(cam, x0, x1, y0, y1, 0, h, col, { front: shade(col, 0.82), side: shade(col, 0.9) });
+    // crenellations along the arm's long axis
+    const alongX = (x1 - x0) > (y1 - y0);
+    if (alongX) for (let x = x0 + 0.5; x < x1 - 1; x += 3) s += box(cam, x, x + 1.6, y0, y0 + (y1 - y0) * 0.45, h, h + 1.6, col);
+    else for (let y = y1 - 2; y > y0; y -= 3) s += box(cam, x0, x0 + (x1 - x0) * 0.45, y, y + 1.6, h, h + 1.6, col);
+  }
+  return wrap(s);
+};
+
+// --- townsfolk -------------------------------------------------------------------------
+const NPC_LOOKS = [
+  { tunic: '#7a4a3a', legs: '#4a3a2e', hair: '#3a2a1e' },
+  { tunic: '#4f6a52', legs: '#3c3a34', hair: '#8a6a3a' },
+  { tunic: '#5a5f86', legs: '#3a3640', hair: '#2a2420' },
+  { tunic: '#a08a5a', legs: '#5a4a3a', hair: '#c9b48a', apron: true },
+  { tunic: '#7a3a5a', legs: '#3a2e34', hair: '#5a3a2a', dress: true },
+  { tunic: '#6a6e74', legs: '#4a4c50', helmet: true, spear: true }, // guard
+  { tunic: '#8a6a4a', legs: '#4a3a2e', hood: '#5a4a3a' },
+  { tunic: '#3f5a6a', legs: '#30343a', hair: '#1e1a18', dress: true },
+];
+export const NPC_LOOK_COUNT = NPC_LOOKS.length;
+const SKIN = ['#e8c4a0', '#c99a72', '#a0704c', '#f0d2b4', '#7a5238'];
+
+// 16 x 26 canvas, feet at y=24. `walking` adds a looping stride.
+const npcSvg = (look, skin, walking) => {
+  const L = NPC_LOOKS[look % NPC_LOOKS.length];
+  const sk = SKIN[skin % SKIN.length];
+  const stride = (dx) => walking
+    ? `<animateTransform attributeName='transform' type='translate' values='0 0;${dx} -0.6;0 0;${-dx} 0;0 0' dur='0.6s' repeatCount='indefinite'/>`
+    : '';
+  const bob = walking ? `<animateTransform attributeName='transform' type='translate' values='0 0;0 -0.7;0 0;0 -0.7;0 0' dur='0.6s' repeatCount='indefinite'/>` : '';
+  let s = `<ellipse cx='8' cy='24' rx='4.2' ry='1.4' fill='#0d0f14' opacity='0.35'/>`;
+  if (!L.dress) {
+    s += `<g>${stride(1.1)}<rect x='5.6' y='17' width='1.9' height='7' rx='0.6' fill='${L.legs}'/></g>`;
+    s += `<g>${stride(-1.1)}<rect x='8.5' y='17' width='1.9' height='7' rx='0.6' fill='${shade(L.legs, 0.8)}'/></g>`;
+  } else {
+    s += `<g>${stride(0.6)}<rect x='6' y='21' width='1.6' height='3' fill='${L.legs}'/></g><g>${stride(-0.6)}<rect x='8.4' y='21' width='1.6' height='3' fill='${shade(L.legs, 0.8)}'/></g>`;
+  }
+  let body = '';
+  if (L.dress) body += `<path d='M5,11 h6 l1.8,10.5 h-9.6 z' fill='${L.tunic}'/><path d='M8,11 h3 l1.8,10.5 h-4.8 z' fill='${shade(L.tunic, 0.78)}'/>`;
+  else body += `<rect x='4.8' y='10.5' width='6.4' height='7.5' rx='1.4' fill='${L.tunic}'/><rect x='8.4' y='10.5' width='2.8' height='7.5' rx='1' fill='${shade(L.tunic, 0.78)}'/>` +
+    `<rect x='4.8' y='16.2' width='6.4' height='1' fill='${shade(L.tunic, 0.55)}'/>`;
+  if (L.apron) body += `<rect x='6' y='12.5' width='4' height='6' fill='#e6dcc4' opacity='0.92'/>`;
+  body += `<rect x='3.6' y='11' width='1.6' height='5.6' rx='0.8' fill='${shade(L.tunic, 0.9)}'/><rect x='10.8' y='11' width='1.6' height='5.6' rx='0.8' fill='${shade(L.tunic, 0.7)}'/>`;
+  body += `<circle cx='8' cy='7.4' r='3.3' fill='${sk}'/><path d='M8.6,4.3 a3.3,3.3 0 0 1 0,6.2 a3.3,3.3 0 0 0 0,-6.2' fill='${shade(sk, 0.82)}'/>`;
+  if (L.helmet) body += `<path d='M4.5,7 a3.5,3.6 0 0 1 7,0 z' fill='#8a8e94'/><rect x='4.3' y='6.6' width='7.4' height='1' fill='#6a6e74'/>`;
+  else if (L.hood) body += `<path d='M4.3,8.5 a3.8,4.2 0 0 1 7.4,0 l-0.8,-0.6 a3,3 0 0 0 -5.8,0 z' fill='${L.hood}'/><path d='M4.4,8.6 a3.8,4.6 0 0 1 7.2,0 a3.6,2.2 0 0 0 -7.2,0' fill='${L.hood}'/>`;
+  else body += `<path d='M4.7,7.2 a3.4,3.6 0 0 1 6.6,0 q-1.4,-1.6 -3.3,-1.4 q-2,0 -3.3,1.4' fill='${L.hair}'/>`;
+  if (L.spear) body += `<line x1='12.5' y1='2' x2='12.5' y2='23' stroke='#6a5038' stroke-width='0.7'/><path d='M12.5,0.6 l1,2.2 h-2 z' fill='#b9bcc2'/>`;
+  s += `<g>${bob}${body}</g>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 26'>${s}</svg>`)}")`;
+};
+
+// --- public API (memoised) ---------------------------------------------------------------
+const _cache = new Map();
+const memo = (key, fn) => {
+  let v = _cache.get(key);
+  if (v === undefined) { v = fn(); _cache.set(key, v); }
+  return v;
+};
+
+// Building sprite for a building tile. Houses vary per coordinate; civic buildings are
+// stable per type (same as the flat art's cache keys).
+export const buildingSprite3q = (buildingType = 'house', x = 0, y = 0, theme = 'grassland') => {
+  const type = SPEC[buildingType] ? buildingType : 'house';
+  const seed = type === 'house' ? seedOf(x, y) : seedOf(type.length * 31, type.charCodeAt(0));
+  const variant = type === 'house' ? seed % 23 : 0;
+  return memo(`b|${type}|${variant}|${theme}`, () => buildingSvg(type, type === 'house' ? variant * 7919 + 13 : seed, theme));
+};
+
+const POI_KIND = { tree: 'tree', pine: 'pine', bush: 'bush', dead_bush: 'bush', flowers: 'flowers' };
+// Sprite for a decoration POI, or null when this prototype has no 3/4 art for it
+// (callers fall back to the existing emoji).
+export const poiSprite3q = (poi, x = 0, y = 0) => {
+  if (poi === 'fountain' || poi === 'well') return memo('fountain', fountain);
+  const kind = POI_KIND[poi];
+  if (!kind) return null;
+  const variant = seedOf(x, y) % 9;
+  return memo(`p|${kind}|${variant}`, () => tree(variant * 104729 + 7, kind));
+};
+
+export const wallSprite3q = (mask, keep = false) => memo(`w|${mask}|${keep ? 1 : 0}`, () => wallSprite(mask, keep));
+
+export const npcSprite3q = (look, skin, walking) => memo(`n|${look}|${skin}|${walking ? 1 : 0}`, () => npcSvg(look, skin, walking));
+
+export const BUILDING_TYPES_3Q = Object.keys(SPEC);
