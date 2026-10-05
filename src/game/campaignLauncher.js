@@ -37,11 +37,17 @@ export const mergeLocationNames = (customNames, milestones) => {
     // Town entries may be plain strings or { name, size } objects (size-tagged locations).
     const nameOf = (entry) => (typeof entry === 'string' ? entry : entry?.name || '');
 
+    // A milestone name already authored in EITHER list keeps the template's placement.
+    // getMilestoneLocationNames only guesses town vs mountain from the milestone type
+    // (item -> town, location/combat -> mountain), so checking one list alone duplicated
+    // names across both, e.g. the Grey Moors range also appearing as a town.
+    const isAuthored = (name) => [...towns, ...mountains]
+        .some(entry => nameOf(entry).toLowerCase() === name.toLowerCase());
     for (const name of milestoneNames.towns) {
-        if (!towns.some(t => nameOf(t).toLowerCase() === name.toLowerCase())) towns.push(name);
+        if (!isAuthored(name)) towns.push(name);
     }
     for (const name of milestoneNames.mountains) {
-        if (!mountains.some(m => nameOf(m).toLowerCase() === name.toLowerCase())) mountains.push(name);
+        if (!isAuthored(name)) mountains.push(name);
     }
 
     return { towns, mountains };

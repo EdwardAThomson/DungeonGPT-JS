@@ -157,6 +157,31 @@ describe('launchCampaign parity with the NewGame pipeline', () => {
   });
 });
 
+describe('mergeLocationNames', () => {
+  it('never lists one name as both a town and a mountain range', () => {
+    // Grimdark t1: Grey Moors is an authored range but hosts an item milestone (which
+    // the type heuristic files as a town); Mudhollow/Grimstead are authored towns that
+    // host location milestones (filed as mountains).
+    const template = storyTemplates.find((t) => t.id === 'grimdark-survival-t1');
+    const merged = mergeLocationNames(template.customNames, template.settings.milestones);
+    const nameOf = (e) => (typeof e === 'string' ? e : e.name).toLowerCase();
+    const towns = merged.towns.map(nameOf);
+    const mountains = merged.mountains.map(nameOf);
+    expect(towns).not.toContain('grey moors');
+    expect(mountains).toContain('grey moors');
+    expect(mountains).not.toContain('mudhollow');
+    expect(mountains).not.toContain('grimstead');
+  });
+
+  it('still adds milestone locations the template did not author', () => {
+    const merged = mergeLocationNames(
+      { towns: ['Ashford'], mountains: [] },
+      [{ location: 'Oakvale', type: 'item' }, { location: 'Iron Peaks', type: 'location' }]
+    );
+    expect(merged).toEqual({ towns: ['Ashford', 'Oakvale'], mountains: ['Iron Peaks'] });
+  });
+});
+
 describe('premium backstop', () => {
   afterEach(() => localStorage.removeItem(PREMIUM_DEV_OVERRIDE_KEY));
 
