@@ -42,11 +42,13 @@ const valueLabel = (value) => {
  * hub without closing it and is torn down when the hub closes.
  *
  * Reads its item from modal data: { item: { key, name, rarity, icon, description,
- * value, type, quantity } }.
+ * value, type, quantity }, onUse? }. `onUse`, when present, shows a Use button that
+ * closes this modal and hands off to the caller (the inventory's hero picker).
  */
 const ItemDetailModal = () => {
   const { data, close } = useModal('itemDetail');
   const item = data?.item;
+  const onUse = data?.onUse;
   if (!item) return null;
 
   const rarityColor = getRarityColor(item.rarity);
@@ -205,10 +207,19 @@ const ItemDetailModal = () => {
           {item.description || 'No further details are known about this item.'}
         </p>
 
+        {onUse && (
+          <button
+            className="primary-button"
+            onClick={() => { close(); onUse(); }}
+            style={{ marginTop: '20px', width: '100%' }}
+          >
+            Use
+          </button>
+        )}
         <button
           className="modal-close-button"
           onClick={close}
-          style={{ marginTop: '20px', width: '100%' }}
+          style={{ marginTop: onUse ? '10px' : '20px', width: '100%' }}
         >
           Close
         </button>

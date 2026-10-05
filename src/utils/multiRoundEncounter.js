@@ -144,7 +144,10 @@ export const createMultiRoundEncounter = (encounter, character, settings, llmCon
     llmConfig,
     currentRound: 1,
     maxRounds,
-    advantageDefeatThreshold: computeAdvantageDefeatThreshold(maxRounds),
+    // A rout needs momentum to fall at least 3 below where the fight STARTED. With only
+    // the absolute floor, an outmatched start (-2) against a -3 floor ended the fight as a
+    // defeat on a single failed first roll, before the party could land a blow.
+    advantageDefeatThreshold: Math.min(computeAdvantageDefeatThreshold(maxRounds), startAdvantage - 3),
     roundHistory: [],
     enemyMorale: 100, // Drops with successful player actions
     // Computed, VARYING starting lean (usually near 0, sometimes +/-) instead of a

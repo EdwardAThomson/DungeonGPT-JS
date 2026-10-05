@@ -14,6 +14,7 @@ const EncounterModal = () => {
     const onGather = data?.onGather;
     const search = data?.search; // { locationId, name }: an active location milestone here
     const onSearch = data?.onSearch;
+    const notice = data?.notice; // outcome line, e.g. a Search that re-opened this modal
 
     if (!encounter) return null;
 
@@ -66,6 +67,14 @@ const EncounterModal = () => {
                         <div style={{ textAlign: 'center', fontSize: '64px', marginBottom: '12px' }}>
                             {getLocationIcon(encounter.poiType)}
                         </div>
+                    )}
+                    {notice && (
+                        <p
+                            role="status"
+                            style={{ fontSize: '14px', lineHeight: '1.5', margin: '0 0 12px', padding: '8px 12px', borderLeft: '3px solid var(--state-success-strong)', color: 'var(--state-success-strong)' }}
+                        >
+                            {notice}
+                        </p>
                     )}
                     <p style={{ fontSize: '14px', lineHeight: '1.5', marginBottom: '12px' }}>
                         {encounter.description}

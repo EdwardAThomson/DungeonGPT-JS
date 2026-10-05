@@ -728,7 +728,23 @@ export const storyTemplates = [
                     minLevel: null
                 },
                 {
+                    // The herbs are gathered FOR the healer (milestone 1's text), so the
+                    // hand-in is its own Talk step rather than implied by the pickup.
                     id: 2,
+                    text: 'Bring the moorland herbs to the healer in Ashford',
+                    location: 'Ashford',
+                    type: 'talk',
+                    requires: [1],
+                    trigger: { npc: 'ashford_healer', action: 'talk' },
+                    spawn: { type: 'npc', id: 'ashford_healer', name: 'Mother Elspeth', location: 'Ashford',
+                             role: 'Alchemist', gender: 'Female',
+                             personality: 'weary, sharp-tongued, quietly desperate to save her village' },
+                    building: { type: 'apothecary', name: "Mother Elspeth's Apothecary", location: 'Ashford' },
+                    rewards: { xp: 25, gold: '1d6', items: [] },
+                    minLevel: null
+                },
+                {
+                    id: 3,
                     text: 'Search the abandoned well at Mudhollow for clues',
                     location: 'Mudhollow',
                     type: 'location',
@@ -740,11 +756,11 @@ export const storyTemplates = [
                     minLevel: null
                 },
                 {
-                    id: 3,
+                    id: 4,
                     text: 'Track the blight to its source in the Grimstead cellar',
                     location: 'Grimstead',
                     type: 'location',
-                    requires: [1, 2],
+                    requires: [2, 3],
                     trigger: { location: 'grimstead_cellar', action: 'visit' },
                     spawn: { type: 'poi', id: 'grimstead_cellar', name: 'Grimstead Cellar', location: 'Grimstead' },
                     building: null,
@@ -752,11 +768,11 @@ export const storyTemplates = [
                     minLevel: null
                 },
                 {
-                    id: 4,
+                    id: 5,
                     text: 'Slay the Blightspawn lurking beneath Grimstead',
                     location: 'Grimstead',
                     type: 'combat',
-                    requires: [3],
+                    requires: [4],
                     trigger: { enemy: 'blightspawn', action: 'defeat' },
                     spawn: { type: 'enemy', id: 'blightspawn', name: 'Blightspawn', location: 'Grimstead' },
                     building: null,
