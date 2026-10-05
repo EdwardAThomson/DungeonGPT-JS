@@ -85,6 +85,7 @@ export function createTownsfolk(graph, count, rand, looks = 8, skins = 5) {
       look: Math.floor(rand() * looks),
       skin: Math.floor(rand() * skins),
       facing: rand() < 0.5 ? -1 : 1,
+      dir: 's',
       route: [],
       wait: Math.floor(rand() * 4),
       inside: false,
@@ -115,12 +116,15 @@ export function stepTownsfolk(npcs, graph, rand) {
     }
     const [next, ...rest] = route;
     const facing = next.x > n.x ? 1 : next.x < n.x ? -1 : n.facing;
+    // sprite view: profile when walking east/west, back when walking north
+    const dir = next.x > n.x ? 'e' : next.x < n.x ? 'w' : next.y < n.y ? 'n' : 's';
     const arrived = rest.length === 0;
     return {
       ...n,
       x: next.x,
       y: next.y,
       facing,
+      dir,
       route: rest,
       moving: true,
       wait: arrived ? next.wait : 0,

@@ -9,7 +9,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { generateTownMap } from '../utils/townMapGenerator';
 import { tileBackground, waterwayMask, OFF_MAP, POI_EMOJI } from '../utils/townTileArt';
-import { buildingSprite3q, poiSprite3q, wallSprite3q, npcSprite3q, NPC_LOOK_COUNT, BUILDING_TYPES_3Q } from '../utils/townSprites3q';
+import { buildingSprite3q, poiSprite3q, wallSprite3q, BUILDING_TYPES_3Q } from '../utils/townSprites3q';
+import { townsfolkSprite, NPC_LOOK_COUNT, NPC_SKIN_COUNT, TOWNSFOLK_ROLES, lookForRole, FIG_W, FIG_H } from '../utils/townsfolkSprites';
 import { buildStreetGraph, createTownsfolk, stepTownsfolk } from '../game/ambientTownsfolk';
 
 const SIZES = ['hamlet', 'village', 'town', 'city'];
@@ -96,7 +97,7 @@ const Town3QTest = () => {
   const [folk, setFolk] = useState([]);
   useEffect(() => {
     randRef.current = rngFrom(seed ^ 0xabcdef);
-    setFolk(createTownsfolk(graph, npcCount, randRef.current, NPC_LOOK_COUNT, 5));
+    setFolk(createTownsfolk(graph, npcCount, randRef.current, NPC_LOOK_COUNT, NPC_SKIN_COUNT));
   }, [graph, npcCount, seed]);
   useEffect(() => {
     if (prefersReducedMotion()) return undefined;
@@ -142,16 +143,16 @@ const Town3QTest = () => {
         ))}
         {/* townsfolk */}
         {folk.map((n) => {
-          const w = T * 0.42, h = T * 0.68;
+          const w = T * 0.46, h = (w * (FIG_H + 1)) / FIG_W;
           const px = (n.x + 0.5 + n.ox) * T - w / 2;
-          const py = (n.y + 0.78 + n.oy) * T - h;
+          const py = (n.y + 0.8 + n.oy) * T - h * (31.5 / (FIG_H + 1)); // feet on the tile
           return (
             <div key={`n${n.id}`} style={{
               position: 'absolute', left: 0, top: 0, width: w, height: h, zIndex: n.y * 10 + 5, pointerEvents: 'none',
               transform: `translate(${px}px, ${py}px)`, transition: `transform ${STEP_MS}ms linear, opacity 400ms`,
               opacity: n.inside ? 0 : 1,
             }}>
-              <div style={{ width: '100%', height: '100%', backgroundImage: npcSprite3q(n.look, n.skin, n.moving), backgroundSize: '100% 100%', transform: `scaleX(${n.facing})` }} />
+              <div style={{ width: '100%', height: '100%', backgroundImage: townsfolkSprite(n.look, n.skin, n.moving ? n.dir : (n.dir === 'n' ? 's' : n.dir), n.moving), backgroundSize: '100% 100%', transform: n.dir === 'w' ? 'scaleX(-1)' : 'none' }} />
             </div>
           );
         })}
@@ -214,6 +215,21 @@ const Town3QTest = () => {
             <div key={b} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-secondary)' }}>
               <div style={{ width: 90, height: 150, backgroundImage: `${buildingSprite3q(b, 3, 7, theme)}, ${tileBackground({ type: 'grass' }, {}, 1, 1, theme)}`, backgroundSize: '100% 100%, 60px 60px', backgroundPosition: '0 0, 15px 90px', backgroundRepeat: 'no-repeat', borderRadius: 4 }} />
               {b}
+            </div>
+          ))}
+        </div>
+      </section>
+      <section style={{ marginTop: 24 }}>
+        <h3 style={heading}>Townsfolk (medieval Europe): front, profile, back, walking</h3>
+        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+          {TOWNSFOLK_ROLES.map((role, i) => (
+            <div key={role} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-secondary)' }}>
+              <div style={{ display: 'flex', gap: 2, padding: 6, borderRadius: 4, backgroundImage: tileBackground({ type: 'dirt_path' }, {}, i, 2, theme), backgroundSize: '48px 48px' }}>
+                {['s', 'e', 'n'].map((v) => (
+                  <div key={v} style={{ width: 40, height: (40 * (FIG_H + 1)) / FIG_W, backgroundImage: townsfolkSprite(lookForRole(role, i), i % NPC_SKIN_COUNT, v, true), backgroundSize: '100% 100%' }} />
+                ))}
+              </div>
+              {role}
             </div>
           ))}
         </div>

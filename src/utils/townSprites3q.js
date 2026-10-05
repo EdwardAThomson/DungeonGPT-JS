@@ -670,49 +670,7 @@ const wallSprite = (mask, keep) => {
   return wrap(s);
 };
 
-// --- townsfolk -------------------------------------------------------------------------
-const NPC_LOOKS = [
-  { tunic: '#7a4a3a', legs: '#4a3a2e', hair: '#3a2a1e' },
-  { tunic: '#4f6a52', legs: '#3c3a34', hair: '#8a6a3a' },
-  { tunic: '#5a5f86', legs: '#3a3640', hair: '#2a2420' },
-  { tunic: '#a08a5a', legs: '#5a4a3a', hair: '#c9b48a', apron: true },
-  { tunic: '#7a3a5a', legs: '#3a2e34', hair: '#5a3a2a', dress: true },
-  { tunic: '#6a6e74', legs: '#4a4c50', helmet: true, spear: true }, // guard
-  { tunic: '#8a6a4a', legs: '#4a3a2e', hood: '#5a4a3a' },
-  { tunic: '#3f5a6a', legs: '#30343a', hair: '#1e1a18', dress: true },
-];
-export const NPC_LOOK_COUNT = NPC_LOOKS.length;
-const SKIN = ['#e8c4a0', '#c99a72', '#a0704c', '#f0d2b4', '#7a5238'];
-
-// 16 x 26 canvas, feet at y=24. `walking` adds a looping stride.
-const npcSvg = (look, skin, walking) => {
-  const L = NPC_LOOKS[look % NPC_LOOKS.length];
-  const sk = SKIN[skin % SKIN.length];
-  const stride = (dx) => walking
-    ? `<animateTransform attributeName='transform' type='translate' values='0 0;${dx} -0.6;0 0;${-dx} 0;0 0' dur='0.6s' repeatCount='indefinite'/>`
-    : '';
-  const bob = walking ? `<animateTransform attributeName='transform' type='translate' values='0 0;0 -0.7;0 0;0 -0.7;0 0' dur='0.6s' repeatCount='indefinite'/>` : '';
-  let s = `<ellipse cx='8' cy='24' rx='4.2' ry='1.4' fill='#0d0f14' opacity='0.35'/>`;
-  if (!L.dress) {
-    s += `<g>${stride(1.1)}<rect x='5.6' y='17' width='1.9' height='7' rx='0.6' fill='${L.legs}'/></g>`;
-    s += `<g>${stride(-1.1)}<rect x='8.5' y='17' width='1.9' height='7' rx='0.6' fill='${shade(L.legs, 0.8)}'/></g>`;
-  } else {
-    s += `<g>${stride(0.6)}<rect x='6' y='21' width='1.6' height='3' fill='${L.legs}'/></g><g>${stride(-0.6)}<rect x='8.4' y='21' width='1.6' height='3' fill='${shade(L.legs, 0.8)}'/></g>`;
-  }
-  let body = '';
-  if (L.dress) body += `<path d='M5,11 h6 l1.8,10.5 h-9.6 z' fill='${L.tunic}'/><path d='M8,11 h3 l1.8,10.5 h-4.8 z' fill='${shade(L.tunic, 0.78)}'/>`;
-  else body += `<rect x='4.8' y='10.5' width='6.4' height='7.5' rx='1.4' fill='${L.tunic}'/><rect x='8.4' y='10.5' width='2.8' height='7.5' rx='1' fill='${shade(L.tunic, 0.78)}'/>` +
-    `<rect x='4.8' y='16.2' width='6.4' height='1' fill='${shade(L.tunic, 0.55)}'/>`;
-  if (L.apron) body += `<rect x='6' y='12.5' width='4' height='6' fill='#e6dcc4' opacity='0.92'/>`;
-  body += `<rect x='3.6' y='11' width='1.6' height='5.6' rx='0.8' fill='${shade(L.tunic, 0.9)}'/><rect x='10.8' y='11' width='1.6' height='5.6' rx='0.8' fill='${shade(L.tunic, 0.7)}'/>`;
-  body += `<circle cx='8' cy='7.4' r='3.3' fill='${sk}'/><path d='M8.6,4.3 a3.3,3.3 0 0 1 0,6.2 a3.3,3.3 0 0 0 0,-6.2' fill='${shade(sk, 0.82)}'/>`;
-  if (L.helmet) body += `<path d='M4.5,7 a3.5,3.6 0 0 1 7,0 z' fill='#8a8e94'/><rect x='4.3' y='6.6' width='7.4' height='1' fill='#6a6e74'/>`;
-  else if (L.hood) body += `<path d='M4.3,8.5 a3.8,4.2 0 0 1 7.4,0 l-0.8,-0.6 a3,3 0 0 0 -5.8,0 z' fill='${L.hood}'/><path d='M4.4,8.6 a3.8,4.6 0 0 1 7.2,0 a3.6,2.2 0 0 0 -7.2,0' fill='${L.hood}'/>`;
-  else body += `<path d='M4.7,7.2 a3.4,3.6 0 0 1 6.6,0 q-1.4,-1.6 -3.3,-1.4 q-2,0 -3.3,1.4' fill='${L.hair}'/>`;
-  if (L.spear) body += `<line x1='12.5' y1='2' x2='12.5' y2='23' stroke='#6a5038' stroke-width='0.7'/><path d='M12.5,0.6 l1,2.2 h-2 z' fill='#b9bcc2'/>`;
-  s += `<g>${bob}${body}</g>`;
-  return `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 26'>${s}</svg>`)}")`;
-};
+// Townsfolk live in townsfolkSprites.js.
 
 // --- public API (memoised) ---------------------------------------------------------------
 const _cache = new Map();
@@ -744,6 +702,5 @@ export const poiSprite3q = (poi, x = 0, y = 0) => {
 
 export const wallSprite3q = (mask, keep = false) => memo(`w|${mask}|${keep ? 1 : 0}`, () => wallSprite(mask, keep));
 
-export const npcSprite3q = (look, skin, walking) => memo(`n|${look}|${skin}|${walking ? 1 : 0}`, () => npcSvg(look, skin, walking));
 
 export const BUILDING_TYPES_3Q = Object.keys(SPEC);
