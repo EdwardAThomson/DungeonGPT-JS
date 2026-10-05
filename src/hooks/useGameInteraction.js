@@ -8,7 +8,7 @@ import { parseCheckMarker, resolveSkillCheck, formatCheckRollLine, formatCheckRe
 import { getSupportBonus } from '../utils/multiRoundEncounter';
 import { getMilestoneStatus, formatMilestonePromptText, formatSideQuestPromptText, buildLocationContext } from '../game/turnContext';
 import { formatPartyInfo } from '../game/promptComposer';
-import { embedAndStore, query as ragQuery } from '../game/ragEngine';
+import { embedAndStore, query as ragQuery, formatRagContext } from '../game/ragEngine';
 import { composeIntro, formatStartObjective } from '../game/introComposer';
 import { createLogger } from '../utils/logger';
 
@@ -21,13 +21,6 @@ const VERBOSITY_DIRECTIVE = {
   Concise: 'Keep the narration tight and brisk: roughly one short paragraph (2-3 sentences). Favour momentum and clarity over lengthy description.',
   Moderate: 'Keep the narration balanced: about two short paragraphs with a few vivid, well-chosen details.',
   Descriptive: 'Write richly and atmospherically: three or more paragraphs with strong sensory detail, mood, and texture.'
-};
-
-// Format RAG results into a prompt block (appended at end for cache-friendliness)
-const formatRagContext = (results) => {
-    if (!results || results.length === 0) return '';
-    const items = results.map((r, i) => `- ${r.text.slice(0, 300)}`).join('\n');
-    return `\n\n[RECALLED MEMORIES FROM PAST EVENTS]\n${items}`;
 };
 
 // Any stray check/roll marker outside the resolved check flow (e.g. in the authored opening,
