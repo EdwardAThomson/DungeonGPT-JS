@@ -68,7 +68,7 @@ import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, getActiv
 import { buildInSaveContinuation, applyContinuationToSettings, healPartyForNextChapter } from '../game/campaignChain';
 import ContinueLegendPicker from '../components/ContinueLegendPicker';
 import { QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
-import { embedAndStore, query as ragQuery } from '../game/ragEngine';
+import { embedAndStore, query as ragQuery, formatRagContext } from '../game/ragEngine';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { recordTurn } from '../services/telemetry';
@@ -1880,10 +1880,7 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       try {
         const tileDesc = `${tile.biome} ${tile.poi || ''} ${tile.townName || ''}`.trim();
         const ragResults = await ragQuery(sessionId, tileDesc);
-        if (ragResults.length > 0) {
-          ragContext = '\n\n[RECALLED MEMORIES FROM PAST EVENTS]\n' +
-            ragResults.map(r => `- ${r.text.slice(0, 300)}`).join('\n');
-        }
+        ragContext = formatRagContext(ragResults);
       } catch (err) {
         logger.warn('RAG query failed for look-around, continuing without:', err);
       }

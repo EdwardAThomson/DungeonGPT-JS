@@ -103,7 +103,7 @@ const RagTest = () => {
       if (ragEnabled && indexStatus.indexed > 0) {
         const results = await ragEngine.query(TEST_SESSION_ID, userMsg.content, { maxResults: 3 });
         if (results.length > 0) {
-          ragContext = '\n\n[RECALLED EVENTS]\n' + results.map(r => `- ${r.text.slice(0, 200)}`).join('\n');
+          ragContext = '\n\n[RECALLED EVENTS]\n' + results.map(r => `- ${r.text}`).join('\n');
         }
       }
 
@@ -150,7 +150,6 @@ const RagTest = () => {
     try {
       await ragEngine.backfill(TEST_SESSION_ID, msgs, {
         onProgress: (indexed, total) => setBackfillProgress({ indexed, total }),
-        batchSize: 5,
       });
     } catch (err) {
       setError('Backfill failed: ' + err.message);
