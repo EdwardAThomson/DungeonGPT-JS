@@ -251,8 +251,11 @@ export const markPathTiles = (mapData, paths) => {
     path.forEach((tile, index) => {
       const mapTile = mapData[tile.y][tile.x];
 
-      // Don't overwrite towns or other POIs
-      if (mapTile.poi !== null) {
+      // Towns keep no road state (their sprite covers the junction). Other POIs (a forest
+      // or hill the road passes through) DO record it: before 2026-10 they were skipped,
+      // which drew the road as stopping dead at the feature's edge. The renderer
+      // (roadArms) heals older maps; this keeps new ones continuous through chains.
+      if (mapTile.poi === 'town') {
         return;
       }
 

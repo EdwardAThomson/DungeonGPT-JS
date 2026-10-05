@@ -85,10 +85,13 @@ const GameMainPanel = ({
   hookChips = null,
   onHookChipAction,
   onHookChipIgnore,
-  // #84 workspace spike: 'docked' = the right-hand log pane (tools live in the rail, the
-  // quest on the map stage); onCollapse folds the pane away.
+  // #84 workspace spike: 'docked' = the right-hand log pane (tools live in the rail);
+  // onCollapse folds the pane away.
   variant,
-  onCollapse
+  onCollapse,
+  // Engine-derived suggestion chips (#91), shown above the input in the workspace log.
+  suggestions = [],
+  onSuggestion,
 }) => {
   const docked = variant === 'docked';
   // High-intent conversion prompt: fired when a guest reaches for the gated AI chat.
@@ -180,6 +183,16 @@ const GameMainPanel = ({
         )}
         {error && <p className="gm-msg message error">{error}</p>}
       </div>
+
+      {hasAdventureStarted && suggestions.length > 0 && onSuggestion && (
+        <div className="ws-chips" role="group" aria-label="Suggested actions">
+          {suggestions.map((chip) => (
+            <button type="button" key={chip.id} className={`ws-chip-action kind-${chip.kind}`} onClick={() => onSuggestion(chip)} disabled={isLoading}>
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="gm-compose">
         <form onSubmit={aiAvailable ? onSubmit : (e) => e.preventDefault()}>

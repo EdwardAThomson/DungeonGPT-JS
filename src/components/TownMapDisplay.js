@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { tileBackground, waterwayMask, OFF_MAP, POI_EMOJI } from '../utils/townTileArt';
 import { isTownTileWalkable } from '../utils/townMapGenerator';
@@ -12,7 +12,7 @@ const logger = createLogger('town-map-display');
 const TILE = 34; // bigger than the original 30 but small enough that a 20x20 town fits a laptop
 // How close (Manhattan tiles) the party must be to identify and enter a building. 3, not 2:
 // a keep sits behind its own wall, so 2 could leave it out of reach from every open tile.
-const INSPECT_RANGE = 3;
+export const INSPECT_RANGE = 3;
 
 // Decoration / POI overlay emoji live in townTileArt (the art module) so the live
 // renderer, the tileset gallery, and themed towns share one source of truth.
@@ -28,9 +28,18 @@ const INSPECT_RANGE = 3;
  * @param {string} townError - Error message to display in town map
  * @param {Function} markBuildingDiscovered - Callback to mark a building as seen
  */
-const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError, markBuildingDiscovered, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, sideQuests, onAcceptSideQuest, onTurnInQuest, milestones, onTalkToNpc, onVisitTavern }) => {
+const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown, showLeaveButton = true, firstHero, townError, markBuildingDiscovered, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, sideQuests, onAcceptSideQuest, onTurnInQuest, milestones, onTalkToNpc, onVisitTavern, buildingRequest = null, onBuildingRequestHandled }) => {
   const [selectedBuilding, setSelectedBuilding] = useState(null);
   const [distanceWarning, setDistanceWarning] = useState(false);
+  // A suggested-action walk (#91) asks for a building to open once the party arrives.
+  // handleBuildingClick is defined below the early return, so reach it through a ref.
+  const buildingClickRef = useRef(null);
+  useEffect(() => {
+    if (!buildingRequest) return;
+    const tile = townMapData?.mapData?.[buildingRequest.y]?.[buildingRequest.x];
+    if (tile && buildingClickRef.current) buildingClickRef.current({ ...tile, x: buildingRequest.x, y: buildingRequest.y });
+    if (onBuildingRequestHandled) onBuildingRequestHandled();
+  }, [buildingRequest?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!townMapData) return null;
 
@@ -119,6 +128,8 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
       setDistanceWarning(true);
     }
   };
+
+  buildingClickRef.current = handleBuildingClick;
 
   return (
     <div>

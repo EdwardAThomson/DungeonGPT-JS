@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
+import SettingsContext from '../contexts/SettingsContext';
 import { getStepHint, formatStepProgress, isQuestReadyToTurnIn } from '../game/questHints';
 import { useModal } from '../contexts/ModalContext';
 import ModalShell from './ModalShell';
@@ -36,7 +37,7 @@ const TABS = [
   { id: 'quests', label: 'Side Quests' },
   { id: 'codex', label: 'Codex' },
   { id: 'party', label: 'Inventory' },
-  { id: 'ai', label: 'AI' }
+  { id: 'ai', label: 'Settings' }
 ];
 
 // Normalize legacy milestone arrays (plain strings) for display.
@@ -46,6 +47,20 @@ const normalizeMilestones = (milestones) => {
     return milestones;
   }
   return milestones.map((text, index) => ({ id: index + 1, text, completed: false, location: null }));
+};
+
+// Per-viewer display options (Settings tab), kept in the browser, not the save.
+const DisplaySettings = () => {
+  const { showMapGrid, setShowMapGrid } = useContext(SettingsContext);
+  return (
+    <div style={{ marginBottom: '20px', background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+      <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>Display</h4>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: 'var(--text)', textTransform: 'none', letterSpacing: 'normal', fontFamily: 'var(--font-ui, inherit)', fontSize: '0.95rem', fontWeight: 500 }}>
+        <input type="checkbox" checked={showMapGrid} onChange={(e) => setShowMapGrid(e.target.checked)} />
+        Show gridlines on the world map
+      </label>
+    </div>
+  );
 };
 
 const CampaignTab = ({ settings, onContinueLegend }) => (
@@ -335,6 +350,7 @@ const AdventureBook = ({
             onHeroUpdate={onHeroUpdate}
           />
         )}
+        {activeTab === 'ai' && <DisplaySettings />}
         {activeTab === 'ai' && (
           <AiEngineSettings
             selectedProvider={selectedProvider}

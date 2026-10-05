@@ -1065,7 +1065,6 @@ body:has(.gm-page) .app-footer { display: none; }
 [data-theme='redesign'] .ws-rail-btn:disabled { opacity: .35; background: transparent; }
 
 [data-theme='redesign'] .ws-stage { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: radial-gradient(ellipse at center, #15131c 0%, var(--ground) 75%); }
-[data-theme='redesign'] .ws-quest { display: flex; align-items: baseline; gap: .7rem; margin: .8rem 1rem 0; padding: .55rem .9rem; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); border-left: 3px solid var(--gold); background: color-mix(in srgb, var(--gold) 6%, var(--surface)); font-size: .95rem; color: var(--text); }
 [data-theme='redesign'] .ws-stage-map { position: relative; flex: 1; min-height: 0; }
 [data-theme='redesign'] .ws-map { position: absolute; inset: 0; display: flex; flex-direction: column; }
 [data-theme='redesign'] .ws-map-bar { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; padding: .6rem 1rem 0; }
@@ -1115,3 +1114,13 @@ body:has(.gm-page) .app-footer { display: none; }
   [data-theme='redesign'] .ws-party { bottom: .6rem; }
 }
 [data-theme='redesign'] .ws-fit-world { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; }
+
+/* #91 suggested actions: chips above the input + a ring on travel destinations */
+[data-theme='redesign'] .ws-chips { display: flex; flex-wrap: wrap; gap: .45rem; margin: 0 0 .7rem; }
+[data-theme='redesign'] .ws-chip-action { min-height: 0; padding: .45rem .8rem; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent); background: color-mix(in srgb, var(--gold) 8%, var(--surface)); box-shadow: none; color: var(--text); font-family: var(--font-ui); font-size: .88rem; font-weight: 600; letter-spacing: normal; text-transform: none; text-align: left; cursor: pointer; }
+[data-theme='redesign'] .ws-chip-action:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); filter: none; }
+[data-theme='redesign'] .ws-chip-action.kind-travel::before { content: '\2192\00a0'; color: var(--gold); }
+[data-theme='redesign'] .ws-chip-action:disabled { opacity: .45; background: var(--surface); color: var(--muted); }
+.ws-suggest-ring { position: absolute; inset: 3px; z-index: 2; border: 2px dashed #ecb44f; border-radius: 6px; pointer-events: none; animation: wsSuggest 2.4s ease-in-out infinite; }
+@keyframes wsSuggest { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ws-suggest-ring { animation: none; } }

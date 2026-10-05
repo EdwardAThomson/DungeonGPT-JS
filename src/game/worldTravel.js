@@ -3,9 +3,10 @@
 // world move (encounters roll per tile exactly as for a manual click), so batching the
 // clicks never batches away the risk. This module only plans the route.
 
-// Pause per tile while auto-travelling. ~750ms read as walking in the July mock (420ms
-// read as teleporting); the workspace offers a 2x control on top.
-export const TRAVEL_STEP_MS = 750;
+// Time per tile while auto-travelling. The marker glides over the same duration, so the
+// party walks continuously. 750ms with a jumping marker read as too fast (maintainer
+// 2026-10-03); the workspace offers a 2x control on top.
+export const TRAVEL_STEP_MS = 1100;
 
 // Same adjacency as a manual move (isAdjacentWorldMove): 8 directions.
 const STEPS = [

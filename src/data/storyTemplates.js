@@ -62,7 +62,10 @@ export const storyTemplates = [
                     type: 'talk',
                     requires: [],
                     trigger: { npc: 'militia_captain', action: 'talk' },
-                    spawn: { type: 'npc', id: 'militia_captain', name: 'Captain Ulric', location: 'Briarwood', role: 'Guard', gender: 'Male', personality: 'gruff, practical, protective of his people' },
+                    // role = the NPC stat template (npcGenerator ROLES); title = how the story names him.
+                    spawn: { type: 'npc', id: 'militia_captain', name: 'Captain Ulric', location: 'Briarwood', role: 'Guard', title: 'militia captain', gender: 'Male', personality: 'gruff, practical, protective of his people' },
+                    // Authored meeting scene: the no-AI Talk text, and a brief for the AI.
+                    meetingText: '"So you\'re the ones the farmers keep talking about." Ulric looks the party over, unimpressed and not hiding it. "Here is where things stand. The raids come at night, always out of the Greenridge Hills, and the goblins are gone before my patrols arrive. My militia can hold the roads and guard the farms, but I can\'t spare a single spear to go hunting in those hills." He jabs a finger at a worn map of the valley pinned above the muster table. "Find their den. Bring me something I can march on, and the militia will back you when it comes to the fight."',
                     building: { type: 'barracks', name: 'Briarwood Militia Hall', location: 'Briarwood' },
                     rewards: { xp: 25, gold: '1d6', items: ['rations'] },
                     minLevel: null
@@ -169,7 +172,7 @@ export const storyTemplates = [
                     type: 'talk',
                     requires: [],
                     trigger: { npc: 'thornfield_guard_captain', action: 'talk' },
-                    spawn: { type: 'npc', id: 'thornfield_guard_captain', name: 'Captain Aldric', location: 'Thornfield', role: 'Guard', personality: 'proud, honorable, skeptical of outsiders' },
+                    spawn: { type: 'npc', id: 'thornfield_guard_captain', name: 'Captain Aldric', location: 'Thornfield', role: 'Guard', title: 'captain of the guard', personality: 'proud, honorable, skeptical of outsiders' },
                     building: { type: 'barracks', name: 'Thornfield Guard Barracks', location: 'Thornfield' },
                     rewards: { xp: 150, gold: '1d20', items: ['quest_key'] },
                     minLevel: null
@@ -503,7 +506,7 @@ export const storyTemplates = [
                     type: 'talk',
                     requires: [],
                     trigger: { npc: 'frost_warden', action: 'talk' },
-                    spawn: { type: 'npc', id: 'frost_warden', name: 'Warden Sigrun', location: 'Frosthollow', role: 'Guard', personality: 'weathered, taciturn, knows every drift and crevasse of the frozen pass' },
+                    spawn: { type: 'npc', id: 'frost_warden', name: 'Warden Sigrun', location: 'Frosthollow', role: 'Guard', title: 'warden of the pass', personality: 'weathered, taciturn, knows every drift and crevasse of the frozen pass' },
                     building: { type: 'inn', name: 'The Frosthollow Lodge', location: 'Frosthollow' },
                     rewards: { xp: 25, gold: '1d6', items: ['rations'] },
                     minLevel: null

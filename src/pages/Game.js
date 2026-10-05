@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState, useRef } from 'react';
+import React, { useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from '../contexts/AuthContext';
@@ -39,6 +39,8 @@ import {
   trackAreaVisits
 } from '../game/worldMoveController';
 import { planTravelRoute, TRAVEL_STEP_MS } from '../game/worldTravel';
+import { getSuggestedActions } from '../game/suggestedActions';
+import { INSPECT_RANGE } from '../components/TownMapDisplay';
 import {
   ageNarrativeHook,
   applyEncounterOutcomeToParty,
@@ -1047,8 +1049,10 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       return;
     }
 
-    // A new click cancels the in-progress walk and starts fresh from the current position.
+    // A new click cancels the in-progress walk and starts fresh from the current position
+    // (including a suggested-action walk to the gate: the player changed their mind).
     if (walkCancelRef.current) walkCancelRef.current();
+    pendingTravelRef.current = null;
     walkCancelRef.current = runTileWalk({
       path,
       stepIntervalMs: TILE_STEP_MS,
@@ -1907,14 +1911,15 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
 
     // Meeting beat — canonical identity from the milestone; the placed NPC fills gaps.
     const name = milestone.spawn?.name || npc?.name || 'the contact';
-    const role = milestone.spawn?.role || npc?.job || npc?.title || null;
+    // The story's display title ("militia captain") beats the stat role ("Guard").
+    const role = milestone.spawn?.title || milestone.spawn?.role || npc?.job || npc?.title || null;
     const personality = milestone.spawn?.personality || npc?.personality || null;
     const buildingName = milestone.building?.name || null;
     const townName = mapHook.currentTownTile?.townName || milestone.location || null;
 
     // No-AI path (guests, or master toggle off): deterministic templated line.
     if (!aiAvailable || !aiNarrativeEnabled) {
-      const text = composeNpcMeeting({ name, role, building: buildingName, townName, personality, worldSeed });
+      const text = composeNpcMeeting({ name, role, building: buildingName, townName, personality, worldSeed, meetingText: milestone.meetingText || null });
       if (text) interactionHook.setConversation(prev => [...prev, { role: 'ai', content: text }]);
       return;
     }
@@ -1927,6 +1932,7 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       buildingName,
       townName,
       milestoneText: milestone.text,
+      meetingText: milestone.meetingText || null,
       settings,
       selectedHeroes,
       currentSummary: interactionHook.currentSummary
@@ -2251,7 +2257,7 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     return t?.townName || (t?.mountainName && t.isFirstMountainInRange ? t.mountainName : null) || `(${x}, ${y})`;
   };
 
-  const startTravel = (x, y) => {
+  const startTravel = (x, y, label = null) => {
     if (popupOpen()) return;
     const from = mapHook.playerPosition;
     const path = planTravelRoute(mapHook.worldMap, from, { x, y });
@@ -2261,7 +2267,7 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     }
     if (path.length === 0) { handleMoveOnWorldMap(x, y); return; }
     setResumeTravel(null);
-    setTravel({ path, dest: { x, y }, label: placeLabel(x, y) });
+    setTravel({ path, dest: { x, y }, label: label || placeLabel(x, y) });
   };
 
   // World clicks in the workspace: adjacent = one ordinary move; farther = auto-travel;
@@ -2274,6 +2280,133 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     startTravel(x, y);
   };
 
+  // --- Suggested actions (#91, docs/SUGGESTED_ACTIONS_PLAN.md) ---
+  // Engine-derived chips above the input. A click logs a "You" line, then runs the action.
+  const [buildingRequest, setBuildingRequest] = useState(null); // { x, y, nonce }: open on arrival
+  const pendingTravelRef = useRef(null); // travel queued behind leaving a town
+  // Same rule as handleLeaveTown: the gate tile or the tile just right of it.
+  const atTownGate = (pos, entry) => !!pos && !!entry && pos.y === entry.y && (pos.x === entry.x || pos.x === entry.x + 1);
+  const suggestions = useMemo(() => {
+    if (!isWorkspace || !hasAdventureStarted) return [];
+    return getSuggestedActions({
+      mapLevel: mapHook.currentMapLevel,
+      worldMap: mapHook.worldMap,
+      playerPosition: mapHook.playerPosition,
+      townMap: mapHook.currentTownMap?.mapData,
+      townName: mapHook.isInsideTown ? mapHook.currentTownMap?.townName || mapHook.currentTownTile?.townName : null,
+      townPosition: mapHook.townPlayerPosition,
+      milestones: settings?.milestones,
+      sideQuests: settings?.sideQuests,
+      party: selectedHeroes,
+      hookWaiting: !!pendingLookEncounter,
+    });
+  }, [isWorkspace, hasAdventureStarted, mapHook.currentMapLevel, mapHook.worldMap, mapHook.playerPosition, mapHook.currentTownMap, mapHook.isInsideTown, mapHook.currentTownTile, mapHook.townPlayerPosition, settings?.milestones, settings?.sideQuests, selectedHeroes, pendingLookEncounter]);
+  const suggestedTravelTargets = useMemo(
+    () => suggestions.filter((c) => c.kind === 'travel').map((c) => c.target),
+    [suggestions]
+  );
+
+  // Walk toward a town building, then ask TownMapDisplay to open it. Some buildings are
+  // boxed in (walls, water, neighbours), so aim for the reachable tile nearest the
+  // building within inspect range, which is where a click on it works from anyway.
+  const walkToBuilding = ({ x, y }) => {
+    const townMap = mapHook.currentTownMap;
+    const start = mapHook.townPlayerPosition;
+    if (!townMap || !start) return;
+    const dist = (a) => Math.abs(a.x - x) + Math.abs(a.y - y);
+    const open = () => setBuildingRequest({ x, y, nonce: Date.now() });
+    if (dist(start) <= 1) { open(); return; }
+    let best = null;
+    let bestDist = Infinity;
+    for (let dy = -INSPECT_RANGE; dy <= INSPECT_RANGE; dy++) {
+      for (let dx = -INSPECT_RANGE; dx <= INSPECT_RANGE; dx++) {
+        const goal = { x: x + dx, y: y + dy };
+        const d = dist(goal);
+        if (d === 0 || d > INSPECT_RANGE || d > bestDist) continue;
+        const tile = townMap.mapData?.[goal.y]?.[goal.x];
+        if (!tile || !isTownTileWalkable(tile)) continue;
+        const path = (goal.x === start.x && goal.y === start.y) ? [] : computeWalkPath(townMap.mapData, start, goal, isTownTileWalkable);
+        const reachable = path.length > 0 || (goal.x === start.x && goal.y === start.y);
+        if (!reachable) continue;
+        if (d < bestDist || (d === bestDist && path.length < best.length)) { best = path; bestDist = d; }
+      }
+    }
+    if (best && best.length === 0) { open(); return; }
+    if (!best) { mapHook.setTownError('You cannot reach that building.'); return; }
+    if (walkCancelRef.current) walkCancelRef.current();
+    walkCancelRef.current = runTileWalk({
+      path: best,
+      stepIntervalMs: TILE_STEP_MS,
+      onEnterTile: (pos, index) => {
+        const result = runTownStep(pos, index);
+        if (result !== 'halt' && index === best.length - 1) open();
+        return result;
+      },
+    });
+  };
+
+  const runSuggestedAction = (chip) => {
+    if (!chip || interactionHook.isLoading || popupOpen()) return;
+    const { setConversation } = interactionHook;
+    const youLine = { role: 'user', content: chip.label };
+    // Enter/leave town write the log from a snapshot, so hand them one that already has
+    // the "You" line instead of appending it separately (it would be overwritten).
+    const withYou = [...interactionHook.conversation, youLine];
+    if (chip.kind === 'enter') { mapHook.handleEnterCurrentTown(setConversation, withYou); return; }
+    if (chip.kind === 'travel' && mapHook.currentMapLevel !== 'world') {
+      // Leaving only works from the gate: walk there first, then leave, then set off.
+      pendingTravelRef.current = { ...chip.target, label: chip.label.replace(/^(Travel to|Return to|Head for) /, ''), leaving: true };
+      const townMap = mapHook.currentTownMap;
+      const start = mapHook.townPlayerPosition;
+      if (!townMap?.entryPoint || !start || atTownGate(start, townMap.entryPoint)) {
+        pendingTravelRef.current.leaving = false;
+        mapHook.handleLeaveTown(setConversation, withYou);
+        return;
+      }
+      setConversation((prev) => [...prev, youLine]);
+      const path = computeWalkPath(townMap.mapData, start, townMap.entryPoint, isTownTileWalkable);
+      if (!path.length) {
+        pendingTravelRef.current = null;
+        mapHook.setTownError('You cannot reach the town gate from here.');
+        return;
+      }
+      if (walkCancelRef.current) walkCancelRef.current();
+      walkCancelRef.current = runTileWalk({
+        path,
+        stepIntervalMs: TILE_STEP_MS,
+        onEnterTile: (pos, index) => {
+          const result = runTownStep(pos, index);
+          if (result === 'halt') pendingTravelRef.current = null; // an encounter stopped the walk
+          return result;
+        },
+      });
+      return;
+    }
+    setConversation((prev) => [...prev, youLine]);
+    if (chip.kind === 'look') { handleLookAround(); return; }
+    if (chip.kind === 'walk') { walkToBuilding(chip.target); return; }
+    if (chip.kind === 'travel') {
+      startTravel(chip.target.x, chip.target.y, chip.label.replace(/^(Travel to|Return to|Head for) /, ''));
+    }
+  };
+
+  // The gate walk for a travel chip has arrived: leave town (fresh closures here).
+  useEffect(() => {
+    const queued = pendingTravelRef.current;
+    if (!queued?.leaving || !mapHook.isInsideTown || !mapHook.currentTownMap?.entryPoint) return;
+    if (!atTownGate(mapHook.townPlayerPosition, mapHook.currentTownMap.entryPoint)) return;
+    queued.leaving = false;
+    mapHook.handleLeaveTown(interactionHook.setConversation, interactionHook.conversation);
+  }, [mapHook.townPlayerPosition]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A travel chip used inside a town leaves first; set off once back on the world map.
+  useEffect(() => {
+    const queued = pendingTravelRef.current;
+    if (!queued || queued.leaving || mapHook.currentMapLevel !== 'world') return;
+    pendingTravelRef.current = null;
+    startTravel(queued.x, queued.y, queued.label);
+  }, [mapHook.currentMapLevel]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Walk the route one tile per step. Each step is a full move (encounters roll per tile);
   // intermediate tiles pass through (no arrival prompt), the last one arrives normally.
   // The effect re-runs after every step with fresh closures (position/map changed).
@@ -2284,12 +2417,14 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       const [next, ...rest] = travel.path;
       const status = await handleMoveOnWorldMap(next.x, next.y, { passThrough: rest.length > 0 });
       if (status === 'moved' && rest.length > 0) {
-        setTravel({ ...travel, path: rest });
+        setTravel({ ...travel, path: rest, moving: true });
         return;
       }
       setTravel(null);
       if (status === 'interrupted' && rest.length > 0) setResumeTravel({ dest: travel.dest, label: travel.label });
-    }, Math.round(TRAVEL_STEP_MS / travelSpeed));
+      // Each move commits at the end of its wait and the marker then glides for one step
+      // duration, so the first step goes almost at once instead of idling a full step.
+    }, travel.moving ? Math.round(TRAVEL_STEP_MS / travelSpeed) : 120);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [travel, interactionHook.isLoading, mapHook.playerPosition, travelSpeed, modalStack.length]);
@@ -2394,9 +2529,6 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
         )}
         {isWorkspace && (
           <section className="ws-stage" aria-label="Map">
-            {settings.campaignGoal && (
-              <div className="ws-quest"><span className="gm-quest-label">Quest</span><span>{settings.campaignGoal}</span></div>
-            )}
             <div className="ws-stage-map" ref={setStageEl} />
             {(travel || (resumeTravel && modalStack.length === 0)) && (
               <div className="ws-travel" role="status">
@@ -2435,6 +2567,8 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
         <GameMainPanel
           variant={isWorkspace ? 'docked' : undefined}
           onCollapse={isWorkspace ? () => setLogCollapsed(true) : undefined}
+          suggestions={suggestions}
+          onSuggestion={isWorkspace ? runSuggestedAction : undefined}
           campaignGoal={settings.campaignGoal}
           partyLeadName={selectedHeroes?.[0]?.heroName || selectedHeroes?.[0]?.characterName || null}
           templateName={settings?.templateName || null}
@@ -2533,6 +2667,10 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       <GameModals
         mapDockTarget={isWorkspace ? stageEl : null}
         onWorldTileClick={isWorkspace ? handleWorkspaceWorldClick : null}
+        suggestedTravelTargets={isWorkspace ? suggestedTravelTargets : null}
+        mapGlideMs={isWorkspace ? Math.round(TRAVEL_STEP_MS / travelSpeed) : null}
+        buildingRequest={isWorkspace ? buildingRequest : null}
+        onBuildingRequestHandled={() => setBuildingRequest(null)}
         onContinueLegend={() => {
           closeAdventureBook();
           setLegendPicker({ open: true, celebrate: false });

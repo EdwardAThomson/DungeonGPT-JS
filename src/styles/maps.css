@@ -330,3 +330,19 @@
     display: none;
   }
 }
+
+/* #84 workspace: the gliding party marker eases its beach offset instead of snapping. */
+.world-map-glide .player-marker-portrait { transition: transform 400ms ease; }
+
+/* World-map gridlines: one overlay over the whole grid (sized per tile inline), drawn on
+ * top of the art instead of as tile borders, so tile edges never bleed (see .map-tile).
+ * Toggled per viewer in the Adventure Book's Settings tab. */
+.world-map-gridlines {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(20, 16, 10, 0.28) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(20, 16, 10, 0.28) 1px, transparent 1px);
+}

@@ -44,6 +44,10 @@ const GameModals = ({
   handleMoveOnWorldMap,
   // #84 workspace spike: dock the map into this element, and route world clicks here.
   mapDockTarget = null,
+  suggestedTravelTargets = null,
+  mapGlideMs = null,
+  buildingRequest = null,
+  onBuildingRequestHandled,
   onWorldTileClick = null,
   interactionHook,
   currentTile,
@@ -140,6 +144,10 @@ const GameModals = ({
         playerPosition={mapHook.playerPosition}
         onTileClick={onWorldTileClick || handleMoveOnWorldMap}
         dockTarget={mapDockTarget}
+        suggestedTravelTargets={suggestedTravelTargets}
+        glideMs={mapGlideMs}
+        buildingRequest={buildingRequest}
+        onBuildingRequestHandled={onBuildingRequestHandled}
         firstHero={selectedHeroes && selectedHeroes.length > 0 ? selectedHeroes[0] : null}
         mapLevel={mapHook.currentMapLevel}
         townMapData={mapHook.currentTownMap}

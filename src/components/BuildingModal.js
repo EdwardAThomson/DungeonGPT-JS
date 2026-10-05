@@ -396,7 +396,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                                             return (
                                                                 <button
                                                                     className="primary-button quest-talk-button"
-                                                                    onClick={() => onTalkToNpc(npc.milestoneNpcId, npc)}
+                                                                    onClick={() => { onTalkToNpc(npc.milestoneNpcId, npc); onClose(); }}
                                                                     style={{ padding: '4px 12px', fontWeight: 'bold', fontSize: '12px' }}
                                                                     title={talkMs.text}
                                                                 >
@@ -504,7 +504,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                         <button
                                             key={m.id}
                                             className="primary-button quest-talk-button"
-                                            onClick={() => onTalkToNpc(m.trigger.npc, null)}
+                                            onClick={() => { onTalkToNpc(m.trigger.npc, null); onClose(); }}
                                             title={m.text}
                                             style={{ width: '100%', padding: '12px', fontWeight: 'bold', letterSpacing: '1px' }}
                                         >

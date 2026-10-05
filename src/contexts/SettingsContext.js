@@ -20,7 +20,15 @@ const SettingsContext = createContext({
   setIsSettingsModalOpen: () => { },
   theme: 'dark-fantasy',
   setTheme: () => { },
+  showMapGrid: true,
+  setShowMapGrid: () => { },
 });
+
+// Per-viewer display preference: storage can be blocked (private windows), so every
+// read/write is guarded and the default (gridlines on) stands in.
+const readMapGrid = () => {
+  try { return localStorage.getItem('dgpt:showMapGrid') !== 'false'; } catch (e) { return true; }
+};
 
 export const SettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState({});
@@ -30,6 +38,11 @@ export const SettingsProvider = ({ children }) => {
   const [assistantModel, setAssistantModel] = useState(defaultModel);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark-fantasy');
+  const [showMapGrid, setShowMapGridState] = useState(readMapGrid);
+  const setShowMapGrid = (on) => {
+    setShowMapGridState(on);
+    try { localStorage.setItem('dgpt:showMapGrid', on ? 'true' : 'false'); } catch (e) { /* in-memory only */ }
+  };
 
   const updateTheme = (newTheme) => {
     setTheme(newTheme);
@@ -51,7 +64,9 @@ export const SettingsProvider = ({ children }) => {
       isSettingsModalOpen,
       setIsSettingsModalOpen,
       theme,
-      setTheme: updateTheme
+      setTheme: updateTheme,
+      showMapGrid,
+      setShowMapGrid
     }}>
       {children}
     </SettingsContext.Provider>

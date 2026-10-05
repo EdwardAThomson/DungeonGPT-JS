@@ -31,7 +31,7 @@ const FitWorld = ({ mapData, render }) => {
     return <div ref={ref} className="ws-fit-world">{render(tile)}</div>;
 };
 
-const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered, visibleMilestonePois, activeMilestonePois, revealedSiteTypes, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, siteMapData, sitePlayerPosition, onSiteTileClick, onAttackSiteMob, onLeaveSite, siteError, siteNotice, partyLevel, sideQuests, onAcceptSideQuest, onTurnInQuest, milestones, onTalkToNpc, onVisitTavern, dockTarget = null }) => {
+const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, firstHero, mapLevel, townMapData, townPlayerPosition, onLeaveTown, onTownTileClick, currentTile, onEnterCurrentTown, isInsideTown, hasAdventureStarted, townError, markBuildingDiscovered, visibleMilestonePois, activeMilestonePois, revealedSiteTypes, onQuestItemFound, onRest, onResurrect, onBuy, onSell, party, siteMapData, sitePlayerPosition, onSiteTileClick, onAttackSiteMob, onLeaveSite, siteError, siteNotice, partyLevel, sideQuests, onAcceptSideQuest, onTurnInQuest, milestones, onTalkToNpc, onVisitTavern, dockTarget = null, suggestedTravelTargets = null, glideMs = null, buildingRequest = null, onBuildingRequestHandled }) => {
     // Docked (#84 workspace spike): render into the page's map stage instead of a modal.
     const docked = !!dockTarget;
     const previousFocusRef = useRef(null);
@@ -63,7 +63,7 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
         const mapView = viewLevel === 'world' ? null : viewLevel === 'site' ? (
             <SiteMapDisplay siteMapData={siteMapData} playerPosition={sitePlayerPosition} onTileClick={onSiteTileClick} onAttackMob={onAttackSiteMob} onLeaveSite={onLeaveSite} showLeaveButton={false} firstHero={firstHero} siteError={siteError} siteNotice={siteNotice} partyLevel={partyLevel} />
         ) : (
-            <TownMapDisplay townMapData={townMapData} playerPosition={townPlayerPosition} onLeaveTown={onLeaveTown} onTileClick={onTownTileClick} firstHero={firstHero} townError={townError} showLeaveButton={false} markBuildingDiscovered={markBuildingDiscovered} onQuestItemFound={onQuestItemFound} onRest={onRest} onResurrect={onResurrect} onBuy={onBuy} onSell={onSell} party={party} sideQuests={sideQuests} onAcceptSideQuest={onAcceptSideQuest} onTurnInQuest={onTurnInQuest} milestones={milestones} onTalkToNpc={onTalkToNpc} onVisitTavern={onVisitTavern} />
+            <TownMapDisplay townMapData={townMapData} playerPosition={townPlayerPosition} onLeaveTown={onLeaveTown} onTileClick={onTownTileClick} firstHero={firstHero} townError={townError} showLeaveButton={false} markBuildingDiscovered={markBuildingDiscovered} onQuestItemFound={onQuestItemFound} onRest={onRest} onResurrect={onResurrect} onBuy={onBuy} onSell={onSell} party={party} sideQuests={sideQuests} onAcceptSideQuest={onAcceptSideQuest} onTurnInQuest={onTurnInQuest} milestones={milestones} onTalkToNpc={onTalkToNpc} onVisitTavern={onVisitTavern} buildingRequest={buildingRequest} onBuildingRequestHandled={onBuildingRequestHandled} />
         );
         return (
             <div className="ws-map">
@@ -98,6 +98,8 @@ const MapModal = ({ isOpen, onClose, mapData, playerPosition, onTileClick, first
                                     activeMilestonePois={activeMilestonePois}
                                     revealedSiteTypes={revealedSiteTypes}
                                     tileSizeOverride={tile}
+                                    suggestedTargets={suggestedTravelTargets}
+                                    glideMs={glideMs}
                                 />
                             )}
                         />

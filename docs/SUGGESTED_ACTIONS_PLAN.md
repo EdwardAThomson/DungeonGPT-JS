@@ -1,6 +1,7 @@
 # Suggested actions: engine-derived action chips for the workspace (#91)
 
-Status: **Planned, 2026-10-03. Not built.** Part of the #84 workspace (see
+Status: **Phase 1 built in the spike, 2026-10-03** (`src/game/suggestedActions.js`, wired into the
+workspace only). Rule 8 (leave a cleared site) is not built yet; the rest of the table is. Part of the #84 workspace (see
 [MAP_LAYOUT_PLAN.md](MAP_LAYOUT_PLAN.md)); the spike lives at `/workspace-debug` on branch
 `feat/workspace-spike`. The landing mockup (`game.html`) showed suggestion chips above the
 input, such as "Take the west road to Briarwood", which auto-walked the party there. This
