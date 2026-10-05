@@ -57,24 +57,25 @@ const weightedRandom = (table) => {
   return table[table.length - 1];
 };
 
+// Tiles the party only PASSES THROUGH during auto-travel (#84) roll the biome and
+// environmental encounters at this fraction of the normal chance; the destination tile
+// keeps full odds. The base rates were tuned for one click per tile, and a multi-tile
+// journey made fights feel near-constant. Tunable: see src/game/travelOdds.js for the
+// per-journey numbers each value gives.
+export const PASS_THROUGH_ENCOUNTER_MULTIPLIER = 0.5;
+
 /**
- * Check if an encounter should happen on this tile.
- * 
- * @param {Object} tile - The map tile the player moved to
- * @param {boolean} isFirstVisit - Whether this is the first time visiting this tile
- * @param {Object} settings - Game settings (for grimness modifier)
- * @param {number} movesSinceLastEncounter - Moves since last encounter occurred
- * @returns {boolean} Whether an encounter should trigger
+ * The chance (0..0.70) that the biome encounter roll fires on this tile. Pure: shared by
+ * shouldTriggerEncounter and the journey-odds calculator (travelOdds.js).
  */
-export const shouldTriggerEncounter = (tile, isFirstVisit, settings, movesSinceLastEncounter = 0) => {
+export const biomeTriggerChance = (tile, isFirstVisit, settings, movesSinceLastEncounter = 0) => {
   const biome = getEncounterBiome(tile);
 
   // No encounters on water
-  if (biome === 'water') return false;
+  if (biome === 'water') return 0;
 
   // Get base chance for this biome
   let chance = biomeEncounterChance[biome] || 0.25;
-  const baseChance = chance;
 
   // Reduce chance on revisited tiles
   if (!isFirstVisit) {
@@ -107,7 +108,24 @@ export const shouldTriggerEncounter = (tile, isFirstVisit, settings, movesSinceL
   }
 
   // Cap at 70% — always some chance of peaceful travel
-  chance = Math.min(chance, 0.70);
+  return Math.min(chance, 0.70);
+};
+
+/**
+ * Check if an encounter should happen on this tile.
+ *
+ * @param {Object} tile - The map tile the player moved to
+ * @param {boolean} isFirstVisit - Whether this is the first time visiting this tile
+ * @param {Object} settings - Game settings (for grimness modifier)
+ * @param {number} movesSinceLastEncounter - Moves since last encounter occurred
+ * @param {number} [chanceMultiplier=1] - Scales the chance (pass-through travel tiles)
+ * @returns {boolean} Whether an encounter should trigger
+ */
+export const shouldTriggerEncounter = (tile, isFirstVisit, settings, movesSinceLastEncounter = 0, chanceMultiplier = 1) => {
+  const biome = getEncounterBiome(tile);
+  const isTown = biome === 'town';
+  const baseChance = biomeEncounterChance[biome] || 0.25;
+  const chance = biomeTriggerChance(tile, isFirstVisit, settings, movesSinceLastEncounter) * chanceMultiplier;
 
   const roll = Math.random();
   logger.debug('[ENCOUNTER DEBUG] shouldTriggerEncounter calc:', {
@@ -194,11 +212,10 @@ export const rollRandomEncounter = (tile, settings) => {
  *   weather/sky hazards. Defaults to false so open-air and world-map rolls are unchanged.
  * @returns {Object|null} The environmental encounter or null
  */
-export const rollEnvironmentalEncounter = (tile, settings, options = {}) => {
-  const { enclosedInterior = false } = options;
+/** The chance that the environmental roll fires on this tile (before its 'none' entries). */
+export const environmentalTriggerChance = (tile, settings) => {
   const biome = getEncounterBiome(tile);
   const chance = environmentalEncounterChance[biome] || 0.10;
-  
   // Apply grimness modifier
   const grimnessModifier = {
     'Noble': 0.7,
@@ -206,8 +223,14 @@ export const rollEnvironmentalEncounter = (tile, settings, options = {}) => {
     'Dark': 1.3,
     'Grimdark': 1.5
   };
-  const adjustedChance = chance * (grimnessModifier[settings?.grimnessLevel] || 1.0);
-  
+  return chance * (grimnessModifier[settings?.grimnessLevel] || 1.0);
+};
+
+export const rollEnvironmentalEncounter = (tile, settings, options = {}) => {
+  const { enclosedInterior = false, chanceMultiplier = 1 } = options;
+  const biome = getEncounterBiome(tile);
+  const adjustedChance = environmentalTriggerChance(tile, settings) * chanceMultiplier;
+
   if (Math.random() > adjustedChance) return null;
 
   // Determine the current climate from the campaign theme (primary) then the
@@ -445,7 +468,7 @@ export const checkForEncounter = (tile, isFirstVisit, settings, movesSinceLastEn
   }
   
   // Fall back to regular biome encounters
-  const willTrigger = shouldTriggerEncounter(tile, isFirstVisit, settings, movesSinceLastEncounter);
+  const willTrigger = shouldTriggerEncounter(tile, isFirstVisit, settings, movesSinceLastEncounter, options.chanceMultiplier ?? 1);
   logger.debug('[ENCOUNTER DEBUG] shouldTriggerEncounter result:', willTrigger);
   
   if (!willTrigger) {
