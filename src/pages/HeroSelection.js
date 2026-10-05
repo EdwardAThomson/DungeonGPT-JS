@@ -264,6 +264,7 @@ const HeroSelection = () => {
         <div className="wrap">
           {levelWarningBanner}
 
+          <div className="party-layout">
           <ul className="roster-grid party-grid">
             {heroes.map((hero) => {
               const isSelected = selectedHeroes.some(h => h.heroId === hero.heroId);
@@ -329,14 +330,20 @@ const HeroSelection = () => {
               </li>
             ))}
 
-            <li className="roster-card roster-new">
+          </ul>
+
+          {/* Create-a-hero lives in its own right-hand column (sticky on desktop, above
+              the grid on phones), so it never ends up below a long roster. */}
+          <aside className="party-create" aria-label="Create a new hero">
+            <div className="roster-card roster-new">
               <button type="button" onClick={handleCreateHero}>
                 <span className="plus" aria-hidden="true">+</span>
                 <span>Create a hero</span>
                 <small>Your party is kept while you're away</small>
               </button>
-            </li>
-          </ul>
+            </div>
+          </aside>
+          </div>
         </div>
       </section>
 

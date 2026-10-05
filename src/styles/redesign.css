@@ -596,6 +596,31 @@
 [data-theme='redesign'] .rd-app .pick-ready { letter-spacing: normal; text-transform: none; display: flex; flex-direction: column; flex: 1; width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; }
 [data-theme='redesign'] .rd-app .pick-ready:disabled { cursor: default; }
 
+/* Hero selection: the roster grid centred in the main column, create-a-hero in a sticky
+   right column so it is always in view (it used to sit after the last card, off-screen). */
+[data-theme='redesign'] .rd-app .party-layout { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 1.6rem; align-items: start; }
+/* Flex, not grid: a partial last row centres too, and cards keep one width. */
+[data-theme='redesign'] .rd-app .party-layout .party-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; }
+[data-theme='redesign'] .rd-app .party-layout .party-grid > li { flex: 0 0 240px; box-sizing: border-box; }
+/* Wider page than the site's 1120px so four full-width cards fit beside the create
+   column; narrower windows drop to three per row (centred) instead of shrinking cards. */
+[data-theme='redesign'] .rd-app.party-page { --wrap: 1340px; }
+[data-theme='redesign'] .rd-app .party-create { position: sticky; top: calc(69px + 1.2rem); }
+[data-theme='redesign'] .rd-app .party-create .roster-new { border-color: color-mix(in srgb, var(--gold) 60%, transparent); background: color-mix(in srgb, var(--gold) 5%, transparent); }
+[data-theme='redesign'] .rd-app .party-create .roster-new button { min-height: 18rem; color: var(--text); }
+[data-theme='redesign'] .rd-app .party-create .roster-new .plus { color: var(--gold); }
+@media (max-width: 900px) {
+  [data-theme='redesign'] .rd-app .party-layout { grid-template-columns: 1fr; gap: 1rem; }
+  [data-theme='redesign'] .rd-app .party-create { position: static; order: -1; }
+  [data-theme='redesign'] .rd-app .party-create .roster-new button { min-height: 0; flex-direction: row; padding: .8rem 1rem; }
+  [data-theme='redesign'] .rd-app .party-create .roster-new .plus { width: 36px; height: 36px; font-size: 1.3rem; }
+  [data-theme='redesign'] .rd-app .party-create .roster-new small { display: none; }
+}
+@media (max-width: 720px) {
+  [data-theme='redesign'] .rd-app .party-layout .party-grid { gap: .8rem; }
+  [data-theme='redesign'] .rd-app .party-layout .party-grid > li { flex: 0 0 calc(50% - .4rem); }
+}
+
 /* fixed, not sticky: the mobile shell sets overflow-x: hidden on .App, which disables sticky */
 [data-theme='redesign'] .rd-app .party-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; border-top: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); background: color-mix(in srgb, var(--ground) 92%, transparent); backdrop-filter: blur(10px); }
 [data-theme='redesign'] .rd-app .party-dock-inner { display: flex; align-items: center; gap: 1rem; padding-block: .8rem; }
