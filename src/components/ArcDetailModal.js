@@ -20,6 +20,7 @@
 
 import React from 'react';
 import { isOpeningAccessible } from '../game/campaignChain';
+import { scaleMilestoneXP } from '../game/xpScaling';
 
 const MILESTONE_TYPE_LABEL = {
     item: 'Find',
@@ -147,8 +148,9 @@ const ArcDetailModal = ({
     // Total XP across the chapter's milestones and their encounters.
     let totalXp = 0;
     for (const m of ms) {
-        if (m.rewards?.xp) totalXp += m.rewards.xp;
-        if (m.encounter?.rewards?.xp) totalXp += m.encounter.rewards.xp;
+        // Tier-scaled, matching what the game awards (xpScaling.js).
+        if (m.rewards?.xp) totalXp += scaleMilestoneXP(m.rewards.xp, t);
+        if (m.encounter?.rewards?.xp) totalXp += scaleMilestoneXP(m.encounter.rewards.xp, t);
     }
 
     return (
@@ -228,7 +230,7 @@ const ArcDetailModal = ({
                                                     <small>
                                                         {m.location || ''}
                                                         {m.requires?.length > 0 ? `${m.location ? ' · ' : ''}after #${m.requires.join(', #')}` : ''}
-                                                        {m.rewards ? `${m.location || m.requires?.length ? ' · ' : ''}${m.rewards.xp} XP, ${m.rewards.gold} gold` : ''}
+                                                        {m.rewards ? `${m.location || m.requires?.length ? ' · ' : ''}${scaleMilestoneXP(m.rewards.xp, t)} XP, ${m.rewards.gold} gold` : ''}
                                                     </small>
                                                 </span>
                                             </li>

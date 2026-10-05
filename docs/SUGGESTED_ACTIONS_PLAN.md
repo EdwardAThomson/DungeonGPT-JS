@@ -39,6 +39,22 @@ chips never spoil an unrevealed POI.
 | 7 | The party is hurt and the current town has an inn | Rest at the inn | town walk to the inn, then `onRest` |
 | 8 | Inside a site that is cleared | Leave the cave | `onLeaveSite` |
 
+### Levelling nudges (added 2026-10-05)
+
+With one-click travel a player can finish a campaign far below the next chapter's level,
+so two more rules steer them toward XP without ever blocking the main quest:
+
+| When | Chip | Click does |
+|---|---|---|
+| The party (effective level) is below a step's recommended level: its `minLevel`, else the top of the campaign `levelRange` for a boss | "Travel to X (level N recommended)", plus "Hunt in the forest/hills/mountains" | travel; the hunt goes to the nearest unexplored wild tile, where encounter odds are full |
+| Inside a town, under the active side-quest cap, a building offers a quest the party can take | "Ask for work at The Crooked Pint" | town walk, then the building opens |
+
+Alongside, XP now scales by campaign tier where it is granted (`src/game/xpScaling.js`):
+milestones and their bosses x2 (tier 1) / x3 (tiers 2-3); random fights and side quests
+x1 / x1.5 / x2. Measured on the built-in campaigns: a tier-1 main path alone ends at level
+2 and a thorough run at level 3 (the tier-2 start); a tier-2 main path alone ends at level
+4 and a thorough run at the top of its range.
+
 Ties: the current milestone beats side quests; nearer beats farther. The set is recomputed on
 every move and engine event, so a chip disappears once it no longer applies (arriving,
 completing, entering).
