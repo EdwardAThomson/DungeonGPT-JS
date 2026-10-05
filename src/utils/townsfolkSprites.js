@@ -34,7 +34,8 @@ const WOOL = {
   leather: '#6a4a2e', straw: '#d1b26a', steel: '#9aa0a6', crimson: '#7d2430', blue: '#2f4a7a',
   forest: '#2f5a3c', fur: '#d8cdb8', gold: '#b89a48', murrey: '#6a2f4a',
 };
-const SKINS = ['#efcfae', '#e2b590', '#c9966c', '#a8744e', '#f3dcc4'];
+// Fair to sun-weathered complexions of medieval European townsfolk.
+const SKINS = ['#f3d9c0', '#ecc8a6', '#e4ba95', '#f7e3d0', '#dcae88'];
 const HAIR = ['#3a2a1e', '#6a4a2a', '#9a7040', '#c9a86a', '#2a2420', '#8a3a22', '#bdb7ad'];
 
 // --- roles -----------------------------------------------------------------------
@@ -50,13 +51,16 @@ const ROLES = {
     garment: 'tunic', hem: 24, coat: [WOOL.oatmeal, WOOL.green, WOOL.brown][v % 3], hose: WOOL.brown,
     belt: WOOL.leather, head: 'straw', prop: v % 2 ? 'hoe' : null,
   }),
+  // Women: kirtle laced at the front, hair dressed and visible under a small linen cap
+  // or kerchief (married) or a steeple hennin (a gentlewoman, 15th c.).
   goodwife: (v) => ({
-    garment: 'gown', hem: 29.4, coat: [WOOL.woad, WOOL.madder, WOOL.green, WOOL.russet][v % 4],
-    apron: WOOL.linen, head: 'coif', headColor: WOOL.linen, prop: v % 2 ? 'basket' : null,
+    female: true, garment: 'gown', hem: 29.4, coat: [WOOL.woad, WOOL.madder, WOOL.green, WOOL.russet][v % 4],
+    apron: WOOL.linen, lacing: true, head: 'cap', headColor: WOOL.linen, braid: true, prop: v % 2 ? 'basket' : null,
   }),
   matron: (v) => ({
-    garment: 'gown', hem: 29.4, coat: [WOOL.brown, WOOL.grey, WOOL.woad][v % 3], belt: WOOL.leather,
-    head: 'wimple', headColor: WOOL.linen, prop: v % 3 === 1 ? 'jug' : null,
+    female: true, garment: 'gown', hem: 29.4, coat: [WOOL.brown, WOOL.grey, WOOL.woad][v % 3], belt: WOOL.leather,
+    lacing: true, shawl: [WOOL.oatmeal, WOOL.russet, WOOL.green][v % 3],
+    head: 'kerchief', headColor: [WOOL.madder, WOOL.weld, WOOL.woad][v % 3], hairTone: [1, 5, 2][v % 3], prop: v % 3 === 1 ? 'jug' : null,
   }),
   labourer: (v) => ({
     garment: 'tunic', hem: 23.5, coat: [WOOL.oatmeal, WOOL.grey, WOOL.russet][v % 3], hose: WOOL.brown,
@@ -75,8 +79,9 @@ const ROLES = {
     belt: WOOL.black, head: 'roundlet', headColor: [WOOL.black, WOOL.crimson, WOOL.murrey, WOOL.blue][(v + 1) % 4], purse: true,
   }),
   lady: (v) => ({
-    garment: 'gown', hem: 29.8, coat: [WOOL.blue, WOOL.forest, WOOL.crimson][v % 3], trim: WOOL.gold,
-    belt: WOOL.gold, head: 'veil', headColor: WOOL.linen, hangingSleeves: true,
+    female: true, garment: 'gown', hem: 29.8, coat: [WOOL.blue, WOOL.forest, WOOL.crimson][v % 3], trim: WOOL.fur,
+    belt: WOOL.gold, highWaist: true, squareNeck: true, head: 'hennin', headColor: [WOOL.crimson, WOOL.black, WOOL.gold][v % 3],
+    hangingSleeves: true,
   }),
   child: (v) => ({
     child: true, garment: 'tunic', hem: 24.5, coat: [WOOL.oatmeal, WOOL.russet, WOOL.weld, WOOL.green][v % 4],
@@ -109,7 +114,7 @@ const figure = (p, view, walking, skinIdx, hairIdx) => {
   gid = 0;
   const defs = [];
   const sk = SKINS[skinIdx % SKINS.length];
-  const hair = HAIR[hairIdx % HAIR.length];
+  const hair = HAIR[(p.hairTone ?? hairIdx) % HAIR.length];
   const side = view === 'e';
   const back = view === 'n';
   const cx = 10;
@@ -183,7 +188,8 @@ const figure = (p, view, walking, skinIdx, hairIdx) => {
 
   // --- torso
   const tW = side ? 2.5 : 3.4;
-  const torso = `M${f1(cx - tW)},${waistY + 0.2} L${f1(cx - tW - 0.2)},13.2 Q${f1(cx - tW)},11.9 ${cx},11.7 Q${f1(cx + tW)},11.9 ${f1(cx + tW + 0.2)},13.2 L${f1(cx + tW)},${waistY + 0.2} Z`;
+  const tWaist = p.female ? tW - (side ? 0.4 : 0.8) : tW; // fitted kirtle bodice
+  const torso = `M${f1(cx - tWaist)},${waistY + 0.2} L${f1(cx - tW - 0.2)},13.2 Q${f1(cx - tW)},11.9 ${cx},11.7 Q${f1(cx + tW)},11.9 ${f1(cx + tW + 0.2)},13.2 L${f1(cx + tWaist)},${waistY + 0.2} Z`;
   if (p.mail) {
     s += `<path d='${torso}' fill='${grad(defs, WOOL.steel)}' ${ol(WOOL.steel)}/>`;
     // surcoat over the mail
@@ -197,10 +203,25 @@ const figure = (p, view, walking, skinIdx, hairIdx) => {
     s += `<path d='M${f1(bx - bw)},13.6 h${f1(bw * 2)} l${side ? 0.3 : 0.9},${f1(hem - 15)} q0,1 -1,1 h${f1(-(bw * 2) + (side ? 0.4 : 0.2))} q-1,0 -1,-1 z' fill='${grad(defs, '#8a6440')}' ${ol('#8a6440')}/>` +
       (side ? '' : `<path d='M${f1(bx - bw)},13.6 L${cx - 1.4},11.9 M${f1(bx + bw)},13.6 L${cx + 1.4},11.9' stroke='#5a4028' stroke-width='0.45'/>`);
   }
-  if (p.trim && !side) s += `<path d='M${cx - 2.2},12 Q${cx},13.6 ${cx + 2.2},12' stroke='${p.trim}' stroke-width='0.9' fill='none'/>`;
+  if (p.squareNeck && !side && !back) {
+    s += `<path d='M${cx - 2},12 v1.9 h4 v-1.9' fill='${shade(SKINS[skinIdx % SKINS.length], 0.97)}' stroke='${p.trim || WOOL.gold}' stroke-width='0.7'/>`;
+  } else if (p.trim && !side) s += `<path d='M${cx - 2.2},12 Q${cx},13.6 ${cx + 2.2},12' stroke='${p.trim}' stroke-width='0.9' fill='none'/>`;
+  if (p.lacing && !back && !side) {
+    // front-laced kirtle: a linen shift shows at the neck, cord criss-crosses the bodice
+    s += `<path d='M${cx - 1.3},11.9 Q${cx},12.9 ${cx + 1.3},11.9' fill='${WOOL.linen}' stroke='${shade(WOOL.linen, 0.6)}' stroke-width='0.3'/>` +
+      `<path d='M${cx - 0.5},13 L${cx + 0.5},14 L${cx - 0.5},15 L${cx + 0.5},16 L${cx - 0.5},17 M${cx + 0.5},13 L${cx - 0.5},14 L${cx + 0.5},15 L${cx - 0.5},16 L${cx + 0.5},17' stroke='${shade(p.coat, 0.45)}' stroke-width='0.3' fill='none'/>`;
+  }
   if (p.belt) {
-    s += `<rect x='${f1(cx - tW - 0.1)}' y='${waistY - 0.6}' width='${f1(tW * 2 + 0.2)}' height='1' fill='${p.belt}'/>`;
-    if (!back && !side) s += `<rect x='${cx - 0.5}' y='${waistY - 0.75}' width='1' height='1.3' fill='#b8a060'/>`;
+    const by = p.highWaist ? 14.9 : waistY - 0.6;
+    const bw = p.highWaist ? tW - 0.2 : tWaist;
+    s += `<rect x='${f1(cx - bw - 0.1)}' y='${by}' width='${f1(bw * 2 + 0.2)}' height='${p.highWaist ? 1.4 : 1}' fill='${p.belt}'/>`;
+    if (!back && !side && !p.highWaist) s += `<rect x='${cx - 0.5}' y='${waistY - 0.75}' width='1' height='1.3' fill='#b8a060'/>`;
+  }
+  if (p.shawl) {
+    const sf = grad(defs, p.shawl);
+    if (back) s += `<path d='M${f1(cx - tW - 0.6)},12.4 Q${cx},11.4 ${f1(cx + tW + 0.6)},12.4 L${cx},17 Z' fill='${sf}' ${ol(p.shawl)}/>`;
+    else if (side) s += `<path d='M${f1(cx - tW - 0.4)},12.2 Q${cx},11.6 ${f1(cx + tW + 0.4)},12.4 L${f1(cx + tW)},14.6 Q${cx},15.4 ${f1(cx - tW - 0.2)},15 Z' fill='${sf}' ${ol(p.shawl)}/>`;
+    else s += `<path d='M${f1(cx - tW - 0.6)},12.3 Q${cx},11.3 ${f1(cx + tW + 0.6)},12.3 L${f1(cx + tW - 0.6)},14.4 L${cx},15.6 L${f1(cx - tW + 0.6)},14.4 Z' fill='${sf}' ${ol(p.shawl)}/>`;
   }
   if (p.rope) {
     s += `<rect x='${f1(cx - tW)}' y='${waistY - 0.5}' width='${f1(tW * 2)}' height='0.7' fill='${p.rope}'/>`;
@@ -233,6 +254,18 @@ const figure = (p, view, walking, skinIdx, hairIdx) => {
   const hx = side ? cx + 0.5 : cx;
   const hy = 8.2;
   s += `<rect x='${cx - 0.8}' y='10.6' width='1.6' height='1.6' fill='${shade(sk, 0.85)}'/>`;
+  if (p.female && p.head !== 'hennin') {
+    // dressed hair framing the face (drawn behind it): coiled over the ears in front,
+    // a braid down the back for the cap-wearers
+    const hf = grad(defs, hair);
+    if (!back) s += `<ellipse cx='${f1(hx - (side ? 0.6 : 0))}' cy='${f1(hy + 0.3)}' rx='${side ? 3.2 : 3.6}' ry='3.6' fill='${hf}' ${ol(hair)}/>`;
+    if (p.braid && (back || side)) {
+      const bx = back ? hx : hx - 2.6;
+      let br = `<path d='M${f1(bx - 0.75)},${f1(hy + 1)} L${f1(bx + 0.75)},${f1(hy + 1)} L${f1(bx + 0.5)},17.2 Q${f1(bx)},17.9 ${f1(bx - 0.5)},17.2 Z' fill='${hf}' ${ol(hair)}/>`;
+      for (let y = hy + 2.2; y < 17; y += 1.3) br += `<path d='M${f1(bx - 0.6)},${f1(y)} q0.6,0.6 1.2,0' stroke='${shade(hair, 0.55)}' stroke-width='0.3' fill='none'/>`;
+      s += br + `<rect x='${f1(bx - 0.5)}' y='16.6' width='1' height='0.5' fill='${WOOL.madder}'/>`;
+    }
+  }
   s += `<circle cx='${f1(hx)}' cy='${hy}' r='3' fill='${skinFill}' ${ol(sk)}/>`;
   if (side) s += `<path d='M${f1(hx + 2.8)},${f1(hy - 0.2)} q0.9,0.5 0.1,1.2' fill='${sk}' stroke='${shade(sk, 0.45)}' stroke-width='0.35'/>`;
   if (!back) {
@@ -267,6 +300,47 @@ const figure = (p, view, walking, skinIdx, hairIdx) => {
       if (back) s += `<path d='M${f1(hx - 3.4)},${f1(hy)} A3.4,3.5 0 0 1 ${f1(hx + 3.4)},${f1(hy)} L${f1(hx + 3.8)},${p.head === 'wimple' ? 14.6 : f1(hy + 3)} L${f1(hx - 3.8)},${p.head === 'wimple' ? 14.6 : f1(hy + 3)} Z' fill='${lf}' ${ol(hc)}/>`;
       else if (side) s += `<path d='M${f1(hx + 1.4)},${f1(hy - 3)} A3.4,3.4 0 0 0 ${f1(hx - 3.3)},${f1(hy + 1)} L${f1(hx - 3.6)},${p.head === 'wimple' ? 14 : f1(hy + 3)} L${f1(hx - 1)},${f1(hy + 3)} Q${f1(hx - 0.4)},${f1(hy - 1.4)} ${f1(hx + 1.6)},${f1(hy - 2.2)} Z' fill='${lf}' ${ol(hc)}/>`;
       else s += `<path d='M${f1(hx - 3.4)},${f1(hy + 2.6)} A3.5,3.7 0 1 1 ${f1(hx + 3.4)},${f1(hy + 2.6)} L${f1(hx + 2.5)},${f1(hy + 1.2)} Q${f1(hx)},${f1(hy - 3.6)} ${f1(hx - 2.5)},${f1(hy + 1.2)} Z' fill='${lf}' ${ol(hc)}/>`;
+      break;
+    }
+    case 'cap':
+    case 'kerchief': {
+      // centre-parted hair on top, then a small linen cap on the crown (goodwife) or a
+      // kerchief tied at the nape with its tails hanging (matron)
+      const hf = grad(defs, hair);
+      if (back) s += `<circle cx='${f1(hx)}' cy='${f1(hy)}' r='3.1' fill='${hf}' ${ol(hair)}/>`;
+      else if (side) s += hairSide;
+      else s += `<path d='M${f1(hx - 3.1)},${f1(hy + 0.6)} Q${f1(hx - 3)},${f1(hy - 3.2)} ${f1(hx)},${f1(hy - 3.1)} Q${f1(hx + 3)},${f1(hy - 3.2)} ${f1(hx + 3.1)},${f1(hy + 0.6)} Q${f1(hx + 2.2)},${f1(hy - 1.6)} ${f1(hx + 0.15)},${f1(hy - 2.1)} L${f1(hx - 0.15)},${f1(hy - 2.1)} Q${f1(hx - 2.2)},${f1(hy - 1.6)} ${f1(hx - 3.1)},${f1(hy + 0.6)} Z' fill='${hf}' ${ol(hair)}/>`;
+      const cf = grad(defs, hc);
+      if (p.head === 'cap') {
+        // linen cap set back on the crown, ties under the hair
+        if (back) s += `<path d='M${f1(hx - 2.9)},${f1(hy - 0.6)} A2.9,2.7 0 0 1 ${f1(hx + 2.9)},${f1(hy - 0.6)} Q${f1(hx)},${f1(hy + 0.6)} ${f1(hx - 2.9)},${f1(hy - 0.6)} Z' fill='${cf}' ${ol(hc)}/>`;
+        else if (side) s += `<path d='M${f1(hx - 3.1)},${f1(hy + 0.4)} A3.1,3 0 0 1 ${f1(hx + 1.2)},${f1(hy - 3)} Q${f1(hx - 0.6)},${f1(hy - 1.2)} ${f1(hx - 1.4)},${f1(hy + 0.8)} Z' fill='${cf}' ${ol(hc)}/>`;
+        else s += `<path d='M${f1(hx - 2.6)},${f1(hy - 2)} Q${f1(hx)},${f1(hy - 4.3)} ${f1(hx + 2.6)},${f1(hy - 2)} Q${f1(hx)},${f1(hy - 2.9)} ${f1(hx - 2.6)},${f1(hy - 2)} Z' fill='${cf}' ${ol(hc)}/>`;
+      } else {
+        // kerchief: covers crown and back of the head, hairline shows in front, knot at the nape
+        if (back) s += `<path d='M${f1(hx - 3.3)},${f1(hy + 0.8)} A3.3,3.4 0 0 1 ${f1(hx + 3.3)},${f1(hy + 0.8)} L${f1(hx)},${f1(hy + 3.4)} Z' fill='${cf}' ${ol(hc)}/>` +
+          `<path d='M${f1(hx - 0.3)},${f1(hy + 2.8)} l-1.2,2.6 l1,0.2 z M${f1(hx + 0.3)},${f1(hy + 2.8)} l1.2,2.6 l-1,0.2 z' fill='${shade(hc, 0.9)}' ${ol(hc)}/>`;
+        else if (side) s += `<path d='M${f1(hx - 3.3)},${f1(hy + 1.6)} A3.3,3.3 0 0 1 ${f1(hx + 1.6)},${f1(hy - 3)} L${f1(hx + 1)},${f1(hy - 1.6)} Q${f1(hx - 1.2)},${f1(hy - 1)} ${f1(hx - 1.6)},${f1(hy + 1.4)} Z' fill='${cf}' ${ol(hc)}/>` +
+          `<path d='M${f1(hx - 3.1)},${f1(hy + 1.4)} l-1,2.4 l0.9,0.3 z' fill='${shade(hc, 0.9)}' ${ol(hc)}/>`;
+        else s += `<path d='M${f1(hx - 3.2)},${f1(hy - 1.2)} Q${f1(hx - 3)},${f1(hy - 4.1)} ${f1(hx)},${f1(hy - 4.1)} Q${f1(hx + 3)},${f1(hy - 4.1)} ${f1(hx + 3.2)},${f1(hy - 1.2)} Q${f1(hx)},${f1(hy - 3.4)} ${f1(hx - 3.2)},${f1(hy - 1.2)} Z' fill='${cf}' ${ol(hc)}/>`;
+      }
+      break;
+    }
+    case 'hennin': {
+      // steeple hennin (15th c. Burgundy/France/England): a tall cone worn tilted back,
+      // a sheer veil trailing from its tip, a black velvet frontlet loop on the brow;
+      // the hair is hidden underneath
+      const nf = grad(defs, hc);
+      const tilt = side ? -4.6 : 0;
+      const tipX = hx + (side ? tilt : 0.6), tipY = hy - 9; // stays inside the sprite canvas
+      const veil = `<path d='M${f1(tipX)},${f1(tipY)} Q${f1(tipX + (side ? -4 : 3.4))},${f1(tipY + 5)} ${f1(hx + (side ? -4.4 : 3.6))},${f1(hy + 7)} L${f1(hx + (side ? -2.6 : 2.2))},${f1(hy + 6.4)} Q${f1(tipX + (side ? -1.6 : 1.4))},${f1(tipY + 5)} ${f1(tipX)},${f1(tipY)} Z' fill='#f4f1ea' opacity='0.55'/>`;
+      if (back) {
+        s += `<path d='M${f1(hx - 2.8)},${f1(hy - 0.4)} L${f1(tipX)},${f1(tipY)} L${f1(hx + 2.8)},${f1(hy - 0.4)} Z' fill='${nf}' ${ol(hc)}/>` +
+          `<path d='M${f1(tipX)},${f1(tipY)} Q${f1(hx - 3.6)},${f1(hy - 2)} ${f1(hx - 3.8)},${f1(hy + 7)} L${f1(hx + 3.8)},${f1(hy + 7)} Q${f1(hx + 3.6)},${f1(hy - 2)} ${f1(tipX)},${f1(tipY)} Z' fill='#f4f1ea' opacity='0.5'/>`;
+      } else {
+        s += `<path d='M${f1(hx - 2.9 + (side ? -0.6 : 0))},${f1(hy - 0.8)} L${f1(tipX)},${f1(tipY)} L${f1(hx + 2.9 + (side ? -0.6 : 0))},${f1(hy - 1.6)} Q${f1(hx)},${f1(hy - 3.2)} ${f1(hx - 2.9 + (side ? -0.6 : 0))},${f1(hy - 0.8)} Z' fill='${nf}' ${ol(hc)}/>` + veil;
+        if (!side) s += `<path d='M${f1(hx - 0.3)},${f1(hy - 2.9)} q0.3,-0.9 0.6,0' stroke='#141414' stroke-width='0.45' fill='none'/>`;
+      }
       break;
     }
     case 'veil': {
