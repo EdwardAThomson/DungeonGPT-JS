@@ -4,10 +4,12 @@
 // hand one out: ready-made and newly created heroes began with no gear and 0 gold, so
 // every new player started below the line the fights were balanced for.
 //
-// Granted at game load (Game.js, before the hero invariants run) because in-game gear lives
-// in each save, not on the hero roster. Once per hero per save: `starterKitGranted` marks
-// it. A hero who already has a weapon or armour equipped (a veteran from an older save) is
-// only marked, never re-kitted, so this cannot hand out a second set of gear.
+// In-game gear lives in each save, not on the hero roster, so the kit is handled at game
+// load (Game.js, before the hero invariants run):
+//   - a hero entering a game for the first time (a new campaign) is outfitted automatically;
+//   - a hero from an existing save is NOT changed silently: a gearless one can CLAIM the kit
+//     from the Inventory, a veteran with a weapon or armour equipped is only marked.
+// Once per hero per save: `starterKitGranted` marks it, so it can never be handed out twice.
 
 import { addItem } from '../utils/inventorySystem';
 import { equipItem } from './equipment';
@@ -47,6 +49,17 @@ export const grantStarterKit = (hero) => {
   return { hero: next, granted: true, events };
 };
 
+/** Can this hero still claim the kit? (Not had it, nothing equipped in weapon or armour.) */
+export const isStarterKitEligible = (hero) => {
+  if (!hero || hero.starterKitGranted) return false;
+  const eq = hero.equipment || {};
+  return !eq.weapon && !eq.armor;
+};
+
+/** Existing-save load: mark veterans who already have gear (no grant, no claim offer). */
+export const markStarterKitVeterans = (party) => (party || []).map((hero) =>
+  (hero && !hero.starterKitGranted && !isStarterKitEligible(hero) ? { ...hero, starterKitGranted: true } : hero));
+
 /**
  * Apply the starter kit across a party.
  * @returns {{ party: Array, grantedNames: string[], events: Array }}
@@ -65,12 +78,20 @@ export const grantPartyStarterKits = (party) => {
   return { party: out, grantedNames, events };
 };
 
+const joinNames = (names) => (names.length === 1
+  ? names[0]
+  : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
+
+/** One-time notice on an existing save whose heroes can claim the kit. */
+export const starterKitOfferMessage = (names) => {
+  if (!names || names.length === 0) return null;
+  return `🎒 A starter kit is waiting for ${joinNames(names)}: a shortsword, leather armour, two healing items and ${STARTER_KIT.gold} gold each. Claim it from the Inventory.`;
+};
+
 /** One Adventure Log line describing what each outfitted hero received. */
 export const starterKitMessage = (grantedNames) => {
   if (!grantedNames || grantedNames.length === 0) return null;
-  const who = grantedNames.length === 1
-    ? grantedNames[0]
-    : `${grantedNames.slice(0, -1).join(', ')} and ${grantedNames[grantedNames.length - 1]}`;
+  const who = joinNames(grantedNames);
   const each = grantedNames.length === 1 ? 'sets out with' : 'each set out with';
   return `🎒 ${who} ${each} a shortsword and leather armour (equipped), a healing potion, a herbal remedy and ${STARTER_KIT.gold} gold.`;
 };

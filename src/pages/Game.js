@@ -41,7 +41,7 @@ import {
 import { planTravelRoute, TRAVEL_STEP_MS } from '../game/worldTravel';
 import { getSuggestedActions } from '../game/suggestedActions';
 import { visitLeaveMessage } from '../game/logGroups';
-import { grantPartyStarterKits, starterKitMessage } from '../game/starterKit';
+import { grantPartyStarterKits, starterKitMessage, starterKitOfferMessage, markStarterKitVeterans, isStarterKitEligible } from '../game/starterKit';
 import { scaleEncounterXP, scaleMilestoneRewards, scaleWorldRewards } from '../game/xpScaling';
 import { INSPECT_RANGE } from '../components/TownMapDisplay';
 import WorkspaceHints from '../components/WorkspaceHints';
@@ -259,8 +259,10 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     // Normalize first (de-dupe + migrate legacy characterId -> heroId), then backfill
     // progression fields. normalizeParty repairs saves corrupted by the old hero-overwrite bug.
     const normalized = normalizeParty(loadedConversation?.selected_heroes || stateHeroes || []);
+    const newHeroIds = new Set(); // heroes entering a game for the first time (a new campaign)
     const heroes = normalized.map(hero => {
       if (hero.xp === undefined) {
+        newHeroIds.add(heroUid(hero));
         // Use healthSystem's calculateMaxHP for consistency
         const maxHP = hero.maxHP || calculateMaxHP(hero);
         return {
@@ -276,10 +278,22 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       return hero;
     });
     // Starter kit (once per hero per save): a basic weapon, armour, two healing items and
-    // a little gold, so new heroes meet fights at the gear level they are tuned for.
+    // a little gold, so new heroes meet fights at the gear level they are tuned for. New
+    // heroes get it automatically; heroes from an existing save are never changed silently
+    // (veterans with gear are marked, gearless ones can claim it from the Inventory).
     // Runs before the invariant pass, which keeps the equipped keys (they are carried).
-    let kit = { party: heroes, grantedNames: [], events: [] };
-    try { kit = grantPartyStarterKits(heroes); } catch (err) { logger.error('Starter kit grant failed; continuing without it', err); }
+    let kit = { party: heroes, grantedNames: [], events: [], claimableNames: [] };
+    try {
+      const fresh = grantPartyStarterKits(heroes.filter(h => newHeroIds.has(heroUid(h))));
+      const byId = new Map(fresh.party.map(h => [heroUid(h), h]));
+      const party = markStarterKitVeterans(heroes.map(h => byId.get(heroUid(h)) || h));
+      kit = {
+        party,
+        grantedNames: fresh.grantedNames,
+        events: fresh.events,
+        claimableNames: party.filter(isStarterKitEligible).map(h => h.heroName || h.characterName || 'A hero'),
+      };
+    } catch (err) { logger.error('Starter kit grant failed; continuing without it', err); }
     try {
       const savedSettings = typeof loadedConversation?.game_settings === 'string'
         ? JSON.parse(loadedConversation.game_settings)
@@ -642,6 +656,12 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     if (kitLine) {
       interactionHook.setConversation(prev => [...prev, { role: 'system', content: kitLine }]);
       appendHeroLedger(kit.events, 'starter_kit');
+    }
+    // Existing save with gearless heroes: say once (per save) that a kit can be claimed.
+    const offerLine = !settingsObj?.starterKitOffered && starterKitOfferMessage(kit?.claimableNames);
+    if (offerLine) {
+      interactionHook.setConversation(prev => [...prev, { role: 'system', content: offerLine }]);
+      setSettings(prev => (prev ? { ...prev, starterKitOffered: true } : prev));
     }
     if (reportedMessages.length > 0) {
       logger.info(`[HERO LEDGER] ${reportedMessages.join(' · ')}`);
@@ -2788,6 +2808,15 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
         handleAttackSiteMob={handleAttackSiteMob}
         handleEncounterResolve={handleEncounterResolve}
         handleHeroUpdate={handleHeroUpdate}
+        onClaimStarterKit={() => {
+          // Existing-save claim (Inventory): same grant as a new hero gets, gearless heroes only.
+          const claim = grantPartyStarterKits(selectedHeroes);
+          if (claim.grantedNames.length === 0) return;
+          setSelectedHeroes(claim.party);
+          appendHeroLedger(claim.events, 'starter_kit');
+          interactionHook.setConversation(prev => [...prev, { role: 'system', content: starterKitMessage(claim.grantedNames) }]);
+          setTimeout(() => performSave(), 500);
+        }}
         onUseItem={(heroId, itemKey, healedHero, logLine) => {
           setSelectedHeroes(prev => replaceHeroInParty(prev, healedHero));
           if (logLine) interactionHook.setConversation(prev => [...prev, { role: 'system', content: logLine }]);

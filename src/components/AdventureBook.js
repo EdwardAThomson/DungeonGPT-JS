@@ -293,6 +293,7 @@ const AdventureBook = ({
   assistantModel, setAssistantModel,
   selectedHeroes,
   onUseItem,
+  onClaimStarterKit,
   onHeroUpdate
 }) => {
   const { isOpen, data, close } = useModal('adventureBook');
@@ -349,6 +350,7 @@ const AdventureBook = ({
           <PartyInventoryContent
             selectedHeroes={selectedHeroes || []}
             onUseItem={onUseItem}
+            onClaimStarterKit={onClaimStarterKit}
             onHeroUpdate={onHeroUpdate}
           />
         )}

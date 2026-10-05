@@ -78,3 +78,27 @@ describe('balance: the kit sits between no gear and the mid baseline', () => {
     expect(starter).toBeLessThanOrEqual(mid + 0.02);
   });
 });
+
+describe('existing saves: claim, not auto-grant', () => {
+  const { isStarterKitEligible, markStarterKitVeterans, starterKitOfferMessage } = require('./starterKit');
+
+  it('a gearless hero who has not had the kit can claim it; a kitted one cannot', () => {
+    expect(isStarterKitEligible(fresh())).toBe(true);
+    expect(isStarterKitEligible(grantStarterKit(fresh()).hero)).toBe(false);
+  });
+
+  it('veterans with gear are marked (no claim offer); gearless heroes stay claimable and untouched', () => {
+    const vet = fresh({ heroId: 'v', inventory: ['silver_dagger'], equipment: { weapon: 'silver_dagger' } });
+    const bare = fresh({ heroId: 'b' });
+    const [v, b] = markStarterKitVeterans([vet, bare]);
+    expect(v.starterKitGranted).toBe(true);
+    expect(isStarterKitEligible(v)).toBe(false);
+    expect(b).toBe(bare); // unchanged until the player claims
+    expect(isStarterKitEligible(b)).toBe(true);
+  });
+
+  it('the offer names who can claim it', () => {
+    expect(starterKitOfferMessage(['Marius'])).toMatch(/^🎒 A starter kit is waiting for Marius: .*Claim it from the Inventory\.$/);
+    expect(starterKitOfferMessage([])).toBeNull();
+  });
+});
