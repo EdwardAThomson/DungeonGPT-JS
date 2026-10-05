@@ -2337,6 +2337,8 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       townMapsCache: mapHook.townMapsCache,
       atTownExit: mapHook.isInsideTown && atTownGate(mapHook.townPlayerPosition, mapHook.currentTownMap?.entryPoint),
       siteName: mapHook.currentSiteMap?.name,
+      siteMap: mapHook.currentSiteMap,
+      sitePosition: mapHook.sitePlayerPosition,
       // Same reach as handleLeaveSite: on the entrance or next to it.
       atSiteExit: mapHook.isInsideSite && atSiteEntrance(mapHook.sitePlayerPosition, mapHook.currentSiteMap?.entryPoint),
     });
@@ -2396,6 +2398,12 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     // the "You" line instead of appending it separately (it would be overwritten).
     const withYou = [...interactionHook.conversation, youLine];
     if (chip.kind === 'enter') { mapHook.handleEnterCurrentTown(setConversation, withYou); return; }
+    if (chip.kind === 'enterSite') {
+      const tile = getTile(mapHook.worldMap, mapHook.playerPosition.x, mapHook.playerPosition.y);
+      const poiEncounter = tile ? buildPoiEncounter(tile) : null;
+      if (poiEncounter) mapHook.handleEnterLocation(poiEncounter, setConversation, withYou, effectivePartyLevel(selectedHeroes));
+      return;
+    }
     if (chip.kind === 'leave') {
       if (mapHook.isInsideSite) mapHook.handleLeaveSite(setConversation, withYou);
       else mapHook.handleLeaveTown(setConversation, withYou);
@@ -2432,6 +2440,12 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     }
     setConversation((prev) => [...prev, youLine]);
     if (chip.kind === 'look') { handleLookAround(); return; }
+    if (chip.kind === 'siteWalk') { handleSiteTileClick(chip.target.x, chip.target.y); return; }
+    if (chip.kind === 'siteMob') {
+      const mob = (mapHook.currentSiteMap?.mobs || []).find((m) => m && m.id === chip.mobId);
+      if (mob) handleAttackSiteMob(mob);
+      return;
+    }
     if (chip.kind === 'search' || chip.kind === 'gather' || chip.kind === 'fight') {
       const tile = getTile(mapHook.worldMap, mapHook.playerPosition.x, mapHook.playerPosition.y);
       const ms = settings?.milestones || [];

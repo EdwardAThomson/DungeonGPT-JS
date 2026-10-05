@@ -8,13 +8,18 @@
 //   kind 'look'   - run Look around (a narrative hook is waiting)
 //   kind 'search' / 'gather' / 'fight' - the milestone action on the world tile the party
 //                   stands on (same resolvers as the POI arrival modal)
+//   kind 'enterSite' - explore the cave / ruins the party stands on
+//   kind 'siteWalk'  - inside a site, walk to target {x, y} (an objective or a gather node)
+//   kind 'siteMob'   - inside a site, engage the boss mob `mobId`
+// Side-quest chips carry `side: true`; one slot is kept for them when any exist.
 //   kind 'enter'  - enter the town the party stands on
 //   kind 'leave'  - leave the town or site (the party stands at its exit)
 //   kind 'travel' - auto-travel on the world map to target {x, y} (leaving town first)
 //   kind 'walk'   - walk inside the current town to the building at target {x, y}, then open it
 
 import { areRequirementsMet, getMilestoneBossForTile, getMilestoneLocationForTile, getMilestoneItemForTile } from './milestoneEngine';
-import { getActiveSideQuests, getAvailableQuestsAt, effectivePartyLevel, ACTIVE_QUEST_CAP } from './questEngine';
+import { getActiveSideQuests, getAvailableQuestsAt, effectivePartyLevel, ACTIVE_QUEST_CAP, getActiveGatherResources, getRevealedSiteTypes } from './questEngine';
+import { ITEM_CATALOG } from '../utils/inventorySystem';
 
 export const MAX_SUGGESTIONS = 3;
 export const HURT_FRACTION = 0.5;
@@ -101,6 +106,45 @@ const isHurt = (party) => (party || []).some((h) =>
   Number.isFinite(h?.currentHP) && Number.isFinite(h?.maxHP) && h.maxHP > 0 && h.currentHP > 0 && h.currentHP / h.maxHP < HURT_FRACTION);
 
 const SITE_LABEL = { cave: 'the cave', ruins: 'the ruins' };
+// Quest site types vs the world tile `poi` that draws them.
+const SITE_POI = { cave: 'cave_entrance', ruins: 'ruins' };
+const siteTypeOfTile = (tile) => (tile?.poi === 'cave_entrance' ? 'cave' : tile?.poi === 'ruins' ? 'ruins' : null);
+
+// Inside a site: the objectives still to do (quest bosses, item / room objectives) and the
+// harvest nodes an active gather quest still needs, nearest first.
+const siteChips = ({ siteMap, sitePosition, sideQuests }) => {
+  const grid = siteMap?.mapData;
+  if (!Array.isArray(grid) || !sitePosition) return [];
+  const dist = (p) => townDistance(sitePosition, p);
+  const chips = [];
+  (siteMap.mobs || []).forEach((m) => {
+    if (!m || !m.isBoss || m.defeated) return;
+    chips.push({ id: `face:${m.id}`, label: `Face ${m.encounter?.name || 'the guardian'}`, kind: 'siteMob', mobId: m.id, target: { x: m.x, y: m.y }, d: dist(m) });
+  });
+  const needed = new Set(((getActiveGatherResources(sideQuests) || {})[siteMap.type] || [])
+    .filter((r) => r.needed > 0).map((r) => r.itemId));
+  const gatherBest = {};
+  eachTile(grid, (tile, x, y) => {
+    const c = tile.content;
+    if (!c || c.consumed || (x === sitePosition.x && y === sitePosition.y)) return;
+    if (c.kind === 'objective' && c.objectiveType !== 'combat') {
+      const label = c.objectiveType === 'item' ? `Find ${c.item?.name || 'the objective'}` : `Reach ${c.name || 'the objective'}`;
+      chips.push({ id: `obj:${x},${y}`, label, kind: 'siteWalk', target: { x, y }, d: dist({ x, y }) });
+      return;
+    }
+    if (c.kind === 'loot') {
+      (c.loot?.items || []).filter((id) => needed.has(id)).forEach((id) => {
+        const d = dist({ x, y });
+        if (!gatherBest[id] || d < gatherBest[id].d) {
+          gatherBest[id] = { id: `gather:${id}`, label: `Gather ${ITEM_CATALOG[id]?.name || id.replace(/_/g, ' ')}`, kind: 'siteWalk', target: { x, y }, d, side: true };
+        }
+      });
+    }
+  });
+  return [...chips, ...Object.values(gatherBest)]
+    .sort((a, b) => a.d - b.d)
+    .map(({ d, ...chip }) => chip);
+};
 
 // The level a main-quest step expects: its own minLevel, else (for a boss fight) the top
 // of the campaign's level range. Advice only: the main quest is never blocked by it.
@@ -129,16 +173,22 @@ const huntTarget = (worldMap, from) => nearestTile(worldMap, from, (t) =>
  * @param {Object} [s.townMapsCache] visited towns' maps by name (finds a hand-in building)
  * @param {string} [s.siteName]    current site (inside a cave / ruin / forest)
  * @param {boolean} [s.atSiteExit] inside a site, at its entrance (where leaving works)
+ * @param {Object} [s.siteMap]     the current site (inside one)
+ * @param {{x,y}} [s.sitePosition] party position inside the site
  * @returns {Array<{id,label,kind,target}>}
  */
 export const getSuggestedActions = (s = {}) => {
-  const { mapLevel = 'world', worldMap, playerPosition, townMap, townName, townPosition, milestones, sideQuests, party, hookWaiting, levelRange, atTownExit, siteName, atSiteExit, townMapsCache } = s;
+  const { mapLevel = 'world', worldMap, playerPosition, townMap, townName, townPosition, milestones, sideQuests, party, hookWaiting, levelRange, atTownExit, siteName, atSiteExit, townMapsCache, siteMap, sitePosition } = s;
   const partyLevel = effectivePartyLevel(party);
-  if (mapLevel === 'site' || !Array.isArray(worldMap) || !playerPosition) {
+  if (mapLevel === 'site') {
     const chips = [];
-    if (mapLevel === 'site' && atSiteExit) chips.push({ id: 'leave', label: `Leave ${siteName || 'this place'}`, kind: 'leave' });
+    if (atSiteExit) chips.push({ id: 'leave', label: `Leave ${siteName || 'this place'}`, kind: 'leave' });
+    chips.push(...siteChips({ siteMap, sitePosition, sideQuests }));
     if (hookWaiting) chips.push({ id: 'look', label: 'Look around', kind: 'look' });
-    return chips;
+    return chips.slice(0, MAX_SUGGESTIONS);
+  }
+  if (!Array.isArray(worldMap) || !playerPosition) {
+    return hookWaiting ? [{ id: 'look', label: 'Look around', kind: 'look' }] : [];
   }
   const inTown = mapLevel === 'town' && !!townName;
   const here = worldMap[playerPosition.y]?.[playerPosition.x];
@@ -149,15 +199,16 @@ export const getSuggestedActions = (s = {}) => {
     seen.add(chip.id);
     out.push(chip);
   };
-  const travelTo = (target, label) => {
+  const travelTo = (target, label, extra) => {
     if (!target) return;
     if (target.x === playerPosition.x && target.y === playerPosition.y) return;
-    push({ id: `travel:${target.x},${target.y}`, label, kind: 'travel', target: { x: target.x, y: target.y } });
+    push({ id: `travel:${target.x},${target.y}`, label, kind: 'travel', target: { x: target.x, y: target.y }, ...extra });
   };
-  const walkTo = (b, label) => {
+  const walkTo = (b, label, extra) => {
     if (!b) return;
-    push({ id: `walk:${b.x},${b.y}`, label, kind: 'walk', target: { x: b.x, y: b.y } });
+    push({ id: `walk:${b.x},${b.y}`, label, kind: 'walk', target: { x: b.x, y: b.y }, ...extra });
   };
+  const SIDE = { side: true };
 
   // On the exit tile, leaving is the obvious next step: offer it first.
   if (inTown && atTownExit) push({ id: 'leave', label: `Leave ${townName}`, kind: 'leave' });
@@ -173,6 +224,14 @@ export const getSuggestedActions = (s = {}) => {
     if (gather) push({ id: 'gather', label: `Gather ${gather.name}`, kind: 'gather' });
   }
   if (!inTown && isTownTile(here)) push({ id: 'enter', label: `Enter ${here.townName}`, kind: 'enter' });
+  // Standing on a revealed cave / ruins: explore it. A side quest needing it marks it side.
+  const hereSite = !inTown && siteTypeOfTile(here);
+  const sitesShown = sideQuests?.length ? getRevealedSiteTypes(sideQuests) : null; // null: no gating
+  if (hereSite && (!sitesShown || sitesShown[hereSite])) {
+    const wanted = getActiveSideQuests(sideQuests).some((q) => (q.milestones || []).some((st) =>
+      !st.completed && (st.site?.type === hereSite || (st.sites || []).includes(hereSite))));
+    push({ id: 'enterSite', label: `Explore ${SITE_LABEL[hereSite]}`, kind: 'enterSite', ...(wanted ? SIDE : {}) });
+  }
 
   // Campaign milestones first, nearest destination first.
   const active = activeMilestones(milestones);
@@ -211,12 +270,12 @@ export const getSuggestedActions = (s = {}) => {
       const types = Array.isArray(building) ? building : [building];
       if (location && !(inTown && sameName(location, townName))) {
         const t = nearestTile(worldMap, playerPosition, (tile) => isTownTile(tile) && sameName(tile.townName, location));
-        if (t) travelTo(t, `Return to ${t.tile.townName}`);
+        if (t) travelTo(t, `Return to ${t.tile.townName}`, SIDE);
         return;
       }
       if (inTown) {
         const b = nearestBuilding(townMap, townPosition, (tile) => types.includes(tile.buildingType));
-        if (b) { walkTo(b, `Hand in at ${b.tile.buildingName || `the ${String(b.tile.buildingType).replace(/_/g, ' ')}`}`); return; }
+        if (b) { walkTo(b, `Hand in at ${b.tile.buildingName || `the ${String(b.tile.buildingType).replace(/_/g, ' ')}`}`, SIDE); return; }
       }
       // Not anchored to a town (older saves): any town with the building takes it. Point at
       // the nearest visited town known to have one.
@@ -228,13 +287,18 @@ export const getSuggestedActions = (s = {}) => {
         };
         const t = nearestTile(worldMap, playerPosition, (tile) =>
           isTownTile(tile) && !(inTown && sameName(tile.townName, townName)) && hasBuilding(tile.townName));
-        if (t) travelTo(t, `Return to ${t.tile.townName}`);
+        if (t) travelTo(t, `Return to ${t.tile.townName}`, SIDE);
       }
     });
     if (inTown) return;
-    steps.filter((st) => st.site?.type && !st.trigger?.turnIn && ready(st)).forEach((st) => {
-      const t = nearestTile(worldMap, playerPosition, (tile) => tile.poi === st.site.type);
-      if (t) travelTo(t, `Head for ${SITE_LABEL[st.site.type] || st.site.type}`);
+    // Site objectives and gather steps sourced from sites: head for the nearest one.
+    // (Cave tiles are drawn as poi 'cave_entrance', not 'cave'.)
+    steps.filter((st) => !st.trigger?.turnIn && ready(st)).forEach((st) => {
+      const types = st.site?.type ? [st.site.type] : (st.sites || []);
+      types.forEach((type) => {
+        const t = nearestTile(worldMap, playerPosition, (tile) => tile.poi === (SITE_POI[type] || type));
+        if (t) travelTo(t, `Head for ${SITE_LABEL[type] || type}`, SIDE);
+      });
     });
   });
 
@@ -243,7 +307,7 @@ export const getSuggestedActions = (s = {}) => {
   if (inTown && getActiveSideQuests(sideQuests).length < ACTIVE_QUEST_CAP) {
     const offer = nearestBuilding(townMap, townPosition, (t) =>
       !!t.buildingType && getAvailableQuestsAt(sideQuests, { buildingType: t.buildingType, townName, level: partyLevel }).length > 0);
-    if (offer) walkTo(offer, `Ask for work at ${offer.tile.buildingName || `the ${String(offer.tile.buildingType).replace(/_/g, ' ')}`}`);
+    if (offer) walkTo(offer, `Ask for work at ${offer.tile.buildingName || `the ${String(offer.tile.buildingType).replace(/_/g, ' ')}`}`, SIDE);
   }
 
   if (inTown && isHurt(party)) {
@@ -251,5 +315,10 @@ export const getSuggestedActions = (s = {}) => {
     if (inn) walkTo(inn, `Rest at ${inn.tile.buildingName || 'the inn'}`);
   }
 
-  return out.slice(0, MAX_SUGGESTIONS);
+  // Keep one slot for side quests: campaign steps come first and would otherwise always
+  // crowd them out of the three.
+  const top = out.slice(0, MAX_SUGGESTIONS);
+  const firstSide = out.find((c) => c.side);
+  if (firstSide && !top.some((c) => c.side)) top[Math.min(top.length, MAX_SUGGESTIONS - 1)] = firstSide;
+  return top;
 };

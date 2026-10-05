@@ -11,7 +11,7 @@ const world = () => {
   g[0][5] = { ...g[0][5], poi: 'town', townName: 'Willowdale' };
   g[7][7] = { ...g[7][7], poi: 'town', townName: 'Briarwood' };
   g[4][4] = { ...g[4][4], poi: 'goblin_hideout', milestonePoi: true, poiName: 'Goblin Hideout' };
-  g[6][1] = { ...g[6][1], poi: 'cave' };
+  g[6][1] = { ...g[6][1], poi: 'cave_entrance' }; // caves are drawn as cave_entrance
   return g;
 };
 
@@ -149,6 +149,44 @@ describe('getSuggestedActions', () => {
     expect(taken[0]).toMatchObject({ label: 'Head for the cave', target: { x: 1, y: 6 } });
     const offered = getSuggestedActions({ worldMap: world(), playerPosition: { x: 3, y: 3 }, sideQuests: [{ id: 'q', status: 'available', milestones: [step] }] });
     expect(offered).toEqual([]);
+  });
+
+  it('keeps one of the three slots for a side quest when campaign steps fill them', () => {
+    const many = [
+      ...milestones().slice(0, 2),
+      { id: 4, type: 'item', location: 'Snowley', requires: [], trigger: { item: 'x' },
+        building: { type: 'inn', name: 'Snow Inn', location: 'Snowley' } },
+    ];
+    const sideQuests = [{ id: 'q', status: 'active', milestones: [{ id: 1, site: { type: 'cave' }, trigger: { defeat: 'bats' } }] }];
+    const chips = getSuggestedActions({ worldMap: world(), playerPosition: { x: 3, y: 3 }, milestones: many, sideQuests });
+    expect(chips).toHaveLength(MAX_SUGGESTIONS);
+    expect(chips[MAX_SUGGESTIONS - 1]).toMatchObject({ label: 'Head for the cave', side: true });
+    expect(chips.filter((c) => !c.side)).toHaveLength(MAX_SUGGESTIONS - 1);
+  });
+
+  it('offers Explore on a revealed cave, flagged as side-quest work when a quest needs it', () => {
+    const sideQuests = [{ id: 'q', status: 'active', milestones: [{ id: 1, site: { type: 'cave' }, trigger: { defeat: 'bats' } }] }];
+    const chips = getSuggestedActions({ worldMap: world(), playerPosition: { x: 1, y: 6 }, sideQuests });
+    expect(chips[0]).toMatchObject({ id: 'enterSite', label: 'Explore the cave', kind: 'enterSite', side: true });
+    // A cave no quest has revealed stays unexplorable from the chips.
+    const hidden = getSuggestedActions({ worldMap: world(), playerPosition: { x: 1, y: 6 },
+      sideQuests: [{ id: 'r', status: 'active', milestones: [{ id: 1, site: { type: 'ruins' } }] }] });
+    expect(labels(hidden)).not.toContain('Explore the cave');
+  });
+
+  it('inside a site, points at the boss, the objective and needed gather nodes, nearest first', () => {
+    const site = grid(6, 6, () => ({ type: 'floor', walkable: true }));
+    site[0][5] = { ...site[0][5], content: { kind: 'objective', objectiveType: 'item', item: { id: 'idol', name: 'Bone Idol' }, consumed: false } };
+    site[1][1] = { ...site[1][1], content: { kind: 'loot', loot: { items: ['cave_mushroom'] }, consumed: false } };
+    site[1][2] = { ...site[1][2], content: { kind: 'loot', loot: { items: ['bat_guano'] }, consumed: false } }; // not needed
+    const siteMap = { type: 'cave', mapData: site, mobs: [{ id: 'boss1', isBoss: true, x: 5, y: 5, encounter: { name: 'Cave Troll' } }] };
+    const sideQuests = [{ id: 'g', status: 'active', milestones: [{ id: 1, trigger: { item: 'cave_mushroom', count: 3 }, progress: 1, sites: ['cave'] }] }];
+    const chips = getSuggestedActions({ mapLevel: 'site', siteMap, sitePosition: { x: 0, y: 0 }, sideQuests, siteName: 'Mossy Cave' });
+    expect(chips.map((c) => c.kind)).toEqual(['siteWalk', 'siteWalk', 'siteMob']);
+    expect(chips[0]).toMatchObject({ target: { x: 1, y: 1 }, side: true });
+    expect(chips[0].label).toMatch(/^Gather /);
+    expect(chips[1]).toMatchObject({ label: 'Find Bone Idol', target: { x: 5, y: 0 } });
+    expect(chips[2]).toMatchObject({ label: 'Face Cave Troll', mobId: 'boss1' });
   });
 
   it('suggests resting at the inn only when someone is hurt', () => {

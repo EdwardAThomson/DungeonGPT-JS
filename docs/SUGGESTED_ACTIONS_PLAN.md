@@ -39,6 +39,20 @@ chips never spoil an unrevealed POI.
 | 7 | The party is hurt and the current town has an inn | Rest at the inn | town walk to the inn, then `onRest` |
 | 8 | Inside a site that is cleared | Leave the cave | `onLeaveSite` |
 
+### Playtest additions (2026-10-05)
+
+| When | Chip | Click does |
+|---|---|---|
+| On a town exit tile, or at a site entrance | Leave Ashford / Leave Mossy Cave | `handleLeaveTown` / `handleLeaveSite` |
+| Standing on a milestone objective tile | Search X / Confront X / Gather X | same resolvers and actions as the POI arrival modal |
+| A boss or wilderness-item step | Travel to the nearest tile the engine fires it on | e.g. the Rot Tunnels, not only the town the step names |
+| Standing on a revealed cave / ruins | Explore the cave | `handleEnterLocation` |
+| Inside a site | Face the boss / Find or Reach the objective / Gather a needed node | site walk (`handleSiteTileClick`) or `handleAttackSiteMob` |
+| A side-quest chip exists but campaign steps fill the three slots | (the last slot goes to the side quest) | side-quest chips carry `side: true` |
+
+Rule 6 matches caves by their world tile (`poi: 'cave_entrance'`), and also covers gather
+steps sourced from sites (`step.sites`).
+
 ### Levelling nudges (added 2026-10-05)
 
 With one-click travel a player can finish a campaign far below the next chapter's level,
