@@ -35,6 +35,7 @@ import BuildingSearchTest from './BuildingSearchTest';
 import ImageGenDebug from './ImageGenDebug';
 import SummarizationTest from './SummarizationTest';
 import RagTest from './RagTest';
+import RagCompare from './RagCompare';
 import PremiumPage from './PremiumPage';
 import BossFightTest from './BossFightTest';
 import CombatHudTest from './CombatHudTest';
@@ -104,6 +105,7 @@ const debugSections = [
       { to: 'image-gen', label: 'Image Generation' },
       { to: 'summarization-test', label: 'Summarization A/B Test' },
       { to: 'rag-test', label: 'RAG Test' },
+      { to: 'rag-compare', label: 'RAG Before / After (#175)' },
     ],
   },
   {
@@ -284,6 +286,7 @@ const DebugRoutes = () => {
           <Route path="image-gen" element={<ImageGenDebug />} />
           <Route path="summarization-test" element={<SummarizationTest />} />
           <Route path="rag-test" element={<RagTest />} />
+          <Route path="rag-compare" element={<RagCompare />} />
           <Route path="premium" element={<PremiumPage />} />
           <Route path="*" element={<Navigate to="/debug" replace />} />
         </Routes>
