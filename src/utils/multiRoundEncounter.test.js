@@ -261,16 +261,16 @@ describe('resolveRound: flat enemy damage and incoming party damage', () => {
 describe('resolveRound: outcome ordering (round cap vs advantage floor)', () => {
   test('reaching the round cap with a collapsed advantage is a stalemate, not a defeat', async () => {
     mockRoll(0.5); // d20 = 11 -> failure: advantage -1, enemy takes only 2
-    // enemyHP 50 -> maxRounds 4, advantageDefeatThreshold -3.
+    // enemyHP 50 -> maxRounds 4. The floor is -3 or lower (3 below the starting lean).
     const state = createMultiRoundEncounter(makeBoss({ enemyHP: 50 }), makeHero(), {});
     expect(state.maxRounds).toBe(4);
-    expect(state.advantageDefeatThreshold).toBe(-3);
+    const floor = state.advantageDefeatThreshold;
     state.currentRound = state.maxRounds; // final round -> increments past the cap
-    state.playerAdvantage = -3; // at the floor; the failure below drops it to -4
+    state.playerAdvantage = floor; // at the floor; the failure below drops it one lower
     const { updatedState } = await resolveRound(state, 'Fight');
-    // Advantage is now -4 (<= the -3 floor) AND the cap is exceeded. Old ordering scored
+    // Advantage is now below the floor AND the cap is exceeded. Old ordering scored
     // this a DEFEAT; the cap check now runs first, so it is a stalemate.
-    expect(updatedState.playerAdvantage).toBe(-4);
+    expect(updatedState.playerAdvantage).toBe(floor - 1);
     expect(updatedState.currentRound).toBeGreaterThan(updatedState.maxRounds);
     expect(updatedState.outcome).toBe('stalemate');
   });
@@ -278,12 +278,29 @@ describe('resolveRound: outcome ordering (round cap vs advantage floor)', () => 
   test('an advantage collapse BEFORE the cap is still a defeat (rout preserved)', async () => {
     mockRoll(0.5); // failure: advantage -1
     const state = createMultiRoundEncounter(makeBoss({ enemyHP: 50 }), makeHero(), {});
+    const floor = state.advantageDefeatThreshold;
     state.currentRound = 1; // nowhere near the cap (maxRounds 4)
-    state.playerAdvantage = -3; // the failure below drops it to -4 (<= floor)
+    state.playerAdvantage = floor; // the failure below drops it below the floor
     const { updatedState } = await resolveRound(state, 'Fight');
     expect(updatedState.currentRound).toBeLessThanOrEqual(updatedState.maxRounds);
-    expect(updatedState.playerAdvantage).toBe(-4);
+    expect(updatedState.playerAdvantage).toBe(floor - 1);
     expect(updatedState.outcome).toBe('defeat');
+  });
+
+  test('an outmatched start cannot be routed by a single failed first roll', async () => {
+    mockRoll(0.5); // failure: advantage -1
+    const state = createMultiRoundEncounter(makeBoss({ enemyHP: 40 }), makeHero(), {});
+    state.playerAdvantage = -2; // the worst computed start
+    state.advantageDefeatThreshold = Math.min(state.advantageDefeatThreshold, -2 - 3);
+    const { updatedState } = await resolveRound(state, 'Fight');
+    expect(updatedState.playerAdvantage).toBe(-3);
+    expect(updatedState.isResolved).toBe(false); // the party gets to hit back
+  });
+
+  test('the rout floor sits at least 3 below the starting advantage', () => {
+    const state = createMultiRoundEncounter(makeBoss({ enemyHP: 40 }), makeHero(), {});
+    expect(state.advantageDefeatThreshold).toBeLessThanOrEqual(state.playerAdvantage - 3);
+    expect(state.advantageDefeatThreshold).toBeLessThanOrEqual(-3);
   });
 
   test('killing the enemy on the final round is still a victory, not a stalemate', async () => {
