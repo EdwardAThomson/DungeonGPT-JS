@@ -1,10 +1,10 @@
 import React from 'react';
+import ClickableImage from './ClickableImage';
 
 // Action chips for a narrative-tier encounter hook woven into a Look-around
 // narration (#35). Renders the encounter's suggestedActions as tappable pills
 // (echoing the SegmentedControl chip look) plus an "Ignore" chip, and, when the
-// encounter has one, a small preview image (#37; the action modal shows the
-// full image once the player engages).
+// encounter has one, its image (#37), which opens full size when clicked.
 //
 // This block is driven entirely by TRANSIENT state in Game.js: conversation
 // messages persist in saves, so nothing here is ever written into the message:
@@ -21,11 +21,12 @@ const NarrativeHookChips = ({ encounter, onAction, onIgnore }) => {
   return (
     <div className="narrative-hook-chips" role="group" aria-label={`Respond to ${encounter.name || 'the encounter'}`}>
       {encounter.image && (
-        <img
+        <ClickableImage
           src={encounter.image}
           alt={encounter.name || 'Encounter'}
-          className="narrative-hook-image"
-          loading="lazy"
+          height="220px"
+          maxWidth="320px"
+          objectPosition="center"
         />
       )}
       <div className="narrative-hook-chip-row">

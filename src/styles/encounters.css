@@ -733,21 +733,11 @@
 /* --- Narrative-hook action chips (#35/#37) ---------------------------------
  * Rendered under the Look-around narration message that carried a narrative-tier
  * encounter hook. Pills echo the SegmentedControl chip look (settings.css); the
- * optional image is a modest preview; the action modal shows the full art. */
+ * optional image opens full size when clicked (ClickableImage). */
 .narrative-hook-chips {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px dashed var(--border);
-}
-
-.narrative-hook-image {
-  display: block;
-  max-height: 90px;
-  max-width: 100%;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  margin-bottom: 8px;
-  object-fit: cover;
 }
 
 .narrative-hook-chip-row {
