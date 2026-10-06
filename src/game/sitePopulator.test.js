@@ -1,3 +1,5 @@
+import { SIDE_QUEST_BOSSES } from '../data/sideQuests';
+import { CAVE_ENCOUNTERS } from '../data/encounters/caveEncounters';
 import { populateSite, injectSiteObjective, injectHarvestResource, resourceDisplayFor, LOOT, HOARD_BONUS, HARVEST_NODES } from './sitePopulator';
 import { generateSiteMap } from '../utils/siteMapGenerator';
 import { ITEM_CATALOG, filterDropsByTier } from '../utils/inventorySystem';
@@ -96,6 +98,26 @@ describe('populateSite', () => {
       // idempotent: a re-inject with the same milestone spawns no duplicate boss
       injectSiteObjective(site, { objectiveType: 'combat', id: 'cave_tyrant', name: 'the Cave Tyrant', milestoneId: 'm2' });
       expect((site.mobs || []).filter((m) => m.isBoss && m.milestoneId === 'm2')).toHaveLength(1);
+    });
+
+    test('combat objective uses the authored boss text and art, keeping the base stats', () => {
+      const site = injectSiteObjective(make('cave', 3), { objectiveType: 'combat', id: 'fugitive', name: 'the Fugitive Cutpurse', milestoneId: 'm4' });
+      const enc = site.mobs.find((m) => m.isBoss && m.enemyId === 'fugitive').encounter;
+      expect(enc.image).toBe(SIDE_QUEST_BOSSES.fugitive.image);
+      expect(enc.description).toBe(SIDE_QUEST_BOSSES.fugitive.description);
+      expect(enc.consequences).toEqual(SIDE_QUEST_BOSSES.fugitive.consequences);
+      expect(enc.suggestedActions.map((a) => a.label)).not.toContain('Burn Webs');
+      expect(enc.enemyHP).toBe(CAVE_ENCOUNTERS.cave_spider_nest.enemyHP);
+      expect(enc.difficulty).toBe('hard');
+    });
+
+    test.each(['forest', 'hills', 'mountain'])('open-air %s sites take boss, item and location objectives', (type) => {
+      const boss = injectSiteObjective(make(type, 7), { objectiveType: 'combat', id: 'poacher_chief', name: 'the Poacher Chief', milestoneId: 'o1' })
+        .mobs.find((m) => m.isBoss && m.enemyId === 'poacher_chief');
+      expect(boss.encounter.poiType).toBe(type);
+      expect(boss.encounter.image).toBe(SIDE_QUEST_BOSSES.poacher_chief.image);
+      expect(deepestTile(injectSiteObjective(make(type, 7), { objectiveType: 'item', id: 'pilgrim_badge', name: "the Pilgrim's Badge", milestoneId: 'o2' })).content.item.id).toBe('pilgrim_badge');
+      expect(deepestTile(injectSiteObjective(make(type, 7), { objectiveType: 'location', id: 'old_sheepfold', name: 'the Old Sheepfold', milestoneId: 'o3' })).content.locationId).toBe('old_sheepfold');
     });
 
     test('location objective records the locationId for the reach-room trigger', () => {

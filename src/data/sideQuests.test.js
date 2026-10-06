@@ -5,18 +5,19 @@
 // rewards reference real catalog items, and the minLevel curve actually serves
 // the mid/top bands. Dice-rolling balance checks live in progressionLint.test.js.
 
-import { SIDE_QUESTS, QUEST_ITEM_ICON_FROM, initialSideQuests } from './sideQuests';
+import { SIDE_QUESTS, QUEST_ITEM_ICON_FROM, SIDE_QUEST_BOSSES, initialSideQuests } from './sideQuests';
 import { ITEM_CATALOG } from '../utils/inventorySystem';
 import { describeItemSources } from '../game/questHints';
 
 const questTotalXp = (q) =>
   q.milestones.reduce((sum, m) => sum + (m.rewards?.xp || 0), 0) + (q.rewards?.xp || 0);
 
-const SITE_TYPES = ['cave', 'ruins']; // the only quest-gatable world sites (NewGame.js availableSites)
+// world sites that can hold a quest objective: hidden cave/ruins plus the open-air sites
+const SITE_TYPES = ['cave', 'ruins', 'forest', 'hills', 'mountain'];
 
 describe('side-quest pool size and minLevel distribution (#45/#50)', () => {
   test('pool size', () => {
-    expect(SIDE_QUESTS.length).toBe(48);
+    expect(SIDE_QUESTS.length).toBe(91);
   });
 
   test('quest ids are unique', () => {
@@ -29,7 +30,10 @@ describe('side-quest pool size and minLevel distribution (#45/#50)', () => {
     SIDE_QUESTS.forEach((q) => { dist[q.minLevel || 1] = (dist[q.minLevel || 1] || 0) + 1; });
     // Exact pin: expanding or retiring quests should update this consciously.
     // 2026-07-05: +6 water-town quests (#65 Phase 6): 1: +2, 2: +3, 3: +1.
-    expect(dist).toEqual({ 1: 12, 2: 15, 3: 10, 4: 4, 5: 4, 6: 2, 7: 1 });
+    // 2026-10-06: +7 multi-step quests: 2: +1, 3: +3, 4: +1, 5: +1, 6: +1.
+    // 2026-10-06: +21 trade, law and open-country quests: 1: +8, 2: +3, 3: +4, 4: +3, 5: +2, 6: +1.
+    // 2026-10-06: +10 desert/snow quests: 1: +2, 2: +3, 3: +2, 4: +2, 5: +1.
+    expect(dist).toEqual({ 1: 23, 2: 23, 3: 21, 4: 10, 5: 9, 6: 4, 7: 1 });
     // The #50 headline: a healthy share of the pool is reserved for Lv 3+.
     const midTop = SIDE_QUESTS.filter((q) => (q.minLevel || 1) >= 3).length;
     expect(midTop).toBeGreaterThanOrEqual(18);
@@ -60,7 +64,7 @@ describe('builder well-formedness', () => {
     giverBuildings.forEach((b) => expect(typeof b).toBe('string'));
     expect(typeof q.giver.hook).toBe('string');
 
-    // milestones: unique step ids, valid requires, exactly one turn-in step (last)
+    // milestones: unique step ids, valid requires, the last step is the final turn-in
     expect(q.milestones.length).toBeGreaterThanOrEqual(1);
     const stepIds = q.milestones.map((m) => m.id);
     expect(new Set(stepIds).size).toBe(stepIds.length);
@@ -70,12 +74,14 @@ describe('builder well-formedness', () => {
       (m.requires || []).forEach((rid) => expect(stepIds).toContain(rid));
       expect(typeof (m.rewards?.xp)).toBe('number');
     });
-    const turnIns = q.milestones.filter((m) => m.trigger?.turnIn);
-    expect(turnIns.length).toBe(1);
-    expect(q.milestones[q.milestones.length - 1]).toBe(turnIns[0]);
-    const turnInBuildings = Array.isArray(turnIns[0].trigger.turnIn.building)
-      ? turnIns[0].trigger.turnIn.building : [turnIns[0].trigger.turnIn.building];
-    turnInBuildings.forEach((b) => expect(typeof b).toBe('string'));
+    const last = q.milestones[q.milestones.length - 1];
+    expect(last.trigger?.turnIn).toBeTruthy();
+    // the final hand-in waits on every other step
+    q.milestones.slice(0, -1).forEach((m) => expect(last.requires).toContain(m.id));
+    q.milestones.filter((m) => m.trigger?.turnIn).forEach((m) => {
+      const buildings = Array.isArray(m.trigger.turnIn.building) ? m.trigger.turnIn.building : [m.trigger.turnIn.building];
+      buildings.forEach((b) => expect(typeof b).toBe('string'));
+    });
 
     // objective steps carry a matching event trigger
     q.milestones.filter((m) => !m.trigger?.turnIn).forEach((m) => {
@@ -224,5 +230,86 @@ describe('reward integrity and XP curve', () => {
       expect(m.completed).toBe(false);
       expect(m.progress).toBe(0);
     }));
+  });
+});
+
+describe('authored text', () => {
+  test('every quest has its own turn-in line', () => {
+    SIDE_QUESTS.forEach((q) => {
+      expect(q.milestones[q.milestones.length - 1].text).not.toBe('Return to claim your reward');
+    });
+  });
+
+  test('every site boss has authored art and text', () => {
+    const bossIds = SIDE_QUESTS.flatMap((q) => q.milestones)
+      .filter((m) => m.site && m.site.objectiveType === 'combat')
+      .map((m) => m.site.id);
+    expect(bossIds.length).toBeGreaterThan(0);
+    bossIds.forEach((id) => {
+      const b = SIDE_QUEST_BOSSES[id];
+      if (!b) throw new Error(`${id} has no SIDE_QUEST_BOSSES entry`);
+      expect(b.image).toMatch(/^\/assets\/encounters\//);
+      expect(typeof b.description).toBe('string');
+      expect(b.suggestedActions.length).toBeGreaterThan(0);
+      ['criticalSuccess', 'success', 'failure', 'criticalFailure'].forEach((k) => expect(typeof b.consequences[k]).toBe('string'));
+    });
+  });
+});
+
+describe('multi-step quests', () => {
+  const siteTypesOf = (m) => (m.site ? [m.site.type] : (m.sites || []));
+
+  test('an ordered step never shares a site type with the step it waits on', () => {
+    // Site objectives and gather nodes are placed on site entry, so a later step in the
+    // same site would only appear after leaving and re-entering it.
+    SIDE_QUESTS.forEach((q) => {
+      q.milestones.filter((m) => !m.trigger?.turnIn).forEach((m) => {
+        (m.requires || []).forEach((rid) => {
+          const prior = q.milestones.find((x) => x.id === rid);
+          const shared = siteTypesOf(m).filter((t) => siteTypesOf(prior).includes(t));
+          if (shared.length) throw new Error(`${q.id}: ${m.id} waits on ${rid} in the same ${shared[0]}`);
+        });
+      });
+    });
+  });
+
+  test('the pool has multi-step quests', () => {
+    expect(SIDE_QUESTS.filter((q) => q.milestones.length > 2).length).toBeGreaterThanOrEqual(5);
+  });
+});
+
+describe('biome-themed quests', () => {
+  const BIOMES = ['grassland', 'desert', 'snow'];
+
+  test('themes name real biomes', () => {
+    SIDE_QUESTS.filter((q) => q.themes).forEach((q) => {
+      expect(q.themes.length).toBeGreaterThan(0);
+      q.themes.forEach((t) => expect(BIOMES).toContain(t));
+    });
+  });
+
+  test('every biome keeps quests at every level band 1-5', () => {
+    BIOMES.forEach((biome) => {
+      const fits = SIDE_QUESTS.filter((q) => !q.themes || q.themes.includes(biome));
+      for (let level = 1; level <= 5; level++) {
+        expect(fits.filter((q) => (q.minLevel || 1) === level).length).toBeGreaterThanOrEqual(3);
+      }
+    });
+  });
+
+  test('desert and snow each have their own quests', () => {
+    ['desert', 'snow'].forEach((biome) => {
+      expect(SIDE_QUESTS.filter((q) => q.themes && q.themes.length === 1 && q.themes[0] === biome).length).toBeGreaterThanOrEqual(5);
+    });
+  });
+});
+
+describe('quest tone', () => {
+  test('tone is horror or light', () => {
+    SIDE_QUESTS.filter((q) => q.tone !== undefined).forEach((q) => expect(['horror', 'light']).toContain(q.tone));
+  });
+
+  test('Dark games get their own horror quests', () => {
+    expect(SIDE_QUESTS.filter((q) => q.tone === 'horror').length).toBeGreaterThanOrEqual(5);
   });
 });

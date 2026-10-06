@@ -17,7 +17,7 @@ import { SIDE_QUESTS } from '../data/sideQuests';
 import { canUseTemplate } from './entitlements';
 import { specFromTemplate, mergeLocationNames, resolveMilestoneCoords } from './campaignLauncher';
 import { spawnCampaignIntoWorld, retroInjectQuestContent, findLocationOnMap } from './milestoneSpawner';
-import { selectSideQuests } from './questEngine';
+import { selectSideQuests, assignHomeTowns } from './questEngine';
 import { composeChapterPrologue } from './prologueComposer';
 import { calculateMaxHP } from '../utils/healthSystem';
 import { createLogger } from '../utils/logger';
@@ -186,7 +186,7 @@ export const healPartyForNextChapter = (party) =>
 // (startable within its level range), excluding every quest id already in the
 // save (any status, including completed), map-valid, and APPENDED by the caller;
 // existing quests keep their state untouched.
-const selectContinuationSideQuests = ({ mapData, townMapsCache, existingSideQuests, levelRange, worldSeed, chapter }) => {
+const selectContinuationSideQuests = ({ mapData, townMapsCache, existingSideQuests, levelRange, worldSeed, chapter, theme, darkness }) => {
   const flatTiles = [].concat(...mapData);
   const availableSites = {
     cave: flatTiles.some((t) => t.poi === 'cave_entrance'),
@@ -216,7 +216,8 @@ const selectContinuationSideQuests = ({ mapData, townMapsCache, existingSideQues
   let sqSeed = ((parseInt(worldSeed) || 1) + chapter * 104729) % 233280 || 1;
   const sqRng = () => { sqSeed = (sqSeed * 9301 + 49297) % 233280; return sqSeed / 233280; };
 
-  return selectSideQuests({ sites: availableSites, buildings: [...availableBuildings] }, 2, sqRng, pool);
+  const picked = selectSideQuests({ sites: availableSites, buildings: [...availableBuildings], theme, darkness }, 2, sqRng, pool);
+  return assignHomeTowns(picked, townMapsCache, sqRng, existingSideQuests);
 };
 
 /**
@@ -279,6 +280,8 @@ export const buildInSaveContinuation = ({
     levelRange: spec.levelRange,
     worldSeed,
     chapter,
+    theme: spec.worldTheme,
+    darkness: spec.darknessLevel,
   });
 
   const prologue = composeChapterPrologue({ spec, chapter, party });

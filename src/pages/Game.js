@@ -194,6 +194,8 @@ const QuestOfferModal = () => {
   // wording stays consistent), the giver's venue, and a full reward preview.
   const objective = getQuestObjectiveStep(quest);
   const objectiveHint = objective ? getStepHint(objective, quest) : '';
+  // Multi-step quests: how many steps follow the first, not counting the final hand-in.
+  const laterSteps = Math.max(0, (quest?.milestones?.length || 0) - 2);
   // "From" the giver: prefer the town's ACTUAL generated building name (a proper noun,
   // e.g. a specific guildhall) when known, else the generic building label; the origin
   // town supplies the specificity ("the guild in Millhaven"), addressing playtest #1a.
@@ -218,7 +220,10 @@ const QuestOfferModal = () => {
           <p className="rumour-detail"><span className="rumour-detail-label">From</span>{giverLabel}</p>
         )}
         {objective?.text && (
-          <p className="rumour-detail"><span className="rumour-detail-label">Objective</span>{objective.text}</p>
+          <p className="rumour-detail"><span className="rumour-detail-label">{laterSteps > 0 ? 'First' : 'Objective'}</span>{objective.text}</p>
+        )}
+        {laterSteps > 0 && (
+          <p className="rumour-detail"><span className="rumour-detail-label">Then</span>{laterSteps === 1 ? '1 more step' : `${laterSteps} more steps`} before the reward</p>
         )}
         {objectiveHint && (
           <p className="rumour-detail"><span className="rumour-detail-label">Where</span>{objectiveHint}</p>

@@ -4,7 +4,8 @@ import {
   getSideQuestProgress, getActiveSiteObjectives, selectSideQuests, effectivePartyLevel,
   deriveSideQuestAvailability, backfillSideQuests, applySideQuestBackfill,
   pickOfferableSideQuest, ACTIVE_QUEST_CAP, OFFER_COOLDOWN_MOVES,
-  resolveQuestOrigin, stampQuestOrigin,
+  resolveQuestOrigin, stampQuestOrigin, getActiveGatherResources, getReadyTurnInStep,
+  assignHomeTowns, getOfferAt, isQuestEligible,
 } from './questEngine';
 import { initialSideQuests, SIDE_QUESTS, QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
 import { ITEM_CATALOG } from '../utils/inventorySystem';
@@ -35,9 +36,9 @@ describe('questEngine — basics', () => {
     // the wraith-lord quest is given at a temple/shrine, not an inn
     expect(getAvailableQuestsAt(sq, { buildingType: 'temple' }).map((q) => q.id)).toContain('ruin_menace');
     expect(getAvailableQuestsAt(sq, { buildingType: 'inn' }).map((q) => q.id)).not.toContain('ruin_menace');
-    // the relic quest is offered at a library; a warehouse offers nothing
+    // the relic quest is offered at a library; a plain house offers nothing
     expect(getAvailableQuestsAt(sq, { buildingType: 'library' }).map((q) => q.id)).toContain('relic_hunt');
-    expect(getAvailableQuestsAt(sq, { buildingType: 'warehouse' }).length).toBe(0);
+    expect(getAvailableQuestsAt(sq, { buildingType: 'house' }).length).toBe(0);
     // accepted/active quests are no longer "available" to offer
     const accepted = acceptSideQuest(sq, 'ruin_menace');
     expect(getAvailableQuestsAt(accepted, { buildingType: 'temple' }).map((q) => q.id)).not.toContain('ruin_menace');
@@ -833,5 +834,170 @@ describe('questEngine: origin-stamped turn-in is restricted to that town (playte
 
   test('an unstamped quest still turns in at any matching building (unchanged behavior)', () => {
     expect(turnInQuest([baseQuest()], { buildingType: 'guild', townName: 'Anywhere' }).completions).toHaveLength(1);
+  });
+});
+
+describe('questEngine: multi-step quests (ordered steps + errands)', () => {
+  const ids = (byType, type) => ((byType[type] || []).map((o) => o.id));
+
+  test('an ordered site step is only placed once the step it waits on is done', () => {
+    let sq = accept('tax_collector');
+    expect(ids(getActiveSiteObjectives(sq), 'ruins')).toEqual(['tax_satchel']);
+    expect(ids(getActiveSiteObjectives(sq), 'cave')).toEqual([]);
+    sq = checkSideQuestEvent(sq, { type: 'item_acquired', itemId: 'tax_satchel' }).updatedSideQuests;
+    expect(ids(getActiveSiteObjectives(sq), 'cave')).toEqual(['tithe_robbers']);
+  });
+
+  test('a kill before its step unlocks does not count', () => {
+    let sq = accept('tax_collector');
+    const early = checkSideQuestEvent(sq, { type: 'enemy_defeated', enemyId: 'tithe_robbers' });
+    expect(early.completions).toHaveLength(0);
+    sq = checkSideQuestEvent(sq, { type: 'item_acquired', itemId: 'tax_satchel' }).updatedSideQuests;
+    sq = checkSideQuestEvent(sq, { type: 'enemy_defeated', enemyId: 'tithe_robbers' }).updatedSideQuests;
+    const { updatedSideQuests, completions } = turnInQuest(sq, { buildingType: 'townhall' });
+    expect(completions.some((c) => c.questCompleted)).toBe(true);
+    expect(find(updatedSideQuests, 'tax_collector').status).toBe('completed');
+  });
+
+  test('an errand at another building unlocks the next step without finishing the quest', () => {
+    let sq = accept('magistrates_warrant');
+    expect(ids(getActiveSiteObjectives(sq), 'ruins')).toEqual([]);
+    expect(getReadyTurnInStep(find(sq, 'magistrates_warrant'), { buildingType: 'townhall' }).id).toBe('mwa1');
+    expect(getReadyTurnIns(sq, { buildingType: 'jail' })).toHaveLength(0);
+    const errand = turnInQuest(sq, { buildingType: 'townhall' });
+    expect(errand.completions).toHaveLength(1);
+    expect(errand.completions[0].questCompleted).toBe(false);
+    sq = errand.updatedSideQuests;
+    expect(ids(getActiveSiteObjectives(sq), 'ruins')).toEqual(['seal_forger']);
+    sq = checkSideQuestEvent(sq, { type: 'enemy_defeated', enemyId: 'seal_forger' }).updatedSideQuests;
+    expect(turnInQuest(sq, { buildingType: 'jail' }).completions.some((c) => c.questCompleted)).toBe(true);
+  });
+
+  test('parallel steps are both open at once and the hand-in needs both', () => {
+    let sq = accept('empty_reliquary');
+    expect(ids(getActiveSiteObjectives(sq), 'ruins')).toEqual(['temple_relic']);
+    expect((getActiveGatherResources(sq).cave || []).map((r) => r.itemId)).toEqual(['raw_gems']);
+    sq = checkSideQuestEvent(sq, { type: 'item_acquired', itemId: 'temple_relic' }).updatedSideQuests;
+    expect(getReadyTurnIns(sq, { buildingType: 'temple' })).toHaveLength(0);
+    for (let i = 0; i < 3; i++) sq = checkSideQuestEvent(sq, { type: 'item_acquired', itemId: 'raw_gems' }).updatedSideQuests;
+    expect(getReadyTurnIns(sq, { buildingType: 'temple' }).map((q) => q.id)).toEqual(['empty_reliquary']);
+  });
+
+  test('gather resupply waits for an ordered step too', () => {
+    // smiths_masterwork: both gathers are open from the start, the foundry errand waits on them
+    const sq = accept('smiths_masterwork');
+    expect((getActiveGatherResources(sq).mountain || []).map((r) => r.itemId).sort()).toEqual(['mountain_crystal', 'rare_ore']);
+    expect(getReadyTurnIns(sq, { buildingType: 'foundry' })).toHaveLength(0);
+  });
+});
+
+describe('questEngine: home towns and one quest per building', () => {
+  // two towns, each with a temple and an inn; only Ashford has a library
+  const town = (types) => ({ mapData: [types.map((t) => ({ type: 'building', buildingType: t, buildingName: `The ${t}` }))] });
+  const cache = { Ashford: town(['temple', 'inn', 'library']), Brook: town(['temple', 'inn']) };
+  const pick = (ids) => initialSideQuests().filter((q) => ids.includes(q.id));
+
+  test('every placeable quest gets a home town that has its giver building', () => {
+    const placed = assignHomeTowns(pick(['ruin_menace', 'relic_hunt', 'lost_heirloom']), cache, seededRng(3));
+    placed.forEach((q) => expect(Object.keys(cache)).toContain(q.giver.town));
+    expect(placed.find((q) => q.id === 'relic_hunt').giver.town).toBe('Ashford'); // only Ashford has a library
+    // turn-ins are pinned to the home town too
+    placed.forEach((q) => q.milestones.filter((m) => m.trigger?.turnIn).forEach((m) => expect(m.trigger.turnIn.location).toBe(q.giver.town)));
+  });
+
+  test('quests at the same building type spread across towns', () => {
+    const placed = assignHomeTowns(pick(['ruin_menace', 'consecrated_relic']), cache, seededRng(5));
+    expect(new Set(placed.map((q) => q.giver.town)).size).toBe(2);
+  });
+
+  test('different seeds give different placements', () => {
+    const towns = (seed) => assignHomeTowns(pick(['ruin_menace', 'lost_heirloom', 'tend_sick']), cache, seededRng(seed)).map((q) => q.giver.town).join();
+    const seen = new Set([1, 2, 3, 4, 5, 6, 7, 8].map(towns));
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  test('a quest whose giver building is in no cached town is left unplaced', () => {
+    const [q] = assignHomeTowns(pick(['vermin_stores']), cache, seededRng(1)); // mill
+    expect(q.giver.town).toBeUndefined();
+  });
+
+  test('a building offers one quest at a time, only in the home town', () => {
+    const sq = assignHomeTowns(pick(['ruin_menace', 'consecrated_relic', 'tend_sick']), { Ashford: town(['temple']) }, seededRng(2));
+    expect(getOfferAt(sq, { buildingType: 'temple', townName: 'Ashford', level: 9 })).toHaveLength(1);
+    expect(getOfferAt(sq, { buildingType: 'temple', townName: 'Brook', level: 9 })).toHaveLength(0);
+    // while one is active, the building offers nothing else
+    const offered = getOfferAt(sq, { buildingType: 'temple', townName: 'Ashford', level: 9 })[0];
+    const busy = acceptSideQuest(sq, offered.id);
+    expect(getOfferAt(busy, { buildingType: 'temple', townName: 'Ashford', level: 9 })).toHaveLength(0);
+    expect(pickOfferableSideQuest(busy, [{ level: 9 }], { now: 0 })).toBeNull();
+  });
+
+  test('a rumour about a placed quest names its home town', () => {
+    const [q] = assignHomeTowns(pick(['relic_hunt']), cache, seededRng(1));
+    expect(resolveQuestOrigin(q, { worldMap: [], townMapsCache: cache, currentTownName: 'Brook' }).town).toBe('Ashford');
+  });
+});
+
+describe('questEngine: biome-themed quests', () => {
+  const avail = (theme) => ({ sites: { cave: true, ruins: true, forest: true, hills: true, mountain: true }, buildings: ['inn', 'tavern', 'shop', 'market', 'townhall', 'barn'], theme });
+  const byId = (id) => SIDE_QUESTS.find((q) => q.id === id);
+
+  test('a desert quest is only eligible on desert worlds', () => {
+    expect(isQuestEligible(byId('buried_well'), avail('desert'))).toBe(true);
+    expect(isQuestEligible(byId('buried_well'), avail('snow'))).toBe(false);
+    expect(isQuestEligible(byId('buried_well'), avail('grassland'))).toBe(false);
+  });
+
+  test('worlds without a recorded theme count as grassland', () => {
+    expect(isQuestEligible(byId('seed_corn'), avail(undefined))).toBe(true);
+    expect(isQuestEligible(byId('buried_well'), avail(undefined))).toBe(false);
+  });
+
+  test('temperate quests stay off desert worlds; unthemed quests fit anywhere', () => {
+    expect(isQuestEligible(byId('seed_corn'), avail('desert'))).toBe(false);
+    expect(isQuestEligible(byId('seed_corn'), avail('snow'))).toBe(true);
+    expect(isQuestEligible(byId('lost_heirloom'), avail('desert'))).toBe(true);
+  });
+
+  test('backfill reads the theme from the save', () => {
+    const worldMap = [[{ poi: 'ruins' }, { poi: 'town', townName: 'Sandreach' }]];
+    const townMapsCache = { Sandreach: { mapData: [[{ type: 'building', buildingType: 'inn' }]] } };
+    const { settings } = applySideQuestBackfill({ theme: 'snow', sideQuests: [], worldSeed: 1 }, { worldMap, townMapsCache, party: [{ level: 1 }] });
+    expect(settings.sideQuests.map((q) => q.id)).not.toContain('buried_well');
+  });
+});
+
+describe('questEngine: quest tone', () => {
+  const avail = (darkness) => ({
+    sites: { cave: true, ruins: true, forest: true, hills: true, mountain: true },
+    buildings: ['inn', 'tavern', 'tailor', 'manor', 'library', 'keep', 'apothecary'],
+    darkness,
+  });
+  const byId = (id) => SIDE_QUESTS.find((q) => q.id === id);
+
+  test('horror quests only appear in Dark games', () => {
+    expect(isQuestEligible(byId('corpse_lights'), avail('Dark'))).toBe(true);
+    expect(isQuestEligible(byId('corpse_lights'), avail('Grey'))).toBe(false);
+    expect(isQuestEligible(byId('corpse_lights'), avail(undefined))).toBe(false);
+  });
+
+  test('light quests stay out of Dark games', () => {
+    expect(isQuestEligible(byId('wedding_gown'), avail('Bright'))).toBe(true);
+    expect(isQuestEligible(byId('wedding_gown'), avail('Dark'))).toBe(false);
+  });
+
+  test('untoned quests fit any game', () => {
+    expect(isQuestEligible(byId('lost_heirloom'), avail('Dark'))).toBe(true);
+    expect(isQuestEligible(byId('lost_heirloom'), avail('Bright'))).toBe(true);
+  });
+
+  test('backfill reads darkness from the save', () => {
+    const worldMap = [[{ poi: 'cave_entrance' }, { poi: 'ruins' }, { poi: 'town', townName: 'Greyfold' }]];
+    const townMapsCache = { Greyfold: { mapData: [[{ type: 'building', buildingType: 'inn' }]] } };
+    const party = [{ level: 5 }];
+    const ids = (settings) => applySideQuestBackfill({ sideQuests: [], worldSeed: 1, ...settings }, { worldMap, townMapsCache, party }, [byId('whispering_well')])
+      .settings.sideQuests.map((q) => q.id);
+    expect(ids({ darknessLevel: 'Dark' })).toContain('whispering_well');
+    expect(ids({ darknessLevel: 'Bright' })).toEqual([]);
   });
 });

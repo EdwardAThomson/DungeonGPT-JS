@@ -107,6 +107,13 @@ describe('getStepHint', () => {
     expect(getStepHint(turnin, quest([done, turnin]))).toBe('✅ Ready — return to an inn or a tavern in any town');
   });
 
+  it('a turn-in partway through a quest reads as an errand, not a return', () => {
+    const errand = { id: 'a', trigger: { turnIn: { building: 'townhall' } }, requires: [], completed: false };
+    const obj = { id: 'b', trigger: { item: 'x' }, requires: ['a'], completed: false };
+    const final = { id: 'c', trigger: { turnIn: { building: 'jail' } }, requires: ['a', 'b'], completed: false };
+    expect(getStepHint(errand, quest([errand, obj, final]))).toBe('✅ Ready — go to the town hall in any town');
+  });
+
   it('completed steps get no hint', () => {
     expect(getStepHint({ site: { type: 'cave' }, completed: true })).toBe('');
   });
@@ -122,6 +129,13 @@ describe('getQuestObjectiveStep', () => {
   it('falls back to the sole turn-in step for a courier quest', () => {
     const deliver = { id: 'd', type: 'turnin', trigger: { turnIn: { building: 'townhall' } } };
     expect(getQuestObjectiveStep({ milestones: [deliver] })).toBe(deliver);
+  });
+
+  it('returns an opening errand for a multi-step quest', () => {
+    const errand = { id: 'a', type: 'turnin', trigger: { turnIn: { building: 'townhall' } }, requires: [] };
+    const obj = { id: 'b', type: 'combat', trigger: { enemy: 'x' }, requires: ['a'] };
+    const final = { id: 'c', type: 'turnin', trigger: { turnIn: { building: 'jail' } }, requires: ['a', 'b'] };
+    expect(getQuestObjectiveStep({ milestones: [errand, obj, final] })).toBe(errand);
   });
 
   it('returns null when there are no milestones', () => {
@@ -160,6 +174,17 @@ describe('isQuestReadyToTurnIn', () => {
   it('is true only once the objective is done and the turn-in is pending', () => {
     expect(isQuestReadyToTurnIn(mk(false))).toBe(false);
     expect(isQuestReadyToTurnIn(mk(true))).toBe(true);
+  });
+
+  it('is false while only a mid-quest errand is ready', () => {
+    const q = {
+      status: 'active',
+      milestones: [
+        { id: 'a', trigger: { turnIn: { building: 'townhall' } }, requires: [], completed: false },
+        { id: 'b', trigger: { turnIn: { building: 'jail' } }, requires: ['a'], completed: false }
+      ]
+    };
+    expect(isQuestReadyToTurnIn(q)).toBe(false);
   });
 
   it('is false for completed/available quests and bad input', () => {

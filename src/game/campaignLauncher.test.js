@@ -14,7 +14,7 @@ import { storyTemplates, registerPremiumTemplates } from '../data/storyTemplates
 import { generateMapData } from '../utils/mapGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
 import { analyzeTownWater, getTownRoadEdges } from '../utils/townWater';
-import { selectSideQuests } from './questEngine';
+import { selectSideQuests, assignHomeTowns } from './questEngine';
 import { populateTown } from '../utils/npcGenerator';
 import { spawnWorldMapEntities, injectQuestBuildings } from './milestoneSpawner';
 import { getMilestoneNpcsForTown } from './milestoneEngine';
@@ -88,7 +88,9 @@ const legacyNewGamePipeline = (template, seedToUse) => {
   const sqRng = () => { sqSeed = (sqSeed * 9301 + 49297) % 233280; return sqSeed / 233280; };
   const townCount = flatTiles.filter((t) => t.poi === 'town').length;
   const sideQuestCount = Math.min(4, Math.max(2, townCount));
-  const selectedSideQuests = selectSideQuests({ sites: availableSites, buildings: [...availableBuildings] }, sideQuestCount, sqRng);
+  const selectedSideQuests = assignHomeTowns(
+    selectSideQuests({ sites: availableSites, buildings: [...availableBuildings], theme: worldTheme, darkness: template.settings.darknessLevel }, sideQuestCount, sqRng),
+    townMapsCache, sqRng);
 
   const settingsData = {
     shortDescription: template.settings.shortDescription,
