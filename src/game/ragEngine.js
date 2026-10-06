@@ -29,7 +29,44 @@ const isCurrentVersion = (entry) =>
 // handled like stale-model vectors: excluded from retrieval, counted as not
 // indexed, and replaced with chunks by the load-time backfill.
 const isChunked = (entry) => Number.isInteger(entry.chunkIndex);
-const isCurrent = (entry) => isCurrentVersion(entry) && isChunked(entry);
+
+// Chunk format 2: each chunk is EMBEDDED with its scene's names in front ("Names:
+// Elara, Tamsin, Lyria.\n<chunk>") while the stored, injected text stays the plain
+// chunk. Narration refers back with "she"/"he", so a paragraph split off on its own
+// can lose the name it is about (a ring handed over by "she" no longer matched "What
+// did Elara give us?"). Measured on /debug/rag-compare's sample: plain chunks reached
+// 11/13 answers, names-prefixed 13/13 with no regressions. Format-1 chunks (#175,
+// unstamped) count as not indexed, so the load-time backfill re-embeds them.
+export const CHUNK_FORMAT_VERSION = 2;
+const isCurrentFormat = (entry) => entry.chunkFormat === CHUNK_FORMAT_VERSION;
+const isCurrent = (entry) => isCurrentVersion(entry) && isChunked(entry) && isCurrentFormat(entry);
+
+// Capitalised words that are usually sentence openers or titles, not names.
+const NOT_NAMES = new Set((
+  'The A An He She They It His Her Hers Their Its We Our You Your I Me My When Then Than Before After ' +
+  'At In On From If Back Later Here There This That These Those Some Every Each Not No Yes Up Out Down ' +
+  'As By For With Without Into Over Under And But Or So Yet Now Once Still Just Only Even Also While ' +
+  'Where What Who Why How Which Whose Somewhere Something Someone Nothing Everyone All One Two Three ' +
+  'Four Five Six Seven Eight Nine Ten Fifty Hundred Mother Father Captain Sister Brother Lord Lady Sir ' +
+  'Ser Master Old Young Inside Outside Above Below Behind Beyond Beneath Across Through Along Around ' +
+  'Near Past Toward Towards Upon Amid Against Among Between Beside Despite During Except Until Within ' +
+  'Let Your Ring Find Bring Give Take Go Come Look See Say Tell Ask Wait Stop Hold Keep Make Get'
+).split(' '));
+const MAX_NAMES = 12;
+
+/**
+ * The names a scene mentions, for embedding context: capitalised words (hyphenated
+ * allowed) minus common sentence openers and titles. A heuristic: a stray capitalised
+ * word costs little, a missing name is what the prefix exists to fix.
+ * @param {string} text
+ * @returns {string[]}
+ */
+export const sceneNames = (text) => [...new Set(
+  ((text || '').match(/\b[A-Z][a-z]+(?:-[A-Z]?[a-z]+)?\b/g) || []).filter((w) => !NOT_NAMES.has(w))
+)].slice(0, MAX_NAMES);
+
+/** What actually gets embedded for a chunk: the scene's names, then the chunk. */
+export const chunkEmbeddingText = (chunk, names) => (names && names.length ? `Names: ${names.join(', ')}.\n${chunk}` : chunk);
 
 export const MAX_CHUNK_CHARS = 600;
 // The worker's /api/embed accepts up to 100 texts per call (MAX_BATCH_SIZE in
@@ -75,6 +112,7 @@ const buildChunkEntries = (sessionId, msgIndex, chunks, vectors, timestamp, tags
     timestamp,
     tags,
     modelVersion: EMBEDDING_MODEL_VERSION, // #18
+    chunkFormat: CHUNK_FORMAT_VERSION,
   }));
 
 /**
@@ -114,7 +152,8 @@ export const embedAndStore = async (sessionId, text, metadata) => {
   try {
     const chunks = chunkText(text);
     if (chunks.length === 0) return false;
-    const { vectors } = await embeddingService.embed(chunks);
+    const names = sceneNames(text);
+    const { vectors } = await embeddingService.embed(chunks.map((c) => chunkEmbeddingText(c, names)));
     await ragStore.putBatch(buildChunkEntries(
       sessionId, metadata.msgIndex, chunks, vectors,
       metadata.timestamp || Date.now(), metadata.tags || []
@@ -144,14 +183,14 @@ export const query = async (sessionId, queryText, options = {}) => {
     // #18: vectors stamped with a DIFFERENT model are excluded: comparing them
     // against a current-model query vector is meaningless. Unstamped entries
     // (pre-#18) are current by definition and stay in. Unchunked whole-message
-    // entries are excluded too until backfill re-chunks them.
+    // entries and older-format chunks are excluded too until backfill redoes them.
     const entries = allEntries.filter(isCurrent);
     const staleCount = allEntries.length - entries.length;
     if (staleCount > 0 && !staleWarnedSessions.has(sessionId)) {
       staleWarnedSessions.add(sessionId);
       logger.warn(
         `Excluding ${staleCount} stale vector(s) for session ${sessionId} ` +
-        `(embedded with a different model than ${EMBEDDING_MODEL_VERSION}); ` +
+        `(a different model than ${EMBEDDING_MODEL_VERSION}, unchunked, or an older chunk format); ` +
         `the next load-time backfill will re-index them.`
       );
     }
@@ -179,7 +218,7 @@ export const query = async (sessionId, queryText, options = {}) => {
   }
 };
 
-/** msgIndexes that have current (right model, chunked) entries. */
+/** msgIndexes that have current (right model, current chunk format) entries. */
 const getIndexedMessages = async (sessionId) =>
   new Set((await ragStore.getBySession(sessionId)).filter(isCurrent).map(e => e.msgIndex));
 
@@ -201,7 +240,7 @@ export const backfill = async (sessionId, conversation, options = {}) => {
   if (embeddable.length === 0) return 0;
 
   // Check what's already indexed, per message. Entries stamped with a different
-  // embedding model (#18) or stored unchunked do NOT count: those messages get
+  // embedding model (#18), stored unchunked, or an older chunk format do NOT count: those messages get
   // re-embedded below as fresh chunks, and the old entries are removed.
   const indexedSet = await getIndexedMessages(sessionId);
   const existingCount = indexedSet.size;
@@ -231,14 +270,14 @@ export const backfill = async (sessionId, conversation, options = {}) => {
       group = [];
       groupChunks = 0;
     }
-    group.push({ index, chunks });
+    group.push({ index, chunks, names: sceneNames(msg.content) });
     groupChunks += chunks.length;
   }
   if (group.length > 0) groups.push(group);
 
   for (const [g, batch] of groups.entries()) {
     try {
-      const result = await embeddingService.embed(batch.flatMap(({ chunks }) => chunks));
+      const result = await embeddingService.embed(batch.flatMap(({ chunks, names }) => chunks.map((c) => chunkEmbeddingText(c, names))));
 
       const timestamp = Date.now();
       let offset = 0;
@@ -279,7 +318,7 @@ export const backfill = async (sessionId, conversation, options = {}) => {
  */
 export const getIndexStatus = async (sessionId, conversation) => {
   const embeddableCount = conversation.filter(m => m.role === 'ai').length;
-  // #18: stale-model and unchunked vectors count as unindexed, so they surface
+  // #18: stale-model, unchunked and older-format vectors count as unindexed, so they surface
   // as 'partial'/'empty' and useRagSync's auto-backfill re-indexes on next load.
   const indexedCount = (await getIndexedMessages(sessionId)).size;
 
@@ -290,4 +329,4 @@ export const getIndexStatus = async (sessionId, conversation) => {
   return { status, indexed: indexedCount, total: embeddableCount };
 };
 
-export const ragEngine = { embedAndStore, query, backfill, getIndexStatus, chunkText, formatRagContext };
+export const ragEngine = { embedAndStore, query, backfill, getIndexStatus, chunkText, formatRagContext, sceneNames, chunkEmbeddingText };
