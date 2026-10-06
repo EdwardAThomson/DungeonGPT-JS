@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { generateText, AiServiceError } from "../services/ai";
+import {
+  generateText,
+  AiServiceError,
+  AI_QUOTA_CODE,
+  quotaRetryAfterSeconds,
+} from "../services/ai";
 import { getAllModels, DEFAULT_MODEL_ID } from "../services/models";
 import { generatePremiumText } from "../services/openrouter";
 import { getSql, type Sql } from "../services/pg";
@@ -245,6 +250,21 @@ aiRoutes.post("/generate", requireAuth, rateLimit("ai-generate"), async (c) => {
     });
     return c.json(output);
   } catch (error: unknown) {
+    if (error instanceof AiServiceError && error.code === AI_QUOTA_CODE) {
+      // Players get a clear "out of AI for today" instead of a generic failure.
+      console.error("[ai] Workers AI daily allocation used up; refusing until 00:00 UTC");
+      const retryAfterSeconds = quotaRetryAfterSeconds();
+      c.header("Retry-After", String(retryAfterSeconds));
+      return c.json(
+        {
+          error: "The storyteller is out of AI for today. It resets at midnight UTC.",
+          code: AI_QUOTA_CODE,
+          retryAfterSeconds,
+        },
+        503
+      );
+    }
+
     const status =
       error instanceof AiServiceError &&
       error.status >= 200 &&

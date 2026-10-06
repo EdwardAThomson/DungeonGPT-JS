@@ -115,7 +115,13 @@ export const llmService = {
                 if (data?.code === 'rate_limited' && data?.retryAfterSeconds) {
                     errorMessage = `${errorMessage} (try again in ${data.retryAfterSeconds}s)`;
                 }
-                throw new Error(errorMessage);
+                if (data?.code === 'ai_quota' && data?.retryAfterSeconds) {
+                    const hours = Math.max(1, Math.round(data.retryAfterSeconds / 3600));
+                    errorMessage = `${errorMessage} (about ${hours} hour${hours === 1 ? '' : 's'} from now)`;
+                }
+                const err = new Error(errorMessage);
+                if (data?.code) err.code = data.code;
+                throw err;
             }
 
             if (!data || typeof data.text !== 'string') {
