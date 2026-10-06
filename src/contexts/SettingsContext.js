@@ -22,12 +22,19 @@ const SettingsContext = createContext({
   setTheme: () => { },
   showMapGrid: true,
   setShowMapGrid: () => { },
+  classicTownArt: false,
+  setClassicTownArt: () => { },
 });
 
 // Per-viewer display preference: storage can be blocked (private windows), so every
 // read/write is guarded and the default (gridlines on) stands in.
 const readMapGrid = () => {
   try { return localStorage.getItem('dgpt:showMapGrid') !== 'false'; } catch (e) { return true; }
+};
+
+// Town art: the 3/4 view by default; 'classic' brings back the flat tileset.
+const readClassicTownArt = () => {
+  try { return localStorage.getItem('dgpt:townArt') === 'classic'; } catch (e) { return false; }
 };
 
 export const SettingsProvider = ({ children }) => {
@@ -42,6 +49,12 @@ export const SettingsProvider = ({ children }) => {
   const setShowMapGrid = (on) => {
     setShowMapGridState(on);
     try { localStorage.setItem('dgpt:showMapGrid', on ? 'true' : 'false'); } catch (e) { /* in-memory only */ }
+  };
+
+  const [classicTownArt, setClassicTownArtState] = useState(readClassicTownArt);
+  const setClassicTownArt = (on) => {
+    setClassicTownArtState(on);
+    try { localStorage.setItem('dgpt:townArt', on ? 'classic' : '3q'); } catch (e) { /* in-memory only */ }
   };
 
   const updateTheme = (newTheme) => {
@@ -66,7 +79,9 @@ export const SettingsProvider = ({ children }) => {
       theme,
       setTheme: updateTheme,
       showMapGrid,
-      setShowMapGrid
+      setShowMapGrid,
+      classicTownArt,
+      setClassicTownArt
     }}>
       {children}
     </SettingsContext.Provider>

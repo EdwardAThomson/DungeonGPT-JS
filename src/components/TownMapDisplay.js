@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { tileBackground, waterwayMask, OFF_MAP, POI_EMOJI } from '../utils/townTileArt';
 import { isTownTileWalkable } from '../utils/townMapGenerator';
@@ -6,6 +6,8 @@ import { getReadyTurnIns } from '../game/questEngine';
 import BuildingModal from './BuildingModal';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
+import SettingsContext from '../contexts/SettingsContext';
+import Town3QView, { seedForTown } from './Town3QView';
 
 const logger = createLogger('town-map-display');
 
@@ -34,6 +36,9 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
   // A suggested-action walk (#91) asks for a building to open once the party arrives.
   // handleBuildingClick is defined below the early return, so reach it through a ref.
   const buildingClickRef = useRef(null);
+  // 3/4 town art by default; the classic flat tileset is a per-viewer setting.
+  const { classicTownArt } = useContext(SettingsContext);
+  const townSeed = useMemo(() => seedForTown(townMapData), [townMapData]);
   useEffect(() => {
     if (!buildingRequest) return;
     const tile = townMapData?.mapData?.[buildingRequest.y]?.[buildingRequest.x];
@@ -131,6 +136,16 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
 
   buildingClickRef.current = handleBuildingClick;
 
+  // The 3/4 view draws the town; the tile grid above it stays as the (transparent) click,
+  // tooltip and marker layer, so interaction is identical in both art styles.
+  const wrapView = (grid) => (classicTownArt ? grid : (
+    <div style={{ width: width * TILE, margin: '20px auto', border: '2px solid #5d4530', borderRadius: 4, boxShadow: '0 4px 14px rgba(0,0,0,0.25)', background: '#1b1a1f' }}>
+      <Town3QView town={townMapData} theme={townTheme} tile={TILE} roster={townMapData.npcs || []} npcCount={12} seed={townSeed} interactiveFolk={false}>
+        {grid}
+      </Town3QView>
+    </div>
+  ));
+
   return (
     <div>
       <style>{`
@@ -139,16 +154,18 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
           50%      { box-shadow: 0 0 10px 4px rgba(255, 225, 130, 0.95), inset 0 0 7px rgba(255, 225, 130, 0.75); }
         }
       `}</style>
-      <div style={{
+      {wrapView(<div style={{
         position: 'relative',
         display: 'grid',
         gridTemplateColumns: `repeat(${width}, ${TILE}px)`,
         gap: 0,
-        border: '2px solid #5d4530',
-        borderRadius: 4,
+        ...(classicTownArt ? {
+          border: '2px solid #5d4530',
+          borderRadius: 4,
+          margin: '20px auto',
+          boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
+        } : {}),
         width: `${width * TILE}px`,
-        margin: '20px auto',
-        boxShadow: '0 4px 14px rgba(0,0,0,0.25)',
         fontSize: '16px',
       }}>
         {mapData.flat().map((tile, index) => {
@@ -182,7 +199,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
               style={{
                 width: TILE,
                 height: TILE,
-                backgroundImage: tileBackground(tile, neighbours, col, row, townTheme, wetMask),
+                backgroundImage: classicTownArt ? tileBackground(tile, neighbours, col, row, townTheme, wetMask) : 'none',
                 backgroundSize: 'cover',
                 display: 'flex',
                 alignItems: 'center',
@@ -210,7 +227,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
                   filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.6))', pointerEvents: 'none',
                 }} aria-label="quest objective">❗</span>
               )}
-              {poiEmoji && (
+              {poiEmoji && classicTownArt && (
                 <span style={{ position: 'relative', zIndex: 2, fontSize: 18, filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.45))' }}>
                   {poiEmoji}
                 </span>
@@ -251,7 +268,7 @@ const TownMapDisplay = ({ townMapData, playerPosition, onTileClick, onLeaveTown,
             )}
           </div>
         )}
-      </div>
+      </div>)}
       {townError && (
         <div className="message system error" style={{ margin: '10px auto', display: 'block', maxWidth: '400px' }}>
           ⚠️ {townError}
