@@ -9,7 +9,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { generateTownMap } from '../utils/townMapGenerator';
 import { tileBackground, waterwayMask, jettyInfo, OFF_MAP, POI_EMOJI } from '../utils/townTileArt';
-import { SPRITE_W, bridgeSprite3q, jettySprite3q, squareFaceSprite3q, squareParapetSprite3q, buildingSprite3q, buildingSmoke3q, poiSprite3q, wallSprite3q, gateSprite3q, fieldTile3q, scarecrowSprite3q, FIELD_CROPS, BUILDING_TYPES_3Q } from '../utils/townSprites3q';
+import { SPRITE_W, snowLane3q, bridgeSprite3q, jettySprite3q, squareFaceSprite3q, squareParapetSprite3q, buildingSprite3q, buildingSmoke3q, poiSprite3q, wallSprite3q, gateSprite3q, fieldTile3q, scarecrowSprite3q, FIELD_CROPS, BUILDING_TYPES_3Q } from '../utils/townSprites3q';
 import { townsfolkStrip, NPC_LOOK_COUNT, NPC_SKIN_COUNT, TOWNSFOLK_ROLES, lookForRole, lookForResident, FIG_W, FIG_H } from '../utils/townsfolkSprites';
 import { buildStreetGraph, createTownsfolk, stepTownsfolk } from '../game/ambientTownsfolk';
 import { populateTown } from '../utils/npcGenerator';
@@ -360,7 +360,9 @@ const Town3QTest = () => {
       <div style={{ position: 'absolute', inset: 0, display: 'grid', gridTemplateColumns: `repeat(${W}, ${T}px)`, filter: grade ? 'saturate(0.8) brightness(0.95) contrast(1.04)' : 'none' }}>
         {grid.flat().map((t) => {
           const g = groundTypeFor(t, theme);
-          const bg = t.type === 'farm_field' ? fieldBg(t) : tileBackground(g, neighbours(t.x, t.y), t.x, t.y, theme, wetMask(g, t.x, t.y));
+          const bg = t.type === 'farm_field' ? fieldBg(t)
+            : theme === 'snow' && t.type === 'dirt_path' && !wetMask(g, t.x, t.y) ? snowLane3q(t.x, t.y)
+            : tileBackground(g, neighbours(t.x, t.y), t.x, t.y, theme, wetMask(g, t.x, t.y));
           return <div key={`g${t.x},${t.y}`} style={{ width: T, height: T, backgroundImage: bg, backgroundSize: '100% 100%' }} />;
         })}
       </div>

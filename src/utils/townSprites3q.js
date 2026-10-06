@@ -1123,7 +1123,15 @@ const fieldTile = (crop, mask, variant, theme, edge) => {
       `<rect x='0' y='${y + 3.2}' width='40' height='1.8' fill='${shade(soil, 0.72)}'/>`;
   }
   if (snow) {
-    for (let y = 1; y < 40; y += 5) s += `<rect x='0' y='${y}' width='40' height='1.8' fill='#eef2f6' opacity='0.85'/>`;
+    // snow lying over the furrows: soft ridges with blue shadow, stubble poking through
+    s = `<rect width='40' height='40' fill='#e9eef2'/>`;
+    for (let y = 1; y < 40; y += 5) {
+      s += `<rect x='0' y='${y}' width='40' height='1.4' fill='#fbfdfe'/>` +
+        `<rect x='0' y='${y + 3}' width='40' height='1.6' fill='#cdd8e0' opacity='0.8'/>`;
+      for (let x = 1 + r() * 3; x < 39; x += 2.5 + r() * 3) {
+        if (r() < 0.55) s += `<line x1='${fmt(x)}' y1='${fmt(y + 2.6)}' x2='${fmt(x + (r() - 0.5) * 0.6)}' y2='${fmt(y + 1.2)}' stroke='#9a8a5e' stroke-width='0.4'/>`;
+      }
+    }
   } else if (st.plant) {
     for (let y = 2.4; y < 40; y += 5) {
       for (let x = 1.5 + (r() * 1.5); x < 39; x += st.round ? 4.2 : 2.2) {
@@ -1167,6 +1175,28 @@ const fieldTile = (crop, mask, variant, theme, edge) => {
   if (!(mask & 2)) s += side(37.6, 0, 2.4, 40, false);
   return `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' preserveAspectRatio='none'>${s}</svg>`)}")`;
 };
+// Trodden snow over a lane (snow towns): packed, greyed snow scuffed with footprints and
+// the odd patch of slush. No edges or ruts, so lanes of any width join up seamlessly.
+const snowLane = (variant) => {
+  const r = rng(variant * 4421 + 7);
+  let s = `<rect width='40' height='40' fill='#d8dfe5'/>`;
+  for (let i = 0; i < 3; i++) {
+    s += `<ellipse cx='${fmt(6 + r() * 28)}' cy='${fmt(6 + r() * 28)}' rx='${fmt(4 + r() * 4)}' ry='${fmt(2 + r() * 2)}' fill='#cbd3da' opacity='0.8'/>`;
+  }
+  for (let i = 0; i < 16; i++) {
+    const x = 2 + r() * 36, y = 2 + r() * 36;
+    s += `<ellipse cx='${fmt(x)}' cy='${fmt(y)}' rx='0.7' ry='1.1' fill='#b3bdc5' opacity='0.75'/>`;
+  }
+  for (let i = 0; i < 4; i++) {
+    s += `<circle cx='${fmt(2 + r() * 36)}' cy='${fmt(2 + r() * 36)}' r='${fmt(0.5 + r() * 0.6)}' fill='#a59c88' opacity='0.5'/>`;
+  }
+  return `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' preserveAspectRatio='none'>${s}</svg>`)}")`;
+};
+export const snowLane3q = (x = 0, y = 0) => {
+  const variant = seedOf(x, y) % 6;
+  return memo(`sl|${variant}`, () => snowLane(variant));
+};
+
 export const fieldTile3q = (crop = 'wheat', mask = 15, x = 0, y = 0, theme = 'grassland', edge = 'hedge') => {
   const variant = seedOf(x, y) % 4;
   return memo(`f|${crop}|${mask}|${variant}|${theme}|${edge}`, () => fieldTile(crop, mask, variant, theme, edge));
