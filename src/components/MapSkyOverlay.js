@@ -27,7 +27,7 @@
 
 import React, { useMemo } from 'react';
 
-const CLOUD_COUNT = 5;
+const CLOUD_COUNT = 7;
 const BIRD_COUNT = 5;
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -37,7 +37,7 @@ function makeClouds() {
     key: `cloud-${i}`,
     top: rand(4, 88),          // % from top of the map — full vertical span, not just the top half
     scale: rand(0.7, 1.3),
-    opacity: rand(0.14, 0.28), // subtle — this should read as weather, not fog
+    opacity: rand(0.154, 0.308), // subtle — this should read as weather, not fog
     duration: rand(70, 130),   // seconds for one off-left -> off-right traverse
     delay: -rand(0, 120),      // negative delay desyncs clouds from each other
   }));
@@ -47,8 +47,8 @@ function makeBirds() {
   return Array.from({ length: BIRD_COUNT }, (_, i) => ({
     key: `bird-${i}`,
     top: rand(6, 90),          // % from top — full vertical span, not just the top half
-    duration: rand(22, 40),    // full cycle; the bird is only visible for ~15% of it
-    delay: -rand(0, 40),
+    duration: rand(27.5, 50),  // full cycle; the bird is only visible for ~15% of it
+    delay: -rand(0, 50),
     scale: rand(0.85, 1.25),
     reverse: i % 2 === 1,      // alternate flight direction so flocks don't all match
   }));
