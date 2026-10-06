@@ -1,6 +1,6 @@
 # Roadmap — DungeonGPT (JS)
 
-_Status: active · updated 2026-10-05_
+_Status: active · updated 2026-10-06_
 
 The production rewrite of DungeonGPT — a React web app for creating fantasy
 characters and playing AI-narrated RPG campaigns. Deployed at dungeongpt.xyz on
@@ -58,6 +58,12 @@ backlog; see the `docs/` design docs for each system.
 - [x] Playtest fixes: quest-building injection for milestone towns (#74), Start Adventure retry (#75); 17 encounter/boss image mismatches corrected
 - [x] Hub payments enforcement + visibility (#6, 2026-07-22): billing live at the Octonion hub; the Worker's premium gates (AI pool, premium templates) and the client snapshot all admit on the merged tier MAX(local, hub) via `cf-worker/src/services/mergedTier.ts`; Profile shows a read-only premium-allowance meter (daily/monthly used vs limit) plus the hub credit balance; Membership page links the hub tier page with a live upgrade CTA
 - [x] World map animated tile art + sky overlay; town nobility fixes (the keep seats the lord, manor families match their manors); unnamed saves take the campaign chapter name
+- [x] Map & Adventure Log layout (#84): the map-stage workspace is the default for `/game` (2026-10-06); docked map with auto-travel, smooth travel and continuous roads. Classic layout kept as a fallback (`?layout=classic`, Adventure Book Settings, or `DEFAULT_GAME_LAYOUT` in `src/game/gameLayout.js`)
+- [x] Suggested actions (#91): engine-derived action chips in the workspace, including side-quest chips; side-quest sites and hand-in towns marked on the world map
+- [x] Starter kit (#177): new heroes start at the gear level combat is tuned for; automatic in new games, claimable in old saves. Fewer encounters on auto-travel pass-through tiles
+- [x] Adventure Log narration pass (#180): more local movement lines across all terrains, varied openers, rewritten encounter outcomes, more Look-around and NPC meeting lines
+- [x] RAG memory chunks (#175): narration stored as paragraph chunks and injected whole, chunks embedded with their scene's names; before/after compare page at `/debug/rag-compare`
+- [x] Side-quest expansion (#182, #184): larger quest pool with ordered steps, per-quest turn-in lines and side-quest bosses; a few side quests per town, with level-1 work in the starting town
 
 ## Next
 
@@ -66,7 +72,6 @@ backlog; see the `docs/` design docs for each system.
 - [x] Replace fragile keyword-based encounter-engagement detection: superseded by the two-tier narration redesign; the keyword matching no longer exists (OUTSTANDING_ISSUES #13)
 - [x] Deploy product analytics (#86): migration 007 applied + Worker deployed; pipeline verified live 2026-07-22 (funnel events recording)
 - [x] Landing page + UI redesign (#82): merged to master and live 2026-10-03 (PR #172). Dark token layer + auth-aware nav, guest landing + player dashboard (split to `/play`), live world map + Subscribe CTA, The Engine + Overview depth pages, How to Play manual (absorbing Features & FAQ), and every in-app page restyled on the redesign primitives (Your Games, Your Heroes, sign-in, Choose your party, New game, Create Your Hero, game screen, pop-ups via a shared dialog); mobile overflow QA pass
-- [ ] Map & Adventure Log layout: promote the map to the main stage (#84, HIGH PRIORITY): nearly done on `feat/workspace-spike`. Docked map stage with auto-travel, suggested actions, smooth travel, and continuous roads built; final polish before merge
 - [ ] Combat UX continuation (#79): dockable map-context HUD (§0 step 2), then the remaining animation/refine threads (`docs/COMBAT_UX_PLAN.md`)
 - [ ] In-flight phase work: AI narration contract Phase 2 (#76), skill checks Phases 3-4 (#83), arc cards Phases 2-4 (#73). Groundwork for moving adjudication engine-side: typed-decision eval plan, pilot runner + narrator baseline, and the AI DM design direction note (`docs/AI_DM_DESIGN_DIRECTION.md`, `docs/TYPED_DECISION_NEXT_STEPS.md`, 2026-09-30)
 - [ ] Mobile UI fixes (tracked only here, no backlog row): the #82 redesign rebuilt sign-in, nav, and How to Play and fixed phone overflow; needs a device re-check to confirm the original sign-in/nav overlap and How-To-Play layout issues are gone
