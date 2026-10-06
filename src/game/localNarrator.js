@@ -960,7 +960,16 @@ const LOOK_OPENERS = [
   'You stop and look around, letting your eyes settle on the place.',
   'Halting a moment, the party takes stock of the land about them.',
   'You take a slow look around, marking what stands out.',
-  'Standing still, the party lets the place reveal itself.'
+  'Standing still, the party lets the place reveal itself.',
+  'A moment\'s halt, and a slow turn to take the place in.',
+  'You stand a while and let the ground speak for itself.',
+  'Nothing is done for a minute but looking.',
+  'The party stops, and the land comes into focus a piece at a time.',
+  'You look about you, near things first, then far.',
+  'Here is as good a place as any to stop and look.',
+  'Packs down for a moment, and eyes up.',
+  'You turn a full circle, slowly, missing nothing you can help.',
+  'A pause, and the place fills in around the party.'
 ];
 
 export const composeLocalAmbientNarrative = ({
@@ -1012,13 +1021,24 @@ const NPC_MEETING_OPENERS = [
   '{who} looks up as the party enters {where} and beckons them closer.',
   'The party finds {who} within {where}, already sizing them up.',
   '{who} sets aside their work as the party steps into {where}.',
-  'Inside {where}, {who} greets the party with a curt nod.'
+  'Inside {where}, {who} greets the party with a curt nod.',
+  '{who} is at the far end of {where} and comes over without hurry.',
+  'Within {where}, {who} glances up from a ledger and waits for the party to speak.',
+  '{who} is waiting just inside {where}, as if expecting someone, though perhaps not these.',
+  'The party is barely inside {where} before {who} is on their feet.',
+  '{who} breaks off a conversation as the party comes into {where} and gives them a long look.',
+  'Somewhere in {where} a stool scrapes, and {who} comes forward to see who has arrived.'
 ];
 
 const NPC_MEETING_CLOSERS = [
   'Introductions made, the party lays out what brings them here, and is heard out in full.',
   'The party states their business plainly, and it is taken in with a measuring look.',
-  'What the party has come to say is listened to, word for word.'
+  'What the party has come to say is listened to, word for word.',
+  'The party says what it has come to say, and nothing is said back until it is finished.',
+  'A chair is pushed out with a foot, and the party is told to sit and talk.',
+  'The party explains itself; the answer, when it comes, is short and to the point.',
+  'What the party has to tell is heard with a frown that does not mean displeasure.',
+  'They speak, and are weighed as they speak, and are not found wanting.'
 ];
 
 export const composeNpcMeeting = ({
