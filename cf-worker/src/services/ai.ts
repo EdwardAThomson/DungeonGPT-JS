@@ -1,5 +1,6 @@
 import { DEFAULT_MODEL_ID, getFallbackCandidates, getModelById } from "./models";
 import type { Env } from "../types";
+import { detectNarrationProblem } from "./responseGuard";
 
 const DEFAULT_MAX_TOKENS = 500;
 const DEFAULT_TEMPERATURE = 0.7;
@@ -58,6 +59,21 @@ export function sanitizeResponse(text: string): string {
   return sanitized.trim();
 }
 
+// Sanitize, then reject output that echoes the DM protocol or has collapsed into a
+// repetition loop. Throwing lets the caller's fallback walk try the next model
+// instead of showing the player the leak. Shared with the premium pool.
+export function acceptNarration(text: string, modelId: string): string {
+  const sanitized = sanitizeResponse(text);
+  const problem = detectNarrationProblem(sanitized);
+  if (problem) {
+    console.warn(
+      `Model ${modelId} output rejected (${problem}): ${sanitized.slice(0, 200)}`
+    );
+    throw new AiServiceError(`Model output rejected (${problem})`, 502);
+  }
+  return sanitized;
+}
+
 async function callWorkersAi(
   env: Env,
   modelId: string,
@@ -105,18 +121,15 @@ async function callWorkersAi(
           return { text: message.content };
         }
 
-        // Reasoning-model fallback: some models (e.g. @cf/google/gemma-4-26b-a4b-it)
-        // emit chain-of-thought into `message.reasoning` and only populate
-        // `message.content` once they finish thinking. If max_tokens runs out
-        // mid-thinking, content is null while reasoning holds partial planning.
-        // Use reasoning as a degraded fallback so callers get something back
-        // instead of a 502, but warn loudly so the situation is visible.
+        // Reasoning models that run out of max_tokens mid-thinking return
+        // content null with partial planning in `message.reasoning`. That text is
+        // the model's internal planning (it often restates the prompt), so it is
+        // never shown as narration: fall through to the error and let the
+        // fallback walk try another model.
         if (typeof message?.reasoning === "string" && message.reasoning.length > 0) {
           console.warn(
-            `Model ${modelId} returned null content with reasoning text; ` +
-              `using reasoning as degraded fallback (likely max_tokens exhausted mid-thinking).`
+            `Model ${modelId} returned null content with reasoning text (likely max_tokens exhausted mid-thinking).`
           );
-          return { text: message.reasoning };
         }
       }
     }
@@ -167,7 +180,7 @@ export async function generateText(
       temperature,
       options.systemPrompt
     );
-    return { text: sanitizeResponse(primary.text) };
+    return { text: acceptNarration(primary.text, model.id) };
   } catch (primaryError: unknown) {
     console.error(
       `Primary model ${model.id} failed:`,
@@ -190,7 +203,7 @@ export async function generateText(
           temperature,
           options.systemPrompt
         );
-        return { text: sanitizeResponse(fallback.text) };
+        return { text: acceptNarration(fallback.text, fallbackModel.id) };
       } catch (fallbackError: unknown) {
         console.error(
           `Fallback model ${fallbackModel.id} also failed:`,
