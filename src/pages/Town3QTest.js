@@ -8,21 +8,31 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { generateTownMap } from '../utils/townMapGenerator';
-import { tileBackground, waterwayMask, OFF_MAP, POI_EMOJI } from '../utils/townTileArt';
-import { SPRITE_W, buildingSprite3q, buildingSmoke3q, poiSprite3q, wallSprite3q, gateSprite3q, fieldTile3q, scarecrowSprite3q, FIELD_CROPS, BUILDING_TYPES_3Q } from '../utils/townSprites3q';
+import { tileBackground, waterwayMask, jettyInfo, OFF_MAP, POI_EMOJI } from '../utils/townTileArt';
+import { SPRITE_W, bridgeSprite3q, jettySprite3q, squareFaceSprite3q, squareParapetSprite3q, buildingSprite3q, buildingSmoke3q, poiSprite3q, wallSprite3q, gateSprite3q, fieldTile3q, scarecrowSprite3q, FIELD_CROPS, BUILDING_TYPES_3Q } from '../utils/townSprites3q';
 import { townsfolkStrip, NPC_LOOK_COUNT, NPC_SKIN_COUNT, TOWNSFOLK_ROLES, lookForRole, lookForResident, FIG_W, FIG_H } from '../utils/townsfolkSprites';
 import { buildStreetGraph, createTownsfolk, stepTownsfolk } from '../game/ambientTownsfolk';
 import { populateTown } from '../utils/npcGenerator';
 
 const SIZES = ['hamlet', 'village', 'town', 'city'];
 const THEMES = ['grassland', 'desert', 'snow'];
+// Water contexts, as the world map would pass them (see townWater.analyzeTownWater).
+const WATERS = {
+  none: { river: false, water: null },
+  river: { river: true, water: null },
+  riverfork: { river: true, water: { archetype: 'riverfork' } },
+  riverside: { river: false, water: { kind: 'riverside', edges: { N: false, E: true, S: false, W: false } } },
+  lake: { river: false, water: { kind: 'lake', edges: { N: true, E: false, S: false, W: false } } },
+  coast: { river: false, water: { kind: 'coast', edges: { N: false, E: false, S: false, W: true } } },
+  canal: { river: false, water: { kind: 'coast', edges: { N: false, E: false, S: false, W: true }, archetype: 'canal' } },
+};
 const STEP_MS = 950; // one tile per tick: an unhurried walk
 const STRIDE_S = 0.62; // one walk cycle (matches townsfolkSprites)
 
 // A townsperson's figure: a static strip of poses stepped through by a CSS animation
 // (transform only, so the compositor runs it without repainting).
-const Figure = ({ look, skin, dir, moving }) => {
-  const strip = townsfolkStrip(look, skin, moving ? dir : (dir === 'n' ? 's' : dir), moving);
+const Figure = ({ look, skin, dir, moving, theme }) => {
+  const strip = townsfolkStrip(look, skin, moving ? dir : (dir === 'n' ? 's' : dir), moving, theme);
   return (
     <div style={{ width: '100%', height: '100%', overflow: 'hidden', transform: dir === 'w' ? 'scaleX(-1)' : 'none' }}>
       <div style={{
@@ -46,12 +56,24 @@ const rngFrom = (seed) => {
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// The ground under a sprite: buildings and walls stand on plain ground in the 3/4 view.
+// The ground under a sprite: buildings and walls stand on plain ground in the 3/4 view;
+// bridges and jetties stand over water.
 const groundTypeFor = (tile, theme) => {
   if (tile.type === 'building' || tile.type === 'wall' || tile.type === 'keep_wall') {
     return { ...tile, type: 'grass', poi: null };
   }
+  if (tile.type === 'bridge') return { ...tile, type: 'water' };
   return tile;
+};
+
+// How a crossing (non-jetty bridge tile) is drawn: walk axis, and which sides meet land.
+const PATHISH = new Set(['bridge', 'dirt_path', 'stone_path', 'town_square']);
+const bridgeShape = (nb) => {
+  const wat = (t) => !t || t === 'water';
+  const ew = PATHISH.has(nb.e) || PATHISH.has(nb.w), ns = PATHISH.has(nb.n) || PATHISH.has(nb.s);
+  const axis = ew && !ns ? 'ew' : ns && !ew ? 'ns' : (wat(nb.n) || wat(nb.s) ? 'ew' : 'ns');
+  const land = (t) => !!t && t !== 'bridge' && t !== 'water';
+  return { axis, ends: axis === 'ew' ? { e: land(nb.e), w: land(nb.w) } : { n: land(nb.n), s: land(nb.s), sw: nb.s === 'water' } };
 };
 
 const Btn = ({ on, children, ...rest }) => (
@@ -77,8 +99,12 @@ const Town3QTest = () => {
   const [clouds, setClouds] = useState(true);
   const [grade, setGrade] = useState(true);
   const [allGates, setAllGates] = useState(false);
+  const [waterKind, setWaterKind] = useState('none');
 
-  const town = useMemo(() => generateTownMap(size, `Demo ${size}`, allGates ? ['south', 'north', 'east', 'west'] : 'south', seed, false, 'NORTH_SOUTH', theme), [size, seed, theme, allGates]);
+  const town = useMemo(() => {
+    const w = WATERS[waterKind] || WATERS.none;
+    return generateTownMap(size, `Demo ${size}`, allGates ? ['south', 'north', 'east', 'west'] : 'south', seed, w.river, 'NORTH_SOUTH', theme, w.water);
+  }, [size, seed, theme, allGates, waterKind]);
   const grid = town.mapData;
   const W = town.width, H = town.height;
   const at = (x, y) => (y >= 0 && y < H && x >= 0 && x < W ? grid[y][x] : null);
@@ -155,6 +181,19 @@ const Town3QTest = () => {
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
         const t = grid[y][x];
+        // a town square built over the river: parapets where it meets water, and its
+        // arched front face on the water tile just south of it
+        if (t.type === 'town_square') {
+          const wet = (tx, ty) => at(tx, ty)?.type === 'water';
+          const sq = (tx, ty) => at(tx, ty)?.type === 'town_square';
+          const side = (wx, wy, ax, ay, bx, by) => (wet(x + wx, y + wy)
+            ? 1 | (sq(x + ax, y + ay) && wet(x + ax + wx, y + ay + wy) ? 0 : 2) | (sq(x + bx, y + by) && wet(x + bx + wx, y + by + wy) ? 0 : 4)
+            : 0);
+          const sides = { n: side(0, -1, -1, 0, 1, 0), s: side(0, 1, -1, 0, 1, 0), w: side(-1, 0, 0, 1, 0, -1), e: side(1, 0, 0, 1, 0, -1) };
+          if (sides.n || sides.e || sides.s || sides.w) out.push({ k: `q${x},${y}`, x, y, bg: squareParapetSprite3q(sides) });
+        } else if (t.type === 'water' && at(x, y - 1)?.type === 'town_square') {
+          out.push({ k: `qf${x},${y}`, x, y, bg: squareFaceSprite3q(x, y) });
+        }
         if (t.type === 'building') out.push({ k: `b${x},${y}`, x, y, bg: buildingSprite3q(t.buildingType, x, y, theme), smoke: buildingSmoke3q(t.buildingType, x, y, theme) });
         else if (t.type === 'keep_wall' && at(x, y - 1)?.buildingType === 'keep' && at(x - 1, y)?.type === 'keep_wall' && at(x + 1, y)?.type === 'keep_wall') {
           // the keep's front wall carries its gate (view only; the tile stays a wall)
@@ -173,9 +212,16 @@ const Town3QTest = () => {
           const flank = nbs.some((n) => n?.isGate);
           const keep = t.type === 'keep_wall';
           out.push({ k: `w${x},${y}`, x, y, bg: wallSprite3q(mask, keep, x, y, flank, facesOut(x, y, keep)) });
+        } else if (t.type === 'bridge') {
+          const nb = neighbours(x, y);
+          const jetty = jettyInfo(t, nb);
+          // a bridge at the map edge is a road leaving town, not a jetty
+          const toWater = jetty && { n: [x, y - 1], e: [x + 1, y], s: [x, y + 1], w: [x - 1, y] }[jetty.waterEnd];
+          if (jetty && at(toWater[0], toWater[1])) out.push({ k: `j${x},${y}`, x, y, bg: jettySprite3q(jetty.waterEnd, x, y) });
+          else { const b = bridgeShape(nb); out.push({ k: `br${x},${y}`, x, y, bg: bridgeSprite3q(b.axis, b.ends, x, y) }); }
         } else if (t.poi) {
-          const bg = poiSprite3q(t.poi, x, y);
-          const sway = bg && (t.poi === 'tree' || t.poi === 'pine') ? 4 + ((x * 7 + y * 13) % 30) / 10 : 0;
+          const bg = poiSprite3q(t.poi, x, y, theme);
+          const sway = bg && (t.poi === 'tree' || t.poi === 'pine' || t.poi === 'cactus') ? 4 + ((x * 7 + y * 13) % 30) / 10 : 0;
           out.push(bg ? { k: `p${x},${y}`, x, y, bg, sway } : { k: `e${x},${y}`, x, y, emoji: POI_EMOJI[t.poi] || null });
         }
       }
@@ -365,7 +411,7 @@ const Town3QTest = () => {
             {n.id === selected && (
               <div style={{ position: 'absolute', left: '-15%', width: '130%', bottom: figH(T) * 0.02, height: figH(T) * 0.14, borderRadius: '50%', border: '2px solid #f2c46a', boxShadow: '0 0 6px rgba(242,196,106,0.8)' }} />
             )}
-            <Figure look={n.look} skin={n.skin} dir={n.dir} moving={n.moving} />
+            <Figure look={n.look} skin={n.skin} dir={n.dir} moving={n.moving} theme={theme} />
           </div>
         ))}
       </div>
@@ -431,13 +477,43 @@ const Town3QTest = () => {
           </div>
         </section>
         <section style={{ marginTop: 24 }}>
-          <h3 style={heading}>Townsfolk (medieval Europe): front, profile, back, walking</h3>
+          <h3 style={heading}>Bridges and jetties</h3>
+          <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            {[
+              ['bridge, east-west', [[{ axis: 'ew', ends: { w: true } }, 0], [{ axis: 'ew', ends: {} }, 1], [{ axis: 'ew', ends: { e: true } }, 2]], 'row'],
+              ['bridge, north-south', [[{ axis: 'ns', ends: { n: true } }, 0], [{ axis: 'ns', ends: {} }, 1], [{ axis: 'ns', ends: { s: true } }, 2]], 'col'],
+            ].map(([label, parts, dir]) => (
+              <div key={label} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-secondary)' }}>
+                <div style={{ position: 'relative', width: dir === 'row' ? 180 : 60, height: dir === 'row' ? 110 : 230 }}>
+                  {parts.map(([b, i]) => {
+                    const px = dir === 'row' ? i * 60 : 0, py = dir === 'row' ? 45 : i * 60 + 45;
+                    return (
+                      <React.Fragment key={i}>
+                        <div style={{ position: 'absolute', left: px, top: py, width: 60, height: 60, backgroundImage: tileBackground({ type: 'water' }, {}, i, 3, theme), backgroundSize: '100% 100%' }} />
+                        <div style={{ position: 'absolute', left: px - 15, top: py - 90, width: 90, height: 150, zIndex: i + 1, backgroundImage: bridgeSprite3q(b.axis, b.ends, i, 3), backgroundSize: '100% 100%' }} />
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+                {label}
+              </div>
+            ))}
+            {['n', 'e', 's', 'w'].map((d) => (
+              <div key={d} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-secondary)' }}>
+                <div style={{ width: 90, height: 150, backgroundImage: `${jettySprite3q(d, 1, 1)}, ${tileBackground({ type: 'water' }, {}, 1, 1, theme)}`, backgroundSize: '100% 100%, 60px 60px', backgroundPosition: '0 0, 15px 90px', backgroundRepeat: 'no-repeat' }} />
+                jetty, water to {d.toUpperCase()}
+              </div>
+            ))}
+          </div>
+        </section>
+        <section style={{ marginTop: 24 }}>
+          <h3 style={heading}>Townsfolk ({theme}): front, profile, back, walking</h3>
           <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
             {TOWNSFOLK_ROLES.map((role, i) => (
               <div key={role} style={{ textAlign: 'center', fontSize: 11, color: 'var(--text-secondary)' }}>
                 <div style={{ display: 'flex', gap: 2, padding: 6, borderRadius: 4, backgroundImage: tileBackground({ type: 'dirt_path' }, {}, i, 2, theme), backgroundSize: '48px 48px' }}>
                   {['s', 'e', 'n'].map((v) => (
-                    <div key={v} style={{ width: 40, height: (40 * (FIG_H + 1)) / FIG_W }}><Figure look={lookForRole(role, i)} skin={i % NPC_SKIN_COUNT} dir={v} moving /></div>
+                    <div key={v} style={{ width: 40, height: (40 * (FIG_H + 1)) / FIG_W }}><Figure look={lookForRole(role, i)} skin={i % NPC_SKIN_COUNT} dir={v} moving theme={theme} /></div>
                   ))}
                 </div>
                 {role}
@@ -478,6 +554,11 @@ const Town3QTest = () => {
         <label style={{ fontSize: 12 }}><input type="checkbox" checked={clouds} onChange={(e) => setClouds(e.target.checked)} /> cloud shadows</label>
         <label style={{ fontSize: 12 }}><input type="checkbox" checked={grade} onChange={(e) => setGrade(e.target.checked)} /> colour grade</label>
         <label style={{ fontSize: 12 }}><input type="checkbox" checked={allGates} onChange={(e) => setAllGates(e.target.checked)} /> gates on all sides</label>
+        <label style={{ fontSize: 12 }}>water{' '}
+          <select value={waterKind} onChange={(e) => setWaterKind(e.target.value)}>
+            {Object.keys(WATERS).map((k) => <option key={k} value={k}>{k}</option>)}
+          </select>
+        </label>
       </div>
       <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         {(mode === '3q' || mode === 'both') && <div><h3 style={heading}>3/4 prototype</h3>{view3q}</div>}

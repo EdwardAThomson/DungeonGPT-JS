@@ -52,7 +52,7 @@ const P = {
   glass: '#f2c46a', glassDim: '#55616b', door: '#4b3121', iron: '#3c3c42',
   terracotta: '#9a5440', slate: '#525d66', thatch: '#a88a52', shingle: '#6e5a45',
   moss: '#5d6b4a', gold: '#b89a48', violet: '#5d4a8c', teal: '#467268',
-  snow: '#eef2f6', sand: '#d8bf8c', adobe: '#c9a274',
+  snow: '#eef2f6', sand: '#d8bf8c', adobe: '#c9a274', limewash: '#ece5d6', mudbrick: '#c29a6e',
 };
 // Muted version of the live tileset's per-type roof colours, so each building keeps
 // its identity colour from the flat art, just less candy-bright.
@@ -342,6 +342,49 @@ const themeTint = (theme) => ({
   roofMix: theme === 'snow' ? [P.snow, 0.72] : theme === 'desert' ? ['#b7704a', 0.35] : null,
 });
 
+// A small high window with a wooden lattice (desert houses).
+const latticeAt = (ox, oy, x, z, w, h) => {
+  const X = ox + x, Y = oy - z - h;
+  let s = `<rect x='${fmt(X)}' y='${fmt(Y)}' width='${fmt(w)}' height='${fmt(h)}' fill='#2a2119'/>`;
+  for (let i = 1; i < 3; i++) {
+    s += `<line x1='${fmt(X + (w * i) / 3)}' y1='${fmt(Y)}' x2='${fmt(X + (w * i) / 3)}' y2='${fmt(Y + h)}' stroke='#8a6440' stroke-width='0.45'/>` +
+      `<line x1='${fmt(X)}' y1='${fmt(Y + (h * i) / 3)}' x2='${fmt(X + w)}' y2='${fmt(Y + (h * i) / 3)}' stroke='#8a6440' stroke-width='0.45'/>`;
+  }
+  return s + `<rect x='${fmt(X - 0.4)}' y='${fmt(Y - 0.4)}' width='${fmt(w + 0.8)}' height='${fmt(h + 0.8)}' fill='none' stroke='#6e5034' stroke-width='0.5'/>`;
+};
+
+// A flat roof terrace: parapets on the back and sides, then what sits on it (water jars,
+// a stair head, or a cloth shade on poles). The front parapet is drawn by the caller.
+const roofTerrace = (cam, x0, x1, D, H, wall, r) => {
+  let s = box(cam, x0 - 0.5, x1 + 0.5, D - 1.2, D + 0.5, H, H + 2, wall);
+  s += box(cam, x0 - 0.5, x0 + 1.2, -0.5, D + 0.5, H, H + 2, wall);
+  s += box(cam, x1 - 1.2, x1 + 0.5, -0.5, D + 0.5, H, H + 2, wall);
+  const pick3 = Math.floor(r() * 3);
+  if (pick3 === 0) {
+    // stair head with its door
+    const sx = x1 - 8, sy = D - 8;
+    s += box(cam, sx, sx + 6, sy, sy + 6, H, H + 5, shade(wall, 0.97));
+    const d = cam([sx + 1.8, sy, H]);
+    s += `<path d='M${fmt(d[0])},${fmt(d[1])} v-3 q1.2,-1.4 2.4,0 v3 z' fill='#3a2a1c'/>`;
+  } else if (pick3 === 1) {
+    // cloth shade on four poles
+    const cx = x0 + 3 + r() * 4, cy = D * 0.35;
+    for (const [px, py] of [[cx, cy], [cx + 9, cy], [cx, cy + 7], [cx + 9, cy + 7]]) {
+      const a = cam([px, py, H]), b = cam([px, py, H + 5]);
+      s += `<line x1='${fmt(a[0])}' y1='${fmt(a[1])}' x2='${fmt(b[0])}' y2='${fmt(b[1])}' stroke='#5d4a30' stroke-width='0.6'/>`;
+    }
+    const c = [[cx, cy, H + 5], [cx + 9, cy, H + 5], [cx + 9, cy + 7, H + 5.6], [cx, cy + 7, H + 5.6]].map(cam);
+    s += `<polygon points='${ptsStr(c)}' fill='${pick(r, ['#b5523b', '#d9c9a0', '#3f6f63'])}' opacity='0.92'/>`;
+  }
+  // water jars by the parapet
+  const n = 1 + Math.floor(r() * 3);
+  for (let i = 0; i < n; i++) {
+    const j = cam([x0 + 3 + i * 2.6, 2.6 + r() * 2, H + 1.2]);
+    s += `<ellipse cx='${fmt(j[0])}' cy='${fmt(j[1])}' rx='1.2' ry='1.5' fill='#a8613c'/><ellipse cx='${fmt(j[0] - 0.3)}' cy='${fmt(j[1] - 0.5)}' rx='0.5' ry='0.6' fill='#c98a5e'/>`;
+  }
+  return s;
+};
+
 const buildingSvg = (type, seed, theme) => {
   const r = rng(seed ^ 0x9e3779b9);
   const sp = SPEC[type] || SPEC.house;
@@ -361,6 +404,9 @@ const buildingSvg = (type, seed, theme) => {
   if (theme === 'desert' && wallStyle === 'timber') wallStyle = 'plaster'; // adobe, not half-timber
   let wallColor = sp.wallColor || (wallStyle === 'stone' ? P.stone : wallStyle === 'timber' ? P.plaster : wallStyle === 'plaster' ? P.plasterWarm : P.wood);
   if (tint.wall && wallStyle !== 'planks') wallColor = mixHex(wallColor, tint.wall, 0.6);
+  // desert houses: limewashed or bare mud brick, one or the other per house
+  const dryHouse = theme === 'desert' && type === 'house';
+  if (dryHouse) wallColor = seedOf(seed, 11) % 3 ? P.limewash : P.mudbrick;
   let roof = type === 'house' ? pick(r, HOUSE_ROOFS) : desat(ROOF[type] || P.terracotta);
   if (tint.roofMix) roof = mixHex(roof, tint.roofMix[0], tint.roofMix[1]);
   const glass = sp.glass || P.glass;
@@ -415,7 +461,8 @@ const buildingSvg = (type, seed, theme) => {
         if (!upper && door && wx + winW > door[0] - 1.2 && wx < door[0] + door[1] + 1.2) continue;
         if (sp.slit) { s += `<rect x='${fmt(ox + wx + 1.2)}' y='${fmt(oy - z - 4.5 - (sp.tall ? 2 : 0))}' width='1.2' height='4.5' fill='#1e1e24'/>`; continue; }
         r(); // (formerly a per-window lit roll; kept so the rest of the sprite is unchanged)
-        s += windowAt(ox, oy, wx, z, winW, sp.tall ? 5.5 : 3.6, litWindows, seed + i * 7 + z, glass);
+        s += dryHouse ? latticeAt(ox, oy, wx, z + 1.5, winW - 0.6, 3.2)
+          : windowAt(ox, oy, wx, z, winW, sp.tall ? 5.5 : 3.6, litWindows, seed + i * 7 + z, glass);
         if (sp.bars) s += `<path d='M${fmt(ox + wx + 0.9)},${fmt(oy - z - 3.6)} v3.6 M${fmt(ox + wx + 2.7)},${fmt(oy - z - 3.6)} v3.6' stroke='${P.iron}' stroke-width='0.5'/>`;
       }
     }
@@ -452,6 +499,7 @@ const buildingSvg = (type, seed, theme) => {
     // flat roof with parapet
     const top = theme === 'snow' ? P.snow : shade(wallColor, 0.9);
     s += box(cam, x0, x1, 0, D, H, H + 0.01, top, { topRows: 0 });
+    if (dryHouse) s += roofTerrace(cam, x0, x1, D, H, wallColor, r);
     s += box(cam, x0 - 0.5, x1 + 0.5, -0.5, 1.2, H, H + 2, wallColor);
     if (sp.crenel) {
       for (let x = x0; x < x1 - 1; x += 3.2) s += box(cam, x, x + 1.8, -0.5, 1.2, H + 2, H + 3.6, wallColor);
@@ -744,6 +792,49 @@ const tree = (seed, kind) => {
     s = `<ellipse cx='${ox + 3}' cy='${oy - 2}' rx='8' ry='3' fill='#0d0f14' opacity='0.22' filter='url(#soft)'/>`;
     s += `<circle cx='${ox - 3}' cy='${oy - 5}' r='4.5' fill='${shade(g, 0.8)}'/><circle cx='${ox + 3}' cy='${oy - 5}' r='4.5' fill='${shade(g, 0.7)}'/><circle cx='${ox}' cy='${oy - 8}' r='4.6' fill='${shade(g, 1.05)}'/>`;
     if (r() < 0.5) s += `<circle cx='${ox - 2}' cy='${oy - 9}' r='0.8' fill='#c94a5a'/><circle cx='${ox + 2}' cy='${oy - 6}' r='0.8' fill='#c94a5a'/>`;
+    return wrap(s);
+  }
+  if (kind === 'palm') {
+    // date palm: a leaning ringed trunk, a crown of drooping fronds, date clusters
+    const lean = (r() < 0.5 ? -1 : 1) * (2 + r() * 3);
+    const tx = ox + lean, ty = oy - 30;
+    let p = `<path d='M${ox - 1.8},${oy} Q${fmt(ox + lean * 0.2)},${oy - 16} ${fmt(tx - 1.1)},${ty} L${fmt(tx + 1.1)},${ty} Q${fmt(ox + lean * 0.2 + 2.6)},${oy - 16} ${ox + 1.8},${oy} Z' fill='#7a5e3e'/>`;
+    for (let i = 1; i < 10; i++) {
+      const t = i / 10, x = ox + lean * t * t, y = oy - 30 * t;
+      p += `<line x1='${fmt(x - 1.6)}' y1='${fmt(y)}' x2='${fmt(x + 1.6)}' y2='${fmt(y + 0.6)}' stroke='#5a4430' stroke-width='0.5'/>`;
+    }
+    const greens = ['#4f6b34', '#5c7a3a', '#465f30'];
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 + r() * 0.3;
+      const len = 11 + r() * 4, ex = tx + Math.cos(a) * len, ey = ty + Math.sin(a) * len * 0.45 + 3;
+      const cx = tx + Math.cos(a) * len * 0.5, cy = ty + Math.sin(a) * len * 0.2 - 4;
+      p += `<path d='M${fmt(tx)},${fmt(ty)} Q${fmt(cx)},${fmt(cy)} ${fmt(ex)},${fmt(ey)}' stroke='${greens[i % 3]}' stroke-width='2.2' fill='none' stroke-linecap='round'/>`;
+    }
+    p += `<circle cx='${fmt(tx - 1.5)}' cy='${fmt(ty + 2)}' r='1.3' fill='#a8642c'/><circle cx='${fmt(tx + 1.4)}' cy='${fmt(ty + 2.4)}' r='1.2' fill='#94551f'/>`;
+    s = `<ellipse cx='${ox + 7}' cy='${oy - 2}' rx='11' ry='3.6' fill='#0d0f14' opacity='0.22' filter='url(#soft)'/>` + p;
+    return wrap(s);
+  }
+  if (kind === 'scrub') {
+    // dry scrub: low grey-olive tufts
+    s = `<ellipse cx='${ox + 3}' cy='${oy - 2}' rx='8' ry='2.6' fill='#0d0f14' opacity='0.18' filter='url(#soft)'/>`;
+    const cols = ['#8a8a5a', '#7a7d4e', '#9a8f62'];
+    for (let i = 0; i < 3; i++) {
+      const bx = ox - 5 + i * 5 + r() * 2, c = cols[i];
+      for (let k = 0; k < 6; k++) {
+        const a = -Math.PI / 2 + (k - 2.5) * 0.35;
+        s += `<line x1='${fmt(bx)}' y1='${oy - 2}' x2='${fmt(bx + Math.cos(a) * 5)}' y2='${fmt(oy - 2 + Math.sin(a) * 5)}' stroke='${c}' stroke-width='0.8' stroke-linecap='round'/>`;
+      }
+    }
+    return wrap(s);
+  }
+  if (kind === 'rock' || kind === 'rock_snow' || kind === 'rock_sand') {
+    // a boulder with lit and shaded facets (sandstone in the desert, a snow cap in winter)
+    const base = kind === 'rock_sand' ? '#b89a6e' : '#8d8a84';
+    const w = 10 + r() * 4, h = 9 + r() * 4;
+    s = `<ellipse cx='${ox + 3}' cy='${oy - 2}' rx='${fmt(w + 2)}' ry='3' fill='#0d0f14' opacity='0.25' filter='url(#soft)'/>`;
+    s += `<path d='M${fmt(ox - w)},${oy - 2} L${fmt(ox - w + 2)},${fmt(oy - h)} L${fmt(ox - 1)},${fmt(oy - h - 3)} L${fmt(ox + w - 2)},${fmt(oy - h + 1)} L${fmt(ox + w)},${oy - 2} Z' fill='${shade(base, 0.8)}'/>`;
+    s += `<path d='M${fmt(ox - w + 2)},${fmt(oy - h)} L${fmt(ox - 1)},${fmt(oy - h - 3)} L${fmt(ox + 1)},${fmt(oy - 3)} L${fmt(ox - w)},${oy - 2} Z' fill='${shade(base, 1.08)}'/>`;
+    if (kind === 'rock_snow') s += `<path d='M${fmt(ox - w + 2.4)},${fmt(oy - h)} L${fmt(ox - 1)},${fmt(oy - h - 3)} L${fmt(ox + w - 2)},${fmt(oy - h + 1)} Q${fmt(ox)},${fmt(oy - h + 1.5)} ${fmt(ox - w + 2.4)},${fmt(oy - h)} Z' fill='#f4f7fa'/>`;
     return wrap(s);
   }
   if (kind === 'flowers') {
@@ -1095,6 +1186,187 @@ const scarecrow = () => {
 };
 export const scarecrowSprite3q = () => memo('scarecrow', scarecrow);
 
+// --- bridges and jetties ------------------------------------------------------------
+// Both are 'bridge' tiles in the map data; the page tells them apart with the flat
+// tileset's jettyInfo(). Drawn with the wall camera (no recession) so spans join tile to
+// tile, standing over water drawn on the ground layer.
+//
+// A crossing is a stone bridge: a level deck over the water with a low parapet on each
+// side and a round arch on every tile of the face we see. Where the span meets the bank
+// a short ramp runs down onto the land (drawn into the sprite's margin past the tile
+// edge). `axis` is the walk direction ('ew' or 'ns'); `ends` says which sides of this
+// tile meet land: { n, e, s, w } booleans, plus `sw` when open water lies to the south.
+const bridgeSprite = (axis, ends, variant) => {
+  const ox = 30, oy = 100;
+  const cam = makeCam(ox, oy, 0, 1);
+  const r = rng(variant * 7919 + (axis === 'ew' ? 3 : 5));
+  const stone = '#a39a88', face = shade(stone, 0.8), dark = shade(stone, 0.55);
+  const deckCol = '#8f8676', capCol = shade(stone, 1.1);
+  const Z = 5.5, PZ = 2.2; // deck height, parapet height
+  const v = (x, y, z) => cam([x, y, z]);
+  const poly = (pts, fill, extra = '') => `<polygon points='${ptsStr(pts)}' fill='${fill}' ${extra}/>`;
+  const line = (p, q, c, w, o = 1) => `<line x1='${fmt(p[0])}' y1='${fmt(p[1])}' x2='${fmt(q[0])}' y2='${fmt(q[1])}' stroke='${c}' stroke-width='${w}' opacity='${o}'/>`;
+  const RAMP = 9; // how far a ramp runs onto the bank
+  let s = '';
+  if (axis === 'ew') {
+    const y0 = 8, y1 = 32;
+    const xa = ends.w ? -20 - RAMP : -20, xb = ends.e ? 20 + RAMP : 20;
+    const zAt = (x) => (x < -20 ? Z * (x - xa) / RAMP : x > 20 ? Z * (xb - x) / RAMP : Z);
+    const xs = [xa, ...(ends.w ? [-20] : []), ...(ends.e ? [20] : []), xb];
+    const run = (y, dz) => xs.map((x) => v(x, y, zAt(x) + dz));
+    // shadow on the water behind the span
+    s += poly([v(-20, y1, 0), v(20, y1, 0), v(20, y1 + 7, 0), v(-20, y1 + 7, 0)], '#0d1620', "opacity='0.3'");
+    // the face we see: dressed stone, an arch over the water, courses
+    s += poly([...run(y0, 0).map((p, i) => v(xs[i], y0, 0)), ...run(y0, 0).reverse()], face);
+    for (let z = 1.8; z < Z; z += 1.8) s += line(v(-20, y0 - 0.02, z), v(20, y0 - 0.02, z), dark, 0.25, 0.6);
+    const w = 12.5, h = Z - 1.4;
+    const a0 = v(-w, y0 - 0.03, 0), a1 = v(w, y0 - 0.03, 0), k = v(0, y0 - 0.03, h * 2);
+    s += `<path d='M${fmt(a0[0])},${fmt(a0[1])} Q${fmt(k[0])},${fmt(k[1])} ${fmt(a1[0])},${fmt(a1[1])} Z' fill='#16222b'/>`;
+    s += `<path d='M${fmt(a0[0] - 1)},${fmt(a0[1])} Q${fmt(k[0])},${fmt(k[1] - 2.2)} ${fmt(a1[0] + 1)},${fmt(a1[1])}' fill='none' stroke='${capCol}' stroke-width='0.9'/>`;
+    // the arch's reflection on the water just in front
+    s += `<ellipse cx='${fmt(v(0, y0 - 2.5, 0)[0])}' cy='${fmt(v(0, y0 - 2.5, 0)[1])}' rx='${fmt(w * 0.8)}' ry='1.2' fill='#0d1620' opacity='0.18'/>`;
+    // deck: paving laid across the walk
+    s += poly([...run(y0, 0), ...run(y1, 0).reverse()], deckCol);
+    for (let x = -19; x < 20; x += 3.4) s += line(v(x, y0 + 1.6, Z), v(x, y1 - 1.6, Z), shade(deckCol, 0.75), 0.3, 0.7);
+    s += line(v(-20, (y0 + y1) / 2, Z), v(20, (y0 + y1) / 2, Z), shade(deckCol, 0.75), 0.25, 0.5);
+    // parapets: back, then front; capped, with a newel post at each bank
+    for (const [ya, yb] of [[y1 - 1.6, y1], [y0, y0 + 1.6]]) {
+      s += poly([...run(ya, 0), ...run(ya, PZ).reverse()], shade(stone, 0.88));
+      s += poly([...run(ya, PZ), ...run(yb, PZ).reverse()], capCol);
+      for (const [end, x] of [[ends.w, xa + 0.2], [ends.e, xb - 2.2]]) {
+        if (end) s += box(cam, x, x + 2, ya - 0.3, yb + 0.3, 0, PZ + 1.6, stone, { front: shade(stone, 0.9), top: capCol });
+      }
+    }
+    if (r() < 0.5) {
+      const mx = -12 + r() * 22;
+      const m = v(mx, y0, Z + PZ);
+      s += `<ellipse cx='${fmt(m[0])}' cy='${fmt(m[1])}' rx='1.5' ry='0.5' fill='#56693e' opacity='0.55'/>`;
+    }
+  } else {
+    const x0 = -11, x1 = 11;
+    const ya = ends.s ? -RAMP : 0, yb = ends.n ? 40 + RAMP : 40;
+    const zAt = (y) => (y < 0 ? Z * (y - ya) / RAMP : y > 40 ? Z * (yb - y) / RAMP : Z);
+    const ys = [ya, ...(ends.s ? [0] : []), ...(ends.n ? [40] : []), yb];
+    const run = (x, dz) => ys.map((y) => v(x, y, zAt(y) + dz));
+    // shadow on the water east of the deck
+    s += poly([v(x1, 0, 0), v(x1 + 7, 0, 0), v(x1 + 7, 40, 0), v(x1, 40, 0)], '#0d1620', "opacity='0.3'");
+    // deck, paving laid across the walk
+    s += poly([...run(x0, 0), ...run(x1, 0).reverse()], deckCol);
+    for (let y = 1.5; y < 40; y += 3.4) s += line(v(x0 + 1.8, y, Z), v(x1 - 1.8, y, Z), shade(deckCol, 0.75), 0.3, 0.7);
+    // parapets along both sides
+    for (const [xa, xb] of [[x0, x0 + 1.8], [x1 - 1.8, x1]]) {
+      s += poly([...run(xa, PZ), ...run(xb, PZ).reverse()], capCol);
+      if (ends.s) s += box(cam, xa - 0.3, xb + 0.3, ya + 0.2, ya + 2.2, 0, PZ + 1.6, stone, { front: shade(stone, 0.9), top: capCol });
+    }
+    // where open water lies to the south, the deck's face and arch show
+    if (ends.sw) {
+      s += poly([v(x0, 0, 0), v(x1, 0, 0), v(x1, 0, Z), v(x0, 0, Z)], face);
+      const a0 = v(-7, -0.03, 0), a1 = v(7, -0.03, 0), k = v(0, -0.03, (Z - 1.4) * 2);
+      s += `<path d='M${fmt(a0[0])},${fmt(a0[1])} Q${fmt(k[0])},${fmt(k[1])} ${fmt(a1[0])},${fmt(a1[1])} Z' fill='#16222b'/>`;
+    }
+  }
+  return wrap(s);
+};
+
+// A town square built out over the river. `squareFaceSprite` sits on the water tile just
+// south of the square: the square's edge seen from the front, an arch with the river
+// running under it. `squareParapetSprite` sits on a square tile and walls each side that
+// meets water ({ n, e, s, w }: bit 1 = parapet, 2 = post at its west/south end, 4 = post
+// at its east/north end).
+const squareFaceSprite = (variant) => {
+  const ox = 30, oy = 100;
+  const cam = makeCam(ox, oy, 0, 1);
+  const v = (x, y, z) => cam([x, y, z]);
+  const r = rng(variant * 6151 + 11);
+  const stone = '#a39a88', face = shade(stone, 0.8), dark = shade(stone, 0.55), cap = shade(stone, 1.1);
+  const poly = (pts, fill, extra = '') => `<polygon points='${ptsStr(pts)}' fill='${fill}' ${extra}/>`;
+  const F = 5.5; // the face's drop from the square to the water
+  let s = poly([v(-20, 40, -F), v(20, 40, -F), v(20, 33, -F), v(-20, 33, -F)], '#0d1620', "opacity='0.3'");
+  s += poly([v(-20, 40, 0), v(20, 40, 0), v(20, 40, -F), v(-20, 40, -F)], face);
+  for (let z = -1.8; z > -F; z -= 1.8) s += `<line x1='${fmt(v(-20, 40, z)[0])}' y1='${fmt(v(-20, 40, z)[1])}' x2='${fmt(v(20, 40, z)[0])}' y2='${fmt(v(20, 40, z)[1])}' stroke='${dark}' stroke-width='0.25' opacity='0.6'/>`;
+  const a0 = v(-13, 40, -F), a1 = v(13, 40, -F), k = v(0, 40, -F + (F - 1.2) * 2);
+  s += `<path d='M${fmt(a0[0])},${fmt(a0[1])} Q${fmt(k[0])},${fmt(k[1])} ${fmt(a1[0])},${fmt(a1[1])} Z' fill='#16222b'/>`;
+  s += `<path d='M${fmt(a0[0] - 1)},${fmt(a0[1])} Q${fmt(k[0])},${fmt(k[1] - 2.2)} ${fmt(a1[0] + 1)},${fmt(a1[1])}' fill='none' stroke='${cap}' stroke-width='0.9'/>`;
+  const e = v(0, 37, -F);
+  s += `<ellipse cx='${fmt(e[0])}' cy='${fmt(e[1])}' rx='10' ry='1.2' fill='#0d1620' opacity='0.18'/>`;
+  if (r() < 0.4) { const m = v(-17 + r() * 4, 40, -F + 1); s += `<ellipse cx='${fmt(m[0])}' cy='${fmt(m[1])}' rx='1.6' ry='0.6' fill='#56693e' opacity='0.5'/>`; }
+  return wrap(s);
+};
+const squareParapetSprite = (sides) => {
+  const ox = 30, oy = 100;
+  const cam = makeCam(ox, oy, 0, 1);
+  const stone = '#a39a88', cap = shade(stone, 1.1);
+  const PZ = 2.2, T = 1.6;
+  const opts = { front: shade(stone, 0.9), top: cap };
+  let s = '';
+  const post = (x, y) => box(cam, x - 1.2, x + 1.2, y - 1.2, y + 1.2, 0, PZ + 1.6, stone, opts);
+  // back (north) first, then the sides, then the front (south) so the solids overlap correctly
+  if (sides.n & 1) {
+    s += box(cam, -20, 20, 40 - T, 40, 0, PZ, stone, opts);
+    if (sides.n & 2) s += post(-18.8, 40 - T / 2);
+    if (sides.n & 4) s += post(18.8, 40 - T / 2);
+  }
+  for (const [side, x] of [['w', -20 + T / 2], ['e', 20 - T / 2]]) {
+    if (!(sides[side] & 1)) continue;
+    s += box(cam, x - T / 2, x + T / 2, 0, 40, 0, PZ, stone, opts);
+    if (sides[side] & 2) s += post(x, 1.2);
+    if (sides[side] & 4) s += post(x, 38.8);
+  }
+  if (sides.s & 1) {
+    s += box(cam, -20, 20, 0, T, 0, PZ, stone, opts);
+    if (sides.s & 2) s += post(-18.8, T / 2);
+    if (sides.s & 4) s += post(18.8, T / 2);
+  }
+  return wrap(s);
+};
+
+// A jetty: a plank deck on piles running out over the water, with a mooring post at the
+// open end. `waterEnd` is the side ('n'|'e'|'s'|'w') that points out to the water.
+const jettySprite = (waterEnd, variant) => {
+  const ox = 30, oy = 100;
+  const cam = makeCam(ox, oy, 0, 1);
+  const r = rng(variant * 104729 + waterEnd.charCodeAt(0));
+  const v = (x, y, z) => cam([x, y, z]);
+  const plankA = '#9c8a6a', plankB = '#8a795e', beam = '#5d4a30', pile = '#4a3a26';
+  const poly = (pts, fill, extra = '') => `<polygon points='${ptsStr(pts)}' fill='${fill}' ${extra}/>`;
+  const Z = 2.2;
+  let s = '';
+  const ew = waterEnd === 'e' || waterEnd === 'w';
+  if (ew) {
+    const y0 = 13, y1 = 27;
+    s += poly([v(-20, y1, 0), v(20, y1, 0), v(20, y1 + 4, 0), v(-20, y1 + 4, 0)], '#0d1620', "opacity='0.25'");
+    // piles under the near edge
+    for (const px of [-15, -3, 9]) s += poly([v(px, y0, -1), v(px + 1.6, y0, -1), v(px + 1.6, y0, Z), v(px, y0, Z)], pile);
+    // planks laid across the walk, with water showing in the gaps
+    for (let x = -20, i = 0; x < 20; x += 2.6, i++) {
+      s += poly([v(x, y0, Z), v(Math.min(x + 2.1, 20), y0, Z), v(Math.min(x + 2.1, 20), y1, Z), v(x, y1, Z)], i % 2 ? plankB : plankA);
+    }
+    s += poly([v(-20, y0, Z - 0.9), v(20, y0, Z - 0.9), v(20, y0, Z), v(-20, y0, Z)], beam);
+    const tip = waterEnd === 'w' ? -18 : 16;
+    s += poly([v(tip, y0 - 1, -1), v(tip + 2, y0 - 1, -1), v(tip + 2, y0 - 1, Z + 4.5), v(tip, y0 - 1, Z + 4.5)], pile);
+    s += `<ellipse cx='${fmt(v(tip + 1, y0 - 1, Z + 4.5)[0])}' cy='${fmt(v(tip + 1, y0 - 1, Z + 4.5)[1])}' rx='1' ry='0.45' fill='#7a6448'/>`;
+  } else {
+    const x0 = -7, x1 = 7;
+    s += poly([v(x1, 0, 0), v(x1 + 4, 0, 0), v(x1 + 4, 40, 0), v(x1, 40, 0)], '#0d1620', "opacity='0.25'");
+    for (let y = 0, i = 0; y < 40; y += 2.6, i++) {
+      s += poly([v(x0, y, Z), v(x1, y, Z), v(x1, Math.min(y + 2.1, 40), Z), v(x0, Math.min(y + 2.1, 40), Z)], i % 2 ? plankB : plankA);
+    }
+    if (waterEnd === 's') {
+      for (const px of [x0, x1 - 1.6]) s += poly([v(px, 0, -1), v(px + 1.6, 0, -1), v(px + 1.6, 0, Z), v(px, 0, Z)], pile);
+      s += poly([v(x0, 0, Z - 0.9), v(x1, 0, Z - 0.9), v(x1, 0, Z), v(x0, 0, Z)], beam);
+    }
+    const ty = waterEnd === 'n' ? 37 : 2;
+    s += poly([v(x1 + 0.5, ty, -1), v(x1 + 2.5, ty, -1), v(x1 + 2.5, ty, Z + 4.5), v(x1 + 0.5, ty, Z + 4.5)], pile);
+    s += `<ellipse cx='${fmt(v(x1 + 1.5, ty, Z + 4.5)[0])}' cy='${fmt(v(x1 + 1.5, ty, Z + 4.5)[1])}' rx='1' ry='0.45' fill='#7a6448'/>`;
+  }
+  if (r() < 0.6) {
+    // a coil of rope on the boards
+    const c = ew ? v(waterEnd === 'w' ? 6 : -8, 20, Z) : v(-2, waterEnd === 'n' ? 8 : 30, Z);
+    s += `<ellipse cx='${fmt(c[0])}' cy='${fmt(c[1])}' rx='1.8' ry='1.1' fill='none' stroke='#c9b088' stroke-width='0.8'/>`;
+  }
+  return wrap(s);
+};
+
 // Townsfolk live in townsfolkSprites.js.
 
 // --- public API (memoised) ---------------------------------------------------------------
@@ -1124,12 +1396,14 @@ export const buildingSprite3q = (buildingType = 'house', x = 0, y = 0, theme = '
 // [{ x, y, dark, delay }]. Empty when the building has no lit chimney.
 export const buildingSmoke3q = (buildingType = 'house', x = 0, y = 0, theme = 'grassland') => building(buildingType, x, y, theme).smoke;
 
-const POI_KIND = { tree: 'tree', pine: 'pine', bush: 'bush', dead_bush: 'bush', flowers: 'flowers' };
+const POI_KIND = { tree: 'tree', pine: 'pine', bush: 'bush', dead_bush: 'scrub', flowers: 'flowers', cactus: 'palm', rock: 'rock' };
 // Sprite for a decoration POI, or null when this prototype has no 3/4 art for it
 // (callers fall back to the existing emoji).
-export const poiSprite3q = (poi, x = 0, y = 0) => {
+// The desert's `cactus` decoration is drawn as a date palm (cacti are New World plants).
+export const poiSprite3q = (poi, x = 0, y = 0, theme = 'grassland') => {
   if (poi === 'fountain' || poi === 'well') return memo('fountain', fountain);
-  const kind = POI_KIND[poi];
+  let kind = POI_KIND[poi];
+  if (kind === 'rock' && (theme === 'desert' || theme === 'snow')) kind = theme === 'desert' ? 'rock_sand' : 'rock_snow';
   if (!kind) return null;
   const variant = seedOf(x, y) % 9;
   return memo(`p|${kind}|${variant}`, () => tree(variant * 104729 + 7, kind));
@@ -1149,5 +1423,25 @@ export const wallSprite3q = (mask, keep = false, x = 0, y = 0, flank = false, ou
 export const gateSprite3q = (dir = 'x', keep = false, outward = true) =>
   memo(`g|${dir}|${keep ? 1 : 0}|${outward ? 1 : 0}`, () => wallSprite(dir === 'x' ? 10 : 5, keep, 0, dir === 'x' ? 'x' : 'y', false, outward));
 
+
+// Stone bridge over a crossing tile (see bridgeSprite).
+export const bridgeSprite3q = (axis = 'ew', ends = {}, x = 0, y = 0) => {
+  const e = { n: !!ends.n, e: !!ends.e, s: !!ends.s, w: !!ends.w, sw: !!ends.sw };
+  const variant = seedOf(x, y) % 4;
+  return memo(`br|${axis}|${e.n ? 1 : 0}${e.e ? 1 : 0}${e.s ? 1 : 0}${e.w ? 1 : 0}${e.sw ? 1 : 0}|${variant}`, () => bridgeSprite(axis, e, variant));
+};
+// Wooden jetty pointing out to the water on side `waterEnd` (see jettySprite).
+export const squareFaceSprite3q = (x = 0, y = 0) => {
+  const variant = seedOf(x, y) % 4;
+  return memo(`sqf|${variant}`, () => squareFaceSprite(variant));
+};
+export const squareParapetSprite3q = (sides = {}) => {
+  const k = ['n', 'e', 's', 'w'].map((d) => sides[d] || 0).join('');
+  return memo(`sqp|${k}`, () => squareParapetSprite(sides));
+};
+export const jettySprite3q = (waterEnd = 'n', x = 0, y = 0) => {
+  const variant = seedOf(x, y) % 4;
+  return memo(`jt|${waterEnd}|${variant}`, () => jettySprite(waterEnd, variant));
+};
 
 export const BUILDING_TYPES_3Q = Object.keys(SPEC);

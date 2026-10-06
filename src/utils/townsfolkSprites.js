@@ -34,9 +34,20 @@ const WOOL = {
   leather: '#6a4a2e', straw: '#d1b26a', steel: '#9aa0a6', crimson: '#7d2430', blue: '#2f4a7a',
   forest: '#2f5a3c', fur: '#d8cdb8', gold: '#b89a48', murrey: '#6a2f4a',
 };
-// Skin tone palette.
+// Palettes per town theme; a town never mixes palettes.
 const SKINS = ['#f3d9c0', '#ecc8a6', '#e4ba95', '#f7e3d0', '#dcae88'];
+const SKINS_BY_THEME = {
+  grassland: SKINS,
+  desert: ['#d9a97c', '#c9976a', '#d2a073', '#bf8c60', '#e0b289'],
+  snow: ['#f7e3d0', '#f3d9c0'],
+};
+const skinsFor = (theme) => SKINS_BY_THEME[theme] || SKINS;
 const HAIR = ['#3a2a1e', '#6a4a2a', '#9a7040', '#c9a86a', '#2a2420', '#8a3a22', '#bdb7ad'];
+// Per-theme variant of HAIR, index-aligned (some roles pin an index via `hairTone`).
+const HAIR_BY_THEME = {
+  desert: ['#3a2a1e', '#4e3624', '#33251b', '#241c17', '#2a2420', '#3f2a1f', '#bdb7ad'],
+};
+const hairFor = (theme) => HAIR_BY_THEME[theme] || HAIR;
 
 // --- roles -----------------------------------------------------------------------
 // garment: 'tunic' (knee) | 'gown' (ankle) | 'habit' (ankle, monastic)
@@ -110,11 +121,13 @@ const lift = (dy, begin = '0s') =>
 const HALF = '-0.31s';
 
 // --- the figure ------------------------------------------------------------------------
-const figure = (p, view, walking, skinIdx, hairIdx) => {
+const figure = (p, view, walking, skinIdx, hairIdx, theme) => {
   gid = 0;
   const defs = [];
-  const sk = SKINS[skinIdx % SKINS.length];
-  const hair = HAIR[(p.hairTone ?? hairIdx) % HAIR.length];
+  const skins = skinsFor(theme);
+  const sk = skins[skinIdx % skins.length];
+  const hairs = hairFor(theme);
+  const hair = hairs[(p.hairTone ?? hairIdx) % hairs.length];
   const side = view === 'e';
   const back = view === 'n';
   const cx = 10;
@@ -204,7 +217,7 @@ const figure = (p, view, walking, skinIdx, hairIdx) => {
       (side ? '' : `<path d='M${f1(bx - bw)},13.6 L${cx - 1.4},11.9 M${f1(bx + bw)},13.6 L${cx + 1.4},11.9' stroke='#5a4028' stroke-width='0.45'/>`);
   }
   if (p.squareNeck && !side && !back) {
-    s += `<path d='M${cx - 2},12 v1.9 h4 v-1.9' fill='${shade(SKINS[skinIdx % SKINS.length], 0.97)}' stroke='${p.trim || WOOL.gold}' stroke-width='0.7'/>`;
+    s += `<path d='M${cx - 2},12 v1.9 h4 v-1.9' fill='${shade(sk, 0.97)}' stroke='${p.trim || WOOL.gold}' stroke-width='0.7'/>`;
   } else if (p.trim && !side) s += `<path d='M${cx - 2.2},12 Q${cx},13.6 ${cx + 2.2},12' stroke='${p.trim}' stroke-width='0.9' fill='none'/>`;
   if (p.lacing && !back && !side) {
     // front-laced kirtle: a linen shift shows at the neck, cord criss-crosses the bodice
@@ -419,15 +432,16 @@ const figure = (p, view, walking, skinIdx, hairIdx) => {
 
 const _cache = new Map();
 // view: 's' | 'n' | 'e' | 'w' ('w' renders the 'e' sprite; the caller mirrors it).
-export const townsfolkSprite = (look, skin, view = 's', walking = false) => {
+// theme picks the palette (see SKINS_BY_THEME).
+export const townsfolkSprite = (look, skin, view = 's', walking = false, theme = 'grassland') => {
   const v = view === 'w' ? 'e' : view;
-  const key = `${look}|${skin}|${v}|${walking ? 1 : 0}`;
+  const key = `${look}|${skin}|${v}|${walking ? 1 : 0}|${theme}`;
   let out = _cache.get(key);
   if (out === undefined) {
     const role = roleForLook(look);
     const variant = Math.floor(look / POOL.length);
     const p = ROLES[role](variant);
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -1 ${FIG_W} ${FIG_H + 1}'>${figure(p, v, walking, skin, look + skin)}</svg>`;
+    const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -1 ${FIG_W} ${FIG_H + 1}'>${figure(p, v, walking, skin, look + skin, theme)}</svg>`;
     out = `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
     _cache.set(key, out);
   }
@@ -463,15 +477,15 @@ const bakeFrame = (body, t) => body.replace(ANIM, (_, tag) => `<g ${sampleAnim(t
 const _strips = new Map();
 // Static sprite strip for a figure: { url, frames }. Walking strips hold WALK_FRAMES
 // poses; standing figures are a single still frame.
-export const townsfolkStrip = (look, skin, view = 's', walking = false) => {
+export const townsfolkStrip = (look, skin, view = 's', walking = false, theme = 'grassland') => {
   const v = view === 'w' ? 'e' : view;
-  const key = `${look}|${skin}|${v}|${walking ? 1 : 0}`;
+  const key = `${look}|${skin}|${v}|${walking ? 1 : 0}|${theme}`;
   let out = _strips.get(key);
   if (out === undefined) {
     const role = roleForLook(look);
     const variant = Math.floor(look / POOL.length);
     const p = ROLES[role](variant);
-    const svg = figure(p, v, walking, skin, look + skin);
+    const svg = figure(p, v, walking, skin, look + skin, theme);
     const cut = svg.indexOf('</defs>') + 7;
     const defs = svg.slice(0, cut), body = svg.slice(cut);
     const frames = walking ? WALK_FRAMES : 1;
