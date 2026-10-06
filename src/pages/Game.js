@@ -4,7 +4,7 @@ import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from '../contexts/AuthContext';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
 import ModalContext, { useModal } from '../contexts/ModalContext';
-import { checkForEncounter, rollSiteWanderingEncounter, PASS_THROUGH_ENCOUNTER_MULTIPLIER } from '../utils/encounterGenerator';
+import { checkForEncounter, rollSiteWanderingEncounter, PASS_THROUGH_ENCOUNTER_MULTIPLIER, ROAD_ENCOUNTER_MULTIPLIER } from '../utils/encounterGenerator';
 import { encounterTemplates } from '../data/encounters';
 import { isTownTileWalkable } from '../utils/townMapGenerator';
 import useGameSession from '../hooks/useGameSession';
@@ -38,7 +38,7 @@ import {
   isAdjacentWorldMove,
   trackAreaVisits
 } from '../game/worldMoveController';
-import { planTravelRoute, TRAVEL_STEP_MS } from '../game/worldTravel';
+import { planTravelRoute, travelStepMs, isRoadTile } from '../game/worldTravel';
 import { getSuggestedActions } from '../game/suggestedActions';
 import { visitLeaveMessage } from '../game/logGroups';
 import { setStoredLayout } from '../game/gameLayout';
@@ -1780,9 +1780,11 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
       settings: { grimnessLevel: settings?.grimnessLevel }
     });
     // Pass-through tiles on an auto-travel route roll at reduced odds; the destination
-    // (and every ordinary single-tile move) keeps the full chance.
+    // (and every ordinary single-tile move) keeps the full chance. Roads are safer still.
+    const chanceMultiplier = (passThrough ? PASS_THROUGH_ENCOUNTER_MULTIPLIER : 1)
+      * (isRoadTile(targetTile) ? ROAD_ENCOUNTER_MULTIPLIER : 1);
     const randomEncounter = checkForEncounter(targetTile, isFirstVisitToTile, settings, movesSinceEncounter,
-      { chanceMultiplier: passThrough ? PASS_THROUGH_ENCOUNTER_MULTIPLIER : 1 });
+      { chanceMultiplier });
     logger.debug('checkForEncounter returned', randomEncounter ? randomEncounter.name : null);
 
     const plannedEncounterFlow = planWorldTileEncounterFlow({
@@ -2589,6 +2591,10 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
     startTravel(queued.x, queued.y, queued.label);
   }, [mapHook.currentMapLevel]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The marker glides into the tile just entered for that step's duration (roads are
+  // quicker), and the next step waits the same time so the party walks continuously.
+  const currentStepMs = Math.round(travelStepMs(mapHook.worldMap?.[mapHook.playerPosition?.y]?.[mapHook.playerPosition?.x]) / travelSpeed);
+
   // Walk the route one tile per step. Each step is a full move (encounters roll per tile);
   // intermediate tiles pass through (no arrival prompt), the last one arrives normally.
   // The effect re-runs after every step with fresh closures (position/map changed).
@@ -2606,7 +2612,7 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
       if (status === 'interrupted' && rest.length > 0) setResumeTravel({ dest: travel.dest, label: travel.label });
       // Each move commits at the end of its wait and the marker then glides for one step
       // duration, so the first step goes almost at once instead of idling a full step.
-    }, travel.moving ? Math.round(TRAVEL_STEP_MS / travelSpeed) : 120);
+    }, travel.moving ? currentStepMs : 120);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [travel, interactionHook.isLoading, mapHook.playerPosition, travelSpeed, modalStack.length]);
@@ -2860,7 +2866,7 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
         mapDockTarget={isWorkspace ? stageEl : null}
         onWorldTileClick={isWorkspace ? handleWorkspaceWorldClick : null}
         suggestedTravelTargets={isWorkspace ? suggestedTravelTargets : null}
-        mapGlideMs={isWorkspace ? Math.round(TRAVEL_STEP_MS / travelSpeed) : null}
+        mapGlideMs={isWorkspace ? currentStepMs : null}
         buildingRequest={isWorkspace ? buildingRequest : null}
         onBuildingRequestHandled={() => setBuildingRequest(null)}
         onContinueLegend={() => {

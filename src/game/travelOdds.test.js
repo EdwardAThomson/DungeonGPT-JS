@@ -1,5 +1,5 @@
 import { tileEncounterChance, journeyEncounterStats } from './travelOdds';
-import { PASS_THROUGH_ENCOUNTER_MULTIPLIER } from '../utils/encounterGenerator';
+import { PASS_THROUGH_ENCOUNTER_MULTIPLIER, ROAD_ENCOUNTER_MULTIPLIER } from '../utils/encounterGenerator';
 
 describe('travelOdds', () => {
   it('a one-tile move is just the tile chance', () => {
@@ -28,5 +28,14 @@ describe('travelOdds', () => {
     // 6 new plains tiles, counter reset on leaving town.
     const j = journeyEncounterStats({ tiles: 6, multiplier: PASS_THROUGH_ENCOUNTER_MULTIPLIER });
     expect(j.expected).toBeLessThan(1.5);
+  });
+});
+
+describe('road odds', () => {
+  it('a road journey is markedly safer than the same journey cross-country', () => {
+    const open = journeyEncounterStats({ tiles: 6, multiplier: PASS_THROUGH_ENCOUNTER_MULTIPLIER });
+    const road = journeyEncounterStats({ tiles: 6, multiplier: PASS_THROUGH_ENCOUNTER_MULTIPLIER * ROAD_ENCOUNTER_MULTIPLIER });
+    expect(road.expected).toBeLessThan(open.expected * 0.75);
+    expect(road.pClear).toBeGreaterThan(open.pClear);
   });
 });
