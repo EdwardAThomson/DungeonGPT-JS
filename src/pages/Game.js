@@ -2483,8 +2483,26 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
   // "Travel to Ironhold (level 3 recommended)" -> "Ironhold" for the travel bar.
   const travelLabel = (label) => label.replace(/^(Travel to|Return to|Head for|Hunt in) /, '').replace(/ \(level \d+ recommended\)$/, '');
 
+  // A chip pressed again while its own action is still under way does nothing (no
+  // restart, no duplicate "You" line). Once that walk/travel ends, halts or is replaced
+  // by another action, the chip works again, so a stuck hero can re-issue it.
+  const chipRunRef = useRef(null); // { key, walk }: the last chip and the walk it started
+  const chipKey = (chip) => `${chip.kind}:${chip.id || chip.label}`;
+  const isChipRunning = (chip) => {
+    if (chip.kind === 'travel' && travel?.dest && chip.target
+      && travel.dest.x === chip.target.x && travel.dest.y === chip.target.y) return true;
+    const run = chipRunRef.current;
+    return !!run && run.key === chipKey(chip) && run.walk === walkCancelRef.current && !!run.walk?.isActive?.();
+  };
+
   const runSuggestedAction = (chip) => {
-    if (!chip || interactionHook.isLoading || popupOpen()) return;
+    if (!chip || interactionHook.isLoading || popupOpen() || isChipRunning(chip)) return;
+    const walkBefore = walkCancelRef.current;
+    dispatchSuggestedAction(chip);
+    if (walkCancelRef.current !== walkBefore) chipRunRef.current = { key: chipKey(chip), walk: walkCancelRef.current };
+  };
+
+  const dispatchSuggestedAction = (chip) => {
     const { setConversation } = interactionHook;
     const youLine = { role: 'user', content: chip.label };
     // Enter/leave town write the log from a snapshot, so hand them one that already has
