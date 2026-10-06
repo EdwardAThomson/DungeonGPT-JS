@@ -497,6 +497,10 @@ const useEncounterFight = ({
         // for the badge. A FAILED flee (below) deliberately omits this: the party was
         // caught, so it neither disengages nor repositions.
         outcome: 'fled',
+        // The foe's remaining HP, so a fled site mob keeps its wounds (Game.js).
+        ...(roundState && Number.isFinite(roundState.enemyCurrentHP)
+          ? { enemyCurrentHP: roundState.enemyCurrentHP, enemyMaxHP: roundState.enemyMaxHP }
+          : {}),
         rewards: null,
         penalties: {
           messages: ['Fled from combat'],
@@ -582,6 +586,9 @@ const useEncounterFight = ({
       narration: `Too wounded to continue, the party breaks off and retreats from the ${encounter.name.toLowerCase()}.`,
       rollResult: null,
       outcomeTier: 'failure',
+      ...(roundState && Number.isFinite(roundState.enemyCurrentHP)
+        ? { enemyCurrentHP: roundState.enemyCurrentHP, enemyMaxHP: roundState.enemyMaxHP }
+        : {}),
       rewards: null,
       penalties: null
     });

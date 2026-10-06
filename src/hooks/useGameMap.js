@@ -486,6 +486,17 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         });
     };
 
+    // Record the HP a site mob was left on after a fight it survived (stalemate / flee /
+    // rout), so the next fight resumes there (mobEncounter). Mutates in place like the others.
+    const setSiteMobEnemyHP = (id, hp) => {
+        setCurrentSiteMap(prev => {
+            if (!prev || !Array.isArray(prev.mobs)) return prev;
+            const mob = prev.mobs.find(m => m && m.id === id);
+            if (mob && Number.isFinite(hp) && hp > 0) mob.enemyHP = hp;
+            return { ...prev };
+        });
+    };
+
     // Push a freshly-spawned mob (a per-step wandering monster) onto the site's mobs array.
     // Mutates prev.mobs in place (the same array siteMobsRef holds, mirroring the other mob
     // mutators) so a mid-walk spawn is visible to the very next advanceMobs step, then
@@ -692,6 +703,7 @@ const useGameMap = (loadedConversation, hasAdventureStarted, isLoading, setError
         markSiteContentConsumed,
         setSiteMobDefeated,
         setSiteMobFleeCooldown,
+        setSiteMobEnemyHP,
         addSiteMob,
 
         visitedBiomes,

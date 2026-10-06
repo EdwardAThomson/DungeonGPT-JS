@@ -154,7 +154,10 @@ export const createMultiRoundEncounter = (encounter, character, settings, llmCon
     // forced constant; surfaced from the intro so the player sees the true match.
     playerAdvantage: startAdvantage, // Builds with successful tactics
     enemyMaxHP: enemyHP,
-    enemyCurrentHP: enemyHP,
+    // A site mob wounded in an earlier fight it survived resumes at its remaining HP.
+    enemyCurrentHP: Number.isFinite(encounter.enemyStartHP) && encounter.enemyStartHP > 0
+      ? Math.min(enemyHP, encounter.enemyStartHP)
+      : enemyHP,
     // --- Phase 5 team state ---
     party: partyList,
     leadIndex,

@@ -70,6 +70,18 @@ export const DEFAULT_MOB_CONFIG = {
 // Manhattan distance between two {x,y} points.
 const manhattan = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 
+// Return `base` if no mob in `mobs` already uses it, else `base_2`, `base_3`, ... Spawn ids
+// are keyed on coordinate + list length, and a re-entry prune shrinks the list, so a later
+// spawn on a tile a still-living mob walked off could reuse that mob's id. Duplicate ids made
+// a win/flee land on the wrong mob (one vanished, the one fought stayed at full health).
+export function uniqueMobId(base, mobs) {
+  const taken = new Set((Array.isArray(mobs) ? mobs : []).filter(Boolean).map((m) => m.id));
+  if (!taken.has(base)) return base;
+  let n = 2;
+  while (taken.has(`${base}_${n}`)) n += 1;
+  return `${base}_${n}`;
+}
+
 // Site walkability predicate. Sites mark every tile with `t.walkable`; the only
 // non-walkable type is `wall`. Deliberately NOT isTownTileWalkable (towns gate on water
 // and building tiles instead). Reused for both chase and leash-return pathing.
@@ -182,6 +194,7 @@ export function seedAmbientRoamers(site, { count, encounterFor, rng = Math.rando
 
   const roamers = [];
   const baseCount = existing.length;
+  const idsSoFar = [...existing];
   for (let i = 0; i < count && candidates.length > 0; i++) {
     const pick = candidates.splice(Math.floor(rng() * candidates.length), 1)[0];
     const encounter = encounterFor(rng);
@@ -189,10 +202,12 @@ export function seedAmbientRoamers(site, { count, encounterFor, rng = Math.rando
     // Roamers are gentle wildlife (never a hard hunter) so speed stays 1; the id carries a
     // growing suffix so a roamer placed where a defeated one fell never reuses its id.
     const speed = encounter.difficulty === 'hard' ? HUNTER_SPEED : DEFAULT_MOB_SPEED;
-    roamers.push(makeMob({
-      id: `roamer_${pick.x}_${pick.y}_${baseCount + i}`,
+    const roamer = makeMob({
+      id: uniqueMobId(`roamer_${pick.x}_${pick.y}_${baseCount + i}`, idsSoFar),
       x: pick.x, y: pick.y, encounter, speed, state: 'idle', wandering: true,
-    }));
+    });
+    roamers.push(roamer);
+    idsSoFar.push(roamer);
     occupied.add(`${pick.x},${pick.y}`);
   }
   return roamers;
@@ -276,7 +291,7 @@ export function spawnWanderingMob(site, playerPos, encounter, config = {}) {
   // live mob count so successive wandering spawns never collide with each other or a slot mob.
   const speed = encounter.difficulty === 'hard' ? HUNTER_SPEED : DEFAULT_MOB_SPEED;
   return makeMob({
-    id: `wmob_${pick.x}_${pick.y}_${mobs.length}`,
+    id: uniqueMobId(`wmob_${pick.x}_${pick.y}_${mobs.length}`, mobs),
     x: pick.x, y: pick.y, encounter, speed, state, wandering: true,
   });
 }
@@ -396,6 +411,45 @@ export function stepMobs(mobs, playerPos, siteMap, config = DEFAULT_MOB_CONFIG) 
   });
 
   return { mobs: nextMobs, combatMob };
+}
+
+/**
+ * Copy one stepMobs result back onto the SHARED mob objects (the cached site holds the same
+ * array, so positions/defeats survive a leave/re-enter and a save). Mutates `mobs` in place.
+ * fleeCooldown must be copied too: without it the cooldown never ticked down and a fled mob
+ * stayed passive for good.
+ *
+ * @param {Array<Object>} mobs the shared mob array.
+ * @param {Array<Object>} nextMobs stepMobs(...).mobs, index-aligned with `mobs`.
+ * @returns {Array<Object>} the same `mobs` array.
+ */
+export function applySteppedMobs(mobs, nextMobs) {
+  if (!Array.isArray(mobs) || !Array.isArray(nextMobs)) return mobs;
+  mobs.forEach((m, i) => {
+    const n = nextMobs[i];
+    if (!m || !n) return;
+    m.x = n.x; m.y = n.y; m.state = n.state; m.defeated = n.defeated;
+    if (Number.isFinite(n.fleeCooldown)) m.fleeCooldown = n.fleeCooldown;
+  });
+  return mobs;
+}
+
+/**
+ * The encounter a site mob fight opens with. A boss carries its enemyId (its defeat completes
+ * the milestone). A mob wounded in an earlier fight it survived (stalemate / flee / rout)
+ * carries `enemyStartHP` so the next fight resumes at that HP instead of a fresh pool.
+ *
+ * @param {Object} mob the site mob.
+ * @returns {Object} the encounter to open.
+ */
+export function mobEncounter(mob) {
+  if (!mob || !mob.encounter) return mob && mob.encounter;
+  let encounter = mob.isBoss ? { ...mob.encounter, enemyId: mob.enemyId } : mob.encounter;
+  const maxHP = encounter.enemyHP;
+  if (Number.isFinite(mob.enemyHP) && mob.enemyHP > 0 && (!Number.isFinite(maxHP) || mob.enemyHP < maxHP)) {
+    encounter = { ...encounter, enemyStartHP: mob.enemyHP };
+  }
+  return encounter;
 }
 
 /**
