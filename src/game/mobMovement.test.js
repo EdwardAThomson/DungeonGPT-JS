@@ -367,3 +367,46 @@ describe('spawnWanderingMob', () => {
     expect(a.id).not.toBe(b.id);
   });
 });
+
+describe('kobold that came back at full health (2026-10-06)', () => {
+  const { applySteppedMobs, mobEncounter, uniqueMobId, stepMobs: step, spawnWanderingMob: spawn } = require('./mobMovement');
+  const { createMultiRoundEncounter } = require('../utils/multiRoundEncounter');
+  const kobolds = { name: 'Kobold Skulkers', multiRound: true, enemyHP: 32, difficulty: 'easy', dc: 15 };
+  const floor = (w, h) => Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => ({ x, y, walkable: true, type: 'floor' })));
+
+  test('applySteppedMobs copies fleeCooldown so it actually ticks down', () => {
+    const mobs = [{ id: 'a', x: 5, y: 0, home: { x: 5, y: 0 }, state: 'idle', speed: 1, defeated: false, fleeCooldown: 2, encounter: kobolds }];
+    const mapData = floor(8, 1);
+    for (let i = 0; i < 2; i++) {
+      const { mobs: next } = step(mobs, { x: 0, y: 0 }, { mapData });
+      applySteppedMobs(mobs, next);
+    }
+    expect(mobs[0].fleeCooldown).toBe(0);
+  });
+
+  test('a wounded mob reopens its fight at the HP it was left on', () => {
+    const mob = { id: 'a', encounter: kobolds, enemyHP: 5 };
+    const enc = mobEncounter(mob);
+    expect(enc.enemyStartHP).toBe(5);
+    const state = createMultiRoundEncounter(enc, { heroId: 'h', stats: {}, currentHP: 10, maxHP: 10 }, {});
+    expect(state.enemyCurrentHP).toBe(5);
+    expect(state.enemyMaxHP).toBe(32);
+    // an unhurt mob opens at full HP, and the shared encounter object is never mutated
+    expect(createMultiRoundEncounter(mobEncounter({ encounter: kobolds }), { heroId: 'h', stats: {} }, {}).enemyCurrentHP).toBe(32);
+    expect(kobolds.enemyStartHP).toBeUndefined();
+  });
+
+  test('uniqueMobId never reuses an id a live mob holds', () => {
+    expect(uniqueMobId('wmob_3_4_2', [{ id: 'x' }])).toBe('wmob_3_4_2');
+    expect(uniqueMobId('wmob_3_4_2', [{ id: 'wmob_3_4_2' }, { id: 'wmob_3_4_2_2' }])).toBe('wmob_3_4_2_3');
+  });
+
+  test('a wandering spawn on a tile a live mob walked off gets a fresh id', () => {
+    // After a re-entry prune the list is length 2 again; the live wmob spawned at (3,0) when
+    // the list was length 2 has walked to (6,0).
+    const mobs = [{ id: 'mob_9_0', x: 9, y: 0, defeated: false }, { id: 'wmob_3_0_2', x: 6, y: 0, defeated: false, wandering: true }];
+    const m = spawn({ mapData: floor(10, 1), mobs }, { x: 0, y: 0 }, kobolds, { minDist: 3, maxDist: 3, rng: () => 0 });
+    expect(m.x).toBe(3);
+    expect(m.id).not.toBe('wmob_3_0_2');
+  });
+});

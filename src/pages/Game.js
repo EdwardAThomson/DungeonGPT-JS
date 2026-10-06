@@ -26,7 +26,7 @@ import { composeRewardSentence, composeLootSentence, narrateRewardMessages } fro
 import { getStepHint, getQuestObjectiveStep, summarizeQuestReward, describeTurnInTarget } from '../game/questHints';
 import { generateMovementNarrative } from '../game/movementController';
 import { computeWalkPath, runTileWalk, TILE_STEP_MS } from '../game/tileWalk';
-import { stepMobs, spawnWanderingMob, countActiveWanderingMobs, WANDERING_MOB_CAP } from '../game/mobMovement';
+import { stepMobs, spawnWanderingMob, countActiveWanderingMobs, WANDERING_MOB_CAP, applySteppedMobs, mobEncounter } from '../game/mobMovement';
 import { buildSaveName, saveRootFor } from '../game/saveController';
 import { conversationsApi } from '../services/conversationsApi';
 import {
@@ -1213,11 +1213,7 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
     const { mobs: nextMobs, combatMob } = stepMobs(mobs, playerPos, { mapData });
     // Copy stepped state onto the SHARED mob objects (same array the cache holds), then
     // re-render. Keeps positions/defeats persistent across a leave/re-enter and a save.
-    mobs.forEach((m, i) => {
-      const n = nextMobs[i];
-      if (!m || !n) return;
-      m.x = n.x; m.y = n.y; m.state = n.state; m.defeated = n.defeated;
-    });
+    applySteppedMobs(mobs, nextMobs);
     mapHook.setCurrentSiteMap(prev => (prev ? { ...prev } : prev));
     return combatMob;
   };
@@ -1252,12 +1248,9 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
       preEncounterPosRef.current = fromSitePos
         ? { level: 'site', x: fromSitePos.x, y: fromSitePos.y }
         : null;
-      // A boss carries enemyId so its defeat completes the milestone (handleEncounterResolve).
-      openEncounterAction({
-        encounter: combatMob.isBoss
-          ? { ...combatMob.encounter, enemyId: combatMob.enemyId }
-          : combatMob.encounter,
-      });
+      // A boss carries enemyId so its defeat completes the milestone (handleEncounterResolve);
+      // a mob wounded in an earlier fight resumes at its remaining HP.
+      openEncounterAction({ encounter: mobEncounter(combatMob) });
       return 'halt'; // stop the walk on the tile where the mob caught the party
     }
 
@@ -1424,7 +1417,7 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
       preEncounterPosRef.current = { level: 'site', x: start.x, y: start.y };
       mapHook.setIsMapModalOpen(false);
       reopenMapAfterEncounterRef.current = true;
-      openEncounterAction({ encounter: mob.isBoss ? { ...mob.encounter, enemyId: mob.enemyId } : mob.encounter });
+      openEncounterAction({ encounter: mobEncounter(mob) });
       return;
     }
 
@@ -2103,6 +2096,12 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
       mapHook.setSiteMobFleeCooldown(activeSiteMobIdRef.current);
     }
     preEncounterPosRef.current = null; // consume: never reposition on a later encounter
+
+    // A site mob that survived the fight (stalemate, flee, rout) keeps its wounds, so the
+    // next fight resumes at the HP it was left on instead of a fresh pool.
+    if (activeSiteMobIdRef.current && !isEncounterVictory(result) && Number.isFinite(result?.enemyCurrentHP)) {
+      mapHook.setSiteMobEnemyHP(activeSiteMobIdRef.current, result.enemyCurrentHP);
+    }
 
     // #43: team boss fights split XP across the whole party (+10% pot per
     // supporter); gold/items/penalties still flow through the lead. Solo results
