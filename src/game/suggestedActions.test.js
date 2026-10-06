@@ -245,3 +245,20 @@ describe('levelling nudges', () => {
     expect(getSuggestedActions({ ...base, sideQuests: [tooHard] })).toEqual([]);
   });
 });
+
+describe('work offers that share a building with another chip', () => {
+  it('marks the existing chip instead of collapsing the offer, and prefers another building', () => {
+    const town = grid(5, 5, () => ({ type: 'grass' }));
+    town[1][2] = { ...town[1][2], type: 'building', buildingType: 'tavern', buildingName: 'The Crooked Pint' };
+    const step = [{ id: 1, type: 'item', location: 'Willowdale', requires: [], trigger: { item: 'map' },
+      building: { type: 'tavern', name: 'The Crooked Pint', location: 'Willowdale' } }];
+    const offerAt = (building) => ({ id: `q_${building}`, status: 'available', minLevel: 1, giver: { building, town: 'Willowdale' }, milestones: [] });
+    const base = { mapLevel: 'town', worldMap: world(), playerPosition: { x: 5, y: 0 }, townMap: town, townName: 'Willowdale',
+      townPosition: { x: 0, y: 4 }, milestones: step, party: [{ level: 1 }] };
+    const shared = getSuggestedActions({ ...base, sideQuests: [offerAt('tavern')] });
+    expect(shared.map((c) => c.label)).toContain('Go to The Crooked Pint (work on offer)');
+    town[3][3] = { ...town[3][3], type: 'building', buildingType: 'shop', buildingName: 'Lorien\'s Provisions' };
+    const both = getSuggestedActions({ ...base, sideQuests: [offerAt('tavern'), offerAt('shop')] });
+    expect(both.map((c) => c.label)).toEqual(expect.arrayContaining(['Go to The Crooked Pint', "Ask for work at Lorien's Provisions"]));
+  });
+});

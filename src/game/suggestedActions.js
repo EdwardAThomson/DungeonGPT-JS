@@ -95,7 +95,7 @@ const buildingTiles = (townMap) => {
 const nearestBuilding = (townMap, from, matches) => {
   let best = null;
   buildingTiles(townMap).forEach((b) => {
-    if (!matches(b.tile)) return;
+    if (!matches(b.tile, b)) return; // b carries the tile's x, y
     const d = from ? townDistance(from, b) : 0;
     if (!best || d < best.d) best = { ...b, d };
   });
@@ -310,9 +310,18 @@ export const getSuggestedActions = (s = {}) => {
   // Work on offer in this town: one building with a side quest the party can take, while
   // under the active-quest cap. Sends players into buildings they'd otherwise skip.
   if (inTown && getActiveSideQuests(sideQuests).length < ACTIVE_QUEST_CAP) {
-    const offer = nearestBuilding(townMap, townPosition, (t) =>
-      !!t.buildingType && getOfferAt(sideQuests, { buildingType: t.buildingType, townName, level: partyLevel }).length > 0);
-    if (offer) walkTo(offer, `Ask for work at ${offer.tile.buildingName || `the ${String(offer.tile.buildingType).replace(/_/g, ' ')}`}`, SIDE);
+    const offers = (t) => !!t.buildingType && getOfferAt(sideQuests, { buildingType: t.buildingType, townName, level: partyLevel }).length > 0;
+    // Prefer a building no other chip already walks to: when the work is in the main
+    // quest's building, that chip gets you there anyway and a second one would collapse.
+    const offer = nearestBuilding(townMap, townPosition, (t, at) => offers(t) && !seen.has(`walk:${at.x},${at.y}`))
+      || nearestBuilding(townMap, townPosition, offers);
+    if (offer && !seen.has(`walk:${offer.x},${offer.y}`)) {
+      walkTo(offer, `Ask for work at ${offer.tile.buildingName || `the ${String(offer.tile.buildingType).replace(/_/g, ' ')}`}`, SIDE);
+    } else if (offer) {
+      // Same building as an existing chip: say so on that chip instead.
+      const chip = out.find((c) => c.id === `walk:${offer.x},${offer.y}`);
+      if (chip && !/work on offer/.test(chip.label)) chip.label = `${chip.label} (work on offer)`;
+    }
   }
 
   if (inTown && isHurt(party)) {
