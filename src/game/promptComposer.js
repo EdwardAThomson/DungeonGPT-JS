@@ -1,4 +1,5 @@
 import { DM_PROTOCOL } from '../data/prompts';
+import { detectNarrationProblem } from '../utils/responseGuard';
 import { buildMovementPrompt } from '../utils/promptBuilder';
 import { areRequirementsMet } from '../game/milestoneEngine';
 import { getHPStatus } from '../utils/healthSystem';
@@ -85,6 +86,8 @@ export const buildLocationInfo = ({ tile, coords, isNewArea }) => {
 const buildRecentAiContext = (conversation = [], maxMessages = 3) => {
   const recentAiMessages = conversation
     .filter((msg) => msg.role === 'ai')
+    // A leaked or looping reply already in an older save must not be fed back as context.
+    .filter((msg) => typeof msg.content !== 'string' || !detectNarrationProblem(msg.content))
     .slice(-maxMessages)
     .map((msg) => {
       const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);

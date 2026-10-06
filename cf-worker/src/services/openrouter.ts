@@ -1,4 +1,4 @@
-import { AiServiceError, sanitizeResponse } from './ai';
+import { AiServiceError, acceptNarration } from './ai';
 import type { Env } from '../types';
 
 // ─── Premium AI pool via OpenRouter (backlog #7) ──────────────────────────────
@@ -209,7 +209,7 @@ async function callOpenRouter(
  * Premium-pool text generation with the same shape and posture as generateText in
  * services/ai.ts: resolve model (unknown -> default), clamp tokens, try the primary,
  * then walk up to two fallback candidates. Applies the SAME sanitization pass as the
- * free pool (sanitizeResponse is imported from services/ai.ts, not duplicated).
+ * free pool (acceptNarration is imported from services/ai.ts, not duplicated).
  * Throws AiServiceError when the pool is unconfigured or every candidate fails;
  * routes/ai.ts catches that and falls back to the free pool so a generation is
  * never dead.
@@ -253,7 +253,7 @@ export async function generatePremiumText(
       temperature,
       options.systemPrompt
     );
-    return { text: sanitizeResponse(primary.text), modelId: model.id };
+    return { text: acceptNarration(primary.text, model.id), modelId: model.id };
   } catch (primaryError: unknown) {
     console.error(
       `Primary premium model ${model.id} failed:`,
@@ -275,7 +275,7 @@ export async function generatePremiumText(
           temperature,
           options.systemPrompt
         );
-        return { text: sanitizeResponse(fallback.text), modelId: fallbackModel.id };
+        return { text: acceptNarration(fallback.text, fallbackModel.id), modelId: fallbackModel.id };
       } catch (fallbackError: unknown) {
         console.error(
           `Fallback premium model ${fallbackModel.id} also failed:`,

@@ -73,13 +73,16 @@ describe("generateText: response format handling", () => {
     expect(result.text).toBe("openai text");
   });
 
-  it("degrades to message.reasoning when content is empty (reasoning models)", async () => {
-    const ai = stubAi(() => ({
-      choices: [{ message: { content: null, reasoning: "partial planning" } }],
-    }));
+  it("never returns message.reasoning as narration; falls back to another model", async () => {
+    const ai = stubAi((call) =>
+      call.modelId === KNOWN_MODEL
+        ? { choices: [{ message: { content: null, reasoning: "partial planning" } }] }
+        : okResponse("fallback narration")
+    );
     const env = makeEnv({ AI: ai.binding });
     const result = await generateText(env, { prompt: "hi", modelId: KNOWN_MODEL });
-    expect(result.text).toBe("partial planning");
+    expect(result.text).toBe("fallback narration");
+    expect(ai.calls.length).toBe(2);
   });
 });
 
@@ -161,5 +164,48 @@ describe("generateText: fallback walk", () => {
     });
     const fallbackCall = ai.calls.find((c) => c.modelId !== small.id)!;
     expect(fallbackCall.inputs.max_tokens).toBe(small.maxTokens);
+  });
+});
+
+describe("generateText: leaked-prompt and repetition guard", () => {
+  // The live-game leak (2026-10-06): the model restated DM_PROTOCOL, then looped.
+  const LEAK =
+    'You are a Dungeon master for a tabletop RPG. You must ALWAYS stay in character. ' +
+    '1. NEVER output internal reasoning, plans, or " agentic thoughts (e.g ( e.g., " ' +
+    "I will examine any item found in the environment. " +
+    "NEVER ".repeat(40);
+
+  it.each([
+    ["a protocol echo", 'The wind stirs. 1. NEVER output internal reasoning, plans, or "agentic" thoughts.'],
+    ["a repetition loop", "The boar falls. " + "NEVER ".repeat(30)],
+    ["a repeated phrase loop", "You look around. " + "the dark the dark the dark ".repeat(5)],
+    ["the live-game leak", LEAK],
+  ])("rejects %s and serves the fallback model's narration", async (_name, bad) => {
+    const ai = stubAi((call) =>
+      call.modelId === KNOWN_MODEL ? okResponse(bad) : okResponse("The clearing is quiet.")
+    );
+    const env = makeEnv({ AI: ai.binding });
+    const result = await generateText(env, { prompt: "hi", modelId: KNOWN_MODEL });
+    expect(result.text).toBe("The clearing is quiet.");
+  });
+
+  it("throws AiServiceError when every model leaks", async () => {
+    const ai = stubAi(() => okResponse(LEAK));
+    const env = makeEnv({ AI: ai.binding });
+    const err = await generateText(env, { prompt: "hi", modelId: KNOWN_MODEL }).catch(
+      (e: unknown) => e
+    );
+    expect(err).toBeInstanceOf(AiServiceError);
+  });
+
+  it.each([
+    ["short emphatic dialogue", '"No, no, no, no!" the miller cries. "Not the mill!"'],
+    ["a stat array", "Rolls: 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"],
+    ["ordinary narration mentioning a master", "The dungeon master of the keep, a stooped jailer, eyes you warily."],
+  ])("lets %s through", async (_name, text) => {
+    const ai = stubAi(() => okResponse(text));
+    const env = makeEnv({ AI: ai.binding });
+    const result = await generateText(env, { prompt: "hi", modelId: KNOWN_MODEL });
+    expect(result.text).toBe(text);
   });
 });

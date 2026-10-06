@@ -2,6 +2,8 @@ import { apiFetch, buildApiUrl } from './apiClient';
 import { createLogger } from '../utils/logger';
 import { supabase } from './supabaseClient';
 import { getRequestPool, recordPoolOutcome } from './aiPool';
+import { DM_PROTOCOL } from '../data/prompts';
+import { detectNarrationProblem } from '../utils/responseGuard';
 
 const API_PATH = '/api/llm';
 const rawCfWorkerUrl = process.env.REACT_APP_CF_WORKER_URL || 'http://localhost:8787';
@@ -35,6 +37,9 @@ const sanitizeResponse = (text) => {
 
     return sanitized.trim();
 };
+
+// Shown instead of a narration that echoed the DM rules or fell into a repetition loop.
+export const NARRATION_REJECTED_MESSAGE = 'The narrator lost the thread there. Please try again.';
 
 export const llmService = {
     /**
@@ -244,14 +249,25 @@ export const llmService = {
                 });
             });
         } else {
+            // Send the DM rules as the system message rather than as the opening of the
+            // user turn: in the user turn some models treat them as text to continue and
+            // narrate the rules back to the player.
+            const hasProtocol = prompt.startsWith(DM_PROTOCOL);
             const responseText = await this.generateText({
                 provider,
                 model,
-                prompt,
+                prompt: hasProtocol ? prompt.slice(DM_PROTOCOL.length) : prompt,
+                systemPrompt: hasProtocol ? DM_PROTOCOL.trim() : undefined,
                 maxTokens: maxTokens || 1000,
                 temperature: temperature || 0.7
             });
-            return sanitizeResponse(responseText);
+            const text = sanitizeResponse(responseText);
+            const problem = detectNarrationProblem(text);
+            if (problem) {
+                logger.warn(`Narration rejected (${problem}): ${text.slice(0, 200)}`);
+                throw new Error(NARRATION_REJECTED_MESSAGE);
+            }
+            return text;
         }
     }
 };
