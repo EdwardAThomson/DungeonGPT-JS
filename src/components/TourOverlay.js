@@ -5,7 +5,7 @@
 // minimized to a small pill (so the player can re-read them), advanced with "Next"
 // for multi-step pages, or the whole tour skipped.
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
 import '../styles/tour.css';
 
@@ -42,6 +42,7 @@ const Pill = ({ onExpand }) => (
 // the cross-route tour (below) and the in-game workspace tips (WorkspaceHints).
 export const Coachmark = ({ step, minimized, pageInfo, hasNextOnPage, onNext, onSkip, onMinimize, onExpand, skipLabel }) => {
   const [rect, setRect] = useState(null);
+  const lastRect = useRef(null);
 
   // `target` rings an element; `inside` instead floats the card at the top of an element
   // with no ring (for big areas like the map, where a ring and an outside tooltip don't fit).
@@ -50,22 +51,29 @@ export const Coachmark = ({ step, minimized, pageInfo, hasNextOnPage, onNext, on
   const needsRect = hasTarget && !minimized;
 
   const measure = useCallback(() => {
-    if (!needsRect) { setRect(null); return; }
-    const el = document.querySelector(selector);
+    const el = needsRect ? document.querySelector(selector) : null;
     const r = el && el.getBoundingClientRect();
     // A hidden target (display:none, e.g. the other tab on phones) measures 0x0: fall
     // back to the docked card rather than ringing the top-left corner.
+    let next = null;
     if (r && (r.width > 0 || r.height > 0)) {
-      setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
-    } else {
-      setRect(null);
+      // The ring copies the target's corner radius so it hugs pills and cards alike.
+      const radius = parseFloat(window.getComputedStyle(el).borderTopLeftRadius) || 0;
+      next = { top: r.top, left: r.left, width: r.width, height: r.height, radius };
     }
+    const prev = lastRect.current;
+    const same = prev === next || (prev && next
+      && prev.top === next.top && prev.left === next.left
+      && prev.width === next.width && prev.height === next.height && prev.radius === next.radius);
+    if (same) return;
+    lastRect.current = next;
+    setRect(next);
   }, [selector, needsRect]);
 
   // Locate (and scroll to) the target when a targeted step activates; poll briefly
   // because the element may render a beat after the route does.
   useEffect(() => {
-    if (!needsRect) { setRect(null); return; }
+    if (!needsRect) { measure(); return undefined; }
     let tries = 0;
     const locate = () => {
       const el = document.querySelector(selector);
@@ -84,19 +92,18 @@ export const Coachmark = ({ step, minimized, pageInfo, hasNextOnPage, onNext, on
     return () => clearInterval(iv);
   }, [selector, step, needsRect, measure]);
 
+  // Track the target every frame while it is ringed: content reflowing around it
+  // (chips added, web fonts, smooth scrolling) moves it without any resize or scroll
+  // event, which left the ring offset. measure() only re-renders when the box changes.
   useEffect(() => {
-    if (!needsRect) return;
-    window.addEventListener('resize', measure);
-    window.addEventListener('scroll', measure, true);
-    // Late layout shifts (web fonts, hero images) move the target without a
-    // resize or scroll event, leaving the ring offset from it; re-measure then too.
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
-    if (ro) ro.observe(document.body);
-    return () => {
-      window.removeEventListener('resize', measure);
-      window.removeEventListener('scroll', measure, true);
-      if (ro) ro.disconnect();
+    if (!needsRect) return undefined;
+    let frame;
+    const tick = () => {
+      measure();
+      frame = requestAnimationFrame(tick);
     };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
   }, [needsRect, measure]);
 
   if (!step) return null;
@@ -126,6 +133,7 @@ export const Coachmark = ({ step, minimized, pageInfo, hasNextOnPage, onNext, on
     left: rect.left - pad,
     width: rect.width + pad * 2,
     height: rect.height + pad * 2,
+    borderRadius: rect.radius > 0 ? rect.radius + pad : undefined,
   };
 
   const spaceBelow = window.innerHeight - (rect.top + rect.height);
