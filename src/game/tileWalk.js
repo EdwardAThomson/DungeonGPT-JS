@@ -98,12 +98,14 @@ export function computeWalkPath(mapData, start, goal, isWalkable) {
  * @param {number} args.stepIntervalMs delay between successive tiles.
  * @param {(pos:{x:number,y:number}, index:number)=>('halt'|'continue'|any)} args.onEnterTile
  * @param {(fn:Function, ms:number)=>any} [args.schedule] timer factory; defaults to setTimeout.
- * @returns {() => void} cancel function that stops any pending step.
+ * @returns {() => void} cancel function that stops any pending step. It also carries
+ *          `isActive()`: true until the walk finishes, halts or is cancelled.
  */
 export function runTileWalk({ path, stepIntervalMs, onEnterTile, schedule = setTimeout }) {
   let cancelled = false;
   let timerId = null;
   let index = 0;
+  let pending = false;
 
   const cancel = () => {
     cancelled = true;
@@ -117,8 +119,10 @@ export function runTileWalk({ path, stepIntervalMs, onEnterTile, schedule = setT
 
   const scheduleNext = () => {
     if (cancelled || index >= (path ? path.length : 0)) return;
+    pending = true;
     timerId = schedule(() => {
       timerId = null;
+      pending = false;
       if (cancelled) return;
       const pos = path[index];
       const currentIndex = index;
@@ -130,5 +134,6 @@ export function runTileWalk({ path, stepIntervalMs, onEnterTile, schedule = setT
   };
 
   scheduleNext();
+  cancel.isActive = () => !cancelled && pending;
   return cancel;
 }

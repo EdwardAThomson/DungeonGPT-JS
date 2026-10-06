@@ -169,4 +169,26 @@ describe('runTileWalk', () => {
       jest.useRealTimers();
     }
   });
+
+  test('isActive() is true until the walk finishes, halts or is cancelled', () => {
+    const pending = [];
+    const schedule = (fn) => { pending.push(fn); return pending.length - 1; };
+    const flushOne = () => { const fn = pending.shift(); if (fn) fn(); };
+    const path = [{ x: 1, y: 0 }, { x: 2, y: 0 }];
+
+    const done = runTileWalk({ path, stepIntervalMs: TILE_STEP_MS, schedule, onEnterTile: () => 'continue' });
+    expect(done.isActive()).toBe(true);
+    flushOne();
+    expect(done.isActive()).toBe(true);
+    flushOne();
+    expect(done.isActive()).toBe(false);
+
+    const halted = runTileWalk({ path, stepIntervalMs: TILE_STEP_MS, schedule, onEnterTile: () => 'halt' });
+    flushOne();
+    expect(halted.isActive()).toBe(false);
+
+    const cancelled = runTileWalk({ path, stepIntervalMs: TILE_STEP_MS, schedule, onEnterTile: () => 'continue' });
+    cancelled();
+    expect(cancelled.isActive()).toBe(false);
+  });
 });
