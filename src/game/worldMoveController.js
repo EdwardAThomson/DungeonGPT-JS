@@ -21,9 +21,17 @@ export const applyWorldMapMove = (worldMap, clickedX, clickedY) => {
   return { newMap, targetTile, wasExplored };
 };
 
+// Terrain features laid over the base biome count as their own area for first-visit
+// narration. Keyed on biome alone, the first plains tile marked every later wood,
+// hill, mountain, ruin and cave as "visited", so their arrival prose never showed
+// and the party always "returned" to places it had never been. The feature key is
+// stored in visitedBiomes next to the plain biomes (additive: old saves lack the
+// feature keys and simply get each arrival line once).
+const AREA_FEATURE_POIS = { forest: 'forest', hills: 'hills', mountain: 'mountain', ruins: 'ruins', cave: 'cave', cave_entrance: 'cave' };
+
 export const getAreaIdentifiers = (targetTile) => {
   return {
-    biomeType: targetTile.biome || 'Unknown Area',
+    biomeType: AREA_FEATURE_POIS[targetTile.poi] || targetTile.biome || 'Unknown Area',
     townName: targetTile.townName || (targetTile.poi === 'town' ? 'Unknown Town' : null)
   };
 };

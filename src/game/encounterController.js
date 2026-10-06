@@ -282,6 +282,22 @@ export const NARRATIVE_HOOK_PERSIST_MOVES = 3;
  * @param {Object} [options]
  * @param {boolean} [options.remind=false] - emit the one-time reminder line
  */
+// The one-move-away nudge. Several shapes, chosen by a hash of the hook text so the
+// same hook always gets the same line (pure, no Math.random) but a session's hooks
+// don't all read as one fixed sentence. Each keeps "Look around" (the button name).
+const HOOK_REMINDERS = [
+  (hook) => `*You think back to ${hook}, just a short way behind you. It may be worth a Look around before you press on.*`,
+  (hook) => `*Something nags at you: ${hook}, a short way back. A Look around might tell you more before you go further.*`,
+  (hook) => `*Behind you, ${hook} goes unexamined. One Look around would settle it.*`,
+  (hook) => `*Nobody has quite forgotten ${hook}. There is still time for a Look around.*`
+];
+
+const composeHookReminder = (hook) => {
+  let h = 0;
+  for (let i = 0; i < hook.length; i++) h = (h * 31 + hook.charCodeAt(i)) >>> 0;
+  return HOOK_REMINDERS[h % HOOK_REMINDERS.length](hook);
+};
+
 export const ageNarrativeHook = (hookState, { remind = false } = {}) => {
   if (!hookState) {
     return { hookState: null, reminderText: null };
@@ -294,7 +310,7 @@ export const ageNarrativeHook = (hookState, { remind = false } = {}) => {
 
   const hook = hookState.hook || hookState.encounter?.narrativeHook || null;
   const reminderText = remind && hookMoves === 1 && hook
-    ? `*You think back to ${hook}, just a short way behind you. It may be worth a Look around before you press on.*`
+    ? composeHookReminder(hook)
     : null;
 
   return { hookState: { ...hookState, hookMoves }, reminderText };

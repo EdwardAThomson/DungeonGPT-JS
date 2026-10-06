@@ -19,8 +19,8 @@ export const CAVE_ENCOUNTERS = {
     ],
     rewards: { xp: 50, gold: '3d12', items: ['cave_mushrooms:60%', 'raw_gems:40%', 'ancient_artifact:15%'] },
     consequences: {
-      criticalSuccess: 'You discover a hidden cache of treasure and valuable minerals.',
-      success: 'The cave offers shelter and you find useful supplies.',
+      criticalSuccess: 'Deep in the cave a crevice holds what someone hid and never came back for, and the walls around it glint with ore.',
+      success: 'The cave is dry, out of the wind, and whoever sheltered here last left firewood and a few provisions behind.',
       failure: 'The cave is empty but provides brief respite.',
       criticalFailure: 'You disturb sleeping creatures who attack!'
     }
@@ -45,7 +45,7 @@ export const CAVE_ENCOUNTERS = {
     consequences: {
       criticalSuccess: 'You avoid the swarm entirely and notice they fled from something deeper in.',
       success: 'The bats pass quickly, leaving you unharmed.',
-      failure: 'You suffer minor scratches and bites from the panicked swarm.',
+      failure: 'The swarm goes through you like a storm of leather and teeth, and you come out scratched and bitten.',
       criticalFailure: 'The bats leave you disoriented and several follow, attracting predators.'
     }
   },
@@ -78,7 +78,7 @@ export const CAVE_ENCOUNTERS = {
       criticalSuccess: 'You scatter the pack and find a gnawed pouch of coin among the nests.',
       success: 'You beat the rats back and press on.',
       failure: 'The rats nip and bite before fleeing, leaving you scratched.',
-      criticalFailure: 'The swarm overwhelms you - you retreat bleeding and short of supplies.'
+      criticalFailure: 'The rats are too many. You fall back bleeding, and they have been at your food.'
     }
   },
 
@@ -101,10 +101,10 @@ export const CAVE_ENCOUNTERS = {
     ],
     rewards: { xp: 80, gold: '2d10', items: ['spider_silk:80%', 'poison_vial:40%', 'wrapped_corpse_loot:50%'] },
     consequences: {
-      criticalSuccess: 'You defeat the spiders and find valuable silk and a wrapped corpse with treasure.',
+      criticalSuccess: 'The spiders are dead, and among the silk hangs a wrapped body whose purse and rings are still where it carried them.',
       success: 'You fight through the spiders and continue deeper.',
       failure: 'Venomous bites sink deep as the spiders swarm over you.',
-      criticalFailure: 'The spiders overwhelm you - you barely escape, poisoned and weakened.'
+      criticalFailure: 'The spiders drive you out of the nest, poisoned and stumbling, with the venom still working in you.'
     }
   },
 
@@ -127,9 +127,9 @@ export const CAVE_ENCOUNTERS = {
     rewards: { xp: 40, gold: '1d20', items: ['glowing_fungi:70%', 'cave_fish:60%', 'pearl:25%', 'drowned_treasure:20%'] },
     consequences: {
       criticalSuccess: 'You discover the lake hides drowned treasure from past explorers.',
-      success: 'The lake provides fresh water and useful fungi.',
+      success: 'The lake water is cold and sweet, and the fungi along its edge are the kind a healer would keep.',
       failure: 'The water is too mineral-rich to drink safely.',
-      criticalFailure: 'Something in the lake grabs at you - you escape but lose equipment.'
+      criticalFailure: 'Something under the surface takes hold of your leg. You tear free, but not with everything you went in with.'
     }
   },
 
@@ -190,7 +190,7 @@ export const CAVE_ENCOUNTERS = {
       criticalSuccess: 'You rout the kobolds and loot their crude stash of shinies.',
       success: 'You drive the kobolds back into the dark and press on.',
       failure: 'A few spears and slung stones find their mark before the kobolds scatter.',
-      criticalFailure: 'The kobolds spring their traps - you retreat scraped and rattled.'
+      criticalFailure: 'The kobolds spring their traps and you fall back the way you came, scraped, rattled, and poorer.'
     }
   },
 
@@ -217,7 +217,7 @@ export const CAVE_ENCOUNTERS = {
       criticalSuccess: 'You fell the lurker clean and find its nest lined with swallowed valuables.',
       success: 'You beat the lurker off and move on, wary of the ceiling.',
       failure: 'It rakes you once before slinking back into the dark.',
-      criticalFailure: 'The lurker drags you off your feet - you break free bloodied and shaken.'
+      criticalFailure: 'The lurker has you off your feet before you see it. You break free, bloodied and shaking.'
     }
   },
 
@@ -243,7 +243,7 @@ export const CAVE_ENCOUNTERS = {
       criticalSuccess: 'You ride out the collapse and spot fresh ore laid bare in the rubble.',
       success: 'You scramble clear as the passage fills behind you.',
       failure: 'Falling stone catches you a glancing blow before you break clear.',
-      criticalFailure: 'The collapse batters you and buries the way ahead - you dig out slowly.'
+      criticalFailure: 'The collapse batters you and seals the way ahead. Digging out takes hours and most of your strength.'
     }
   },
 

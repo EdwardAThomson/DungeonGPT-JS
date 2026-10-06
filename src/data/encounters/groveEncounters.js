@@ -20,7 +20,7 @@ export const GROVE_ENCOUNTERS = {
     rewards: { xp: 35, gold: '0', items: ['healing_herbs:70%', 'natures_blessing:40%', 'druid_token:25%', 'rare_flower:35%'] },
     consequences: {
       criticalSuccess: 'The grove\'s guardian appears and grants you a powerful blessing.',
-      success: 'You feel refreshed and find useful herbs.',
+      success: 'The grove\'s quiet does you good, and along its edge grow herbs you know by name.',
       failure: 'The grove offers rest but no special benefits.',
       criticalFailure: 'You offend the forest spirits who curse your passage.'
     }
@@ -44,7 +44,7 @@ export const GROVE_ENCOUNTERS = {
     ],
     rewards: { xp: 50, gold: '0', items: ['dryad_blessing:50%', 'enchanted_seed:40%', 'forest_map:60%', 'nature_charm:30%'] },
     consequences: {
-      criticalSuccess: 'The dryad marks you as a friend of the forest - all woodland creatures will aid you.',
+      criticalSuccess: 'The dryad touches your brow and names you friend of the wood; from here on the forest\'s creatures will not hinder you.',
       success: 'The dryad shares forest secrets and safe paths.',
       failure: 'The dryad is indifferent and lets you pass.',
       criticalFailure: 'The dryad sees threat and entangles you in vines.'
@@ -96,7 +96,7 @@ export const GROVE_ENCOUNTERS = {
     rewards: { xp: 60, gold: '2d20', items: ['fairy_dust:60%', 'fey_charm:40%', 'enchanted_mushroom:50%', 'pixie_gold:30%'] },
     consequences: {
       criticalSuccess: 'Friendly fey grant you a wish or powerful boon.',
-      success: 'You gain fairy gifts and useful magical items.',
+      success: 'The fey send you off with gifts: small, strange, and more useful than they look.',
       failure: 'The fey play tricks but cause no lasting harm.',
       criticalFailure: 'You\'re transported elsewhere and must find your way back.'
     }

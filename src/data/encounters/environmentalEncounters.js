@@ -35,9 +35,9 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     rewards: { xp: 30, gold: '0', items: ['rainwater:70%', 'storm_crystal:20%'] },
     consequences: {
       criticalSuccess: 'You find excellent shelter and the storm uncovers hidden treasures.',
-      success: 'You weather the storm with minimal difficulty.',
+      success: 'You find a bank to crouch under and the storm passes over you, loud but harmless.',
       failure: 'The storm soaks your equipment and slows travel.',
-      criticalFailure: 'Lightning strikes nearby - you take damage and lose supplies.'
+      criticalFailure: 'Lightning hits close enough to throw you down. You get up burned and ringing, and part of the baggage did not survive the wet.'
     }
   },
 
@@ -83,9 +83,9 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     ],
     rewards: { xp: 50, gold: '0', items: ['exposed_minerals:50%', 'uncovered_ruins:25%', 'fallen_treasure:30%'] },
     consequences: {
-      criticalSuccess: 'You help everyone stay safe and the quake reveals something valuable.',
+      criticalSuccess: 'You keep everyone on their feet, and when the shaking stops a crack in the ground has opened on something worth taking.',
       success: 'You weather the earthquake without injury.',
-      failure: 'You take minor injuries from falling debris.',
+      failure: 'Falling stone catches you before you can get clear, and you come away bruised.',
       criticalFailure: 'You fall into a fissure and must be rescued.'
     }
   },
@@ -111,8 +111,8 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     rewards: { xp: 30, gold: '0', items: ['herbal_remedy:60%', 'desert_flower:30%'] },
     consequences: {
       criticalSuccess: 'You find an oasis with cool water and shade.',
-      success: 'You manage the heat effectively.',
-      failure: 'The heat saps your strength - travel is slower.',
+      success: 'You rest through the worst of the day in what shade there is and move again at evening.',
+      failure: 'The heat wrings you out, and by afternoon you are stopping every few hundred paces.',
       criticalFailure: 'Someone collapses from heat exhaustion.'
     }
   },
@@ -138,8 +138,8 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
     rewards: { xp: 30, gold: '0', items: ['herbal_remedy:60%', 'frost_flower:30%'] },
     consequences: {
       criticalSuccess: 'You find a sheltered hollow with dry wood and a warming spring.',
-      success: 'You manage the cold effectively.',
-      failure: 'The cold saps your strength - travel is slower.',
+      success: 'You keep moving and keep the blood going, and the cold does not get a grip.',
+      failure: 'The cold gets into fingers and feet, and every mile takes longer than the last.',
       criticalFailure: 'Someone succumbs to the cold and risks frostbite.'
     }
   },
@@ -166,7 +166,7 @@ export const ENVIRONMENTAL_ENCOUNTERS = {
       criticalSuccess: 'The lights lead you to treasure or helpful allies.',
       success: 'You discover the lights are a natural phenomenon and gain knowledge.',
       failure: 'The lights lead nowhere interesting.',
-      criticalFailure: 'The lights were a trap - you\'re ambushed or lost.'
+      criticalFailure: 'The lights were leading you somewhere on purpose, and by the time you understand that you are far from any path you know.'
     }
   }
 
