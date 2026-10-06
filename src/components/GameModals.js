@@ -60,6 +60,8 @@ const GameModals = ({
   handleHeroUpdate,
   onUseItem,
   onClaimStarterKit,
+  gameLayout,
+  onSwitchLayout,
   onQuestItemFound,
   onRest,
   onResurrect,
@@ -125,6 +127,8 @@ const GameModals = ({
         selectedHeroes={selectedHeroes}
         onUseItem={onUseItem}
         onClaimStarterKit={onClaimStarterKit}
+        gameLayout={gameLayout}
+        onSwitchLayout={onSwitchLayout}
         onHeroUpdate={handleHeroUpdate}
         />
       </Suspense>

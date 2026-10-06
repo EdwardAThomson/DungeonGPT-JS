@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { conversationsApi } from '../services/conversationsApi';
 import { createLogger } from '../utils/logger';
 import Game from './Game';
+import { resolveGameLayout } from '../game/gameLayout';
 
 const logger = createLogger('game-resume');
 
@@ -30,7 +31,10 @@ const isPageReload = () => {
 // the real progress instead of the stale starting snapshot in location.state. Without this,
 // a reload silently discarded in-progress games even though the save was on disk.
 const GameResumeGate = () => {
-  const { state } = useLocation();
+  const { state, search } = useLocation();
+  // Workspace by default; ?layout=classic (or the in-game Layout setting) falls back to the
+  // classic layout without a redeploy. Resolved once per mount (gameLayout.js).
+  const [layout] = useState(() => resolveGameLayout(search));
   const [resume, setResume] = useState(() => {
     const sid = localStorage.getItem('activeGameSessionId');
     // Resume from the store on a reload (stale/absent state), or any time we have a session
@@ -78,10 +82,10 @@ const GameResumeGate = () => {
   // the state initializers run against the resumed conversation.
   if (resume.status === 'resumed') {
     const sid = resume.conv.sessionId || resume.conv.session_id;
-    return <Game key={sid} resumeConversation={resume.conv} />;
+    return <Game key={sid} resumeConversation={resume.conv} layout={layout} layoutSwitchable />;
   }
 
-  return <Game />;
+  return <Game layout={layout} layoutSwitchable />;
 };
 
 export default GameResumeGate;

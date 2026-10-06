@@ -16,6 +16,7 @@ import { heroesApi } from '../services/heroesApi';
 import { conversationsApi } from '../services/conversationsApi';
 import { localHeroStore } from '../services/localHeroStore';
 import { createLogger } from '../utils/logger';
+import { currentGameLayout } from '../game/gameLayout';
 
 const logger = createLogger('guided-tour');
 const TUTORIAL_DONE_KEY = 'tutorialDone';
@@ -87,13 +88,19 @@ export const TOUR_STEPS = [
     body: 'Click Start the Adventure to enter the world.',
   },
   {
+    // Classic layout only: the map-stage workspace shows the map already and has its own
+    // first-time tips (WorkspaceHints), so there the tour ends after "Begin your quest".
     id: 'open-map',
+    layout: 'classic',
     route: '/game',
     target: '[data-tour="open-map"]',
     title: 'Travel with the map',
     body: 'Open the map and click a tile to move. It stays open as you explore, so you can travel freely.',
   },
 ];
+
+/** Tour steps shown for a game layout ('workspace' | 'classic'). */
+export const visibleTourSteps = (layout) => TOUR_STEPS.filter((s) => !s.layout || s.layout === layout);
 
 const GuidedTourContext = createContext(null);
 
@@ -188,38 +195,43 @@ export const GuidedTourProvider = ({ children }) => {
     return () => { cancelled = true; };
   }, [user]);
 
+  // The steps for the current game layout (layout-tagged steps drop out of the other one).
+  const steps = visibleTourSteps(currentGameLayout());
+
   // On navigation (not on manual Next), re-sync to the current route's first step.
   useEffect(() => {
     if (!tourActive) { prevPathRef.current = location.pathname; return; }
     if (prevPathRef.current !== location.pathname) {
       prevPathRef.current = location.pathname;
-      const idx = TOUR_STEPS.findIndex((s) => s.route === location.pathname);
+      const idx = steps.findIndex((s) => s.route === location.pathname);
       if (idx !== -1) setStepIndex(idx);
     }
+    // Route changes only: `steps` is rebuilt each render, and prevPathRef already guards.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tourActive, location.pathname]);
 
   // Finishing line: the tour completes once the player advances past the last step
   // (the in-game map coachmark). Driven by Game.js as the player begins and opens
   // the map; the manual "Got it" advances too.
   useEffect(() => {
-    if (tourActive && stepIndex >= TOUR_STEPS.length) {
+    if (tourActive && stepIndex >= steps.length) {
       setTourActive(false);
       markDone();
     }
-  }, [tourActive, stepIndex, markDone]);
+  }, [tourActive, stepIndex, markDone, steps.length]);
 
-  const current = TOUR_STEPS[stepIndex];
+  const current = steps[stepIndex];
   const activeStep = tourActive && current && current.route === location.pathname ? current : null;
 
   let pageInfo = null;
   let hasNextOnPage = false;
   if (activeStep) {
-    const pageSteps = TOUR_STEPS.filter((s) => s.route === activeStep.route);
+    const pageSteps = steps.filter((s) => s.route === activeStep.route);
     pageInfo = {
       current: pageSteps.findIndex((s) => s.id === activeStep.id) + 1,
       total: pageSteps.length,
     };
-    const next = TOUR_STEPS[stepIndex + 1];
+    const next = steps[stepIndex + 1];
     hasNextOnPage = !!next && next.route === activeStep.route;
   }
 
