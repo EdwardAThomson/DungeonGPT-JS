@@ -41,6 +41,7 @@ import {
 import { planTravelRoute, TRAVEL_STEP_MS } from '../game/worldTravel';
 import { getSuggestedActions } from '../game/suggestedActions';
 import { visitLeaveMessage } from '../game/logGroups';
+import { setStoredLayout } from '../game/gameLayout';
 import { grantPartyStarterKits, starterKitMessage, starterKitOfferMessage, markStarterKitVeterans, isStarterKitEligible } from '../game/starterKit';
 import { scaleEncounterXP, scaleMilestoneRewards, scaleWorldRewards } from '../game/xpScaling';
 import { INSPECT_RANGE } from '../components/TownMapDisplay';
@@ -235,7 +236,7 @@ const QuestOfferModal = () => {
   );
 };
 
-const Game = ({ resumeConversation = null, layout = 'classic' }) => {
+const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable = false }) => {
   const { state } = useLocation();
   // On a hard reload BrowserRouter restores location.state, but that is the STALE starting
   // snapshot (initial heroes / generated map / seed from when the game began). When the
@@ -2821,6 +2822,14 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
         handleAttackSiteMob={handleAttackSiteMob}
         handleEncounterResolve={handleEncounterResolve}
         handleHeroUpdate={handleHeroUpdate}
+        gameLayout={layout}
+        onSwitchLayout={layoutSwitchable ? async (next) => {
+          // Save first, then reload into the other layout: the resume gate rehydrates the
+          // game from that save, so nothing is lost. Same save format in both layouts.
+          try { await performSave(); } catch (err) { logger.error('Save before layout switch failed', err); }
+          setStoredLayout(next);
+          window.location.reload();
+        } : null}
         onClaimStarterKit={() => {
           // Existing-save claim (Inventory): same grant as a new hero gets, gearless heroes only.
           const claim = grantPartyStarterKits(selectedHeroes);

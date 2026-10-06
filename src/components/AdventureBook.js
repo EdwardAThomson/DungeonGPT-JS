@@ -284,6 +284,32 @@ const SideQuestsTab = ({ settings }) => {
   });
 };
 
+// Layout switch (/game only): the map-stage layout is the default, classic is the fallback.
+// Switching saves and reloads (see Game.js onSwitchLayout).
+const GameLayoutSetting = ({ layout, onSwitch }) => {
+  const [busy, setBusy] = useState(false);
+  const current = layout === 'classic' ? 'classic' : 'workspace';
+  const next = current === 'classic' ? 'workspace' : 'classic';
+  return (
+    <section style={{ marginBottom: '20px', padding: '12px 14px', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--bg)' }}>
+      <h4 style={{ margin: '0 0 6px', color: 'var(--text)' }}>Layout</h4>
+      <p style={{ margin: '0 0 10px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+        {current === 'workspace'
+          ? 'Map stage: the map fills the screen with the log beside it, and suggested actions above the input.'
+          : 'Classic: the adventure log fills the screen and the map opens in a pop-up.'}
+      </p>
+      <button
+        type="button"
+        className="secondary-button"
+        disabled={busy}
+        onClick={() => { setBusy(true); onSwitch(next); }}
+      >
+        {busy ? 'Saving and switching…' : next === 'classic' ? 'Switch to the classic layout' : 'Switch to the map stage layout'}
+      </button>
+    </section>
+  );
+};
+
 const AdventureBook = ({
   settings,
   onContinueLegend,
@@ -294,7 +320,9 @@ const AdventureBook = ({
   selectedHeroes,
   onUseItem,
   onClaimStarterKit,
-  onHeroUpdate
+  onHeroUpdate,
+  gameLayout,
+  onSwitchLayout
 }) => {
   const { isOpen, data, close } = useModal('adventureBook');
   // Remembered last tab (session): this component stays mounted while the game
@@ -354,6 +382,7 @@ const AdventureBook = ({
             onHeroUpdate={onHeroUpdate}
           />
         )}
+        {activeTab === 'ai' && onSwitchLayout && <GameLayoutSetting layout={gameLayout} onSwitch={onSwitchLayout} />}
         {activeTab === 'ai' && <DisplaySettings />}
         {activeTab === 'ai' && (
           <AiEngineSettings
