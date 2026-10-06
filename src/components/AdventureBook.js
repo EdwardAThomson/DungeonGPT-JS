@@ -51,13 +51,18 @@ const normalizeMilestones = (milestones) => {
 
 // Per-viewer display options (Settings tab), kept in the browser, not the save.
 const DisplaySettings = () => {
-  const { showMapGrid, setShowMapGrid } = useContext(SettingsContext);
+  const { showMapGrid, setShowMapGrid, classicTownArt, setClassicTownArt } = useContext(SettingsContext);
+  const labelStyle = { display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: 'var(--text)', textTransform: 'none', letterSpacing: 'normal', fontFamily: 'var(--font-ui, inherit)', fontSize: '0.95rem', fontWeight: 500 };
   return (
     <div style={{ marginBottom: '20px', background: 'var(--bg)', padding: '15px', borderRadius: '8px', border: '1px solid var(--border)' }}>
       <h4 style={{ margin: '0 0 10px 0', fontSize: '0.9rem', color: 'var(--primary)', fontFamily: 'var(--header-font)' }}>Display</h4>
       <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: 'var(--text)', textTransform: 'none', letterSpacing: 'normal', fontFamily: 'var(--font-ui, inherit)', fontSize: '0.95rem', fontWeight: 500 }}>
         <input type="checkbox" checked={showMapGrid} onChange={(e) => setShowMapGrid(e.target.checked)} />
         Show gridlines on the world map
+      </label>
+      <label style={{ ...labelStyle, marginTop: '8px' }}>
+        <input type="checkbox" checked={classicTownArt} onChange={(e) => setClassicTownArt(e.target.checked)} />
+        Classic town art (flat tiles)
       </label>
     </div>
   );
