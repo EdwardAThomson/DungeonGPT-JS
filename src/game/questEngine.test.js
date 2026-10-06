@@ -7,6 +7,7 @@ import {
   resolveQuestOrigin, stampQuestOrigin, getActiveGatherResources, getReadyTurnInStep,
   assignHomeTowns, getOfferAt, isQuestEligible,
 } from './questEngine';
+import { planSideQuests, selectTownSideQuests, openTownOffers, getOfferAt as offerAt, TOWN_OFFER_CAP, MAX_WORLD_SIDE_QUESTS } from './questEngine';
 import { initialSideQuests, SIDE_QUESTS, QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
 import { ITEM_CATALOG } from '../utils/inventorySystem';
 
@@ -999,5 +1000,57 @@ describe('questEngine: quest tone', () => {
       .settings.sideQuests.map((q) => q.id);
     expect(ids({ darknessLevel: 'Dark' })).toContain('whispering_well');
     expect(ids({ darknessLevel: 'Bright' })).toEqual([]);
+  });
+});
+
+// --- per-town side quests (2026-10-06): a few per town by size, level-1 work where the
+// party starts, and at most TOWN_OFFER_CAP of a town's quests in play at once.
+
+describe('per-town side quests', () => {
+  const q = (id, minLevel, building) => ({
+    id, title: id, minLevel, giver: { building },
+    milestones: [{ id: `${id}_1`, type: 'turnin', trigger: { turnIn: { building } }, requires: [], completed: false }],
+  });
+  const pool = [q('l1_inn', 1, 'tavern'), q('l1_shop', 1, 'shop'), q('l3_guild', 3, 'guild'), q('l2_tavern', 2, 'tavern'),
+    q('l4_guild', 4, 'guild'), q('l2_shop', 2, 'shop'), q('l5_temple', 5, 'temple')];
+  const availability = { buildings: ['tavern', 'shop', 'guild', 'temple'] };
+
+  it('plans quotas by size, starting town and cities first, capped', () => {
+    const plan = planSideQuests([
+      { townName: 'Hamlet', townSize: 'hamlet' }, { townName: 'Big', townSize: 'city' },
+      { townName: 'Start', townSize: 'village', isStartingTown: true }, { townName: 'Mid', townSize: 'town' },
+    ]);
+    expect(plan.total).toBe(7);
+    expect(plan.levelOneTowns).toEqual(['Start', 'Big']);
+    expect(plan.order.map((t) => [t.town, t.quota])).toEqual([['Start', 1], ['Big', 3], ['Mid', 2], ['Hamlet', 1]]);
+    const many = planSideQuests([1, 2, 3, 4].map((i) => ({ townName: `C${i}`, townSize: 'city' })));
+    expect(many.total).toBe(MAX_WORLD_SIDE_QUESTS);
+    expect(many.order.reduce((n, t) => n + t.quota, 0)).toBe(MAX_WORLD_SIDE_QUESTS);
+  });
+
+  it('fills each town from its own buildings, level-1 first in level-one towns, never over quota', () => {
+    const towns = [
+      { town: 'Start', quota: 1, buildings: ['tavern'], levelOne: true },
+      { town: 'Big', quota: 3, buildings: ['shop', 'guild'], levelOne: true },
+    ];
+    const out = selectTownSideQuests(availability, towns, () => 0.42, {}, pool);
+    const at = (town) => out.filter((x) => x.giver.town === town);
+    expect(at('Start').map((x) => x.id)).toEqual(['l1_inn']);
+    expect(at('Big')).toHaveLength(3);
+    expect(at('Big')[0].minLevel).toBe(1);
+    expect(at('Big').every((x) => ['shop', 'guild'].includes(x.giver.building))).toBe(true);
+    expect(new Set(out.map((x) => x.id)).size).toBe(out.length); // no duplicates
+    expect(out.every((x) => x.status === 'available')).toBe(true);
+  });
+
+  it(`keeps at most ${TOWN_OFFER_CAP} of a town's quests in play, lowest level first`, () => {
+    const homed = (id, minLevel, building, status = 'available') => ({ ...q(id, minLevel, building), giver: { building, town: 'Big' }, status });
+    const quests = [homed('a', 1, 'shop'), homed('b', 2, 'guild'), homed('c', 1, 'temple')];
+    expect([...openTownOffers(quests, 'Big', 3)].sort()).toEqual(['a', 'c']);
+    expect(offerAt(quests, { buildingType: 'guild', townName: 'Big', level: 3 })).toEqual([]); // b waits its turn
+    const oneActive = [homed('a', 1, 'shop', 'active'), homed('b', 2, 'guild'), homed('c', 1, 'temple')];
+    expect([...openTownOffers(oneActive, 'Big', 3)]).toEqual(['c']);
+    const done = [homed('a', 1, 'shop', 'completed'), homed('b', 2, 'guild'), homed('c', 1, 'temple', 'completed')];
+    expect(offerAt(done, { buildingType: 'guild', townName: 'Big', level: 3 }).map((x) => x.id)).toEqual(['b']);
   });
 });

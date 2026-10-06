@@ -109,6 +109,41 @@ export const stampQuestOrigin = (quest, origin) => {
   };
 };
 
+// Side quests per settlement, by size: a few per town, more in bigger places (maintainer
+// 2026-10-06: "a few per town, just not ALL side quests in one town and not all at the
+// same time"). Summed per world and capped; TOWN_OFFER_CAP paces how many are in play.
+export const TOWN_QUEST_QUOTA = { city: 3, town: 2, village: 1, hamlet: 1 };
+export const MAX_WORLD_SIDE_QUESTS = 8;
+export const TOWN_OFFER_CAP = 2;
+
+/**
+ * Side-quest plan for a world from its settlements: how many quests in total, each town's
+ * quota, and the towns that should get a level-1 quest (the starting town, then cities).
+ * @param {Array<{ townName: string, townSize?: string, isStartingTown?: boolean }>} towns
+ */
+export const planSideQuests = (towns) => {
+  const list = (towns || []).filter((t) => t?.townName);
+  const quotas = {};
+  list.forEach((t) => { quotas[t.townName] = TOWN_QUEST_QUOTA[t.townSize] || 1; });
+  const total = Math.min(MAX_WORLD_SIDE_QUESTS, Math.max(2, Object.values(quotas).reduce((a, b) => a + b, 0)));
+  const start = list.filter((t) => t.isStartingTown).map((t) => t.townName);
+  const cities = list.filter((t) => t.townSize === 'city' && !t.isStartingTown).map((t) => t.townName).sort();
+  const levelOneTowns = [...start, ...cities];
+  // Fill order for selectTownSideQuests: level-one towns first, then the rest by size.
+  const rank = { city: 0, town: 1, village: 2, hamlet: 3 };
+  const others = list.filter((t) => !levelOneTowns.includes(t.townName))
+    .sort((a, b) => ((rank[a.townSize] ?? 4) - (rank[b.townSize] ?? 4)) || a.townName.localeCompare(b.townName))
+    .map((t) => t.townName);
+  // Trim quotas to the world cap, taking from the smallest settlements last in order.
+  let budget = total;
+  const order = [...levelOneTowns, ...others].map((town) => {
+    const quota = Math.min(quotas[town], budget);
+    budget -= quota;
+    return { town, quota, levelOne: levelOneTowns.includes(town) };
+  }).filter((t) => t.quota > 0);
+  return { total, quotas, levelOneTowns, order };
+};
+
 /**
  * Give each quest without a town a home town: one whose cached map has the giver
  * building. Spreads quests out by preferring the town and building with the fewest quests
@@ -214,6 +249,47 @@ export const selectSideQuests = (availability = {}, count = 2, rng = Math.random
     milestones: q.milestones.map((m) => ({ ...m, completed: false, progress: 0 })),
     status: 'available',
   }));
+};
+
+/**
+ * New-game side quests, filled TOWN BY TOWN so each settlement gets its quota from quests
+ * its own buildings can give (no town ends up holding quests that could only go there).
+ * Order: the starting town, then cities, then the rest; each level-one town takes a
+ * level-1 quest first (level 2 if none fits). Quests are placed in their town directly.
+ * @param {object} availability - as selectSideQuests (sites, buildings, theme, darkness)
+ * @param {Array<{ town: string, quota: number, buildings: string[], levelOne?: boolean }>} towns
+ * @param {() => number} rng
+ * @param {Object} townMapsCache - for the giver building's name
+ */
+export const selectTownSideQuests = (availability = {}, towns = [], rng = Math.random, townMapsCache = {}, pool = SIDE_QUESTS) => {
+  const shuffle = (arr) => {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
+  const eligible = shuffle(pool.filter((q) => isQuestEligible(q, availability)));
+  const taken = new Set();
+  const out = [];
+  const giverTypes = (q) => (Array.isArray(q.giver.building) ? q.giver.building : [q.giver.building]);
+  towns.forEach(({ town, quota, buildings, levelOne }) => {
+    const have = new Set(buildings || []);
+    const fits = (q) => !taken.has(q.id) && giverTypes(q).some((b) => have.has(b));
+    const picks = [];
+    if (levelOne) {
+      const first = eligible.find((q) => fits(q) && (q.minLevel || 1) <= 1) || eligible.find((q) => fits(q) && (q.minLevel || 1) === 2);
+      if (first) { picks.push(first); taken.add(first.id); }
+    }
+    eligible.forEach((q) => { if (picks.length < quota && fits(q)) { picks.push(q); taken.add(q.id); } });
+    picks.forEach((q) => {
+      const type = giverTypes(q).find((b) => have.has(b));
+      out.push(stampQuestOrigin({
+        ...q,
+        milestones: q.milestones.map((m) => ({ ...m, completed: false, progress: 0 })),
+        status: 'available',
+      }, { town, buildingName: buildingNameInTown(townMapsCache[town], type) }));
+    });
+  });
+  return out;
 };
 
 // --- side-quest backfill (#45) ------------------------------------------------
@@ -504,7 +580,24 @@ export const getAvailableQuestsAt = (sideQuests, ctx = {}) =>
  */
 export const getOfferAt = (sideQuests, ctx = {}) => {
   if (isGiverBusy(sideQuests, ctx.townName, [ctx.buildingType])) return [];
-  return getAvailableQuestsAt(sideQuests, ctx).slice(0, 1);
+  const here = getAvailableQuestsAt(sideQuests, ctx);
+  if (!ctx.townName) return here.slice(0, 1);
+  // Per-town pacing: only TOWN_OFFER_CAP of a town's quests are in play at once
+  // (active + offered), lowest level first; finishing one opens the next.
+  const open = openTownOffers(sideQuests, ctx.townName, ctx.level);
+  return here.filter((q) => !q.giver?.town || open.has(q.id)).slice(0, 1);
+};
+
+/** Ids of a town's available quests currently open for offer (see TOWN_OFFER_CAP). */
+export const openTownOffers = (sideQuests, townName, level = null) => {
+  const homed = (q) => q.giver?.town === townName;
+  const activeHere = getActiveSideQuests(sideQuests).filter(homed).length;
+  const slots = Math.max(0, TOWN_OFFER_CAP - activeHere);
+  return new Set(getAvailableSideQuests(sideQuests)
+    .filter((q) => homed(q) && (level == null || (q.minLevel || 1) <= level))
+    .sort((a, b) => ((a.minLevel || 1) - (b.minLevel || 1)) || String(a.id).localeCompare(String(b.id)))
+    .slice(0, slots)
+    .map((q) => q.id));
 };
 
 // Is a quest taken from this building type (in this town, when known) still active?

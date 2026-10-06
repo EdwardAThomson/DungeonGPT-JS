@@ -18,7 +18,7 @@
 import { generateMapData } from '../utils/mapGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
 import { getTownWaterContext, getTownRoadEdges } from '../utils/townWater';
-import { selectSideQuests, assignHomeTowns } from './questEngine';
+import { selectTownSideQuests, planSideQuests } from './questEngine';
 import { populateTown } from '../utils/npcGenerator';
 import { spawnWorldMapEntities, injectQuestBuildings, findMissingMilestoneLocations } from './milestoneSpawner';
 import { getMilestoneLocationNames, getMilestoneNpcsForTown } from './milestoneEngine';
@@ -231,13 +231,21 @@ export const launchCampaign = (spec, options = {}) => {
     });
     let sqSeed = parseInt(seedToUse) || 1;
     const sqRng = () => { sqSeed = (sqSeed * 9301 + 49297) % 233280; return sqSeed / 233280; };
-    // Scale the number of side quests to the map (≈1 per town, 2–4).
-    const townCount = flatTiles.filter((t) => t.poi === 'town').length;
-    const sideQuestCount = Math.min(4, Math.max(2, townCount));
-    // Each quest lives in one home town (seeded, so a world is reproducible but worlds differ).
-    const selectedSideQuests = assignHomeTowns(
-        selectSideQuests({ sites: availableSites, buildings: [...availableBuildings], theme: worldTheme, darkness: spec.darknessLevel }, sideQuestCount, sqRng),
-        townMapsCache, sqRng);
+    // A few side quests per settlement by size (planSideQuests: city 3, town 2, village
+    // and hamlet 1, capped at 8), filled town by town from quests each town's buildings
+    // can give, with a level-1 quest first in the starting town and each city. Seeded, so
+    // a world is reproducible but worlds differ; per-town pacing (getOfferAt) keeps a
+    // town's quests from all showing at once.
+    const plan = planSideQuests(flatTiles.filter((t) => t.poi === 'town'));
+    const townBuildings = (name) => {
+        const set = new Set();
+        (townMapsCache[name]?.mapData || []).forEach((row) => row.forEach((t) => { if (t.type === 'building' && t.buildingType) set.add(t.buildingType); }));
+        return [...set];
+    };
+    const selectedSideQuests = selectTownSideQuests(
+        { sites: availableSites, buildings: [...availableBuildings], theme: worldTheme, darkness: spec.darknessLevel },
+        plan.order.map((t) => ({ ...t, buildings: townBuildings(t.town) })),
+        sqRng, townMapsCache);
 
     // Derive campaignGoal from the final milestone if not explicitly set
     const derivedGoal = spec.campaignGoal || (milestones.length > 0
