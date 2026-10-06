@@ -22,6 +22,71 @@ export const EMBEDDING_MODEL_VERSION = '@cf/baai/bge-base-en-v1.5';
 const isCurrentVersion = (entry) =>
   !entry.modelVersion || entry.modelVersion === EMBEDDING_MODEL_VERSION;
 
+// Chunked entries: each AI narration is stored as paragraph-sized chunks
+// (`${sessionId}-${msgIndex}-${chunkIndex}`), so retrieval matches and injects
+// the relevant passage whole instead of the first N characters of a long reply.
+// Older whole-message entries (no chunkIndex, id `${sessionId}-${msgIndex}`) are
+// handled like stale-model vectors: excluded from retrieval, counted as not
+// indexed, and replaced with chunks by the load-time backfill.
+const isChunked = (entry) => Number.isInteger(entry.chunkIndex);
+const isCurrent = (entry) => isCurrentVersion(entry) && isChunked(entry);
+
+export const MAX_CHUNK_CHARS = 600;
+// The worker's /api/embed accepts up to 100 texts per call (MAX_BATCH_SIZE in
+// cf-worker/src/routes/embed.ts).
+const MAX_CHUNKS_PER_EMBED_CALL = 96;
+
+const splitSentences = (text) =>
+  text.match(/[^.!?]+(?:[.!?]+["'”’)]*|$)/g)?.map(s => s.trim()).filter(Boolean) || [text];
+
+/**
+ * Split narration into chunks of at most MAX_CHUNK_CHARS, on paragraph breaks
+ * first, then sentence breaks. Never cuts mid-sentence: a single sentence longer
+ * than the limit becomes its own chunk.
+ * @param {string} text
+ * @returns {string[]}
+ */
+export const chunkText = (text) => {
+  const paragraphs = (text || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+  const units = paragraphs.flatMap(p => (p.length > MAX_CHUNK_CHARS ? splitSentences(p) : [p]));
+
+  const chunks = [];
+  let current = '';
+  for (const unit of units) {
+    if (current && current.length + 1 + unit.length > MAX_CHUNK_CHARS) {
+      chunks.push(current);
+      current = unit;
+    } else {
+      current = current ? `${current} ${unit}` : unit;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+};
+
+const buildChunkEntries = (sessionId, msgIndex, chunks, vectors, timestamp, tags = []) =>
+  chunks.map((text, chunkIndex) => ({
+    id: `${sessionId}-${msgIndex}-${chunkIndex}`,
+    sessionId,
+    text,
+    vector: vectors[chunkIndex],
+    msgIndex,
+    chunkIndex,
+    timestamp,
+    tags,
+    modelVersion: EMBEDDING_MODEL_VERSION, // #18
+  }));
+
+/**
+ * Format retrieved memories for the end of a prompt. Chunks are injected whole.
+ * @param {Array<{ text: string }>} results
+ * @returns {string}
+ */
+export const formatRagContext = (results) => {
+  if (!results || results.length === 0) return '';
+  return `\n\n[RECALLED MEMORIES FROM PAST EVENTS]\n${results.map(r => `- ${r.text}`).join('\n')}`;
+};
+
 // Log the stale-vector exclusion once per session per app run, not per query.
 const staleWarnedSessions = new Set();
 
@@ -40,25 +105,21 @@ const cosineSimilarity = (a, b) => {
 };
 
 /**
- * Embed text and store it in the RAG index.
+ * Chunk, embed and store an AI narration in the RAG index.
  * @param {string} sessionId
  * @param {string} text - The raw AI response text to embed
  * @param {{ msgIndex: number, timestamp?: number, tags?: string[] }} metadata
  */
 export const embedAndStore = async (sessionId, text, metadata) => {
   try {
-    const vector = await embeddingService.embedSingle(text);
-    await ragStore.put({
-      id: `${sessionId}-${metadata.msgIndex}`,
-      sessionId,
-      text,
-      vector,
-      msgIndex: metadata.msgIndex,
-      timestamp: metadata.timestamp || Date.now(),
-      tags: metadata.tags || [],
-      modelVersion: EMBEDDING_MODEL_VERSION, // #18
-    });
-    logger.info(`Indexed event ${metadata.msgIndex} for session ${sessionId}`);
+    const chunks = chunkText(text);
+    if (chunks.length === 0) return false;
+    const { vectors } = await embeddingService.embed(chunks);
+    await ragStore.putBatch(buildChunkEntries(
+      sessionId, metadata.msgIndex, chunks, vectors,
+      metadata.timestamp || Date.now(), metadata.tags || []
+    ));
+    logger.info(`Indexed event ${metadata.msgIndex} (${chunks.length} chunks) for session ${sessionId}`);
     return true;
   } catch (err) {
     logger.error('Failed to embed and store:', err);
@@ -82,8 +143,9 @@ export const query = async (sessionId, queryText, options = {}) => {
 
     // #18: vectors stamped with a DIFFERENT model are excluded: comparing them
     // against a current-model query vector is meaningless. Unstamped entries
-    // (pre-#18) are current by definition and stay in.
-    const entries = allEntries.filter(isCurrentVersion);
+    // (pre-#18) are current by definition and stay in. Unchunked whole-message
+    // entries are excluded too until backfill re-chunks them.
+    const entries = allEntries.filter(isCurrent);
     const staleCount = allEntries.length - entries.length;
     if (staleCount > 0 && !staleWarnedSessions.has(sessionId)) {
       staleWarnedSessions.add(sessionId);
@@ -101,10 +163,13 @@ export const query = async (sessionId, queryText, options = {}) => {
         text: entry.text,
         similarity: cosineSimilarity(queryVector, entry.vector),
         msgIndex: entry.msgIndex,
+        chunkIndex: entry.chunkIndex,
         tags: entry.tags || [],
       }))
       .filter(r => r.similarity >= minSimilarity)
       .sort((a, b) => b.similarity - a.similarity)
+      // Best chunk per message, so results recall distinct past events.
+      .filter((r, i, all) => all.findIndex(o => o.msgIndex === r.msgIndex) === i)
       .slice(0, maxResults);
 
     return scored;
@@ -114,15 +179,19 @@ export const query = async (sessionId, queryText, options = {}) => {
   }
 };
 
+/** msgIndexes that have current (right model, chunked) entries. */
+const getIndexedMessages = async (sessionId) =>
+  new Set((await ragStore.getBySession(sessionId)).filter(isCurrent).map(e => e.msgIndex));
+
 /**
  * Backfill the RAG index from conversation data, most recent first.
  * @param {string} sessionId
  * @param {Array<{ role: string, content: string }>} conversation
- * @param {{ onProgress?: (indexed: number, total: number) => void, batchSize?: number }} options
+ * @param {{ onProgress?: (indexed: number, total: number) => void, maxChunksPerCall?: number }} options
  * @returns {Promise<number>} Number of entries indexed
  */
 export const backfill = async (sessionId, conversation, options = {}) => {
-  const { onProgress, batchSize = 5 } = options;
+  const { onProgress, maxChunksPerCall = MAX_CHUNKS_PER_EMBED_CALL } = options;
 
   // Filter to embeddable AI messages
   const embeddable = conversation
@@ -131,18 +200,16 @@ export const backfill = async (sessionId, conversation, options = {}) => {
 
   if (embeddable.length === 0) return 0;
 
-  // Check what's already indexed. Entries stamped with a different embedding
-  // model (#18) do NOT count: they get re-embedded below, and the fresh put()
-  // overwrites the stale entry in place (same `${sessionId}-${msgIndex}` id).
-  const existing = (await ragStore.getBySession(sessionId)).filter(isCurrentVersion);
-  const existingCount = existing.length;
+  // Check what's already indexed, per message. Entries stamped with a different
+  // embedding model (#18) or stored unchunked do NOT count: those messages get
+  // re-embedded below as fresh chunks, and the old entries are removed.
+  const indexedSet = await getIndexedMessages(sessionId);
+  const existingCount = indexedSet.size;
   if (existingCount >= embeddable.length) {
-    logger.info(`Session ${sessionId} already fully indexed (${existingCount} entries)`);
+    logger.info(`Session ${sessionId} already fully indexed (${existingCount} messages)`);
     if (onProgress) onProgress(existingCount, embeddable.length);
     return 0;
   }
-
-  const indexedSet = new Set(existing.map(e => e.msgIndex));
 
   // Most recent first
   const toIndex = embeddable
@@ -150,33 +217,52 @@ export const backfill = async (sessionId, conversation, options = {}) => {
     .reverse();
 
   let indexed = 0;
-  const total = toIndex.length;
 
-  // Process in batches
-  for (let i = 0; i < toIndex.length; i += batchSize) {
-    const batch = toIndex.slice(i, i + batchSize);
-    const texts = batch.map(({ msg }) => msg.content);
+  // Group messages so each embed call carries as many chunks as the worker
+  // accepts (one call per group), keeping backfill well inside the embed rate limit.
+  const groups = [];
+  let group = [];
+  let groupChunks = 0;
+  for (const { msg, index } of toIndex) {
+    const chunks = chunkText(msg.content);
+    if (chunks.length === 0) continue;
+    if (group.length > 0 && groupChunks + chunks.length > maxChunksPerCall) {
+      groups.push(group);
+      group = [];
+      groupChunks = 0;
+    }
+    group.push({ index, chunks });
+    groupChunks += chunks.length;
+  }
+  if (group.length > 0) groups.push(group);
 
+  for (const [g, batch] of groups.entries()) {
     try {
-      const result = await embeddingService.embed(texts);
+      const result = await embeddingService.embed(batch.flatMap(({ chunks }) => chunks));
 
-      const entries = batch.map(({ msg, index }, batchIdx) => ({
-        id: `${sessionId}-${index}`,
-        sessionId,
-        text: msg.content,
-        vector: result.vectors[batchIdx],
-        msgIndex: index,
-        timestamp: Date.now(),
-        tags: [],
-        modelVersion: EMBEDDING_MODEL_VERSION, // #18
-      }));
+      const timestamp = Date.now();
+      let offset = 0;
+      const entries = batch.flatMap(({ index, chunks }) => {
+        const vectors = result.vectors.slice(offset, offset + chunks.length);
+        offset += chunks.length;
+        return buildChunkEntries(sessionId, index, chunks, vectors, timestamp);
+      });
 
       await ragStore.putBatch(entries);
-      indexed += entries.length;
+      // Drop the replaced entries: the old whole-message id, plus any stale
+      // chunk ids beyond the new chunk count. Same-id stale chunks were
+      // overwritten in place by putBatch.
+      const keep = new Set(entries.map(e => e.id));
+      const batchIndexes = new Set(batch.map(({ index }) => index));
+      const stale = (await ragStore.getBySession(sessionId))
+        .filter(e => batchIndexes.has(e.msgIndex) && !keep.has(e.id))
+        .map(e => e.id);
+      await ragStore.deleteBatch(stale);
 
+      indexed += batch.length;
       if (onProgress) onProgress(existingCount + indexed, embeddable.length);
     } catch (err) {
-      logger.error(`Backfill batch failed at offset ${i}:`, err);
+      logger.error(`Backfill batch ${g + 1}/${groups.length} failed:`, err);
       // Continue with next batch rather than aborting
     }
   }
@@ -193,9 +279,9 @@ export const backfill = async (sessionId, conversation, options = {}) => {
  */
 export const getIndexStatus = async (sessionId, conversation) => {
   const embeddableCount = conversation.filter(m => m.role === 'ai').length;
-  // #18: stale-model vectors count as unindexed, so a model change surfaces as
-  // 'partial'/'empty' and useRagSync's auto-backfill re-indexes on next load.
-  const indexedCount = (await ragStore.getBySession(sessionId)).filter(isCurrentVersion).length;
+  // #18: stale-model and unchunked vectors count as unindexed, so they surface
+  // as 'partial'/'empty' and useRagSync's auto-backfill re-indexes on next load.
+  const indexedCount = (await getIndexedMessages(sessionId)).size;
 
   let status = 'current';
   if (indexedCount === 0) status = 'empty';
@@ -204,4 +290,4 @@ export const getIndexStatus = async (sessionId, conversation) => {
   return { status, indexed: indexedCount, total: embeddableCount };
 };
 
-export const ragEngine = { embedAndStore, query, backfill, getIndexStatus };
+export const ragEngine = { embedAndStore, query, backfill, getIndexStatus, chunkText, formatRagContext };

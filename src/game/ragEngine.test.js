@@ -10,6 +10,9 @@ import {
   query,
   backfill,
   getIndexStatus,
+  chunkText,
+  formatRagContext,
+  MAX_CHUNK_CHARS,
   EMBEDDING_MODEL_VERSION
 } from './ragEngine';
 import { embeddingService } from '../services/embeddingService';
@@ -23,6 +26,7 @@ jest.mock('../services/ragStore', () => ({
   ragStore: {
     put: jest.fn(),
     putBatch: jest.fn(),
+    deleteBatch: jest.fn(),
     getBySession: jest.fn(),
     countBySession: jest.fn(),
     clearSession: jest.fn(),
@@ -32,11 +36,12 @@ jest.mock('../services/ragStore', () => ({
 const VEC = [1, 0]; // unit vector: cosine similarity 1 against itself
 
 const entry = (msgIndex, overrides = {}) => ({
-  id: `s1-${msgIndex}`,
+  id: `s1-${msgIndex}-0`,
   sessionId: 's1',
   text: `event ${msgIndex}`,
   vector: VEC,
   msgIndex,
+  chunkIndex: 0,
   timestamp: 1,
   tags: [],
   ...overrides,
@@ -51,15 +56,16 @@ beforeEach(() => {
   }));
   ragStore.put.mockResolvedValue();
   ragStore.putBatch.mockResolvedValue();
+  ragStore.deleteBatch.mockResolvedValue();
   ragStore.getBySession.mockResolvedValue([]);
 });
 
 describe('version stamp on write (#18)', () => {
   test('embedAndStore stamps new vectors with the current model version', async () => {
     await embedAndStore('s1', 'the dragon speaks', { msgIndex: 3 });
-    expect(ragStore.put).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 's1-3', modelVersion: EMBEDDING_MODEL_VERSION })
-    );
+    expect(ragStore.putBatch).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 's1-3-0', chunkIndex: 0, modelVersion: EMBEDDING_MODEL_VERSION }),
+    ]);
   });
 
   test('backfill stamps every batched entry', async () => {
@@ -123,7 +129,7 @@ describe('re-index piggybacks on the existing sync flow (#18)', () => {
     const indexed = await backfill('s1', [{ role: 'ai', content: 'a tale' }]);
     expect(indexed).toBe(1);
     const entries = ragStore.putBatch.mock.calls[0][0];
-    expect(entries[0].id).toBe('s1-0'); // same id: the stale entry is replaced
+    expect(entries[0].id).toBe('s1-0-0'); // same id: the stale entry is replaced
     expect(entries[0].modelVersion).toBe(EMBEDDING_MODEL_VERSION);
   });
 
@@ -138,5 +144,99 @@ describe('re-index piggybacks on the existing sync flow (#18)', () => {
     ]);
     expect(indexed).toBe(0);
     expect(ragStore.putBatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('chunking', () => {
+  const sentence = (n) => `Sentence number ${n} tells of the road ahead and the long night.`;
+
+  test('a short narration is one chunk, unchanged', () => {
+    expect(chunkText('The gate creaks open.')).toEqual(['The gate creaks open.']);
+  });
+
+  test('splits on paragraph breaks and packs paragraphs up to the limit', () => {
+    const para = 'x'.repeat(250);
+    const chunks = chunkText([para, para, para].join('\n\n'));
+    expect(chunks).toHaveLength(2);
+    chunks.forEach(c => expect(c.length).toBeLessThanOrEqual(MAX_CHUNK_CHARS));
+  });
+
+  test('an over-long paragraph splits on sentences and loses no text', () => {
+    const para = Array.from({ length: 30 }, (_, i) => sentence(i)).join(' ');
+    const chunks = chunkText(para);
+    expect(chunks.length).toBeGreaterThan(1);
+    chunks.forEach(c => expect(c.length).toBeLessThanOrEqual(MAX_CHUNK_CHARS));
+    expect(chunks.join(' ')).toBe(para);
+  });
+
+  test('empty text yields no chunks', () => {
+    expect(chunkText('')).toEqual([]);
+    expect(chunkText('  \n\n ')).toEqual([]);
+  });
+
+  test('embedAndStore stores one entry per chunk under the same msgIndex', async () => {
+    const para = 'y'.repeat(400);
+    await embedAndStore('s1', `${para}\n\n${para}`, { msgIndex: 5 });
+    const entries = ragStore.putBatch.mock.calls[0][0];
+    expect(entries.map(e => e.id)).toEqual(['s1-5-0', 's1-5-1']);
+    expect(entries.every(e => e.msgIndex === 5)).toBe(true);
+  });
+
+  test('formatRagContext injects chunks whole', () => {
+    const text = 'z'.repeat(550);
+    expect(formatRagContext([{ text }])).toContain(text);
+    expect(formatRagContext([])).toBe('');
+  });
+});
+
+describe('unchunked whole-message entries', () => {
+  const legacy = (msgIndex) => ({ ...entry(msgIndex), id: `s1-${msgIndex}`, chunkIndex: undefined });
+
+  test('are excluded from retrieval', async () => {
+    ragStore.getBySession.mockResolvedValue([legacy(0), entry(1)]);
+    const results = await query('s1', 'what happened?');
+    expect(results.map(r => r.msgIndex)).toEqual([1]);
+  });
+
+  test('count as unindexed, and status counts messages rather than chunks', async () => {
+    ragStore.getBySession.mockResolvedValue([
+      legacy(0),
+      entry(1),
+      { ...entry(1), id: 's1-1-1', chunkIndex: 1 },
+    ]);
+    const status = await getIndexStatus('s1', [
+      { role: 'ai', content: 'a' },
+      { role: 'ai', content: 'b' },
+    ]);
+    expect(status).toEqual({ status: 'partial', indexed: 1, total: 2 });
+  });
+
+  test('backfill re-chunks them and deletes the old entry', async () => {
+    ragStore.getBySession
+      .mockResolvedValueOnce([legacy(0)])
+      .mockResolvedValueOnce([legacy(0), entry(0)]);
+    const indexed = await backfill('s1', [{ role: 'ai', content: 'a tale' }]);
+    expect(indexed).toBe(1);
+    expect(ragStore.putBatch.mock.calls[0][0].map(e => e.id)).toEqual(['s1-0-0']);
+    expect(ragStore.deleteBatch).toHaveBeenCalledWith(['s1-0']);
+  });
+});
+
+describe('retrieval and backfill shape', () => {
+  test('query returns the best chunk per message, so results are distinct events', async () => {
+    ragStore.getBySession.mockResolvedValue([
+      entry(0),
+      { ...entry(0), id: 's1-0-1', chunkIndex: 1 },
+      entry(1),
+    ]);
+    const results = await query('s1', 'what happened?');
+    expect(results.map(r => r.msgIndex)).toEqual([0, 1]);
+  });
+
+  test('backfill packs messages into as few embed calls as the chunk cap allows', async () => {
+    const conversation = Array.from({ length: 7 }, (_, i) => ({ role: 'ai', content: `tale ${i}` }));
+    const indexed = await backfill('s1', conversation, { maxChunksPerCall: 3 });
+    expect(indexed).toBe(7);
+    expect(embeddingService.embed.mock.calls.map(c => c[0].length)).toEqual([3, 3, 1]);
   });
 });

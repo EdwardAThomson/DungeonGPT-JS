@@ -59,6 +59,7 @@ const GameModals = ({
   handleEncounterResolve,
   handleHeroUpdate,
   onUseItem,
+  onClaimStarterKit,
   onQuestItemFound,
   onRest,
   onResurrect,
@@ -123,6 +124,7 @@ const GameModals = ({
         setAssistantModel={setAssistantModel}
         selectedHeroes={selectedHeroes}
         onUseItem={onUseItem}
+        onClaimStarterKit={onClaimStarterKit}
         onHeroUpdate={handleHeroUpdate}
         />
       </Suspense>

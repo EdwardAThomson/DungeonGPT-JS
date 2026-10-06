@@ -4,7 +4,7 @@ import SettingsContext from "../contexts/SettingsContext";
 import { useAuth } from '../contexts/AuthContext';
 import { useGuidedTour } from '../contexts/GuidedTourContext';
 import ModalContext, { useModal } from '../contexts/ModalContext';
-import { checkForEncounter, rollSiteWanderingEncounter } from '../utils/encounterGenerator';
+import { checkForEncounter, rollSiteWanderingEncounter, PASS_THROUGH_ENCOUNTER_MULTIPLIER } from '../utils/encounterGenerator';
 import { encounterTemplates } from '../data/encounters';
 import { isTownTileWalkable } from '../utils/townMapGenerator';
 import useGameSession from '../hooks/useGameSession';
@@ -41,6 +41,7 @@ import {
 import { planTravelRoute, TRAVEL_STEP_MS } from '../game/worldTravel';
 import { getSuggestedActions } from '../game/suggestedActions';
 import { visitLeaveMessage } from '../game/logGroups';
+import { grantPartyStarterKits, starterKitMessage, starterKitOfferMessage, markStarterKitVeterans, isStarterKitEligible } from '../game/starterKit';
 import { scaleEncounterXP, scaleMilestoneRewards, scaleWorldRewards } from '../game/xpScaling';
 import { INSPECT_RANGE } from '../components/TownMapDisplay';
 import WorkspaceHints from '../components/WorkspaceHints';
@@ -67,7 +68,7 @@ import { checkSideQuestEvent, acceptSideQuest, getActiveSiteObjectives, getActiv
 import { buildInSaveContinuation, applyContinuationToSettings, healPartyForNextChapter } from '../game/campaignChain';
 import ContinueLegendPicker from '../components/ContinueLegendPicker';
 import { QUEST_ITEM_ICON_FROM } from '../data/sideQuests';
-import { embedAndStore, query as ragQuery } from '../game/ragEngine';
+import { embedAndStore, query as ragQuery, formatRagContext } from '../game/ragEngine';
 import { createLogger } from '../utils/logger';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { recordTurn } from '../services/telemetry';
@@ -258,8 +259,10 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
     // Normalize first (de-dupe + migrate legacy characterId -> heroId), then backfill
     // progression fields. normalizeParty repairs saves corrupted by the old hero-overwrite bug.
     const normalized = normalizeParty(loadedConversation?.selected_heroes || stateHeroes || []);
+    const newHeroIds = new Set(); // heroes entering a game for the first time (a new campaign)
     const heroes = normalized.map(hero => {
       if (hero.xp === undefined) {
+        newHeroIds.add(heroUid(hero));
         // Use healthSystem's calculateMaxHP for consistency
         const maxHP = hero.maxHP || calculateMaxHP(hero);
         return {
@@ -274,12 +277,29 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       }
       return hero;
     });
+    // Starter kit (once per hero per save): a basic weapon, armour, two healing items and
+    // a little gold, so new heroes meet fights at the gear level they are tuned for. New
+    // heroes get it automatically; heroes from an existing save are never changed silently
+    // (veterans with gear are marked, gearless ones can claim it from the Inventory).
+    // Runs before the invariant pass, which keeps the equipped keys (they are carried).
+    let kit = { party: heroes, grantedNames: [], events: [], claimableNames: [] };
+    try {
+      const fresh = grantPartyStarterKits(heroes.filter(h => newHeroIds.has(heroUid(h))));
+      const byId = new Map(fresh.party.map(h => [heroUid(h), h]));
+      const party = markStarterKitVeterans(heroes.map(h => byId.get(heroUid(h)) || h));
+      kit = {
+        party,
+        grantedNames: fresh.grantedNames,
+        events: fresh.events,
+        claimableNames: party.filter(isStarterKitEligible).map(h => h.heroName || h.characterName || 'A hero'),
+      };
+    } catch (err) { logger.error('Starter kit grant failed; continuing without it', err); }
     try {
       const savedSettings = typeof loadedConversation?.game_settings === 'string'
         ? JSON.parse(loadedConversation.game_settings)
         : loadedConversation?.game_settings;
       const ledger = Array.isArray(savedSettings?.heroLedger) ? savedSettings.heroLedger : null;
-      const { party, healed } = healPartyUpward(heroes);
+      const { party, healed } = healPartyUpward(kit.party);
       let finalParty = party;
       const healedMessages = [...healed];
       const reportedMessages = [];
@@ -291,10 +311,10 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
           return result.hero;
         });
       }
-      return { heroes: finalParty, healedMessages, reportedMessages };
+      return { heroes: finalParty, healedMessages, reportedMessages, kit };
     } catch (err) {
       logger.error('Hero invariant check failed on load; using heroes as loaded', err);
-      return { heroes, healedMessages: [], reportedMessages: [] };
+      return { heroes: kit.party, healedMessages: [], reportedMessages: [], kit };
     }
   });
   const [selectedHeroes, setSelectedHeroes] = useState(initialPartyCheck.heroes);
@@ -509,6 +529,19 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
   // settings (loaded saves) and finally 'grassland' so older saves are unaffected.
   const mapTheme = settings?.theme || settingsObj?.theme || 'grassland';
   const mapHook = useGameMap(loadedConversation, hasAdventureStarted, false, () => { }, worldSeed, stateGeneratedMap, settings?.requiredBuildings, stateTownMapsCache, mapTheme, getActiveSiteObjectives(settings?.sideQuests), settings?.milestones, getActiveGatherResources(settings?.sideQuests));
+  // Back on the world map after a town or site: start the quiet-moves counter afresh. It
+  // is shared with town/site walking, so a long quiet cave crawl used to leave it maxed and
+  // the first world tiles rolled at their raised pity odds. Covers leaving by the gate,
+  // the Leave chip, and being carried out after a party wipe.
+  const prevMapLevelRef = useRef(mapHook.currentMapLevel);
+  useEffect(() => {
+    const prev = prevMapLevelRef.current;
+    prevMapLevelRef.current = mapHook.currentMapLevel;
+    if (mapHook.currentMapLevel === 'world' && prev && prev !== 'world') {
+      movesSinceEncounterRef.current = 0;
+      setMovesSinceEncounter(0);
+    }
+  }, [mapHook.currentMapLevel]);
 
   // #83 Phase 2: entering a town/site clears every OTHER location's spent check locks —
   // arriving somewhere else is what resets a prior place's approaches. Does NOTHING on the
@@ -629,7 +662,20 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
   useEffect(() => {
     if (healAnnouncedRef.current) return;
     healAnnouncedRef.current = true;
-    const { healedMessages, reportedMessages } = initialPartyCheck;
+    const { healedMessages, reportedMessages, kit } = initialPartyCheck;
+    // Starter kit granted on this load: one log line, and ledger the grants so gold
+    // reconciliation protects them like any other reward.
+    const kitLine = starterKitMessage(kit?.grantedNames);
+    if (kitLine) {
+      interactionHook.setConversation(prev => [...prev, { role: 'system', content: kitLine }]);
+      appendHeroLedger(kit.events, 'starter_kit');
+    }
+    // Existing save with gearless heroes: say once (per save) that a kit can be claimed.
+    const offerLine = !settingsObj?.starterKitOffered && starterKitOfferMessage(kit?.claimableNames);
+    if (offerLine) {
+      interactionHook.setConversation(prev => [...prev, { role: 'system', content: offerLine }]);
+      setSettings(prev => (prev ? { ...prev, starterKitOffered: true } : prev));
+    }
     if (reportedMessages.length > 0) {
       logger.info(`[HERO LEDGER] ${reportedMessages.join(' · ')}`);
     }
@@ -1718,7 +1764,10 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       movesSinceEncounter,
       settings: { grimnessLevel: settings?.grimnessLevel }
     });
-    const randomEncounter = checkForEncounter(targetTile, isFirstVisitToTile, settings, movesSinceEncounter);
+    // Pass-through tiles on an auto-travel route roll at reduced odds; the destination
+    // (and every ordinary single-tile move) keeps the full chance.
+    const randomEncounter = checkForEncounter(targetTile, isFirstVisitToTile, settings, movesSinceEncounter,
+      { chanceMultiplier: passThrough ? PASS_THROUGH_ENCOUNTER_MULTIPLIER : 1 });
     logger.debug('checkForEncounter returned', randomEncounter ? randomEncounter.name : null);
 
     const plannedEncounterFlow = planWorldTileEncounterFlow({
@@ -1835,10 +1884,7 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
       try {
         const tileDesc = `${tile.biome} ${tile.poi || ''} ${tile.townName || ''}`.trim();
         const ragResults = await ragQuery(sessionId, tileDesc);
-        if (ragResults.length > 0) {
-          ragContext = '\n\n[RECALLED MEMORIES FROM PAST EVENTS]\n' +
-            ragResults.map(r => `- ${r.text.slice(0, 300)}`).join('\n');
-        }
+        ragContext = formatRagContext(ragResults);
       } catch (err) {
         logger.warn('RAG query failed for look-around, continuing without:', err);
       }
@@ -2779,6 +2825,15 @@ const Game = ({ resumeConversation = null, layout = 'classic' }) => {
         handleAttackSiteMob={handleAttackSiteMob}
         handleEncounterResolve={handleEncounterResolve}
         handleHeroUpdate={handleHeroUpdate}
+        onClaimStarterKit={() => {
+          // Existing-save claim (Inventory): same grant as a new hero gets, gearless heroes only.
+          const claim = grantPartyStarterKits(selectedHeroes);
+          if (claim.grantedNames.length === 0) return;
+          setSelectedHeroes(claim.party);
+          appendHeroLedger(claim.events, 'starter_kit');
+          interactionHook.setConversation(prev => [...prev, { role: 'system', content: starterKitMessage(claim.grantedNames) }]);
+          setTimeout(() => performSave(), 500);
+        }}
         onUseItem={(heroId, itemKey, healedHero, logLine) => {
           setSelectedHeroes(prev => replaceHeroInParty(prev, healedHero));
           if (logLine) interactionHook.setConversation(prev => [...prev, { role: 'system', content: logLine }]);
