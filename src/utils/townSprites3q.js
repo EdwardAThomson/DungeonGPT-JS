@@ -49,7 +49,7 @@ const pick = (r, arr) => arr[Math.floor(r() * arr.length) % arr.length];
 const P = {
   plaster: '#d8c9a8', plasterWarm: '#cfb68e', timber: '#4a3424', stone: '#a39a8a',
   stoneDark: '#7d7568', stonePale: '#c4bba8', wood: '#7a5638', woodDark: '#563c27',
-  glass: '#f2c46a', glassDim: '#3a3a44', door: '#4b3121', iron: '#3c3c42',
+  glass: '#f2c46a', glassDim: '#55616b', door: '#4b3121', iron: '#3c3c42',
   terracotta: '#9a5440', slate: '#525d66', thatch: '#a88a52', shingle: '#6e5a45',
   moss: '#5d6b4a', gold: '#b89a48', violet: '#5d4a8c', teal: '#467268',
   snow: '#eef2f6', sand: '#d8bf8c', adobe: '#c9a274',
@@ -208,24 +208,18 @@ const cylinder = (cam, cx, cy, r, z0, z1, color, n = 12) => {
   return solid(cam, faces, [cx, cy, (z0 + z1) / 2], { amb: 0.6, k: 0.55 });
 };
 
-// --- animation snippets (SMIL, self-contained inside the data-URI) ------------------
+// --- animation snippets -----------------------------------------------------------
+// An animated SVG used as a CSS background is re-rasterised in full every frame, so
+// motion that would sit on dozens of sprites (chimney smoke, window glow, tree sway,
+// crop ripple) is kept out of the SVG. Chimney smoke is reported as emitter points
+// (buildingSmoke3q) for the page to draw as CSS puffs; trees sway via a CSS transform on
+// their element. SMIL stays only on rare one-off sprites (flags, mill sails, fountain).
+let _smokeOut = null; // collects emitters while a building sprite is drawn
 const smoke = (x, y, dark = false, delay = 0) => {
-  let s = '';
-  for (let i = 0; i < 3; i++) {
-    const b = (delay + i * 1.3).toFixed(1);
-    s += `<circle cx='${fmt(x)}' cy='${fmt(y)}' r='1.6' fill='${dark ? '#55504a' : '#d9d6d0'}' opacity='0'>` +
-      `<animate attributeName='cy' values='${fmt(y)};${fmt(y - 16)}' dur='3.9s' begin='${b}s' repeatCount='indefinite'/>` +
-      `<animate attributeName='cx' values='${fmt(x)};${fmt(x + 2)};${fmt(x + 5)}' dur='3.9s' begin='${b}s' repeatCount='indefinite'/>` +
-      `<animate attributeName='r' values='1.4;3.6' dur='3.9s' begin='${b}s' repeatCount='indefinite'/>` +
-      `<animate attributeName='opacity' values='0;0.55;0' dur='3.9s' begin='${b}s' repeatCount='indefinite'/></circle>`;
-  }
-  return s;
+  if (_smokeOut) _smokeOut.push({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, dark, delay: Math.round(delay * 10) / 10 });
+  return '';
 };
-const flicker = (seed) => {
-  const r = rng(seed);
-  const d = (2.2 + r() * 2.5).toFixed(1);
-  return `<animate attributeName='opacity' values='0.82;1;0.88;0.97;0.84' dur='${d}s' begin='${(r() * 2).toFixed(1)}s' repeatCount='indefinite'/>`;
-};
+const flicker = () => '';
 
 // --- front-wall dressing (drawn in the y=0 plane, so screen = (ox+x, oy-z)) ----------
 const wallDressing = (ox, oy, x0, x1, H, style, color, r) => {
@@ -258,7 +252,9 @@ const wallDressing = (ox, oy, x0, x1, H, style, color, r) => {
 const windowAt = (ox, oy, x, z, w, h, lit, seed, glass = P.glass) => {
   const X = ox + x, Y = oy - z - h;
   return `<rect x='${fmt(X - 0.5)}' y='${fmt(Y - 0.5)}' width='${fmt(w + 1)}' height='${fmt(h + 1)}' fill='${P.timber}'/>` +
-    `<rect x='${fmt(X)}' y='${fmt(Y)}' width='${fmt(w)}' height='${fmt(h)}' fill='${lit ? glass : P.glassDim}'>${lit ? flicker(seed) : ''}</rect>` +
+    `<rect x='${fmt(X)}' y='${fmt(Y)}' width='${fmt(w)}' height='${fmt(h)}' fill='${lit ? glass : P.glassDim}'/>` +
+    // unlit glass catches the sky, so it reads as glazing rather than an empty hole
+    (lit ? '' : `<path d='M${fmt(X + 0.3)},${fmt(Y + h * 0.55)} L${fmt(X + w * 0.55)},${fmt(Y + 0.3)}' stroke='#c9d6de' stroke-width='0.6' opacity='0.55'/>`) +
     `<line x1='${fmt(X + w / 2)}' y1='${fmt(Y)}' x2='${fmt(X + w / 2)}' y2='${fmt(Y + h)}' stroke='${P.timber}' stroke-width='0.45'/>` +
     `<line x1='${fmt(X)}' y1='${fmt(Y + h / 2)}' x2='${fmt(X + w)}' y2='${fmt(Y + h / 2)}' stroke='${P.timber}' stroke-width='0.45'/>` +
     `<rect x='${fmt(X - 0.8)}' y='${fmt(Y + h + 0.3)}' width='${fmt(w + 1.6)}' height='0.7' fill='${shade(P.stone, 0.9)}'/>`;
@@ -273,17 +269,14 @@ const doorAt = (ox, oy, x, w, h, color = P.door, glow = null) => {
 };
 const hangingSign = (ox, oy, x, z, color) =>
   `<line x1='${fmt(ox + x)}' y1='${fmt(oy - z)}' x2='${fmt(ox + x + 5)}' y2='${fmt(oy - z)}' stroke='${P.iron}' stroke-width='0.6'/>` +
-  `<g><animateTransform attributeName='transform' type='rotate' values='-4 ${fmt(ox + x + 4)} ${fmt(oy - z)};4 ${fmt(ox + x + 4)} ${fmt(oy - z)};-4 ${fmt(ox + x + 4)} ${fmt(oy - z)}' dur='3.4s' repeatCount='indefinite'/>` +
+  `<g>` +
   `<rect x='${fmt(ox + x + 2)}' y='${fmt(oy - z + 0.8)}' width='4.4' height='3.4' rx='0.4' fill='${color}' stroke='${P.timber}' stroke-width='0.4'/></g>`;
 const lantern = (x, y, seed) =>
   `<circle cx='${fmt(x)}' cy='${fmt(y)}' r='3' fill='#ffcf6a' opacity='0.25'>${flicker(seed)}</circle>` +
   `<rect x='${fmt(x - 0.8)}' y='${fmt(y - 1)}' width='1.6' height='2' fill='#ffd77a' stroke='${P.iron}' stroke-width='0.3'/>`;
 const flag = (x, y, color) =>
   `<line x1='${fmt(x)}' y1='${fmt(y)}' x2='${fmt(x)}' y2='${fmt(y - 9)}' stroke='${P.iron}' stroke-width='0.5'/>` +
-  `<path fill='${color}'><animate attributeName='d' dur='1.8s' repeatCount='indefinite' values='` +
-  `M${fmt(x)},${fmt(y - 9)} q3,-1 6,0 q-1,1.5 0,3 q-3,-1 -6,0 Z;` +
-  `M${fmt(x)},${fmt(y - 9)} q3,1 6,0 q1,1.5 0,3 q-3,1 -6,0 Z;` +
-  `M${fmt(x)},${fmt(y - 9)} q3,-1 6,0 q-1,1.5 0,3 q-3,-1 -6,0 Z'/></path>`;
+  `<path fill='${color}' d='M${fmt(x)},${fmt(y - 9)} q3,-1 6,0 q-1,1.5 0,3 q-3,-1 -6,0 Z'/>`;
 
 // Cast shadow on the ground: footprint extruded away from the light (back-right).
 const castShadow = (cam, x0, x1, D, H) => {
@@ -296,9 +289,12 @@ const castShadow = (cam, x0, x1, D, H) => {
 const defs =
   `<defs><linearGradient id='ao' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#000' stop-opacity='0'/><stop offset='1' stop-color='#000' stop-opacity='0.22'/></linearGradient>` +
   `<filter id='soft' x='-20%' y='-20%' width='140%' height='140%'><feGaussianBlur stdDeviation='0.9'/></filter></defs>`;
+// Sprites are emitted still: any SMIL left in a snippet is dropped here, because one
+// animated background image repaints the whole layer it sits in, every frame.
+const still = (svg) => svg.replace(/<animate(?:Transform)?\b[^>]*\/>/g, '');
 const wrap = (inner) =>
   `url("data:image/svg+xml,${encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${SPRITE_W} ${SPRITE_H}'>${defs}${inner}</svg>`
+    still(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 ${SPRITE_W} ${SPRITE_H}'>${defs}${inner}</svg>`)
   )}")`;
 
 // --- building specs ------------------------------------------------------------------
@@ -375,12 +371,15 @@ const buildingSvg = (type, seed, theme) => {
 
   // openings on the front wall
   const mid = (x0 + x1) / 2;
-  if (sp.forge) s += doorAt(ox, oy, mid - 4, 8, 8, P.door, '#ff8a2a');
+  let door = null; // [left, width] of the front opening, kept clear of windows
+  if (sp.forge) { s += doorAt(ox, oy, mid - 4, 8, 8, P.door, '#ff8a2a'); door = [mid - 4, 8]; }
   else if (sp.bigDoor) {
+    door = [mid - 6, 12];
     s += `<rect x='${fmt(ox + mid - 6)}' y='${fmt(oy - 9)}' width='12' height='9' fill='${P.woodDark}'/>` +
       `<path d='M${fmt(ox + mid - 6)},${fmt(oy - 9)} L${fmt(ox + mid + 6)},${fmt(oy)} M${fmt(ox + mid + 6)},${fmt(oy - 9)} L${fmt(ox + mid - 6)},${fmt(oy)}' stroke='${shade(P.wood, 1.1)}' stroke-width='0.7'/>` +
       `<line x1='${fmt(ox + mid)}' y1='${fmt(oy - 9)}' x2='${fmt(ox + mid)}' y2='${fmt(oy)}' stroke='${P.timber}' stroke-width='0.6'/>`;
   } else if (sp.stalls) {
+    door = [x0, w];
     for (let i = 0; i < 3; i++) {
       const sx = x0 + 3 + i * ((w - 6) / 3);
       s += `<rect x='${fmt(ox + sx)}' y='${fmt(oy - 7)}' width='${fmt((w - 6) / 3 - 2)}' height='4' fill='#2a1d14'/>` +
@@ -399,17 +398,24 @@ const buildingSvg = (type, seed, theme) => {
   } else {
     const dx = sp.windows >= 2 ? mid - 2 : (r() < 0.5 ? x0 + 3 : x1 - 8);
     s += doorAt(ox, oy, dx, 5, 7.5);
+    door = [dx, 5];
   }
+  // Windows: evenly spaced slots per storey (at least one per ~10 units of frontage),
+  // skipping any slot that would overlap the door, so every building keeps some.
   const nWin = sp.windows ?? 1;
+  const litWindows = seedOf(seed, 7) % 10 < 6; // one glazing look per building, never mixed
   if (nWin && !sp.columns) {
     const rowsZ = sp.rows2 ? [3.5, H * 0.58 + 1] : [3.5];
+    const winW = 3.6;
     for (const z of rowsZ) {
-      for (let i = 0; i < nWin + (sp.rows2 && z > 4 ? 1 : 0); i++) {
-        const count = nWin + (sp.rows2 && z > 4 ? 1 : 0);
-        const wx = x0 + (i + 0.5) * (w / count) - 1.8;
-        if (z < 4 && Math.abs(wx + 1.8 - mid) < 5 && !sp.forge && !sp.bigDoor) continue; // keep clear of the door
+      const upper = z > 4;
+      const count = Math.max(nWin + (sp.rows2 && upper ? 1 : 0), Math.floor(w / 10));
+      for (let i = 0; i < count; i++) {
+        const wx = x0 + (i + 0.5) * (w / count) - winW / 2;
+        if (!upper && door && wx + winW > door[0] - 1.2 && wx < door[0] + door[1] + 1.2) continue;
         if (sp.slit) { s += `<rect x='${fmt(ox + wx + 1.2)}' y='${fmt(oy - z - 4.5 - (sp.tall ? 2 : 0))}' width='1.2' height='4.5' fill='#1e1e24'/>`; continue; }
-        s += windowAt(ox, oy, wx, z, 3.6, sp.tall ? 5.5 : 3.6, r() < 0.55, seed + i * 7 + z, glass);
+        r(); // (formerly a per-window lit roll; kept so the rest of the sprite is unchanged)
+        s += windowAt(ox, oy, wx, z, winW, sp.tall ? 5.5 : 3.6, litWindows, seed + i * 7 + z, glass);
         if (sp.bars) s += `<path d='M${fmt(ox + wx + 0.9)},${fmt(oy - z - 3.6)} v3.6 M${fmt(ox + wx + 2.7)},${fmt(oy - z - 3.6)} v3.6' stroke='${P.iron}' stroke-width='0.5'/>`;
       }
     }
@@ -719,7 +725,8 @@ const marketStall = (cam, ox, oy, r) => {
 const tree = (seed, kind) => {
   const r = rng(seed);
   const ox = 30, oy = 92;
-  const sway = (inner) => `<g><animateTransform attributeName='transform' type='rotate' values='-1.2 ${ox} ${oy};1.4 ${ox} ${oy};-1.2 ${ox} ${oy}' dur='${(4 + r() * 3).toFixed(1)}s' begin='${(r() * 3).toFixed(1)}s' repeatCount='indefinite'/>${inner}</g>`;
+  r(); r(); // (formerly the SMIL sway timing; kept so tree shapes stay the same per seed)
+  const sway = (inner) => inner;
   let s = `<ellipse cx='${ox + 6}' cy='${oy - 2}' rx='12' ry='4.5' fill='#0d0f14' opacity='0.24' filter='url(#soft)'/>`;
   if (kind === 'pine') {
     let p = `<rect x='${ox - 1.2}' y='${oy - 8}' width='2.4' height='8' fill='${P.woodDark}'/>`;
@@ -777,8 +784,9 @@ const fountain = () => {
 // mask: N=1 E=2 S=4 W=8 (same as townTileArt's autotiler). Straight runs are a single
 // curtain wall; corners, junctions and ends get a square tower. Each wall has a paved
 // wall-walk between two crenellated parapets, coursed masonry with a darker plinth,
-// arrow slits and weathering on the faces the camera sees.
-const wallSprite = (mask, keep, variant = 0, gate = null, flank = false) => {
+// arrow slits and weathering on the faces the camera sees. `outward` says whether the
+// south faces we see look out of the enclosure; slits are only cut in outward faces.
+const wallSprite = (mask, keep, variant = 0, gate = null, flank = false, outward = true) => {
   const ox = 30, oy = 100; // tile spans world x -20..20, y 0..40 (front edge at the tile bottom)
   const cam = makeCam(ox, oy, 0, 1);
   const H = keep ? 20 : 15, t = keep ? 5 : 4;
@@ -809,7 +817,7 @@ const wallSprite = (mask, keep, variant = 0, gate = null, flank = false) => {
       f += line(P2(x, h - 1), P2(x, h - 1 - len), '#3f3a32', 0.7, 0.18);
       f += `<ellipse cx='${fmt(P2(x, 1)[0])}' cy='${fmt(P2(x, 1)[1])}' rx='${fmt(1 + r() * 1.6)}' ry='0.8' fill='#56693e' opacity='0.55'/>`;
     }
-    for (const sx of slits) {
+    for (const sx of outward ? slits : []) {
       f += `<polygon points='${ptsStr([P2(sx - 0.45, h * 0.42), P2(sx + 0.45, h * 0.42), P2(sx + 0.45, h * 0.42 + 3.6), P2(sx - 0.45, h * 0.42 + 3.6)])}' fill='#1b1b20'/>`;
       f += line(P2(sx - 1.2, h * 0.42 + 2.2), P2(sx + 1.2, h * 0.42 + 2.2), '#1b1b20', 0.7);
     }
@@ -1042,12 +1050,6 @@ const fieldTile = (crop, mask, variant, theme, edge) => {
         }
       }
     }
-    if (st.tall) {
-      // a slow wind ripple across standing crops
-      s += `<rect x='-40' y='0' width='24' height='40' fill='#fff' opacity='0'>` +
-        `<animate attributeName='x' values='-40;56' dur='${(7 + r() * 3).toFixed(1)}s' begin='${(r() * 5).toFixed(1)}s' repeatCount='indefinite'/>` +
-        `<animate attributeName='opacity' values='0;0.1;0' dur='${(7 + r() * 3).toFixed(1)}s' repeatCount='indefinite'/></rect>`;
-    }
   }
   // patch edge: hedge (green) or wattle fence (woven hazel) on sides facing non-field
   const hedge = edge === 'hedge';
@@ -1105,12 +1107,22 @@ const memo = (key, fn) => {
 
 // Building sprite for a building tile. Houses vary per coordinate; civic buildings are
 // stable per type (same as the flat art's cache keys).
-export const buildingSprite3q = (buildingType = 'house', x = 0, y = 0, theme = 'grassland') => {
+const building = (buildingType, x, y, theme) => {
   const type = SPEC[buildingType] ? buildingType : 'house';
   const seed = type === 'house' ? seedOf(x, y) : seedOf(type.length * 31, type.charCodeAt(0));
   const variant = type === 'house' ? seed % 23 : 0;
-  return memo(`b|${type}|${variant}|${theme}`, () => buildingSvg(type, type === 'house' ? variant * 7919 + 13 : seed, theme));
+  return memo(`b|${type}|${variant}|${theme}`, () => {
+    _smokeOut = [];
+    const bg = buildingSvg(type, type === 'house' ? variant * 7919 + 13 : seed, theme);
+    const out = { bg, smoke: _smokeOut };
+    _smokeOut = null;
+    return out;
+  });
 };
+export const buildingSprite3q = (buildingType = 'house', x = 0, y = 0, theme = 'grassland') => building(buildingType, x, y, theme).bg;
+// Chimney smoke emitters for a building sprite, in sprite units (SPRITE_W x SPRITE_H):
+// [{ x, y, dark, delay }]. Empty when the building has no lit chimney.
+export const buildingSmoke3q = (buildingType = 'house', x = 0, y = 0, theme = 'grassland') => building(buildingType, x, y, theme).smoke;
 
 const POI_KIND = { tree: 'tree', pine: 'pine', bush: 'bush', dead_bush: 'bush', flowers: 'flowers' };
 // Sprite for a decoration POI, or null when this prototype has no 3/4 art for it
@@ -1125,16 +1137,17 @@ export const poiSprite3q = (poi, x = 0, y = 0) => {
 
 // `x`/`y` pick one of a few weathering/slit variants so long runs don't repeat exactly.
 // `flank` turns a straight run beside a gate into a tower that the gatehouse abuts.
-export const wallSprite3q = (mask, keep = false, x = 0, y = 0, flank = false) => {
+// `outward` is false where the visible face looks into the town (or keep yard): no slits.
+export const wallSprite3q = (mask, keep = false, x = 0, y = 0, flank = false, outward = true) => {
   const variant = seedOf(x, y) % 5;
-  return memo(`w|${mask}|${keep ? 1 : 0}|${variant}|${flank ? 1 : 0}`, () => wallSprite(mask, keep, variant, null, flank));
+  return memo(`w|${mask}|${keep ? 1 : 0}|${variant}|${flank ? 1 : 0}|${outward ? 1 : 0}`, () => wallSprite(mask, keep, variant, null, flank, outward));
 };
 
 // Gatehouse for a gap in a wall. `dir`: 'x' when the wall runs east-west (the road
 // passes towards the camera), 'y' when it runs north-south. `keep` draws the smaller
 // keep-compound gate with its portcullis half lowered.
-export const gateSprite3q = (dir = 'x', keep = false) =>
-  memo(`g|${dir}|${keep ? 1 : 0}`, () => wallSprite(dir === 'x' ? 10 : 5, keep, 0, dir === 'x' ? 'x' : 'y'));
+export const gateSprite3q = (dir = 'x', keep = false, outward = true) =>
+  memo(`g|${dir}|${keep ? 1 : 0}|${outward ? 1 : 0}`, () => wallSprite(dir === 'x' ? 10 : 5, keep, 0, dir === 'x' ? 'x' : 'y', false, outward));
 
 
 export const BUILDING_TYPES_3Q = Object.keys(SPEC);

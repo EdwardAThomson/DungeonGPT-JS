@@ -434,6 +434,56 @@ export const townsfolkSprite = (look, skin, view = 's', walking = false) => {
   return out;
 };
 
+// --- baked walk cycle ------------------------------------------------------------------
+// An animated SVG used as a CSS background is re-rasterised every frame, for every
+// figure on screen, which saturates the main thread with a dozen walkers. Instead the
+// SMIL stride is sampled into WALK_FRAMES still poses laid side by side in one static
+// strip; the caller steps through the strip with a CSS transform (see Town3QTest).
+export const WALK_FRAMES = 8;
+const STRIDE_S = parseFloat(STRIDE);
+const num = (str) => str.trim().split(/[\s,]+/).map(Number);
+// Value of one <animateTransform> at phase `t` (0..1 of the stride), as a transform attr.
+const sampleAnim = (tag, t) => {
+  const attr = (k) => (tag.match(new RegExp(`${k}='([^']*)'`)) || [])[1];
+  const values = attr('values').split(';').map(num);
+  const keyTimes = attr('keyTimes') ? attr('keyTimes').split(';').map(Number) : values.map((_, i) => i / (values.length - 1));
+  const dur = parseFloat(attr('dur'));
+  const begin = parseFloat(attr('begin') || '0');
+  const u = ((((t * STRIDE_S - begin) / dur) % 1) + 1) % 1;
+  let i = 0;
+  while (i < keyTimes.length - 2 && u > keyTimes[i + 1]) i++;
+  const span = keyTimes[i + 1] - keyTimes[i] || 1;
+  const k = Math.min(1, Math.max(0, (u - keyTimes[i]) / span));
+  const v = values[i].map((a, j) => f1(a + (values[i + 1][j] - a) * k));
+  return `transform='${attr('type')}(${v.join(' ')})'`;
+};
+const ANIM = /<g><animateTransform ([^>]*)\/>/g;
+const bakeFrame = (body, t) => body.replace(ANIM, (_, tag) => `<g ${sampleAnim(tag, t)}>`);
+
+const _strips = new Map();
+// Static sprite strip for a figure: { url, frames }. Walking strips hold WALK_FRAMES
+// poses; standing figures are a single still frame.
+export const townsfolkStrip = (look, skin, view = 's', walking = false) => {
+  const v = view === 'w' ? 'e' : view;
+  const key = `${look}|${skin}|${v}|${walking ? 1 : 0}`;
+  let out = _strips.get(key);
+  if (out === undefined) {
+    const role = roleForLook(look);
+    const variant = Math.floor(look / POOL.length);
+    const p = ROLES[role](variant);
+    const svg = figure(p, v, walking, skin, look + skin);
+    const cut = svg.indexOf('</defs>') + 7;
+    const defs = svg.slice(0, cut), body = svg.slice(cut);
+    const frames = walking ? WALK_FRAMES : 1;
+    let poses = '';
+    for (let i = 0; i < frames; i++) poses += `<g transform='translate(${i * FIG_W} 0)'>${bakeFrame(body, i / frames)}</g>`;
+    const strip = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 -1 ${FIG_W * frames} ${FIG_H + 1}'>${defs}${poses}</svg>`;
+    out = { url: `url("data:image/svg+xml,${encodeURIComponent(strip)}")`, frames };
+    _strips.set(key, out);
+  }
+  return out;
+};
+
 export const TOWNSFOLK_ROLES = Object.keys(ROLES);
 export const lookForRole = (role, variant = 0) => {
   const i = POOL.indexOf(role);
