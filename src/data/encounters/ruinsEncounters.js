@@ -20,7 +20,7 @@ export const RUINS_ENCOUNTERS = {
     rewards: { xp: 55, gold: '2d20', items: ['ancient_scroll:40%', 'old_coins:60%', 'artifact_fragment:30%'] },
     consequences: {
       criticalSuccess: 'You uncover a hidden chamber filled with ancient treasures.',
-      success: 'You find valuable artifacts and learn about the ancient civilization.',
+      success: 'Among the fallen stones you turn up carved pieces worth carrying, and the carvings tell you something of who built here.',
       failure: 'The ruins yield little of value.',
       criticalFailure: 'You trigger an ancient trap and must escape quickly.'
     }
@@ -109,7 +109,7 @@ export const RUINS_ENCOUNTERS = {
     consequences: {
       criticalSuccess: 'The spirit shares ancient knowledge before departing peacefully.',
       success: 'You defeat or calm the spirit.',
-      failure: 'The spirit curses you before fading, imposing a minor hex.',
+      failure: 'The spirit fades, but not before laying a small cold curse on you that will take time to wear off.',
       criticalFailure: 'The spirit possesses a party member temporarily, causing chaos.'
     }
   },
@@ -140,7 +140,7 @@ export const RUINS_ENCOUNTERS = {
     rewards: { xp: 90, gold: '5d20', items: ['ancient_gold:80%', 'magic_scroll:50%', 'runic_greatsword:20%', 'stormbound_ring:10%', 'legendary_weapon:15%'] },
     consequences: {
       criticalSuccess: 'The vault opens to reveal untouched treasure from the ancient era.',
-      success: 'You access the vault and find valuable items.',
+      success: 'The vault door gives at last, and what is on the shelves inside has waited a long time for you.',
       failure: 'The vault is mostly looted but you find a few coins.',
       criticalFailure: 'Opening the vault releases a trapped creature!'
     }
@@ -173,7 +173,7 @@ export const RUINS_ENCOUNTERS = {
       criticalSuccess: 'You stop the ritual and capture the cult leader for questioning.',
       success: 'You defeat the cultists and prevent the ritual.',
       failure: 'The cultists hold you off and the ritual partially completes; something stirs.',
-      criticalFailure: 'The ritual completes - you must face what they summoned!'
+      criticalFailure: 'The ritual completes while you are still fighting, and what the cultists called up turns to look at you.'
     }
   },
 
@@ -196,7 +196,7 @@ export const RUINS_ENCOUNTERS = {
     rewards: { xp: 45, gold: '1d10', items: ['spell_scroll:50%', 'history_tome:60%', 'treasure_map:25%', 'forbidden_knowledge:15%'] },
     consequences: {
       criticalSuccess: 'You discover a complete spellbook and maps to other ruins.',
-      success: 'You gain useful knowledge and a few valuable scrolls.',
+      success: 'Most of the library is dust, but a few scrolls are whole, and what you read in them you will not forget.',
       failure: 'Most texts are too damaged to read.',
       criticalFailure: 'A guardian construct activates to protect the library!'
     }

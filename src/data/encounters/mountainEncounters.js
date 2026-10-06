@@ -22,7 +22,7 @@ export const MOUNTAIN_ENCOUNTERS = {
       criticalSuccess: 'You find a hidden shortcut and rare mountain treasures.',
       success: 'You cross safely and continue your journey.',
       failure: 'The crossing is slow and exhausting.',
-      criticalFailure: 'A rockslide blocks the path - you must dig through or retreat.'
+      criticalFailure: 'A rockslide comes down across the pass and leaves you a long cold choice: dig through, or go back the way you came.'
     }
   },
 
@@ -54,7 +54,7 @@ export const MOUNTAIN_ENCOUNTERS = {
       criticalSuccess: 'You slay or outsmart the dragon and claim its hoard!',
       success: 'You survive the encounter and escape with some treasure.',
       failure: 'You escape with your lives but nothing else.',
-      criticalFailure: 'The dragon pursues you - lose equipment and take heavy damage.'
+      criticalFailure: 'The dragon follows you out of its lair. You get away burned and broken, and what you dropped in the running stays dropped.'
     }
   },
 
@@ -77,7 +77,7 @@ export const MOUNTAIN_ENCOUNTERS = {
     rewards: { xp: 40, gold: '1d10', items: ['hermit_wisdom:60%', 'mountain_herbs:50%', 'old_map:35%', 'enchanted_staff:15%'] },
     consequences: {
       criticalSuccess: 'The hermit was once a great wizard and teaches you powerful secrets.',
-      success: 'The hermit shares useful knowledge about the mountains.',
+      success: 'The hermit knows these mountains stone by stone, and tells you which passes are open and which will kill you.',
       failure: 'The hermit is unfriendly but not hostile.',
       criticalFailure: 'The hermit is paranoid and attacks, or their past catches up.'
     }
@@ -101,8 +101,8 @@ export const MOUNTAIN_ENCOUNTERS = {
     ],
     rewards: { xp: 55, gold: '0', items: ['giant_feather:80%', 'eagle_blessing:30%', 'mountain_view:50%', 'eagle_blessing:20%'] },
     consequences: {
-      criticalSuccess: 'You befriend the eagles - they offer to carry you where you need to go.',
-      success: 'The eagles accept you and you gather valuable feathers.',
+      criticalSuccess: 'The eagles accept you, and the great one spreads its wings in an offer no one could mistake: a ride.',
+      success: 'The eagles let you be, and you gather from the ledge feathers as long as your arm.',
       failure: 'The eagles tolerate your presence but nothing more.',
       criticalFailure: 'The eagles attack to protect their nest!'
     }

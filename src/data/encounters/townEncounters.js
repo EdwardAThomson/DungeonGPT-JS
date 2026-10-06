@@ -17,7 +17,7 @@ export const TOWN_ENCOUNTERS = {
     ],
     rewards: { xp: 30, gold: '1d8', items: ['ale_mug:50%', 'bar_stool_leg:20%'] },
     consequences: {
-      criticalSuccess: 'You emerge as the hero of the tavern, earning free drinks and a useful contact.',
+      criticalSuccess: 'By the end of it the whole tavern is on your side, the drinks are free, and a man in the corner says to look him up if you ever need anything.',
       success: 'You handle the situation well and earn some respect from the locals.',
       failure: 'You get a black eye but nothing worse. The barkeep gives you a dirty look.',
       criticalFailure: 'You get knocked out cold and wake up missing some coin.'
@@ -42,7 +42,7 @@ export const TOWN_ENCOUNTERS = {
     rewards: { xp: 20, gold: '2d6', items: ['rations:60%', 'healing_potion:30%', 'map_fragment:15%'] },
     consequences: {
       criticalSuccess: 'A merchant takes a shine to you and offers a rare item at a steep discount.',
-      success: 'You find good deals and pick up useful information about the region.',
+      success: 'You buy well, and the stallholders talk while they wrap: who is hiring, what is on the roads, which way not to go.',
       failure: 'Prices are high and the merchants are tight-lipped today.',
       criticalFailure: 'A pickpocket lifts some of your coin while you browse.'
     }
@@ -65,8 +65,8 @@ export const TOWN_ENCOUNTERS = {
     ],
     rewards: { xp: 25, gold: '0', items: ['quest_clue:60%', 'map_fragment:30%'] },
     consequences: {
-      criticalSuccess: 'You find a highly lucrative posting and learn crucial information about your quest.',
-      success: 'You pick up a useful lead and learn something about the area.',
+      criticalSuccess: 'One posting offers more coin than the rest put together, and its details touch on the very matter you came here about.',
+      success: 'One notice is worth following up, and the others between them tell you how this town lives.',
       failure: 'Most of the postings are outdated or irrelevant.',
       criticalFailure: 'You accidentally accept a job that turns out to be a scam.'
     }
@@ -91,8 +91,8 @@ export const TOWN_ENCOUNTERS = {
     consequences: {
       criticalSuccess: 'The healer mends your wounds completely and gifts you a powerful restorative.',
       success: 'You receive helpful treatment and your wounds begin to close.',
-      failure: 'The healer is busy but applies a minor salve to your wounds.',
-      criticalFailure: 'The healer\'s remedy stings painfully, though it does provide minor relief.'
+      failure: 'The healer has a queue, and you get a dab of salve and a quick word before being waved on.',
+      criticalFailure: 'Whatever the healer puts on the wound burns like fire, and does about as much good.'
     },
     healingByTier: {
       criticalSuccess: 'full',  // Full heal
@@ -149,9 +149,9 @@ export const TOWN_ENCOUNTERS = {
     ],
     rewards: { xp: 40, gold: '1d10', items: ['quest_clue:50%', 'stolen_goods:20%', 'poisoned_dagger:10%'] },
     consequences: {
-      criticalSuccess: 'The stranger reveals critical intelligence about dangers ahead and a hidden cache.',
-      success: 'You learn useful information, though you\'re not sure how much to trust.',
-      failure: 'The information seems dubious at best. You may have wasted your time.',
+      criticalSuccess: 'The stranger tells you exactly what waits on the road ahead, and where something has been buried that no one else knows about.',
+      success: 'The stranger tells you a good deal, some of it even likely to be true.',
+      failure: 'The stranger\'s story falls apart the more you hear of it, and an hour is gone that you will not get back.',
       criticalFailure: 'It was a setup! Thugs emerge from the shadows, though you manage to escape.'
     }
   },

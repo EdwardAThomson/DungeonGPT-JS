@@ -19,10 +19,10 @@ export const BASE_ENCOUNTERS = {
     image: '/assets/encounters/goblin_ambush.webp',
     rewards: { xp: 50, gold: '2d10', items: ['rusty_dagger:30%', 'healing_potion:20%'] },
     consequences: {
-      criticalSuccess: 'The goblins flee in terror, dropping valuable loot in their panic.',
-      success: 'You overcome the goblins with minimal injury and claim their meager possessions.',
+      criticalSuccess: 'The goblins break and run, and in their panic they leave half of what they carried in the grass.',
+      success: 'The goblins give up the fight after a few sharp exchanges, and you pick over what they dropped: not much, but something.',
       failure: 'The goblins wound you before retreating into the wilderness.',
-      criticalFailure: 'The ambush goes badly - you lose equipment and take serious injuries before escaping.'
+      criticalFailure: 'The ambush goes badly. You break clear at last, hurt, and lighter by whatever the goblins got their hands on.'
     }
   },
 
@@ -46,8 +46,8 @@ export const BASE_ENCOUNTERS = {
     consequences: {
       criticalSuccess: 'The alpha wolf respects your strength and the pack disperses peacefully.',
       success: 'You drive off the wolves without serious harm to your party.',
-      failure: 'The wolves bite before fleeing - you need to tend your wounds.',
-      criticalFailure: 'The pack overwhelms you, stealing supplies and leaving you wounded and shaken.'
+      failure: 'The wolves get their teeth in before they go, and the bites will want tending tonight.',
+      criticalFailure: 'The pack comes in from every side at once. When they finally draw off you are bleeding, shaken, and short of the food they tore from your packs.'
     }
   },
 
@@ -70,8 +70,8 @@ export const BASE_ENCOUNTERS = {
     rewards: { xp: 100, gold: '3d10', items: ['shortsword:25%', 'leather_armor:15%', 'healing_potion:30%'] },
     consequences: {
       criticalSuccess: 'You defeat or outwit the bandits, claiming their ill-gotten gains.',
-      success: 'You pass through with minimal cost and no injuries.',
-      failure: 'You lose some gold or supplies but escape unharmed.',
+      success: 'A few coins change hands, or a few hard words, and the bandits stand aside and let you by unhurt.',
+      failure: 'The toll is steeper than you liked, but you pay it and walk on with your skin whole.',
       criticalFailure: 'The bandits rob you blind and rough you up for good measure.'
     },
     affectedFactions: {
@@ -99,8 +99,8 @@ export const BASE_ENCOUNTERS = {
     ],
     rewards: { xp: 25, gold: '1d10', items: ['healing_potion:50%', 'rations:70%', 'map_fragment:20%'] },
     consequences: {
-      criticalSuccess: 'The merchant is so pleased they give you a rare item and valuable information.',
-      success: 'You make a fair trade and learn useful news about the road ahead.',
+      criticalSuccess: 'The merchant takes such a liking to you that a rare piece comes out from under the cart, along with the kind of road gossip only pedlars hear.',
+      success: 'A fair trade, and over it the merchant tells you which stretch of road to hurry through and which inn waters its ale.',
       failure: 'The merchant is cagey and offers poor prices, but you part on good terms.',
       criticalFailure: 'The merchant suspects you of ill intent and refuses to deal with you.'
     },
@@ -128,7 +128,7 @@ export const BASE_ENCOUNTERS = {
     rewards: { xp: 30, gold: '0', items: ['inspiration:40%', 'quest_clue:30%'] },
     consequences: {
       criticalSuccess: 'The bard teaches you an ancient song that grants a powerful blessing.',
-      success: 'You gain inspiration and learn valuable lore about your quest.',
+      success: 'The minstrel\'s songs lift your spirits, and one old ballad turns out to be about the very matter you are chasing.',
       failure: 'The bard is pleasant but offers little of value.',
       criticalFailure: 'The bard is offended and spreads unflattering songs about your party.'
     }
@@ -152,8 +152,8 @@ export const BASE_ENCOUNTERS = {
     ],
     rewards: { xp: 90, gold: '2d8', items: ['spider_silk:70%', 'venom_sac:40%', 'healing_potion:25%'] },
     consequences: {
-      criticalSuccess: 'You destroy the nest and claim valuable spider silk and venom.',
-      success: 'You overcome the spiders with minor injuries and some useful materials.',
+      criticalSuccess: 'You burn the nest out and come away with silk by the armful and venom sacs any apothecary would pay for.',
+      success: 'The spiders are beaten off, at the cost of a few bites, and you cut free what silk is worth carrying.',
       failure: 'Spider venom weakens you, but you escape the nest.',
       criticalFailure: 'You\'re badly poisoned and wrapped in webbing before cutting yourself free.'
     }
@@ -177,10 +177,10 @@ export const BASE_ENCOUNTERS = {
     ],
     rewards: { xp: 120, gold: '1d4', items: ['bear_pelt:80%', 'bear_claw:60%'] },
     consequences: {
-      criticalSuccess: 'The bear backs down and even leads you to a hidden cache of food.',
+      criticalSuccess: 'The bear thinks better of it and lumbers off; following its trail, you find the honey-tree it was guarding.',
       success: 'You drive off the bear without serious injury.',
-      failure: 'The bear mauls you before retreating - you\'re badly wounded.',
-      criticalFailure: 'The bear\'s attack is devastating, leaving you near death and without supplies.'
+      failure: 'The bear gets one good swipe in before it goes, and the claws went deep.',
+      criticalFailure: 'The bear tears through you and through your packs alike. You crawl away alive, barely, and with nothing left to eat.'
     }
   },
 
@@ -202,7 +202,7 @@ export const BASE_ENCOUNTERS = {
     rewards: { xp: 80, gold: '0', items: ['divine_blessing:50%', 'ancient_knowledge:30%', 'cursed_item:10%'] },
     consequences: {
       criticalSuccess: 'The shrine grants you a powerful blessing and reveals hidden knowledge.',
-      success: 'You receive a minor blessing or useful insight.',
+      success: 'A small warmth settles on you as you leave the shrine, and with it a clearer sense of the road ahead.',
       failure: 'The shrine remains silent, offering neither help nor harm.',
       criticalFailure: 'You anger the shrine\'s guardian spirit and are cursed.'
     }
@@ -223,8 +223,8 @@ export const BASE_ENCOUNTERS = {
     ],
     rewards: { xp: 60, gold: '0', items: ['raw_gems:25%', 'rare_gem:5%', 'rare_ore:20%'] },
     consequences: {
-      criticalSuccess: 'You avoid all harm and discover valuable gems in the rubble.',
-      success: 'You escape with minor scrapes and bruises.',
+      criticalSuccess: 'You get clear without a scratch, and the slide has laid bare a seam of stones that glitter in the fresh-broken rock.',
+      success: 'You scramble clear with scraped hands and a few bruises, and nothing worse.',
       failure: 'Falling rocks injure you and damage equipment.',
       criticalFailure: 'You\'re badly hurt and buried under debris, losing precious time digging out.'
     }
