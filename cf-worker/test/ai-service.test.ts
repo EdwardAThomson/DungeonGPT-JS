@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { generateText, AiServiceError } from "../src/services/ai";
+import {
+  generateText,
+  AiServiceError,
+  AI_QUOTA_CODE,
+  quotaRetryAfterSeconds,
+} from "../src/services/ai";
 import { MODEL_REGISTRY, DEFAULT_MODEL_ID } from "../src/services/models";
 import { makeEnv, stubAi } from "./helpers/env";
 
@@ -207,5 +212,41 @@ describe("generateText: leaked-prompt and repetition guard", () => {
     const env = makeEnv({ AI: ai.binding });
     const result = await generateText(env, { prompt: "hi", modelId: KNOWN_MODEL });
     expect(result.text).toBe(text);
+  });
+});
+
+describe("generateText: daily allocation used up", () => {
+  const QUOTA_MSG =
+    "4006: you have used up your daily free allocation of 10,000 neurons, please upgrade to Cloudflare's Workers Paid plan if you would like to continue usage.";
+
+  it("throws an ai_quota error without trying fallback models", async () => {
+    const ai = stubAi(() => {
+      throw new Error(QUOTA_MSG);
+    });
+    const env = makeEnv({ AI: ai.binding });
+    const err = await generateText(env, { prompt: "hi", modelId: KNOWN_MODEL }).catch(
+      (e: unknown) => e
+    );
+    expect(err).toBeInstanceOf(AiServiceError);
+    expect((err as AiServiceError).code).toBe(AI_QUOTA_CODE);
+    expect(ai.calls.length).toBe(1);
+  });
+
+  it("stops the fallback walk when a fallback hits the allocation", async () => {
+    const ai = stubAi((call) => {
+      if (call.modelId === KNOWN_MODEL) throw new Error("model exploded");
+      throw new Error(QUOTA_MSG);
+    });
+    const env = makeEnv({ AI: ai.binding });
+    const err = await generateText(env, { prompt: "hi", modelId: KNOWN_MODEL }).catch(
+      (e: unknown) => e
+    );
+    expect((err as AiServiceError).code).toBe(AI_QUOTA_CODE);
+    expect(ai.calls.length).toBe(2);
+  });
+
+  it("counts retry-after down to the next 00:00 UTC", () => {
+    expect(quotaRetryAfterSeconds(Date.UTC(2026, 9, 6, 22, 0, 0))).toBe(2 * 3600);
+    expect(quotaRetryAfterSeconds(Date.UTC(2026, 9, 31, 23, 59, 30))).toBe(30);
   });
 });

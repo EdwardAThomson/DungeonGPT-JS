@@ -100,6 +100,21 @@ describe("POST /api/ai/generate: generation", () => {
     expect(json.error).toBe("AI generation failed");
     expect(JSON.stringify(json)).not.toContain("secret internal detail");
   });
+
+  it("returns 503 ai_quota with a retry window when the daily allocation is used up", async () => {
+    const ai = stubAi(() => {
+      throw new Error("4006: you have used up your daily free allocation of 10,000 neurons");
+    });
+    const env = makeBypassEnv({ AI: ai.binding });
+    const res = await post(valid, env);
+    expect(res.status).toBe(503);
+    const json = (await res.json()) as any;
+    expect(json.code).toBe("ai_quota");
+    expect(json.error).toContain("out of AI for today");
+    expect(json.retryAfterSeconds).toBeGreaterThan(0);
+    expect(res.headers.get("Retry-After")).toBe(String(json.retryAfterSeconds));
+    expect(ai.calls.length).toBe(1);
+  });
 });
 
 describe("GET /api/ai/models", () => {

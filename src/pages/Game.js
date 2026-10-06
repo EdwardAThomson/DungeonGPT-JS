@@ -1886,10 +1886,14 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
     // Inside a cave / ruin, describe the site rather than the world tile it sits on.
     const inSite = mapHook.isInsideSite && !!mapHook.currentSiteMap;
 
-    // No-AI path (guests, or master toggle off): local ambient line.
-    if (!aiAvailable || !aiNarrativeEnabled) {
+    const appendLocalLook = () => {
       if (inSite) appendLocalSiteAmbientNarrative();
       else appendLocalAmbientNarrative({ tile, coords });
+    };
+
+    // No-AI path (guests, or master toggle off): local ambient line.
+    if (!aiAvailable || !aiNarrativeEnabled) {
+      appendLocalLook();
       return;
     }
 
@@ -1955,9 +1959,10 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
       });
       interactionHook.setProgressStatus(null);
       if (!aiResponse || !aiResponse.trim()) {
-        logger.warn('Empty look-around AI response, skipping');
+        logger.warn('Empty look-around AI response, using the local line');
         // The hook wasn't delivered, so re-park it: it must not be silently lost (#36).
         if (narrativeEncounter) setPendingLookEncounter(narrativeEncounter);
+        appendLocalLook();
         return;
       }
       const aiMessage = { role: 'ai', content: aiResponse };
@@ -1980,10 +1985,12 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
       });
     } catch (error) {
       logger.error('Look-around AI error', error);
-      interactionHook.setError(error.message);
       interactionHook.setProgressStatus(null);
       // Generation failed, so re-park the hook: it must not be silently lost (#36).
       if (narrativeEncounter) setPendingLookEncounter(narrativeEncounter);
+      // The look still gets a description: the local line guests get.
+      appendLocalLook();
+      if (error.code === 'ai_quota') interactionHook.setError(error.message);
     } finally {
       interactionHook.setIsLoading(false);
     }
@@ -2035,10 +2042,14 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
     const buildingName = milestone.building?.name || null;
     const townName = mapHook.currentTownTile?.townName || milestone.location || null;
 
-    // No-AI path (guests, or master toggle off): deterministic templated line.
-    if (!aiAvailable || !aiNarrativeEnabled) {
+    const appendLocalMeeting = () => {
       const text = composeNpcMeeting({ name, role, building: buildingName, townName, personality, worldSeed, meetingText: milestone.meetingText || null });
       if (text) interactionHook.setConversation(prev => [...prev, { role: 'ai', content: text }]);
+    };
+
+    // No-AI path (guests, or master toggle off): deterministic templated line.
+    if (!aiAvailable || !aiNarrativeEnabled) {
+      appendLocalMeeting();
       return;
     }
 
@@ -2072,7 +2083,8 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
         .replace(/\[COMPLETE_CAMPAIGN\]/gi, '')
         .trim();
       if (!aiResponse) {
-        logger.warn('Empty NPC-meeting AI response, skipping');
+        logger.warn('Empty NPC-meeting AI response, using the local line');
+        appendLocalMeeting();
         return;
       }
       const aiMessage = { role: 'ai', content: aiResponse };
@@ -2087,8 +2099,10 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
       });
     } catch (error) {
       logger.error('NPC meeting AI error', error);
-      interactionHook.setError(error.message);
       interactionHook.setProgressStatus(null);
+      // The meeting still happens in the log: the local line guests get.
+      appendLocalMeeting();
+      if (error.code === 'ai_quota') interactionHook.setError(error.message);
     } finally {
       interactionHook.setIsLoading(false);
     }

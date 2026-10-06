@@ -143,6 +143,21 @@ describe('llmService cf-workers pool plumbing', () => {
         expect(global.fetch).toHaveBeenCalledTimes(1); // no premium retry for plain throttling
     });
 
+    test('ai_quota 503 throws the out-of-AI message with hours until reset', async () => {
+        global.fetch.mockResolvedValueOnce(
+            jsonResponse(
+                { error: 'The storyteller is out of AI for today. It resets at midnight UTC.', code: 'ai_quota', retryAfterSeconds: 3 * 3600 + 100 },
+                { ok: false, status: 503 }
+            )
+        );
+
+        await expect(generate()).rejects.toMatchObject({
+            code: 'ai_quota',
+            message: expect.stringMatching(/out of AI for today.*about 3 hours from now/),
+        });
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
     test('free-pool requests do not record premium outcomes', async () => {
         global.fetch.mockResolvedValueOnce(jsonResponse({ text: 'ok', pool: 'free' }));
         await generate();

@@ -7,12 +7,34 @@ const DEFAULT_TEMPERATURE = 0.7;
 
 export class AiServiceError extends Error {
   readonly status: number;
+  readonly code?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = "AiServiceError";
     this.status = status;
+    this.code = code;
   }
+}
+
+// Workers AI refuses every model once the account's daily neuron allocation is
+// spent (error 4006, "you have used up your daily free allocation of 10,000
+// neurons"). It resets at 00:00 UTC.
+export const AI_QUOTA_CODE = "ai_quota";
+
+function isQuotaExhausted(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return /\b4006\b|daily free allocation|neurons/i.test(msg);
+}
+
+function secondsUntilUtcMidnight(now = Date.now()): number {
+  const d = new Date(now);
+  const next = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+  return Math.max(1, Math.ceil((next - now) / 1000));
+}
+
+export function quotaRetryAfterSeconds(now?: number): number {
+  return secondsUntilUtcMidnight(now);
 }
 
 interface GenerateOptions {
@@ -138,6 +160,10 @@ async function callWorkersAi(
     throw new AiServiceError("Unexpected Workers AI response format", 502);
   } catch (error: unknown) {
     console.error(`CF AI error for model ${modelId}:`, error);
+    if (error instanceof AiServiceError) throw error;
+    if (isQuotaExhausted(error)) {
+      throw new AiServiceError("Workers AI daily allocation used up", 503, AI_QUOTA_CODE);
+    }
     if (error instanceof Error) {
       throw new AiServiceError(`CF AI error: ${error.message}`, 502);
     }
@@ -187,6 +213,11 @@ export async function generateText(
       primaryError instanceof Error ? primaryError.message : primaryError
     );
 
+    // Every model draws on the same account allocation, so a fallback can't help.
+    if (primaryError instanceof AiServiceError && primaryError.code === AI_QUOTA_CODE) {
+      throw primaryError;
+    }
+
     // Try fallback candidates: default model first, then others in registry order
     const candidates = getFallbackCandidates(model.id);
     for (const candidateId of candidates.slice(0, 2)) {
@@ -209,6 +240,9 @@ export async function generateText(
           `Fallback model ${fallbackModel.id} also failed:`,
           fallbackError instanceof Error ? fallbackError.message : fallbackError
         );
+        if (fallbackError instanceof AiServiceError && fallbackError.code === AI_QUOTA_CODE) {
+          throw fallbackError;
+        }
       }
     }
 
