@@ -18,6 +18,17 @@ describe('RagCompare recall', () => {
     expect(r.beforeBlock).not.toMatch(/silver bell/); // past the 300-character cut
     expect(r.after[0]).toMatchObject({ msgIndex: 0 });
     expect(r.afterBlock).toMatch(/silver bell in the chapel/);
+    expect(idx.named).toHaveLength(idx.chunks.length);
+    expect(r.namedBlock).toMatch(/silver bell in the chapel/);
+  });
+
+  it('embeds the third index with the scene names in front, and injects the plain chunk', async () => {
+    const seen = [];
+    const spy = async (texts) => { seen.push(...texts); return texts.map(vec); };
+    const idx = await buildMemoryIndex(['Elara waits.\n\nShe hands over a bell.'], spy);
+    expect(seen.some((t) => t.startsWith('Names: Elara.\n'))).toBe(true);
+    const r = recallBoth(idx, vec('bell'));
+    expect(r.namedBlock).not.toMatch(/Names:/);
   });
 
   it('keeps only the best chunk per message and drops weak matches', async () => {

@@ -13,7 +13,10 @@ import {
   chunkText,
   formatRagContext,
   MAX_CHUNK_CHARS,
-  EMBEDDING_MODEL_VERSION
+  EMBEDDING_MODEL_VERSION,
+  CHUNK_FORMAT_VERSION,
+  sceneNames,
+  chunkEmbeddingText
 } from './ragEngine';
 import { embeddingService } from '../services/embeddingService';
 import { ragStore } from '../services/ragStore';
@@ -42,6 +45,7 @@ const entry = (msgIndex, overrides = {}) => ({
   vector: VEC,
   msgIndex,
   chunkIndex: 0,
+  chunkFormat: CHUNK_FORMAT_VERSION,
   timestamp: 1,
   tags: [],
   ...overrides,
@@ -240,3 +244,36 @@ describe('retrieval and backfill shape', () => {
     expect(embeddingService.embed.mock.calls.map(c => c[0].length)).toEqual([3, 3, 1]);
   });
 });
+
+describe('chunk format 2: names in front of each embedded chunk', () => {
+  const scene = 'They make camp in a hollow. Thorin keeps watch.\n\nElara admits she came north for her brother Tamsin.\n\nBefore turning in, she presses a jade ring into Lyria\'s hand.';
+
+  it('finds the scene names and skips common openers', () => {
+    expect(sceneNames(scene)).toEqual(['Thorin', 'Elara', 'Tamsin', 'Lyria']);
+    expect(sceneNames('The road. She waits. Then nothing.')).toEqual([]);
+  });
+
+  it('prefixes the embedded text but stores and injects the plain chunk', async () => {
+    await embedAndStore('s1', scene, { msgIndex: 4 });
+    const embedded = embeddingService.embed.mock.calls[0][0];
+    expect(embedded.every((t) => t.startsWith('Names: Thorin, Elara, Tamsin, Lyria.\n'))).toBe(true);
+    const stored = ragStore.putBatch.mock.calls[0][0];
+    expect(stored.every((e) => e.chunkFormat === CHUNK_FORMAT_VERSION && !e.text.startsWith('Names:'))).toBe(true);
+    expect(chunkEmbeddingText('x', [])).toBe('x');
+  });
+
+  it('backfill embeds with the prefix too', async () => {
+    await backfill('s1', [{ role: 'ai', content: scene }]);
+    const embedded = embeddingService.embed.mock.calls[0][0];
+    expect(embedded[0]).toMatch(/^Names: Thorin, Elara, Tamsin, Lyria\.\n/);
+  });
+
+  it('treats #175 chunks (no format stamp) as not indexed and keeps them out of recall', async () => {
+    ragStore.getBySession.mockResolvedValue([entry(0, { chunkFormat: undefined }), entry(1)]);
+    const status = await getIndexStatus('s1', [{ role: 'ai', content: 'a' }, { role: 'ai', content: 'b' }]);
+    expect(status).toMatchObject({ status: 'partial', indexed: 1, total: 2 });
+    const results = await query('s1', 'anything');
+    expect(results.map((r) => r.msgIndex)).toEqual([1]);
+  });
+});
+

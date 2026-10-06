@@ -1,14 +1,16 @@
-// RagCompare: before/after for the DM memory change in PR #175 (paragraph chunks,
-// injected whole). Embeds a set of narrations IN MEMORY (never touches the real
-// IndexedDB memory index), then answers one question two ways:
+// RagCompare: before/after for the DM memory changes. Embeds a set of narrations IN
+// MEMORY (never touches the real IndexedDB memory index), then answers one question
+// three ways:
 //   Before: one vector per whole message; recall injects the first 300 characters.
-//   After:  messages split by chunkText; best chunk per message, injected whole.
+//   Chunks (#175): messages split by chunkText; best chunk per message, injected whole.
+//   Chunks + names (current engine): the same chunks, each embedded with its scene's
+//     names in front (sceneNames), so a "she" paragraph still matches its person.
 // Same retrieval knobs both sides (top 3, similarity >= 0.5), so the only differences
 // are what gets embedded and what gets injected.
 
 import React, { useState } from 'react';
 import { embeddingService } from '../services/embeddingService';
-import { chunkText, formatRagContext, MAX_CHUNK_CHARS } from '../game/ragEngine';
+import { chunkText, formatRagContext, sceneNames, chunkEmbeddingText, MAX_CHUNK_CHARS } from '../game/ragEngine';
 import { conversationsApi } from '../services/conversationsApi';
 
 const MAX_RESULTS = 3;
@@ -57,7 +59,7 @@ export const PRESETS = [
   { q: 'Where is the secret crossing the raiders use?', expect: 'south of the old mill' },
   { q: 'What is the goblin chieftain afraid of?', expect: 'fears fire' },
   { q: 'What did Elara give us?', expect: 'jade',
-    note: 'Known limit of chunking: the ring paragraph only says "she", so its chunk no longer mentions Elara.' },
+    note: 'The ring paragraph only says "she", so a plain chunk no longer mentions Elara; the names prefix fixes this.' },
   { q: 'How much do healing potions cost?', expect: 'thirty gold',
     note: 'Control: the price sits inside the first 300 characters, so the old cut keeps it too.' },
 ];
@@ -86,22 +88,30 @@ export const buildMemoryIndex = async (messages, embedBatch) => {
   const chunkRows = messages.flatMap((text, msgIndex) => chunkText(text).map((c, chunkIndex) => ({ text: c, msgIndex, chunkIndex })));
   const wholeVectors = await embedAll(messages, embedBatch);
   const chunkVectors = await embedAll(chunkRows.map((c) => c.text), embedBatch);
+  const names = messages.map((m) => sceneNames(m));
+  const namedVectors = await embedAll(chunkRows.map((c) => chunkEmbeddingText(c.text, names[c.msgIndex])), embedBatch);
   return {
     whole: messages.map((text, msgIndex) => ({ text, msgIndex, vector: wholeVectors[msgIndex] })),
     chunks: chunkRows.map((c, i) => ({ ...c, vector: chunkVectors[i] })),
+    named: chunkRows.map((c, i) => ({ ...c, vector: namedVectors[i] })),
   };
 };
 
-/** Recall for one question vector, the old way and the #175 way, with their prompt blocks. */
+/** Recall for one question vector three ways, with the prompt block each produces. */
 export const recallBoth = (index, queryVector) => {
   const score = (rows) => rows.map((r) => ({ ...r, similarity: cosine(queryVector, r.vector) }))
     .filter((r) => r.similarity >= MIN_SIMILARITY)
     .sort((a, b) => b.similarity - a.similarity);
-  const before = score(index.whole).slice(0, MAX_RESULTS);
-  const after = score(index.chunks)
+  const bestPerMessage = (rows) => score(rows)
     .filter((r, i, all) => all.findIndex((o) => o.msgIndex === r.msgIndex) === i)
     .slice(0, MAX_RESULTS);
-  return { before, after, beforeBlock: formatOld(before), afterBlock: formatRagContext(after) };
+  const before = score(index.whole).slice(0, MAX_RESULTS);
+  const after = bestPerMessage(index.chunks);
+  const named = index.named ? bestPerMessage(index.named) : [];
+  return {
+    before, after, named,
+    beforeBlock: formatOld(before), afterBlock: formatRagContext(after), namedBlock: formatRagContext(named),
+  };
 };
 
 const box = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, marginBottom: 16 };
@@ -179,7 +189,7 @@ const RagCompare = () => {
     try {
       let idx = index && index.key === sourceKey ? index : null;
       if (!idx) {
-        setBusy(`Embedding ${messages.length} whole messages and ${chunkCount} chunks...`);
+        setBusy(`Embedding ${messages.length} whole messages and ${chunkCount} chunks (twice: plain and with names)...`);
         idx = { key: sourceKey, ...(await buildMemoryIndex(messages)) };
         setIndex(idx);
       }
@@ -195,12 +205,14 @@ const RagCompare = () => {
 
   return (
     <div style={{ padding: 20, maxWidth: 1400, margin: '0 auto', color: 'var(--text)', textAlign: 'left' }}>
-      <h2 style={{ marginTop: 0 }}>DM memory: before / after (#175)</h2>
+      <h2 style={{ marginTop: 0 }}>DM memory: before / after</h2>
       <p style={{ fontSize: 14, opacity: 0.85, maxWidth: 900 }}>
         Embeds the narration below in memory only (your real memory index is not touched), then recalls memories for one
-        question both ways. <b>Before</b>: one vector per whole message, first {OLD_SLICE} characters injected.
-        <b> After</b>: messages split into chunks of up to {MAX_CHUNK_CHARS} characters, best chunk per message injected whole.
-        Both use the top {MAX_RESULTS} with similarity of at least {MIN_SIMILARITY}.
+        question three ways. <b>Before</b>: one vector per whole message, first {OLD_SLICE} characters injected.
+        <b> Chunks</b> (#175): messages split into chunks of up to {MAX_CHUNK_CHARS} characters, best chunk per message
+        injected whole. <b>Chunks + names</b> (what the game does now): the same chunks, each embedded with the names its
+        scene mentions, so a paragraph that only says "she" still matches its person. All use the top {MAX_RESULTS} with
+        similarity of at least {MIN_SIMILARITY}.
       </p>
 
       <div style={box}>
@@ -256,9 +268,10 @@ const RagCompare = () => {
       </div>
 
       {result && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 16 }}>
           {[['Before: whole messages, cut at 300', result.before, result.beforeBlock, true],
-            ['After (#175): paragraph chunks, whole', result.after, result.afterBlock, false]].map(([title, rows, block, old]) => (
+            ['Chunks (#175): paragraphs, whole', result.after, result.afterBlock, false],
+            ['Chunks + names (current engine)', result.named, result.namedBlock, false]].map(([title, rows, block, old]) => (
             <div key={title} style={box}>
               <h3 style={{ margin: '0 0 8px', fontSize: 16 }}>
                 {title}<Verdict text={block} expect={expect} />

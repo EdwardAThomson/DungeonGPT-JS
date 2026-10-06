@@ -105,7 +105,7 @@ const debugSections = [
       { to: 'image-gen', label: 'Image Generation' },
       { to: 'summarization-test', label: 'Summarization A/B Test' },
       { to: 'rag-test', label: 'RAG Test' },
-      { to: 'rag-compare', label: 'RAG Before / After (#175)' },
+      { to: 'rag-compare', label: 'RAG Before / After' },
     ],
   },
   {

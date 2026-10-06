@@ -283,6 +283,16 @@ Pure view change. Heroes with `equipment: undefined` render empty slots (already
 
 # THREAD 3 — Starter equipment (class-based, weapon only)
 
+> **UPDATE (2026-10-05):** a starter kit has shipped, in a different shape from the proposal
+> below. `src/game/starterKit.js` (`STARTER_KIT`) gives every hero the same class-agnostic
+> kit: `shortsword` + `leather_armor` (both auto-equipped), a `healing_potion`, a
+> `herbal_remedy` and 20 gold. It is applied per save at game load in `Game.js` (in-game gear
+> lives in the save, not on the roster), not at hero creation: a hero entering a new campaign
+> is outfitted automatically; in an existing save a gearless hero can claim it from the
+> Inventory, and a hero who already has a weapon or armour equipped is only marked.
+> `starterKitGranted` on the hero makes it once per hero per save, and grants are written to
+> the hero ledger. The class -> weapon mapping and `starterEquipment.js` below were not built.
+
 ## Player-facing behaviour
 A newly created hero **starts with one weapon suited to their class, already equipped**:
 - **Martial / melee classes** start with a **Shortsword** (`shortsword`, +1, common).
