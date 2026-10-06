@@ -1,4 +1,4 @@
-import { composeLocalMovementNarrative, composeLocalAmbientNarrative, composeNpcMeeting, __test__ } from './localNarrator';
+import { composeLocalMovementNarrative, composeLocalAmbientNarrative, composeLocalSiteAmbientNarrative, composeNpcMeeting, __test__ } from './localNarrator';
 
 const plainsTile = { biome: 'plains', poi: null, x: 3, y: 4, descriptionSeed: 'Open fields' };
 const desertTile = { biome: 'desert', poi: null, x: 3, y: 4, descriptionSeed: 'Open desert' };
@@ -277,5 +277,27 @@ describe('composeNpcMeeting', () => {
   it('returns an empty string without a name', () => {
     expect(composeNpcMeeting({})).toBe('');
     expect(composeNpcMeeting()).toBe('');
+  });
+});
+
+describe('composeLocalSiteAmbientNarrative', () => {
+  const site = { name: 'Echo Hollow', type: 'cave' };
+
+  it('is deterministic for the same seed, position and nonce', () => {
+    const a = composeLocalSiteAmbientNarrative({ siteMap: site, sitePosition: { x: 2, y: 3 }, worldSeed: 7 });
+    const b = composeLocalSiteAmbientNarrative({ siteMap: site, sitePosition: { x: 2, y: 3 }, worldSeed: 7 });
+    expect(a).toBe(b);
+    expect(a.length).toBeGreaterThan(0);
+  });
+
+  it('describes the inside of the site, not open country', () => {
+    for (let nonce = 0; nonce < 20; nonce++) {
+      const text = composeLocalSiteAmbientNarrative({ siteMap: site, sitePosition: { x: 1, y: 1 }, worldSeed: 1, nonce });
+      expect(text).not.toMatch(/grass|wildflower|cave mouth|sky/i);
+    }
+  });
+
+  it('returns empty text with no site', () => {
+    expect(composeLocalSiteAmbientNarrative({})).toBe('');
   });
 });

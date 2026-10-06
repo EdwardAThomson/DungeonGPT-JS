@@ -37,6 +37,13 @@ describe('NarrativeHookChips (#35/#37)', () => {
     expect(screen.queryByAltText('Hidden Cache')).not.toBeInTheDocument();
   });
 
+  it('opens the encounter image full size when clicked', () => {
+    render(<NarrativeHookChips encounter={hiddenCache} onAction={() => {}} onIgnore={() => {}} />);
+    fireEvent.click(screen.getByTitle('Click to view larger image'));
+    expect(screen.getAllByAltText('Hidden Cache')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Close lightbox' })).toBeInTheDocument();
+  });
+
   it('fires onAction with the tapped action, and onIgnore for the Ignore chip', () => {
     const onAction = jest.fn();
     const onIgnore = jest.fn();

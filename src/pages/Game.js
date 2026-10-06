@@ -20,8 +20,8 @@ import ModalShell from '../components/ModalShell';
 import { calculateMaxHP, shortRest, longRest } from '../utils/healthSystem';
 import { addGold, addItem, ITEM_CATALOG } from '../utils/inventorySystem';
 import { replaceHeroInParty, normalizeParty, heroUid } from '../utils/partyUtils';
-import { composeMovementNarrativePrompt, composeNpcMeetingPrompt } from '../game/promptComposer';
-import { composeLocalMovementNarrative, composeLocalAmbientNarrative, composeNpcMeeting, RECENT_WINDOW } from '../game/localNarrator';
+import { composeMovementNarrativePrompt, composeNpcMeetingPrompt, composeSiteLookPrompt } from '../game/promptComposer';
+import { composeLocalMovementNarrative, composeLocalAmbientNarrative, composeLocalSiteAmbientNarrative, composeNpcMeeting, RECENT_WINDOW } from '../game/localNarrator';
 import { composeRewardSentence, composeLootSentence, narrateRewardMessages } from '../game/rewardNarrator';
 import { getStepHint, getQuestObjectiveStep, summarizeQuestReward, describeTurnInTarget } from '../game/questHints';
 import { generateMovementNarrative } from '../game/movementController';
@@ -1605,6 +1605,22 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
     interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
   };
 
+  // The same, inside a cave / ruin / other site: describes the site, not the world tile.
+  const appendLocalSiteAmbientNarrative = () => {
+    const nonce = lookNonceRef.current++;
+    const recent = recentNarrationRef.current;
+    const text = composeLocalSiteAmbientNarrative({
+      siteMap: mapHook.currentSiteMap,
+      sitePosition: mapHook.sitePlayerPosition || {},
+      worldSeed,
+      nonce,
+      recent
+    });
+    if (recent.length > RECENT_WINDOW) recent.splice(0, recent.length - RECENT_WINDOW);
+    if (!text || !text.trim()) return;
+    interactionHook.setConversation((prev) => [...prev, { role: 'ai', content: text }]);
+  };
+
   // Fight an active milestone boss on the tile the party stands on (POI modal Confront,
   // or the suggested-action chip).
   const startMilestoneBossFight = (boss) => {
@@ -1822,7 +1838,7 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
     if (plannedEncounterFlow.flowType === 'narrative_context') {
       setPendingLookEncounter(
         plannedEncounterFlow.narrativeEncounter
-          ? { ...plannedEncounterFlow.narrativeEncounter, hookMoves: 0 }
+          ? { ...plannedEncounterFlow.narrativeEncounter, origin: { x: clickedX, y: clickedY }, hookMoves: 0 }
           : null
       );
     } else if (pendingLookEncounter) {
@@ -1867,10 +1883,13 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
     const tile = getTile(mapHook.worldMap, x, y);
     if (!tile) return;
     const coords = { x, y };
+    // Inside a cave / ruin, describe the site rather than the world tile it sits on.
+    const inSite = mapHook.isInsideSite && !!mapHook.currentSiteMap;
 
     // No-AI path (guests, or master toggle off): local ambient line.
     if (!aiAvailable || !aiNarrativeEnabled) {
-      appendLocalAmbientNarrative({ tile, coords });
+      if (inSite) appendLocalSiteAmbientNarrative();
+      else appendLocalAmbientNarrative({ tile, coords });
       return;
     }
 
@@ -1881,7 +1900,9 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
     let ragContext = '';
     if (sessionId) {
       try {
-        const tileDesc = `${tile.biome} ${tile.poi || ''} ${tile.townName || ''}`.trim();
+        const tileDesc = inSite
+          ? `${mapHook.currentSiteMap.name || ''} ${mapHook.currentSiteMap.type || ''}`.trim()
+          : `${tile.biome} ${tile.poi || ''} ${tile.townName || ''}`.trim();
         const ragResults = await ragQuery(sessionId, tileDesc);
         ragContext = formatRagContext(ragResults);
       } catch (err) {
@@ -1889,23 +1910,40 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
       }
     }
 
-    // Consume any parked narrative-tier encounter so the AI can weave it in.
-    const narrativeEncounter = pendingLookEncounter;
+    // Consume any parked narrative-tier encounter so the AI can weave it in. Hooks are
+    // rolled on world tiles, so only a look on the world map weaves one; in a town or
+    // site it stays parked for when the party is back out in the wilds.
+    const narrativeEncounter = mapHook.currentMapLevel === 'world' ? pendingLookEncounter : null;
     if (narrativeEncounter) setPendingLookEncounter(null);
 
-    const { fullPrompt } = composeMovementNarrativePrompt({
-      tile,
-      coords,
-      settings,
-      selectedHeroes,
-      currentSummary: interactionHook.currentSummary,
-      narrativeEncounter,
-      worldMap: mapHook.worldMap,
-      isNewArea: true,
-      conversation: interactionHook.conversation,
-      includeRecentContext: true,
-      ragContext
-    });
+    const { fullPrompt } = inSite
+      ? composeSiteLookPrompt({
+        siteMap: mapHook.currentSiteMap,
+        sitePosition: mapHook.sitePlayerPosition,
+        biome: tile.biome,
+        settings,
+        selectedHeroes,
+        currentSummary: interactionHook.currentSummary,
+        conversation: interactionHook.conversation,
+        includeRecentContext: true,
+        ragContext
+      })
+      : composeMovementNarrativePrompt({
+        tile,
+        coords,
+        settings,
+        selectedHeroes,
+        currentSummary: interactionHook.currentSummary,
+        narrativeEncounter,
+        worldMap: mapHook.worldMap,
+        isNewArea: true,
+        conversation: interactionHook.conversation,
+        includeRecentContext: true,
+        ragContext,
+        look: true,
+        // Name the cave / ruin here when known (visited sites are cached by type + coords).
+        placeName: mapHook.siteMapsCache?.[`${tile.poi}_${x},${y}`]?.name || tile.poiName || tile.mountainName || null
+      });
     interactionHook.setLastPrompt(fullPrompt);
 
     try {
@@ -2387,7 +2425,7 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
       milestones: settings?.milestones,
       sideQuests: settings?.sideQuests,
       party: selectedHeroes,
-      hookWaiting: !!pendingLookEncounter,
+      hookWaiting: !!pendingLookEncounter && mapHook.currentMapLevel === 'world',
       levelRange: settings?.levelRange,
       townMapsCache: mapHook.townMapsCache,
       atTownExit: mapHook.isInsideTown && atTownGate(mapHook.townPlayerPosition, mapHook.currentTownMap?.entryPoint),
@@ -2699,6 +2737,7 @@ const Game = ({ resumeConversation = null, layout = 'classic', layoutSwitchable 
           partyLeadName={selectedHeroes?.[0]?.heroName || selectedHeroes?.[0]?.characterName || null}
           templateName={settings?.templateName || null}
           townName={townName}
+          siteName={mapHook.isInsideSite ? mapHook.currentSiteMap?.name || null : null}
           subLocationName={subLocationName}
           townPosition={mapHook.townPlayerPosition}
           worldPosition={mapHook.playerPosition}

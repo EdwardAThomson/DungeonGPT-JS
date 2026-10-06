@@ -1,6 +1,6 @@
 import { DM_PROTOCOL } from '../data/prompts';
 import { detectNarrationProblem } from '../utils/responseGuard';
-import { buildMovementPrompt } from '../utils/promptBuilder';
+import { buildMovementPrompt, LOOK_TONE_EXAMPLES } from '../utils/promptBuilder';
 import { areRequirementsMet } from '../game/milestoneEngine';
 import { getHPStatus } from '../utils/healthSystem';
 
@@ -110,10 +110,12 @@ export const composeMovementNarrativePrompt = ({
   isNewArea,
   conversation = [],
   includeRecentContext = true,
-  ragContext = ''
+  ragContext = '',
+  look = false,
+  placeName = null
 }) => {
   const partyInfo = formatPartyInfo(selectedHeroes);
-  const movementDescription = buildMovementPrompt(tile, settings, narrativeEncounter, worldMap);
+  const movementDescription = buildMovementPrompt(tile, settings, narrativeEncounter, worldMap, { look, placeName });
   const locationInfo = buildLocationInfo({ tile, coords, isNewArea });
   const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
   const milestonesInfo = formatCampaignMilestones(settings.milestones);
@@ -123,6 +125,94 @@ export const composeMovementNarrativePrompt = ({
   const gameContext = `Setting: ${settings.shortDescription}.${themeInfo} Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${locationInfo}. Party: ${partyInfo}.`;
   const recentContext = includeRecentContext ? buildRecentAiContext(conversation) : '';
   const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary}${recentContext}\n\n${movementDescription}${ragContext}`;
+
+  return {
+    prompt,
+    fullPrompt: DM_PROTOCOL + prompt
+  };
+};
+
+// What a Look around inside an explorable site (cave, ruins, ...) should be framed as.
+// Enclosed sites have no sky or open land; open-air ones sit in the world tile's biome.
+const SITE_LOOK_SETTING = {
+  cave: 'inside a cave, underground, with rock on every side and no daylight beyond the entrance',
+  mountain: 'inside a rocky mountain pass, hemmed in by stone walls',
+  ruins: 'among old ruins standing in open country',
+  forest: 'in a clearing deep in a wood',
+  hills: 'among rolling hills and rocky outcrops'
+};
+
+// Decoration keys -> plain nouns for the AI (SITE_DECORATIONS keys, siteTileArt.js).
+const SITE_FEATURE_NOUNS = {
+  boulder: 'a boulder', crystal: 'crystals in the rock', mushroom: 'pale mushrooms',
+  ore: 'an ore vein', pool: 'a still pool', column: 'a broken column', statue: 'a weathered statue',
+  overgrowth: 'thick overgrowth', urn: 'an old urn', tree: 'an old tree', bush: 'a thicket',
+  flowers: 'wildflowers', snow: 'drifted snow'
+};
+
+// Distinct decorations within `radius` tiles of the party, nearest first.
+export const nearbySiteFeatures = (mapData, pos, radius = 3, max = 3) => {
+  if (!Array.isArray(mapData) || !pos) return [];
+  const found = [];
+  for (let y = pos.y - radius; y <= pos.y + radius; y++) {
+    for (let x = pos.x - radius; x <= pos.x + radius; x++) {
+      const key = mapData[y]?.[x]?.poi;
+      if (!key || !SITE_FEATURE_NOUNS[key]) continue;
+      found.push({ key, d: Math.abs(x - pos.x) + Math.abs(y - pos.y) });
+    }
+  }
+  found.sort((a, b) => a.d - b.d);
+  const seen = new Set();
+  const out = [];
+  for (const f of found) {
+    if (seen.has(f.key)) continue;
+    seen.add(f.key);
+    out.push(SITE_FEATURE_NOUNS[f.key]);
+    if (out.length >= max) break;
+  }
+  return out;
+};
+
+/**
+ * Look around inside an explorable site. Describes the site itself (its name, type and
+ * what is near the party), never the world tile outside it, and carries no encounter
+ * hook: world-map hooks belong to the world map.
+ */
+export const composeSiteLookPrompt = ({
+  siteMap,
+  sitePosition,
+  biome = null,
+  settings = {},
+  selectedHeroes = [],
+  currentSummary = '',
+  conversation = [],
+  includeRecentContext = true,
+  ragContext = ''
+}) => {
+  const partyInfo = formatPartyInfo(selectedHeroes);
+  const type = siteMap?.type === 'cave_entrance' ? 'cave' : (siteMap?.type || 'cave');
+  const name = siteMap?.name || 'this place';
+  const setting = SITE_LOOK_SETTING[type] || SITE_LOOK_SETTING.cave;
+  const enclosed = type === 'cave' || type === 'mountain';
+  const entry = siteMap?.entryPoint;
+  const nearEntrance = entry && sitePosition
+    && Math.abs(entry.x - sitePosition.x) + Math.abs(entry.y - sitePosition.y) <= 2;
+  const features = nearbySiteFeatures(siteMap?.mapData, sitePosition);
+
+  let place = `The party is ${setting}, in the place called "${name}" (this is the name of the PLACE, not a person).`;
+  if (!enclosed && biome) place += ` The surrounding land is ${biome}.`;
+  place += nearEntrance ? ' They stand near the way they came in.' : ' They are some way in from the entrance.';
+  if (features.length) place += ` Close by: ${features.join(', ')}.`;
+
+  const goalInfo = settings.campaignGoal ? `\nCampaign Goal: ${settings.campaignGoal}` : '';
+  const milestonesInfo = formatCampaignMilestones(settings.milestones);
+  const gameContext = `Setting: ${settings.shortDescription}. Mood: ${settings.grimnessLevel}.${goalInfo}${milestonesInfo}\n${place} Party: ${partyInfo}.`;
+  const recentContext = includeRecentContext ? buildRecentAiContext(conversation) : '';
+  const task = `The party stops and looks around ${name}. Describe what they see, hear and smell right here, in 2-3 sentences, atmospheric and brief.`
+    + (enclosed ? ' They are enclosed: no sky, sun, wind across open land or distant views.' : '')
+    + ' Stay inside this place: do not describe travel or other terrain. Do not invent creatures, fights or treasure.'
+    + `\n\n${LOOK_TONE_EXAMPLES}`;
+  const prompt = `Game Context: ${gameContext}\n\nStory summary so far: ${currentSummary}${recentContext}\n\n${task}${ragContext}`;
 
   return {
     prompt,

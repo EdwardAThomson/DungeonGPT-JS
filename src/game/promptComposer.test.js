@@ -3,7 +3,9 @@ import {
   formatPartyInfo,
   buildLocationInfo,
   buildRegionThemeInfo,
-  composeMovementNarrativePrompt
+  composeMovementNarrativePrompt,
+  composeSiteLookPrompt,
+  nearbySiteFeatures
 } from './promptComposer';
 
 describe('promptComposer', () => {
@@ -178,5 +180,74 @@ describe('promptComposer', () => {
       settings: { shortDescription: 'A trek across the sands', grimnessLevel: 'Neutral', milestones: [] }
     });
     expect(grassland.prompt).not.toContain('arid desert');
+  });
+});
+
+describe('composeSiteLookPrompt', () => {
+  const grid = (w, h) => Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => ({ x, y, type: 'floor', poi: null })));
+  const cave = () => {
+    const mapData = grid(10, 10);
+    mapData[5][6].poi = 'mushroom';
+    mapData[5][7].poi = 'mushroom';
+    mapData[1][1].poi = 'crystal'; // too far
+    return { name: 'Echo Hollow', type: 'cave', mapData, entryPoint: { x: 5, y: 9 } };
+  };
+  const settings = { shortDescription: 'A dark land', grimnessLevel: 'Grim' };
+
+  it('describes the site by name, not the world tile', () => {
+    const { prompt, fullPrompt } = composeSiteLookPrompt({ siteMap: cave(), sitePosition: { x: 5, y: 5 }, biome: 'plains', settings, currentSummary: 'x' });
+    expect(fullPrompt.startsWith(DM_PROTOCOL)).toBe(true);
+    expect(prompt).toContain('"Echo Hollow"');
+    expect(prompt).toContain('inside a cave');
+    expect(prompt).toContain('no sky');
+    expect(prompt).not.toContain('plains');
+    expect(prompt).not.toMatch(/Encounter Hook/);
+    expect(prompt).toContain('pale mushrooms');
+    expect(prompt).not.toContain('crystals');
+    expect(prompt).toContain('Tone examples');
+  });
+
+  it('gives open-air sites their surrounding biome', () => {
+    const ruins = { ...cave(), name: 'Old Keep', type: 'ruins' };
+    const { prompt } = composeSiteLookPrompt({ siteMap: ruins, sitePosition: { x: 5, y: 8 }, biome: 'desert', settings });
+    expect(prompt).toContain('among old ruins');
+    expect(prompt).toContain('surrounding land is desert');
+    expect(prompt).toContain('near the way they came in');
+    expect(prompt).not.toContain('no sky');
+  });
+
+  it('lists each nearby feature once, nearest first', () => {
+    expect(nearbySiteFeatures(cave().mapData, { x: 5, y: 5 })).toEqual(['pale mushrooms']);
+    expect(nearbySiteFeatures(null, { x: 0, y: 0 })).toEqual([]);
+  });
+});
+
+describe('composeMovementNarrativePrompt look mode', () => {
+  const caveTile = { biome: 'plains', poi: 'cave_entrance', x: 4, y: 2 };
+  const worldMap = Array.from({ length: 5 }, (_, y) => Array.from({ length: 6 }, (_, x) => ({ x, y, biome: 'plains' })));
+  const settings = { shortDescription: 'A land', grimnessLevel: 'Gritty' };
+
+  it('frames a look at a cave tile as standing at the named cave, not arriving', () => {
+    const { prompt } = composeMovementNarrativePrompt({ tile: caveTile, coords: { x: 4, y: 2 }, settings, worldMap, look: true, placeName: 'Echo Hollow' });
+    expect(prompt).toContain('looks around where they stand');
+    expect(prompt).toContain('the dark mouth of a cave, known as "Echo Hollow"');
+    expect(prompt).toContain('Do not describe the party travelling');
+    expect(prompt).not.toContain('moves to a new location');
+    expect(prompt).toContain('Tone examples');
+  });
+
+  it('places a hook rolled on another tile a short way back, in its direction', () => {
+    const hook = { aiContext: 'A narrow pass.', origin: { x: 3, y: 1 } };
+    const { prompt } = composeMovementNarrativePrompt({ tile: caveTile, coords: { x: 4, y: 2 }, settings, worldMap, narrativeEncounter: hook, look: true });
+    expect(prompt).toContain('a short way back to the north-west');
+    const here = composeMovementNarrativePrompt({ tile: caveTile, coords: { x: 4, y: 2 }, settings, worldMap, narrativeEncounter: { ...hook, origin: { x: 4, y: 2 } }, look: true });
+    expect(here.prompt).not.toContain('short way back');
+  });
+
+  it('leaves the arrival prompt unchanged by default', () => {
+    const { prompt } = composeMovementNarrativePrompt({ tile: caveTile, coords: { x: 4, y: 2 }, settings, worldMap });
+    expect(prompt).toContain('moves to a new location');
+    expect(prompt).not.toContain('Right here is');
+    expect(prompt).not.toContain('Tone examples');
   });
 });

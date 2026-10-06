@@ -42,6 +42,7 @@ const Icon = ({ name }) => (
 const GameMainPanel = ({
   campaignGoal,
   townName,
+  siteName,
   subLocationName,
   townPosition,
   worldPosition,
@@ -150,7 +151,7 @@ const GameMainPanel = ({
         <div className="game-info-header gm-place">
           <h2 className="gm-eyebrow">Adventure Log</h2>
           <p>
-            <span className="gm-place-name">{townName || biomeLabel(currentBiome)}</span>
+            <span className="gm-place-name">{townName || siteName || biomeLabel(currentBiome)}</span>
             {townName && subLocationName && <span className="gm-place-sub"> · {subLocationName}</span>}
             <span className="gm-place-coords"> ({worldPosition.x}, {worldPosition.y})</span>
           </p>

@@ -1012,6 +1012,96 @@ export const composeLocalAmbientNarrative = ({
   return sentences.join(' ');
 };
 
+// --- Site look-around composer ----------------------------------------------------
+// Look around INSIDE an explorable site. The world-tile pools above describe a cave or
+// ruin from outside (its mouth, its outline), so a site gets its own interior lines.
+const SITE_LOOK_OPENERS = [
+  'The party pauses to take in their surroundings.',
+  'You stop and look around, letting your eyes settle on the place.',
+  'You take a slow look around, marking what stands out.',
+  'Standing still, the party lets the place reveal itself.',
+  'A moment\'s halt, and a slow turn to take the place in.',
+  'Nothing is done for a minute but looking.',
+  'You look about you, near things first, then far.',
+  'A pause, and the place fills in around the party.'
+];
+
+const SITE_INTERIOR = {
+  cave: [
+    'Water drips somewhere deeper in, slow and patient.',
+    'The torchlight reaches a few yards and the dark takes the rest.',
+    'The rock overhead is close and beaded with damp.',
+    'Every footstep comes back off the walls a moment late.',
+    'The air is cold and still and smells of wet stone.',
+    'Pale roots hang through a crack in the roof.',
+    'The floor is uneven, slick in the hollows where water stands.',
+    'Far off, something small scrabbles over stone and stops.',
+    'The passage narrows ahead, then opens into more dark.',
+    'Old soot marks the rock where someone once kept a fire.'
+  ],
+  mountain: [
+    'Stone walls rise close on either hand.',
+    'Loose scree shifts and settles under the party\'s boots.',
+    'A cold draught finds its way down the pass.',
+    'The rock is streaked with old falls of grit.',
+    'Somewhere above, a stone breaks loose and rattles down.',
+    'The path between the rocks is barely wide enough to walk two abreast.'
+  ],
+  ruins: [
+    'Broken walls stand at odd heights, their tops furred with moss.',
+    'Cut stones lie where they fell, half sunk in the turf.',
+    'An empty doorway frames nothing but more rubble.',
+    'Ivy has pulled a corner of masonry down and kept going.',
+    'The wind moves through gaps that were once windows.',
+    'Old tool marks still show on the dressed stone.',
+    'A threshold, worn smooth by feet long gone, leads into weeds.'
+  ],
+  forest: [
+    'The trees stand close, and the light comes down green.',
+    'Leaf litter muffles every step.',
+    'A bird calls once and is answered further off.',
+    'Moss climbs the north side of every trunk.',
+    'A fallen tree lies across the way, soft with rot.',
+    'The air under the branches is cool and smells of earth.'
+  ],
+  hills: [
+    'The ground rolls away in green humps and hollows.',
+    'Grey outcrops break through the turf here and there.',
+    'Wind runs over the grass in long waves.',
+    'Sheep tracks wind between the rocks.',
+    'From the higher ground the land opens out in every direction.',
+    'Gorse grows thick in the lee of the stones.'
+  ]
+};
+
+/**
+ * Local Look-around line for the inside of a site (no-AI path). Deterministic per
+ * (worldSeed, site name, party position, nonce); shares the avoid-window like the others.
+ */
+export const composeLocalSiteAmbientNarrative = ({
+  siteMap,
+  sitePosition = {},
+  worldSeed = null,
+  nonce = 0,
+  recent = []
+} = {}) => {
+  if (!siteMap) return '';
+  const type = siteMap.type === 'cave_entrance' ? 'cave' : siteMap.type;
+  const pool = SITE_INTERIOR[type] || SITE_INTERIOR.cave;
+  const rng = mulberry32(hashSeed([worldSeed == null ? 'noseed' : worldSeed, siteMap.name || type, sitePosition.x, sitePosition.y, 'sitelook', nonce]));
+
+  const opener = pickLine(SITE_LOOK_OPENERS, rng, recent, firstWord(recent[recent.length - 1]));
+  const a1 = pickLine(pool, rng, recent);
+  let a2 = pickLine(pool, rng, [...recent, a1]);
+  if (a2 === a1 && pool.length > 1) a2 = pool[(pool.indexOf(a1) + 1) % pool.length];
+
+  const tail = [a1];
+  if (a2 && a2 !== a1) tail.push(a2);
+  recent.push(...tail);
+  if (opener) recent.push(opener);
+  return [opener, `*${tail.join(' ')}*`].join(' ');
+};
+
 // --- NPC meeting composer ---------------------------------------------------------
 // Local, templated beat for talking to a milestone NPC (the building "Talk" button)
 // on the no-AI (guest) path, so the click isn't mute. Deterministic per
