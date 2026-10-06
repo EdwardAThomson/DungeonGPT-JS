@@ -1327,7 +1327,7 @@ const jettySprite = (waterEnd, variant) => {
   const cam = makeCam(ox, oy, 0, 1);
   const r = rng(variant * 104729 + waterEnd.charCodeAt(0));
   const v = (x, y, z) => cam([x, y, z]);
-  const plankA = '#9c8a6a', plankB = '#8a795e', beam = '#5d4a30', pile = '#4a3a26';
+  const plankA = '#93693f', plankB = '#7f5a36', beam = '#4e3621', pile = '#4a3a26';
   const poly = (pts, fill, extra = '') => `<polygon points='${ptsStr(pts)}' fill='${fill}' ${extra}/>`;
   const Z = 2.2;
   let s = '';
