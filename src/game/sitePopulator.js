@@ -17,6 +17,7 @@
 
 import { CAVE_ENCOUNTERS } from '../data/encounters/caveEncounters';
 import { RUINS_ENCOUNTERS } from '../data/encounters/ruinsEncounters';
+import { SIDE_QUEST_BOSSES } from '../data/sideQuests';
 import { makeMob, spawnMobsFromSlots, seedAmbientRoamers, AMBIENT_ROAMER_TARGET } from './mobMovement';
 import { createLogger } from '../utils/logger';
 
@@ -428,7 +429,7 @@ export function repopulateSiteRoamers(site, partyLevel) {
 
 // Build a milestone-boss encounter for a site objective, based on the type's combat pool
 // (so the encounter shape is valid) but flagged so completion fires on defeat.
-function makeBossEncounter(objective, type) {
+function makeBossEncounter(objective, type, poiType = type) {
   const pool = combatPool(type);
   // Borrow the SHAPE of a HARD-tier encounter (the classic boss shell). Filtering to
   // 'hard' keeps this base identical to before the level-matched easy/medium fillers
@@ -444,16 +445,19 @@ function makeBossEncounter(objective, type) {
     consequences: { criticalSuccess: '', success: '', failure: '', criticalFailure: '' },
   };
   delete base.dc; // never inherit a random-pool dc override; the forced hard label sets DC 20
+  // Authored art and text for this boss, if any; stats and damage stay from the base.
+  const authored = SIDE_QUEST_BOSSES[objective.id] || {};
   return {
     ...base,
+    ...authored,
     name: objective.name,
     enemyId: objective.id,           // -> enemy_defeated event on victory completes the milestone
     isMilestoneBoss: true,
     encounterTier: 'immediate',
-    poiType: type,
+    poiType,
     difficulty: 'hard',
     multiRound: true,
-    description: objective.description || `${objective.name} stands between you and your goal.`,
+    description: objective.description || authored.description || `${objective.name} stands between you and your goal.`,
     rewards: { xp: 150, gold: '4d12', items: (base.rewards && base.rewards.items) || [] },
   };
 }
@@ -534,7 +538,9 @@ export function injectSiteObjective(site, objectiveOrList) {
       // falls the hoard on that tile is still there to walk onto and claim (R1 preserved).
       const boss = makeMob({
         x: slot.x, y: slot.y,
-        encounter: makeBossEncounter(objective, type),
+        // Open-air sites (forest/hills/mountain) borrow the cave pool's boss shell, as
+        // their roamers do; the authored SIDE_QUEST_BOSSES entry supplies the look and text.
+        encounter: makeBossEncounter(objective, type, site.type || type),
         enemyId: objective.id,
         isBoss: true,
         milestoneId: objective.milestoneId,

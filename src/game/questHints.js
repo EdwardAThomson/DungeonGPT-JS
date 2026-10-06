@@ -112,12 +112,18 @@ export const getStepHint = (step, quest) => {
     // Unanchored (older saves): any town with that building accepts the hand-in.
     target = turnIn.location ? `${target} in ${turnIn.location}` : `${target} in any town`;
     const ready = quest ? isStepReady(step, quest.milestones) : false;
+    // A turn-in partway through a quest is an errand ("go to"), not the final hand-in.
+    const steps = quest?.milestones || [];
+    const isFinal = !steps.length || steps[steps.length - 1].id === step.id;
+    if (!isFinal) return ready ? `✅ Ready — go to ${target}` : `Go to ${target}`;
     return ready ? `✅ Ready — return to ${target}` : `Return to ${target}`;
   }
 
   // Site-bound objective: the site was revealed on the map when the quest was accepted.
   if (step.site) {
     const label = SITE_LABEL[step.site.type] || `a ${step.site.type}`;
+    // Forests, hills and mountains are never hidden, so there is nothing to reveal.
+    if (step.site.type !== 'cave' && step.site.type !== 'ruins') return `In ${label}`;
     // Side quests only un-hide the site's sprite on the world map (a type-wide reveal);
     // they draw no pin, glow, or label. "revealed" describes what actually happens, so
     // neither the journal nor the AI (this string is fed straight into the prompt)
@@ -146,15 +152,17 @@ export const getStepHint = (step, quest) => {
 };
 
 /**
- * The objective step of a quest: the first non-turn-in milestone (its first "go do a
- * thing" step). Falls back to the first milestone (courier quests are a single turn-in).
+ * The objective step of a quest: the first step with no prerequisites that isn't the final
+ * hand-in (a multi-step quest may open with a mid-quest errand). Falls back to the first
+ * milestone (courier quests are a single turn-in).
  * Returns null when the quest has no milestones.
  * @param {Object} quest
  * @returns {Object|null}
  */
 export const getQuestObjectiveStep = (quest) => {
   const milestones = quest?.milestones || [];
-  return milestones.find((m) => !m.trigger?.turnIn) || milestones[0] || null;
+  return milestones.find((m) => !(m.requires || []).length && !(m.trigger?.turnIn && m === milestones[milestones.length - 1]))
+    || milestones[0] || null;
 };
 
 /**
@@ -210,7 +218,8 @@ export const computeSideQuestMarkers = (sideQuests) => {
  */
 export const isQuestReadyToTurnIn = (quest) => {
   if (!quest || quest.status !== 'active') return false;
-  return (quest.milestones || []).some((s) =>
-    s.trigger?.turnIn && !s.completed && isStepReady(s, quest.milestones)
-  );
+  // Only the FINAL hand-in counts; a ready mid-quest errand is not "ready to turn in".
+  const steps = quest.milestones || [];
+  const last = steps[steps.length - 1];
+  return Boolean(last && last.trigger?.turnIn && !last.completed && isStepReady(last, steps));
 };

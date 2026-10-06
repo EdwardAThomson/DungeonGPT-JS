@@ -72,6 +72,10 @@ const buildingNameInTown = (townMap, type) => {
 export const resolveQuestOrigin = (quest, { worldMap, townMapsCache = {}, currentTownName = null, playerPos = null } = {}) => {
   const giver = quest?.giver?.building;
   if (!giver) return null;
+  // A quest given a home town at world creation always comes from there.
+  if (quest.giver.town) {
+    return { town: quest.giver.town, buildingName: quest.giver.buildingName || buildingNameInTown(townMapsCache[quest.giver.town], giver) };
+  }
   if (currentTownName) {
     return { town: currentTownName, buildingName: buildingNameInTown(townMapsCache[currentTownName], giver) };
   }
@@ -106,17 +110,73 @@ export const stampQuestOrigin = (quest, origin) => {
 };
 
 /**
+ * Give each quest without a town a home town: one whose cached map has the giver
+ * building. Spreads quests out by preferring the town and building with the fewest quests
+ * already (counting `existing` quests that are not completed), with ties broken by `rng`,
+ * so each world places its quests differently. Quests whose giver building isn't in any
+ * cached town are returned unchanged (any town with the building may offer them).
+ * @param {Array} quests - quests to place (returned as new objects; input untouched).
+ * @param {Object} townMapsCache - townName -> town map.
+ * @param {() => number} rng
+ * @param {Array} [existing] - quests already in the save.
+ * @returns {Array}
+ */
+export const assignHomeTowns = (quests, townMapsCache, rng = Math.random, existing = []) => {
+  const towns = Object.keys(townMapsCache || {}).sort();
+  const typesIn = {};
+  towns.forEach((name) => {
+    const set = new Set();
+    (townMapsCache[name]?.mapData || []).forEach((row) => (row || []).forEach((t) => {
+      if (t?.type === 'building' && t.buildingType) set.add(t.buildingType);
+    }));
+    typesIn[name] = set;
+  });
+  const perTown = {};
+  const perSlot = {};
+  const count = (town, type) => {
+    perTown[town] = (perTown[town] || 0) + 1;
+    perSlot[`${town}|${type}`] = (perSlot[`${town}|${type}`] || 0) + 1;
+  };
+  const giverTypes = (q) => (Array.isArray(q?.giver?.building) ? q.giver.building : [q?.giver?.building]).filter(Boolean);
+  (existing || []).forEach((q) => {
+    if (q?.status === 'completed' || !q?.giver?.town) return;
+    const type = giverTypes(q).find((b) => typesIn[q.giver.town]?.has(b));
+    if (type) count(q.giver.town, type);
+  });
+  return (quests || []).map((q) => {
+    if (q?.giver?.town) return q;
+    const options = [];
+    towns.forEach((town) => giverTypes(q).forEach((type) => {
+      if (typesIn[town].has(type)) options.push({ town, type, roll: rng() });
+    }));
+    if (options.length === 0) return q;
+    options.sort((a, b) => ((perSlot[`${a.town}|${a.type}`] || 0) - (perSlot[`${b.town}|${b.type}`] || 0))
+      || ((perTown[a.town] || 0) - (perTown[b.town] || 0)) || (a.roll - b.roll));
+    const pick = options[0];
+    count(pick.town, pick.type);
+    return stampQuestOrigin(q, { town: pick.town, buildingName: buildingNameInTown(townMapsCache[pick.town], pick.type) });
+  });
+};
+
+/**
  * Can this quest be both STARTED and COMPLETED on the generated map? It must have a giver
  * building that exists, every site objective's site type must exist, and every turn-in
  * building must exist — otherwise the quest would be unstartable or uncompletable.
  * @param {Object} quest
- * @param {{ sites?: {cave?:boolean, ruins?:boolean}, buildings?: string[] }} availability
+ * @param {{ sites?: {cave?:boolean, ruins?:boolean}, buildings?: string[], theme?: string,
+ *   darkness?: string }} availability
  */
 export const isQuestEligible = (quest, availability = {}) => {
   const sites = availability.sites || {};
   const buildingSet = new Set(availability.buildings || []);
   const hasBuilding = (b) => (Array.isArray(b) ? b : [b]).some((x) => buildingSet.has(x));
 
+  // biome-themed quests (`themes`) only fit worlds of that biome (settings.theme)
+  if (Array.isArray(quest.themes) && !quest.themes.includes(availability.theme || 'grassland')) return false;
+  // tone: 'horror' quests need a Dark game, 'light' ones stay out of Dark games
+  const dark = availability.darkness === 'Dark';
+  if (quest.tone === 'horror' && !dark) return false;
+  if (quest.tone === 'light' && dark) return false;
   // startable: the giver building must exist on the map
   if (!quest.giver?.building || !hasBuilding(quest.giver.building)) return false;
   // completable: every step's site / turn-in target must exist
@@ -224,7 +284,7 @@ export const backfillSideQuests = (existingSideQuests, { availability = {}, leve
   const existingIds = new Set(existing.map((q) => q?.id));
   const candidates = pool.filter((q) => !existingIds.has(q.id) && (q.minLevel || 1) <= level + 2);
   if (candidates.length === 0) return [];
-  return selectSideQuests({ sites: availability.sites || {}, buildings: availability.buildings || [] }, room, rng, candidates);
+  return selectSideQuests({ ...availability, sites: availability.sites || {}, buildings: availability.buildings || [] }, room, rng, candidates);
 };
 
 /**
@@ -253,7 +313,11 @@ export const applySideQuestBackfill = (settings, { worldMap, townMapsCache, part
   const poolSize = pool.length;
   if (!settings || settings.sideQuestPoolSize === poolSize) return { settings, added: [] };
   if (!Array.isArray(worldMap) || worldMap.length === 0) return { settings, added: [] };
-  const availability = deriveSideQuestAvailability(worldMap, townMapsCache);
+  const availability = {
+    ...deriveSideQuestAvailability(worldMap, townMapsCache),
+    theme: settings.theme,
+    darkness: settings.darknessLevel,
+  };
   let seed = ((parseInt(settings.worldSeed, 10) || 1) + poolSize * 104729) % 233280 || 1;
   const rng = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
   const added = backfillSideQuests(settings.sideQuests, {
@@ -263,8 +327,16 @@ export const applySideQuestBackfill = (settings, { worldMap, townMapsCache, part
     pool,
   });
   const next = { ...settings, sideQuestPoolSize: poolSize };
-  if (added.length > 0) next.sideQuests = [...(settings.sideQuests || []), ...added];
-  return { settings: next, added };
+  // Place unaccepted quests (old ones included) in home towns, so offers spread out.
+  const existing = settings.sideQuests || [];
+  const unplaced = existing.filter((q) => q?.status === 'available' && !q.giver?.town);
+  const placedById = new Map(assignHomeTowns(unplaced, townMapsCache, rng, existing).map((q) => [q.id, q]));
+  const placedExisting = existing.map((q) => placedById.get(q?.id) || q);
+  const placedAdded = assignHomeTowns(added, townMapsCache, rng, placedExisting);
+  if (placedAdded.length > 0 || placedExisting.some((q, i) => q !== existing[i])) {
+    next.sideQuests = [...placedExisting, ...placedAdded];
+  }
+  return { settings: next, added: placedAdded };
 };
 
 /**
@@ -334,7 +406,9 @@ export const pickOfferableSideQuest = (sideQuests, party, opts = {}) => {
 
   // 1. Eligible pool: available, in-level.
   const level = effectivePartyLevel(party);
-  const eligible = getAvailableSideQuests(sideQuests).filter((q) => (q.minLevel || 1) <= level);
+  const eligible = getAvailableSideQuests(sideQuests).filter((q) => (q.minLevel || 1) <= level
+    // one quest per building at a time: skip a quest whose home building is still busy
+    && !(q.giver?.town && isGiverBusy(sideQuests, q.giver.town, [].concat(q.giver.building))));
   if (eligible.length === 0) return null;
 
   // 4. Deterministic rotate: index from the stable clock, never Math.random.
@@ -418,14 +492,35 @@ export const getAvailableQuestsAt = (sideQuests, ctx = {}) =>
     const buildings = Array.isArray(g.building) ? g.building : [g.building];
     if (!buildings.includes(ctx.buildingType)) return false;
     if (g.location && ctx.townName !== g.location) return false;
+    if (g.town && ctx.townName && ctx.townName !== g.town) return false;
     if (ctx.level != null && (q.minLevel || 1) > ctx.level) return false; // tiered reveal
     return true;
   });
 
+/**
+ * The side quest a building offers right now: at most one, and none while a quest taken
+ * from that same building (same town and building type) is still active. Paces offers so
+ * a busy town doesn't hand out a pile of quests at once.
+ */
+export const getOfferAt = (sideQuests, ctx = {}) => {
+  if (isGiverBusy(sideQuests, ctx.townName, [ctx.buildingType])) return [];
+  return getAvailableQuestsAt(sideQuests, ctx).slice(0, 1);
+};
+
+// Is a quest taken from this building type (in this town, when known) still active?
+const isGiverBusy = (sideQuests, town, buildingTypes) => getActiveSideQuests(sideQuests).some((q) => {
+  const g = q.giver || {};
+  const buildings = Array.isArray(g.building) ? g.building : [g.building];
+  return buildings.some((b) => buildingTypes.includes(b)) && (!town || !g.town || g.town === town);
+});
+
 /** Quests with a turn-in step ready to hand in at this context (for building UI). */
 export const getReadyTurnIns = (sideQuests, ctx = {}) =>
-  getActiveSideQuests(sideQuests).filter((q) =>
-    q.milestones.some((s) => s.trigger?.turnIn && !s.completed && requiresMet(s, q.milestones) && turnInMatches(s.trigger.turnIn, ctx)));
+  getActiveSideQuests(sideQuests).filter((q) => getReadyTurnInStep(q, ctx) !== null);
+
+/** The turn-in step of `quest` that is ready to hand in at this context, or null. */
+export const getReadyTurnInStep = (quest, ctx = {}) =>
+  (quest?.milestones || []).find((s) => s.trigger?.turnIn && !s.completed && requiresMet(s, quest.milestones) && turnInMatches(s.trigger.turnIn, ctx)) || null;
 
 export const getActiveSideQuests = (sideQuests) => (sideQuests || []).filter((q) => q.status === 'active');
 export const getAvailableSideQuests = (sideQuests) => (sideQuests || []).filter((q) => q.status === 'available');
@@ -470,7 +565,9 @@ export const getActiveSiteObjectives = (sideQuests) => {
   const byType = {};
   getActiveSideQuests(sideQuests).forEach((q) => {
     q.milestones.forEach((m) => {
-      if (m.site && !m.completed) {
+      // A later step's objective is only placed once its prerequisites are done: a pickup
+      // or kill before then would not count, and the objective would not come back.
+      if (m.site && !m.completed && requiresMet(m, q.milestones)) {
         (byType[m.site.type] = byType[m.site.type] || []).push({ ...m.site, milestoneId: m.id, questId: q.id });
       }
     });
@@ -498,7 +595,7 @@ export const getActiveGatherResources = (sideQuests) => {
   const byType = {};
   getActiveSideQuests(sideQuests).forEach((q) => {
     q.milestones.forEach((m) => {
-      if (m.completed) return;
+      if (m.completed || !requiresMet(m, q.milestones)) return;
       if (!Array.isArray(m.sites) || m.sites.length === 0) return;
       const itemId = m.trigger?.item;
       const count = m.trigger?.count;

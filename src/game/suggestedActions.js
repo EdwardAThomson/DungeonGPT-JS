@@ -18,7 +18,7 @@
 //   kind 'walk'   - walk inside the current town to the building at target {x, y}, then open it
 
 import { areRequirementsMet, getMilestoneBossForTile, getMilestoneLocationForTile, getMilestoneItemForTile } from './milestoneEngine';
-import { getActiveSideQuests, getAvailableQuestsAt, effectivePartyLevel, ACTIVE_QUEST_CAP, getActiveGatherResources, getRevealedSiteTypes } from './questEngine';
+import { getActiveSideQuests, getOfferAt, effectivePartyLevel, ACTIVE_QUEST_CAP, getActiveGatherResources, getRevealedSiteTypes } from './questEngine';
 import { ITEM_CATALOG } from '../utils/inventorySystem';
 
 export const MAX_SUGGESTIONS = 3;
@@ -105,10 +105,12 @@ const nearestBuilding = (townMap, from, matches) => {
 const isHurt = (party) => (party || []).some((h) =>
   Number.isFinite(h?.currentHP) && Number.isFinite(h?.maxHP) && h.maxHP > 0 && h.currentHP > 0 && h.currentHP / h.maxHP < HURT_FRACTION);
 
-const SITE_LABEL = { cave: 'the cave', ruins: 'the ruins' };
+const SITE_LABEL = { cave: 'the cave', ruins: 'the ruins', forest: 'the forest', hills: 'the hills', mountain: 'the mountains' };
 // Quest site types vs the world tile `poi` that draws them.
 const SITE_POI = { cave: 'cave_entrance', ruins: 'ruins' };
-const siteTypeOfTile = (tile) => (tile?.poi === 'cave_entrance' ? 'cave' : tile?.poi === 'ruins' ? 'ruins' : null);
+const OPEN_SITES = new Set(['forest', 'hills', 'mountain']);
+const siteTypeOfTile = (tile) => (tile?.poi === 'cave_entrance' ? 'cave' : tile?.poi === 'ruins' ? 'ruins'
+  : OPEN_SITES.has(tile?.poi) ? tile.poi : null);
 
 // Inside a site: the objectives still to do (quest bosses, item / room objectives) and the
 // harvest nodes an active gather quest still needs, nearest first.
@@ -230,7 +232,10 @@ export const getSuggestedActions = (s = {}) => {
   if (hereSite && (!sitesShown || sitesShown[hereSite])) {
     const wanted = getActiveSideQuests(sideQuests).some((q) => (q.milestones || []).some((st) =>
       !st.completed && (st.site?.type === hereSite || (st.sites || []).includes(hereSite))));
-    push({ id: 'enterSite', label: `Explore ${SITE_LABEL[hereSite]}`, kind: 'enterSite', ...(wanted ? SIDE : {}) });
+    // Open-air sites are everywhere, so only suggest entering one a quest needs.
+    if (wanted || !OPEN_SITES.has(hereSite)) {
+      push({ id: 'enterSite', label: `Explore ${SITE_LABEL[hereSite]}`, kind: 'enterSite', ...(wanted ? SIDE : {}) });
+    }
   }
 
   // Campaign milestones first, nearest destination first.
@@ -306,7 +311,7 @@ export const getSuggestedActions = (s = {}) => {
   // under the active-quest cap. Sends players into buildings they'd otherwise skip.
   if (inTown && getActiveSideQuests(sideQuests).length < ACTIVE_QUEST_CAP) {
     const offer = nearestBuilding(townMap, townPosition, (t) =>
-      !!t.buildingType && getAvailableQuestsAt(sideQuests, { buildingType: t.buildingType, townName, level: partyLevel }).length > 0);
+      !!t.buildingType && getOfferAt(sideQuests, { buildingType: t.buildingType, townName, level: partyLevel }).length > 0);
     if (offer) walkTo(offer, `Ask for work at ${offer.tile.buildingName || `the ${String(offer.tile.buildingType).replace(/_/g, ' ')}`}`, SIDE);
   }
 

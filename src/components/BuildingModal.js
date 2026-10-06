@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { getHPStatus } from '../utils/healthSystem';
-import { getReadyTurnIns, getAvailableQuestsAt, effectivePartyLevel } from '../game/questEngine';
+import { getReadyTurnIns, getReadyTurnInStep, getOfferAt, effectivePartyLevel } from '../game/questEngine';
 import { getShopStock } from '../data/shopStock';
 import { buyPrice, sellPrice, canAfford, isSellable } from '../game/shopController';
 import { ITEM_CATALOG, getRarityColor, describeHealAmount, describeSpellDamage } from '../utils/inventorySystem';
@@ -627,6 +627,8 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                             const ctx = { buildingType: building.buildingType, townName };
                             const ready = getReadyTurnIns(sideQuests || [], ctx);
                             if (ready.length === 0) return null;
+                            // Multi-step quests can have errands partway through, so name the step.
+                            const readyStepText = (q, c) => (getReadyTurnInStep(q, c) || {}).text || '';
                             return (
                                 <div className="modal-section" style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '20px', borderRadius: '10px', border: '1px solid var(--state-success, #4caf50)', marginTop: '15px' }}>
                                     <h4 style={{ borderBottom: '2px solid var(--state-success, #4caf50)', paddingBottom: '10px', margin: '0 0 15px 0', color: 'var(--state-success, #4caf50)', fontFamily: 'var(--header-font)' }}>
@@ -635,7 +637,10 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                         {ready.map(q => (
                                             <div key={q.id} style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 14px' }}>
-                                                <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '8px' }}>{q.title}</div>
+                                                <div style={{ fontWeight: 700, color: 'var(--text)', marginBottom: '4px' }}>{q.title}</div>
+                                                {readyStepText(q, ctx) && (
+                                                    <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>{readyStepText(q, ctx)}</div>
+                                                )}
                                                 <button className="primary-button" onClick={() => onTurnInQuest(ctx)}>Turn In</button>
                                             </div>
                                         ))}
@@ -646,7 +651,7 @@ const BuildingModal = ({ building, npcs, onClose, firstHero, onQuestItemFound, o
 
                         {/* Quest-giver Section - rumours & tasks offered by THIS building's type */}
                         {onAcceptSideQuest && (() => {
-                            const available = getAvailableQuestsAt(sideQuests || [], { buildingType: building.buildingType, townName, level: effectivePartyLevel(party) });
+                            const available = getOfferAt(sideQuests || [], { buildingType: building.buildingType, townName, level: effectivePartyLevel(party) });
                             if (available.length === 0) return null;
                             return (
                                 <div className="modal-section" style={{ backgroundColor: 'rgba(0,0,0,0.03)', padding: '20px', borderRadius: '10px', border: '1px solid var(--border)', marginTop: '15px' }}>

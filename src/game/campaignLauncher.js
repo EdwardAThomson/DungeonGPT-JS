@@ -18,7 +18,7 @@
 import { generateMapData } from '../utils/mapGenerator';
 import { generateTownMap } from '../utils/townMapGenerator';
 import { getTownWaterContext, getTownRoadEdges } from '../utils/townWater';
-import { selectSideQuests } from './questEngine';
+import { selectSideQuests, assignHomeTowns } from './questEngine';
 import { populateTown } from '../utils/npcGenerator';
 import { spawnWorldMapEntities, injectQuestBuildings, findMissingMilestoneLocations } from './milestoneSpawner';
 import { getMilestoneLocationNames, getMilestoneNpcsForTown } from './milestoneEngine';
@@ -234,7 +234,10 @@ export const launchCampaign = (spec, options = {}) => {
     // Scale the number of side quests to the map (≈1 per town, 2–4).
     const townCount = flatTiles.filter((t) => t.poi === 'town').length;
     const sideQuestCount = Math.min(4, Math.max(2, townCount));
-    const selectedSideQuests = selectSideQuests({ sites: availableSites, buildings: [...availableBuildings] }, sideQuestCount, sqRng);
+    // Each quest lives in one home town (seeded, so a world is reproducible but worlds differ).
+    const selectedSideQuests = assignHomeTowns(
+        selectSideQuests({ sites: availableSites, buildings: [...availableBuildings], theme: worldTheme, darkness: spec.darknessLevel }, sideQuestCount, sqRng),
+        townMapsCache, sqRng);
 
     // Derive campaignGoal from the final milestone if not explicitly set
     const derivedGoal = spec.campaignGoal || (milestones.length > 0
