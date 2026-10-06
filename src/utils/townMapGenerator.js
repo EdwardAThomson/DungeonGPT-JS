@@ -238,6 +238,15 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   let riverInfo = null;
   if (hasRiver && !riverForkInfo && !canalInfo) {
     riverInfo = placeRiverInTown(mapData, riverDirection, width, height, rng);
+    // Gates were placed before the band was carved, so one can land in the river (a
+    // gatehouse half over the water with its road ending at the bank). Slide any such
+    // gate along its edge to the nearest dry spot, one tile clear of the bank.
+    for (const e of entrances) {
+      if (!inRiverBand(riverInfo, e.pos.x, e.pos.y)) continue;
+      const key = riverInfo.isHorizontal ? 'y' : 'x';
+      const lo = riverInfo.center - 2, hi = riverInfo.center + riverInfo.riverWidth + 1;
+      e.pos[key] = e.pos[key] - riverInfo.center < riverInfo.riverWidth / 2 ? lo : hi;
+    }
   }
 
   // The hub of the path network: the town square (placed just below). Every gate road
@@ -393,11 +402,11 @@ export const generateTownMap = (townSize, townName, entryPoint = 'south', seed =
   }
 
   // Frame the native layout with countryside so every town fills a uniform canvas
-  // while its buildings stay huddled exactly as generated. River-city stamps also
-  // pass their plain-band geometry so the frame can carry the river out to the
-  // canvas edge on fork-less fallback seeds (see extendRiverWater); ordinary towns
-  // pass null and stay byte-identical (fixture pins).
-  const riverBand = (water && water.archetype === 'riverfork' && riverInfo) ? riverInfo : null;
+  // while its buildings stay huddled exactly as generated. Any town with a river band
+  // (plain river towns, and river-city stamps on fork-less fallback seeds) passes its
+  // geometry so the frame carries the river out to the canvas edge (see
+  // extendRiverWater) instead of stopping it one ring short of the border.
+  const riverBand = riverInfo || null;
   return padTownToUniform(result, UNIFORM_TOWN_SIZE, UNIFORM_TOWN_SIZE, rng, riverBand);
 };
 
@@ -448,8 +457,8 @@ export function padTownToUniform(town, targetW, targetH, rng, riverBand = null) 
   // grid, so without this pass the river would stop dead at the countryside ring
   // (the "river ends inside the town" playtest bug, water towns #65). Only the two
   // flow-axis borders are continued; a meander that merely brushes a side border
-  // stays put. Ordinary towns have no riverFork and pass no riverBand, so they are
-  // byte-identical (fixture pins in townMapGenerator.test.js).
+  // stays put. Plain river towns pass their band the same way; dry towns pass
+  // neither and are byte-identical (fixture pins in townMapGenerator.test.js).
   if (town.riverFork || riverBand) {
     extendRiverWater(newMap, town.riverFork, riverBand, offX, offY, width, height, targetW, targetH);
   }
@@ -1570,7 +1579,7 @@ function extendCoastWater(newMap, edges, offX, offY, coreW, coreH, targetW, targ
 // border straight out to the canvas edge, preserving its `waterway` flag so the canal
 // art continues seamlessly. A border channel tile may already have been bridged by a
 // gate road, so bridges over the channel count as sources too (the water flows under
-// them). Called only for river-city towns; ordinary towns never reach this.
+// them). Called for river towns (band or fork); dry towns never reach this.
 function extendRiverWater(newMap, riverFork, riverBand, offX, offY, coreW, coreH, targetW, targetH) {
   const isHorizontal = riverFork ? riverFork.direction === 'EAST_WEST' : riverBand.isHorizontal;
   const inBand = (v) => !!riverBand && v >= riverBand.center && v < riverBand.center + riverBand.riverWidth;
@@ -1813,6 +1822,14 @@ function routeWindyPath(mapData, starts, isTarget, opts) {
       if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
       const ni = idx(nx, ny);
       if (done[ni]) continue;
+      // The river band is crossed straight over, never walked along: a step along the
+      // band's flow between two band tiles would lay a plank run down the river (the
+      // L-shaped "bridges to nowhere" seen on river towns). An entrance road that
+      // arrives on the band at the map edge may still come straight in through the
+      // wall line (the outer two rings).
+      const nearEdge = cx <= 1 || cy <= 1 || cx >= width - 2 || cy >= height - 2;
+      if (riverInfo && !nearEdge && inRiverBand(riverInfo, cx, cy) && inRiverBand(riverInfo, nx, ny)
+        && (riverInfo.isHorizontal ? dx !== 0 : dy !== 0)) continue;
       const c = enterCost(nx, ny);
       if (c === Infinity) continue;
       const nd = dist[cur] + c;
