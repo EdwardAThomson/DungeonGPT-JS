@@ -161,7 +161,14 @@ const TEMPLATES = {
       'Scorching sand underfoot, and a dry wind throwing grit against the party.',
       'Endless desert stretches before the party, pale and merciless under a white sun.',
       'Heat rolls up off the sand in waves as the party steps out into the open waste.',
-      'Past the last scrub there is only bare dune, and the sun bears down like a weight.'
+      'Past the last scrub there is only bare dune, and the sun bears down like a weight.',
+      'Desert: cracked earth, thorn scrub, and a sun with nothing between it and the party.',
+      'Sand and stone, and the heat coming up off both.',
+      'Out onto the waste, where the last of the green gives up and the sand turns the colour of bone.',
+      'Heat, a white sky, and dust in every fold of cloth before a hundred paces are done.',
+      'The party steps into the desert glare, and the shade behind them becomes the thing they will remember.',
+      'Dunes, low and pale, running away in ridges that all look alike.',
+      'Dead heat, and the stillness that comes with it; nothing moves out here that does not have to.'
     ],
     revisit: [
       'More burning sand, the dunes blurring together in the haze.',
@@ -169,7 +176,14 @@ const TEMPLATES = {
       'Another stretch of shadeless sand, the heat pressing down like a hand.',
       'Dunes roll on without end, every crest the same as the last.',
       'Deeper into the waste, sand grinding in every seam.',
-      'Overhead the sun wheels, and still the sand runs on to the horizon.'
+      'Overhead the sun wheels, and still the sand runs on to the horizon.',
+      'Sand again, and the sun no lower.',
+      'Dust in the throat, grit in the eyes, and the desert going on as before.',
+      'Same pale sand, the shimmer standing on it like water that is not there.',
+      'On across the dry sand, the party\'s shadows the only shade for miles.',
+      'Thorn scrub, cracked earth, heat, and a sky without a cloud to its name.',
+      'The desert does not change; the party only grows thirstier crossing it.',
+      'Dune, hollow, dune, and the heat sitting on it all.'
     ],
     ambient: [
       'Sand hisses across the dunes on a hot, gritty wind.',
@@ -177,7 +191,14 @@ const TEMPLATES = {
       'Nothing moves but the slow march of the dunes.',
       'A vulture turns lazily in the blinding sky.',
       'Bleached bones jut from a dune, half-scoured by the wind.',
-      'The wind dies, and the silence of the waste presses close.'
+      'The wind dies, and the silence of the waste presses close.',
+      'A lizard flicks across the stones and is gone.',
+      'Wind lifts a skin of sand off the crest and lets it fall.',
+      'Somewhere a bird calls, two dry notes, and nothing answers.',
+      'Thorns catch at sleeves and let go reluctantly.',
+      'Heat shimmer turns a far rock into a tower and back.',
+      'The party\'s tracks fill with blown sand almost as fast as they are made.',
+      'A dry watercourse crosses the way, its bed white with old salt.'
     ]
   },
   snow: {
@@ -187,7 +208,14 @@ const TEMPLATES = {
       'Snow lies deep and silent here, the cold biting at every exposed inch of skin.',
       'Ice and drifting snow now, breath clouding in the frigid air.',
       'Knee-deep drifts, each step a small cold labour.',
-      'A pale glare of snow opens ahead, so bright it aches to look at.'
+      'A pale glare of snow opens ahead, so bright it aches to look at.',
+      'White, as far as sight goes, and the cold already at work on fingers and face.',
+      'Snow takes the party\'s boots to the ankle, then the shin, and gives nothing back.',
+      'Out onto the snowfield, the wind coming off it clean and bitter.',
+      'A frozen country, the drifts sculpted by wind into shapes like waves stopped mid-break.',
+      'Cold that makes the teeth ache, and snow that creaks underfoot at every step.',
+      'The ground goes white under a sky nearly as pale, and the party\'s breath hangs frozen between.',
+      'Drifts to wade and snow-crust to break, and no track across any of it but the one the party makes.'
     ],
     revisit: [
       'More frozen ground, the snow squeaking underfoot.',
@@ -195,7 +223,14 @@ const TEMPLATES = {
       'Another white expanse, the chill working deeper into their bones.',
       'Snow stretches on, every drift the twin of the last.',
       'Deeper into the cold, breath freezing on their scarves.',
-      'White on and on, and the cold never once relents.'
+      'White on and on, and the cold never once relents.',
+      'Snow again, and the cold again, and no end to either.',
+      'Same white, the party\'s old tracks the only mark on the snow.',
+      'On through the snow, the party taking turns to break the trail.',
+      'Cold has stopped being weather and become the place itself.',
+      'White ground, grey sky, and the line between them lost in blowing snow.',
+      'Snow-crust holds, then breaks, then holds; the party\'s legs are tired of guessing.',
+      'The snowfield goes on, and the party\'s breath goes on hanging in front of them.'
     ],
     ambient: [
       'Fine snow sifts down from a low grey sky.',
@@ -203,7 +238,14 @@ const TEMPLATES = {
       'Wind moans across the drifts and dies away.',
       'Frost glitters where a thin sun breaks through.',
       'A single line of animal tracks crosses the snow and vanishes.',
-      'Ice cracks somewhere with a sound like a snapped branch.'
+      'Ice cracks somewhere with a sound like a snapped branch.',
+      'A hare, white on white, is there and then not.',
+      'Snow squeaks underfoot the way it does only in deep cold.',
+      'Snow slides off a bough with a soft thump.',
+      'Wind lifts the surface and drives it along in low hissing veils.',
+      'The party\'s eyelashes have frost in them.',
+      'A buried fence shows as a row of posts no higher than a hand.',
+      'Silence, of the kind that makes the ears ring.'
     ]
   },
   water: {
@@ -413,13 +455,27 @@ const TEMPLATES = {
       'Bog now, mist curling low over black, still water.',
       'A fetid swamp opens before the party, alive with the drone of insects.',
       'Firm ground fails, and the party sinks ankle-deep into cold black mud.',
-      'A reek of rot rolls up as the party pushes into the standing water and reeds.'
+      'A reek of rot rolls up as the party pushes into the standing water and reeds.',
+      'Marsh. Wet to the knee within ten paces, and the smell of it rising.',
+      'Reeds close in and the ground goes soft, then softer, then stops being ground.',
+      'Black water between tussocks, and a path across them that may or may not hold.',
+      'The firm way ends and the mire begins, breathing out rot as the party disturbs it.',
+      'Low ground, standing water, and a mist that has nowhere better to be.',
+      'Into the fen, where every step is a question and the mud has most of the answers.',
+      'Sedge and sucking mud, and the party\'s boots full before the second tussock.'
     ],
     revisit: [
       'More black water and clinging mud, the stench no kinder than before.',
       'The party slogs on through the mire, midges thick around their heads.',
       'Another stretch of bog, the reeds whispering wetly.',
-      'Mire still, every step won back from the sucking mud.'
+      'Mire still, every step won back from the sucking mud.',
+      'Mud again, up to the boot-tops.',
+      'More of the mire, the reeds leaning in to watch the party struggle.',
+      'Same black water, same stink, the party no drier for having crossed this much of it.',
+      'Tussock to tussock, with the mud waiting between for a foot to slip.',
+      'On through the fen, the midges keeping pace.',
+      'Wet ground going on, every step a small negotiation with the mud.',
+      'The marsh has not let go of the party yet, and does not seem minded to.'
     ],
     ambient: [
       'Bubbles rise and burst in the dark water.',
@@ -427,7 +483,14 @@ const TEMPLATES = {
       'Something unseen slips beneath the surface.',
       'A low mist drifts between the dead trees.',
       'A frog stops mid-croak, and the silence leans in.',
-      'Pale gas glimmers for a moment over the still water.'
+      'Pale gas glimmers for a moment over the still water.',
+      'A bittern booms somewhere in the reeds, low and far.',
+      'Rotten wood gives under a boot with a soft wet sigh.',
+      'Dragonflies hang over the black water, blue as blades.',
+      'The mud lets go of each boot with a sound like a kiss.',
+      'A heron lifts out of the reeds, slow and heavy, and flaps away low.',
+      'Leeches, or something like them, move in the shallows.',
+      'Alder roots stand clear of the water, bearded with weed.'
     ]
   },
   mountain: {
@@ -573,13 +636,27 @@ const TEMPLATES = {
       'Ancient ruins sprawl ahead, half-swallowed by creeping vine and drifted soil.',
       'Fallen archways and weathered carvings worn past reading, and the party steps among them.',
       'Roofless halls open around the party, the sky showing through where beams once ran.',
-      'Between leaning walls, every stone furred with lichen and age.'
+      'Between leaning walls, every stone furred with lichen and age.',
+      'Old stone, tumbled and grown over, and the shape of a place that was once lived in.',
+      'Walls stand to shoulder height here, to knee height there, and nowhere higher.',
+      'A broken gateway, its arch fallen, and beyond it courts and halls open to the sky.',
+      'Ruins, grey and quiet, the grass growing where the floors were.',
+      'Carved stones lie where they fell, faces worn to suggestion.',
+      'The party passes through a gap in a wall that was once a door and stands in a hall without a roof.',
+      'Whoever built here built well; even thrown down, the stones fit each other still.'
     ],
     revisit: [
       'Ruins again, silent and patient in their decay.',
       'The party picks back through the broken stones they passed before.',
       'More tumbled walls, the same heavy stillness hanging over them.',
-      'Old stones, standing as they left them, indifferent and grey.'
+      'Old stones, standing as they left them, indifferent and grey.',
+      'Back among the old stones.',
+      'The same ruins, quieter if anything than before.',
+      'Broken walls again, their shadows a little longer now.',
+      'Through the tumbled masonry once more, the party\'s footsteps loud in the empty courts.',
+      'Grey stones, grass, and the silence of a place that has finished its business.',
+      'Old walls as before, giving away nothing.',
+      'Ruins still, and the party still no wiser about who left them.'
     ],
     ambient: [
       'Wind sighs through empty window-holes.',
@@ -587,7 +664,14 @@ const TEMPLATES = {
       'Faded carvings hint at some forgotten purpose.',
       'Dust lies thick in the shadow of the old walls.',
       'A fallen keystone lies where it dropped a hundred years ago.',
-      'Ivy has pried a doorway apart, stone by patient stone.'
+      'Ivy has pried a doorway apart, stone by patient stone.',
+      'A rook watches from the stump of a tower.',
+      'Nettles grow thickest where the midden was.',
+      'Someone has had a fire here, not long ago, in the corner of a roofless room.',
+      'Water has pooled in a worn stone basin, green and still.',
+      'A stair goes up six steps and stops at nothing.',
+      'Lichen has written on the stones in rings of grey and gold.',
+      'Moss has taken the north side of every stone.'
     ]
   },
   cave: {
@@ -597,13 +681,27 @@ const TEMPLATES = {
       'A cave entrance, its throat black and silent before the party.',
       'A low, dark cavern mouth gapes in the hillside as the party draws near.',
       'Ahead the rock splits open into a black slot the daylight cannot follow.',
-      'The party halts at a cave mouth, cold and dark, that seems to swallow sound as well as light.'
+      'The party halts at a cave mouth, cold and dark, that seems to swallow sound as well as light.',
+      'A black mouth in the rock, breathing cold.',
+      'Rock closes overhead and the daylight stops a few paces in, as if it knew better.',
+      'The hillside opens into darkness, and the air that comes out is colder than the day.',
+      'An entrance low enough to stoop for, and beyond it nothing the eye can use.',
+      'Cave. Cold air, wet stone, and a dark that does not end where the light does.',
+      'A cleft in the rock, wider than a door, and silence inside it.',
+      'The party stands at the cave mouth, where the smell of wet stone and old earth comes out to meet them.'
     ],
     revisit: [
       'The cave mouth waits as before, dark and exhaling cold.',
       'Back to the black opening in the rock.',
       'Same damp breath of the cave, meeting them again.',
-      'Dark entrance gaping as it did before, patient and cold.'
+      'Dark entrance gaping as it did before, patient and cold.',
+      'The cave mouth again, dark as before.',
+      'Back to the black opening, the cold breath of it unchanged.',
+      'Same cave, same dark, same cold coming out of it.',
+      'Here is the entrance once more, and the party no keener on it than last time.',
+      'Cold air from the rock again, and the dark waiting behind it.',
+      'The hole in the hillside has not moved, and neither has the dark inside.',
+      'Wet stone and darkness as before.'
     ],
     ambient: [
       'Water drips somewhere deep in the dark.',
@@ -611,7 +709,14 @@ const TEMPLATES = {
       'The sounds of the world seem to stop at the cave mouth.',
       'Pale roots dangle over the dark entrance.',
       'An echo answers from somewhere far back in the black.',
-      'The stone underfoot is slick and cold with old damp.'
+      'The stone underfoot is slick and cold with old damp.',
+      'A bat flicks out of the dark and back into it.',
+      'Something inside shifts, a pebble, then nothing.',
+      'The air from the cave smells of iron and old wet.',
+      'Someone has scratched a mark on the rock by the entrance, long ago.',
+      'Daylight reaches in a few paces and gives up.',
+      'A draught comes out of the cave, steady, as if the hill were breathing.',
+      'Bones, small ones, lie scattered in the entrance.'
     ]
   }
 };
