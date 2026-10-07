@@ -64,6 +64,10 @@ const weightedRandom = (table) => {
 // per-journey numbers each value gives.
 export const PASS_THROUGH_ENCOUNTER_MULTIPLIER = 0.5;
 
+// World-map road tiles (hasPath) roll biome and environmental encounters at this
+// fraction of the normal chance. Stacks with the pass-through multiplier.
+export const ROAD_ENCOUNTER_MULTIPLIER = 0.5;
+
 /**
  * The chance (0..0.70) that the biome encounter roll fires on this tile. Pure: shared by
  * shouldTriggerEncounter and the journey-odds calculator (travelOdds.js).
@@ -156,6 +160,9 @@ const getPoiType = (tile) => {
   const poiTypes = ['cave', 'ruins', 'grove', 'forest', 'mountain', 'peak'];
   return poiTypes.includes(tile.poi) ? tile.poi : null;
 };
+
+/** True when the tile has its own POI encounter roll (cave, ruins, grove, forest, mountain, peak). */
+export const hasPoiEncounter = (tile) => getPoiType(tile) !== null;
 
 /**
  * Roll a random encounter for a given tile.
