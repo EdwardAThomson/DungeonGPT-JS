@@ -76,19 +76,23 @@ cf-worker/           # Cloudflare Workers backend (production)
 └── wrangler.toml    # Cloudflare Workers config
 ```
 
-The following image shows the character creator interface of DungeonGPT:
+The character creator:
 
-![Character Creation](./public/assets/screenshots/character_creator_updated.webp)
+![Character Creation](./public/assets/screenshots/character_creator.webp)
 
-The following image shows the chat interface of DungeonGPT:
+Exploring a town, with the AI narrating in the adventure log:
 
-![Chat Interface](./public/assets/screenshots/chat_interface.webp)
+![Town View](./public/assets/screenshots/town_view.webp)
 
-Setting up an adventure, a combat encounter, and the saved-games screen:
+The world map:
+
+![World Map](./public/assets/screenshots/world_map.webp)
+
+Choosing an adventure, a combat encounter, and the saved-games screen:
 
 ![Adventure Creator](./public/assets/screenshots/adventure_creator.webp)
 
-![Bandit Encounter](./public/assets/screenshots/bandit_encounter_modal.webp)
+![Encounter](./public/assets/screenshots/encounter_modal.webp)
 
 ![Saved Games](./public/assets/screenshots/saved_games.webp)
 
