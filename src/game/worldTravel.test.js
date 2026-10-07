@@ -65,6 +65,7 @@ describe('roads', () => {
     expect(isRoadTile({ hasPath: true })).toBe(true);
     expect(isRoadTile({ poi: 'village' })).toBe(true);
     expect(isRoadTile({ biome: 'plains' })).toBe(false);
+    expect(isRoadTile({ hasPath: true, poi: 'forest' })).toBe(false);
     expect(travelStepMs({ hasPath: true })).toBe(Math.round(TRAVEL_STEP_MS * ROAD_STEP_FACTOR));
     expect(travelStepMs({ biome: 'plains' })).toBe(TRAVEL_STEP_MS);
   });

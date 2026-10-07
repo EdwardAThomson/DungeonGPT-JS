@@ -161,6 +161,9 @@ const getPoiType = (tile) => {
   return poiTypes.includes(tile.poi) ? tile.poi : null;
 };
 
+/** True when the tile has its own POI encounter roll (cave, ruins, grove, forest, mountain, peak). */
+export const hasPoiEncounter = (tile) => getPoiType(tile) !== null;
+
 /**
  * Roll a random encounter for a given tile.
  * Returns an encounter template or null if 'none' is rolled.
