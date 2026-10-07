@@ -151,6 +151,14 @@ describe('getSuggestedActions', () => {
     expect(offered).toEqual([]);
   });
 
+  it('heads for a side quest site from inside the town it was taken in', () => {
+    const step = { id: 1, site: { type: 'cave' }, trigger: { defeat: 'bats' } };
+    const chips = getSuggestedActions({ mapLevel: 'town', worldMap: world(), playerPosition: { x: 7, y: 7 },
+      townMap: grid(4, 4, () => ({ type: 'grass' })), townName: 'Briarwood', townPosition: { x: 0, y: 3 },
+      sideQuests: [{ id: 'q', status: 'active', milestones: [step] }] });
+    expect(chips).toContainEqual(expect.objectContaining({ label: 'Head for the cave', kind: 'travel', target: { x: 1, y: 6 }, side: true }));
+  });
+
   it('keeps one of the three slots for a side quest when campaign steps fill them', () => {
     const many = [
       ...milestones().slice(0, 2),

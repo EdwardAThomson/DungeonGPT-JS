@@ -295,8 +295,8 @@ export const getSuggestedActions = (s = {}) => {
         if (t) travelTo(t, `Return to ${t.tile.townName}`, SIDE);
       }
     });
-    if (inTown) return;
     // Site objectives and gather steps sourced from sites: head for the nearest one.
+    // Offered from inside town too, where quests are picked up.
     // (Cave tiles are drawn as poi 'cave_entrance', not 'cave'.)
     steps.filter((st) => !st.trigger?.turnIn && ready(st)).forEach((st) => {
       const types = st.site?.type ? [st.site.type] : (st.sites || []);
