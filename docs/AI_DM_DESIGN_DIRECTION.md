@@ -1,6 +1,6 @@
 # AI DM Design Direction
 
-Status: direction note, 2026-09-30 (not yet a decision)
+Status: direction note, 2026-09-30; updated 2026-10-08 for the #84/#91 workspace (not yet a decision)
 Related: [AI_NARRATION_CONTRACT.md](AI_NARRATION_CONTRACT.md) ("engine referees, LLM
 narrates"), [TYPED_DECISION_EVAL_RESULTS.md](TYPED_DECISION_EVAL_RESULTS.md),
 [TYPED_DECISION_NEXT_STEPS.md](TYPED_DECISION_NEXT_STEPS.md),
@@ -55,16 +55,25 @@ The typed-decision pilot measured reading and deciding separately:
 
 ## Buttons and free text: one rulebook, several doors
 
-Buttons guarantee progress; free text keeps play open. The milestone system already works
-this way: the Talk button completes a talk objective, and narration can never complete one.
-The direction is to keep both routes for mechanics:
+Buttons guarantee progress; free text keeps play open. This is now largely built:
 
-- **Buttons** for every mechanical action the scene supports ("Talk to / Persuade X" when X is
-  present, "Search / Examine" for searchable things), each carrying its skill and difficulty
-  rule, as the encounter system does today. Pressing one is fully deterministic.
-- **Free text** stays. Options for what it may do, not yet decided: narration only; *suggest*
-  a button the player confirms (a misread costs one click and decides nothing); or trigger
-  the same check directly.
+- **Engine chips (#91, [SUGGESTED_ACTIONS_PLAN.md](SUGGESTED_ACTIONS_PLAN.md)):** travel, enter,
+  talk to the objective NPC, search / confront / gather on objective tiles, rest, leave,
+  explore, levelling hunts. Fixed rules over game state, no model call, never suggesting what
+  the engine would refuse. Progression no longer depends on what the player types.
+- **Encounter chips** carry their skill (the encounter's authored `suggestedActions`), so
+  checks inside encounters are already decided in code.
+- **More narration in code:** terrain lines, Look-around openers, NPC meeting beats and
+  encounter outcomes are templated, and Look around lights up from map features code
+  detects ([LOOK_AROUND_PLAN.md](LOOK_AROUND_PLAN.md)).
+
+The remaining gap (2026-10-08) is **skill checks outside encounters**: persuading an NPC,
+sneaking past a guard, searching for something that is not an objective. No chip covers them,
+so they still run through typed text and the narrator's `[CHECK:]`, the one place a model
+still rules. Two ways to close it, which combine: engine chips for the common cases
+("Persuade Warden Sigrun" when she is present), each with a code-defined check; and, for
+improvisation, matching typed text to one of the scene's actions for the player to confirm,
+with the matched action's code rule deciding the check.
 
 Whichever option wins, both routes must resolve through **one rulebook**. A button press, a
 confirmed suggestion and a typed check all become the same action object, go through the
@@ -74,6 +83,16 @@ model's only job on the typed route is to recognise which door the player walked
 
 ## Open decisions
 
-Tracked in [TYPED_DECISION_NEXT_STEPS.md](TYPED_DECISION_NEXT_STEPS.md). The main one is the
-input design above; the others (quest-item roll policy, Engine page copy, fresh held-out
-turns) follow from it.
+Tracked in [TYPED_DECISION_NEXT_STEPS.md](TYPED_DECISION_NEXT_STEPS.md). The main one is how
+skill checks outside encounters reach the engine (above); the others (Phase 2 AI chips
+mapping onto engine actions, quest-item roll policy, Engine page copy) follow from it.
+
+## Where a Jev-like model still fits
+
+The pilot asked open questions about every turn. With engine chips in place, a narrower and
+better-posed question is available: "which of this scene's actions, if any, does the
+player's text mean?", with the options supplied by the engine (its chips, candidate skill
+actions, and "none: just roleplay"). That is exactly the fixed-options shape Jev and OpenAI's
+Decisions API are built for. The model only picks a door; code decides what happens behind
+it; a confirmation click makes a misread cost one click. The chip-matching experiment in the
+checklist tests whether this needs a model at all, and how small one can be.
