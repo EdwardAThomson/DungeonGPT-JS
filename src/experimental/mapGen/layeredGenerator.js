@@ -252,7 +252,10 @@ export function generateLayeredTerrain(width, height, params = {}) {
 
     const continentOpts = {
         freq: continent.freq ?? 0.005,
-        seaLevel: continent.seaLevel ?? -0.1
+        seaLevel: continent.seaLevel ?? -0.1,
+        // How strongly the mask pushes land up and ocean down. Higher gives smoother,
+        // mask-shaped coasts; lower lets the relief noise shape them.
+        weight: continent.weight ?? 0.15
     };
 
     const warpOpts = {
@@ -281,9 +284,12 @@ export function generateLayeredTerrain(width, height, params = {}) {
             // Layer 1 + 3: Domain-warped multi-octave noise
             let elevation = domainWarpedSample(wx, wy, terrainNoise, warpNoise, terrainOpts, warpOpts);
 
-            // Layer 2: Continental mask
+            // Layer 2: Continental mask. The mask nudges the relief up on continents and
+            // down in oceans; the relief still draws the coastline. (Multiplying by the
+            // mask instead pulled masked-out ocean to mid height, where it became flat
+            // land and the Sea Level slider did nothing until it flooded the map.)
             const mask = continentalMask(wx, wy, continentNoise, continentOpts);
-            elevation *= mask;
+            elevation = (elevation + continentOpts.weight * (2 * mask - 1)) / (1 + continentOpts.weight);
 
             // Layer 4: Power redistribution
             elevation = redistribute(elevation, exponent);
@@ -339,8 +345,9 @@ export function generateLayeredTerrain(width, height, params = {}) {
 
 
     // ─── Pre-calculate Water and Port Maps ──────────────────────────────
-    const sortedForThreshold = [...heightmap].sort((a, b) => a - b);
-    const waterThreshold = sortedForThreshold[Math.floor(sortedForThreshold.length * 0.3)];
+    // Sea level is elevation 0 before redistribution, so the continental mask's
+    // seaLevel (the studio's Sea Level slider) decides how much of the map is water.
+    const waterThreshold = redistribute(0, exponent);
     const waterNorm = (waterThreshold - hMin) / hRange;
 
     // We pre-calculate these to ensure consistency and performance during pathfinding
