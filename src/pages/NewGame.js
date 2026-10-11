@@ -21,6 +21,7 @@ import { getStoryArcs, getArcSections, healTeaserChapter, TEASER_SIGN_IN_COPY } 
 import ArcDetailModal, { chapterChip } from "../components/ArcDetailModal";
 import { isOpeningAccessible } from "../game/campaignChain";
 import { resolveWaterTownAccess, waterTownWorldGenOptions } from "../game/waterTowns";
+import { normalizeWorldSeed } from "../utils/worldSeed";
 
 const logger = createLogger('new-game');
 
@@ -284,7 +285,7 @@ const NewGame = () => {
       }, {
         // Keep the manual preview map (Custom/Freeform) when one was built;
         // Ready-Made adventures generate here.
-        seed: worldSeed || null,
+        seed: normalizeWorldSeed(worldSeed),
         mapData: generatedMap || null,
       });
     } catch (err) {
@@ -1296,8 +1297,9 @@ const NewGame = () => {
                       return;
                     }
                   }
-                  const seedToUse = worldSeed || Math.floor(Math.random() * 1000000);
-                  if (!worldSeed) setWorldSeed(seedToUse);
+                  // Typed seeds are strings; normalise so the preview is not the seed-42 world.
+                  const seedToUse = normalizeWorldSeed(worldSeed) ?? Math.floor(Math.random() * 1000000);
+                  setWorldSeed(seedToUse);
                   // Same water-town shims the launch pipeline uses, so the previewed
                   // world is the world the campaign starts on ({} for free tier).
                   const newMap = generateMapData(10, 10, seedToUse, mergeLocationNames(customNames, milestones), worldTheme, waterTownWorldGenOptions(waterTownAccess));

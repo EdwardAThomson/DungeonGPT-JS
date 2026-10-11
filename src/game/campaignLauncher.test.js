@@ -148,6 +148,16 @@ describe('launchCampaign parity with the NewGame pipeline', () => {
     expect(a.settings).toEqual(b.settings);
   });
 
+  it('treats a typed (string) seed like the same number, not as seed 42', () => {
+    const template = storyTemplates.find((t) => t.id === 'heroic-fantasy-t1');
+    const typed = launchCampaign(specFromTemplate(template), { seed: String(SEED) });
+    const numeric = launchCampaign(specFromTemplate(template), { seed: SEED });
+    const fallback = launchCampaign(specFromTemplate(template), { seed: 42 });
+    expect(typed.worldSeed).toBe(SEED);
+    expect(typed.mapData).toEqual(numeric.mapData);
+    expect(typed.mapData).not.toEqual(fallback.mapData);
+  });
+
   it('mints distinct game session ids per launch', () => {
     const a = mintGameSessionId();
     const b = mintGameSessionId();
