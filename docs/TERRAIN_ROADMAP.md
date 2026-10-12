@@ -21,7 +21,7 @@ Replace the rule-based placement generator with a noise-driven heightmap that pr
 **Pipeline (5 layers):**
 
 1. **Multi-octave Simplex/Perlin noise** — terrain skeleton. Parameters: `octaves` (4–8), `persistence` (0.4–0.6), `lacunarity` (~2.0), `baseFreq` (0.005–0.02). Standard FBM accumulation, normalised to [-1, 1].
-2. **Continental mask** — a separate very-low-frequency noise field (`freq` 0.001–0.005) smoothstepped around `seaLevel`, multiplied against layer 1 to carve land vs water.
+2. **Continental mask** — a separate very-low-frequency noise field (`freq` 0.001–0.005) smoothstepped around `seaLevel` and added to layer 1 with a small weight (`(noise + weight * (2 * mask - 1)) / (1 + weight)`, `weight` 0.15), so oceans sink below sea level (elevation 0) and continents rise above it while the relief still shapes the coast. Water is everything below elevation 0, so `seaLevel` sets how much of the map is water.
 3. **Domain warping** — sample layer 1 at coordinates displaced by two decorrelated noise fields. `warpStrength` 0.5–2.0, `warpFreq` 0.005–0.015. This is the single biggest contributor to "looks natural" vs "looks like Perlin blobs".
 4. **Power redistribution** — `pow(normalised, exponent)` with exponent 1.5–2.0. Cheaply produces sharp peaks with broad valleys without paying for DLA.
 5. **Hydraulic erosion (optional)** — particle-based droplet simulation that carves river valleys and deposits sediment. 50k–200k particles, one-time post-process cost (~200ms–2s depending on grid size).

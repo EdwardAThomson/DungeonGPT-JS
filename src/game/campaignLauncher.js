@@ -25,6 +25,7 @@ import { getMilestoneLocationNames, getMilestoneNpcsForTown } from './milestoneE
 import { isPremium, isThemePremium, isTemplatePremium } from './entitlements';
 import { resolveWaterTownAccess, waterTownWorldGenOptions, stampWaterTowns } from './waterTowns';
 import { createLogger } from '../utils/logger';
+import { normalizeWorldSeed } from '../utils/worldSeed';
 
 const logger = createLogger('campaign-launcher');
 
@@ -145,7 +146,9 @@ export const launchCampaign = (spec, options = {}) => {
     const worldTheme = spec.worldTheme || 'grassland';
     const customNames = spec.customNames || { towns: [], mountains: [] };
 
-    const seedToUse = seed || Math.floor(Math.random() * 1000000);
+    // Typed seeds arrive as strings; normalise so they are not coerced to 42 by the
+    // generators (0 is a valid seed, hence ?? rather than ||).
+    const seedToUse = normalizeWorldSeed(seed) ?? Math.floor(Math.random() * 1000000);
 
     // Water towns (#65 Phase 3): the entitlement is checked exactly ONCE, here at New
     // Game. When the tier allows, the world-gen shims run (river to the sea + estuary
