@@ -26,6 +26,7 @@ const World3QTest = () => {
   const [showGrid, setShowGrid] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
   const [showPois, setShowPois] = useState(true);
+  const [waterways, setWaterways] = useState(true);
 
   const world = useMemo(() => {
     const m = generateMapData(dim, Math.round(dim * 0.7), seed, {}, theme);
@@ -89,10 +90,11 @@ const World3QTest = () => {
         <Toggle on={showGrid} set={setShowGrid}>grid</Toggle>
         <Toggle on={showLabels} set={setShowLabels}>labels</Toggle>
         <Toggle on={showPois} set={setShowPois}>sprites</Toggle>
+        <Toggle on={waterways} set={setWaterways}>new rivers/roads</Toggle>
       </div>
 
       <div className="world3q-view" style={{ overflow: 'auto', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)', display: 'inline-block', maxWidth: '100%' }}>
-        <World3QView world={world} theme={theme} tile={tile} showGrid={showGrid} showPois={showPois}>
+        <World3QView world={world} theme={theme} tile={tile} showGrid={showGrid} showPois={showPois} waterways={waterways}>
           {showLabels && <WorldMapLabels labels={labels} tile={tile} />}
           {start && <span style={{ position: 'absolute', left: start.x * tile + tile - 12, top: start.y * tile - 6, fontSize: 14 }}>⭐</span>}
         </World3QView>

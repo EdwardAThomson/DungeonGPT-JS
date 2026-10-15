@@ -10,6 +10,7 @@
 import React, { useMemo } from 'react';
 import { biomeBackground } from '../utils/worldTileArt';
 import { worldPoiParts3q } from '../utils/worldSprites3q';
+import WorldWaterwaysLayer from './WorldWaterwaysLayer';
 
 // Headroom above row 0, in tiles, so the tallest sprites on the top row are not cut off.
 export const WORLD3Q_HEADROOM = 0.8;
@@ -31,7 +32,7 @@ const Line = ({ d, stroke, edge, width }) => (
   </svg>
 );
 
-const World3QView = ({ world, theme = 'grassland', tile: T = 56, showGrid = true, showRivers = true, showPaths = true, showPois = true, children }) => {
+const World3QView = ({ world, theme = 'grassland', tile: T = 56, showGrid = true, showRivers = true, showPaths = true, showPois = true, waterways = true, children }) => {
   const rows = world.length, cols = (world[0] || []).length;
   const pad = Math.round(WORLD3Q_HEADROOM * T);
 
@@ -76,11 +77,12 @@ const World3QView = ({ world, theme = 'grassland', tile: T = 56, showGrid = true
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, ${T}px)`, gridAutoRows: `${T}px` }}>
           {world.flat().map((t) => (
             <div key={`${t.x},${t.y}`} style={{ position: 'relative', width: T + 1, height: T + 1, backgroundImage: biomeBackground(t, t.x, t.y, world), backgroundSize: 'cover' }}>
-              {showRivers && t.hasRiver && t.biome !== 'water' && <Line d={PATHS[t.riverDirection] || PATHS.NORTH_SOUTH} stroke="#4a86c8" edge="#2f5f93" width={4} />}
-              {showPaths && t.hasPath && t.biome !== 'water' && <Line d={PATHS[t.pathDirection] || PATHS.NORTH_SOUTH} stroke="#9a7448" edge="#5e4329" width={3} />}
+              {!waterways && showRivers && t.hasRiver && t.biome !== 'water' && <Line d={PATHS[t.riverDirection] || PATHS.NORTH_SOUTH} stroke="#4a86c8" edge="#2f5f93" width={4} />}
+              {!waterways && showPaths && t.hasPath && t.biome !== 'water' && <Line d={PATHS[t.pathDirection] || PATHS.NORTH_SOUTH} stroke="#9a7448" edge="#5e4329" width={3} />}
             </div>
           ))}
         </div>
+        {waterways && (showRivers || showPaths) && <WorldWaterwaysLayer map={world} theme={theme} />}
         {showGrid && (
           <div style={{
             position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1,
