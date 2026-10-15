@@ -1,9 +1,9 @@
-import React, { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import SettingsContext from '../contexts/SettingsContext';
 import { resolveProfilePicture } from '../utils/assetHelper';
 import { biomeBackground, poiSprite } from '../utils/worldTileArt';
 import WorldMapLabels from './WorldMapLabels';
-import { roadArms, roadPathD, roadBend } from '../utils/roadArms';
+import { waterwaysSvg } from '../utils/worldWaterways';
 import MapSkyOverlay from './MapSkyOverlay';
 import { worldPoiParts3q } from '../utils/worldSprites3q';
 import { WORLD3Q_HEADROOM } from './World3QView';
@@ -49,96 +49,8 @@ const beachShiftFor = (beachDirection, scale) => {
   return `translate(${r(x)}px, ${r(y)}px)`;
 };
 
-// SVG path definitions for different path/river directions (viewBox 40x40)
-const pathSVGs = {
-  NORTH_SOUTH: 'M20,0 L20,40',           // Straight vertical
-  EAST_WEST: 'M0,20 L40,20',             // Straight horizontal
-  NORTH_EAST: 'M20,0 Q20,20 40,20',      // Curved from north to east
-  NORTH_WEST: 'M20,0 Q20,20 0,20',       // Curved from north to west
-  SOUTH_EAST: 'M20,40 Q20,20 40,20',     // Curved from south to east
-  SOUTH_WEST: 'M20,40 Q20,20 0,20',      // Curved from south to west
-  INTERSECTION: 'M20,0 L20,40 M0,20 L40,20', // Cross intersection
-  // Partial paths for starts/ends (mountain sources / lake mouths)
-  START_NORTH: 'M20,20 L20,0',
-  START_SOUTH: 'M20,20 L20,40',
-  START_EAST: 'M20,20 L40,20',
-  START_WEST: 'M20,20 L0,20',
-  END_NORTH: 'M20,40 L20,20',
-  END_SOUTH: 'M20,0 L20,20',
-  END_EAST: 'M0,20 L20,20',
-  END_WEST: 'M40,20 L20,20'
-};
-
-// Helper function to render river overlay
-const renderRiverOverlay = (tile) => {
-  if (!tile.hasRiver || tile.biome === 'water') return null;
-
-  const pathD = pathSVGs[tile.riverDirection] || pathSVGs.NORTH_SOUTH;
-
-  return (
-    <svg
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-        zIndex: 1
-      }}
-      viewBox="0 0 40 40"
-    >
-      <path
-        d={pathD}
-        stroke="#4169E1" // Royal Blue for rivers
-        strokeWidth="4"   // Slightly thicker than paths
-        fill="none"
-        opacity="0.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-};
-
-// Helper function to render path overlay
-const renderPathOverlay = (tile, mapData) => {
-  // Pathfinding treats water as a very costly but not forbidden tile (a last-resort
-  // route around a lake with no other way through, see pathfinding.js), so hasPath can
-  // legitimately be true on a water tile. There's no bridge/ford art for that case, so
-  // rendering the plain road stroke straight over the water reads as a rendering defect
-  // (a road-colored line cutting across open water) rather than a road. Skip it here,
-  // same as renderRiverOverlay already does for rivers on water tiles above.
-  if (tile.biome === 'water') return null;
-  // Shape from roadArms: the union of the tile's connections, plus roads running in from
-  // neighbours through features generation skipped (heals older saves; see roadArms.js).
-  // On beaches the road bends landward instead of being translated (see roadBend).
-  const pathD = roadPathD(roadArms(mapData, tile.x, tile.y), roadBend(tile));
-  if (!pathD) return null;
-
-  return (
-    <svg
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-        zIndex: 1,
-      }}
-      viewBox="0 0 40 40"
-    >
-      <path
-        d={pathD}
-        stroke="#8B4513"
-        strokeWidth="3"
-        fill="none"
-        opacity="0.7"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-};
+// Gives each mounted map its own id for its shared rivers/roads drawing.
+let waterwaysSeq = 0;
 
 // The chosen zoom step is remembered for the browser session (module state), so the map
 // reopens at the same zoom after Game.js's close/reopen-around-encounters cycle (#25).
@@ -153,6 +65,12 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
   // per-viewer display options; classicTownArt ("Classic map art") keeps the flat POI
   // icons, otherwise POIs are 3/4 sprites that stand up over the tiles behind them
   const { showMapGrid, classicTownArt } = useContext(SettingsContext);
+  // Rivers, roads and bridges: one drawing for the whole map (worldWaterways.js), shown in
+  // each tile through a window onto it so it stays under that tile's POI sprite.
+  const waterways = useMemo(() => waterwaysSvg(mapData), [mapData]);
+  const waterwaysIdRef = useRef(null);
+  if (!waterwaysIdRef.current) waterwaysIdRef.current = `ww-map-${++waterwaysSeq}`;
+  const waterwaysId = waterwaysIdRef.current;
   const art3q = !classicTownArt;
   const mapHeight = mapData ? mapData.length : 0;
   const mapWidth = mapHeight > 0 ? mapData[0].length : 0;
@@ -461,11 +379,16 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
             tile's own box; the player marker below is deliberately larger than one tile
             (it overlaps neighbours on purpose for visibility) and must stay unclipped. */}
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-          {/* Render river overlay (below POI) */}
-          {renderRiverOverlay(tile)}
-
-          {/* Render path overlay (below POI) */}
-          {renderPathOverlay(tile, mapData)}
+          {/* This tile's part of the rivers/roads drawing (below POI) */}
+          {waterways && (
+            <svg
+              viewBox={`${tile.x} ${tile.y} 1 1`}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}
+              aria-hidden="true"
+            >
+              <use href={`#${waterwaysId}`} />
+            </svg>
+          )}
 
           {/* POI sprite overlay */}
           {poi && (
@@ -518,6 +441,11 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
         'data-tile-size': tileSize,
       } : {})}
     >
+      {waterways && (
+        <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+          <defs><g id={waterwaysId} dangerouslySetInnerHTML={{ __html: waterways }} /></defs>
+        </svg>
+      )}
       {tiles}
 
       {/* Gridlines as ONE overlay on top of the tiles, not tile borders: borders bled
