@@ -62,7 +62,7 @@ const DisplaySettings = () => {
       </label>
       <label style={{ ...labelStyle, marginTop: '8px' }}>
         <input type="checkbox" checked={classicTownArt} onChange={(e) => setClassicTownArt(e.target.checked)} />
-        Classic town art (flat tiles)
+        Classic map art (flat tiles)
       </label>
     </div>
   );
