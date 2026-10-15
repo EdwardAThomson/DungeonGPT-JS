@@ -5,6 +5,8 @@ import { biomeBackground, poiSprite } from '../utils/worldTileArt';
 import WorldMapLabels from './WorldMapLabels';
 import { roadArms, roadPathD, roadBend } from '../utils/roadArms';
 import MapSkyOverlay from './MapSkyOverlay';
+import { worldPoiParts3q } from '../utils/worldSprites3q';
+import { WORLD3Q_HEADROOM } from './World3QView';
 import {
   CLOSE_TILE,
   CLICK_DRAG_THRESHOLD,
@@ -148,7 +150,10 @@ const ZOOM_LABELS = { fit: 'Fit', medium: 'Mid', close: 'Close' };
 // tileSizeOverride (#84 workspace stage): an integer tile size chosen by the container so a
 // 10x10 world fills the stage. Whole pixels avoid the tile-edge seams a transform scale gives.
 const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visibleMilestonePois, activeMilestonePois, revealedSiteTypes, sideQuestMarkers = null, tileSizeOverride = null, suggestedTargets = null, glideMs = null }) => {
-  const { showMapGrid } = useContext(SettingsContext); // per-viewer display option
+  // per-viewer display options; classicTownArt ("Classic map art") keeps the flat POI
+  // icons, otherwise POIs are 3/4 sprites that stand up over the tiles behind them
+  const { showMapGrid, classicTownArt } = useContext(SettingsContext);
+  const art3q = !classicTownArt;
   const mapHeight = mapData ? mapData.length : 0;
   const mapWidth = mapHeight > 0 ? mapData[0].length : 0;
 
@@ -302,7 +307,13 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
     // In the pane, `auto` margins center the grid when it is smaller than the pane (fit
     // step) without clipping when it overflows; standalone keeps the legacy centering.
     margin: viewportActive ? 'auto' : '20px auto',
+    // 3/4 art: room above row 0 for the sprites that rise over it
+    ...(art3q ? { marginTop: Math.round(WORLD3Q_HEADROOM * tileSize) + (viewportActive ? 0 : 20) } : {}),
   };
+  // 3/4 sprites for the rendered tiles, collected by renderTile and drawn as one layer
+  const sprites3q = [];
+  // the party marker rides its own layer (over the sprites) when gliding or in 3/4 art
+  const markerLayer = !!glideMs || art3q;
 
   // Place names for the scroll-label overlay: towns, named mountains (first in range),
   // and visible milestone POIs.
@@ -365,7 +376,28 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
       : 'none';
 
     // POI sprite overlay (town/forest/mountain/hills/cave_entrance/ruins/milestone)
-    const poi = (isMilestoneHidden || isSiteHidden) ? null : poiSprite(tile);
+    const poiHidden = isMilestoneHidden || isSiteHidden;
+    const poi = (poiHidden || art3q) ? null : poiSprite(tile);
+    if (art3q && !poiHidden) {
+      worldPoiParts3q(tile).forEach((p, i) => {
+        const key = `${tile.x},${tile.y},${i}`;
+        if (p.flat) {
+          sprites3q.push({ key, z: Math.round((tile.y + 0.99) * 100), transform: beachShift, style: { left: tile.x * tileSize, top: tile.y * tileSize, width: tileSize, height: tileSize, backgroundImage: p.bg, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' } });
+          return;
+        }
+        const k = (tileSize / 40) * p.s;
+        const cw = p.cw || 60, ch = p.ch || 100, ox = p.ox || 30, oy = p.oy || 92;
+        sprites3q.push({
+          key,
+          z: Math.round((tile.y + p.ay) * 100),
+          transform: beachShift,
+          style: {
+            left: Math.round((tile.x + p.ax) * tileSize - ox * k), top: Math.round((tile.y + p.ay) * tileSize - oy * k),
+            width: Math.round(cw * k), height: Math.round(ch * k), backgroundImage: p.bg, backgroundSize: '100% 100%',
+          },
+        });
+      });
+    }
 
     // An ACTIVE milestone POI (revealed but not yet completed) gets a warm glowing
     // border for findability, mirroring the town quest-building glow. Completed
@@ -456,7 +488,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
         {isSuggestedTarget && <div className="ws-suggest-ring" aria-hidden="true" />}
 
         {/* Display player marker when on this tile */}
-        {isPlayerHere && !glideMs && renderMarker(beachShift)}
+        {isPlayerHere && !markerLayer && renderMarker(beachShift)}
       </div>
     );
   };
@@ -498,7 +530,15 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
         />
       )}
 
-      {glideMs && playerPosition && (() => {
+      {art3q && (
+        <div className="world-map-sprites3q" aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'none' }}>
+          {sprites3q.map((sp) => (
+            <div key={sp.key} style={{ position: 'absolute', zIndex: sp.z, transform: sp.transform === 'none' ? undefined : sp.transform, ...sp.style }} />
+          ))}
+        </div>
+      )}
+
+      {markerLayer && playerPosition && (() => {
         const t = mapData[playerPosition.y]?.[playerPosition.x];
         const shift = (t && t.biome === 'beach' && t.beachDirection !== undefined) ? beachShiftFor(t.beachDirection, scale) : 'none';
         return (
@@ -508,7 +548,7 @@ const WorldMapDisplay = ({ mapData, playerPosition, onTileClick, firstHero, visi
             style={{
               position: 'absolute', left: 0, top: 0, width: tileSize, height: tileSize, zIndex: 16, pointerEvents: 'none',
               transform: `translate(${playerPosition.x * tileSize}px, ${playerPosition.y * tileSize}px)`,
-              transition: `transform ${glideMs}ms linear`,
+              transition: glideMs ? `transform ${glideMs}ms linear` : undefined,
             }}
           >
             {renderMarker(shift)}

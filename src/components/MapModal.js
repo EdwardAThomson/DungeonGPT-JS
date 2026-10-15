@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
+import SettingsContext from '../contexts/SettingsContext';
+import { WORLD3Q_HEADROOM } from './World3QView';
 import { createPortal } from 'react-dom';
 import FitToBox from './FitToBox';
 import FocusTrap from 'focus-trap-react';
@@ -14,7 +16,9 @@ const FitWorld = ({ mapData, render }) => {
     const ref = useRef(null);
     const [tile, setTile] = useState(56);
     const cols = mapData?.[0]?.length || 10;
-    const rows = mapData?.length || 10;
+    const { classicTownArt } = useContext(SettingsContext);
+    // 3/4 art reserves headroom above the top row for the sprites that rise over it
+    const rows = (mapData?.length || 10) + (classicTownArt ? 0 : WORLD3Q_HEADROOM);
     useEffect(() => {
         const el = ref.current;
         if (!el) return undefined;

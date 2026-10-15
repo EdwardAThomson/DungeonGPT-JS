@@ -158,12 +158,23 @@ const Town3QView = ({ town, theme = 'grassland', tile: T, roster = [], npcCount 
       return seen;
     };
     return {
-      town: fill((t) => t.type === 'wall' || t.isGate),
+      // water and bridges block too: a river running through the wall would otherwise
+      // let the fill leak inside, and every inner face would get slits
+      town: fill((t) => t.type === 'wall' || t.isGate || t.type === 'water' || t.type === 'bridge'),
       keep: fill((t) => t.type === 'keep_wall'),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [town]);
-  const facesOut = (x, y, keep) => y + 1 >= H || (keep ? outside.keep : outside.town).has(`${x},${y + 1}`);
+  // Backstop for any other gap in a ring: a face with more of the same wall further south
+  // in its column looks into the enclosure.
+  const wallBelow = (x, y, keep) => {
+    for (let yy = y + 2; yy < H; yy++) {
+      const t = at(x, yy);
+      if (keep ? t?.type === 'keep_wall' : (t?.type === 'wall' || t?.isGate)) return true;
+    }
+    return false;
+  };
+  const facesOut = (x, y, keep) => y + 1 >= H || ((keep ? outside.keep : outside.town).has(`${x},${y + 1}`) && !wallBelow(x, y, keep));
 
   // Static sprite list (buildings, walls, decorations), y-sorted via zIndex.
   const sprites = useMemo(() => {

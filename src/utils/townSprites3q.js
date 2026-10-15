@@ -1475,3 +1475,7 @@ export const jettySprite3q = (waterEnd = 'n', x = 0, y = 0) => {
 };
 
 export const BUILDING_TYPES_3Q = Object.keys(SPEC);
+
+// Shared 3/4 drawing kit (camera, solids, lighting, palette) for the world-map sprites
+// (worldSprites3q.js), so both maps share one light direction and palette.
+export const kit3q = { makeCam, solid, box, gableX, pyramid, cone, cylinder, castShadow, wrap, shade, mixHex, rng, seedOf, fmt, ptsStr, P };

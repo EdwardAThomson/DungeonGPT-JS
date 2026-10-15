@@ -3211,7 +3211,7 @@ export const getTownTileEmoji = (tile) => {
       tree: '🌳',
       bush: '🌿',
       flowers: '🌸',
-      cactus: '🌵',     // desert
+      cactus: '🌴',     // desert (saved key; drawn as a date palm)
       rock: '🪨',       // desert / snow
       dead_bush: '🥀',  // desert
       pine: '🌲',       // snow

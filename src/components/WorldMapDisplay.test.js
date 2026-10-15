@@ -40,7 +40,8 @@ describe('ship-dark: 10x10 renders exactly like today', () => {
     expect(grid.style.gridTemplateColumns).toBe('repeat(10, 56px)');
     expect(grid.style.gridTemplateRows).toBe('repeat(10, 56px)');
     expect(grid.style.width).toBe('560px');
-    expect(grid.style.margin).toBe('20px auto');
+    // default 3/4 art adds headroom above row 0 for the upright sprites (0.8 tiles)
+    expect(grid.style.margin).toBe('65px auto 20px auto');
   });
 
   test('no viewport pane, no zoom UI, no viewport data attributes', () => {

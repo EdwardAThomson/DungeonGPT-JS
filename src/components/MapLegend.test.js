@@ -54,7 +54,7 @@ describe('MapLegend', () => {
     expect(labels(townLegendGroups())).toEqual(expect.arrayContaining(['Grass', 'Tree', 'Flowers']));
     // desert swaps ground + natural cover and re-tints the building swatches
     const desert = townLegendGroups('desert');
-    expect(labels(desert)).toEqual(expect.arrayContaining(['Sand', 'Cactus', 'Rocks']));
+    expect(labels(desert)).toEqual(expect.arrayContaining(['Sand', 'Palm', 'Rocks']));
     expect(labels(desert)).not.toContain('Grass');
     // snow does the same with its own set
     expect(labels(townLegendGroups('snow'))).toEqual(expect.arrayContaining(['Snow', 'Pine', 'Snowdrift']));

@@ -8,6 +8,7 @@ import WorldMapTest from './WorldMapTest';
 import TilesetTest from './TilesetTest';
 import Town3QTest from './Town3QTest';
 import WorldMapArtTest from './WorldMapArtTest';
+import World3QTest from './World3QTest';
 import WorldFixedMapTest from './WorldFixedMapTest';
 import LargeWorldTest from './LargeWorldTest';
 import LargeWorldViewportTest from './LargeWorldViewportTest';
@@ -59,6 +60,7 @@ const debugSections = [
       { to: 'tileset', label: 'Tileset Preview (SVG)' },
       { to: 'town-3q', label: 'Town 3/4 View (prototype)' },
       { to: 'world-map-art', label: 'World Map Art (SVG)' },
+      { to: 'world-3q', label: 'World 3/4 View (prototype)' },
       { to: 'world-fixed', label: 'World Fixed Map (render test)' },
       { to: 'large-world', label: 'Large World (chunk assembly)' },
       { to: 'large-world-viewport', label: 'Large World Viewport (scroll+zoom)' },
@@ -261,6 +263,7 @@ const DebugRoutes = () => {
           <Route path="tileset" element={<TilesetTest />} />
           <Route path="town-3q" element={<Town3QTest />} />
           <Route path="world-map-art" element={<WorldMapArtTest />} />
+          <Route path="world-3q" element={<World3QTest />} />
           <Route path="world-fixed" element={<WorldFixedMapTest />} />
           <Route path="large-world" element={<LargeWorldTest />} />
           <Route path="large-world-viewport" element={<LargeWorldViewportTest />} />

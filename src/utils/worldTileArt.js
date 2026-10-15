@@ -7,9 +7,9 @@
 // drawn on a transparent canvas so the biome shows through around them.
 
 const C = {
-  plains: '#7fb86a', plainsDark: '#5f9a4c', plainsLight: '#9bcf82',
+  plains: '#7bae5e', plainsDark: '#5b8c44', plainsLight: '#98c579',
   water: '#3f7cc2', waterLight: '#5a93d6', foam: '#bcd8f5',
-  sand: '#dccfac', sandDark: '#c5b78f',
+  sand: '#e4cf9f', sandDark: '#c9b17d', sandWet: '#c7ad7a',
   rock: '#8a8278', rockDark: '#6f685f', snow: '#f2f2f2',
   trunk: '#6b4a2b', leafLo: '#2f7d3f', leafHi: '#3a924c',
   desert: '#e0c178', desertDark: '#cda85f',
@@ -188,8 +188,8 @@ const landBiomeNear = (grid, x, y) => {
 // the wrong way", a separate earlier bug). Nearest beach N/S -> the shared edge there is
 // horizontal (coast runs horizontal -> 'h' ripples, sign toward whichever of N/S is
 // closer); nearest beach E/W -> a vertical coast -> 'v' (sign toward whichever of E/W is
-// closer); roughly equidistant on both axes -> a diagonal cove, split the difference with
-// 'd' (sign toward whichever single direction is closest overall). No grid context / no
+// closer); shore directly on two adjacent sides -> a diagonal cove, split the difference
+// with 'd' or 'a' depending on which corner is land (sign toward the land). No grid context / no
 // beach anywhere keeps the previous default ('h', sign 1).
 const coastFlowNear = (grid, x, y) => {
   if (!grid) return { axis: 'h', sign: 1 };
@@ -207,13 +207,21 @@ const coastFlowNear = (grid, x, y) => {
   const vDist = Math.min(distN, distS); // beach N/S -> horizontal coast
   const hDist = Math.min(distE, distW); // beach E/W -> vertical coast
   if (vDist === Infinity && hDist === Infinity) return { axis: 'h', sign: 1 };
-  if (Math.abs(vDist - hDist) <= 1) {
-    const best = Math.min(distN, distS, distE, distW);
-    // south/east -> positive (+y/+x, matching beachRipples' dir0/dir3 sign); north/west -> negative
-    const sign = (best === distS || best === distE) ? 1 : -1;
-    return { axis: 'd', sign };
+  // Diagonal only on a true corner (shore on two adjacent sides). A near-tie further out
+  // (e.g. the middle of a lake) used to go diagonal too, leaving open water full of 45°
+  // ripples parallel to no shore; those now follow the nearer coast, ties -> horizontal.
+  if (vDist === 1 && hDist === 1) {
+    // A straight channel (shore on both opposite sides) keeps straight ripples.
+    if (distN === 1 && distS === 1) return { axis: 'h', sign: 1 };
+    if (distE === 1 && distW === 1) return { axis: 'v', sign: 1 };
+    // Corner: the coast runs across the land corner, so land NE/SW -> '\' ('d', rotate 45)
+    // and land NW/SE -> '/' ('a', rotate -45). Previously every corner got rotate 45, so
+    // half of all coves had ripples perpendicular to the shore. sign: toward the land
+    // (inside the rotated group local +y points SW for 'd', SE for 'a').
+    const north = distN === 1, east = distE === 1;
+    return { axis: north === east ? 'd' : 'a', sign: north ? -1 : 1 };
   }
-  if (vDist < hDist) return { axis: 'h', sign: distS <= distN ? 1 : -1 };
+  if (vDist <= hDist) return { axis: 'h', sign: distS <= distN ? 1 : -1 };
   return { axis: 'v', sign: distE <= distW ? 1 : -1 };
 };
 
@@ -222,28 +230,50 @@ const coastFlowNear = (grid, x, y) => {
 const sandNoise = (seed, bounds = [0, 40, 0, 40]) => {
   const r = rng(seed + 9);
   const [minX, maxX, minY, maxY] = bounds;
+  const at = () => [(minX + r() * (maxX - minX)).toFixed(1), (minY + r() * (maxY - minY)).toFixed(1)];
   let s = '';
-  for (let i = 0; i < 16; i++) {
-    const x = (minX + r() * (maxX - minX)).toFixed(1), y = (minY + r() * (maxY - minY)).toFixed(1);
-    const c = r() > 0.5 ? C.sandDark : shade(C.sand, 1.08);
-    s += `<circle cx='${x}' cy='${y}' r='${(r() * 0.9 + 0.4).toFixed(1)}' fill='${c}' opacity='0.7'/>`;
+  for (let i = 0; i < 14; i++) {
+    const [x, y] = at();
+    s += `<circle cx='${x}' cy='${y}' r='${(r() * 0.5 + 0.3).toFixed(1)}' fill='${r() > 0.45 ? C.sandDark : shade(C.sand, 1.06)}' opacity='0.75'/>`;
+  }
+  // a pebble and a pale shell or two
+  const [px, py] = at();
+  s += `<ellipse cx='${px}' cy='${py}' rx='1.1' ry='0.7' fill='#a39478'/>`;
+  for (let i = 0; i < 1 + Math.floor(r() * 2); i++) {
+    const [sx, sy] = at();
+    s += `<path d='M${sx} ${sy} q0.7 -1.3 1.4 0 z' fill='#f4ece0' stroke='#cdbf9f' stroke-width='0.3'/>`;
   }
   return s;
 };
 
 // --- biomes ------------------------------------------------------------------
+// Grass: faint tonal mottling (small radial fades, so nothing hard meets the tile edge),
+// clumps of three-blade tufts with the odd sunlit blade, and an occasional flower
+// cluster or stone. Muted toward the 3/4 town greens.
 const plains = (seed) => {
   const r = rng(seed + 1);
-  let m = '';
-  for (let i = 0; i < 8; i++) {
-    const x = Math.floor(r() * 34) + 3;
-    const y = Math.floor(r() * 32) + 5;
-    const c = r() > 0.5 ? C.plainsDark : C.plainsLight;
-    m += `<path d='M${x} ${y} q1.4 -3.4 2.8 0' stroke='${c}' stroke-width='1.2' fill='none' stroke-linecap='round'/>`;
+  // tonal mottling: loose clusters of small, flat, faint smudges rather than one big
+  // round patch, so the ground reads as varied turf and not as a bulge in it
+  let m = `<defs><radialGradient id='pa'><stop offset='0' stop-color='${C.plainsLight}' stop-opacity='0.35'/><stop offset='1' stop-color='${C.plainsLight}' stop-opacity='0'/></radialGradient>` +
+    `<radialGradient id='pb'><stop offset='0' stop-color='${C.plainsDark}' stop-opacity='0.22'/><stop offset='1' stop-color='${C.plainsDark}' stop-opacity='0'/></radialGradient></defs>`;
+  for (const g of ['pa', 'pb']) {
+    const cx = 8 + r() * 24, cy = 8 + r() * 24;
+    for (let i = 0; i < 3; i++) {
+      const x = cx + (r() - 0.5) * 14, y = cy + (r() - 0.5) * 7;
+      m += `<ellipse cx='${x.toFixed(1)}' cy='${y.toFixed(1)}' rx='${(3 + r() * 3).toFixed(1)}' ry='${(1.2 + r() * 1.2).toFixed(1)}' fill='url(#${g})'/>`;
+    }
+  }
+  const n = 6 + Math.floor(r() * 3);
+  for (let i = 0; i < n; i++) {
+    const x = (3 + r() * 34).toFixed(1);
+    const y = (6 + r() * 31).toFixed(1);
+    const tip = r() > 0.6 ? C.plainsLight : C.plainsDark;
+    m += `<path d='M${x} ${y} q-0.5 -1.6 -1.8 -2.4 M${x} ${y} q0.1 -1.9 0.5 -3 M${x} ${y} q0.7 -1.4 2 -2' stroke='${C.plainsDark}' stroke-width='0.7' stroke-linecap='round' fill='none'/>` +
+      `<path d='M${x} ${y} q0.1 -1.9 0.5 -3' stroke='${tip}' stroke-width='0.55' stroke-linecap='round' fill='none'/>`;
   }
   // occasional scatter (flowers / a rock) so open plains feel less bare
   const dx = Math.floor(r() * 24) + 8, dy = Math.floor(r() * 24) + 8;
-  if (r() > 0.6) {
+  if (r() > 0.7) {
     // a small cluster of detailed flowers: four petals around a golden centre
     const pc = ['#e8d24a', '#d96a8f', '#e6843a', '#b884d6', '#e8e8ee'][Math.floor(r() * 5)];
     const flower = (cx, cy) =>
@@ -261,7 +291,7 @@ const plains = (seed) => {
 };
 
 // axis: 'h' (default, ripples running horizontal), 'v' (rotated 90 for a coast running
-// N-S), or 'd' (a cove with coast on two adjacent sides -> ripples rotated 45).
+// N-S), or 'd' / 'a' (a cove with coast on two adjacent sides -> ripples rotated 45 / -45).
 // Each ripple line gets a one-directional `flow`: the wave's own bulge already runs
 // perpendicular to the line's travel direction (y for a horizontal line, x for a
 // vertical one), so translating + fading along that same axis reads as the crest
@@ -297,6 +327,7 @@ const water = (seed, axis = 'h', sign = 1, isInlandLake = false) => {
       : `<path d='M0 ${o} q10 -3.5 20 0 t20 0' stroke='${C.waterLight}' stroke-width='1.6' fill='none'>${anim}</path>`;
   }
   if (axis === 'd') w = `<g transform='rotate(45 20 20)'>${w}</g>`;
+  else if (axis === 'a') w = `<g transform='rotate(-45 20 20)'>${w}</g>`;
   let pad = '';
   if (isInlandLake && r() > 0.75) {
     const px = (8 + r() * 24).toFixed(1), py = (8 + r() * 24).toFixed(1);
@@ -544,6 +575,7 @@ const beach = (dir, landBiome, isLakeShore = false, posSeed = 0) => {
       `<clipPath id='${edgeClipId}'><rect x='1.5' y='1.5' width='37' height='37'/></clipPath>` +
       `</defs>` +
       sandLayer +
+      `<path d='${corner.curve}' stroke='${C.sandWet}' stroke-width='5' fill='none'/>` +
       `<path d='${corner.fill}' fill='${C.water}'/>` +
       `<g clip-path='url(#${edgeClipId})'>` +
       ripple +
@@ -552,7 +584,7 @@ const beach = (dir, landBiome, isLakeShore = false, posSeed = 0) => {
     );
   }
   const B = SAND_BAND;
-  const edgeTone = shade(C.sand, 0.85);
+  const edgeTone = shade(ground, 0.8); // the grass (or other land) edge casts a soft line on the sand
   let sandRect = '', waterRect = '', shore = '', landEdge = '', noise = '', ripple = '', reeds = '';
   if (dir === 0) {
     sandRect = `<rect x='0' y='20' width='40' height='${B}' fill='${C.sand}'/>`;
@@ -587,19 +619,29 @@ const beach = (dir, landBiome, isLakeShore = false, posSeed = 0) => {
     noise = sandNoise(dir, [20, 20 + B, 0, 40]);
     if (isLakeShore) reeds = lakeReeds(posSeed, [20, 20 + B, 0, 40]);
   }
-  return wrap(`${base}${sandRect}${noise}${waterRect}${ripple}${reeds}${shore}${landEdge}`);
+  // wet sand: the shore wave drawn wide in a darker sand tone, half hidden by the water
+  const wet = shore.replace(`stroke='${C.foam}' stroke-width='2' fill='none' opacity='0.7'`, `stroke='${C.sandWet}' stroke-width='5' fill='none'`);
+  return wrap(`${base}${sandRect}${noise}${wet}${waterRect}${ripple}${reeds}${shore}${landEdge}`);
 };
 
+// Sand: short scattered dune crests (a lit ridge over a soft shadow) and fine grit,
+// rather than tile-wide stripes, which repeated row after row and read as water.
 const desert = (seed) => {
   const r = rng(seed + 11);
   let d = '';
-  for (let i = 0; i < 3; i++) {
-    const y = 11 + i * 10 + Math.floor(r() * 3);
-    d += `<path d='M0 ${y} q12 -5 20 0 t20 0' stroke='${C.desertDark}' stroke-width='2' fill='none' opacity='0.55'/>`;
+  const n = 2 + Math.floor(r() * 2);
+  for (let i = 0; i < n; i++) {
+    const x = 4 + r() * 24, y = 8 + i * (28 / n) + r() * 6, w = 9 + r() * 7, b = 2 + r() * 1.5;
+    d += `<path d='M${x.toFixed(1)} ${y.toFixed(1)} q${(w / 2).toFixed(1)} ${(-b).toFixed(1)} ${w.toFixed(1)} 0 q${(-w / 2).toFixed(1)} ${(b * 0.9).toFixed(1)} ${(-w).toFixed(1)} 0z' fill='${C.desertDark}' opacity='0.45'/>` +
+      `<path d='M${x.toFixed(1)} ${y.toFixed(1)} q${(w / 2).toFixed(1)} ${(-b).toFixed(1)} ${w.toFixed(1)} 0' stroke='#efd79a' stroke-width='0.9' fill='none' stroke-linecap='round'/>`;
   }
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 12; i++) {
     const x = (r() * 40).toFixed(1), y = (r() * 40).toFixed(1);
-    d += `<circle cx='${x}' cy='${y}' r='${(r() * 0.8 + 0.4).toFixed(1)}' fill='${C.desertDark}' opacity='0.4'/>`;
+    d += `<circle cx='${x}' cy='${y}' r='${(r() * 0.5 + 0.3).toFixed(1)}' fill='${r() > 0.5 ? C.desertDark : '#b8924e'}' opacity='0.5'/>`;
+  }
+  if (r() > 0.6) {
+    const x = (6 + r() * 28).toFixed(1), y = (6 + r() * 28).toFixed(1);
+    d += `<ellipse cx='${x}' cy='${y}' rx='1.6' ry='1' fill='#a8916a'/><ellipse cx='${x}' cy='${(+y - 0.4).toFixed(1)}' rx='1.5' ry='0.6' fill='#bfa97f'/>`;
   }
   return wrap(`<rect width='40' height='40' fill='${C.desert}'/>${d}`);
 };
@@ -839,7 +881,7 @@ const HILL_VARIANTS = [
 const hills = (v = 0) => wrap(HILL_VARIANTS[v % HILL_VARIANTS.length]);
 
 // --- theme-aware POI variants -------------------------------------------------
-// poiSprite picks these by tile.biome: desert → sand dunes + cacti, snow → snow-capped
+// poiSprite picks these by tile.biome: desert → sand dunes + date palms, snow → snow-capped
 // hills + snow-laden pines. (Temperate keeps the green forest/hills above.)
 const shadedHump = (cx, by, rx, ry, pal) => domeFill(cx, by, rx, ry, pal);
 const hillVariantsFor = (pal) => [
@@ -875,19 +917,47 @@ const snowForest = (v = 0, x = 0) => {
   return wrap(s);
 };
 
-// desert saguaro cactus
-const cactus = (cx, by, h) =>
-  `<rect x='${(cx - 1.7).toFixed(1)}' y='${(by - h).toFixed(1)}' width='3.4' height='${h.toFixed(1)}' rx='1.7' fill='#4e8b4a' stroke='${EDGE}' stroke-width='0.8'/>` +
-  `<rect x='${(cx - 1.7).toFixed(1)}' y='${(by - h).toFixed(1)}' width='1.3' height='${h.toFixed(1)}' rx='0.6' fill='#5fa05a'/>` +
-  `<path d='M${(cx - 1.7).toFixed(1)} ${(by - h * 0.55).toFixed(1)} h-3 v-${(h * 0.32).toFixed(1)}' stroke='#4e8b4a' stroke-width='2.8' fill='none' stroke-linecap='round'/>` +
-  `<path d='M${(cx + 1.7).toFixed(1)} ${(by - h * 0.42).toFixed(1)} h3 v-${(h * 0.26).toFixed(1)}' stroke='#4e8b4a' stroke-width='2.8' fill='none' stroke-linecap='round'/>`;
+// Desert cover: date palms and dry scrub. Old World plants only (the setting draws on
+// al-Andalus / North Africa / the Levant for its deserts), so no saguaros.
+// date palm: a gently leaning ringed trunk, a crown of drooping fronds, a date cluster.
+const datePalm = (cx, by, h, lean) => {
+  const tx = cx + lean, ty = by - h;
+  let s = `<path d='M${cx} ${by} Q${(cx + lean * 0.2).toFixed(1)} ${(by - h * 0.55).toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)}' stroke='${EDGE}' stroke-width='3.4' fill='none' stroke-linecap='round'/>` +
+    `<path d='M${cx} ${by} Q${(cx + lean * 0.2).toFixed(1)} ${(by - h * 0.55).toFixed(1)} ${tx.toFixed(1)} ${ty.toFixed(1)}' stroke='#8a6a42' stroke-width='2.2' fill='none' stroke-linecap='round'/>`;
+  for (let k = 1; k < 4; k++) { // trunk rings
+    const t = k / 4, px = cx + (lean * 0.2) * 2 * t * (1 - t) + lean * t * t, py = by - h * (1.1 * t - 0.1 * t * t);
+    s += `<path d='M${(px - 1.1).toFixed(1)} ${py.toFixed(1)} h2.2' stroke='#6b4f30' stroke-width='0.6'/>`;
+  }
+  const fronds = [[-8, 3], [-6, -1.5], [-2.5, -4], [2.5, -4], [6, -1.5], [8, 3]];
+  for (const [dx, dy] of fronds) {
+    const ex = tx + dx, ey = ty + dy + 3, mx = tx + dx * 0.55, my = ty + dy - 1.5;
+    s += `<path d='M${tx.toFixed(1)} ${ty.toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}' stroke='${EDGE}' stroke-width='2.6' fill='none' stroke-linecap='round'/>` +
+      `<path d='M${tx.toFixed(1)} ${ty.toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}' stroke='${dy < 0 ? '#5f9a3e' : '#4a7f33'}' stroke-width='1.6' fill='none' stroke-linecap='round'/>`;
+  }
+  s += `<circle cx='${(tx - 0.8).toFixed(1)}' cy='${(ty + 1.6).toFixed(1)}' r='1' fill='#b5762d'/><circle cx='${(tx + 0.9).toFixed(1)}' cy='${(ty + 1.8).toFixed(1)}' r='0.9' fill='#9c5a24'/>`;
+  return s;
+};
+// low dry scrub bush (olive-grey)
+const scrub = (cx, by, w) =>
+  `<ellipse cx='${cx}' cy='${(by - w * 0.35).toFixed(1)}' rx='${w.toFixed(1)}' ry='${(w * 0.55).toFixed(1)}' fill='#8a8a55' stroke='${EDGE}' stroke-width='0.6'/>` +
+  `<ellipse cx='${(cx - w * 0.3).toFixed(1)}' cy='${(by - w * 0.5).toFixed(1)}' rx='${(w * 0.5).toFixed(1)}' ry='${(w * 0.3).toFixed(1)}' fill='#a3a26a'/>`;
+// A small grove: 2-4 palms with scrub at their feet, drawn back-to-front.
 const desertForest = (v = 0) => {
   const r = rng(v + 22);
-  const slots = [[13, 31], [26, 32], [20, 29], [9, 30], [32, 30], [16, 25], [24, 25]];
-  const n = 3 + Math.floor(r() * 5);
-  let s = '';
-  for (let i = 0; i < n; i++) { const [bx, by] = slots[i]; s += cactus(bx + (Math.floor(r() * 4) - 2), by, 12 + Math.floor(r() * 6)); }
-  return wrap(s);
+  const slots = [[14, 27], [27, 28], [20, 33], [9, 33], [32, 34]];
+  const n = 2 + Math.floor(r() * 3);
+  const items = [];
+  for (let i = 0; i < n; i++) {
+    const [bx, by] = slots[i];
+    items.push([by, datePalm(bx + (Math.floor(r() * 3) - 1), by, 13 + Math.floor(r() * 5), (r() - 0.5) * 5)]);
+  }
+  const nScrub = 1 + Math.floor(r() * 3);
+  for (let i = 0; i < nScrub; i++) {
+    const sx = 6 + Math.floor(r() * 28), sy = 30 + Math.floor(r() * 7);
+    items.push([sy, scrub(sx, sy, 2.2 + r() * 1.3)]);
+  }
+  items.sort((a, b) => a[0] - b[0]);
+  return wrap(items.map((it) => it[1]).join(''));
 };
 
 // a craggy rock outcrop with a dark cave mouth (inner depth) and a couple of boulders
@@ -1311,8 +1381,7 @@ export function poiSprite(tile) {
       // see `windBegin` above for why that distinction matters.
       key = `forest-b|${dir}|${v}|${tx}`; build = () => beachForest(v, dir, tx);
     }
-    // desertForest (cacti) intentionally excluded from the wind-sway threading below —
-    // rigid succulents, not swaying trees — so its key/call stay hash-only.
+    // desertForest (palm grove) is not wind-sway threaded, so its key/call stay hash-only.
     else if (tile.biome === 'desert') { key = `forest-d|${v}`; build = () => desertForest(v); }
     else if (tile.biome === 'snow') { key = `forest-s|${v}|${tx}`; build = () => snowForest(v, tx); }
     else { key = `forest|${v}|${tx}`; build = () => forest(v, tx); }

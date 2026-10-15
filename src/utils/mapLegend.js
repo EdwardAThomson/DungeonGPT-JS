@@ -69,7 +69,7 @@ export function townLegendGroups(theme = 'grassland') {
     : t === 'snow' ? tile(townSamples.snow(), 'Snow')
     : tile(townSamples.grass(), 'Grass');
   const cover = t === 'desert'
-    ? [mark(POI_EMOJI.cactus, 'Cactus'), mark(POI_EMOJI.rock, 'Rocks')]
+    ? [mark(POI_EMOJI.cactus, 'Palm'), mark(POI_EMOJI.rock, 'Rocks')]
     : t === 'snow'
       ? [mark(POI_EMOJI.pine, 'Pine'), mark(POI_EMOJI.snowdrift, 'Snowdrift')]
       : [mark(POI_EMOJI.tree, 'Tree'), mark(POI_EMOJI.flowers, 'Flowers')];

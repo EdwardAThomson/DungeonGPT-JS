@@ -1069,7 +1069,7 @@ export function tileBackground(tile, neighbours = {}, x = 0, y = 0, theme = 'gra
 export const POI_EMOJI = {
   fountain: '⛲', well: '🪣',
   tree: '🌳', bush: '🌿', flowers: '🌸',      // grassland
-  cactus: '🌵', rock: '🪨', dead_bush: '🥀',  // desert
+  cactus: '🌴', rock: '🪨', dead_bush: '🥀',  // desert ('cactus' is the saved key; shown as a palm)
   pine: '🌲', snowdrift: '⛄',                // snow (rock shared with desert)
 };
 
