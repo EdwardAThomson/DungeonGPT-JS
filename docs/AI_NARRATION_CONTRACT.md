@@ -78,7 +78,11 @@ every playthrough) survives at every rung:
 ## Current behavior → target behavior
 
 Today's prompt contract is `DM_PROTOCOL` in `src/data/prompts.js`, prepended to every AI
-prompt by `generateResponse()` (`useGameInteraction.js`). What changes:
+prompt by `generateResponse()` (`useGameInteraction.js`). (Since 2026-10-06 `llmService.js`
+splits that prefix off again on the `cf-workers` path and sends it as the `systemPrompt`
+rather than the opening of the user turn, because some models treated it as text to continue
+and narrated the rules back; output that still echoes the protocol is rejected by the
+response guard on both sides, see `CF_WORKER_GUIDE.md`.) What changes:
 
 | Surface | Today | Target (renderer contract) |
 |---|---|---|

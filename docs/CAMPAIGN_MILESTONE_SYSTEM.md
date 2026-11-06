@@ -550,7 +550,7 @@ Campaigns that bypass the structured milestone system entirely. Pure AI-narrated
 - [ ] ~~Custom tab: milestone editor with registry-backed entity pickers~~ (deferred to Phase 3+)
 
 ### Phase 3: Custom Campaign Builder & Registries
-- [x] Extract quest enemies into shared data file (`questEnemies.js`) — 35 bosses, 4 themes × 2 tiers, `getEnemiesByTierAndTheme()` helper
+- [x] Extract quest enemies into shared data file (`questEnemies.js`) — 35 bosses, 4 themes × 3 tiers, `getEnemiesByTierAndTheme()` helper
 - [x] Extract quest items into shared registry — `QUEST_ITEMS` + `SEARCHABLE_ITEMS` in `questPickerData.js`
 - [x] Extract quest POIs into shared registry — `POI_TYPES` in `questPickerData.js` (10 types with terrain tags)
 - [x] Build menu-driven Custom tab with registry-backed pickers (not free text) — theme, tier, enemy, item, building, NPC, POI, town/mountain name pickers
@@ -617,13 +617,13 @@ Themes (Heroic Fantasy, Grimdark, etc.) and difficulty tiers are **separate axes
 
 | Tier | Level Range | Boss HP | Reward Scale | Narrative Stakes |
 |------|------------|---------|--------------|-----------------|
-| **Tier 1** | 1-2 | 20-40 HP | 25-75 XP, 1d10 gold | Local threats — bandits, beasts, petty villains |
-| **Tier 2** | 3-4 | 100-200 HP | 100-200 XP, 2d20 gold | Regional threats — warlords, plagues, conspiracies |
-| **Tier 3** | 5+ | 250-400 HP | 300-500 XP, 4d20 gold | Epic threats — demon lords, elder gods, world-enders |
+| **Tier 1** | 1-2 | 25-35 HP | 25-75 XP, 1d6-2d10 gold | Local threats — bandits, beasts, petty villains |
+| **Tier 2** | 3-5 (two templates cap at 4) | 150-300 HP | 100-500 XP (bosses 350-500), 2d10-5d20 gold | Regional threats — warlords, plagues, conspiracies |
+| **Tier 3** | 5-7 | 250-400 HP | 300-500 XP, 4d20 gold | Epic threats — demon lords, elder gods, world-enders |
 
 #### Theme x Tier matrix
 
-| Theme | Tier 1 (Lv 1-2) | Tier 2 (Lv 3-4) | Tier 3 (Lv 5+) |
+| Theme | Tier 1 (Lv 1-2) | Tier 2 (Lv 3-5) | Tier 3 (Lv 5-7) |
 |-------|-----------------|-----------------|----------------|
 | **Heroic Fantasy** | The Goblin Threat | Crown of Sunfire | The Shattered Throne *(coming soon)* |
 | **Desert Expedition** | The Sunscorched Road | The Waking Sands | (none) |

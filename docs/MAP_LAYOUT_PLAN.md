@@ -1,6 +1,13 @@
 # Map & Adventure Log Layout: promote the map to the main stage
 
-Status: **Brainstorm / proposed, HIGH PRIORITY (2026-07-17). No code yet.** Tracks
+Status: **Shipped 2026-10-06 (PR #179).** The map-stage workspace is the default layout
+for `/game`: docked map stage, persistent Adventure Log pane with the input, auto-travel
+with encounter interrupts, smooth travel and continuous roads, plus the #91 suggested-action
+chips. The classic layout stays one switch away (`?layout=classic` / `?layout=workspace`
+on `/game`, remembered; the Layout setting in the Adventure Book; `DEFAULT_GAME_LAYOUT` in
+`src/game/gameLayout.js` is the code-level revert). Both layouts are the same `Game`
+component and save format. The spike page remains at `/workspace-debug` (debug routes).
+The sections below are the original brainstorm (2026-07-17), kept as the design record. Tracks
 `OUTSTANDING_ISSUES.md` #84. Sibling of the #79 open-play combat rework
 ([COMBAT_UX_PLAN.md](COMBAT_UX_PLAN.md)) and the in-app half of #82
 ([UI redesign], Track B): all three want the same answer to "what is the primary

@@ -36,8 +36,9 @@
 ### Service layer
 
 - **`services/models.ts`** — `MODEL_REGISTRY`, `DEFAULT_MODEL_ID`, `getFallbackCandidates()`, lookup helpers (free pool).
-- **`services/ai.ts`** — `generateText()` orchestrates: resolve model (unknown IDs fall back to default), call Workers AI, handle response format variants, try fallback on failure, sanitize output (strips leaked prompt markers and, since #76 Phase 1, any `[COMPLETE_MILESTONE...]`/`[COMPLETE_CAMPAIGN]` completion marker — the engine referees completions, the LLM only narrates; `sanitizeResponse` is exported so the premium pool reuses the exact same pass).
-- **`services/openrouter.ts`** — premium pool (#7): `PREMIUM_MODEL_REGISTRY`, `DEFAULT_PREMIUM_MODEL_ID`, `generatePremiumText()` (OpenRouter chat completions, same resolve/clamp/fallback/sanitize shape as `ai.ts`).
+- **`services/ai.ts`** — `generateText()` orchestrates: resolve model (unknown IDs fall back to default), call Workers AI, handle response format variants, try fallback on failure, sanitize output (strips leaked prompt markers and, since #76 Phase 1, any `[COMPLETE_MILESTONE...]`/`[COMPLETE_CAMPAIGN]` completion marker — the engine referees completions, the LLM only narrates; `sanitizeResponse` is exported so the premium pool reuses the exact same pass). Since 2026-10-06 the sanitize step is wrapped by `acceptNarration()`: sanitized output that still echoes the DM protocol or has collapsed into a repetition loop (`services/responseGuard.ts`) is rejected with a 502 `AiServiceError`, which lets the fallback walk try the next model instead of showing the player the leak. Workers AI daily-allocation exhaustion (error 4006) is mapped to a 503 `AiServiceError` with `code: 'ai_quota'` and skips the fallback walk (every model draws on the same account allocation).
+- **`services/responseGuard.ts`** — `detectNarrationProblem(text)` returns `'prompt_echo'` (a DM_PROTOCOL signature phrase in the output), `'repetition'` (a word n-gram repeated back-to-back at least 6 times over 12+ words), or `null`. Mirrored client-side in `src/utils/responseGuard.js` (which also filters such lines out of older saves' conversation context); keep the two in sync.
+- **`services/openrouter.ts`** — premium pool (#7): `PREMIUM_MODEL_REGISTRY`, `DEFAULT_PREMIUM_MODEL_ID`, `generatePremiumText()` (OpenRouter chat completions, same resolve/clamp/fallback/sanitize shape as `ai.ts`, incl. the `acceptNarration` guard).
 - **`services/pg.ts` / `services/tiers.ts`** — shared per-request postgres.js client (Hyperdrive) and the tier ladder + `getAccountTier()` lookup, used by `routes/db.ts`, the rate limiter, and the premium gate. `getAccountTier()` returns the **effective** tier = base `account_tiers` row MAX any unexpired `tier_grants` (redemption-code grants, #6); expiry is passive and a grant never lowers the base, so premium-templates / premium-AI / allowances all honour grants with no further changes.
 - **`services/hubEntitlements.ts`** — hub payments Phase 1: `getHubEntitlements()` reads the Octonion hub's billing tier (`GET ${HUB_URL}/api/me/entitlements` with the user's forwarded JWT), 60 s per-user cache mirroring the JWKS-cache pattern, 3 s timeout, **fails closed to free** (failures uncached). `hubTierToGameTier()` normalizes the hub's `members` rung onto the game ladder's `member` in exactly one place. Consumed by `services/mergedTier.ts`.
 - **`services/mergedTier.ts`** — hub payments Phase 3: `getMergedTier()` is THE one shared answer to "what tier is this caller, really?": effective game-ladder tier = `MAX(local effective tier, hub tier mapped onto the game ladder)`. Local (`account_tiers` + `tier_grants`) is consulted first (one indexed round trip, no network); an optional `skipHubAtOrAbove` skips the hub call entirely when the local tier already satisfies the admission bar. Never throws, each source degrades to `free` independently, and errors can only narrow access, never widen it. Returns `localErrored` so a gate can distinguish a genuine `free` verdict (deny with an upgrade prompt) from a local-DB outage (degrade politely). Consumed by the premium AI gate (`routes/ai.ts`), premium-content delivery (`routes/db.ts` premium-templates), and the client snapshot (`routes/entitlements.ts`). Tests: `cf-worker/test/hub-tier-gates.test.ts`.
@@ -83,7 +84,7 @@ Fixed-window per-user counters in the `request_counters` Postgres table (migrati
 
 A registry entry may carry an optional `providerOnly` list to pin which OpenRouter providers may serve it (no pin means any provider). Every rung caps output at **1500 tokens** (raised from 800 for parity with the free pool); the registry enforces the cap even against a client-requested `maxTokens`.
 
-The pool is the choice in production: clients send their free-pool model id and the premium default carries the pool (only ids present in `PREMIUM_MODEL_REGISTRY` are honored; everything else resolves to the premium default). The client side lives in `src/services/aiPool.js` (persisted preference, tier-gated request pool, pool-outcome notices), `src/services/llmService.js` (sends `pool`, retries once on `premium_cap`/`premium_required`), and the shared pool pills in `src/components/AiPoolPills.js` (rendered in the in-game AI settings, `src/components/Modals.js`, and on Profile; non-members reaching for the locked Premium pill see a contextual link to the Membership page).
+The pool is the choice in production: the route never forwards a client model id to the premium pool, which always runs `DEFAULT_PREMIUM_MODEL_ID` and its fallback chain. The client side lives in `src/services/aiPool.js` (persisted preference, tier-gated request pool, pool-outcome notices), `src/services/llmService.js` (sends `pool`, retries once on `premium_cap`/`premium_required`), and the shared pool pills in `src/components/AiPoolPills.js` (rendered in the in-game AI settings, `src/components/Modals.js`, and on Profile; non-members reaching for the locked Premium pill see a contextual link to the Membership page).
 
 **Secret setup** (never `.env`; same pattern as `CF_API_TOKEN`):
 
@@ -137,6 +138,8 @@ Four models across three tiers. Trimmed from 15 after benchmark runs (commit `2a
 
 On generation failure, `getFallbackCandidates(failedId)` returns the default model first (unless it was the one that failed), then every other registered model in `MODEL_REGISTRY` order. `ai.ts` tries the first two of those candidates in turn until one succeeds; if both fail, the error propagates to the client. There is no hand-maintained map — fallback order is derived from registry order, so any registered model can serve as a fallback. Unknown model IDs (e.g. a removed model cached in localStorage) are silently remapped to `DEFAULT_MODEL_ID` before the primary call.
 
+A rejected narration (prompt echo / repetition loop, see `services/responseGuard.ts`) counts as a failure and walks the same chain. **Daily allocation exhaustion does not:** when Workers AI reports the account's daily neuron allocation is used up (error 4006, resets 00:00 UTC), `generateText` throws `AiServiceError(503, code: 'ai_quota')` immediately and `routes/ai.ts` answers `503 { error: "The storyteller is out of AI for today. It resets at midnight UTC.", code: 'ai_quota', retryAfterSeconds }` with a `Retry-After` header set to the seconds until UTC midnight (`quotaRetryAfterSeconds()`). The client (`src/services/llmService.js`) surfaces the message with an approximate hours-until-reset suffix; Look around and NPC meetings fall back to their local templated line so the turn still produces text.
+
 ### Token clamping
 
 `generateText` takes `min(requested, model.maxTokens)`. The 8B model caps at 2048; everything else at 4096. `DEFAULT_MAX_TOKENS` in `ai.ts` is 500.
@@ -151,13 +154,13 @@ Legacy CF models return `{ response: "text" }`. Newer models (GPT-OSS, Llama 4 S
 
 Some Workers AI models emit chain-of-thought into `choices[0].message.reasoning` and only populate `content` once thinking completes. If `max_tokens` runs out mid-reasoning, `content` is `null` while `reasoning` holds partial planning text.
 
-**What `callWorkersAi` does (commit `e454761`):**
+**What `callWorkersAi` does (commit `e454761`, tightened `b1f0664` 2026-10-06):**
 
 1. Prefer `content` if present and non-empty.
-2. If `content` is null/empty but `reasoning` exists, return reasoning as a **degraded fallback** and log a warning.
-3. If neither is usable, throw `AiServiceError` (502).
+2. If `content` is null/empty but `reasoning` exists, log a warning and **do not** return the reasoning (it is the model's internal planning and often restates the prompt; the earlier "degraded fallback" that returned it as narration was removed).
+3. Throw `AiServiceError` (502), so the fallback chain tries another model.
 
-**Operational signal:** the warning in worker logs means a caller's `maxTokens` is too low for that model. Bump `DEFAULT_MAX_TOKENS` or have the caller pass a larger value. The reasoning text is not real DM narration.
+**Operational signal:** the warning in worker logs means a caller's `maxTokens` is too low for that model. Bump `DEFAULT_MAX_TOKENS` or have the caller pass a larger value. The reasoning text is never shown as DM narration.
 
 None of the current four models are R1-style reasoners, but the handler is defensive for future additions.
 
@@ -172,7 +175,7 @@ Four files, none derived from the others — missing one leaves the model invisi
 3. **`scripts/test-cf-models.mjs`** — Add to `ALL_MODELS` (direct CF API test).
 4. **`scripts/test-cf-models-simple.mjs`** — Add to `TEST_MODELS` (worker-proxy test).
 
-**If the model is a reasoner:** verify `DEFAULT_MAX_TOKENS` (currently 500) is high enough, or have the caller pass a larger `maxTokens`. The degraded-fallback path keeps it from 502ing, but the output quality will be poor.
+**If the model is a reasoner:** verify `DEFAULT_MAX_TOKENS` (currently 500) is high enough, or have the caller pass a larger `maxTokens`. A reasoner that runs out of tokens mid-thinking now 502s and drops to the fallback chain rather than returning its planning text.
 
 **Validation:** Run Phase 1 automated tests against just the new model. If it clears >=80%, proceed to Phase 2/3 comparison against the incumbent in its tier. Fallback order follows `MODEL_REGISTRY` order automatically, so its ranking there is the only thing to get right.
 

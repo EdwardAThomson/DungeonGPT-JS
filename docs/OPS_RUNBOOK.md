@@ -24,6 +24,9 @@ Browser (dungeongpt.xyz)
    |
    '-- /api/* ---------- Cloudflare Worker `dungeongpt-api` (cf-worker/, Hono + TS)
                             |-- /api/ai, /api/embed, /api/image  -> Workers AI binding
+                            |-- /api/ai (pool: premium) -> OpenRouter (falls back to Workers AI)
+                            |-- /api/entitlements -> Hyperdrive + Octonion hub tier lookup
+                            |-- /api/events (no auth, IP rate-limited) -> Hyperdrive
                             |-- /api/db/* (requireAuth: JWT verified against hub JWKS)
                             '------ Hyperdrive -----> self-hosted Postgres
                                                       Hetzner box (ssh alias in your local ssh config)
@@ -226,8 +229,9 @@ dump the affected table first (`pg_dump -Fc -t <table> dungeongpt > pre_down.dum
   DROP TABLE IF EXISTS account_tiers;
   ```
   Destroys manual tier grants (playtester/founder notes). Only safe with a
-  Worker predating #39; the current Worker's `/api/db/entitlements` and the
-  tier join in `/api/db/premium-templates` 500 without this table.
+  Worker predating #39; the current Worker's `/api/db/entitlements` 500s
+  without this table, while `/api/db/premium-templates` and
+  `/api/entitlements` degrade to the hub tier (or `free`, teasers only).
 
 - **003_conversation_rev.sql** (save-sync rev counter, #54)
   ```sql
@@ -250,6 +254,13 @@ dump the affected table first (`pg_dump -Fc -t <table> dungeongpt > pre_down.dum
   Hard down destroys authored premium content rows (re-loadable from the
   private content repo) and 500s the current Worker's
   `/api/db/premium-templates`; only safe with a Worker predating #40.
+
+- **005_request_counters.sql**, **006_redemption_codes.sql**,
+  **007_app_events.sql** (rate limits #12/#7, redemption codes #6, analytics
+  #86): additive, with no down statement in the files; do not drop them while
+  the current Worker is live. Per the migration headers, a missing
+  `request_counters` makes the limiter fail open (no throttling), and missing
+  006 tables 500 the redeem endpoint and make the tier lookup throw.
 
 ---
 
@@ -447,6 +458,7 @@ stops being acceptable).
 | Name | What it is | Where it lives |
 |---|---|---|
 | `CF_API_TOKEN` (Worker runtime) | Cloudflare API token the Worker uses for Workers AI REST calls (image gen) | `wrangler secret put CF_API_TOKEN`; local: `cf-worker/.dev.vars` |
+| `OPENROUTER_API_KEY` | OpenRouter key for the premium AI pool (#7) | `wrangler secret put OPENROUTER_API_KEY`; local: `cf-worker/.dev.vars` |
 | `OCTONION_SUPABASE_URL` | Auth hub base URL for JWKS verification (`SUPABASE_URL` is the legacy fallback name) | `wrangler secret put`; local: `cf-worker/.dev.vars` |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | LEGACY pre-cutover data-project creds, kept only for quick rollback of the Hyperdrive cutover; retire once stable | Worker secrets (wrangler) |
 | Hyperdrive connection string | Contains the `dungeongpt` DB role password | Inside the Cloudflare Hyperdrive config (created via `wrangler hyperdrive create`); never in the repo. Local dev uses `WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` + ssh tunnel (recipe in `cf-worker/wrangler.toml`) |
@@ -455,11 +467,12 @@ stops being acceptable).
 | Postgres role passwords (`dungeongpt`, `postgres`) | DB auth on the box | In Postgres on the box; box login is ssh-key only (`ssh <games-box>`) |
 | `/etc/dungeongpt/backup.env` | Optional PG* creds for backup/restore scripts | On the box, chmod 600 (scripts refuse it otherwise) |
 | rclone R2 credentials | Offsite backup bucket keys (Object Read & Write, one bucket) | `~postgres/.config/rclone/rclone.conf` on the box, chmod 600 |
-| `REACT_APP_SUPABASE_URL` / `_ANON_KEY`, `REACT_APP_CF_WORKER_URL` | Frontend build-time config (anon key is public by design) | Pages build environment; local `.env` |
+| `REACT_APP_OCTONION_SUPABASE_URL` / `_ANON_KEY`, `REACT_APP_CF_WORKER_URL` | Frontend build-time config (anon key is public by design) | Pages build environment; local `.env` |
 | Server LLM keys (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`) | Local Express dev server only, never production | Local `.env` |
 
 Rotation notes: revoking the CI token only breaks deploys; revoking the
-Worker runtime token only breaks image gen; rotating the DB password means
+Worker runtime token only breaks image gen; revoking `OPENROUTER_API_KEY`
+quietly degrades premium requests to the free pool; rotating the DB password means
 recreating the Hyperdrive config (`wrangler hyperdrive create`, then update
 the `id` in `wrangler.toml`) and redeploying.
 

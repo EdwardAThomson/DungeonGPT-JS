@@ -1,9 +1,14 @@
 # Suggested actions: engine-derived action chips for the workspace (#91)
 
-Status: **Phase 1 built in the spike, 2026-10-03** (`src/game/suggestedActions.js`, wired into the
-workspace only). Rule 8 (leave a cleared site) is not built yet; the rest of the table is. Part of the #84 workspace (see
-[MAP_LAYOUT_PLAN.md](MAP_LAYOUT_PLAN.md)); the spike lives at `/workspace-debug` on branch
-`feat/workspace-spike`. The landing mockup (`game.html`) showed suggestion chips above the
+Status: **Phase 1 shipped 2026-10-06** with the #84 workspace, now the default `/game` layout
+(`src/game/suggestedActions.js`; chips render in the workspace layout only). Rule 8 as written
+(leave a *cleared* site) is not built; instead a Leave chip appears whenever the party stands on
+a site's or town's exit tile. Side-quest chips shipped with the side-quest expansion ("Ask for
+work at <building>" for a town's open offers, Return to the turn-in, Head for the quest site), and
+a chip pressed again while its own walk or travel is still running does nothing (no restart, no
+duplicate "You" line; `518b387`). Phase 2 (AI-proposed chips) is open. Part of the #84 workspace (see
+[MAP_LAYOUT_PLAN.md](MAP_LAYOUT_PLAN.md)); the original spike page is still at `/workspace-debug`
+(debug routes only). The landing mockup (`game.html`) showed suggestion chips above the
 input, such as "Take the west road to Briarwood", which auto-walked the party there. This
 doc turns that into rules the engine can evaluate.
 

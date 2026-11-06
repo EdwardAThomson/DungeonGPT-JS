@@ -1,8 +1,15 @@
 # Look around: tile features that light the button (#89)
 
-Status: **Proposed, 2026-10-02. Not built.** The button move itself shipped (`c9f30a8`):
-Look around left the top toolbar and sits above Send. This doc covers the next step,
-deferred until the redesign PR (#82, draft PR #172) merges.
+Status: **Proposed, 2026-10-02. Tile features not built.** The button move itself shipped (`c9f30a8`):
+Look around left the top toolbar and sits above Send. This doc covers the next step; it was
+deferred until the redesign PR (#82, PR #172) merged, which happened 2026-10-03.
+
+Related change since (2026-10-06, `82e16bf`): Look around is now site-aware. Inside a cave,
+ruin or other explorable site it describes the site itself (name, type, nearby decorations,
+whether the party is near the entrance) via `composeSiteLookPrompt` in `promptComposer.js`,
+never the world tile outside; on a world tile it names the cave/ruin/mountain there when known.
+A parked hook is only woven in on the world map (in a town or site it stays parked). If the AI
+call fails or returns nothing, the local line is appended instead of an empty turn.
 
 ## The problem
 
@@ -18,7 +25,8 @@ worth it.
   encounter skips Look around and opens straight away as the interactive fallback modal
   (`planWorldTileEncounterFlow` in `src/game/encounterController.js`,
   `narrative_fallback_modal`). Guest Look around only ever produces the local ambient
-  line (`appendLocalAmbientNarrative` in `Game.js`). This is correct, not a bug.
+  line (`appendLocalAmbientNarrative` in `Game.js`, or `appendLocalSiteAmbientNarrative`
+  inside a site since 2026-10-06). This is correct, not a bug.
 - **Hooks are not rare for AI players.** About a 25% base chance of a random encounter
   per new tile (capped at 70% after a dry spell), and 32 of the 54 random encounters are
   narrative-tier. A parked hook survives one further move (`NARRATIVE_HOOK_PERSIST_MOVES`,
