@@ -60,20 +60,6 @@ const IMAGE_MODELS = [
     maxHeight: 1024,
     defaultSteps: 4,
   },
-  {
-    id: "@cf/stabilityai/stable-diffusion-xl-base-1.0",
-    name: "Stable Diffusion XL",
-    maxWidth: 1024,
-    maxHeight: 1024,
-    defaultSteps: 20,
-  },
-  {
-    id: "@cf/bytedance/stable-diffusion-xl-lightning",
-    name: "SDXL Lightning",
-    maxWidth: 1024,
-    maxHeight: 1024,
-    defaultSteps: 4,
-  },
 ];
 
 const generateImageSchema = z.object({
