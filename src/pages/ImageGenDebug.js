@@ -14,8 +14,6 @@ const IMAGE_MODELS = [
   { id: '@cf/black-forest-labs/flux-2-klein-9b', name: 'FLUX.2 Klein 9B (good)', defaultSteps: 25 },
   { id: '@cf/black-forest-labs/flux-2-klein-4b', name: 'FLUX.2 Klein 4B (fast)', defaultSteps: 25 },
   { id: '@cf/black-forest-labs/flux-1-schnell', name: 'FLUX.1 Schnell (cheapest)', defaultSteps: 4 },
-  { id: '@cf/stabilityai/stable-diffusion-xl-base-1.0', name: 'Stable Diffusion XL', defaultSteps: 20 },
-  { id: '@cf/bytedance/stable-diffusion-xl-lightning', name: 'SDXL Lightning (fast)', defaultSteps: 4 },
 ];
 
 // localStorage keys for persisting CF credentials
